@@ -4038,7 +4038,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int weight;
         float height;
         int maxStringLength = -1;
-        private Map<Character, Integer> widthCache = new HashMap<Character, Integer>();
+        private final Map<Character, Integer> widthCache = new HashMap<Character, Integer>();
         
         public NativeFont() {
         }

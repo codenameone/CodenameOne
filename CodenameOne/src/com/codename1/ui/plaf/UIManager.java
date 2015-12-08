@@ -975,7 +975,7 @@ public class UIManager {
         defaultSelectedStyle = createStyle("", "sel#", true);
     }
     
-    private Style createStyle(String id, String prefix, boolean selected) {
+    Style createStyle(String id, String prefix, boolean selected) {
         Style style;
         String originalId = id;
         if (prefix != null && prefix.length() > 0) {

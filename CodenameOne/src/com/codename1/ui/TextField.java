@@ -414,6 +414,7 @@ public class TextField extends TextArea {
      * 
      * @param inputMode the display name of the input mode by default the following modes
      * are supported: Abc, ABC, abc, 123
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public void setInputMode(String inputMode) {
         this.inputMode = inputMode;
@@ -422,6 +423,7 @@ public class TextField extends TextArea {
     
     /**
      * @inheritDoc
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public String getInputMode() {
         return inputMode;
@@ -432,6 +434,7 @@ public class TextField extends TextArea {
      * 
      * @param keyCode the code
      * @return true for the hash (#) key code
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     protected boolean isChangeInputMode(int keyCode) {
         return keyCode == defaultChangeInputModeKey;
@@ -470,6 +473,7 @@ public class TextField extends TextArea {
      * is a String containing the characters to toggle between for the given keycode
      * @param firstUpcase indicates if this input mode in an input mode used for the special
      * case where the first letter is an upper case letter
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public static void addInputMode(String name, Hashtable values, boolean firstUpcase) {
         initInputModes();
@@ -495,6 +499,7 @@ public class TextField extends TextArea {
      * an input mode
      * 
      * @param order the order for the input modes in this field
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public void setInputModeOrder(String[] order) {
         inputModeOrder = order;
@@ -505,6 +510,7 @@ public class TextField extends TextArea {
      * Returns the order in which input modes are toggled by default
      * 
      * @return the default order of the input mode
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public static String[] getDefaultInputModeOrder() {
         return defaultInputModeOrder;
@@ -515,6 +521,7 @@ public class TextField extends TextArea {
      * disabling/hiding an input mode
      * 
      * @param order the order for the input modes in all future created fields
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public static void setDefaultInputModeOrder(String[] order) {
         defaultInputModeOrder = order;
@@ -897,6 +904,7 @@ public class TextField extends TextArea {
      * 
      * @param mode the input mode
      * @return returns true for input mode 123 by default
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     protected boolean isImmediateInputMode(String mode) {
         return "123".equals(mode);
@@ -1011,6 +1019,7 @@ public class TextField extends TextArea {
      * input and paste.
      * 
      * @param c character for insertion
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public void insertChars(String c) {
         String currentText = getText();
@@ -1817,6 +1826,7 @@ public class TextField extends TextArea {
      * Key to change the input mode on the device
      * 
      * @param k key to change the input mode
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public static void setDefaultChangeInputModeKey(int k) {
         defaultChangeInputModeKey = k;
@@ -1826,6 +1836,7 @@ public class TextField extends TextArea {
      * Key to change the input mode on the device
      * 
      * @return key to change the input mode
+     * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
     public static int getDefaultChangeInputModeKey() {
         return defaultChangeInputModeKey;

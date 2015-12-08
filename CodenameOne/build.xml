@@ -104,13 +104,13 @@
         <copydir src="dist/javadoc" dest="javadoc" />
     </target>
 
+    <available file="../../CodenameOne/GUIBuilder/src" property="cn1env" />
     <target name="-pre-compile" depends="stamp">
     </target>
 
-
     <!-- This target is used to build releases, you will need to comment out this target and to remove
      the depends from the pre-compile target above-->
-    <target name="stamp">
+    <target name="stamp" if="cn1env">
         <tstamp>
             <format property="tstamp" pattern="yyyyMMdd" />
         </tstamp>

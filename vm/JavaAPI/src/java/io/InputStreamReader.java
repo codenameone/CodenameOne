@@ -30,7 +30,6 @@ package java.io;
 public class InputStreamReader extends java.io.Reader{
     private InputStream internal; 
     private java.lang.String enc;
-    private byte[] bbuffer = new byte[8192];
     private char[] cbuffer;
     private int cbufferOff;
     
@@ -43,6 +42,28 @@ public class InputStreamReader extends java.io.Reader{
          this.enc = "UTF-8";
     }
 
+    private void complete() throws IOException{
+        byte[] b = readInputStream(internal);
+        cbuffer = bytesToChars(b, 0, b.length, enc);
+    }
+
+    private static byte[] readInputStream(InputStream i) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        copy(i, b, 8192);
+        return b.toByteArray();
+    }
+    
+    
+    private static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
+        byte[] buffer = new byte[bufferSize];
+        int size = i.read(buffer);
+        while(size > -1) {
+            o.write(buffer, 0, size);
+            size = i.read(buffer);
+        }
+        o.close();
+    }
+    
     /**
      * Create an InputStreamReader that uses the named character encoding.
      * is - An InputStreamenc - The name of a supported character encoding
@@ -79,8 +100,11 @@ public class InputStreamReader extends java.io.Reader{
     /**
      * Read a single character.
      */
+    char[] c;
     public int read() throws java.io.IOException{
-        char[] c = new char[1];
+        if(c == null) {
+            c = new char[1];
+        }
         int count = read(c, 0, 1);
         if(count < 0) {
             return -1;
@@ -92,13 +116,12 @@ public class InputStreamReader extends java.io.Reader{
      * Read characters into a portion of an array.
      */
     public int read(char[] cbuf, int off, int len) throws java.io.IOException{
-        if(cbuffer == null || cbufferOff > cbuffer.length - 1) {
-            int size = internal.read(bbuffer);
-            if(size < 0) {
-                return -1;
-            }
-            cbuffer = bytesToChars(bbuffer, 0, size, enc);
+        if(cbuffer == null) {
+            complete();
             cbufferOff = 0;
+        }
+        if(cbufferOff == cbuffer.length) {
+            return -1;
         }
         int count = 0;
         while(cbufferOff < cbuffer.length && len > count) {
@@ -109,15 +132,6 @@ public class InputStreamReader extends java.io.Reader{
         }
         if(count == len) {
             return count;
-        }
-        if(count < len && cbufferOff == cbuffer.length) {
-            cbuffer = null;
-            cbufferOff = 0;
-            int val = read(cbuf, off, len - count);
-            if(val == -1) {
-                return count;
-            }
-            return count + val;
         }
         return count; 
     }

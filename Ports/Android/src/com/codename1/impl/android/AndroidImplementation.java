@@ -718,7 +718,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void run() {
                 // Must be called from the UI thread
-                InPlaceEditView.endEdit();
+                InPlaceEditView.stopEdit();
 
                 synchronized (flag) {
                     flag[0] = true;
@@ -1024,12 +1024,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object loadTrueTypeFont(String fontName, String fileName) {
         if(fontName.startsWith("native:")) {
             Typeface t = fontToRoboto(fontName);
+            int fontStyle = com.codename1.ui.Font.STYLE_PLAIN;
+            if(t.isBold()) {
+                fontStyle |= com.codename1.ui.Font.STYLE_BOLD;
+            }
+            if(t.isItalic()) {
+                fontStyle |= com.codename1.ui.Font.STYLE_ITALIC;
+            }
             TextPaint newPaint = new TextPaint();
             newPaint.setAntiAlias(true);
             newPaint.setSubpixelText(true);
             newPaint.setTypeface(t);
-            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, 
-                    com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
+            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, fontStyle, 
+                    com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
         }
         Typeface t = Typeface.createFromAsset(activity.getAssets(), fileName);
         if(t == null) {
@@ -1089,10 +1096,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         paint.setAntiAlias(true);
         Typeface type = paint.getTypeface();
         int fontstyle = Typeface.NORMAL;
-        if ((weight & Font.STYLE_BOLD) != 0) {
+        if ((weight & Font.STYLE_BOLD) != 0 || type.isBold()) {
             fontstyle |= Typeface.BOLD;
         }
-        if ((weight & Font.STYLE_ITALIC) != 0) {
+        if ((weight & Font.STYLE_ITALIC) != 0 || type.isItalic()) {
             fontstyle |= Typeface.ITALIC;
         }
         type = Typeface.create(type, fontstyle);
@@ -1100,7 +1107,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         newPaint.setTypeface(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
-        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
+        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
         return n;
     }
 

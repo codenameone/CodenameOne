@@ -5510,7 +5510,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     nr.setResponseHeaders(headers);
                     nr.setResponseBody("");
                 }
-                InputStream i = new BufferedInputStream(con.getInputStream()) {
+                InputStream is;
+                if(con.getResponseCode() >= 200 && con.getResponseCode() < 300){
+                    is = con.getInputStream();
+                }else{
+                    is = con.getErrorStream();
+                }
+                InputStream i = new BufferedInputStream(is) {
 
                     public synchronized int read(byte b[], int off, int len)
                             throws IOException {
