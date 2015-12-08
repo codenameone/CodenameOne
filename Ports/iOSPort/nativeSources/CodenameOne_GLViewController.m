@@ -1883,7 +1883,7 @@ BOOL prefersStatusBarHidden = NO;
         }
         if(keyboardSlideOffset <  0) {
             keyboardSlideOffset = keyboardSlideOffset < -editCompoentY ? -editCompoentY : keyboardSlideOffset;
-            if (keyboardHeight + editCompoentH > viewFrame.size.height) {
+            if (keyboardHeight + editCompoentH > displayHeight / scaleValue) {
                 // If the keyboard covers up part of the field, we'll update
                 // the size of the native text component.
                 com_codename1_impl_ios_IOSImplementation_resizeNativeTextComponentCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
