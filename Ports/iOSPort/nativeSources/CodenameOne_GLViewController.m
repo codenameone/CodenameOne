@@ -1882,6 +1882,7 @@ BOOL prefersStatusBarHidden = NO;
             keyboardSlideOffset = 0;
         }
         if(keyboardSlideOffset <  0) {
+            keyboardSlideOffset = keyboardSlideOffset < -editCompoentY ? -editCompoentY : keyboardSlideOffset;
             //https://github.com/codenameone/CodenameOne/issues/1074
 #ifdef __IPHONE_7_0
             if (isIOS7()) {
