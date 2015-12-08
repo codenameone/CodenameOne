@@ -1662,7 +1662,7 @@ CGFloat getOriginY() {
     if(isIOS7()) {
         statusbarHeight = 0;
     }
-    if (isIOS7()) {
+    if (isIOS8()) {
         return [CodenameOne_GLViewController instance].view.frame.origin.y;
     } else {
         if (displayHeight > displayWidth) {
@@ -1678,7 +1678,7 @@ CGRect setOriginY(CGFloat y, CGRect frame) {
     if(isIOS7()) {
         statusbarHeight = 0;
     }
-    if (isIOS7()) {
+    if (isIOS8()) {
         frame.origin.y = y;
     } else {
         if (displayHeight > displayWidth) {
