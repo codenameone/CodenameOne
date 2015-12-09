@@ -16,7 +16,7 @@ You can run the translation process using:
 
 Once the translation process succeeds you should have a valid xcode project that you can run and use as usual. You will need a Mac for this to work.
 
-The main class name is expected to have a `public static void main(String[])` method and it is assumed to reside in the `com.package.name` directory.
+The main class name is expected to have a `public static void main(String[])` method and it is assumed to reside in the `com.package.name` directory  (figuratively, you need to replace `com.package.name` with your actual package passed to the translator).
 
 ## Why Another VM for iOS?
 
