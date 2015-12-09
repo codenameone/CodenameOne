@@ -35,6 +35,12 @@ public class Jump extends Instruction {
     private static int jsrCounter = 1;
     private Label label;
     
+    /**
+     * If customCompareCode is set, it will be used for the comparison 
+     * leading to the jump instead of the default stack-based comparison.
+     */
+    private String customCompareCode;
+    
     public Jump(int opcode, Label label) {
         super(opcode);
         this.label = label;
@@ -44,69 +50,73 @@ public class Jump extends Instruction {
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
         b.append("    ");
-        switch(opcode) {
-            case Opcodes.IFEQ:
-                b.append("if(POP_INT() == 0) /* IFEQ */ ");
-                break;
-            case Opcodes.IFNE:
-                b.append("if(POP_INT() != 0) /* IFNE */ ");
-                break;
-            case Opcodes.IFLT:
-                b.append("if(POP_INT() < 0) /* IFLT */ ");
-                break;
-            case Opcodes.IFGE:
-                b.append("if(POP_INT() >= 0) /* IFGE */ ");
-                break;
-            case Opcodes.IFGT:
-                b.append("if(POP_INT() > 0) /* IFGT */ ");
-                break;
-            case Opcodes.IFLE:
-                b.append("if(POP_INT() <= 0) /* IFLE */ ");
-                break;
-            case Opcodes.IF_ICMPEQ:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i == stack[stackPointer + 1].data.i) /* IF_ICMPEQ */ ");
-                break;
-            case Opcodes.IF_ICMPNE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i != stack[stackPointer + 1].data.i) /* IF_ICMPNE */ ");
-                break;
-            case Opcodes.IF_ICMPLT:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i < stack[stackPointer + 1].data.i) /* IF_ICMPLT */ ");
-                break;
-            case Opcodes.IF_ICMPGE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i >= stack[stackPointer + 1].data.i) /* IF_ICMPGE */ ");
-                break;
-            case Opcodes.IF_ICMPGT:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i > stack[stackPointer + 1].data.i) /* IF_ICMPGT */ ");
-                break;
-            case Opcodes.IF_ICMPLE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i <= stack[stackPointer + 1].data.i) /* IF_ICMPLE */ ");
-                break;
-            case Opcodes.IF_ACMPEQ:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.o == stack[stackPointer + 1].data.o) /* IF_ACMPEQ */ ");
-                break;
-            case Opcodes.IF_ACMPNE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.o != stack[stackPointer + 1].data.o) /* IF_ACMPNE */ ");
-                break;
-            case Opcodes.GOTO:
-                // this space intentionally left blank
-                break;
-            case Opcodes.JSR:
-                b.append("/* JSR TODO */");
-                /*b.append("PUSH_")
-                b.append("goto label_");
-                b.append(label.toString());
-                b.append(";\n");
-                b.append("JSR_RETURN_LABEL_");
-                b.append(jsrCounter);
-                b.append(":");
-                jsrCounter++;*/
-                return;
-            case Opcodes.IFNULL:
-                b.append("if(POP_OBJ() == JAVA_NULL) /* IFNULL */ ");
-                break;
-            case Opcodes.IFNONNULL:
-                b.append("if(POP_OBJ() != JAVA_NULL) /* IFNONNULL */ ");
-                break;
+        if (customCompareCode == null) {
+            switch(opcode) {
+                case Opcodes.IFEQ:
+                    b.append("if(POP_INT() == 0) /* IFEQ */ ");
+                    break;
+                case Opcodes.IFNE:
+                    b.append("if(POP_INT() != 0) /* IFNE */ ");
+                    break;
+                case Opcodes.IFLT:
+                    b.append("if(POP_INT() < 0) /* IFLT */ ");
+                    break;
+                case Opcodes.IFGE:
+                    b.append("if(POP_INT() >= 0) /* IFGE */ ");
+                    break;
+                case Opcodes.IFGT:
+                    b.append("if(POP_INT() > 0) /* IFGT */ ");
+                    break;
+                case Opcodes.IFLE:
+                    b.append("if(POP_INT() <= 0) /* IFLE */ ");
+                    break;
+                case Opcodes.IF_ICMPEQ:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.i == stack[stackPointer + 1].data.i) /* IF_ICMPEQ */ ");
+                    break;
+                case Opcodes.IF_ICMPNE:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.i != stack[stackPointer + 1].data.i) /* IF_ICMPNE */ ");
+                    break;
+                case Opcodes.IF_ICMPLT:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.i < stack[stackPointer + 1].data.i) /* IF_ICMPLT */ ");
+                    break;
+                case Opcodes.IF_ICMPGE:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.i >= stack[stackPointer + 1].data.i) /* IF_ICMPGE */ ");
+                    break;
+                case Opcodes.IF_ICMPGT:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.i > stack[stackPointer + 1].data.i) /* IF_ICMPGT */ ");
+                    break;
+                case Opcodes.IF_ICMPLE:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.i <= stack[stackPointer + 1].data.i) /* IF_ICMPLE */ ");
+                    break;
+                case Opcodes.IF_ACMPEQ:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.o == stack[stackPointer + 1].data.o) /* IF_ACMPEQ */ ");
+                    break;
+                case Opcodes.IF_ACMPNE:
+                    b.append("stackPointer -= 2; if(stack[stackPointer].data.o != stack[stackPointer + 1].data.o) /* IF_ACMPNE */ ");
+                    break;
+                case Opcodes.GOTO:
+                    // this space intentionally left blank
+                    break;
+                case Opcodes.JSR:
+                    b.append("/* JSR TODO */");
+                    /*b.append("PUSH_")
+                    b.append("goto label_");
+                    b.append(label.toString());
+                    b.append(";\n");
+                    b.append("JSR_RETURN_LABEL_");
+                    b.append(jsrCounter);
+                    b.append(":");
+                    jsrCounter++;*/
+                    return;
+                case Opcodes.IFNULL:
+                    b.append("if(POP_OBJ() == JAVA_NULL) /* IFNULL */ ");
+                    break;
+                case Opcodes.IFNONNULL:
+                    b.append("if(POP_OBJ() != JAVA_NULL) /* IFNONNULL */ ");
+                    break;
+            }
+        } else {
+            b.append(customCompareCode);
         }
         if(TryCatch.isTryCatchInMethod()) {
             b.append("JUMP_TO(label_");
@@ -119,6 +129,10 @@ public class Jump extends Instruction {
             b.append(label.toString());
             b.append(";\n");
         }
+    }
+    
+    public void setCustomCompareCode(String code) {
+        this.customCompareCode = code;
     }
 
 }

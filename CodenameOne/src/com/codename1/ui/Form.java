@@ -66,7 +66,7 @@ import java.util.HashMap;
  * @author Chen Fishbein
  */
 public class Form extends Container {
-
+    private boolean globalAnimationLock;
     private Painter glassPane;
     private Container layeredPane;
     private Container contentPane;
@@ -150,6 +150,11 @@ public class Form extends Container {
     private Component stickyDrag;
     private boolean dragStopFlag;
     private Toolbar toolbar;
+    
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     */
+    private TextArea editOnShow;
             
     /**
      * Default constructor creates a simple form
@@ -305,6 +310,27 @@ public class Form extends Container {
         return getContentPane().isAlwaysTensile();
     }
 
+    /**
+     * Allows grabbing a flag that is used by convention to indicate that you are running an exclusive animation.
+     * This is used by some code to prevent collision between optional animation
+     * 
+     * @return whether the lock was acquired or not
+     */
+    public boolean grabAnimationLock() {
+        if(globalAnimationLock) {
+            return false;
+        }
+        globalAnimationLock = true;
+        return true;
+    }
+    
+    /**
+     * Invoke this to release the animation lock that was grabbed in grabAnimationLock
+     */
+    public void releaseAnimationLock() {
+        globalAnimationLock = false;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -924,14 +950,59 @@ public class Form extends Container {
     /**
      * This method returns the layered pane of the Form, the layered pane is laid
      * on top of the content pane and is created lazily upon calling this method the layer
-     * will be created.
+     * will be created. This is equivalent to getLayeredPane(null, false).
      * 
      * @return the LayeredPane
      */ 
     public Container getLayeredPane() {
+        return getLayeredPane(null, false);
+    }
+    
+    /**
+     * Returns the layered pane for the class and if one doesn't exist a new one is created dynamically and returned
+     * @param c the class with which this layered pane is associated, null for the global layered pane which
+     * is always on the bottom
+     * @param top if created this indicates whether the layered pane should be added on top or bottom
+     * @return the layered pane instance
+     */
+    public Container getLayeredPane(Class c, boolean top) {
+        if(c == null) {
+             for(Component cmp : getLayeredPaneImpl()) {
+                 if(cmp.getClientProperty("cn1$_cls") == null) {
+                     return (Container)cmp;
+                 }
+             } 
+        }
+        String n = c.getName();
+        for(Component cmp : getLayeredPaneImpl()) {
+            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container)cmp;
+            }
+        } 
+        Container cnt = new Container();
+        if(top) {
+            getLayeredPaneImpl().add(cnt);
+        } else {
+            getLayeredPaneImpl().addComponent(0, cnt);            
+        }
+        cnt.putClientProperty("cn1$_cls", n);
+        return cnt;
+    }
+    
+    /**
+     * This method returns the layered pane of the Form, the layered pane is laid
+     * on top of the content pane and is created lazily upon calling this method the layer
+     * will be created.
+     * 
+     * @return the LayeredPane
+     */ 
+    private Container getLayeredPaneImpl() {
         if(layeredPane == null){
             Container parent = new Container(new LayeredLayout());
-            layeredPane = new Container(new FlowLayout());
+            layeredPane = new Container(new LayeredLayout());
+            
+            // adds the global layered pane
+            layeredPane.add(new Container());
             removeComponentFromForm(contentPane);
             addComponentToForm(BorderLayout.CENTER, parent);
             parent.addComponent(contentPane);
@@ -997,6 +1068,11 @@ public class Form extends Container {
      * @param title the form title
      */
     public void setTitle(String title) {
+        if(toolbar != null){
+            toolbar.setTitle(title);
+            return;
+        }
+            
         this.title.setText(title);
 
         if (!Display.getInstance().isNativeTitle()) {
@@ -1573,6 +1649,9 @@ public class Form extends Container {
         if (showListener != null) {
             showListener.fireActionEvent(new ActionEvent(this));
         }
+        if(editOnShow != null) {
+            editOnShow.startEditingAsync();
+        }
     }
 
     /**
@@ -1710,6 +1789,17 @@ public class Form extends Container {
     void disposeImpl() {
         if (previousForm != null) {
             boolean clearPrevious = Display.getInstance().getCurrent() == this;
+            if (!clearPrevious) {
+                Form f = Display.getInstance().getCurrent();
+                while (f != null) {
+                    if (f.previousForm == this) {
+                        f.previousForm = previousForm;
+                        previousForm = null;
+                        return;
+                    }
+                    f = f.previousForm;
+                }
+            }
             previousForm.tint = false;
 
             if (previousForm instanceof Dialog) {
@@ -3115,5 +3205,21 @@ public class Form extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     * @return the component instance
+     */
+    public TextArea getEditOnShow() {
+        return editOnShow;
+    }
+
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     * @param editOnShow text component to edit when the form is shown
+     */
+    public void setEditOnShow(TextArea editOnShow) {
+        this.editOnShow = editOnShow;
     }
 }

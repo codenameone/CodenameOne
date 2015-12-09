@@ -975,7 +975,7 @@ public class UIManager {
         defaultSelectedStyle = createStyle("", "sel#", true);
     }
     
-    private Style createStyle(String id, String prefix, boolean selected) {
+    Style createStyle(String id, String prefix, boolean selected) {
         Style style;
         String originalId = id;
         if (prefix != null && prefix.length() > 0) {
@@ -1021,6 +1021,7 @@ public class UIManager {
             border = themeProps.get(id + Style.BORDER);
             Object bgImage = themeProps.get(id + Style.BG_IMAGE);
             String transperency = (String) themeProps.get(id + Style.TRANSPARENCY);
+            String opacity = (String) themeProps.get(id + Style.OPACITY);
             String margin = (String) themeProps.get(id + Style.MARGIN);
             String padding = (String) themeProps.get(id + Style.PADDING);
             Object font = themeProps.get(id + Style.FONT);
@@ -1045,6 +1046,16 @@ public class UIManager {
                     transperency = (String) themeProps.get(originalId + Style.TRANSPARENCY);
                     if (transperency != null) {
                         style.setBgTransparency(Integer.valueOf(transperency).intValue());
+                    }
+                }
+            }
+            if (opacity != null) {
+                style.setOpacity(Integer.valueOf(opacity).intValue());
+            } else {
+                if (selected) {
+                    opacity = (String) themeProps.get(originalId + Style.OPACITY);
+                    if (opacity != null) {
+                        style.setBgTransparency(Integer.valueOf(opacity).intValue());
                     }
                 }
             }

@@ -24,6 +24,7 @@
 
 package com.codename1.io;
 
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -290,14 +291,15 @@ public class NetworkManager {
                         if(currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
                             // there may be a race condition where the dialog hasn't yet appeared but the
                             // network request completed
-                            while(Display.getInstance().getCurrent() != currentRequest.getDisposeOnCompletion() && !currentRequest.isKilled()) {
-                                try {
-                                    Thread.sleep(10);
-                                } catch (InterruptedException ex) {
-                                    ex.printStackTrace();
-                                }
-                            }
-                            currentRequest.getDisposeOnCompletion().dispose();
+                            final ConnectionRequest finalReq = currentRequest;
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    Dialog dlg = finalReq.getDisposeOnCompletion();
+                                    if (dlg != null) {
+                                        dlg.dispose();
+                                    }
+                                } 
+                            });
                         }
                     }
                     currentRequest = null;

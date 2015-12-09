@@ -190,6 +190,8 @@ public abstract class LocationManager {
      * updated on the device Locations rather then calling getCurrentLocation.
      * @param l a LocationListener or null to stop the current listener 
      * from getting updates
+     * @param req provide the settings in which we are interested to get updates
+     * to the Listener.
      */
     public void setLocationListener(final LocationListener l, LocationRequest req) {
         setLocationListener(l);

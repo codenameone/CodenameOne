@@ -970,6 +970,7 @@ public class BytecodeMethod {
 
     private int varCounter = 0;
     
+    
     boolean optimize() {
         int instructionCount = instructions.size();
         
@@ -999,6 +1000,11 @@ public class BytecodeMethod {
         boolean hasInstructions = false; 
         for(int iter = 0 ; iter < instructionCount - 1 ; iter++) {
             Instruction current = instructions.get(iter);
+            if (current.isOptimized()) {
+                // This instruction has already been optimized
+                // we should skip it and proceed to the next one
+                continue;
+            }
             Instruction next = instructions.get(iter + 1);
 
             int currentOpcode = current.getOpcode();
@@ -1100,6 +1106,308 @@ public class BytecodeMethod {
                 }
             }
             switch(currentOpcode) {
+                
+                /* Try to optimize if statements that just use constants
+                   and local variables so that they don't need the intermediate
+                   push and pop from the stack.
+                */
+                case Opcodes.IF_ICMPLE:
+                case Opcodes.IF_ICMPLT:
+                case Opcodes.IF_ICMPNE:
+                case Opcodes.IF_ICMPGT:
+                case Opcodes.IF_ICMPEQ:
+                case Opcodes.IF_ICMPGE: {
+                    
+                    if (iter > 1) {
+                        Instruction leftArg = instructions.get(iter-2);
+                        Instruction rightArg = instructions.get(iter-1);
+                        String leftLiteral = null;
+                        String rightLiteral = null;
+                        switch (leftArg.getOpcode()) {
+                            case Opcodes.ICONST_0:
+                                leftLiteral = "0"; break;
+                            case Opcodes.ICONST_1:
+                                leftLiteral = "1"; break;
+                            case Opcodes.ICONST_2:
+                                leftLiteral = "2"; break;
+                            case Opcodes.ICONST_3:
+                                leftLiteral = "3"; break;
+                            case Opcodes.ICONST_4:
+                                leftLiteral = "4"; break;
+                            case Opcodes.ICONST_5:
+                                leftLiteral = "5"; break;
+                            case Opcodes.ICONST_M1:
+                                leftLiteral = "-1"; break;
+                            case Opcodes.ILOAD: {
+                                VarOp varLeft = (VarOp)leftArg;
+                                leftLiteral = "locals["+varLeft.getIndex()+"].data.i";
+                                break;
+                            }
+                                
+                        }
+                        
+                        switch (rightArg.getOpcode()) {
+                            case Opcodes.ICONST_0:
+                                rightLiteral = "0"; break;
+                            case Opcodes.ICONST_1:
+                                rightLiteral = "1"; break;
+                            case Opcodes.ICONST_2:
+                                rightLiteral = "2"; break;
+                            case Opcodes.ICONST_3:
+                                rightLiteral = "3"; break;
+                            case Opcodes.ICONST_4:
+                                rightLiteral = "4"; break;
+                            case Opcodes.ICONST_5:
+                                rightLiteral = "5"; break;
+                            case Opcodes.ICONST_M1:
+                                rightLiteral = "-1"; break;
+                            case Opcodes.ILOAD: {
+                                VarOp varRight = (VarOp)rightArg;
+                                rightLiteral = "locals["+varRight.getIndex()+"].data.i";
+                                break;
+                            }
+                                
+                        }
+                        if (rightLiteral != null && leftLiteral != null) {
+                            Jump jmp = (Jump)current;
+                            instructions.remove(iter-2);
+                            instructions.remove(iter-2);
+                            //instructions.remove(iter-2);
+                            iter-=2;
+                            //instructionCount -= 2;
+                            StringBuilder sb = new StringBuilder();
+                            String operator = null;
+                            String opName = null;
+                            switch (currentOpcode) {
+                                case Opcodes.IF_ICMPLE:
+                                    operator = "<="; opName = "IF_ICMPLE"; break;
+                                case Opcodes.IF_ICMPLT:
+                                    operator = "<"; opName = "IF_IMPLT"; break;
+                                case Opcodes.IF_ICMPNE:
+                                    operator = "!="; opName = "IF_ICMPNE"; break;
+                                case Opcodes.IF_ICMPGT:
+                                    operator = ">"; opName = "IF_ICMPGT"; break;
+                                case Opcodes.IF_ICMPGE:
+                                    operator = ">="; opName = "IF_ICMPGE"; break;
+                                case Opcodes.IF_ICMPEQ:
+                                    operator = "=="; opName = "IF_ICMPEQ"; break;
+                                default :
+                                    throw new RuntimeException("Invalid operator during optimization of integer comparison");
+                            }
+                                    
+                            
+                            sb.append("if (").append(leftLiteral).append(operator).append(rightLiteral).append(") /* ").append(opName).append(" Optimized */ ");
+                            jmp.setCustomCompareCode(sb.toString());
+                            jmp.setOptimized(true);
+                            instructionCount = instructions.size();
+                            
+                        }
+                        
+                    }
+                break;
+                }   
+                    /* Try to optimize if statements that just use constants
+                   and local variables so that they don't need the intermediate
+                   push and pop from the stack.
+                */
+                case Opcodes.IMUL:
+                case Opcodes.IDIV:
+                case Opcodes.IADD:
+                case Opcodes.ISUB: {
+                
+                    if (iter > 1) {
+                        Instruction leftArg = instructions.get(iter-2);
+                        Instruction rightArg = instructions.get(iter-1);
+                        String leftLiteral = null;
+                        String rightLiteral = null;
+                        switch (leftArg.getOpcode()) {
+                            case Opcodes.ICONST_0:
+                                leftLiteral = "0"; break;
+                            case Opcodes.ICONST_1:
+                                leftLiteral = "1"; break;
+                            case Opcodes.ICONST_2:
+                                leftLiteral = "2"; break;
+                            case Opcodes.ICONST_3:
+                                leftLiteral = "3"; break;
+                            case Opcodes.ICONST_4:
+                                leftLiteral = "4"; break;
+                            case Opcodes.ICONST_5:
+                                leftLiteral = "5"; break;
+                            case Opcodes.ICONST_M1:
+                                leftLiteral = "-1"; break;
+                            case Opcodes.ILOAD: {
+                                VarOp varLeft = (VarOp)leftArg;
+                                leftLiteral = "locals["+varLeft.getIndex()+"].data.i";
+                                break;
+                            }
+                                
+                        }
+                        
+                        switch (rightArg.getOpcode()) {
+                            case Opcodes.ICONST_0:
+                                rightLiteral = "0"; break;
+                            case Opcodes.ICONST_1:
+                                rightLiteral = "1"; break;
+                            case Opcodes.ICONST_2:
+                                rightLiteral = "2"; break;
+                            case Opcodes.ICONST_3:
+                                rightLiteral = "3"; break;
+                            case Opcodes.ICONST_4:
+                                rightLiteral = "4"; break;
+                            case Opcodes.ICONST_5:
+                                rightLiteral = "5"; break;
+                            case Opcodes.ICONST_M1:
+                                rightLiteral = "-1"; break;
+                            case Opcodes.ILOAD: {
+                                VarOp varRight = (VarOp)rightArg;
+                                rightLiteral = "locals["+varRight.getIndex()+"].data.i";
+                                break;
+                            }
+                                
+                        }
+                        if (rightLiteral != null && leftLiteral != null) {
+                            instructions.remove(iter-2);
+                            instructions.remove(iter-2);
+                            instructions.remove(iter-2);
+                            iter-=2;
+                            instructionCount -= 2;
+                            StringBuilder sb = new StringBuilder();
+                            String operator = null;
+                            String opName = null;
+                            switch (currentOpcode) {
+                                case Opcodes.IMUL:
+                                    operator = "*"; opName = "IMUL"; break;
+                                case Opcodes.IDIV:
+                                    operator = "/"; opName = "IDIV"; break;
+                                case Opcodes.IADD:
+                                    operator = "+"; opName = "IADD"; break;
+                                case Opcodes.ISUB:
+                                    operator = "-"; opName = "ISUB"; break;
+                                
+                                default :
+                                    throw new RuntimeException("Invalid operator during optimization of binary integer operator");
+                            }
+                            sb.append("    stack[stackPointer].type = CN1_TYPE_INT; stack[stackPointer++].data.i = ")
+                                    .append(leftLiteral).append(operator).append(rightLiteral)
+                                    .append("; /* ").append(opName).append(" Optimized */\n");
+                            Instruction newInst = new CustomIntruction(sb.toString(), sb.toString(), dependentClasses);
+                            newInst.setOptimized(true);
+                            instructions.add(iter, newInst);
+                            instructionCount = instructions.size();
+                        }
+                        
+                    }
+                break;
+                }
+                
+                case Opcodes.INVOKEVIRTUAL:
+                case Opcodes.INVOKESTATIC:
+                case Opcodes.INVOKESPECIAL:
+                case Opcodes.INVOKEINTERFACE: {
+                    if (current instanceof Invoke) {
+                        Invoke inv = (Invoke)current;
+                        List<ByteCodeMethodArg> invocationArgs = inv.getArgs();
+                        int numArgs = invocationArgs.size();
+                        if (iter >= numArgs) {
+                            String[] argLiterals = new String[numArgs];
+                            for (int i=0; i<numArgs; i++) {
+                                Instruction instr = instructions.get(iter-numArgs+i);
+                                if (instr instanceof VarOp) {
+                                    VarOp var = (VarOp)instr;
+                                    switch (instr.getOpcode()) {
+                                        case Opcodes.ALOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.o";
+                                            break;
+                                        }
+                                        case Opcodes.ILOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.i";
+                                            break;
+                                        }
+                                        case Opcodes.ACONST_NULL: {
+                                            argLiterals[i] = "JAVA_NULL";
+                                            break;
+                                        }
+                                        case Opcodes.DLOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.d";
+                                            break;
+                                        }
+                                        case Opcodes.FLOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.f";
+                                            break;
+                                        }
+                                        case Opcodes.LLOAD: {
+                                            argLiterals[i] = "locals["+var.getIndex()+"].data.l";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_0: {
+                                            argLiterals[i] = "0";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_1: {
+                                            argLiterals[i] = "1";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_2: {
+                                            argLiterals[i] = "2";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_3: {
+                                            argLiterals[i] = "3";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_4: {
+                                            argLiterals[i] = "4";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_5: {
+                                            argLiterals[i] = "5";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_M1: {
+                                            argLiterals[i] = "-1";
+                                            break;
+                                        }
+                                        case Opcodes.LCONST_0: {
+                                            argLiterals[i] = "(JAVA_LONG)0";
+                                            break;
+                                        }
+                                        case Opcodes.LCONST_1: {
+                                            argLiterals[i] = "(JAVA_LONG)1";
+                                            break;
+                                        }
+
+
+                                    }
+                                }
+                            }
+                            
+                            
+                            // Check to make sure that we have all the args as literals.
+                            boolean missingLiteral = false;
+                            for (String lit : argLiterals) {
+                                if (lit == null) {
+                                    missingLiteral = true;
+                                    break;
+                                }
+                            }
+                            
+                            // We have all of the arguments as literals.  Let's
+                            // add them to our invoke instruction.
+                            if (!missingLiteral) {
+                                
+                                for (int i=0; i< numArgs; i++) {
+                                    instructions.remove(iter-numArgs);
+                                    inv.setLiteralArg(i, argLiterals[i]);
+                                }
+                                inv.setOptimized(true);
+                                iter = 0;
+                                instructionCount = instructions.size();
+                            }
+                        }
+                    }
+                    break;
+                }
+                    
                 case Opcodes.ICONST_0:
                     if(constReturn(Opcodes.IRETURN, 0, nextOpcode, iter)) {
                         iter = 0;

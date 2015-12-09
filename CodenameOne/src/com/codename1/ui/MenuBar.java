@@ -899,7 +899,8 @@ public class MenuBar extends Container implements ActionListener {
                     rightContainer.removeAll();
                     Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
                     if (i == null) {
-                        i = Resources.getSystemResource().getImage("of_menu.png");
+                        //i = Resources.getSystemResource().getImage("of_menu.png");
+                        i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, getUIManager().getComponentStyle("TouchCommand"));
                     }                    
                     Button menu = createTouchCommandButton(new Command("", i) {
 

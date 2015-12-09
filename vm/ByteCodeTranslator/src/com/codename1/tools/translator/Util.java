@@ -23,7 +23,9 @@
 
 package com.codename1.tools.translator;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -60,5 +62,60 @@ public class Util {
 
     public static String getSigType(Class cls) {
         return sigTypeMap.get(cls);
+    }
+    
+    public static List<ByteCodeMethodArg> getMethodArgs(String methodDesc) {
+        List<ByteCodeMethodArg> arguments = new ArrayList<ByteCodeMethodArg>();
+        int currentArrayDim = 0;
+        
+        String desc = methodDesc;
+        int pos = desc.lastIndexOf(')');
+        desc = desc.substring(1, pos);
+        for(int i = 0 ; i < desc.length() ; i++) {
+            char currentType = desc.charAt(i);
+            switch(currentType) {
+                case '[':
+                    // array of...
+                    currentArrayDim++;
+                    continue;
+                case 'L':
+                    // Object skip until ;
+                    int idx = desc.indexOf(';', i);
+                    String objectType = desc.substring(i + 1, idx);
+                    objectType = objectType.replace('/', '_').replace('$', '_');
+                    //if(!dependentClasses.contains(objectType)) {
+                    //    dependentClasses.add(objectType);
+                    //}
+                    i = idx;
+                    arguments.add(new ByteCodeMethodArg(objectType, currentArrayDim));
+                    break;
+                case 'I':
+                    arguments.add(new ByteCodeMethodArg(Integer.TYPE, currentArrayDim));
+                    break;
+                case 'J':
+                    arguments.add(new ByteCodeMethodArg(Long.TYPE, currentArrayDim));
+                    break;
+                case 'B':
+                    arguments.add(new ByteCodeMethodArg(Byte.TYPE, currentArrayDim));
+                    break;
+                case 'S':
+                    arguments.add(new ByteCodeMethodArg(Short.TYPE, currentArrayDim));
+                    break;
+                case 'F':
+                    arguments.add(new ByteCodeMethodArg(Float.TYPE, currentArrayDim));
+                    break;
+                case 'D':
+                    arguments.add(new ByteCodeMethodArg(Double.TYPE, currentArrayDim));
+                    break;
+                case 'Z':
+                    arguments.add(new ByteCodeMethodArg(Boolean.TYPE, currentArrayDim));
+                    break;
+                case 'C':
+                    arguments.add(new ByteCodeMethodArg(Character.TYPE, currentArrayDim));
+                    break;
+            }
+            currentArrayDim = 0;
+        }
+        return arguments;
     }
 }

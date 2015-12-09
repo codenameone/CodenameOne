@@ -268,4 +268,7 @@ public final class Class<T> {
         return this == obj;
     }
 
+    public boolean desiredAssertionStatus() {
+        return false;
+    }        
 }

@@ -1288,6 +1288,7 @@ public final class Display {
         if(current == newForm){
             current.revalidate();
             current.repaint();
+            current.onShowCompletedImpl();
             return;
         }
         
@@ -3782,5 +3783,20 @@ public final class Display {
      */
     public boolean isSimulator() {
         return impl.isSimulator();
+    }
+
+    /**
+     * Creates an audio media that can be played in the background.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media or null if background playing is not supported on the platform
+     * 
+     * @throws IOException if creation of media from the given URI has failed
+     */ 
+    public Media createBackgroundMedia(String uri) throws IOException{
+        return impl.createBackgroundMedia(uri);
     }
 }

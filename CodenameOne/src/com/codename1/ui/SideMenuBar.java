@@ -220,7 +220,7 @@ public class SideMenuBar extends MenuBar {
         if (i != null) {
             ob.setIcon(i);
         } else {
-            ob.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU);
         }
         Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
         if (p != null) {
@@ -380,11 +380,19 @@ public class SideMenuBar extends MenuBar {
                 if(uiid == null){
                     uiid = "TitleCommand";
                 }
+                int txtPosition = Component.RIGHT;
+                Integer pos = (Integer)rightCommand.getClientProperty("textPosition");
+                if(pos != null){
+                    txtPosition = pos.intValue();
+                }
+                
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     Button b = new Button(rightCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
+                    b.setTextPosition(txtPosition);
+                    
                     BorderLayout bl = (BorderLayout) l;
                     Component east = bl.getEast();
                     if (east == null) {
@@ -437,12 +445,19 @@ public class SideMenuBar extends MenuBar {
                 if(uiid == null){
                     uiid = "TitleCommand";
                 }
+                int txtPosition = Component.RIGHT;
+                Integer pos = (Integer)leftCommand.getClientProperty("textPosition");
+                if(pos != null){
+                    txtPosition = pos.intValue();
+                }
                 
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     Button b = new Button(leftCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
+                    b.setTextPosition(txtPosition);
+                    
                     BorderLayout bl = (BorderLayout) l;
                     Component west = bl.getWest();
                     if (west == null) {
@@ -789,7 +804,7 @@ public class SideMenuBar extends MenuBar {
             if (i != null) {
                 rightSideButton.setIcon(i);
             } else {
-                rightSideButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+                FontImage.setMaterialIcon(rightSideButton, FontImage.MATERIAL_MENU);
             }
             Image p = (Image) uim.getThemeImageConstant("rightSideMenuPressImage");
             if (p != null) {
@@ -919,18 +934,31 @@ public class SideMenuBar extends MenuBar {
         return createSideNavigationPanel(commands, placement);
     }
     
-    Container createSideNavigationPanel(Vector commands, String placement) {
+    /**
+     * Creates an empty side navigation panel.
+     */ 
+    protected Container constructSideNavigationComponent(){
+        return constructSideNavigationPanel();
+    }
+    
+    Container constructSideNavigationPanel(){
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        menu.setUIID("SideNavigationPanel");
+        menu.setScrollableY(true);
+        return menu;
+    }
+    
+    Container createSideNavigationPanel(Vector commands, String placement) {
+        Container menu = constructSideNavigationComponent();
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             Container bar = new Container();
             bar.setUIID("StatusBarSideMenu");
             menu.addComponent(bar);
         }
-        menu.setUIID("SideNavigationPanel");
-        menu.setScrollableY(true);
         if (!getUIManager().isThemeConstant("sideMenuTensileDragBool", true)) {
             menu.setTensileDragEnabled(false);
         }
+        
         for (int iter = commands.size() - 1; iter > -1; iter--) {
             Command c = (Command) commands.elementAt(iter);
             if (c.getClientProperty(COMMAND_PLACEMENT_KEY) != placement) {

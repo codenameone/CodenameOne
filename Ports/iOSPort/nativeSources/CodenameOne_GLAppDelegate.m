@@ -31,6 +31,7 @@ int mallocWhileSuspended = 0;
 #endif
 
 
+int pendingRemoteNotificationRegistrations = 0;
 
 BOOL isAppSuspended = NO;
 //GL_APP_DELEGATE_IMPORT
@@ -131,15 +132,18 @@ extern UIView *editingComponent;
 
 // implemented this way so this will compile on older versions of xcode
 - (void)application:(UIApplication *)application didRegisterUserNotificationSettings:(id)notificationSettings {
-    Class uiApp = NSClassFromString(@"UIApplication");
-    UIApplication* uiAppInstance = [UIApplication sharedApplication];
-    SEL sel = NSSelectorFromString(@"registerForRemoteNotifications");
-    //[[UIApplication sharedApplication] registerForRemoteNotifications];
-    NSMethodSignature *signature = [uiAppInstance methodSignatureForSelector:sel];
-    NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
-    invocation.selector = sel;
-    invocation.target = uiApp;
-    [invocation invokeWithTarget:uiAppInstance];
+    if (pendingRemoteNotificationRegistrations > 0) {
+        pendingRemoteNotificationRegistrations--;
+        Class uiApp = NSClassFromString(@"UIApplication");
+        UIApplication* uiAppInstance = [UIApplication sharedApplication];
+        SEL sel = NSSelectorFromString(@"registerForRemoteNotifications");
+        //[[UIApplication sharedApplication] registerForRemoteNotifications];
+        NSMethodSignature *signature = [uiAppInstance methodSignatureForSelector:sel];
+        NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+        invocation.selector = sel;
+        invocation.target = uiApp;
+        [invocation invokeWithTarget:uiAppInstance];
+    }
 }
 
 // required for URL opening

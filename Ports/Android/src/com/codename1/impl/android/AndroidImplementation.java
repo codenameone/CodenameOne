@@ -40,13 +40,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.RectF;
-import android.graphics.Region;
 import android.graphics.Typeface;
-import android.graphics.Paint.Style;
 import android.graphics.Path;
-import android.graphics.PorterDuff.Mode;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -56,7 +51,6 @@ import android.text.TextPaint;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -64,14 +58,12 @@ import android.view.Window;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import com.codename1.ui.BrowserComponent;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
@@ -86,7 +78,6 @@ import java.util.Vector;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Matrix;
-import android.graphics.PixelFormat;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
 import android.media.ExifInterface;
@@ -96,6 +87,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
@@ -114,6 +106,9 @@ import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.*;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.media.Audio;
+import com.codename1.media.AudioService;
+import com.codename1.media.MediaProxy;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
@@ -205,6 +200,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
+    private Media background; 
     
     /**
      * This method in used internally for ads
@@ -722,7 +718,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void run() {
                 // Must be called from the UI thread
-                InPlaceEditView.endEdit();
+                InPlaceEditView.stopEdit();
 
                 synchronized (flag) {
                     flag[0] = true;
@@ -746,6 +742,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void saveTextEditingState() {
         stopEditing();
+    }
+    
+    @Override
+    public void stopTextEditing() {    
+        saveTextEditingState();
     }
 
     protected void setLastSizeChangedWH(int w, int h) {
@@ -1023,12 +1024,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object loadTrueTypeFont(String fontName, String fileName) {
         if(fontName.startsWith("native:")) {
             Typeface t = fontToRoboto(fontName);
+            int fontStyle = com.codename1.ui.Font.STYLE_PLAIN;
+            if(t.isBold()) {
+                fontStyle |= com.codename1.ui.Font.STYLE_BOLD;
+            }
+            if(t.isItalic()) {
+                fontStyle |= com.codename1.ui.Font.STYLE_ITALIC;
+            }
             TextPaint newPaint = new TextPaint();
             newPaint.setAntiAlias(true);
             newPaint.setSubpixelText(true);
             newPaint.setTypeface(t);
-            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, 
-                    com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
+            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, fontStyle, 
+                    com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
         }
         Typeface t = Typeface.createFromAsset(activity.getAssets(), fileName);
         if(t == null) {
@@ -1088,10 +1096,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         paint.setAntiAlias(true);
         Typeface type = paint.getTypeface();
         int fontstyle = Typeface.NORMAL;
-        if ((weight & Font.STYLE_BOLD) != 0) {
+        if ((weight & Font.STYLE_BOLD) != 0 || type.isBold()) {
             fontstyle |= Typeface.BOLD;
         }
-        if ((weight & Font.STYLE_ITALIC) != 0) {
+        if ((weight & Font.STYLE_ITALIC) != 0 || type.isItalic()) {
             fontstyle |= Typeface.ITALIC;
         }
         type = Typeface.create(type, fontstyle);
@@ -1099,7 +1107,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         newPaint.setTypeface(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
-        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
+        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
         return n;
     }
 
@@ -1933,6 +1941,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if("OSVer".equals(key)) {
             return "" + android.os.Build.VERSION.RELEASE;
         }
+        if("DeviceName".equals(key)) {
+            return "" + android.os.Build.MODEL;
+        }
         try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
                 TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
@@ -2131,6 +2142,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isNativeVideoPlayerControlsIncluded() {
         return true;
     }
+    
+   
+    @Override
+    public Media createBackgroundMedia(String uri) throws IOException {
+
+        Intent serviceIntent = new Intent(activity, AudioService.class);
+        serviceIntent.putExtra("mediaLink", uri);
+        
+        final ServiceConnection mConnection = new ServiceConnection() {
+
+            public void onServiceDisconnected(ComponentName name) {
+                background = null;
+            }
+
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                AudioService.LocalBinder mLocalBinder = (AudioService.LocalBinder) service;
+                background = mLocalBinder.getService();
+            }
+        };
+
+        activity.bindService(serviceIntent, mConnection, activity.BIND_AUTO_CREATE);
+        activity.startService(serviceIntent);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                while (background == null) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+        });
+
+        Media retVal = new MediaProxy(background) {
+
+            @Override
+            public void cleanup() {
+                super.cleanup();
+                activity.unbindService(mConnection);
+            }
+        };
+        return retVal;
+    }
+
     
     /**
      * @inheritDoc

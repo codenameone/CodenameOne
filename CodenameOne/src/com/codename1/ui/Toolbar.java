@@ -200,9 +200,7 @@ public class Toolbar extends Container {
     
     private void constructPermanentSideMenu() {
         if(permanentSideMenuContainer == null) {
-            permanentSideMenuContainer = new Container(new BoxLayout(BoxLayout.Y_AXIS));
-            permanentSideMenuContainer.setUIID("SideNavigationPanel");
-            permanentSideMenuContainer.setScrollableY(true);
+            permanentSideMenuContainer = constructSideNavigationComponent();
             Form parent = getComponentForm();
             parent.addComponentToForm(BorderLayout.WEST, permanentSideMenuContainer);
         }
@@ -537,6 +535,13 @@ public class Toolbar extends Container {
         return sideMenu.createSideNavigationPanel(commands, placement);
     }
     
+    /**
+     * Creates an empty side navigation panel.
+     */ 
+    protected Container constructSideNavigationComponent(){
+        return sideMenu.constructSideNavigationPanel();
+    }
+    
 
     class ToolbarSideMenu extends SideMenuBar {
 
@@ -544,7 +549,11 @@ public class Toolbar extends Container {
         protected Container createSideNavigationComponent(Vector commands, String placement) {
             return Toolbar.this.createSideNavigationComponent(commands, placement);
         }
-
+        
+        @Override
+        protected Container constructSideNavigationComponent(){
+            return Toolbar.this.constructSideNavigationComponent();
+        }
         
         @Override
         protected Container getTitleAreaContainer() {

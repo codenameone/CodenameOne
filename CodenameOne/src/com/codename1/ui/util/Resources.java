@@ -1273,6 +1273,11 @@ public class Resources {
                 theme.put(key, "" + (input.readByte() & 0xff));
                 continue;
             } 
+            
+            if(key.endsWith("opacity")) {
+                theme.put(key, "" + (input.readInt() & 0xff));
+                continue;
+            } 
 
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("adding") || key.endsWith("argin")) {

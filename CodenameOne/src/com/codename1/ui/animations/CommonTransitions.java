@@ -669,6 +669,13 @@ public final class CommonTransitions extends Transition {
                     }
                     return;
                 case TYPE_UNCOVER:
+                    int p = motion.getDestinationValue() - position;
+                    if (slideType == SLIDE_HORIZONTAL) {
+                        paintCoverAtPosition(g, p, 0);
+                    } else {
+                        paintCoverAtPosition(g, 0, p);
+                    }
+                    return;
                 case TYPE_COVER:
                     if (slideType == SLIDE_HORIZONTAL) {
                         paintCoverAtPosition(g, position, 0);

@@ -3369,6 +3369,40 @@ public abstract class CodenameOneImplementation {
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return null;
     }
+    
+    /**
+     * Creates an audio media that can be played in the background.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media
+     * 
+     * @throws IOException if creation of media from the given URI has failed
+     */ 
+    public Media createBackgroundMedia(String uri) throws IOException {
+        if(uri.startsWith("jar://")){
+            uri = uri.substring(6);
+            if(!uri.startsWith("/")){
+                uri = "/" + uri;
+            }
+            InputStream is = getResourceAsStream(this.getClass(), uri);
+            String mime = "";
+            if(uri.endsWith(".mp3")){
+                mime = "audio/mp3";
+            }else if(uri.endsWith(".wav")){
+                mime = "audio/x-wav";            
+            }else if(uri.endsWith(".amr")){
+                mime = "audio/amr";            
+            }else if(uri.endsWith(".3gp")){
+                mime = "audio/3gpp";            
+            }
+
+            return createMedia(is, mime, null);
+        }
+        return createMedia(uri, false, null);
+    }
 
     /**
      * Creates a soft/weak reference to an object that allows it to be collected

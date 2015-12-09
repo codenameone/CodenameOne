@@ -71,6 +71,10 @@
     nbproject/build-impl.xml file. 
 
     -->
+    
+    <target name="init-skins" unless="skinsAvailable" depends="build-skins">
+    </target>
+    
     <target name="build-skins">
         <copy file="../../Themes/androidTheme.res" todir="../../../codenameone-skins/android" />
         <copy file="../../Themes/androidTheme.res" todir="../../../codenameone-skins/nexus" />
@@ -95,9 +99,6 @@
             <exclude name="**/svn/"/>
         </zip>
         <zip basedir="../../../codenameone-skins/android" destfile="../../../codenameone-skins/android.skin" compress="false">
-            <exclude name="**/svn/"/>
-        </zip>
-        <zip basedir="../../../codenameone-skins/feature_phone" destfile="../../../codenameone-skins/feature_phone.skin" compress="false">
             <exclude name="**/svn/"/>
         </zip>
         <zip basedir="../../../codenameone-skins/ipad" destfile="../../../codenameone-skins/ipad.skin" compress="false">
@@ -137,21 +138,20 @@
         </zip>
     </target>    
     
-    <target name="-pre-compile">
-        <!-- run manually the build-skins target to generate the skins-->
+    <target name="-pre-compile" >
+        <available file="src/iphone3gs.skin" property="skinsAvailable" />
+    </target>
+    
+    <target name="-post-compile" depends="init-skins">
         <copy file="../../../codenameone-skins/torch.skin" todir="src" />
         <copy file="../../../codenameone-skins/lumia.skin" todir="src" />
         <copy file="../../../codenameone-skins/android.skin" todir="src" />
-        <copy file="../../../codenameone-skins/feature_phone.skin" todir="src" />
         <copy file="../../../codenameone-skins/ipad_os7.skin" tofile="src/ipad.skin" />
         <copy file="../../../codenameone-skins/nexus.skin" todir="src" />
         <copy file="../../../codenameone-skins/iphone3gs_os7.skin" tofile="src/iphone3gs.skin" />
         <copy file="../../../codenameone-skins/iphone4_os7.skin" tofile="src/iphone4.skin" />
         <copy file="../../../codenameone-skins/iphone5_os7.skin" tofile="src/iphone5.skin" />
         <copy file="../../../codenameone-skins/xoom.skin" todir="src" />
-    </target>
-    
-    <target name="-post-compile">
         <copydir src="${project.CodenameOne}/build/classes" dest="build/classes" />
         <unjar src="../../../cn1-binaries/javase/sqlite-jdbc-3.7.15-M1.jar" dest="build/classes" /> 
     </target>    

@@ -53,11 +53,14 @@
 #import "ZooZ.h"
 #endif
 
+// Flag to enable experimental new keyboard handling.
+#define CN1_NEW_KEYBOARD_HANDLING 1
+
 //#define BACKGROUND_LOCATION_ENABLED
 #define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization
 
 #define IOS8_LOCATION_WARNING NSLog(@"As of iOS8, location services requires the ios.locationUsageDescription build hint to be set.");
-
+//#define CN1_ENABLE_BACKGROUND_LOCATION 1
 
 //#define INCLUDE_MOPUB
 #ifdef INCLUDE_MOPUB

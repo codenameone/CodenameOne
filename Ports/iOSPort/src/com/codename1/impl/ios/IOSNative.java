@@ -46,6 +46,7 @@ public final class IOSNative {
     native int getDisplayWidth();
     native int getDisplayHeight();
     native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar);
+    native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
     native long createImageFromARGB(int[] argb, int width, int height);
@@ -292,6 +293,7 @@ public final class IOSNative {
     
     native String getUDID();
     native String getOSVersion();
+    native String getDeviceName();
     
     // location manager
     native long createCLLocation();
