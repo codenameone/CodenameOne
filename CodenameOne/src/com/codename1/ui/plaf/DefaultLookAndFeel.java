@@ -1743,6 +1743,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 }
             }
         } else {
+            if(!Font.isTrueTypeFileSupported()) {
+                return;
+            }
             UIManager uim = UIManager.getInstance();
             Style unsel = uim.createStyle("CheckBox", "", false);
             Style sel = uim.getComponentSelectedStyle("CheckBox");
@@ -1781,6 +1784,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 }
             }
         } else {
+            if(!Font.isTrueTypeFileSupported()) {
+                return;
+            }
             UIManager uim = UIManager.getInstance();
             Style unsel = uim.createStyle("RadioButton", "", false);
             Style sel = uim.getComponentSelectedStyle("RadioButton");
