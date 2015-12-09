@@ -60,7 +60,7 @@
 #define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization
 
 #define IOS8_LOCATION_WARNING NSLog(@"As of iOS8, location services requires the ios.locationUsageDescription build hint to be set.");
-
+//#define CN1_ENABLE_BACKGROUND_LOCATION 1
 
 //#define INCLUDE_MOPUB
 #ifdef INCLUDE_MOPUB
