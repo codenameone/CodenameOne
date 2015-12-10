@@ -118,7 +118,7 @@ public class ContactsManager {
      * @param includeAddress if true try to fetch all Contact Addresses
      * @return array of the contacts
      */
-    public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+    public static Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         return Display.getInstance().getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
     }
 
@@ -127,7 +127,7 @@ public class ContactsManager {
      * might still take seconds or more to run so you should still use a separate thread!
      * @return true if getAllContacts will perform faster that just getting each contact
      */
-    public boolean isGetAllContactsFast() {
+    public static boolean isGetAllContactsFast() {
         return Display.getInstance().isGetAllContactsFast();
     }
     
