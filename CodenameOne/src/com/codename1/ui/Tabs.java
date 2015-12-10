@@ -484,7 +484,9 @@ public class Tabs extends Container {
             return;
         }
         final Component b = tab;
-        b.setUIID(tabUIID);
+        if(tabUIID != null) {
+            b.setUIID(tabUIID);
+        }
 
         b.addFocusListener(focusListener);
         
@@ -492,7 +494,9 @@ public class Tabs extends Container {
             public void actionPerformed(ActionEvent evt) {
 
                 if(selectedTab != null){
-                    selectedTab.setUIID(tabUIID);
+                    if(tabUIID != null) {
+                        selectedTab.setUIID(tabUIID);
+                    }
                     selectedTab.setShouldCalcPreferredSize(true);
                     selectedTab.repaint();
                     int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);

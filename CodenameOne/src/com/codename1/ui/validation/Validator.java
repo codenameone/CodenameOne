@@ -411,7 +411,9 @@ public class Validator {
                                     ypos -= scr.getScrollY();
                                     scr.addScrollListener(new ScrollListener() {
                                         public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                                            message.dispose();
+                                            if (message != null) {
+                                                message.dispose();
+                                            }
                                             message = null;
                                         }
                                     });

@@ -1743,8 +1743,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 }
             }
         } else {
+            if(!Font.isTrueTypeFileSupported()) {
+                return;
+            }
             UIManager uim = UIManager.getInstance();
-            Style unsel = uim.getComponentStyle("CheckBox");
+            Style unsel = uim.createStyle("CheckBox", "", false);
             Style sel = uim.getComponentSelectedStyle("CheckBox");
             Style dis = uim.getComponentCustomStyle("CheckBox", "dis");
             FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, dis);
@@ -1781,8 +1784,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 }
             }
         } else {
+            if(!Font.isTrueTypeFileSupported()) {
+                return;
+            }
             UIManager uim = UIManager.getInstance();
-            Style unsel = uim.getComponentStyle("RadioButton");
+            Style unsel = uim.createStyle("RadioButton", "", false);
             Style sel = uim.getComponentSelectedStyle("RadioButton");
             Style dis = uim.getComponentCustomStyle("RadioButton", "dis");
             FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, dis);

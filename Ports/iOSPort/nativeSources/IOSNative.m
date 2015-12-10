@@ -372,6 +372,37 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
                                                                    padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
     POOL_END();
 }
+extern float scaleValue;
+extern int editComponentPadTop, editComponentPadLeft;
+extern float editCompoentX, editCompoentY, editCompoentW, editCompoentH;
+void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT padTop, JAVA_INT padRight, JAVA_INT padBottom, JAVA_INT padLeft) {
+    POOL_BEGIN();
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if(editingComponent != nil) {
+            float scale = scaleValue;
+            CGRect existingBounds = editingComponent.frame;
+            NSString *currText = ((UITextField*)editingComponent).text;
+
+            editCompoentX = (x + padLeft) / scale;
+            editCompoentY = (y + padTop) / scale;
+            editComponentPadTop = padTop / scale;
+            editComponentPadLeft = padLeft / scale;
+            if (scale > 1) {
+                editCompoentY -= 1.5;
+            } else {
+                editCompoentY -= 1;
+            }
+            editCompoentW = (w - padLeft - padRight) / scale;
+            editCompoentH = (h - padTop - padBottom) / scale;
+            CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
+            editingComponent.frame = rect;
+        }
+        POOL_END();
+    });
+    
+    POOL_END();
+}
 
 void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
@@ -2744,21 +2775,57 @@ void com_codename1_impl_ios_IOSNative_startUpdatingLocation___long_int(CN1_THREA
         case 0 : // HIGH PRIORITY
             l.desiredAccuracy = kCLLocationAccuracyBest;
             l.distanceFilter = kCLDistanceFilterNone;
+            if (isIOS7()) {
+                l.pausesLocationUpdatesAutomatically = NO;
+            }
             break;
         case 1: // MEDIUM PRIORITY
             l.desiredAccuracy = kCLLocationAccuracyHundredMeters;
             l.distanceFilter = 100;
+            if (isIOS7()) {
+                l.pausesLocationUpdatesAutomatically = YES;
+            }
             break;
         case 2 : // LOW PRIORITY
             l.desiredAccuracy = kCLLocationAccuracyThreeKilometers;
             l.distanceFilter = 3000;
+            if (isIOS7()) {
+                l.pausesLocationUpdatesAutomatically = YES;
+            }
             break;
             
-        default : 
+        default :
             l.desiredAccuracy = kCLLocationAccuracyHundredMeters;
             l.distanceFilter = kCLDistanceFilterNone;
+            if (isIOS7()) {
+                l.pausesLocationUpdatesAutomatically = NO;
+            }
             break;
     }
+    
+    
+#ifdef CN1_ENABLE_BACKGROUND_LOCATION
+    SEL sel = NSSelectorFromString(@"setAllowsBackgroundLocationUpdates:");
+    if ([l respondsToSelector:sel]) {
+        // Obtain a method signature of selector on UIUserNotificationSettings class
+        NSMethodSignature *signature = [l methodSignatureForSelector:sel];
+        
+        // Create an invocation on a signature -- must be used because of primitive (enum) arguments on selector
+        NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+        invocation.selector = sel;
+        invocation.target = l;
+        BOOL param = YES;
+        // Set arguments
+        [invocation setArgument:&param atIndex:2];
+        
+        [invocation invoke];
+
+        
+        // All the above just to say *this v* because this property wasn't
+        // added until iOS 9
+        //[l setAllowsBackgroundLocationUpdates:YES];
+    }
+#endif
     [l startUpdatingLocation];
 }
 
@@ -4954,9 +5021,10 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
 }
 
 
+extern BOOL isVKBAlwaysOpen();
 extern BOOL vkbAlwaysOpen;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isAsyncEditMode__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return vkbAlwaysOpen;
+    return isVKBAlwaysOpen();
 }
 
 extern int vkbHeight;

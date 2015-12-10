@@ -87,6 +87,10 @@ public final class Boolean{
             return b ? Boolean.TRUE : Boolean.FALSE;
     }
 
+    public static Boolean valueOf(final String b) {
+            return valueOf(parseBoolean(b));
+    }
+
     public static boolean parseBoolean(final String s) {
             return (s != null) && s.equalsIgnoreCase("true");
     }
