@@ -117,8 +117,39 @@ public class ContactsManager {
      * @param includesEmail if true try to fetch all Contact Emails
      * @param includeAddress if true try to fetch all Contact Addresses
      * @return array of the contacts
+     * @deprecated this method was incorrectly introduced use getContacts instead
      */
-    public static Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+    public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        return Display.getInstance().getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
+    }
+
+    /**
+     * Indicates if the getAllContacts is platform optimized, notice that the method
+     * might still take seconds or more to run so you should still use a separate thread!
+     * @return true if getAllContacts will perform faster that just getting each contact
+     * @deprecated this method was incorrectly introduced and isn't static use isAllContactsFast instead
+     */
+    public boolean isGetAllContactsFast() {
+        return Display.getInstance().isGetAllContactsFast();
+    }
+    
+    
+    
+    /**
+     * Notice: this method might be very slow and should be invoked on a separate thread!
+     * It might have platform specific optimizations over getAllContacts followed by looping
+     * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
+     * information.
+     * 
+     * @param withNumbers if true returns only contacts that has a number
+     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
+     * @param includesPicture if true try to fetch the Contact Picture if exists
+     * @param includesNumbers if true try to fetch all Contact numbers
+     * @param includesEmail if true try to fetch all Contact Emails
+     * @param includeAddress if true try to fetch all Contact Addresses
+     * @return array of the contacts
+     */
+    public static Contact[] getContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         return Display.getInstance().getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
     }
 
@@ -127,9 +158,7 @@ public class ContactsManager {
      * might still take seconds or more to run so you should still use a separate thread!
      * @return true if getAllContacts will perform faster that just getting each contact
      */
-    public static boolean isGetAllContactsFast() {
+    public static boolean isAllContactsFast() {
         return Display.getInstance().isGetAllContactsFast();
     }
-    
-    
 }
