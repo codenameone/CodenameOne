@@ -188,6 +188,12 @@ public class Contact {
      * @return the Contact primary phone number or null if not declared
      */
     public String getPrimaryPhoneNumber() {
+        if(primaryPhoneNumber == null) {
+            Collection c = phoneNumbers.values();
+            if(c.size() > 0) {
+                return (String)c.iterator().next();
+            }
+        }
         return primaryPhoneNumber;
     }
 
