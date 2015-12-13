@@ -2228,6 +2228,18 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Returns the animation manager of the parent form or null if this component isn't currently associated with a form
+     * @return the animation manager instance
+     */
+    public AnimationManager getAnimationManager() {
+        Form f = getComponentForm();
+        if(f == null) {
+            return null;
+        }
+        return f.getAnimationManager();
+    }
+
+    /**
      * Scroll animation speed in milliseconds allowing a developer to slow down or accelerate
      * the smooth animation mode
      * 

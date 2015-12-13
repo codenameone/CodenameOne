@@ -76,6 +76,8 @@ public class Form extends Container {
     private Component dragged;
     ArrayList<Component> buttonsAwatingRelease;
     
+    private AnimationManager animMananger = new AnimationManager(this);
+    
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
@@ -220,6 +222,16 @@ public class Form extends Container {
     }
         
     /**
+     * Returns the animation manager instance responsible for this form, this can be used to track/queue
+     * animations
+     * 
+     * @return the animation manager
+     */
+    public AnimationManager getAnimationManager() {
+        return animMananger;
+    }
+    
+    /**
      * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
      * possible when working with text fields that aren't in a scrollable container.
      * @param b true to enable false to disable
@@ -315,6 +327,7 @@ public class Form extends Container {
      * This is used by some code to prevent collision between optional animation
      * 
      * @return whether the lock was acquired or not
+     * @deprecated this is effectively invalidated by the newer animation framework
      */
     public boolean grabAnimationLock() {
         if(globalAnimationLock) {
@@ -326,6 +339,7 @@ public class Form extends Container {
     
     /**
      * Invoke this to release the animation lock that was grabbed in grabAnimationLock
+     * @deprecated this is effectively invalidated by the newer animation framework
      */
     public void releaseAnimationLock() {
         globalAnimationLock = false;
@@ -1282,6 +1296,9 @@ public class Form extends Container {
         if (internalAnimatableComponents != null) {
             loopAnimations(internalAnimatableComponents, animatableComponents);
         }
+        if(animMananger != null) {
+            animMananger.updateAnimations();
+        }
     }
 
     private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
@@ -1320,7 +1337,8 @@ public class Form extends Container {
      */
     boolean hasAnimations() {
         return (animatableComponents != null && animatableComponents.size() > 0)
-                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0);
+                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0) 
+                || (animMananger != null && animMananger.isAnimating());
     }
 
     /**
@@ -1577,6 +1595,7 @@ public class Form extends Container {
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
+        animMananger.flush();
         buttonsAwatingRelease = null;
         dragged = null;
     }

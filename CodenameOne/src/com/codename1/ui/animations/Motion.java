@@ -92,6 +92,16 @@ public class Motion {
     }
 
     /**
+     * Sends the motion to the end time instantly which is useful for flushing an animation
+     */
+    public void finish() {
+        if(!isFinished()) {
+            startTime = System.currentTimeMillis() - duration;
+            currentMotionTime = -1;
+        }
+    }
+    
+    /**
      * Construct a velocity motion
      * 
      * @param sourceValue starting value
