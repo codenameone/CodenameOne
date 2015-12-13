@@ -509,7 +509,7 @@ public class Container extends Component implements Iterable<Component>{
      */
     public void addComponent(Component cmp) {
         layout.addLayoutComponent(null, cmp, this);
-        insertComponentAt(components.size(), cmp);
+        insertComponentAt(Integer.MAX_VALUE, null, cmp);
     }
 
     /**
@@ -522,9 +522,9 @@ public class Container extends Component implements Iterable<Component>{
      *
      * @param cmp component to add
      */
-    public void addComponent(Object constraints, Component cmp) {
+    public void addComponent(final Object constraints, final Component cmp) {
         layout.addLayoutComponent(constraints, cmp, this);
-        insertComponentAt(components.size(), cmp);
+        insertComponentAt(Integer.MAX_VALUE, null, cmp);
     }
 
 
@@ -539,11 +539,38 @@ public class Container extends Component implements Iterable<Component>{
      * @param cmp component to add
      */
     public void addComponent(int index, Object constraints, Component cmp) {
-        layout.addLayoutComponent(constraints, cmp, this);
-        insertComponentAt(index, cmp);
+        insertComponentAt(index, constraints, cmp);
     }
 
-    void insertComponentAt(int index, final Component cmp) {
+    void insertComponentAt(final int index, final Object constraint, final Component cmp) {
+        AnimationManager a = getAnimationManager();
+        if(a != null && a.isAnimating()) {
+            a.addAnimation(new ComponentAnimation() {
+                @Override
+                public boolean isInProgress() {
+                    return false;
+                }
+
+                @Override
+                protected void updateState() {
+                    if(constraint != null) {
+                        layout.addLayoutComponent(constraint, cmp, Container.this);
+                    }
+                    insertComponentAtImpl(index, cmp);
+                }
+            });
+        } else {
+            if(constraint != null) {
+                layout.addLayoutComponent(constraint, cmp, this);
+            }
+            insertComponentAtImpl(index, cmp);
+        }
+    }
+    
+    void insertComponentAtImpl(int index, final Component cmp) {
+        if(index == Integer.MAX_VALUE) {
+            index = components.size();
+        }
         if (cmp.getParent() != null) {
             throw new IllegalArgumentException("Component is already contained in Container: " + cmp.getParent());
         }
@@ -579,8 +606,7 @@ public class Container extends Component implements Iterable<Component>{
      * the cmp is a Form Component
      */
     public void addComponent(int index, Component cmp) {
-        layout.addLayoutComponent(null, cmp, this);
-        insertComponentAt(index, cmp);
+        insertComponentAt(index, null, cmp);
     }
 
     /**
@@ -774,17 +800,17 @@ public class Container extends Component implements Iterable<Component>{
         }
         Object constraint = layout.getComponentConstraint(current);
         if (constraint != null) {
-            removeComponentImpl(current);
+            removeComponentImplNoAnimationSafety(current);
             layout.addLayoutComponent(constraint, next, Container.this);
         } else {
-            removeComponentImpl(current);
+            removeComponentImplNoAnimationSafety(current);
         }
         cancelRepaintsRecursively(current);
         next.setParent(null);
         if (index < 0) {
             index = 0;
         }
-        insertComponentAt(index, next);
+        insertComponentAtImpl(index, next);
         if (currentFocused) {
             if (next.isFocusable()) {
                 if(avoidRepaint) {
@@ -838,12 +864,31 @@ public class Container extends Component implements Iterable<Component>{
         removeComponentImpl(cmp);
     }
 
+    void removeComponentImpl(final Component cmp) {
+        AnimationManager a = getAnimationManager();
+        if(a != null && a.isAnimating()) {
+            a.addAnimation(new ComponentAnimation() {
+                @Override
+                public boolean isInProgress() {
+                    return false;
+                }
+
+                @Override
+                protected void updateState() {
+                    removeComponentImplNoAnimationSafety(cmp);
+                }
+            });
+        } else {
+            removeComponentImplNoAnimationSafety(cmp);
+        }
+    }
+    
     /**
      * removes a Component from the Container
      * 
      * @param cmp the removed component
      */
-    void removeComponentImpl(Component cmp) {
+    void removeComponentImplNoAnimationSafety(Component cmp) {
         Form parentForm = cmp.getComponentForm();
         layout.removeLayoutComponent(cmp);
         cmp.deinitializeImpl();
@@ -2428,6 +2473,11 @@ public class Container extends Component implements Iterable<Component>{
                 Display.getInstance().repaint(t);
             }
         }        
+
+        @Override
+        public void flush() {
+            destroy();
+        }
         
         public void destroy() {
             if(destroyed) {
@@ -2481,12 +2531,24 @@ public class Container extends Component implements Iterable<Component>{
         }
 
         @Override
+        public void flush() {
+            for(Motion[] mm : motions) {
+                for(Motion m : mm) {
+                    if(m != null) {
+                        m.finish();
+                    }
+                }
+            }
+            updateState();
+        }
+        
+        @Override
         protected void updateState() {
             int componentCount = thisContainer.getComponentCount();
             if(motions != null){
                 componentCount = motions[0].length;
             }
-
+            
             if(animatedComponents != null) {
                 componentCount = animatedComponents.size();
                 for(int iter = 0 ; iter < componentCount ; iter++) {

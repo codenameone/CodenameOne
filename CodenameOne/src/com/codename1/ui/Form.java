@@ -76,7 +76,7 @@ public class Form extends Container {
     private Component dragged;
     ArrayList<Component> buttonsAwatingRelease;
     
-    private AnimationManager animMananger;
+    private AnimationManager animMananger = new AnimationManager(this);
     
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
@@ -228,9 +228,6 @@ public class Form extends Container {
      * @return the animation manager
      */
     public AnimationManager getAnimationManager() {
-        if(animMananger == null) {
-            animMananger = new AnimationManager(this);
-        }
         return animMananger;
     }
     
@@ -330,6 +327,7 @@ public class Form extends Container {
      * This is used by some code to prevent collision between optional animation
      * 
      * @return whether the lock was acquired or not
+     * @deprecated this is effectively invalidated by the newer animation framework
      */
     public boolean grabAnimationLock() {
         if(globalAnimationLock) {
@@ -341,6 +339,7 @@ public class Form extends Container {
     
     /**
      * Invoke this to release the animation lock that was grabbed in grabAnimationLock
+     * @deprecated this is effectively invalidated by the newer animation framework
      */
     public void releaseAnimationLock() {
         globalAnimationLock = false;
@@ -1596,6 +1595,7 @@ public class Form extends Container {
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
+        animMananger.flush();
         buttonsAwatingRelease = null;
         dragged = null;
     }

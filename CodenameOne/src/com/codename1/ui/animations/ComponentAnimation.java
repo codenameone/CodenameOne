@@ -32,10 +32,20 @@ public abstract class ComponentAnimation {
     private Object notifyLock;
     private Runnable onCompletion;
     
+    /**
+     * Indicates if the animation is in progress
+     * @return true if in progress
+     */
     public abstract boolean isInProgress();
     
+    /**
+     * Updates the animation state
+     */
     protected abstract void updateState();
     
+    /**
+     * Invoked by the animation manager internally
+     */
     public final void updateAnimationState() {
         updateState();
         if(!isInProgress()) {
@@ -48,6 +58,12 @@ public abstract class ComponentAnimation {
                 onCompletion.run();
             }
         }
+    }
+    
+    /**
+     * Flushes the animation immediately, this will be called if the form is de-initialized
+     */
+    public void flush() {
     }
     
     /**

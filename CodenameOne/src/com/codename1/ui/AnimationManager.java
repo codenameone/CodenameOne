@@ -61,6 +61,13 @@ public final class AnimationManager {
             }
         }
     }
+
+    void flush() {
+        while(anims.size() > 0) {
+            anims.get(0).flush();
+            anims.remove(0);
+        }
+    }
     
     /**
      * Adds the animation to the end to the animation queue
