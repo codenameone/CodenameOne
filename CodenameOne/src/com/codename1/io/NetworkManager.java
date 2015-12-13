@@ -736,9 +736,9 @@ public class NetworkManager {
     }
 
     /**
-     * Adds a generic listener to a network error that is invoked before the exception is propogated.
+     * Adds a generic listener to a network error that is invoked before the exception is propagated.
      * Notice that this doesn't apply to server error codes!
-     * Consume the event in order to prevent it from propogating further.
+     * Consume the event in order to prevent it from propagating further.
      *
      * @param e callback will be invoked with the Exception as the source object
      */

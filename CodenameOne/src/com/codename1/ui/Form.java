@@ -76,6 +76,8 @@ public class Form extends Container {
     private Component dragged;
     ArrayList<Component> buttonsAwatingRelease;
     
+    private AnimationManager animMananger;
+    
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
      * moving to a larger component as was the case in older versions of Codename One.
@@ -219,6 +221,19 @@ public class Form extends Container {
         return Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
     }
         
+    /**
+     * Returns the animation manager instance responsible for this form, this can be used to track/queue
+     * animations
+     * 
+     * @return the animation manager
+     */
+    public AnimationManager getAnimationManager() {
+        if(animMananger == null) {
+            animMananger = new AnimationManager(this);
+        }
+        return animMananger;
+    }
+    
     /**
      * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
      * possible when working with text fields that aren't in a scrollable container.
@@ -1282,6 +1297,9 @@ public class Form extends Container {
         if (internalAnimatableComponents != null) {
             loopAnimations(internalAnimatableComponents, animatableComponents);
         }
+        if(animMananger != null) {
+            animMananger.updateAnimations();
+        }
     }
 
     private void loopAnimations(ArrayList<Animation> v, ArrayList<Animation> notIn) {
@@ -1320,7 +1338,8 @@ public class Form extends Container {
      */
     boolean hasAnimations() {
         return (animatableComponents != null && animatableComponents.size() > 0)
-                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0);
+                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0) 
+                || (animMananger != null && animMananger.isAnimating());
     }
 
     /**

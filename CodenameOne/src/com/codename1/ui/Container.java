@@ -32,6 +32,7 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
@@ -690,16 +691,24 @@ public class Container extends Component implements Iterable<Component>{
             ((Container) next).layoutContainer();
         }
 
-        final Anim anim = new Anim(this, current, next, t);
-        anim.onFinish = onFinish;
+        final TransitionAnimation anim = new TransitionAnimation(this, current, next, t);
         anim.growSpeed = growSpeed;
         anim.layoutAnimationSpeed = layoutAnimationSpeed;
 
         // register the transition animation
-        getComponentForm().registerAnimatedInternal(anim);
+        /*getComponentForm().registerAnimatedInternal(anim);
         //wait until animation has finished
         if (wait) {
             Display.getInstance().invokeAndBlock(anim, dropEvents);
+        }*/
+        if(wait) {
+            getAnimationManager().addAnimationAndBlock(anim);
+        } else {
+            if(onFinish != null) {
+                getAnimationManager().addAnimation(anim, onFinish);
+            } else {
+                getAnimationManager().addAnimation(anim);
+            }
         }
     }
 
@@ -884,16 +893,17 @@ public class Container extends Component implements Iterable<Component>{
     /**
      * Flushes ongoing replace operations to prevent two concurrent replace operations from colliding.
      * If there is no ongoing replace nothing will occur
+     * @deprecated this method is no longer used in the new animation framework
      */
     public void flushReplace() {
-        if (cmpTransitions != null) {
+        /*if (cmpTransitions != null) {
             int size = cmpTransitions.size();
             for (int iter = 0; iter < size; iter++) {
                 ((Anim) cmpTransitions.elementAt(iter)).destroy();
             }
             cmpTransitions.removeAllElements();
             cmpTransitions = null;
-        }
+        }*/
     }
 
     /**
@@ -2134,7 +2144,7 @@ public class Container extends Component implements Iterable<Component>{
             createAndStartAnimateMotion(source.getHeight(), destination.getHeight(), duration),
             createAndStartAnimateMotion(source.getHeight(), destination.getHeight(), duration)
         };
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         a.opacity = new Motion[] {
@@ -2144,16 +2154,18 @@ public class Container extends Component implements Iterable<Component>{
         a.animatedComponents = new Vector();
         a.animatedComponents.addElement(source);
         a.animatedComponents.addElement(destination);
-        a.onFinish = onCompletion;
         a.dontRevalidate = true;
         a.scrollTo = destination;
         
-        // animate once to prevent flickering from newly added components 
-        a.animate();
-        getComponentForm().registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
-        }        
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            if(onCompletion != null) {
+                getAnimationManager().addAnimation(a, onCompletion);
+            } else {
+                getAnimationManager().addAnimation(a);
+            }
+        }
     }
     
     /**
@@ -2199,14 +2211,15 @@ public class Container extends Component implements Iterable<Component>{
             current.setWidth(beforeW[iter]);
             current.setHeight(beforeH[iter]);
         }
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(opacity, 255, a, componentCount, duration);
         a.animatedComponents = comps;
-        getComponentForm().registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            getAnimationManager().addAnimation(a);
         }
     }
     
@@ -2271,15 +2284,19 @@ public class Container extends Component implements Iterable<Component>{
             wMotions[iter].start();
             hMotions[iter].start();
         }
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(255, opacity, a, componentCount, duration);
-        a.onFinish = callback;
         a.dontRevalidate = true;
-        getComponentForm().registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            if(callback != null) {
+                getAnimationManager().addAnimation(a, callback);
+            } else {
+                getAnimationManager().addAnimation(a);
+            }
         }
     }
     
@@ -2328,17 +2345,18 @@ public class Container extends Component implements Iterable<Component>{
             current.setWidth(beforeW[iter]);
             current.setHeight(beforeH[iter]);
         }
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(opacity, 255, a, componentCount, duration);
-        f.registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            getAnimationManager().addAnimation(a);
         }
     }
 
-    private void setAnimOpacity(int source, int dest, Anim a, int componentCount, int duration) {
+    private void setAnimOpacity(int source, int dest, MorphAnimation a, int componentCount, int duration) {
         if(source != dest) {
             a.opacity = new Motion[componentCount];
             for(int iter = 0 ; iter < componentCount ; iter++) {
@@ -2354,136 +2372,68 @@ public class Container extends Component implements Iterable<Component>{
     public Iterator<Component> iterator() {
         return components.iterator();
     }
-    
-    static class Anim implements Animation, Runnable {
-        private int animationType;
-        private long startTime;
-        private int duration;
+
+    static class TransitionAnimation extends ComponentAnimation {
         private Transition t;
-        private Component current;
-        private Component next;
-        private boolean started = false;
         private Container thisContainer;
-        private boolean finished = false;
-        private Form parent;
-        private Motion[][] motions;
-        Runnable onFinish;
         int growSpeed;
         int layoutAnimationSpeed;
         Vector animatedComponents;
         Motion[] opacity;
         boolean dontRevalidate;
-        private Component scrollTo;
-        
-        public Anim(Container thisContainer, int duration, Motion[][] motions) {
-            startTime = System.currentTimeMillis();
-            animationType = 2;
-            this.duration = duration;
-            this.thisContainer = thisContainer;
-            this.motions = motions;
-        }
+        private boolean started = false;
+        private boolean inProgress = true;
+        private Component current;
+        private Component next;
+        private Form parent;
+        private boolean destroyed;
 
-        public Anim(Container thisContainer, Component current, Component next, Transition t) {
-            animationType = 1;
+        TransitionAnimation(Container thisContainer, Component current, Component next, Transition t) {
             this.t = t;
             this.next = next;
             this.current = current;
             this.thisContainer = thisContainer;
             this.parent = thisContainer.getComponentForm();
         }
-
-        public boolean animate() {
-            switch(animationType) {
-                case 2:
-                    int componentCount = thisContainer.getComponentCount();
-                    if(motions != null){
-                        componentCount = motions[0].length;
-                    }
-                    
-                    if(animatedComponents != null) {
-                        componentCount = animatedComponents.size();
-                        for(int iter = 0 ; iter < componentCount ; iter++) {
-                            Component currentCmp = (Component)animatedComponents.elementAt(iter);
-
-                            currentCmp.setX(motions[0][iter].getValue());
-                            currentCmp.setY(motions[1][iter].getValue());
-                            currentCmp.setWidth(motions[2][iter].getValue());
-                            currentCmp.setHeight(motions[3][iter].getValue());
-                            if(opacity != null) {
-                                currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
-                            }
-                        }
-                    } else {
-                        for(int iter = 0 ; iter < componentCount ; iter++) {
-                            Component currentCmp = thisContainer.getComponentAt(iter);
-
-                            // this might happen if a container was replaced during animation
-                            if(currentCmp == null) {
-                                continue;
-                            }
-                            currentCmp.setX(motions[0][iter].getValue());
-                            currentCmp.setY(motions[1][iter].getValue());
-                            currentCmp.setWidth(motions[2][iter].getValue());
-                            currentCmp.setHeight(motions[3][iter].getValue());
-                            if(opacity != null) {
-                                currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
-                            }
-                        }
-                    }
-                    if(scrollTo != null) {
-                        boolean s = thisContainer.isSmoothScrolling();
-                        thisContainer.setSmoothScrolling(false);
-                        thisContainer.scrollComponentToVisible(scrollTo);
-                        thisContainer.setSmoothScrolling(s);
-                    }
-                    thisContainer.repaint();
-                    if(System.currentTimeMillis() - startTime >= duration) {
-                        enableLayoutOnPaint = true;
-                        thisContainer.dontRecurseContainer = false;
-                        Form f = thisContainer.getComponentForm();
-                        if(f == null) {
-                            return false;
-                        }
-                        f.deregisterAnimated(this);
-                        if(!dontRevalidate) {
-                            f.revalidate();
-                        }
-                        synchronized(this) {
-                            finished = true;
-                            notify();
-                        }
-                    }
-                    return false;
-
-                default:
-                    if (!started) {
-                        t.init(current, next);
-                        if(current != null) {
-                            current.setLightweightMode(true);
-                        }
-                        if(next != null) {
-                            next.setLightweightMode(true);
-                        }
-                        t.initTransition();
-                        started = true;
-                        if (thisContainer.cmpTransitions == null) {
-                            thisContainer.cmpTransitions = new Vector();
-                        }
-                        thisContainer.cmpTransitions.addElement(this);
-                    }
-                    boolean notFinished = t.animate();
-                    if (!notFinished) {
-                        thisContainer.cmpTransitions.removeElement(this);
-                        destroy();
-                    }
-                    return notFinished;
-            }
+        
+        public boolean isInProgress() {
+            return inProgress;
         }
 
-        public void destroy() {
-            if(parent != null){
-                parent.deregisterAnimatedInternal(this);
+        public void updateState() {
+            if(destroyed) {
+                return;
             }
+            if (!started) {
+                t.init(current, next);
+                if(current != null) {
+                    current.setLightweightMode(true);
+                }
+                if(next != null) {
+                    next.setLightweightMode(true);
+                }
+                t.initTransition();
+                started = true;
+                if (thisContainer.cmpTransitions == null) {
+                    thisContainer.cmpTransitions = new Vector();
+                }
+                thisContainer.cmpTransitions.addElement(this);
+            }
+            inProgress = t.animate();
+            if (!inProgress) {
+                thisContainer.cmpTransitions.removeElement(this);
+                destroy();
+                thisContainer.repaint();
+            } else {
+                Display.getInstance().repaint(t);
+            }
+        }        
+        
+        public void destroy() {
+            if(destroyed) {
+                return;
+            }
+            destroyed = true;
             next.setParent(null);
             thisContainer.replace(current, next, growSpeed > 0 || layoutAnimationSpeed > 0);
             //release the events blocking
@@ -2499,34 +2449,95 @@ public class Container extends Component implements Iterable<Component>{
                     }
                 }
             }
-            synchronized(this) {
-                finished = true;
-                notify();
+            inProgress = false;
+        }
+    }
+    
+    static class MorphAnimation extends ComponentAnimation {
+        private long startTime;
+        private int duration;
+        private Transition t;
+        private Container thisContainer;
+        private boolean finished = false;
+        private Motion[][] motions;
+        Runnable onFinish;
+        int growSpeed;
+        int layoutAnimationSpeed;
+        Vector animatedComponents;
+        Motion[] opacity;
+        boolean dontRevalidate;
+        private Component scrollTo;
+
+        public MorphAnimation(Container thisContainer, int duration, Motion[][] motions) {
+            startTime = System.currentTimeMillis();
+            this.duration = duration;
+            this.thisContainer = thisContainer;
+            this.motions = motions;
+        }
+
+        @Override
+        public boolean isInProgress() {
+            return !finished;
+        }
+
+        @Override
+        protected void updateState() {
+            int componentCount = thisContainer.getComponentCount();
+            if(motions != null){
+                componentCount = motions[0].length;
             }
-            if(onFinish != null) {
-                onFinish.run();
-            }
-        }
 
-        public void paint(Graphics g) {
-            t.paint(g);
-        }
+            if(animatedComponents != null) {
+                componentCount = animatedComponents.size();
+                for(int iter = 0 ; iter < componentCount ; iter++) {
+                    Component currentCmp = (Component)animatedComponents.elementAt(iter);
 
-        public boolean isFinished() {
-            return finished;
-        }
-
-        public void run() {
-            while (!isFinished()) {
-                try {
-                    synchronized(this) {
-                        wait(50);
+                    currentCmp.setX(motions[0][iter].getValue());
+                    currentCmp.setY(motions[1][iter].getValue());
+                    currentCmp.setWidth(motions[2][iter].getValue());
+                    currentCmp.setHeight(motions[3][iter].getValue());
+                    if(opacity != null) {
+                        currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
                     }
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
+                }
+            } else {
+                for(int iter = 0 ; iter < componentCount ; iter++) {
+                    Component currentCmp = thisContainer.getComponentAt(iter);
+
+                    // this might happen if a container was replaced during animation
+                    if(currentCmp == null) {
+                        continue;
+                    }
+                    currentCmp.setX(motions[0][iter].getValue());
+                    currentCmp.setY(motions[1][iter].getValue());
+                    currentCmp.setWidth(motions[2][iter].getValue());
+                    currentCmp.setHeight(motions[3][iter].getValue());
+                    if(opacity != null) {
+                        currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
+                    }
+                }
+            }
+            if(scrollTo != null) {
+                boolean s = thisContainer.isSmoothScrolling();
+                thisContainer.setSmoothScrolling(false);
+                thisContainer.scrollComponentToVisible(scrollTo);
+                thisContainer.setSmoothScrolling(s);
+            }
+            thisContainer.repaint();
+            if(System.currentTimeMillis() - startTime >= duration) {
+                enableLayoutOnPaint = true;
+                thisContainer.dontRecurseContainer = false;
+                Form f = thisContainer.getComponentForm();
+                finished = true;
+                if(f == null) {
+                    return;
+                }
+                if(!dontRevalidate) {
+                    f.revalidate();
                 }
             }
         }
+        
     }
 }
 
