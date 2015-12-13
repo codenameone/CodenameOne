@@ -153,6 +153,15 @@ public class Toolbar extends Container {
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }
+    
+    /**
+     * Returns the Toolbar title Component.
+     * 
+     * @return the Toolbar title component
+     */ 
+    public Component getTitleComponent(){
+        return titleComponent;
+    }
 
     /**
      * Adds a Command to the overflow menu
@@ -249,7 +258,7 @@ public class Toolbar extends Container {
             sideMenu.addCommand(cmd);
             sideMenu.installMenuBar();
         }
-        }
+    }
 
     /**
      * Find the command component instance if such an instance exists
@@ -562,7 +571,7 @@ public class Toolbar extends Container {
 
         @Override
         protected Component getTitleComponent() {
-            return titleComponent;
+            return Toolbar.this.getTitleComponent();
         }
 
         @Override

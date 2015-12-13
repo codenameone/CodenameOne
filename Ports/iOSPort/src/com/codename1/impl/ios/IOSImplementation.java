@@ -519,6 +519,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, final int i) {
         
+        // The very first time we try to edit a string, let's determine if the 
+        // system default is to do async editing.  If the system default
+        // is not yet set, we set it here, and it will be used as the default from now on
+        //  We do this because the nativeInstance.isAsyncEditMode() value changes
+        // to reflect the currently edited field so it isn't a good way to keep a
+        // system default.
+        String defaultAsyncEditingSetting = Display.getInstance().getProperty("ios.VKBAlwaysOpen", null);
+        if (defaultAsyncEditingSetting == null) {
+            defaultAsyncEditingSetting = nativeInstance.isAsyncEditMode() ? "true" : "false";
+            Display.getInstance().setProperty("ios.VKBAlwaysOpen", defaultAsyncEditingSetting);
+            
+        }
+        boolean asyncEdit = "true".equals(defaultAsyncEditingSetting) ? true : false;
+        //Log.p("Application default for async editing is "+asyncEdit);
+        
         try {
             if (currentEditing != cmp && currentEditing != null && currentEditing instanceof TextArea) {
                 Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
@@ -542,6 +557,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } finally {
                     doNotHideTextEditorSemaphore--;
                 }
+                
+                // Notice here that we are checking isAsyncEditMode() which looks
+                // at the previously edited text area.  Not the async mode
+                // of our upcoming field.
                 if(isAsyncEditMode()) {
                     // flush the EDT so the focus will work...
 
@@ -554,8 +573,35 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             
+           // Check if the form has any setting for asyncEditing that should override
+           // the application defaults.
             Form parentForm = cmp.getComponentForm();
-            if(!parentForm.isFormBottomPaddingEditingMode()) {
+            if (parentForm == null) {
+                //Log.p("Attempt to edit text area that is not on a form.  This is not supported");
+                return;
+            }
+            if (parentForm.getClientProperty("asyncEditing") != null) {
+                Object async = parentForm.getClientProperty("asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Form overriding asyncEdit due to asyncEditing client property: "+asyncEdit);
+                }
+            }
+            
+            if (parentForm.getClientProperty("ios.asyncEditing") != null) {
+                Object async = parentForm.getClientProperty("ios.asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Form overriding asyncEdit due to ios.asyncEditing client property: "+asyncEdit);
+                }
+                
+            }
+            
+            // If the system default is to use async editing, we need to check
+            // the form to make sure that it is scrollable.  If it is not 
+            // scrollable, then this field should default to Non-async
+            // editing - and should instead revert to legacy editing mode.
+            if(asyncEdit && !parentForm.isFormBottomPaddingEditingMode()) {
                 Container p = cmp.getParent();
                 while(p != null) {
                     if(p.isScrollableY()) {
@@ -564,12 +610,41 @@ public class IOSImplementation extends CodenameOneImplementation {
                     p = p.getParent();
                 }
                 // no scrollabel parent automatically configure the text field for legacy mode
-                nativeInstance.setAsyncEditMode(p != null);
+                //nativeInstance.setAsyncEditMode(p != null);
+                asyncEdit = p != null;
+                //Log.p("Overriding asyncEdit due to form scrollability: "+asyncEdit);
                 
-            } else {
-                nativeInstance.setAsyncEditMode(true);
+            } else if (parentForm.isFormBottomPaddingEditingMode()){
+                // If form uses bottom padding mode, then we will always
+                // use async edit (unless the field explicitly overrides it).
+                asyncEdit = true;
+                //Log.p("Overriding asyncEdit due to form bottom padding edit mode: "+asyncEdit);
             }
 
+            
+            // If the field itself explicitly sets async editing behaviour
+            // then this will override all other settings.
+            if (cmp.getClientProperty("asyncEditing") != null) {
+                Object async = cmp.getClientProperty("asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Overriding asyncEdit due to field asyncEditing client property: "+asyncEdit);
+                }
+            }
+            
+            if (cmp.getClientProperty("ios.asyncEditing") != null) {
+                Object async = cmp.getClientProperty("ios.asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Overriding asyncEdit due to field ios.asyncEditing client property: "+asyncEdit);
+                }
+                
+            }
+            
+            // Finally we set the async edit mode for this field.
+            //System.out.println("Async edit mode is "+asyncEdit);
+            nativeInstance.setAsyncEditMode(asyncEdit);
+            
             textEditorHidden = false;
             currentEditing = (TextArea)cmp;
 

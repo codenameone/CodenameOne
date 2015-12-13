@@ -1557,8 +1557,8 @@ public class Component implements Animation, StyleListener {
             Border b = par.getBorder();
             if (b.isBackgroundPainter()) {
                 g.translate(-par.getX(), -par.getY());
-                b.paintBorderBackground(g, par);
-                b.paint(g, par);
+                par.paintBorderBackground(g);
+                par.paintBorder(g);
                 g.translate(par.getX() - transX, par.getY() - transY);
                 return;
             }
@@ -3782,6 +3782,18 @@ public class Component implements Animation, StyleListener {
         }
     }
 
+    /**
+     * Draws the component border background if such a border exists.
+     * 
+     * @param g graphics context on which the border is painted
+     */
+    protected void paintBorderBackground(Graphics g) {
+        Border b = getBorder();
+        if (b != null) {
+            b.paintBorderBackground(g, this);
+        }
+    }
+    
     /**
      * Used as an optimization to mark that this component is currently being
      * used as a cell renderer
