@@ -24,8 +24,6 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Hashtable;
 
 /**
@@ -243,6 +241,16 @@ public class Font {
         return f;
     }
 
+    /**
+     * Indicates if this is a TTF native font that can be derived and manipulated. This is true for a font loaded from
+     * file (TTF) or using the native: font name
+     * 
+     * @return true if this is a native font
+     */
+    public boolean isTTFNativeFont() {
+        return ttf;
+    }
+    
     /**
      * Creates a new font instance based on the platform specific string name of the
      * font. This method isn't supported on some platforms.

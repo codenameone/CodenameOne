@@ -30,6 +30,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -2249,6 +2250,294 @@ public class Component implements Animation, StyleListener {
         return animationSpeed;
     }
 
+    static class AnimationTransitionPainter implements Painter{
+        int alpha;
+        Painter original;
+        Painter dest;
+
+        public void paint(Graphics g, Rectangle rect) {
+            int oAlpha = g.getAlpha();
+            if(alpha == 0) {
+                original.paint(g, rect);
+                return;
+            }
+            if(alpha == 255) {
+                dest.paint(g, rect);
+                return;
+            }
+            g.setAlpha(255 - alpha);
+            original.paint(g, rect);
+            g.setAlpha(alpha);
+            dest.paint(g, rect);
+            g.setAlpha(oAlpha);
+        }        
+    }
+    
+    /**
+     * Creates an animation that will transform the current component to the styling of the destination UIID when
+     * completed. Notice that fonts will only animate within the truetype and native familiy and we recommend that you
+     * don't shift weight/typeface/style as this might diminish the effect.<br />
+     * <b>Important: </b> Only unselected styles are animated but once the animation completes all styles are applied.
+     * @param destUIID the UIID to which this component will gradually shift
+     * @param duration the duration of the animation or the number of steps
+     * @return an animation component that can either be stepped or played
+     */
+    public ComponentAnimation createStyleAnimation(final String destUIID, final int duration) {
+        final Style sourceStyle = getUnselectedStyle();
+        final Style destStyle = getUIManager().getComponentStyle(destUIID);
+        
+        int d = duration;
+        
+        Motion m = null;
+        if(sourceStyle.getFgColor() != destStyle.getFgColor()) {
+            m = Motion.createLinearColorMotion(sourceStyle.getFgColor(), destStyle.getFgColor(), d);
+        }
+        final Motion fgColorMotion = m;
+        m = null;
+        
+        if(sourceStyle.getFont().getHeight() != destStyle.getFont().getHeight() && sourceStyle.getFont().isTTFNativeFont()) {
+            // allows for fractional font sizes
+            m = Motion.createLinearMotion(sourceStyle.getFont().getHeight() * 100, destStyle.getFont().getHeight() * 100, d);
+        }
+
+        final Motion fontMotion = m;
+        m = null;
+
+        if(sourceStyle.getPadding(TOP) != destStyle.getPadding(TOP)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(TOP), destStyle.getPadding(TOP), d);
+        }
+        final Motion paddingTop = m;
+        m = null;
+
+        if(sourceStyle.getPadding(BOTTOM) != destStyle.getPadding(BOTTOM)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(BOTTOM), destStyle.getPadding(BOTTOM), d);
+        }
+        final Motion paddingBottom = m;
+        m = null;
+
+        if(sourceStyle.getPadding(LEFT) != destStyle.getPadding(LEFT)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(LEFT), destStyle.getPadding(LEFT), d);
+        }
+        final Motion paddingLeft = m;
+        m = null;
+
+        if(sourceStyle.getPadding(RIGHT) != destStyle.getPadding(RIGHT)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(RIGHT), destStyle.getPadding(RIGHT), d);
+        }
+        final Motion paddingRight = m;
+        m = null;
+
+        if(sourceStyle.getMargin(TOP) != destStyle.getMargin(TOP)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(TOP), destStyle.getMargin(TOP), d);
+        }
+        final Motion marginTop = m;
+        m = null;
+
+        if(sourceStyle.getMargin(BOTTOM) != destStyle.getMargin(BOTTOM)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(BOTTOM), destStyle.getMargin(BOTTOM), d);
+        }
+        final Motion marginBottom = m;
+        m = null;
+
+        if(sourceStyle.getMargin(LEFT) != destStyle.getMargin(LEFT)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(LEFT), destStyle.getMargin(LEFT), d);
+        }
+        final Motion marginLeft = m;
+        m = null;
+
+        if(sourceStyle.getMargin(RIGHT) != destStyle.getMargin(RIGHT)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(RIGHT), destStyle.getMargin(RIGHT), d);
+        }
+        final Motion marginRight = m;
+        m = null;
+
+        if(paddingLeft != null || paddingRight != null || paddingTop != null || paddingBottom != null) {
+            // convert the padding to pixels for smooth animation
+            int left = sourceStyle.getPadding(LEFT);
+            int right = sourceStyle.getPadding(RIGHT);
+            int top = sourceStyle.getPadding(TOP);
+            int bottom = sourceStyle.getPadding(BOTTOM);
+            sourceStyle.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+            sourceStyle.setPadding(top, bottom, left, right);
+        }
+        
+        if(marginLeft != null || marginRight != null || marginTop != null || marginBottom != null) {
+            // convert the margin to pixels for smooth animation
+            int left = sourceStyle.getMargin(LEFT);
+            int right = sourceStyle.getMargin(RIGHT);
+            int top = sourceStyle.getMargin(TOP);
+            int bottom = sourceStyle.getMargin(BOTTOM);
+            sourceStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+            sourceStyle.setMargin(top, bottom, left, right);
+        }
+
+        final AnimationTransitionPainter ap = new AnimationTransitionPainter();
+        ap.alpha = 255;
+        ap.original = sourceStyle.getBgPainter();
+        ap.dest = destStyle.getBgPainter();
+        if(ap.dest == null) {
+            ap.dest = new BGPainter();
+        }
+        sourceStyle.setBgPainter(ap);
+        
+        final Motion bgMotion = Motion.createLinearMotion(0, 255, d);
+        
+        return new ComponentAnimation() {
+            private boolean finished;
+            @Override
+            public boolean isStepModeSupported() {
+                return true;
+            }
+
+            @Override
+            public int getMaxSteps() {
+                return duration;
+            }
+
+            
+            @Override
+            public void setStep(int step) {
+                if(!finished) {
+                    if(bgMotion != null) {
+                        bgMotion.setCurrentMotionTime(step);
+                    }
+                    if(fgColorMotion != null) {
+                        fgColorMotion.setCurrentMotionTime(step);
+                    }
+                    if(fontMotion != null) {
+                        fontMotion.setCurrentMotionTime(step);
+                    }
+                    if(paddingTop != null) {
+                        paddingTop.setCurrentMotionTime(step);
+                    }
+                    if(paddingBottom != null) {
+                        paddingBottom.setCurrentMotionTime(step);
+                    }
+                    if(paddingLeft != null) {
+                        paddingLeft.setCurrentMotionTime(step);
+                    }
+                    if(paddingRight != null) {
+                        paddingRight.setCurrentMotionTime(step);
+                    }
+                    if(marginTop != null) {
+                        marginTop.setCurrentMotionTime(step);
+                    }
+                    if(marginBottom != null) {
+                        marginBottom.setCurrentMotionTime(step);
+                    }
+                    if(marginLeft != null) {
+                        marginLeft.setCurrentMotionTime(step);
+                    }
+                    if(marginRight != null) {
+                        marginRight.setCurrentMotionTime(step);
+                    }
+                }
+                super.setStep(step);
+            }
+            
+            @Override
+            public boolean isInProgress() {
+                return !((bgMotion == null || bgMotion.isFinished()) && 
+                        (fgColorMotion == null || fgColorMotion.isFinished()) &&
+                        (paddingLeft == null || paddingLeft.isFinished()) &&
+                        (paddingRight == null || paddingRight.isFinished()) &&
+                        (paddingTop == null || paddingTop.isFinished()) &&
+                        (paddingBottom == null || paddingBottom.isFinished()) &&
+                        (marginLeft == null || marginLeft.isFinished()) &&
+                        (marginRight == null || marginRight.isFinished()) &&
+                        (marginTop == null || marginTop.isFinished()) &&
+                        (marginBottom == null || marginBottom.isFinished()) &&
+                        (fontMotion == null || fontMotion.isFinished()));
+            }
+
+            @Override
+            protected void updateState() {
+                if(finished) {
+                    return;
+                }
+                                
+                if(!isInProgress()) {
+                    finished = true;
+                    setUIID(destUIID);
+                } else {
+                    if(fgColorMotion != null) {
+                        sourceStyle.setFgColor(fgColorMotion.getValue());
+                    }
+                    if(bgMotion != null) {
+                        ap.alpha = bgMotion.getValue();
+                    }
+                    if(fontMotion != null) {
+                        Font fnt = sourceStyle.getFont();
+                        fnt = fnt.derive(((float)fontMotion.getValue()) / 100.0f, fnt.getStyle());
+                        sourceStyle.setFont(fnt);
+                    }
+                    if(paddingTop != null) {
+                        sourceStyle.setPadding(TOP, paddingTop.getValue());
+                    }
+                    if(paddingBottom != null) {
+                        sourceStyle.setPadding(BOTTOM, paddingBottom.getValue());
+                    }
+                    if(paddingLeft != null) {
+                        sourceStyle.setPadding(LEFT, paddingLeft.getValue());
+                    }
+                    if(paddingRight != null) {
+                        sourceStyle.setPadding(RIGHT, paddingRight.getValue());
+                    }
+                    if(marginTop != null) {
+                        sourceStyle.setMargin(TOP, marginTop.getValue());
+                    }
+                    if(marginBottom != null) {
+                        sourceStyle.setMargin(BOTTOM, marginBottom.getValue());
+                    }
+                    if(marginLeft != null) {
+                        sourceStyle.setMargin(LEFT, marginLeft.getValue());
+                    }
+                    if(marginRight != null) {
+                        sourceStyle.setMargin(RIGHT, marginRight.getValue());
+                    }
+                }
+            }
+
+            @Override
+            public void flush() {
+                if(bgMotion != null) {
+                    bgMotion.finish();
+                }
+                if(fgColorMotion != null) {
+                    fgColorMotion.finish();
+                }
+                if(fontMotion != null) {
+                    fontMotion.finish();
+                }
+                if(paddingTop != null) {
+                    paddingTop.finish();
+                }
+                if(paddingBottom != null) {
+                    paddingBottom.finish();
+                }
+                if(paddingLeft != null) {
+                    paddingLeft.finish();
+                }
+                if(paddingRight != null) {
+                    paddingRight.finish();
+                }
+                if(marginTop != null) {
+                    marginTop.finish();
+                }
+                if(marginBottom != null) {
+                    marginBottom.finish();
+                }
+                if(marginLeft != null) {
+                    marginLeft.finish();
+                }
+                if(marginRight != null) {
+                    marginRight.finish();
+                }
+                updateState();
+            }
+        };
+    }
+    
     /**
      * Scroll animation speed in milliseconds allowing a developer to slow down or accelerate
      * the smooth animation mode
@@ -4830,6 +5119,11 @@ public class Component implements Animation, StyleListener {
                 } else {
                     s = getStyle();
                 }
+                paintImpl(g, rect, s);
+            }
+        }
+
+        private void paintImpl(Graphics g, Rectangle rect, Style s) {
                 int x = rect.getX();
                 int y = rect.getY();
                 int width = rect.getSize().getWidth();
@@ -4989,9 +5283,8 @@ public class Component implements Animation, StyleListener {
                             return;
                     }
                 }
-            }
         }
-
+        
         public boolean animate() {
             if(wMotion.isFinished() && hMotion.isFinished()) {
                 getComponentForm().deregisterAnimated(this);

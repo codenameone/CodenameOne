@@ -3130,12 +3130,23 @@ public class Form extends Container {
      * Sets the Form Toolbar
      * 
      * @param toolbar 
+     * @deprecated use setToolbar instead (lower case b)
      */
     public void setToolBar(Toolbar toolbar){
         this.toolbar =toolbar;
         setMenuBar(toolbar.getMenuBar());
     }
 
+    /**
+     * Sets the Form Toolbar
+     * 
+     * @param toolbar 
+     */
+    public void setToolbar(Toolbar toolbar){
+        this.toolbar =toolbar;
+        setMenuBar(toolbar.getMenuBar());
+    }
+    
     /**
      * Gets the Form Toolbar if exists or null
      * 

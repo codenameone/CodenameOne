@@ -388,13 +388,13 @@ public class SideMenuBar extends MenuBar {
                 
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
-                    Button b = new Button(rightCommand);
+                    final Button b = new Button(rightCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
                     b.setTextPosition(txtPosition);
                     
                     BorderLayout bl = (BorderLayout) l;
-                    Component east = bl.getEast();
+                    final Component east = bl.getEast();
                     if (east == null) {
                         getTitleAreaContainer().addComponent(BorderLayout.EAST, b);
                     } else {
@@ -423,11 +423,23 @@ public class SideMenuBar extends MenuBar {
                                 }                            
                             }
                             // we need this since the next line relies on this working
-                            east.getParent().removeComponentImplNoAnimationSafety(east);
-                            Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
-                            buttons.addComponent(east);
-                            buttons.addComponent(b);
-                            getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);
+                            if(getAnimationManager() != null) {
+                                getAnimationManager().flushAnimation(new Runnable() {
+                                    public void run() {
+                                        east.getParent().removeComponent(east);
+                                        Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
+                                        buttons.addComponent(east);
+                                        buttons.addComponent(b);
+                                        getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);
+                                    }
+                                });
+                            } else {
+                                east.getParent().removeComponent(east);
+                                Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
+                                buttons.addComponent(east);
+                                buttons.addComponent(b);
+                                getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);
+                            }
                         }
                     }
                 }

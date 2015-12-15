@@ -63,6 +63,7 @@ public class Motion {
 
     private static final int DECELERATION = 3;
     private static final int CUBIC = 4;
+    private static final int COLOR_LINEAR = 5;
     
     private int sourceValue;
     private int destinationValue;
@@ -202,6 +203,24 @@ public class Motion {
         return l;
     }
     
+    
+    /**
+     * Creates a linear motion starting from source value all the way to destination value for a color value.
+     * Unlike a regular linear motion a color linear motion is shifted based on channels where red, green & blue 
+     * get shifted separately.
+     * 
+     * @param sourceValue the color from which we are starting 
+     * @param destinationValue the destination color
+     * @param duration the length in milliseconds of the motion (time it takes to get from sourceValue to
+     * destinationValue)
+     * @return new motion object
+     */
+    public static Motion createLinearColorMotion(int sourceValue, int destinationValue, int duration) {
+        Motion l = new Motion(sourceValue, destinationValue, duration);
+        l.motionType = COLOR_LINEAR;
+        return l;
+    }
+
     /**
      * Creates a spline motion starting from source value all the way to destination value
      * 
@@ -395,6 +414,9 @@ public class Motion {
             case DECELERATION:
                 lastReturnedValue = getRubber();
                 break;
+            case COLOR_LINEAR:
+                lastReturnedValue = getColorLinear();
+                break;
             default:
                 lastReturnedValue = getLinear();
                 break;
@@ -421,6 +443,51 @@ public class Motion {
         } else {
             return Math.min(destinationValue, val);
         }
+    }
+
+    private int getColorLinear() {
+        if(isFinished()){
+            return destinationValue;
+        }
+        float totalTime = duration;
+        float currentTime = (int) getCurrentMotionTime();
+        if(currentMotionTime > -1) {
+            currentTime -= startTime;
+            totalTime -= startTime;
+        }
+        
+        int sourceR = (sourceValue >> 16) & 0xff;
+        int destR = (destinationValue >> 16) & 0xff;
+        int sourceG = (sourceValue >> 8) & 0xff;
+        int destG = (destinationValue >> 8) & 0xff;
+        int sourceB = sourceValue & 0xff;
+        int destB = destinationValue & 0xff;
+        
+        int disR = destR - sourceR;
+        int disG = destG - sourceG;
+        int disB = destB - sourceB;
+        int valR = (int)(sourceR + (currentTime / totalTime * disR));
+        int valG = (int)(sourceG + (currentTime / totalTime * disG));
+        int valB = (int)(sourceB + (currentTime / totalTime * disB));
+        
+        if(destR < sourceR) {
+            valR = Math.max(destR, valR);
+        } else {
+            valR = Math.min(destR, valR);
+        }
+        
+        if(destG < sourceG) {
+            valG = Math.max(destG, valG);
+        } else {
+            valG = Math.min(destG, valG);
+        }
+        
+        if(destB < sourceB) {
+            valB = Math.max(destB, valB);
+        } else {
+            valB = Math.min(destB, valB);
+        }
+        return (((valR) << 16) & 0xff0000) | (((valG) << 8) & 0xff00) | (valB & 0xff);
     }
     
     private int getFriction() {

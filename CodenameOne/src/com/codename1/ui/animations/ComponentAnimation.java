@@ -31,6 +31,36 @@ package com.codename1.ui.animations;
 public abstract class ComponentAnimation {
     private Object notifyLock;
     private Runnable onCompletion;
+    private int step = -1;
+    
+    /**
+     * Step mode allows stepping thru an animation one frame at a time, e.g. when scrolling down an animation
+     * might change title elements then change them back as we scroll up.
+     * @return true if this animation can be stepped in which case the setStep etc. methods should work.
+     */
+    public boolean isStepModeSupported() {
+        return false;
+    }
+    
+    /**
+     * Sets the current animation step to a value between 0 and maxSteps
+     * @param step the current step
+     */
+    public void setStep(int step) {
+        this.step = step;
+    }
+    
+    public int getStep() {
+        return step;
+    }
+    
+    /**
+     * The total number of steps in this animation. 
+     * @return the number of steps
+     */
+    public int getMaxSteps() {
+        return 100;
+    }
     
     /**
      * Indicates if the animation is in progress
@@ -89,5 +119,46 @@ public abstract class ComponentAnimation {
             throw new RuntimeException("setOnCompletion shouldn't be invoked more than once"); 
         }
         this.onCompletion = r;
+    }
+    
+    /**
+     * Allows us to create an animation that compounds several separate animations so they appear as a 
+     * single animation to the system and process in parallel
+     * @param anims the animations
+     * @return the compounded animation
+     */
+    public static ComponentAnimation compoundAnimation(ComponentAnimation... anims) {
+        return new CompoundAnimation(anims);
+    }
+    
+    static class CompoundAnimation extends ComponentAnimation {
+        private ComponentAnimation[] anims;
+        public CompoundAnimation(ComponentAnimation[] anims) {
+            this.anims = anims;
+        }
+
+        @Override
+        public boolean isInProgress() {
+            for(ComponentAnimation a : anims) {
+                if(a.isInProgress()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        protected void updateState() {
+            for(ComponentAnimation a : anims) {
+                a.updateState();
+            }
+        }
+        
+        @Override
+        public void flush() {
+            for(ComponentAnimation a : anims) {
+                a.flush();
+            }
+        }
     }
 }
