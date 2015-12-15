@@ -422,7 +422,8 @@ public class SideMenuBar extends MenuBar {
                                     continue;
                                 }                            
                             }
-                            east.getParent().removeComponent(east);
+                            // we need this since the next line relies on this working
+                            east.getParent().removeComponentImplNoAnimationSafety(east);
                             Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
                             buttons.addComponent(east);
                             buttons.addComponent(b);
