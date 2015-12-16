@@ -100,6 +100,8 @@ public class Contact {
                 displayName = getFirstName();
             } else if (getFamilyName() != null) {
                 displayName = getFamilyName();
+            } else {
+                displayName = id;
             }
         }
         return displayName;
