@@ -2250,25 +2250,38 @@ public class Component implements Animation, StyleListener {
         return animationSpeed;
     }
 
-    static class AnimationTransitionPainter implements Painter{
+    class AnimationTransitionPainter implements Painter{
         int alpha;
+        Style originalStyle;
+        Style destStyle;
         Painter original;
         Painter dest;
 
         public void paint(Graphics g, Rectangle rect) {
             int oAlpha = g.getAlpha();
             if(alpha == 0) {
+                unSelectedStyle = originalStyle;
                 original.paint(g, rect);
                 return;
             }
             if(alpha == 255) {
+                unSelectedStyle = destStyle;
                 dest.paint(g, rect);
+                unSelectedStyle = originalStyle;
                 return;
             }
+            int opa = unSelectedStyle.getBgTransparency() & 0xff;
+            unSelectedStyle.setBgTransparency(255 - alpha);
             g.setAlpha(255 - alpha);
             original.paint(g, rect);
+            unSelectedStyle.setBgTransparency(opa);
+            unSelectedStyle = destStyle;
+            opa = unSelectedStyle.getBgTransparency() & 0xff;
             g.setAlpha(alpha);
+            unSelectedStyle.setBgTransparency(alpha);
             dest.paint(g, rect);
+            unSelectedStyle.setBgTransparency(opa);
+            unSelectedStyle = originalStyle;
             g.setAlpha(oAlpha);
         }        
     }
@@ -2372,18 +2385,26 @@ public class Component implements Animation, StyleListener {
         }
 
         final AnimationTransitionPainter ap = new AnimationTransitionPainter();
-        ap.alpha = 255;
-        ap.original = sourceStyle.getBgPainter();
-        ap.dest = destStyle.getBgPainter();
-        if(ap.dest == null) {
-            ap.dest = new BGPainter();
+        if(sourceStyle.getBgTransparency() != 0 || destStyle.getBgTransparency() != 0 ||
+                (sourceStyle.getBorder() != null && sourceStyle.getBorder().isEmptyBorder()) || 
+                (destStyle.getBorder() != null && destStyle.getBorder().isEmptyBorder()) || 
+                sourceStyle.getBgImage() != null || destStyle.getBgImage() != null) {
+            ap.original = sourceStyle.getBgPainter();
+            ap.dest = destStyle.getBgPainter();
+            ap.originalStyle = sourceStyle;
+            ap.destStyle = destStyle;
+            if(ap.dest == null) {
+                ap.dest = new BGPainter();
+            }
+            sourceStyle.setBgPainter(ap);
         }
-        sourceStyle.setBgPainter(ap);
         
         final Motion bgMotion = Motion.createLinearMotion(0, 255, d);
         
         return new ComponentAnimation() {
             private boolean finished;
+            private boolean stepMode;
+            
             @Override
             public boolean isStepModeSupported() {
                 return true;
@@ -2397,6 +2418,7 @@ public class Component implements Animation, StyleListener {
             
             @Override
             public void setStep(int step) {
+                stepMode = true;
                 if(!finished) {
                     if(bgMotion != null) {
                         bgMotion.setCurrentMotionTime(step);
@@ -2437,7 +2459,8 @@ public class Component implements Animation, StyleListener {
             
             @Override
             public boolean isInProgress() {
-                return !((bgMotion == null || bgMotion.isFinished()) && 
+                return stepMode ||
+                        !((bgMotion == null || bgMotion.isFinished()) && 
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&
                         (paddingLeft == null || paddingLeft.isFinished()) &&
                         (paddingRight == null || paddingRight.isFinished()) &&

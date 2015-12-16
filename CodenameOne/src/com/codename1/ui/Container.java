@@ -545,6 +545,11 @@ public class Container extends Component implements Iterable<Component>{
     void insertComponentAt(final int index, final Object constraint, final Component cmp) {
         AnimationManager a = getAnimationManager();
         if(a != null && a.isAnimating()) {
+            // pretend like the component was already added
+            if(cmp.getParent() != null) {
+                throw new IllegalArgumentException("Component is already contained in Container: " + cmp.getParent());
+            }
+            cmp.setParent(this);
             a.addAnimation(new ComponentAnimation() {
                 @Override
                 public boolean isInProgress() {
@@ -553,10 +558,12 @@ public class Container extends Component implements Iterable<Component>{
 
                 @Override
                 protected void updateState() {
+                    cmp.setParent(null);
                     if(constraint != null) {
                         layout.addLayoutComponent(constraint, cmp, Container.this);
                     }
                     insertComponentAtImpl(index, cmp);
+                    revalidate();
                 }
             });
         } else {
@@ -867,6 +874,8 @@ public class Container extends Component implements Iterable<Component>{
     void removeComponentImpl(final Component cmp) {
         AnimationManager a = getAnimationManager();
         if(a != null && a.isAnimating()) {
+            // pretend like the component was already removed
+            cmp.setParent(null);
             a.addAnimation(new ComponentAnimation() {
                 @Override
                 public boolean isInProgress() {
@@ -876,6 +885,7 @@ public class Container extends Component implements Iterable<Component>{
                 @Override
                 protected void updateState() {
                     removeComponentImplNoAnimationSafety(cmp);
+                    revalidate();
                 }
             });
         } else {
