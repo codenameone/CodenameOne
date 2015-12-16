@@ -123,13 +123,15 @@ public final class AnimationManager {
     public void onTitleScrollAnimation(final ComponentAnimation... cna) {
         parentForm.getContentPane().addScrollListener(new ScrollListener() {
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                for(ComponentAnimation c : cna) {
-                    if(scrollY < c.getMaxSteps()) {
-                        c.setStep(scrollY);
-                        c.updateAnimationState();
-                    }
-                } 
-                parentForm.revalidate();
+                if(scrollY >= 0) {
+                    for(ComponentAnimation c : cna) {
+                        if(scrollY < c.getMaxSteps()) {
+                            c.setStep(scrollY);
+                            c.updateAnimationState();
+                        }
+                    } 
+                    parentForm.revalidate();
+                }
             }
         });
     }

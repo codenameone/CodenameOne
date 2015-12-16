@@ -60,8 +60,8 @@ public class ComponentGroup extends Container {
         }
     }
 
-    void insertComponentAt(int index, Component cmp) {
-        super.insertComponentAt(index, null, cmp);
+    void insertComponentAt(int index, Object con, Component cmp) {
+        super.insertComponentAt(index, con, cmp);
         updateUIIDs();
     }
 

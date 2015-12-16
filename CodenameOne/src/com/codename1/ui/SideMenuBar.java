@@ -422,24 +422,12 @@ public class SideMenuBar extends MenuBar {
                                     continue;
                                 }                            
                             }
-                            // we need this since the next line relies on this working
-                            if(getAnimationManager() != null) {
-                                getAnimationManager().flushAnimation(new Runnable() {
-                                    public void run() {
-                                        east.getParent().removeComponent(east);
-                                        Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
-                                        buttons.addComponent(east);
-                                        buttons.addComponent(b);
-                                        getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);
-                                    }
-                                });
-                            } else {
-                                east.getParent().removeComponent(east);
-                                Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
-                                buttons.addComponent(east);
-                                buttons.addComponent(b);
-                                getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);
-                            }
+
+                            east.getParent().removeComponent(east);
+                            Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
+                            buttons.addComponent(east);
+                            buttons.addComponent(b);
+                            getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);
                         }
                     }
                 }

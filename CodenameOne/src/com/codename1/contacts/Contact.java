@@ -175,7 +175,7 @@ public class Contact {
      * @return the Contact primary email or null if not declared
      */
     public String getPrimaryEmail() {
-        if(primaryEmail == null) {
+        if(primaryEmail == null && emails != null) {
             Collection c = emails.values();
             if(c.size() > 0) {
                 return (String)c.iterator().next();
@@ -190,7 +190,7 @@ public class Contact {
      * @return the Contact primary phone number or null if not declared
      */
     public String getPrimaryPhoneNumber() {
-        if(primaryPhoneNumber == null) {
+        if(primaryPhoneNumber == null && phoneNumbers != null) {
             Collection c = phoneNumbers.values();
             if(c.size() > 0) {
                 return (String)c.iterator().next();
