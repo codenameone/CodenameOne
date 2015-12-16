@@ -1264,14 +1264,22 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                     }
                 }
-                ng.clip = new Rectangle(x, y, width, height);
+                if (ng.clip == null || !(ng.clip instanceof Rectangle)) {
+                    ng.clip = new Rectangle(x, y, width, height);
+                } else {
+                    ((Rectangle)ng.clip).setBounds(x, y, width, height);
+                }
                 if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
                     ng.setNativeClipping(x, y, width, height, ng.clipApplied);
                     ng.clipApplied = true;
                     ng.clipDirty = true;
                 }
             } else {
-                ng.clip = new Rectangle(x,y,width,height);
+                if (ng.clip == null || !(ng.clip instanceof Rectangle)) {
+                    ng.clip = new Rectangle(x,y,width,height);
+                } else {
+                    ((Rectangle)ng.clip).setBounds(x, y, width, height);
+                }
                 GeneralPath gp = new GeneralPath();
                 gp.append(ng.clip.getPathIterator(ng.transform), false);
                 //gp.append(ng.clip.getPathIterator(ng.transform), false);
@@ -1407,7 +1415,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return;
                 }
                 
-                Shape newClip = s.intersection(ng.reusableRect);
+                Shape newClip = null;
+                if (s.getClass() == Rectangle.class && ng.clip.getClass() == Rectangle.class) {
+                    ((Rectangle)s).intersection(ng.reusableRect, (Rectangle)ng.clip);
+                    newClip = ng.clip;
+                } else {
+                    newClip = s.intersection(ng.reusableRect);
+                }
                 if ( newClip.isRectangle() ){
                     Rectangle r = newClip.getBounds();
                     ng.clip = r;
