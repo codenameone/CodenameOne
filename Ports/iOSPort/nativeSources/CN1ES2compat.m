@@ -8,6 +8,10 @@
 GLKMatrix4 CN1modelViewMatrix;
 GLKMatrix4 CN1projectionMatrix;
 GLKMatrix4 CN1transformMatrix;
+int CN1projectionMatrixVersion=0;
+int CN1modelViewMatrixVersion=0;
+int CN1transformMatrixVersion=0;
+
 static BOOL CN1ClientState_GL_COLOR_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_EDGE_FLAG_ARRAY = FALSE;
 static BOOL CN1ClientState_GL_FOG_COORD_ARRAY = FALSE;
@@ -68,6 +72,15 @@ static GLenum CN1textureMaskPointerType;
 static GLsizei CN1textureMaskPointerSize;
 
 static GLKVector4 CN1currentColor;
+
+BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2) {
+    for (int i=0; i<16; i++) {
+        if (m2.m[i] != m1.m[i]) {
+            return NO;
+        }
+    }
+    return YES;
+}
 
 static int _getGLSize(GLenum type){
     int elSize = 1;
@@ -175,7 +188,10 @@ static void CN1compileBasicProgram(){
     if ( CN1ProgramLoaded ){
         return;
     }
-    CN1transformMatrix = GLKMatrix4Identity;
+    if (!cn1CompareMatrices(CN1transformMatrix, GLKMatrix4Identity)) {
+        CN1transformMatrix = GLKMatrix4Identity;
+        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
+    }
     //CN1transformMatrix = GLKMatrix4MakeIdentity();
     
     NSLog(@"Compiling basic program");
@@ -470,13 +486,22 @@ void glMatrixModeES2(GLenum mode){
 }
 
 
+
+
 void glLoadIdentityES2(){
     //NSLog(@"Loading identity");
     if ( CN1matrixMode == GL_PROJECTION ){
-        CN1projectionMatrix =GLKMatrix4Identity;
+        if (!cn1CompareMatrices(CN1projectionMatrix, GLKMatrix4Identity)) {
+            CN1projectionMatrix =GLKMatrix4Identity;
+            CN1projectionMatrixVersion = (CN1projectionMatrixVersion +1) % 10000;
+        }
+        
         //CN1updateProjectionMatrixES2();
     } else if ( CN1matrixMode == GL_MODELVIEW ){
-        CN1modelViewMatrix = GLKMatrix4Identity;//GLKMatrix4Make(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+        if (!cn1CompareMatrices(CN1modelViewMatrix, GLKMatrix4Identity)) {
+            CN1modelViewMatrix = GLKMatrix4Identity;//GLKMatrix4Make(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+            CN1modelViewMatrixVersion = (CN1modelViewMatrixVersion+1) % 10000;
+        }
         //CN1updateModelViewMatrixES2();
     } else {
          NSLog(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
@@ -489,10 +514,16 @@ void glOrthofES2(GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLflo
     //NSLog(@"Setting orthographic projection %f %f %f %f %f %f", left, right, bottom, top, nearZ, farZ);
     GLKMatrix4 ortho = GLKMatrix4MakeOrtho(left, right, bottom, top, nearZ, farZ);
     if (CN1matrixMode == GL_PROJECTION ){
-        CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, ortho);
+        if (!cn1CompareMatrices(ortho, GLKMatrix4Identity)) {
+            CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, ortho);
+            CN1projectionMatrixVersion = (CN1projectionMatrixVersion+1)%10000;
+        }
         //CN1updateProjectionMatrixES2();
     } else if ( CN1matrixMode == GL_MODELVIEW ){
-        CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, ortho);
+        if (!cn1CompareMatrices(ortho, GLKMatrix4Identity)) {
+            CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, ortho);
+            CN1modelViewMatrixVersion = (CN1modelViewMatrixVersion+1)%10000;
+        }
         //CN1updateModelViewMatrixES2();
     } else {
         NSLog(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
@@ -540,10 +571,16 @@ void glScalefES2(GLfloat xScale, GLfloat yScale, GLfloat zScale){
     //NSLog(@"Scaling %f %f %f", xScale, yScale, zScale);
     GLKMatrix4 scale = GLKMatrix4MakeScale(xScale, yScale, zScale);
     if ( CN1matrixMode == GL_PROJECTION ){
-        CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, scale);
+        if (!cn1CompareMatrices(GLKMatrix4Identity, scale)) {
+            CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, scale);
+            CN1projectionMatrixVersion = (CN1projectionMatrixVersion+1)%10000;
+        }
         //CN1updateProjectionMatrixES2();
     } else {
-        CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, scale);
+        if (!cn1CompareMatrices(GLKMatrix4Identity, scale)) {
+            CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, scale);
+            CN1modelViewMatrixVersion = (CN1modelViewMatrixVersion+1)%10000;
+        }
         //CN1updateModelViewMatrixES2();
         
     }
@@ -554,10 +591,16 @@ void glTranslatefES2(GLfloat x, GLfloat y, GLfloat z){
     GLKMatrix4 translate = GLKMatrix4MakeTranslation(x, y, z);
     //NSLog(@"Translation matrix is %@", NSStringFromGLKMatrix4(translate));
     if ( CN1matrixMode == GL_PROJECTION ){
-        CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, translate);
+        if (!cn1CompareMatrices(GLKMatrix4Identity, translate)) {
+            CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, translate);
+            CN1projectionMatrixVersion = (CN1projectionMatrixVersion+1)%10000;
+        }
         //CN1updateProjectionMatrixES2();
     } else {
-        CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, translate);
+        if (!cn1CompareMatrices(GLKMatrix4Identity, translate)) {
+            CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, translate);
+            CN1projectionMatrixVersion = (CN1projectionMatrixVersion+1)%10000;
+        }
         //CN1updateModelViewMatrixES2();
     }
 }
@@ -569,16 +612,25 @@ void glRotatefES2(GLfloat angle, GLfloat x, GLfloat y, GLfloat z){
     angle = angle * M_PI / 180.0;
     GLKMatrix4 rotate = GLKMatrix4MakeRotation(angle, x, y, z);
     if ( CN1matrixMode == GL_PROJECTION ){
-        CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, rotate);
+        if (!cn1CompareMatrices(GLKMatrix4Identity, rotate)) {
+            CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, rotate);
+            CN1projectionMatrixVersion = (CN1projectionMatrixVersion+1)%10000;
+        }
         //CN1updateProjectionMatrixES2();
     } else {
-        CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, rotate);
+        if (!cn1CompareMatrices(GLKMatrix4Identity, rotate)) {
+            CN1modelViewMatrix = GLKMatrix4Multiply(CN1modelViewMatrix, rotate);
+            CN1modelViewMatrixVersion = (CN1modelViewMatrixVersion+1)%10000;
+        }
         //CN1updateModelViewMatrixES2();
     }
 }
 
 void glSetTransformES2(GLKMatrix4 t){
-    CN1transformMatrix = t;
+    if (!cn1CompareMatrices(t, CN1transformMatrix)) {
+        CN1transformMatrix = t;
+        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
+    }
     //CN1updateTransformMatrixES2();
 }
 

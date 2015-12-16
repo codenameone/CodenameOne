@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 #import "FillRect.h"
@@ -28,6 +28,9 @@
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
+extern int CN1modelViewMatrixVersion;
+extern int CN1projectionMatrixVersion;
+extern int CN1transformMatrixVersion;
 extern GLuint CN1activeProgram;
 static GLuint program=0;
 static GLuint vertexShader;
@@ -38,6 +41,9 @@ static GLuint transformMatrixUniform;
 static GLuint colorUniform;
 static GLuint vertexCoordAtt;
 static GLuint textureCoordAtt;
+static int currentCN1modelViewMatrixVersion=-1;
+static int currentCN1projectionMatrixVersion=-1;
+static int currentCN1transformMatrixVersion=-1;
 
 
 static NSString *fragmentShaderSrc =
@@ -118,12 +124,21 @@ static GLuint getOGLProgram(){
     glEnableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
     
-    glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
-    GLErrorLog;
+    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
+        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
+        GLErrorLog;
+        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
+    }
+    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
+        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
+        GLErrorLog;
+        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
+    }
+    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
+        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
+        GLErrorLog;
+        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
+    }
     glUniform4fv(colorUniform, 1, colorV.v);
     GLErrorLog;
     
@@ -131,7 +146,7 @@ static GLuint getOGLProgram(){
     //GLErrorLog;
     glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
     GLErrorLog;
-
+    
     
     //GLErrorLog;
     //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
@@ -151,7 +166,7 @@ static GLuint getOGLProgram(){
 #else
 -(void)execute {
     //[UIColorFromRGB(color, alpha) set];
-    //CGContextFillRect(context, CGRectMake(x, y, width, height));    
+    //CGContextFillRect(context, CGRectMake(x, y, width, height));
     GlColorFromRGB(color, alpha);
     GLfloat vertexes[] = {
         x, y,
@@ -173,7 +188,7 @@ static GLuint getOGLProgram(){
 
 #ifndef CN1_USE_ARC
 -(void)dealloc {
-	[super dealloc];
+    [super dealloc];
 }
 #endif
 

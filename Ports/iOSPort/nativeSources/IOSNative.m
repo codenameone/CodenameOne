@@ -3283,10 +3283,34 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
             } else {
                 if(last != nil) {
                     com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG last));
+                } else {
+                    ABMultiValueRef emailsTmp = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
+                    int emailCountTmp = ABMultiValueGetCount(emailsTmp);
+                    if(emailCountTmp > 0) {
+                        NSString *kTmp = (BRIDGE_CAST NSString *)ABMultiValueCopyValueAtIndex(emailsTmp, 0);
+                        com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG kTmp));
+                    } else {
+                        ABMultiValueRef numbers = ABRecordCopyValue(i, kABPersonPhoneProperty);
+                        int numbersCount = ABMultiValueGetCount(numbers);
+                        if(numbersCount > 0) {
+                            NSString *k = (BRIDGE_CAST NSString *)ABMultiValueCopyValueAtIndex(numbers, 0);
+                            com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG k));
+                        } else {
+                            NSString* org = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonOrganizationProperty);
+                            if(org != nil) {
+                                com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG org));
+                            } else {
+                                com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG @"Unnamed Contact"));
+                            }
+                        }
+                    }
+
                 }
             }
         }
+        //NSLog(@"%@", toNSString(CN1_THREAD_STATE_PASS_ARG com_codename1_contacts_Contact_getDisplayName___R_java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt)));
     }
+
     
     NSString* note = (BRIDGE_CAST NSString*)ABRecordCopyValue(i, kABPersonNoteProperty);
     if(note != nil) {

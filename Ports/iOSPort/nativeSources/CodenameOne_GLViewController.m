@@ -181,15 +181,20 @@ int isIPad() {
 
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 
+int cn1IsIOS8 = -1;
+
 BOOL isIOS8() {
-    return !SYSTEM_VERSION_LESS_THAN(@"8.0");
+    if (cn1IsIOS8 < 0) {
+        cn1IsIOS8 = !SYSTEM_VERSION_LESS_THAN(@"8.0") ? 1:0;
+    }
+    return cn1IsIOS8 > 0;
 }
 
 BOOL isVKBAlwaysOpen() {
     if(vkbAlwaysOpen) {
         if(isIOS8() && !isIPad() && displayWidth > displayHeight) {
             return NO;
-        } else if (!isIPad() && ([[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeLeft || [[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeRight)) {
+        } else if (!isIOS8() && !isIPad() && ([[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeLeft || [[UIApplication sharedApplication] statusBarOrientation] == UIInterfaceOrientationLandscapeRight)) {
             // iOS 7 needs a more specific check to find out if we are in landscape mode
             return NO;
         }
@@ -1462,12 +1467,17 @@ bool lockDrawing;
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1transformMatrix;
+extern int CN1transformMatrixVersion;
+extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
 #endif
 
 - (void)awakeFromNib
 {
 #ifdef USE_ES2
-    CN1transformMatrix = GLKMatrix4Identity;
+    if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
+        CN1transformMatrix = GLKMatrix4Identity;
+        CN1transformMatrixVersion = (CN1transformMatrixVersion+1)%10000;
+    }
 #endif
     retinaBug = isRetinaBug();
     if(retinaBug) {
