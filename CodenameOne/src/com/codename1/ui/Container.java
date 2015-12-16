@@ -34,8 +34,10 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Vector;
 
@@ -1106,6 +1108,76 @@ public class Container extends Component implements Iterable<Component>{
         return true;
     }
     
+    
+    
+    private int calculateFirstPaintableOffset(int clipX1, int clipY1, int clipX2, int clipY2) {
+        int len = components.size();
+        Layout l = getLayout();
+        if (l.getClass() == BoxLayout.class) {
+            if (((BoxLayout)l).getAxis() == BoxLayout.Y_AXIS) {
+                // Use a binary search to find the first visible
+                int startPos = binarySearchFirstIntersectionY(clipY1, clipY2, 0, len);
+                if (startPos >= 0) {
+                    return startPos;
+                }
+                
+            }
+        }
+        return 0;
+    }
+    
+    
+    
+    private int calculateLastPaintableOffset(int pos, int clipX1, int clipY1, int clipX2, int clipY2) {
+        int len = components.size();
+        if (pos >= len-1) {
+            return pos;
+        }
+        Layout l = getLayout();
+        if (l.getClass() == BoxLayout.class) {
+            if (((BoxLayout)l).getAxis() == BoxLayout.Y_AXIS) {
+                // Use a binary search to find the first visible
+                Component c = components.get(++pos);
+                int cy1 = c.getBounds().getY();
+                
+                while (pos < len -1 && cy1 < clipY2 ) {
+                    c = components.get(++pos);
+                    cy1 = c.getBounds().getY();
+                }
+                return pos-1;
+                
+            }
+        }
+        return len-1;
+    }
+    
+    private int binarySearchFirstIntersectionY(int y1, int y2, int start, int end) {
+        if (start >= end) {
+            return -1;
+        }
+        int pos = (start + end) /2;
+        //System.out.println(start+","+end+","+pos+", y1="+y1+", y2="+y2);
+        Component c = components.get(pos);
+        Rectangle bounds = c.getBounds();
+        int cy1 = bounds.getY();
+        
+        int cy2 = bounds.getY() + bounds.getHeight();
+        //System.out.println("pos "+pos +", Y="+cy1+" Y1="+cy2);
+        if ((cy1 >= y1 && cy1<= y2)||(cy2>=y1 && cy2 <=y2)) {
+            // We have a hit let's roll backward until we find the first visible
+            while (pos > start && cy1 > y1) {
+                c = components.get(--pos);
+                cy1 = c.getBounds().getY();
+            }
+            //System.out.println("FOUND "+pos);
+            return pos;
+        } else if (cy1 > y2) {
+            return binarySearchFirstIntersectionY(y1, y2, start, pos);
+        } else {
+            return binarySearchFirstIntersectionY(y1, y2, pos+1, end);
+        }
+    }
+    
     /**
      * @inheritDoc
      */
@@ -1115,9 +1187,20 @@ public class Container extends Component implements Iterable<Component>{
         }
         g.translate(getX(), getY());
         int size = components.size();
+        int clipX1 = g.getClipX();
+        int clipX2 = g.getClipX() + g.getClipWidth();
+        int clipY1 = g.getClipY();
+        int clipY2 = g.getClipY() + g.getClipHeight();
+        int startIter = 0;
+        if (size >= 30) {
+            startIter = calculateFirstPaintableOffset(clipX1, clipY1, clipX2, clipY2);
+            //System.out.println("Start: "+startIter+", actual size "+size);
+            size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2)+1;
+            //System.out.println("New size: "+size);
+        }
         CodenameOneImplementation impl = Display.getInstance().getImplementation();
         if(dontRecurseContainer) {
-            for(int iter = 0 ; iter < size ; iter++) {
+            for(int iter = startIter ; iter < size ; iter++) {
                 Component cmp = components.get(iter);
                 if(cmp.getClass() == Container.class) {
                     paintContainerChildrenForAnimation((Container)cmp, g);
@@ -1126,7 +1209,7 @@ public class Container extends Component implements Iterable<Component>{
                 }
             }
         } else {
-            for(int iter = 0 ; iter < size ; iter++) {
+            for(int iter = startIter ; iter < size ; iter++) {
                 Component cmp = components.get(iter);
                 cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
             }
