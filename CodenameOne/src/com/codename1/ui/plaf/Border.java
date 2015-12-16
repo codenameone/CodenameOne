@@ -102,6 +102,8 @@ public class Border {
 
     private static Border empty;
     
+    private boolean emptyType;
+    
     /**
      * Prevents usage of new operator, use the factory methods in the class or subclass
      * to create new border types.
@@ -239,7 +241,17 @@ public class Border {
      * @return a border than draws nothing
      */
     public static Border createEmpty() {
-        return new Border();
+        Border b = new Border();
+        b.emptyType = true;
+        return b;
+    }
+    
+    /**
+     * Indicates whether this is an empty border
+     * @return true if this is an empty border
+     */
+    public boolean isEmptyBorder() {
+        return emptyType;
     }
     
     /**

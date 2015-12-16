@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.io.Util;
 import com.codename1.ui.animations.ComponentAnimation;
+import com.codename1.ui.events.ScrollListener;
 import java.util.ArrayList;
 
 /**
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 public final class AnimationManager {
     private final Form parentForm;
     private ArrayList<ComponentAnimation> anims = new ArrayList<ComponentAnimation>();
+    private ArrayList<Runnable> postAnimations = new ArrayList<Runnable>();
     
     AnimationManager(Form parentForm) {
         this.parentForm = parentForm;
@@ -58,6 +60,11 @@ public final class AnimationManager {
             } else {
                 c.updateAnimationState();
                 anims.remove(c);
+            }
+        } else {
+            while(postAnimations.size() > 0) {
+                postAnimations.get(0).run();
+                postAnimations.remove(0);
             }
         }
     }
@@ -106,5 +113,38 @@ public final class AnimationManager {
         an.setOnCompletion(callback);
         addAnimation(an);
         Display.getInstance().notifyDisplay();
+    }
+    
+    /**
+     * Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
+     * a big visual representation to a smaller title for easier navigation then back again when scrolling up
+     * @param cna the animation to bind to the scroll event
+     */
+    public void onTitleScrollAnimation(final ComponentAnimation... cna) {
+        parentForm.getContentPane().addScrollListener(new ScrollListener() {
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                if(scrollY >= 0) {
+                    for(ComponentAnimation c : cna) {
+                        if(scrollY < c.getMaxSteps()) {
+                            c.setStep(scrollY);
+                            c.updateAnimationState();
+                        }
+                    } 
+                    parentForm.revalidate();
+                }
+            }
+        });
+    }
+    
+    /**
+     * Invokes the runnable when all animations have completed
+     * @param r the runnable that will be invoked after the animations
+     */
+    public void flushAnimation(Runnable r) {
+        if(isAnimating()) {
+            postAnimations.add(r);
+        } else {
+            r.run();
+        }
     }
 }

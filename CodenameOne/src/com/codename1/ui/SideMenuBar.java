@@ -388,13 +388,13 @@ public class SideMenuBar extends MenuBar {
                 
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
-                    Button b = new Button(rightCommand);
+                    final Button b = new Button(rightCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
                     b.setTextPosition(txtPosition);
                     
                     BorderLayout bl = (BorderLayout) l;
-                    Component east = bl.getEast();
+                    final Component east = bl.getEast();
                     if (east == null) {
                         getTitleAreaContainer().addComponent(BorderLayout.EAST, b);
                     } else {
@@ -422,6 +422,7 @@ public class SideMenuBar extends MenuBar {
                                     continue;
                                 }                            
                             }
+
                             east.getParent().removeComponent(east);
                             Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
                             buttons.addComponent(east);
