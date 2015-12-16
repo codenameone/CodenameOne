@@ -875,6 +875,7 @@ public class Container extends Component implements Iterable<Component>{
         AnimationManager a = getAnimationManager();
         if(a != null && a.isAnimating()) {
             // pretend like the component was already removed
+            layout.removeLayoutComponent(cmp);
             cmp.setParent(null);
             a.addAnimation(new ComponentAnimation() {
                 @Override
