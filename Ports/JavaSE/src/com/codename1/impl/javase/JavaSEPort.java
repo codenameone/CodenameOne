@@ -3902,6 +3902,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setAlpha(Object graphics, int alpha) {
+        if(alpha > 255 || alpha < 0) {
+            throw new IllegalArgumentException("Invalid value for alpha: " + alpha);
+        }
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         float a = ((float) alpha) / 255.0f;
