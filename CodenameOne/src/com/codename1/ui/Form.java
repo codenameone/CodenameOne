@@ -67,6 +67,7 @@ import java.util.HashMap;
  */
 public class Form extends Container {
     private boolean globalAnimationLock;
+    static int activePeerCount;
     private Painter glassPane;
     private Container layeredPane;
     private Container contentPane;

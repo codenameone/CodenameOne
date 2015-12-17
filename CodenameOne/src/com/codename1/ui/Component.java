@@ -603,7 +603,9 @@ public class Component implements Animation, StyleListener {
      */
     public void setX(int x) {
         bounds.setX(x);
-        onParentPositionChange();
+        if(Form.activePeerCount > 0) {
+            onParentPositionChange();
+        }
     }
 
     /**
@@ -615,7 +617,9 @@ public class Component implements Animation, StyleListener {
      */
     public void setY(int y) {
         bounds.setY(y);
-        onParentPositionChange();
+        if(Form.activePeerCount > 0) {
+            onParentPositionChange();
+        }
     }
     
     /**

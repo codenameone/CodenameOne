@@ -145,6 +145,7 @@ public class PeerComponent extends Component {
      * @inheritDoc
      */
     protected void deinitialize() {
+        Form.activePeerCount--;
         super.deinitialize();
     }
 
@@ -179,6 +180,7 @@ public class PeerComponent extends Component {
      * @inheritDoc
      */
     protected void initComponent() {
+        Form.activePeerCount++;
         super.initComponent();
     }
 
