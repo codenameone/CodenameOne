@@ -1050,6 +1050,7 @@ public final class Display {
         synchronized(lock) {
             inputEventStackPointerTmp = inputEventStackPointer;
             inputEventStackPointer = 0;
+            lastDragOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
             inputEventStack = qt;
@@ -1059,6 +1060,7 @@ public final class Display {
         while(offset < inputEventStackPointerTmp) {            
             if(offset == inputEventStackPointer) {
                 inputEventStackPointer = 0;
+                lastDragOffset = -1;
             }
             offset = handleEvent(offset);
         }
@@ -1667,6 +1669,37 @@ public final class Display {
             lock.notify();
         }        
     }
+    
+    private int lastDragOffset;
+    private void addPointerDragEventWithTimestamp(int x, int y) {
+        synchronized(lock) {
+            if (this.dropEvents) {
+                return;
+            }
+            try {
+                if(lastDragOffset > -1) {
+                    inputEventStack[lastDragOffset] = x;
+                    inputEventStack[lastDragOffset + 1] = y;
+                    inputEventStack[lastDragOffset + 2] = (int)(System.currentTimeMillis() - displayInitTime);
+                } else {
+                    inputEventStack[inputEventStackPointer] = POINTER_DRAGGED;
+                    inputEventStackPointer++;
+                    lastDragOffset = inputEventStackPointer;
+                    inputEventStack[inputEventStackPointer] = x;
+                    inputEventStackPointer++;
+                    inputEventStack[inputEventStackPointer] = y;
+                    inputEventStackPointer++;
+                    inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+                    inputEventStackPointer++;
+                }
+            } catch(ArrayIndexOutOfBoundsException err) {
+                Log.p("EDT performance is very slow triggering this exception!");
+                Log.e(err);
+            }
+            lock.notify();
+        }        
+    }
+    
 
     private void addPointerEventWithTimestamp(int type, int x, int y) {
         synchronized(lock) {
@@ -1702,7 +1735,7 @@ public final class Display {
         }
         longPointerCharged = false;
         if(x.length == 1) {
-            addPointerEventWithTimestamp(POINTER_DRAGGED, x[0], y[0]);
+            addPointerDragEventWithTimestamp(x[0], y[0]);
         } else {
             addPointerEvent(POINTER_DRAGGED_MULTI, x, y);
         }
