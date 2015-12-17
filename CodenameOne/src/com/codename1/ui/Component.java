@@ -301,6 +301,7 @@ public class Component implements Animation, StyleListener {
     EventDispatcher pointerPressedListeners;
     EventDispatcher pointerReleasedListeners;
     EventDispatcher pointerDraggedListeners;
+    boolean isUnselectedStyle;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
@@ -3457,6 +3458,7 @@ public class Component implements Animation, StyleListener {
         if (unSelectedStyle == null) {
             initStyle();
         }
+        isUnselectedStyle = false;
 
         if(hasLead) {
             Component lead = getLeadComponent();
@@ -3473,6 +3475,7 @@ public class Component implements Animation, StyleListener {
                     return getSelectedStyle();
                 }
             }
+            isUnselectedStyle = true;
             return unSelectedStyle;
         }
 
@@ -3487,6 +3490,7 @@ public class Component implements Animation, StyleListener {
         if (hasFocus() && Display.getInstance().shouldRenderSelection(this)) {
             return getSelectedStyle();
         }
+        isUnselectedStyle = true;
         return unSelectedStyle;
     }
 

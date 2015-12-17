@@ -72,6 +72,7 @@ public class Label extends Component {
     private boolean shouldLocalize = true;
     private boolean showEvenIfBlank = false;
     private int shiftMillimeters = 1;
+    private int stringWidthUnselected = -1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -196,6 +197,7 @@ public class Label extends Component {
     public void setText(String text){
         this.text = text;
         localize();
+        stringWidthUnselected = -1;
         setShouldCalcPreferredSize(true);
         repaint();
     }
@@ -827,4 +829,20 @@ public class Label extends Component {
     public void setShowEvenIfBlank(boolean showEvenIfBlank) {
         this.showEvenIfBlank = showEvenIfBlank;
     }    
+    
+    /**
+     * This method is equivalent to label.getStyle().getFont().stringWidth(label.getText()) but its faster
+     * @param fnt the font is passed as an optimization to save a call to getStyle
+     * @return the string width
+     */
+    public int getStringWidth(Font fnt) {
+        if(isUnselectedStyle) {
+            // very optimized way to get the string width of a label for the common unselected case in larger lists
+            if(stringWidthUnselected < 0) {
+                stringWidthUnselected = fnt.stringWidth(text);
+            }
+            return stringWidthUnselected;
+        }
+        return fnt.stringWidth(text);
+    }
 }

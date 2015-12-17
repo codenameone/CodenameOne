@@ -1021,7 +1021,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             leftPadding +
                             rightPadding +
                             ((icon != null) ? icon.getWidth() + l.getGap() : 0) +
-                            font.stringWidth(text))) / 2;
+                            l.getStringWidth(font))) / 2;
                     x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
@@ -1033,7 +1033,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     x = x + (cmpWidth - (preserveSpaceForState + leftPadding +
                             rightPadding +
                             Math.max(((icon != null) ? icon.getWidth() + l.getGap() : 0),
-                            font.stringWidth(text)))) / 2;
+                            l.getStringWidth(font)))) / 2;
                     x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
@@ -1047,7 +1047,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.RIGHT:
                     x = cmpX + cmpWidth - rightPadding -
                             ( ((icon != null) ? (icon.getWidth() + gap) : 0) +
-                            font.stringWidth(text));
+                            l.getStringWidth(font));
                     if(l.isRTL()) {
                         x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);
                     } else {
@@ -1062,7 +1062,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.TOP:
                     x = cmpX + cmpWidth - rightPadding -
                              (Math.max(((icon != null) ? (icon.getWidth()) : 0),
-                            font.stringWidth(text)));
+                            l.getStringWidth(font)));
                     x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
@@ -1087,7 +1087,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         if (icon == null) { // no icon only string 
             drawLabelString(g, l, text, x, y, textSpaceW);
         } else {
-            int strWidth = font.stringWidth(text);
+            int strWidth = l.getStringWidth(font);
             int iconWidth = icon.getWidth();
             int iconHeight = icon.getHeight();
             int iconStringWGap;
@@ -1178,11 +1178,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         g.clipRect(x, cy, textSpaceW, ch);
 
         if (l.isTickerRunning()) {
+            Font font = style.getFont();
             if (l.getShiftText() > 0) {
                 if (l.getShiftText() > textSpaceW) {
-                    l.setShiftText(x - l.getX() - style.getFont().stringWidth(text));
+                    l.setShiftText(x - l.getX() - l.getStringWidth(font));
                 }
-            } else if (l.getShiftText() + style.getFont().stringWidth(text) < 0) {
+            } else if (l.getShiftText() + l.getStringWidth(font) < 0) {
                 l.setShiftText(textSpaceW);
             }
         }
@@ -1210,7 +1211,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         Font f = style.getFont();
         boolean rtl = l.isRTL();
         boolean isTickerRunning = l.isTickerRunning();
-        int txtW = f.stringWidth(text);
+        int txtW = l.getStringWidth(f);
         if ((!isTickerRunning) || rtl) {
             //if there is no space to draw the text add ... at the end
             if (txtW > textSpaceW && textSpaceW > 0) {
