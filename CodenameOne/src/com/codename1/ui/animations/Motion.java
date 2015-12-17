@@ -282,7 +282,7 @@ public class Motion {
     public static Motion createExponentialDecayMotion(int sourceValue, int maxValue, double initVelocity, double timeConstant) {
         Motion decayMotion = new Motion(sourceValue, initVelocity, timeConstant);
         decayMotion.destinationValue = maxValue;
-        decayMotion.targetPosition = sourceValue + (int)(initVelocity * (double)UIManager.getInstance().getThemeConstant("DecayMotionScaleFactorInt", 600));
+        decayMotion.targetPosition = sourceValue + (int)(initVelocity * (double)UIManager.getInstance().getThemeConstant("DecayMotionScaleFactorInt", 950));
         decayMotion.motionType = EXPONENTIAL_DECAY;
         decayMotion.duration = (int)(6 * timeConstant);
         return decayMotion;

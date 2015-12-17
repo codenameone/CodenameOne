@@ -3423,7 +3423,7 @@ public class Component implements Animation, StyleListener {
             if(!shouldScrollX) {
                 if(speed < 0) {
                     if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
-                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 320);
+                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
                         
                         draggedMotionY = Motion.createExponentialDecayMotion(scroll, -tl/2, speed, timeConstant);
                     } else {
@@ -3431,7 +3431,7 @@ public class Component implements Animation, StyleListener {
                     }
                 } else {
                     if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
-                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 320);
+                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
                         draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() - 
                                 getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2,  speed, timeConstant);
                     } else {
