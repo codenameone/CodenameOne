@@ -23,6 +23,9 @@
  */
 package com.codename1.ui.animations;
 
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.MathUtil;
+
 /**
  * Abstracts the notion of physical motion over time from a numeric location to
  * another. This class can be subclassed to implement any motion equation for
@@ -64,15 +67,16 @@ public class Motion {
     private static final int DECELERATION = 3;
     private static final int CUBIC = 4;
     private static final int COLOR_LINEAR = 5;
+    private static final int EXPONENTIAL_DECAY = 6;
     
     private int sourceValue;
     private int destinationValue;
+    private int targetPosition;
     private int duration;
     private long startTime;
     private double initVelocity,  friction;
     private int lastReturnedValue;
     private long currentMotionTime = -1;
-
     private float p0, p1, p2, p3;
     
     /**
@@ -110,6 +114,13 @@ public class Motion {
      * @param friction degree of friction
      */
     protected Motion(int sourceValue, float initVelocity, float friction) {
+        this.sourceValue = sourceValue;
+        this.initVelocity = initVelocity;
+        this.friction = friction;
+        duration = (int) ((Math.abs(initVelocity)) / friction);
+    }
+    
+    protected Motion(int sourceValue, double initVelocity, double friction) {
         this.sourceValue = sourceValue;
         this.initVelocity = initVelocity;
         this.friction = friction;
@@ -265,6 +276,17 @@ public class Motion {
         frictionMotion.destinationValue = maxValue;
         frictionMotion.motionType = FRICTION;
         return frictionMotion;
+    }
+    
+    
+    public static Motion createExponentialDecayMotion(int sourceValue, int maxValue, double initVelocity, double timeConstant) {
+        Motion decayMotion = new Motion(sourceValue, initVelocity, timeConstant);
+        decayMotion.destinationValue = maxValue;
+        decayMotion.targetPosition = sourceValue + (int)(initVelocity * (double)UIManager.getInstance().getThemeConstant("DecayMotionScaleFactorInt", 600));
+        decayMotion.motionType = EXPONENTIAL_DECAY;
+        decayMotion.duration = (int)(6 * timeConstant);
+        return decayMotion;
+        
     }
     
     /**
@@ -480,6 +502,9 @@ public class Motion {
             case COLOR_LINEAR:
                 lastReturnedValue = getColorLinear();
                 break;
+            case EXPONENTIAL_DECAY:
+                lastReturnedValue = getExponentialDecay();
+                break;
             default:
                 lastReturnedValue = getLinear();
                 break;
@@ -567,6 +592,22 @@ public class Motion {
         } else {
             return Math.max(retVal, destinationValue);
         }
+    }
+    
+    private int getExponentialDecay() {
+        //amplitude = initialVelocity * scaleFactor;
+        //targetPosition = position + amplitude;
+        //timestamp = Date.now();
+        double elapsed = getCurrentMotionTime();
+        double timeConstant = friction;
+        double amplitude = targetPosition - sourceValue;
+        int position = (int)Math.round(targetPosition - amplitude * MathUtil.exp(-elapsed / timeConstant));
+        if(destinationValue > sourceValue) {
+            return Math.min(position, destinationValue);
+        } else {
+            return Math.max(position, destinationValue);
+        }
+        
     }
 
     private int getRubber() {

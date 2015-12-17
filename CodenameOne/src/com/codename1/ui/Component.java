@@ -1802,7 +1802,7 @@ public class Component implements Animation, StyleListener {
             int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
-        }         
+        }
         if (isScrollableY()) {
             onParentPositionChange();            
             repaint();
@@ -1811,7 +1811,7 @@ public class Component implements Animation, StyleListener {
             scrollListeners.fireScrollEvent(this.scrollX, scrollYtmp, this.scrollX, this.scrollY);
         }
         this.scrollY = scrollYtmp;
-        onScrollY(scrollY);
+        onScrollY(this.scrollY);
     }
 
     /**
@@ -2902,7 +2902,7 @@ public class Component implements Animation, StyleListener {
             while(scrollParent != null && !scrollParent.isScrollable()){
                 scrollParent = scrollParent.getParent();
             }
-            if(scrollParent != null){                
+            if(scrollParent != null){
                 Style s = getStyle();
                 int w = getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT);
                 int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
@@ -3414,10 +3414,22 @@ public class Component implements Animation, StyleListener {
             }
             if(!shouldScrollX) {
                 if(speed < 0) {
-                    draggedMotionY = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
+                    if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
+                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 320);
+                        
+                        draggedMotionY = Motion.createExponentialDecayMotion(scroll, -tl/2, speed, timeConstant);
+                    } else {
+                        draggedMotionY = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
+                    }
                 } else {
-                    draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
-                            getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2, speed, 0.0007f);
+                    if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
+                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 320);
+                        draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() - 
+                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2,  speed, timeConstant);
+                    } else {
+                        draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
+                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2, speed, 0.0007f);
+                    }
                 }
             } else {
                 if(speed < 0) {

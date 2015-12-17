@@ -460,6 +460,7 @@ public abstract class CodenameOneImplementation {
     protected void paintOverlay(Graphics g) {
     }
 
+    
     /**
      * Invoked by the EDT to paint the dirty regions
      */
@@ -619,8 +620,12 @@ public abstract class CodenameOneImplementation {
                 }
                 //no need to paint a Component if one of its parent is already in the queue
                 if(ani instanceof Container && cmp instanceof Component){
-                    if(((Container)ani).contains((Component)cmp)){
-                        return;                        
+                    Component parent = ((Component)cmp).getParent();
+                    while (parent != null) {
+                        if (parent == ani) {
+                            return;
+                        }
+                        parent = parent.getParent();
                     }
                 }
             }
