@@ -1167,20 +1167,17 @@ public class Container extends Component implements Iterable<Component>{
             return -1;
         }
         int pos = (start + end) /2;
-        //System.out.println(start+","+end+","+pos+", y1="+y1+", y2="+y2);
         Component c = components.get(pos);
         Rectangle bounds = c.getBounds();
         int cy1 = bounds.getY();
         
         int cy2 = bounds.getY() + bounds.getHeight();
-        //System.out.println("pos "+pos +", Y="+cy1+" Y1="+cy2);
         if ((cy1 >= y1 && cy1<= y2)||(cy2>=y1 && cy2 <=y2)) {
             // We have a hit let's roll backward until we find the first visible
             while (pos > start && cy1 > y1) {
                 c = components.get(--pos);
                 cy1 = c.getBounds().getY();
             }
-            //System.out.println("FOUND "+pos);
             return pos;
         } else if (cy1 > y2) {
             return binarySearchFirstIntersectionY(y1, y2, start, pos);
@@ -1309,7 +1306,9 @@ public class Container extends Component implements Iterable<Component>{
             }
         }
         laidOut();
-        onParentPositionChange();            
+        if(Form.activePeerCount > 0) {
+            onParentPositionChange();
+        }
     }
 
     /**
@@ -1621,10 +1620,16 @@ public class Container extends Component implements Iterable<Component>{
      * @see Component#contains
      */
     public Component getComponentAt(int x, int y) {
+        
+        int startIter = 0;
         int count = getComponentCount();
+        if (count > 30) {
+            startIter = calculateFirstPaintableOffset(x, y, x, y);
+            count = calculateLastPaintableOffset(startIter, x, y, x, y) + 1;
+        }
         boolean overlaps = getLayout().isOverlapSupported();
         Component component = null;
-        for (int i = count - 1; i >= 0; i--) {
+        for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y)) {
                 component = cmp;

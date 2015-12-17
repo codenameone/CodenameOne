@@ -1764,7 +1764,9 @@ public class Component implements Animation, StyleListener {
             scrollXtmp = Math.max(scrollXtmp, 0);
         }
         if (isScrollableX()) {
-            onParentPositionChange();
+            if(Form.activePeerCount > 0) {
+                onParentPositionChange();
+            }
             repaint();
         }
         if(scrollListeners != null){
@@ -1808,7 +1810,9 @@ public class Component implements Animation, StyleListener {
             scrollYtmp = Math.max(scrollYtmp, 0);
         }
         if (isScrollableY()) {
-            onParentPositionChange();            
+            if(Form.activePeerCount > 0) {
+                onParentPositionChange();
+            }
             repaint();
         }
         if(scrollListeners != null){
