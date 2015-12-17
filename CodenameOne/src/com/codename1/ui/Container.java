@@ -1155,7 +1155,7 @@ public class Container extends Component implements Iterable<Component>{
                     c = components.get(++pos);
                     cy1 = c.getBounds().getY();
                 }
-                return pos-1;
+                return pos;
                 
             }
         }
