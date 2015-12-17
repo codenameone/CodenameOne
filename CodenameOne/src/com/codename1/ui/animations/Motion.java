@@ -69,7 +69,7 @@ public class Motion {
     private int destinationValue;
     private int duration;
     private long startTime;
-    private float initVelocity,  friction;
+    private double initVelocity,  friction;
     private int lastReturnedValue;
     private long currentMotionTime = -1;
 
@@ -390,7 +390,70 @@ public class Motion {
         }
         return current;        
     }
-    
+
+//    private int[] values = new int[1000];
+//    private int[] times = new int[1000];
+//    private int vOff;
+//    
+//    /**
+//     * Returns the value for the motion for the current clock time. 
+//     * The value is dependent on the Motion type.
+//     * 
+//     * @return a value that is relative to the source value
+//     */
+//    public int getValue() {
+//        int v = getValueImpl();
+//        if(isFinished() && vOff > 0) {
+//            System.out.println("initVelocity:\t"+initVelocity + "\tfriction:\t" + friction + "\tdestinationValue:\t" + destinationValue + "\tsourceValue:\t" + sourceValue);
+//            System.out.println("Value\tTime");
+//            for(int iter = 0 ; iter < vOff ; iter++) {
+//                System.out.println("" + values[iter] + "\t" + times[iter]);
+//            }
+//            vOff = 0;
+//        } else {
+//            values[vOff] = v;
+//            int time = (int) getCurrentMotionTime();
+//            times[vOff] = time;
+//
+//            vOff++;
+//        }
+//        
+//        return v;
+//    }
+//    
+//    /**
+//     * Returns the value for the motion for the current clock time. 
+//     * The value is dependent on the Motion type.
+//     * 
+//     * @return a value that is relative to the source value
+//     */
+//    private int getValueImpl() {
+//        if(currentMotionTime > -1 && startTime > getCurrentMotionTime()) {
+//            return sourceValue;
+//        }
+//        switch(motionType) {
+//            case SPLINE:
+//                lastReturnedValue = getSplineValue();
+//                break;
+//            case CUBIC:
+//                lastReturnedValue = getCubicValue();
+//                break;
+//            case FRICTION:
+//                lastReturnedValue = getFriction();
+//                break;
+//            case DECELERATION:
+//                lastReturnedValue = getRubber();
+//                break;
+//            case COLOR_LINEAR:
+//                lastReturnedValue = getColorLinear();
+//                break;
+//            default:
+//                lastReturnedValue = getLinear();
+//                break;
+//        }
+//        return lastReturnedValue;
+//    }
+
     /**
      * Returns the value for the motion for the current clock time. 
      * The value is dependent on the Motion type.
@@ -423,7 +486,7 @@ public class Motion {
         }
         return lastReturnedValue;
     }
-
+    
     private int getLinear() {
         //make sure we reach the destination value.
         if(isFinished()){
@@ -494,7 +557,7 @@ public class Motion {
         int time = (int) getCurrentMotionTime();
         int retVal = 0;
 
-        retVal = (int)((Math.abs(initVelocity) * time) - (friction * (((float)time * time) / 2)));
+        retVal = (int)((Math.abs(initVelocity) * time) - (friction * (((double)time * time) / 2)));
         if (initVelocity < 0) {
             retVal *= -1;
         }
