@@ -1624,8 +1624,8 @@ public class Container extends Component implements Iterable<Component>{
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
-            int relx = x - getAbsoluteX() - getScrollX();
-            int rely = y - getAbsoluteY() - getScrollY();
+            int relx = x - getAbsoluteX();
+            int rely = y - getAbsoluteY();
             
             startIter = calculateFirstPaintableOffset(relx, rely, relx, rely);
             count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
