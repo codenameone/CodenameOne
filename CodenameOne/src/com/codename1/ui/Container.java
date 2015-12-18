@@ -1357,21 +1357,15 @@ public class Container extends Component implements Iterable<Component>{
      * @return true if this Component contains in this Container
      */
     public boolean contains(Component cmp) {
-        boolean found = false;
-        int count = getComponentCount();
-        for (int i = 0; i < count; i++) {
-            Component c = getComponentAt(i);
-            if (c.equals(cmp)) {
+        if (cmp == null) {
+            return false;
+        }
+        cmp = cmp.getParent();
+        while (cmp != null) {
+            if (cmp == this) {
                 return true;
             }
-
-            if (c instanceof Container) {
-                found = ((Container) c).contains(cmp);
-                if (found) {
-                    return true;
-                }
-
-            }
+            cmp = cmp.getParent();
         }
         return false;
     }
