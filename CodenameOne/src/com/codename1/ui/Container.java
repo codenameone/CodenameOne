@@ -1172,7 +1172,7 @@ public class Container extends Component implements Iterable<Component>{
         int cy1 = bounds.getY();
         
         int cy2 = bounds.getY() + bounds.getHeight();
-        if ((cy1 >= y1 && cy1<= y2)||(cy2>=y1 && cy2 <=y2)) {
+        if ((cy1 >= y1 && cy1<= y2)||(cy2>=y1 && cy2 <=y2)||(cy1<=y1 && cy2>=y2)) {
             // We have a hit let's roll backward until we find the first visible
             while (pos > start && cy1 > y1) {
                 c = components.get(--pos);
@@ -1624,8 +1624,11 @@ public class Container extends Component implements Iterable<Component>{
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
-            startIter = calculateFirstPaintableOffset(x, y, x, y);
-            count = calculateLastPaintableOffset(startIter, x, y, x, y) + 1;
+            int relx = x - getAbsoluteX() - getScrollX();
+            int rely = y - getAbsoluteY() - getScrollY();
+            
+            startIter = calculateFirstPaintableOffset(relx, rely, relx, rely);
+            count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
         }
         boolean overlaps = getLayout().isOverlapSupported();
         Component component = null;
