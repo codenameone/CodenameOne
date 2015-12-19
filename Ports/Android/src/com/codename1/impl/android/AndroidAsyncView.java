@@ -111,6 +111,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         if (paintOnBuffer) {
             cn1View.d(c);
         }
+        if (implementation.isAsyncEditMode() && implementation.isEditingText()) {
+            InPlaceEditView.reLayoutEdit();
+        }
     }
 
     public void setPaintViewOnBuffer(boolean paintViewOnBuffer) {
