@@ -1120,7 +1120,36 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     
-    
+    /**
+     * Efficiently finds the first child component that is visible in the specified 
+     * bounds.  
+     * <p>This is only really helpful if the child components are sorted
+     * in some way so that we can quickly (with a binary search) find the first
+     * visible component.  E.g. In BoxLayout.Y_AXIS, the components are arranged 
+     * vertically in order of their index so we can use a binary search to find
+     * the first visible element.  For most other layout managers we can't as easily
+     * do a sort like this.</p>
+     * 
+     * <p>If the layout manager doesn't allow for a binary search, then this will
+     * just return 0 (meaning that you need to scan the children from the beginning
+     * to find visible children).</p>
+     * 
+     * <p>After you obtain this value, use the {@link #calculateLastPaintableOffset(int, int, int, int, int) } method
+     * to get the end of the visible region.</p>
+     * 
+     * <p>The motivation for this is to try to improve performance in places where the container
+     * has many (say 2500) children, and most of them aren't actually visible.</p>
+     * 
+     * @param clipX1 Left bounds of region to check.  (0,0) is the top left corner of this component.
+     * @param clipY1 Top bounds of region to check.  (0,0) is top left corner of this component.
+     * @param clipX2 Right bounds of region to check.  (0,0) is top left corner of this component.
+     * @param clipY2 Bottom bounds of region to check.  (0,0) is top left corner of this component.
+     * @return The index within the "components" array where the first child that intersects the provided
+     * clip occurs, or -1 if there is no "fast" way to find it.  If there was a fast way to do it, but no visible
+     * components were found, then this will return components.size().
+     * 
+     * @see #calculateLastPaintableOffset(int, int, int, int, int) 
+     */
     private int calculateFirstPaintableOffset(int clipX1, int clipY1, int clipX2, int clipY2) {
         int len = components.size();
         Layout l = getLayout();
@@ -1130,15 +1159,28 @@ public class Container extends Component implements Iterable<Component>{
                 int startPos = binarySearchFirstIntersectionY(clipY1, clipY2, 0, len);
                 if (startPos >= 0) {
                     return startPos;
+                } else {
+                    return len;
                 }
                 
             }
         }
-        return 0;
+        return -1;
     }
     
     
-    
+    /**
+     * Gets the index of the "last" child component that intersects the given rectangle.  This is
+     * only helpful if the components are sorted (e.g. with BoxLayout.Y_AXIS).  If they aren't
+     * sorted then this will just return components.size()-1.
+     * @param pos The starting position to search.  It is assumed that this starting
+     * position is in the visible region.
+     * @param clipX1 The left bounds of the region to search.  (0,0) is the top left corner of the container.
+     * @param clipY1 The top bounds of the region to search. (0,0) is the top left corner of the container.
+     * @param clipX2 The right bounds of the region to search. (0,0) is the top left corner of the container.
+     * @param clipY2 The bottom bounds of the region to search. (0,0) is the top left corner of the container.
+     * @return The index of the last visible component in this container - or components.size()-1 
+     */
     private int calculateLastPaintableOffset(int pos, int clipX1, int clipY1, int clipX2, int clipY2) {
         int len = components.size();
         if (pos >= len-1) {
@@ -1155,13 +1197,25 @@ public class Container extends Component implements Iterable<Component>{
                     c = components.get(++pos);
                     cy1 = c.getBounds().getY();
                 }
-                return pos;
+                return pos-1;
                 
             }
         }
         return len-1;
     }
     
+    /**
+     * Performs a binary search within the children of the container to find components
+     * that intersect the given range on the y-axis.  <b>This should only be used
+     * if it is known that the child components are sorted by their y coordinates
+     * in ascending order.  Otherwise you'll get undefined results.</b>
+     * @param y1 The lower y-bound of the region to search.  (0,0) is top-left corner of container.
+     * @param y2 The upper y-bound of the region to search.  (0,0) is top-left corner of container.
+     * @param start The lower "index" to search.
+     * @param end The upper "index" to search.
+     * @return The index within the components array of the first child component
+     * that intersects the given region.  Or -1 if none is found.
+     */
     private int binarySearchFirstIntersectionY(int y1, int y2, int start, int end) {
         if (start >= end) {
             return -1;
@@ -1202,9 +1256,14 @@ public class Container extends Component implements Iterable<Component>{
         int startIter = 0;
         if (size >= 30) {
             startIter = calculateFirstPaintableOffset(clipX1, clipY1, clipX2, clipY2);
-            //System.out.println("Start: "+startIter+", actual size "+size);
-            size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2)+1;
-            //System.out.println("New size: "+size);
+            if (startIter < 0) {
+                // There was no efficient way to calculate the offset
+                startIter = 0;
+            } else if (startIter < size){
+                // There was an efficient way to calculate the offset so we
+                // will continue this approach
+                size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2)+1;
+            }
         }
         CodenameOneImplementation impl = Display.getInstance().getImplementation();
         if(dontRecurseContainer) {
@@ -1622,7 +1681,15 @@ public class Container extends Component implements Iterable<Component>{
             int rely = y - getAbsoluteY();
             
             startIter = calculateFirstPaintableOffset(relx, rely, relx, rely);
-            count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
+            if (startIter < 0) {
+                // There was no efficient way to calculate the first paintable offset
+                // start counting from 0
+                startIter = 0;
+            } else if (startIter < count) {
+                // We found a start offset using an efficient method
+                // Find an appropriate end offset.
+                count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
+            }
         }
         boolean overlaps = getLayout().isOverlapSupported();
         Component component = null;

@@ -1118,7 +1118,9 @@ public class TextArea extends Component {
      * @inheritDoc
      */
     void onEditComplete(String text) {
-        setText(text);
+        if (!Display.getInstance().getImplementation().isAsyncEditMode()) {
+            setText(text);
+        }
         if(getParent() != null) {
             getParent().revalidate();
         }
