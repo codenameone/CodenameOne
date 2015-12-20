@@ -201,7 +201,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
-    private Media background; 
+    private Media background;
+    private boolean asyncEditMode = false;
     
     /**
      * This method in used internally for ads
@@ -700,13 +701,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (keyCode > 0 && getKeyboardType() == Display.KEYBOARD_TYPE_QWERTY) {
             text += (char) keyCode;
         }
-        Display display = Display.getInstance();
-        String userInput = InPlaceEditView.edit(this, cmp, constraint);
-        display.onEditingComplete(cmp, userInput);
+        InPlaceEditView.edit(this, cmp, constraint);
     }
 
     protected boolean editInProgress() {
         return InPlaceEditView.isEditing();
+    }
+
+    @Override
+    public boolean isAsyncEditMode() {
+        return asyncEditMode;
+    }
+
+    void setAsyncEditMode(boolean async) {
+        asyncEditMode = async;
+    }
+    
+    void callHideTextEditor() {
+        super.hideTextEditor();
+    }
+
+    @Override
+    public void hideTextEditor() {
+        InPlaceEditView.hideActiveTextEditor();
+    }
+
+    @Override
+    public boolean isEditingText(Component c) {
+        if (InPlaceEditView.isActiveTextEditorHidden()) {
+            return false;
+        }
+        return super.isEditingText(c);
     }
 
     public static void stopEditing(){

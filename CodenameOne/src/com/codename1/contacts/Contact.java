@@ -91,7 +91,7 @@ public class Contact {
     public String getDisplayName() {
         if (displayName == null || "".equals(displayName)) {
             if (familyName != null && firstName != null) {
-                displayName = familyName + ", " + firstName;
+                displayName =  firstName + " " + familyName;
             } else if (getPrimaryPhoneNumber() != null) {
                 displayName = getPrimaryPhoneNumber();
             } else if (getPrimaryEmail() != null) {
