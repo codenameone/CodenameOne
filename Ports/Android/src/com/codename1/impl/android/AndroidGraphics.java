@@ -45,18 +45,22 @@ package com.codename1.impl.android;
 import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.RadialGradient;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Shader;
+import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 
 import com.codename1.ui.Transform;
+import com.codename1.ui.plaf.Style;
 
 /**
  * #######################################################################
@@ -318,6 +322,213 @@ class AndroidGraphics {
         
     }
 
+   public void fillRect(int x, int y, int w, int h, byte alpha) {
+        if(alpha != 0) {
+            int oldAlpha = alpha;
+            setAlpha(alpha & 0xff);
+            fillRect(x, y, w, h);
+            setAlpha(oldAlpha);
+        }
+    }
+
+    public void paintComponentBackground(int x, int y, int width, int height, Style s) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        Image bgImageOrig = s.getBgImage();
+        if (bgImageOrig == null) {
+            if(s.getBackgroundType() >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {
+                drawGradientBackground(s, x, y, width, height);
+                return;
+            }
+            setColor(s.getBgColor());
+            fillRect(x, y, width, height, s.getBgTransparency());
+        } else {
+            int iW = bgImageOrig.getWidth();
+            int iH = bgImageOrig.getHeight();
+            Object bgImage = bgImageOrig.getImage();
+            switch (s.getBackgroundType()) {
+                case Style.BACKGROUND_NONE:
+                    if(s.getBgTransparency() != 0) {
+                        setColor(s.getBgColor());
+                        fillRect(x, y, width, height, s.getBgTransparency());
+                    }
+                    return;
+                case Style.BACKGROUND_IMAGE_SCALED:
+                    drawImage(bgImage, x, y, width, height);
+                    return;
+                case Style.BACKGROUND_IMAGE_SCALED_FILL:
+                    float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+                    int bwidth = (int)(((float)iW) * r);
+                    int bheight = (int)(((float)iH) * r);
+                    drawImage(bgImage, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);
+                    return;
+                case Style.BACKGROUND_IMAGE_SCALED_FIT:
+                    if(s.getBgTransparency() != 0) {
+                        setColor(s.getBgColor());
+                        fillRect(x, y, width, height, s.getBgTransparency());
+                    }
+                    float r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+                    int awidth = (int)(((float)iW) * r2);
+                    int aheight = (int)(((float)iH) * r2);
+                    drawImage(bgImage, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
+                    return;
+                case Style.BACKGROUND_IMAGE_TILE_BOTH:
+                    tileImage(bgImage, x, y, width, height);
+                    return;
+                case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    tileImage(bgImage, x, y, width, iH);
+                    return;
+                case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    tileImage(bgImage, x, y + (height / 2 - iH / 2), width, iH);
+                    return;
+                case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    tileImage(bgImage, x, y + (height - iH), width, iH);
+                    return;
+                case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    for (int yPos = 0; yPos <= height; yPos += iH) {
+                        drawImage(bgImage, x, y + yPos);
+                    }
+                    return;
+                case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    for (int yPos = 0; yPos <= height; yPos += iH) {
+                        drawImage(bgImage, x + (width / 2 - iW / 2), y + yPos);
+                    }
+                    return;
+                case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    for (int yPos = 0; yPos <= height; yPos += iH) {
+                        drawImage(bgImage, x + width - iW, y + yPos);
+                    }
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x + (width / 2 - iW / 2), y);
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x + (width / 2 - iW / 2), y + (height - iH));
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x, y + (height / 2 - iH / 2));
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x + width - iW, y + (height / 2 - iH / 2));
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x + (width / 2 - iW / 2), y + (height / 2 - iH / 2));
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x, y);
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x + width - iW, y);
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x, y + (height - iH));
+                    return;
+                case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+                    setColor(s.getBgColor());
+                    fillRect(x, y, width, height, s.getBgTransparency());
+                    drawImage(bgImage, x + width - iW, y + (height - iH));
+                    return;
+                case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                case Style.BACKGROUND_GRADIENT_RADIAL:
+                    drawGradientBackground(s, x, y, width, height);
+                    return;
+            }
+        }
+    }
+    
+    private void drawGradientBackground(Style s, int x, int y, int width, int height) {
+        switch (s.getBackgroundType()) {
+            case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
+                        x, y, width, height, true);
+                return;
+            case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
+                        x, y, width, height, false);
+                return;
+            case Style.BACKGROUND_GRADIENT_RADIAL:
+                fillRectRadialGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
+                        x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
+                        s.getBackgroundGradientRelativeSize());
+                return;
+        }
+        setColor(s.getBgColor());
+        fillRect(x, y, width, height, s.getBgTransparency());
+    }
+
+    public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(false);
+        if(!horizontal) {
+            paint.setShader(new LinearGradient(x, y, 0, height, startColor, endColor, Shader.TileMode.MIRROR));
+        } else {
+            paint.setShader(new LinearGradient(x, y, width, 0, startColor, endColor, Shader.TileMode.MIRROR));
+        }
+        canvas.concat(getTransformMatrix());
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+        paint.setShader(null);
+        canvas.restore();        
+    }
+
+    public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(false);
+        paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        canvas.concat(getTransformMatrix());
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+        paint.setShader(null);
+        canvas.restore();        
+    }
+
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+        boolean antialias = paint.isAntiAlias();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(false);
+        paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        canvas.concat(getTransformMatrix());
+        canvas.drawRect(x, y, x + width, y + height, paint);
+        paint.setAntiAlias(antialias);
+        paint.setShader(null);
+        canvas.restore();        
+    }
+    
+    public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
+    }
+    
     public void fillRoundRect(int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
         paint.setStyle(Paint.Style.FILL);

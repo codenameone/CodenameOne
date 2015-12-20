@@ -545,13 +545,6 @@ public class Button extends Label {
         }*/
         super.pointerDragged(x, y);
     }
-
-    /**
-     * @inheritDoc
-     */
-    public void paint(Graphics g) {
-        getUIManager().getLookAndFeel().drawButton(g, this);
-    }
     
     /**
      * @inheritDoc

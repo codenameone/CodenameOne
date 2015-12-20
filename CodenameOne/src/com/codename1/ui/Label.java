@@ -416,7 +416,26 @@ public class Label extends Component {
      * @inheritDoc
      */
     public void paint(Graphics g) {
-        getUIManager().getLookAndFeel().drawLabel(g, this);
+        Object icn = null;
+        Image i = getIconFromState();
+        if(i != null) {
+            icn = i.getImage();
+        } else {
+            // optimize away a common usage pattern for drawing the background only
+            if(text == null || text.equals("") || text.equals(" ")) {
+                return;
+            }
+        }
+        //getUIManager().getLookAndFeel().drawLabel(g, this);
+        int cmpX = getX() + g.getTranslateX();
+        int cmpY = getY() + g.getTranslateY();
+        int cmpHeight = getHeight();
+        int cmpWidth = getWidth();
+        Style s = getStyle();
+        Font f = s.getFont();
+        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, text, 
+                icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
+                endsWith3Points, valign);
     }
 
     /**

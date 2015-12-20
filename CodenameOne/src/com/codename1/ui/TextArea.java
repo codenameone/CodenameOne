@@ -616,7 +616,7 @@ public class TextArea extends Component {
         } else {
             super.pointerReleased(x, y);
             if (isEditable() && isEnabled() && !isCellRenderer()) {
-                if(Display.getInstance().getImplementation().isNativeInputImmediate()) {
+                if(Display.impl.isNativeInputImmediate()) {
                     editString();
                     return;
                 }

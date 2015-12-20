@@ -41,6 +41,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Rectangle;
 import java.util.ArrayList;
 import com.codename1.ui.Transform;
+import com.codename1.ui.plaf.Style;
 
 public class AndroidAsyncView extends View implements CodenameOneSurface {
 
@@ -409,6 +410,80 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             });
         }
 
+        @Override
+        public void fillRect(final int x, final int y, final int w, final int h, byte alpha) {
+            if (alpha == 0) {
+                return;
+            }
+            final int preAlpha = this.alpha;
+            final int al = alpha & 0xff;
+            final int col = color;
+            pendingRenderingOperations.add(new AsyncOp(clip) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.setColor(col);
+                    underlying.setAlpha(al);
+                    underlying.fillRect(x, y, w, h);
+                    underlying.setAlpha(preAlpha);
+                }
+            });
+        }
+
+        @Override
+        public void fillLinearGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height, final boolean horizontal) {
+            if (alpha == 0) {
+                return;
+            }
+            pendingRenderingOperations.add(new AsyncOp(clip) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
+                }
+            });
+        }
+
+        @Override
+        public void fillRectRadialGradient(final int startColor, final int endColor, final int x, final int y, 
+                final int width, final int height, final float relativeX, final float relativeY, final float relativeSize) {
+            if (alpha == 0) {
+                return;
+            }
+            pendingRenderingOperations.add(new AsyncOp(clip) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+                }
+            });
+        }
+
+        @Override
+        public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height) {
+            if (alpha == 0) {
+                return;
+            }
+            pendingRenderingOperations.add(new AsyncOp(clip) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height);
+                }
+            });
+        }
+
+        @Override
+        public void paintComponentBackground(final int x, final int y, final int width, final int height, final Style s) {
+            if (alpha == 0 || width <= 0 || height <= 0) {
+                return;
+            }
+            pendingRenderingOperations.add(new AsyncOp(clip) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.paintComponentBackground(x, y, width, height, s);
+                }
+            });
+        }
+
+        
+        
         @Override
         public void fillArc(final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
             final int alph = alpha;

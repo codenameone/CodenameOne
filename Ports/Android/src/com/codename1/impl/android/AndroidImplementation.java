@@ -120,6 +120,7 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -1531,6 +1532,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidGraphics) graphics).fillRect(x, y, width, height);
     }
 
+    @Override
+    public void fillRect(Object graphics, int x, int y, int w, int h, byte alpha) {
+        ((AndroidGraphics) graphics).fillRect(x, y, w, h, alpha);
+    }
+
+    @Override
+    public void paintComponentBackground(Object graphics, int x, int y, int width, int height, Style s) {
+        ((AndroidGraphics) graphics).paintComponentBackground(x, y, width, height, s);
+    }
+
+    @Override
+    public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        ((AndroidGraphics)graphics).fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
+    }
+
+    @Override
+    public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        ((AndroidGraphics)graphics).fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+    }
+
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+        ((AndroidGraphics)graphics).fillRadialGradient(startColor, endColor, x, y, width, height);
+    }
+        
     @Override
     public void fillRoundRect(Object graphics, int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
