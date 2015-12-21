@@ -49,8 +49,8 @@ import com.codename1.ui.util.Resources;
  * Used to render the default look of Codename One
  *
  * @author Chen Fishbein
- * @deprecated this class is central so the deprecation is here to indicate our desire to reduce usage/reliance on
- * this class. We are shifting code away from here to improve performance
+ * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate 
+ * our desire to reduce usage/reliance on this class. 
  */
 public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private Image[] chkBoxImages = null;

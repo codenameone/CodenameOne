@@ -6393,7 +6393,7 @@ public abstract class CodenameOneImplementation {
                         x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
                         y = y + (cmpHeight - (topPadding
                                 + bottomPadding
-                                + Math.max(((icon != null) ? iconWidth : 0),
+                                + Math.max(((icon != null) ? iconHeight : 0),
                                         fontHeight))) / 2;
                         break;
                     case Label.BOTTOM:

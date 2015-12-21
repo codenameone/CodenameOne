@@ -34,8 +34,8 @@ import com.codename1.ui.list.*;
  * overriding drawing/sizing methods appropriately.
  *
  * @author Chen Fishbein
- * @deprecated this class is central so the deprecation is here to indicate our desire to reduce usage/reliance on
- * this class. We are shifting code away from here to improve performance
+ * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate 
+ * our desire to reduce usage/reliance on this class. 
  */
 public abstract class LookAndFeel {
     private Component verticalScroll;
