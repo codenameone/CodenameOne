@@ -56,7 +56,10 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Shader;
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.Stroke;
 
 import com.codename1.ui.Transform;
@@ -82,6 +85,7 @@ class AndroidGraphics {
     private final Rect tmprect = new Rect();
     private final Path tmppath = new Path();
     private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
+    private AndroidImplementation impl;
     
     AndroidGraphics(AndroidImplementation impl, Canvas canvas) {
         this.canvas = canvas;
@@ -92,6 +96,7 @@ class AndroidGraphics {
             canvas.save();
         }
         transform = Transform.makeIdentity();
+        this.impl = impl;
     }
 
 
@@ -526,9 +531,404 @@ class AndroidGraphics {
         canvas.restore();        
     }
     
-    public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
+    public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, 
+            Bitmap icon, Bitmap stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, 
+            int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
+        Font cn1Font = style.getFont();
+        Object nativeFont = cn1Font.getNativeFont();
+        impl.setNativeFont(this, nativeFont);
+        setColor(style.getFgColor());
+
+        int iconWidth = 0;
+        int iconHeight = 0;
+        if(icon != null) {
+            iconWidth = icon.getWidth();
+            iconHeight = icon.getHeight();
+        }
+
+        int textDecoration = style.getTextDecoration();
+        int stateIconSize = 0;
+        int stateIconYPosition = 0;
+
+        int leftPadding = style.getPaddingLeft(rtl);
+        int rightPadding = style.getPaddingRight(rtl);
+        int topPadding = style.getPaddingTop();
+        int bottomPadding = style.getPaddingBottom();
+
+        int fontHeight = 0;
+        if (text == null) {
+            text = "";
+        }
+        if (text.length() > 0) {
+            fontHeight = cn1Font.getHeight();
+        }
+
+        if (stateIcon != null) {
+            stateIconSize = stateIcon.getWidth();
+            stateIconYPosition = cmpY + topPadding
+                    + (cmpHeight - topPadding
+                    - bottomPadding) / 2 - stateIconSize / 2;
+            int tX = cmpX;
+            if (isOppositeSide) {
+                if (rtl) {
+                    tX += leftPadding;
+                } else {
+                    tX = tX + cmpWidth - leftPadding - stateIconSize;
+                }
+                cmpWidth -= leftPadding - stateIconSize;
+            } else {
+                preserveSpaceForState = stateIconSize + gap;
+                if (rtl) {
+                    tX = tX + cmpWidth - leftPadding - stateIconSize;
+                } else {
+                    tX += leftPadding;
+                }
+            }
+
+            drawImage(stateIcon, tX, stateIconYPosition);
+        }
+
+        //default for bottom left alignment
+        int x = cmpX + leftPadding + preserveSpaceForState;
+        int y = cmpY + topPadding;
+
+        int align = reverseAlignForBidi(rtl, style.getAlignment());
+
+        int textPos = reverseAlignForBidi(rtl, textPosition);
+
+        //set initial x,y position according to the alignment and textPosition
+        switch (align) {
+            case Component.LEFT:
+                switch (textPos) {
+                    case Label.LEFT:
+                    case Label.RIGHT:
+                        y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? iconHeight : 0), fontHeight))) / 2;
+                        break;
+                    case Label.BOTTOM:
+                    case Label.TOP:
+                        y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;
+                        break;
+                }
+                break;
+            case Component.CENTER:
+                switch (textPos) {
+                    case Label.LEFT:
+                    case Label.RIGHT:
+                        x = x + (cmpWidth - (preserveSpaceForState
+                                + leftPadding
+                                + rightPadding
+                                + ((icon != null) ? iconWidth + gap : 0)
+                                + stringWidth)) / 2;
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                        y = y + (cmpHeight - (topPadding
+                                + bottomPadding
+                                + Math.max(((icon != null) ? iconHeight : 0),
+                                        fontHeight))) / 2;
+                        break;
+                    case Label.BOTTOM:
+                    case Label.TOP:
+                        x = x + (cmpWidth - (preserveSpaceForState + leftPadding
+                                + rightPadding
+                                + Math.max(((icon != null) ? iconWidth + gap : 0),
+                                        stringWidth))) / 2;
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                        y = y + (cmpHeight - (topPadding
+                                + bottomPadding
+                                + ((icon != null) ? iconHeight + gap : 0)
+                                + fontHeight)) / 2;
+                        break;
+                }
+                break;
+            case Component.RIGHT:
+                switch (textPos) {
+                    case Label.LEFT:
+                    case Label.RIGHT:
+                        x = cmpX + cmpWidth - rightPadding
+                                - (((icon != null) ? (iconWidth + gap) : 0)
+                                + stringWidth);
+                        if (rtl) {
+                            x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);
+                        } else {
+                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                        }
+                        y = y + (cmpHeight - (topPadding
+                                + bottomPadding
+                                + Math.max(((icon != null) ? iconHeight : 0),
+                                        fontHeight))) / 2;
+                        break;
+                    case Label.BOTTOM:
+                    case Label.TOP:
+                        x = cmpX + cmpWidth - rightPadding
+                                - (Math.max(((icon != null) ? (iconWidth) : 0),
+                                        stringWidth));
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                        y = y + (cmpHeight - (topPadding
+                                + bottomPadding
+                                + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;
+                        break;
+                }
+                break;
+            default:
+                break;
+        }
+
+        int textSpaceW = cmpWidth - rightPadding - leftPadding;
+
+        if (icon != null && (textPos == Label.RIGHT || textPos == Label.LEFT)) {
+            textSpaceW = textSpaceW - iconWidth;
+        }
+
+        if (stateIcon != null) {
+            textSpaceW = textSpaceW - stateIconSize;
+        } else {
+            textSpaceW = textSpaceW - preserveSpaceForState;
+        }
+
+        if (icon == null) { 
+            // no icon only string 
+            drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
+                    textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
+        } else {
+            int strWidth = stringWidth;
+            int iconStringWGap;
+            int iconStringHGap;
+
+            switch (textPos) {
+                case Label.LEFT:
+                    if (iconHeight > fontHeight) {
+                        iconStringHGap = (iconHeight - fontHeight) / 2;
+                        strWidth = drawLabelStringValign(nativeFont, text, x, y, textSpaceW, isTickerRunning,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight,
+                                fontHeight, valign);
+
+                        drawImage(icon, x + strWidth + gap, y);
+                    } else {
+                        iconStringHGap = (fontHeight - iconHeight) / 2;
+                        strWidth = drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+
+                        drawImage(icon, x + strWidth + gap, y + iconStringHGap);
+                    }
+                    break;
+                case Label.RIGHT:
+                    if (iconHeight > fontHeight) {
+                        iconStringHGap = (iconHeight - fontHeight) / 2;
+                        drawImage(icon, x, y);
+                        drawLabelStringValign(nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight, fontHeight, valign);
+                    } else {
+                        iconStringHGap = (fontHeight - iconHeight) / 2;
+                        drawImage(icon, x, y + iconStringHGap);
+                        drawLabelString(nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    }
+                    break;
+                case Label.BOTTOM:
+                    //center align the smaller
+                    if (iconWidth > strWidth) { 
+                        iconStringWGap = (iconWidth - strWidth) / 2;
+                        drawImage(icon, x, y);
+                        drawLabelString(nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,
+                                isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    } else {
+                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
+                        drawImage(icon, x + iconStringWGap, y);
+
+                        drawLabelString(nativeFont, text, x, y + iconHeight + gap, textSpaceW, isTickerRunning,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    }
+                    break;
+                case Label.TOP:
+                    //center align the smaller
+                    if (iconWidth > strWidth) { 
+                        iconStringWGap = (iconWidth - strWidth) / 2;
+                        drawLabelString(nativeFont, text, x + iconStringWGap, y, textSpaceW, isTickerRunning,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                        drawImage(icon, x, y + fontHeight + gap);
+                    } else {
+                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
+                        drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
+                                textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                        drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
+                    }
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Implements the drawString for the text component and adjust the valign
+     * assuming the icon is in one of the sides
+     */
+    private int drawLabelStringValign(
+            Object nativeFont, String str, int x, int y, int textSpaceW,
+            boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl,
+            boolean endsWith3Points, int textWidth,
+            int iconStringHGap, int iconHeight, int fontHeight, int valign) {
+        switch (valign) {
+            case Component.TOP:
+                return drawLabelString(nativeFont, str, x, y, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+            case Component.CENTER:
+                return drawLabelString(nativeFont, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+            default:
+                return drawLabelString(nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+        }
+    }
+
+    /**
+     * Implements the drawString for the text component and adjust the valign
+     * assuming the icon is in one of the sides
+     */
+    private int drawLabelString(Object nativeFont, String text, int x, int y, int textSpaceW,
+            boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl, boolean endsWith3Points, int textWidth,
+            int fontHeight) {
+        int cx = getClipX();
+        int cy = getClipY();
+        int cw = getClipWidth();
+        int ch = getClipHeight();
+        clipRect(x, cy, textSpaceW, ch);
+
+        int drawnW = drawLabelText(textDecoration, rtl, isTickerRunning, endsWith3Points, nativeFont,
+                textWidth, textSpaceW, tickerShiftText, text, x, y, fontHeight);
+
+        setClip(cx, cy, cw, ch);
+
+        return drawnW;
+    }
+
+    private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Object f) {
+        if (length * charWidth < width) {
+            return true;
+        }
+        length = Math.min(s.length(), length);
+        return impl.stringWidth(f, s.substring(0, length)) < width;
+    }
+
+    /**
+     * Draws the text of a label
+     *
+     * @param nativeGraphics graphics context
+     * @param textDecoration decoration information for the text
+     * @param text the text for the label
+     * @param x position for the label
+     * @param y position for the label
+     * @param txtW stringWidth(text) equivalent which is faster than just
+     * invoking string width all the time
+     * @param textSpaceW the width available for the component
+     * @return the space used by the drawing
+     */
+    protected int drawLabelText(int textDecoration, boolean rtl, boolean isTickerRunning,
+            boolean endsWith3Points, Object nativeFont, int txtW, int textSpaceW, int shiftText, String text, int x, int y, int fontHeight) {
+        if ((!isTickerRunning) || rtl) {
+            //if there is no space to draw the text add ... at the end
+            if (txtW > textSpaceW && textSpaceW > 0) {
+                // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+                // the allowed space is handled differently in RTL, this is due to the reverse algorithm
+                // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+                // trimming characters from the end of the text (as done with LTR) won't do.
+                // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+                // the downside is that a part of a letter may be shown here as well.
+
+                if (rtl) {
+                    if ((!isTickerRunning) && endsWith3Points) {
+                        String points = "...";
+                        int pointsW = impl.stringWidth(nativeFont, points);
+                        drawString(nativeFont, points, shiftText + x, y, textDecoration, fontHeight);
+                        clipRect(pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);
+                    }
+                    x = x - txtW + textSpaceW;
+                } else if (endsWith3Points) {
+                    String points = "...";
+                    int index = 1;
+                    int widest = impl.charWidth(nativeFont, 'W');
+                    int pointsW = impl.stringWidth(nativeFont, points);
+                    while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, nativeFont) && index < text.length()) {
+                        index++;
+                    }
+                    text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;
+                    txtW = impl.stringWidth(nativeFont, text);
+                }
+            }
+        }
+
+        drawString(nativeFont, text, shiftText + x, y, textDecoration, fontHeight);
+        return Math.min(txtW, textSpaceW);
+    }
+
+    /**
+     * Draw a string using the current font and color in the x,y coordinates.
+     * The font is drawn from the top position and not the baseline.
+     *
+     * @param nativeGraphics the graphics context
+     * @param nativeFont the font used
+     * @param str the string to be drawn.
+     * @param x the x coordinate.
+     * @param y the y coordinate.
+     * @param textDecoration Text decoration bitmask (See Style's
+     * TEXT_DECORATION_* constants)
+     */
+    private void drawString(Object nativeFont, String str, int x, int y, int textDecoration, int fontHeight) {
+        if (str.length() == 0) {
+            return;
+        }
+
+        // this if has only the minor effect of providing a slighly faster execution path
+        if (textDecoration != 0) {
+            boolean raised = (textDecoration & Style.TEXT_DECORATION_3D) != 0;
+            boolean lowerd = (textDecoration & Style.TEXT_DECORATION_3D_LOWERED) != 0;
+            boolean north = (textDecoration & Style.TEXT_DECORATION_3D_SHADOW_NORTH) != 0;
+            if (raised || lowerd || north) {
+                textDecoration = textDecoration & (~Style.TEXT_DECORATION_3D) & (~Style.TEXT_DECORATION_3D_LOWERED) & (~Style.TEXT_DECORATION_3D_SHADOW_NORTH);
+                int c = getColor();
+                int a = getAlpha();
+                int newColor = 0;
+                int offset = -2;
+                if (lowerd) {
+                    offset = 2;
+                    newColor = 0xffffff;
+                } else if (north) {
+                    offset = 2;
+                }
+                setColor(newColor);
+                if (a == 0xff) {
+                    setAlpha(140);
+                }
+                drawString(nativeFont, str, x, y + offset, textDecoration, fontHeight);
+                setAlpha(a);
+                setColor(c);
+                drawString(nativeFont, str, x, y, textDecoration, fontHeight);
+                return;
+            }
+            drawString(str, x, y);
+            if ((textDecoration & Style.TEXT_DECORATION_UNDERLINE) != 0) {
+                drawLine(x, y + fontHeight - 1, x + impl.stringWidth(nativeFont, str), y + fontHeight - 1);
+            }
+            if ((textDecoration & Style.TEXT_DECORATION_STRIKETHRU) != 0) {
+                drawLine(x, y + fontHeight / 2, x + impl.stringWidth(nativeFont, str), y + fontHeight / 2);
+            }
+            if ((textDecoration & Style.TEXT_DECORATION_OVERLINE) != 0) {
+                drawLine(x, y, x + impl.stringWidth(nativeFont, str), y);
+            }
+        } else {
+            drawString(str, x, y);
+        }
     }
     
+    /**
+     * Reverses alignment in the case of bidi
+     */
+    private int reverseAlignForBidi(boolean rtl, int align) {
+        if (rtl) {
+            switch (align) {
+                case Component.RIGHT:
+                    return Component.LEFT;
+                case Component.LEFT:
+                    return Component.RIGHT;
+            }
+        }
+        return align;
+    }
+
     public void fillRoundRect(int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
         paint.setStyle(Paint.Style.FILL);

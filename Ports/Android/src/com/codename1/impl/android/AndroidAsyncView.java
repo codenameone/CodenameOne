@@ -23,6 +23,7 @@
 package com.codename1.impl.android;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -485,7 +486,18 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             });
         }
 
-        
+        @Override
+        public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, final int cmpWidth, final Style style, final String text, 
+                final Bitmap icon, final Bitmap stateIcon, final int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide, 
+                final int textPosition, final int stringWidth, final boolean isTickerRunning, final int tickerShiftText, final boolean endsWith3Points, final int valign) {
+            pendingRenderingOperations.add(new AsyncOp(clip) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState, 
+                            gap, rtl, isOppositeSide, textPosition, stringWidth, isTickerRunning, tickerShiftText, endsWith3Points, valign);
+                }
+            });
+        }        
         
         @Override
         public void fillArc(final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
