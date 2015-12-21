@@ -1182,23 +1182,28 @@ public class Container extends Component implements Iterable<Component>{
      * @return The index of the last visible component in this container - or components.size()-1 
      */
     private int calculateLastPaintableOffset(int pos, int clipX1, int clipY1, int clipX2, int clipY2) {
-        int len = components.size();
+        final int len = components.size();
         if (pos >= len-1) {
-            return pos;
+            // Start position is after the last index, so we didn't
+            // even find an end offset.
+            // Let's return one less than pos to indicate this
+            return len-1;
         }
-        Layout l = getLayout();
+        final Layout l = getLayout();
         if (l.getClass() == BoxLayout.class) {
             if (((BoxLayout)l).getAxis() == BoxLayout.Y_AXIS) {
                 // Use a binary search to find the first visible
-                Component c = components.get(++pos);
-                int cy1 = c.getBounds().getY();
-                
-                while (pos < len -1 && cy1 < clipY2 ) {
-                    c = components.get(++pos);
-                    cy1 = c.getBounds().getY();
-                }
-                return pos-1;
-                
+                //Component c = components.get(++pos);
+                Component c = null;
+                int cy1 = -1;
+                final int end = len-1;
+                pos++; // This should still be a valid index because
+                        // we previously checked to see if it was >= len-1
+                do {
+                    c = components.get(pos);
+                    cy1 = c.getBounds().getY(); 
+                } while (++pos <= end && cy1 <= clipY2);
+               return pos-1;
             }
         }
         return len-1;
