@@ -481,7 +481,7 @@ public class Label extends Component {
     }
 
     Image getIconFromState() {
-        return getIcon();
+        return getMaskedIcon();
     }
 
     int getAvaliableSpaceForText() {
