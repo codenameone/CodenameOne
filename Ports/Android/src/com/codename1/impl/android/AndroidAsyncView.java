@@ -735,7 +735,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         }
 
         @Override
-        void setFont(final Paint font) {
+        void setFont(final CodenameOneTextPaint font) {
             super.setFont(font);
         }
 

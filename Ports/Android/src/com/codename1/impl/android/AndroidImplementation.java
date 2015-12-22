@@ -47,7 +47,6 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Vibrator;
 import android.telephony.TelephonyManager;
-import android.text.TextPaint;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
@@ -179,7 +178,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static final int DROID_IMPL_KEY_MUTE = -23459;
     static int[] leftSK = new int[]{DROID_IMPL_KEY_MENU};
     CodenameOneSurface myView = null;
-    private Paint defaultFont;
+    private CodenameOneTextPaint defaultFont;
     private final char[] tmpchar = new char[1];
     private final Rect tmprect = new Rect();
     protected int defaultFontHeight;
@@ -454,7 +453,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
 
 
-        this.defaultFont = (Paint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
+        this.defaultFont = (CodenameOneTextPaint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
         Display.getInstance().setTransitionYield(-1);
         
         initSurface();
@@ -935,17 +934,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             font = this.defaultFont;
         }
         if (font instanceof NativeFont) {
-            ((AndroidGraphics) graphics).setFont((Paint) ((NativeFont) font).font);
+            ((AndroidGraphics) graphics).setFont((CodenameOneTextPaint) ((NativeFont) font).font);
         } else {
-            ((AndroidGraphics) graphics).setFont((Paint) font);
+            ((AndroidGraphics) graphics).setFont((CodenameOneTextPaint) font);
         }
     }
 
     @Override
     public int getHeight(Object nativeFont) {
-        Paint font = (nativeFont == null ? this.defaultFont
-                : (Paint) ((NativeFont) nativeFont).font);
-        return font.getFontMetricsInt(font.getFontMetricsInt());
+        CodenameOneTextPaint font = (nativeFont == null ? this.defaultFont
+                : (CodenameOneTextPaint) ((NativeFont) nativeFont).font);
+        if(font.fontHeight < 0) {
+            font.fontHeight = font.getFontMetricsInt(font.getFontMetricsInt());
+        }
+        return font.fontHeight;
     }
 
     @Override
@@ -1057,7 +1059,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(t.isItalic()) {
                 fontStyle |= com.codename1.ui.Font.STYLE_ITALIC;
             }
-            TextPaint newPaint = new TextPaint();
+            CodenameOneTextPaint newPaint = new CodenameOneTextPaint();
             newPaint.setAntiAlias(true);
             newPaint.setSubpixelText(true);
             newPaint.setTypeface(t);
@@ -1068,7 +1070,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(t == null) {
             throw new RuntimeException("Font not found: " + fileName);
         }
-        TextPaint newPaint = new TextPaint();
+        CodenameOneTextPaint newPaint = new CodenameOneTextPaint();
         newPaint.setAntiAlias(true);
         newPaint.setSubpixelText(true);
         newPaint.setTypeface(t);
@@ -1118,7 +1120,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         NativeFont fnt = (NativeFont)font;
-        TextPaint paint = (TextPaint)fnt.font;
+        CodenameOneTextPaint paint = (CodenameOneTextPaint)fnt.font;
         paint.setAntiAlias(true);
         Typeface type = paint.getTypeface();
         int fontstyle = Typeface.NORMAL;
@@ -1129,7 +1131,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             fontstyle |= Typeface.ITALIC;
         }
         type = Typeface.create(type, fontstyle);
-        TextPaint newPaint = new TextPaint();
+        CodenameOneTextPaint newPaint = new CodenameOneTextPaint();
         newPaint.setTypeface(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
@@ -1139,7 +1141,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object createFont(int face, int style, int size) {
-        Paint font = new TextPaint();
+        Paint font = new CodenameOneTextPaint();
         font.setAntiAlias(true);
         Typeface typeface = null;
         switch (face) {
@@ -1190,7 +1192,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object loadNativeFont(String lookup) {
         try {
             lookup = lookup.split(";")[0];
-            Paint font = new TextPaint();
+            Paint font = new CodenameOneTextPaint();
             font.setAntiAlias(true);
             int typeface = Typeface.NORMAL;
             String familyName = lookup.substring(0, lookup.indexOf("-"));
@@ -1234,7 +1236,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getDefaultFont() {
-        TextPaint paint = new TextPaint();
+        CodenameOneTextPaint paint = new CodenameOneTextPaint();
         paint.set(this.defaultFont);
         return new NativeFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM, paint);
     }
