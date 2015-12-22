@@ -104,7 +104,6 @@ static GLuint getOGLProgram(){
 
 #ifdef USE_ES2
 -(void)execute {
-    return;
     glUseProgram(getOGLProgram());
     
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
