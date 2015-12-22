@@ -5987,6 +5987,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         c.setId(contact.getId());
         c.setDisplayName(contact.getDisplayName());
         
+        if(includesPicture){
+            c.setPhoto(contact.getPhoto());
+        }
+        
         if (includesFullName) {
             c.setFirstName(contact.getFirstName());
             c.setFamilyName(contact.getFamilyName());
@@ -7321,13 +7325,20 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private Hashtable initContacts() {
         Hashtable retVal = new Hashtable();
-
+        
+        Image img = null;
+        try {
+            img = Image.createImage(getClass().getResourceAsStream("/com/codename1/impl/javase/user.jpg"));
+        } catch (IOException ex) {
+        }
+        
         Contact contact = new Contact();
         contact.setId("1");
 
         contact.setDisplayName("Chen Fishbein");
         contact.setFirstName("Chen");
         contact.setFamilyName("Fishbein");
+        contact.setPhoto(img);
 
         Hashtable phones = new Hashtable();
         phones.put("mobile", "+111111");
@@ -7352,6 +7363,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Shai Almog");
         contact.setFirstName("Shai");
         contact.setFamilyName("Almog");
+        contact.setPhoto(img);
 
         phones = new Hashtable();
         phones.put("mobile", "+111111");
@@ -7422,6 +7434,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Kenny McCormick");
         contact.setFirstName("Kenny");
         contact.setFamilyName("McCormick");
+        contact.setPhoto(img);
 
 
         phones = new Hashtable();
