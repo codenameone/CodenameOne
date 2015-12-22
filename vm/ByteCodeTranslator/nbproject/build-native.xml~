@@ -389,11 +389,9 @@ Portions Copyrighted 2013 Sun Microsystems, Inc.
         <echo message="exec-error:${exec-error}" level="verbose"/>
         <echo message="exec-result:${exec-result}" level="verbose"/>
         <condition property="missing.WiX">
-            <not><and>
-                <contains string="${exec-output}" substring="Windows Installer Xml Compiler version"/>
-                <not><contains string="${exec-output}" substring="Windows Installer Xml Compiler version 1"/></not>
-                <not><contains string="${exec-output}" substring="Windows Installer Xml Compiler version 2"/></not>
-            </and></not>
+            <not>
+                <matches string="${exec-output}" pattern="windows\s+installer\s+xml\s+(toolset\s+)?compiler\s+version\s+3.*" casesensitive="false"/>
+            </not>
         </condition>
     </target>
     <target name="-check-dpkg-presence" depends="-check-native-bundling-type" if="need.dpkg.presence">
