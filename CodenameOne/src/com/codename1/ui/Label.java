@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -33,13 +34,16 @@ import com.codename1.ui.util.EventDispatcher;
 
 /**
  * Allows displaying labels and images with different alignment options, this class
- * is a base class for several components allowing them to declare alignement/icon
+ * is a base class for several components allowing them to declare alignment/icon
  * look in a similar way.
  * 
  * @author Chen Fishbein
  */
 public class Label extends Component {
-
+    /**
+     * Allows us to fallback to the old default look and feel renderer for cases where compatibility is too hard
+     */
+    private boolean legacyRenderer;
     private String text = "";
     
     private Image icon;
@@ -268,6 +272,10 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
+        if(icon instanceof Timeline) {
+            legacyRenderer = true;
+        }
+        
         if(icon != null && mask != null) {
             maskedIcon = icon.applyMaskAutoScale(mask);
         }
@@ -416,6 +424,10 @@ public class Label extends Component {
      * @inheritDoc
      */
     public void paint(Graphics g) {
+        if(legacyRenderer) {
+            getUIManager().getLookAndFeel().drawLabel(g, this);
+            return;
+        }
         Object icn = null;
         Image i = getIconFromState();
         if(i != null) {
