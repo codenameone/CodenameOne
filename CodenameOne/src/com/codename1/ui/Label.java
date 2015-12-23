@@ -124,6 +124,9 @@ public class Label extends Component {
     public Label(Image icon) {
         this("");
         this.icon = icon;
+        if(icon instanceof Timeline) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
@@ -137,6 +140,9 @@ public class Label extends Component {
     public Label(Image icon, String uiid) {
         this("", uiid);
         this.icon = icon;
+        if(icon instanceof Timeline) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
@@ -150,6 +156,9 @@ public class Label extends Component {
     public Label(String text, Image icon, String uiid) {
         this(text, uiid);
         this.icon = icon;
+        if(icon instanceof Timeline) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
@@ -162,6 +171,9 @@ public class Label extends Component {
     public Label(String text, Image icon) {
         this(text);
         this.icon = icon;
+        if(icon instanceof Timeline) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
