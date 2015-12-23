@@ -122,8 +122,9 @@ class AndroidGraphics {
     }
 
     void setColor(int color){
-        this.paint.setColor((paint.getAlpha() << 24) | (color & 0xffffff));
-        this.font.setColor((font.getAlpha() << 24) | (color & 0xffffff));
+        int c = (alpha << 24) | (color & 0xffffff);
+        this.paint.setColor(c);
+        this.font.setColor(c);
     }
 
     Paint getPaint() {
