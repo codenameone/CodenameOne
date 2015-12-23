@@ -24,7 +24,6 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
-import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -124,7 +123,7 @@ public class Label extends Component {
     public Label(Image icon) {
         this("");
         this.icon = icon;
-        if(icon instanceof Timeline) {
+        if(icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
@@ -140,7 +139,7 @@ public class Label extends Component {
     public Label(Image icon, String uiid) {
         this("", uiid);
         this.icon = icon;
-        if(icon instanceof Timeline) {
+        if(icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
@@ -156,7 +155,7 @@ public class Label extends Component {
     public Label(String text, Image icon, String uiid) {
         this(text, uiid);
         this.icon = icon;
-        if(icon instanceof Timeline) {
+        if(icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
@@ -171,7 +170,7 @@ public class Label extends Component {
     public Label(String text, Image icon) {
         this(text);
         this.icon = icon;
-        if(icon instanceof Timeline) {
+        if(icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
@@ -284,7 +283,7 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
-        if(icon instanceof Timeline) {
+        if(icon.requiresDrawImage()) {
             legacyRenderer = true;
         }
         

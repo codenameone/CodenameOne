@@ -1106,4 +1106,15 @@ public class Image {
     public Image flipVertically(boolean maintainOpacity) {
         return Display.impl.flipImageVertically(this, maintainOpacity);
     }
+    
+    /**
+     * New label optimizations don't invoke drawImage and instead just pass the native image directly to
+     * the underlying renderer. This is problematic for some image types specifically timeline &amp; FontImage
+     * and this method allows these classes to indicate that they need that legacy behavior of calling drawImage.
+     * 
+     * @return true if a drawImage call is a required
+     */
+    protected boolean requiresDrawImage() {
+        return false;
+    }
 }

@@ -222,4 +222,12 @@ public class RGBImage extends Image {
     public int getHeight() {
         return height;
     }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    protected boolean requiresDrawImage() {
+        return true;
+    }
 }
