@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
@@ -120,6 +121,10 @@ public class Font {
     private Object font;
 
     private boolean ttf;
+
+    private String fontUniqueId;
+
+    private static HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
     
     /**
      * Creates a new Font
@@ -223,6 +228,10 @@ public class Font {
         }
         Font f = new Font(font);
         f.ttf = true;
+        f.fontUniqueId = fontName;
+        float h = f.getHeight();
+        
+        derivedFontCache.put(fileName + "_" + h + "_"+ Font.STYLE_PLAIN, f);
         return f;
     }
     
@@ -236,9 +245,23 @@ public class Font {
      * @return scaled font instance
      */
     public Font derive(float sizePixels, int weight) {
-        Font f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
-        f.ttf = true;
-        return f;
+        if(fontUniqueId != null) {
+            // derive should recycle instances of Font to allow smarter caching and logic on the native side of the fence
+            String key = fontUniqueId + "_" + sizePixels + "_"+ weight;
+            Font f = derivedFontCache.get(key);
+            if(f != null) {
+                return f;
+            }
+            f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+            derivedFontCache.put(fontUniqueId + "_" + sizePixels + "_"+ weight, f);
+            f.ttf = true;
+            return f;
+        } else {
+            // not sure if this ever happens but don't want to break that code
+            Font f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+            f.ttf = true;
+            return f;
+        }
     }
 
     /**
