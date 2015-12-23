@@ -446,7 +446,7 @@ public class AndroidContactsManager {
                 ContactsContract.Contacts.HAS_PHONE_NUMBER};
 
         ContentResolver contentResolver = activity.getContentResolver();
-        Cursor cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI, projection, selection, null, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC");
+        Cursor cursor = contentResolver.query(ContactsContract.Contacts.CONTENT_URI, projection, selection, null, "upper(" + ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + ") ASC");
         while (cursor.moveToNext()) {
             String contactId = cursor.getString(cursor.getColumnIndex(ContactsContract.Contacts._ID));
             Contact contact = new Contact();
