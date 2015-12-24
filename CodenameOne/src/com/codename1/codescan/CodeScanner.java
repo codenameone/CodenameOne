@@ -26,12 +26,16 @@ import com.codename1.ui.Display;
 import java.util.Vector;
 
 /**
- * A barcode/qrcode scanner API, this class is a singleton, notice that this
+ * Deprecated!!:  Please use the <a href="https://github.com/shannah/cn1-codescan">cn1-codescan library</a> instead.
+ * 
+ * <p>A barcode/qrcode scanner API, this class is a singleton, notice that this
  * API might not be implemented for all platforms in which case the getInstance()
- * method will return null!
+ * method will return null!</p>
  *
  * @author Shai Almog
+ * @deprecated Use the cn1-codescanner cn1lib.
  */
+@Deprecated
 public abstract class CodeScanner {
     
     /**
