@@ -1451,7 +1451,7 @@ public class Container extends Component implements Iterable<Component>{
                     if (f != null && f.getInvisibleAreaUnderVKB() == 0 && 
                             f.findFirstFocusable() == c) {
                         // support this use case only if the component doesn't explicitly declare visible bounds
-                        if (r == c.getBounds()) {
+                        if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) {
                             scrollRectToVisible(new Rectangle(0, 0,
                                     c.getX() + Math.min(c.getWidth(), getWidth()),
                                     c.getY() + Math.min(c.getHeight(), getHeight())), this);
