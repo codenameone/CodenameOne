@@ -490,6 +490,11 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, final int cmpWidth, final Style style, final String text, 
                 final Bitmap icon, final Bitmap stateIcon, final int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide, 
                 final int textPosition, final int stringWidth, final boolean isTickerRunning, final int tickerShiftText, final boolean endsWith3Points, final int valign) {
+            if (clip == null) {
+                clip = new Rectangle(cmpX, cmpY, cmpWidth, cmpHeight);
+            } else {
+                clip = clip.intersection(cmpX, cmpY, cmpWidth, cmpHeight);
+            }
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
@@ -530,18 +535,14 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         @Override
         public void drawString(final String str, final int x, final int y) {
             final int col = this.color;
-            final float size = getFont().getTextSize();
-            final Typeface type = getFont().getTypeface();
+            final CodenameOneTextPaint font = (CodenameOneTextPaint)getFont();
             final int alph = this.alpha;
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
-                    Paint p = underlying.getFont();
-                    p.setTypeface(type);
-                    p.setTextSize(size);
-                    p.setAntiAlias(true);
-                    p.setColor(col);
-                    p.setAlpha(alph);                    
+                    underlying.setFont(font);
+                    font.setColor(col);
+                    font.setAlpha(alph);
                     underlying.drawString(str, x, y);
                 }
             });
