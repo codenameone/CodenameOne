@@ -3676,7 +3676,9 @@ public final class Display {
     /**
      * Returns the native implementation of the code scanner or null
      * @return code scanner instance
+     * @deprecated Use the cn1-codescanner cn1lib.
      */
+    @Deprecated
     public CodeScanner getCodeScanner() {
         if(!hasCamera()) {
             return null;
