@@ -2712,13 +2712,8 @@ public class Container extends Component implements Iterable<Component>{
         
         @Override
         protected void updateState() {
-            int componentCount = thisContainer.getComponentCount();
-            if(motions != null){
-                componentCount = motions[0].length;
-            }
-            
             if(animatedComponents != null) {
-                componentCount = animatedComponents.size();
+                int componentCount = animatedComponents.size();
                 for(int iter = 0 ; iter < componentCount ; iter++) {
                     Component currentCmp = (Component)animatedComponents.elementAt(iter);
 
@@ -2731,6 +2726,10 @@ public class Container extends Component implements Iterable<Component>{
                     }
                 }
             } else {
+                int componentCount = thisContainer.getComponentCount();
+                if(motions != null){
+                    componentCount = Math.min(motions[0].length, componentCount);
+                }
                 for(int iter = 0 ; iter < componentCount ; iter++) {
                     Component currentCmp = thisContainer.getComponentAt(iter);
 
