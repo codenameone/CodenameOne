@@ -80,7 +80,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     private final AndroidGraphics internalGraphics;
     private final AndroidImplementation implementation;
     private boolean paintViewOnBuffer = false;
-    
+
     public AndroidAsyncView(Activity activity, AndroidImplementation implementation) {
         super(activity);
         setId(2001);
@@ -95,9 +95,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
     @Override
     protected void onDraw(Canvas c) {
-        boolean paintOnBuffer = paintViewOnBuffer || 
-                implementation.isEditingText() || 
-                InPlaceEditView.isKeyboardShowing() || 
+        boolean paintOnBuffer = paintViewOnBuffer ||
+                implementation.isEditingText() ||
+                InPlaceEditView.isKeyboardShowing() ||
                 implementation.nativePeers.size() > 0;
 
         internalGraphics.setCanvasNoSave(c);
@@ -269,7 +269,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         private int color;
         private Paint imagePaint = new Paint();
         private Transform transform;
-        
+
 
         AsyncGraphics(AndroidImplementation impl) {
             super(impl, null);
@@ -447,8 +447,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         }
 
         @Override
-        public void fillRectRadialGradient(final int startColor, final int endColor, final int x, final int y, 
-                final int width, final int height, final float relativeX, final float relativeY, final float relativeSize) {
+        public void fillRectRadialGradient(final int startColor, final int endColor, final int x, final int y,
+                                           final int width, final int height, final float relativeX, final float relativeY, final float relativeSize) {
             if (alpha == 0) {
                 return;
             }
@@ -487,9 +487,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         }
 
         @Override
-        public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, final int cmpWidth, final Style style, final String text, 
-                final Bitmap icon, final Bitmap stateIcon, final int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide, 
-                final int textPosition, final int stringWidth, final boolean isTickerRunning, final int tickerShiftText, final boolean endsWith3Points, final int valign) {
+        public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, final int cmpWidth, final Style style, final String text,
+                                       final Bitmap icon, final Bitmap stateIcon, final int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide,
+                                       final int textPosition, final int stringWidth, final boolean isTickerRunning, final int tickerShiftText, final boolean endsWith3Points, final int valign) {
             if (clip == null) {
                 clip = new Rectangle(cmpX, cmpY, cmpWidth, cmpHeight);
             } else {
@@ -498,12 +498,12 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
-                    underlying.drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState, 
+                    underlying.drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState,
                             gap, rtl, isOppositeSide, textPosition, stringWidth, isTickerRunning, tickerShiftText, endsWith3Points, valign);
                 }
             });
-        }        
-        
+        }
+
         @Override
         public void fillArc(final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
             final int alph = alpha;
@@ -645,7 +645,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 }
             });
         }
-        
+
         @Override
         public void drawImage(final Object img, final int x, final int y, final int w, final int h) {
             final int alph = alpha;
@@ -679,7 +679,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         public void drawPath(final Path p, final Stroke stroke) {
             final int alph = alpha;
             final int col = color;
-            
+
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
@@ -693,7 +693,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         public void fillPath(final Path p) {
             final int alph = alpha;
             final int col = color;
-            
+
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
@@ -703,8 +703,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.fillPath(p);
                 }
             });
-        } 
-        
+        }
+
         public void setTransform(final Transform transform) {
             this.transform = transform;
             pendingRenderingOperations.add(new AsyncOp(clip) {
@@ -754,17 +754,17 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     public boolean alwaysRepaintAll() {
         return true;
     }
-    
+
     @Override
     protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
         super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
         //do not let other views steal the focus from the main view
         if(!gainFocus && implementation.hasViewAboveBelow()){
-            requestFocus(); 
+            requestFocus();
             if(implementation.getCurrentForm() != null){
-                implementation.getCurrentForm().repaint();                
+                implementation.getCurrentForm().repaint();
             }
         }
     }
-    
+
 }
