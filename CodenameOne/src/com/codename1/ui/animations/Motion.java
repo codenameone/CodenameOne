@@ -76,6 +76,7 @@ public class Motion {
     private long startTime;
     private double initVelocity,  friction;
     private int lastReturnedValue;
+    private int [] previousLastReturnedValue = new int[3];
     private long currentMotionTime = -1;
     private float p0, p1, p2, p3;
     
@@ -94,6 +95,7 @@ public class Motion {
         if(slowMotion) {
             this.duration *= 50;
         }
+        previousLastReturnedValue[0] = -1;        
     }
 
     /**
@@ -118,6 +120,7 @@ public class Motion {
         this.initVelocity = initVelocity;
         this.friction = friction;
         duration = (int) ((Math.abs(initVelocity)) / friction);
+        previousLastReturnedValue[0] = -1;        
     }
     
     protected Motion(int sourceValue, double initVelocity, double friction) {
@@ -125,6 +128,7 @@ public class Motion {
         this.initVelocity = initVelocity;
         this.friction = friction;
         duration = (int) ((Math.abs(initVelocity)) / friction);
+        previousLastReturnedValue[0] = -1;        
     }
 
     
@@ -339,10 +343,7 @@ public class Motion {
      * @return true if System.currentTimeMillis() > duration + startTime or the last returned value is the destination value
      */
     public boolean isFinished() {
-        if(currentMotionTime < 0) {
-            return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue;
-        }
-        return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue;
+        return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue || (EXPONENTIAL_DECAY == motionType && previousLastReturnedValue[0] == lastReturnedValue);
     }
 
     private int getSplineValue() {
@@ -486,6 +487,10 @@ public class Motion {
         if(currentMotionTime > -1 && startTime > getCurrentMotionTime()) {
             return sourceValue;
         }
+        
+        previousLastReturnedValue[0] = previousLastReturnedValue[1];
+        previousLastReturnedValue[1] = previousLastReturnedValue[2];
+        previousLastReturnedValue[2] = lastReturnedValue;
         switch(motionType) {
             case SPLINE:
                 lastReturnedValue = getSplineValue();
