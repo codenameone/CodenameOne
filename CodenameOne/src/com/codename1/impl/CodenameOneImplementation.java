@@ -5766,6 +5766,7 @@ public abstract class CodenameOneImplementation {
     /**
      * Returns the native implementation of the code scanner or null
      * @return code scanner instance
+     * @deprecated Use cn1-codescan cn1lib instead.
      */
     public CodeScanner getCodeScanner() {
         return null;

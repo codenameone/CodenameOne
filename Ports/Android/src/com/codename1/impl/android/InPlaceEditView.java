@@ -806,11 +806,7 @@ public class InPlaceEditView extends FrameLayout {
      * to 'edit' to return.
      */
     private synchronized void endEditing(int reason, boolean forceVKBOpen) {
-
-        if (mEditText == null) {
-            if(isKeyboardShowing()){
-                showVirtualKeyboard(false);
-            }
+        if (!mIsEditing || mEditText == null) {
             return;
         }
         setVisibility(GONE);
@@ -818,7 +814,7 @@ public class InPlaceEditView extends FrameLayout {
 
         // If the IME action is set to NEXT, do not hide the virtual keyboard
         boolean isNextActionFlagSet = (mEditText.getImeOptions() == EditorInfo.IME_ACTION_NEXT);
-        boolean leaveKeyboardShowing = (reason == REASON_IME_ACTION) && isNextActionFlagSet || forceVKBOpen;
+        boolean leaveKeyboardShowing = impl.isAsyncEditMode() || (reason == REASON_IME_ACTION) && isNextActionFlagSet || forceVKBOpen;
         if (!leaveKeyboardShowing) {
             showVirtualKeyboard(false);
         }
@@ -1092,12 +1088,14 @@ public class InPlaceEditView extends FrameLayout {
         // If we are already editing, we need to finish that up before we proceed to edit the next field.
         synchronized(editingLock) {
             if (mIsEditing) {
+
+
                 final InPlaceEditView instance = sInstance;
                 if (instance != null && instance.mEditText != null && instance.mEditText.mTextArea == textArea) {
                     instance.showTextEditorAgain();
                     return;
                 }
-                if (!isClosing) {
+                if (!isClosing && sInstance != null && sInstance.mEditText != null) {
                     isClosing = true;
 
                     impl.activity.runOnUiThread(new Runnable() {
@@ -1107,6 +1105,7 @@ public class InPlaceEditView extends FrameLayout {
                         }
                     });
                 }
+
                 afterClose = new Runnable() {
 
                     @Override
@@ -1116,8 +1115,8 @@ public class InPlaceEditView extends FrameLayout {
                     }
 
                 };
-
                 return;
+
 
             }
             mIsEditing = true;
@@ -1166,13 +1165,15 @@ public class InPlaceEditView extends FrameLayout {
                 if(sInstance != null && sInstance.mLastEditText != null && sInstance.mLastEditText.mTextArea == textArea){
                     String retVal = sInstance.mLastEditText.getText().toString();
 
-                    sInstance.mLastEditText = null;
-                    impl.activity.runOnUiThread(new Runnable() {
+                    if (!impl.isAsyncEditMode()) {
+                        sInstance.mLastEditText = null;
+                        impl.activity.runOnUiThread(new Runnable() {
 
-                        public void run() {
-                            releaseEdit();
-                        }
-                    });
+                            public void run() {
+                                releaseEdit();
+                            }
+                        });
+                    }
                     out[0] = retVal;
                 }else{
                     out[0] = initialText;
@@ -1181,22 +1182,23 @@ public class InPlaceEditView extends FrameLayout {
                 Display.getInstance().onEditingComplete(component, out[0]);
                 if (impl.isAsyncEditMode()) {
                     impl.callHideTextEditor();
-                }
+                } else {
 
 
-                // the call to releaseEdit above should remove the native text editor and
-                // set sInstance to null
-                // We would like to wait for that to happen before we release our isEditing
-                // lock.
-                if (sInstance != null) {
-                    Display.getInstance().invokeAndBlock(new Runnable() {
-                        public void run() {
-                            while (sInstance != null) {
-                                com.codename1.io.Util.sleep(5);
+                    // the call to releaseEdit above should remove the native text editor and
+                    // set sInstance to null
+                    // We would like to wait for that to happen before we release our isEditing
+                    // lock.
+                    if (sInstance != null) {
+                        Display.getInstance().invokeAndBlock(new Runnable() {
+                            public void run() {
+                                while (sInstance != null) {
+                                    com.codename1.io.Util.sleep(5);
+                                }
                             }
-                        }
 
-                    });
+                        });
+                    }
                 }
 
 
