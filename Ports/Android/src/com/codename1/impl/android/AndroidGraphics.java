@@ -373,6 +373,7 @@ class AndroidGraphics {
             setColor(s.getBgColor());
             fillRectImpl(x, y, width, height, s.getBgTransparency());
             canvas.restore();
+            return;
         } else {
             int iW = bgImageOrig.getWidth();
             int iH = bgImageOrig.getHeight();
@@ -409,6 +410,7 @@ class AndroidGraphics {
                 return;
                 case Style.BACKGROUND_IMAGE_TILE_BOTH:
                     tileImage(bgImage, x, y, width, height);
+                    canvas.restore();
                     return;
                 case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
                     setColor(s.getBgColor());
@@ -545,6 +547,7 @@ class AndroidGraphics {
         } else {
             paint.setShader(new LinearGradient(x, y, width, 0, startColor, endColor, Shader.TileMode.MIRROR));
         }
+        canvas.save();
         canvas.concat(getTransformMatrix());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
@@ -557,6 +560,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        canvas.save();
         canvas.concat(getTransformMatrix());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
@@ -569,6 +573,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        canvas.save();
         canvas.concat(getTransformMatrix());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
