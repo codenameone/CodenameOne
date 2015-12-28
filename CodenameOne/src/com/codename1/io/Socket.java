@@ -24,6 +24,7 @@
 package com.codename1.io;
 
 import com.codename1.ui.Display;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -170,49 +171,88 @@ public class Socket {
             }
         }
         
+        // [ddyer 12/2015] 
+        // try to read some data into the buffer if we think there is some
+        // available, but don't wait if there is not.  This is used to get
+        // additional data for a read that has more room in it's buffer.
+        //
+        private boolean getDataIfAvailable() 
+        {	try {
+        	if(available()>0)
+        		{
+        		buffer = Util.getImplementation().readFromSocketStream(impl);
+          		bufferOffset = 0;
+          		return((buffer!=null) && (buffer.length>0));
+        		}
+        	}
+        	catch (IOException e) 
+        		{
+        		// we don't really expect an IOException here, but if one
+        		// does occur, leave peacefully so the caller can return the
+        		// data he has.
+        		}
+        	// we got nothing.
+        	return(false);
+        }
+        // get some data in the input buffer.  Return true if we did
+        // and false if we can't and never can.  This does not return
+        // until either data is available or it never will be.
+        //
+        // ddyer 12/2015.
+        // 
+        private boolean getSomeData() 
+        {  	// upon entry, there may be data leftover from the previous call to read
+        	while((buffer==null) 
+        			|| (bufferOffset>=buffer.length))
+        	{	// we want new data, but if the socket is closed we won't get it.
+          		if(!Util.getImplementation().isSocketConnected(impl))
+          			{ return(false);	// we'll never get data
+          			}
+          		buffer = Util.getImplementation().readFromSocketStream(impl);
+          		bufferOffset = 0;
+          		
+        		if((buffer==null) || (buffer.length==0))
+         		{	// wait a while
+        			if(!Util.getImplementation().isSocketConnected(impl))
+        				{ return(false);	// we'll never get data, return without waiting
+        				}
+        			try {
+                        Thread.sleep(10);
+                    } catch(InterruptedException err) {}	
+        		}
+        	}
+        	return(true);
+        }
+         
+        // [ddyer 12/2015] 
+        // rewritten to fix a bug that caused data loss if the the output 
+        // and input buffer both ran out at the same time, then rewritten
+        // again for clarity and to avoid waiting forever when the data stream
+        // is closed while waiting for the first batch of data.  The old version
+        // used a recursive call to read which might have gone an indefinite 
+        // number of levels deep, but this version does not.
         @Override
-        public int read(byte[] b, int off, int len) throws IOException {
+        public int read(byte[] b, int off, int len) throws IOException 
+        {
             throwEOF();
             // eventually a read should timeout and return what it has
-            int timeout = 10;
-            while(buffer == null) {
-                buffer = Util.getImplementation().readFromSocketStream(impl);
-                bufferOffset = 0;
-                if(buffer == null && Util.getImplementation().isSocketConnected(impl) && timeout > 0) {
-                    try {
-                        Thread.sleep(10);
-                    } catch(InterruptedException err) {}
-                    timeout--;
-                }
-            }
-            if(buffer.length == bufferOffset) {
-                buffer = null;
-                int size = read(b, off, len);
-                if(size < 0) {
-                    return -1;
-                }
-            }
+            if(!getSomeData()) 
+            	{ return(-1);	// nothing available ever
+            	}
             int bytesRead = 0;
-            for(int iter = 0 ; iter < len ; iter++) {
-                b[off + iter] = buffer[bufferOffset];
-                bufferOffset++;
-                bytesRead++;
-                if(buffer.length == bufferOffset) {
-                    buffer = null;
-                    if(available() == 0 && bytesRead > 0) {
-                        return bytesRead;
-                    }
-                    int size = read(b, off + iter, len - iter);
-                    if(size < 0) {
-                        if(bytesRead == 0) {
-                            return -1;
-                        }
-                        return bytesRead;
-                    }
-                    return bytesRead + size;
-                }
-            }
-            return bytesRead;
+            
+           // copy the available data, limited by whichever buffer is smaller
+           do {
+           while((bytesRead<len) && (bufferOffset<buffer.length))
+            	{
+                b[off + bytesRead++] = buffer[bufferOffset++];
+            	}
+           } 
+           		// if there's more room and data is already available, go for it.
+           while ((bytesRead<len) && getDataIfAvailable());
+
+            // otherwise return with what we have
+            return(bytesRead);
         }
 
         @Override
