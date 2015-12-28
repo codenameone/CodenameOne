@@ -801,11 +801,15 @@ public class InPlaceEditView extends FrameLayout {
         return mIsEditing && mEditText != null && mEditText.mTextArea != null && mEditText.mTextArea.contains(x, y);
     }
 
+    private synchronized void endEditing(int reason, boolean forceVKBOpen) {
+        endEditing(reason, forceVKBOpen, false);
+    }
+    
     /**
      * Finish the in-place editing of the given text area, release the edit lock, and allow the synchronous call
      * to 'edit' to return.
      */
-    private synchronized void endEditing(int reason, boolean forceVKBOpen) {
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose) {
         if (!mIsEditing || mEditText == null) {
             return;
         }
@@ -815,6 +819,9 @@ public class InPlaceEditView extends FrameLayout {
         // If the IME action is set to NEXT, do not hide the virtual keyboard
         boolean isNextActionFlagSet = (mEditText.getImeOptions() == EditorInfo.IME_ACTION_NEXT);
         boolean leaveKeyboardShowing = impl.isAsyncEditMode() || (reason == REASON_IME_ACTION) && isNextActionFlagSet || forceVKBOpen;
+        if (forceVKBClose) {
+            leaveKeyboardShowing = false;
+        }
         if (!leaveKeyboardShowing) {
             showVirtualKeyboard(false);
         }
@@ -894,10 +901,13 @@ public class InPlaceEditView extends FrameLayout {
         return (sInstance == null) ? REASON_UNDEFINED : sInstance.mLastEndEditReason;
     }
 
-    // Called on Android UI thread.
     public static void endEdit() {
+        endEdit(false);
+    }
+    // Called on Android UI thread.
+    public static void endEdit(boolean forceVKBClose) {
         if (sInstance != null) {
-            sInstance.endEditing(REASON_UNDEFINED, false);
+            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose);
             // No longer need these because end editing will allow the onComplete handler to
             // be called which will trigger a releaseEdit
             //ViewParent p = sInstance.getParent();
@@ -909,8 +919,12 @@ public class InPlaceEditView extends FrameLayout {
     }
 
     public static void stopEdit() {
+        stopEdit(false);
+    }
+    
+    public static void stopEdit(boolean forceVKBClose) {
         if (sInstance != null) {
-            sInstance.endEditing(REASON_UNDEFINED, false);
+            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose);
         }
     }
 
