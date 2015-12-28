@@ -49,6 +49,8 @@ import com.codename1.ui.util.Resources;
  * Used to render the default look of Codename One
  *
  * @author Chen Fishbein
+ * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate 
+ * our desire to reduce usage/reliance on this class. 
  */
 public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private Image[] chkBoxImages = null;
@@ -265,6 +267,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
     /**
      * @inheritDoc
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public void drawButton(Graphics g, Button b) {
         drawComponent(g, b, b.getIconFromState(), null, 0);
@@ -376,6 +379,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
     /**
      * @inheritDoc
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public void drawLabel(Graphics g, Label l) {
         drawComponent(g, l, l.getMaskedIcon(), null, 0);

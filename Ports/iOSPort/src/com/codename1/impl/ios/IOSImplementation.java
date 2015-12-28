@@ -6244,6 +6244,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public native void paintComponentBackground(Object nativeGraphics, int x, int y, int width, int height, Style s);
+    
+    @Override
+    public native void fillRect(Object nativeGraphics, int x, int y, int w, int h, byte alpha);
+    
+    @Override
+    public native void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth,
+            Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl,
+            boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText,
+            boolean endsWith3Points, int valign);
+    
+    @Override
     public void registerPush(Hashtable metaData, boolean noFallback) {
         nativeInstance.registerPush();
     }

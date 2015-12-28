@@ -329,7 +329,7 @@ public class EncodedImage extends Image {
             if(opaqueChecked) {
                 i.setOpaque(opaque);
             }
-            CodenameOneImplementation impl = Display.getInstance().getImplementation();
+            CodenameOneImplementation impl = Display.impl;
             impl.setImageName(i.getImage(), getImageName());
         } catch(Exception err) {
             err.printStackTrace();
@@ -367,7 +367,7 @@ public class EncodedImage extends Image {
                         if(opaqueChecked) {
                             i.setOpaque(opaque);
                         }
-                        CodenameOneImplementation impl = Display.getInstance().getImplementation();
+                        CodenameOneImplementation impl = Display.impl;
                         impl.setImageName(i.getImage(), getImageName());
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
@@ -487,7 +487,7 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
-        Display.getInstance().getImplementation().drawingEncodedImage(this);
+        Display.impl.drawingEncodedImage(this);
         Image internal = getInternalImpl();
         if(width > -1 && height > -1 && (internal.getWidth() != width || internal.getHeight() != height)) {
             internal.drawImage(g, nativeGraphics, x, y, width, height);
@@ -500,7 +500,7 @@ public class EncodedImage extends Image {
      * @inheritDoc
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
-        Display.getInstance().getImplementation().drawingEncodedImage(this);
+        Display.impl.drawingEncodedImage(this);
         getInternalImpl().drawImage(g, nativeGraphics, x, y, w, h);
     }
 

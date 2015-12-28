@@ -104,7 +104,7 @@ public class PeerComponent extends Component {
         if(nativePeer == null) {
             return null;
         }
-        return Display.getInstance().getImplementation().createNativePeer(nativePeer);
+        return Display.impl.createNativePeer(nativePeer);
     }
 
     /**
