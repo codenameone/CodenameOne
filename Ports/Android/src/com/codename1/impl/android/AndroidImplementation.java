@@ -733,7 +733,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return super.isEditingText(c);
     }
 
-    public static void stopEditing(){
+    
+    
+    public static void stopEditing() {
+        stopEditing(false);
+    }
+    
+    public static void stopEditing(final boolean forceVKBClose){
         final boolean[] flag = new boolean[]{false};
 
         // InPlaceEditView.endEdit must be called from the UI thread.
@@ -743,7 +749,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void run() {
                 // Must be called from the UI thread
-                InPlaceEditView.stopEdit();
+                InPlaceEditView.stopEdit(forceVKBClose);
 
                 synchronized (flag) {
                     flag[0] = true;
@@ -5423,7 +5429,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             flushGraphics();
         }
         if(InPlaceEditView.isKeyboardShowing()){
-            stopEditing();
+            stopEditing(true);
         }
         super.setCurrentForm(f);
         if (isNativeTitle() &&  !(f instanceof Dialog)) {

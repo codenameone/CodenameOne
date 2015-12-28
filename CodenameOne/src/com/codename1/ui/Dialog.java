@@ -173,6 +173,12 @@ public class Dialog extends Form {
     private Container dialogContentPane;
 
     /**
+     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     */
+    private Boolean popupDirectionBiasPortrait;
+    
+    /**
      * Constructs a Dialog with a title
      * 
      * @param title the title of the dialog
@@ -1104,7 +1110,12 @@ public class Dialog extends Form {
         int y = 0;
         Command result;
 
-        boolean showPortrait = Display.getInstance().isPortrait();
+        boolean showPortrait;
+        if(popupDirectionBiasPortrait != null) {
+            showPortrait = popupDirectionBiasPortrait.booleanValue();
+        } else {
+            showPortrait = Display.getInstance().isPortrait();
+        }
 
         // if we don't have enough space then disregard device orientation
         if(showPortrait) {
@@ -1791,5 +1802,23 @@ public class Dialog extends Form {
                 }
             }
         }
+    }
+
+    /**
+     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     * @return the popupDirectionBiasPortrait
+     */
+    public Boolean getPopupDirectionBiasPortrait() {
+        return popupDirectionBiasPortrait;
+    }
+
+    /**
+     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     * @param popupDirectionBiasPortrait the popupDirectionBiasPortrait to set
+     */
+    public void setPopupDirectionBiasPortrait(Boolean popupDirectionBiasPortrait) {
+        this.popupDirectionBiasPortrait = popupDirectionBiasPortrait;
     }
 }
