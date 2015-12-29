@@ -54,6 +54,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.JTable;
+import javax.swing.JTree;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
 import javax.swing.border.LineBorder;
@@ -66,6 +67,7 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
+import javax.swing.tree.DefaultTreeCellRenderer;
 
 /**
  * The Codename One performance monitor shows you how long (in nano-seconds) it took to paint a specific
@@ -369,6 +371,18 @@ public class PerformanceMonitor extends javax.swing.JFrame {
 
     private void refreshFrameActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshFrameActionPerformed
         componentHierarchy.setModel(new ComponentTreeModel(Display.getInstance().getCurrent()));
+        componentHierarchy.setCellRenderer(new DefaultTreeCellRenderer() {
+
+            @Override
+            public java.awt.Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus) {
+                String s = value.toString();
+                if(value instanceof Component) {
+                    s = ((Component)value).getUIID() + ": " + s;
+                }
+                return super.getTreeCellRendererComponent(tree, s, sel, expanded, leaf, row, hasFocus); //To change body of generated methods, choose Tools | Templates.
+            }
+            
+        });
         
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
