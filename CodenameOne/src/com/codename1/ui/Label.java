@@ -40,7 +40,7 @@ import com.codename1.ui.util.EventDispatcher;
  */
 public class Label extends Component {
     /**
-     * Allows us to fallback to the old default look and feel renderer for cases where compatibility is too hard
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
      */
     private boolean legacyRenderer;
     private String text = "";
@@ -283,12 +283,14 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
-        if(icon.requiresDrawImage()) {
-            legacyRenderer = true;
-        }
-        
-        if(icon != null && mask != null) {
-            maskedIcon = icon.applyMaskAutoScale(mask);
+        if(icon != null) {
+            if(icon.requiresDrawImage()) {
+                legacyRenderer = true;
+            }
+
+            if(mask != null) {
+                maskedIcon = icon.applyMaskAutoScale(mask);
+            }
         }
         this.icon = icon;
         setShouldCalcPreferredSize(true);
@@ -886,5 +888,21 @@ public class Label extends Component {
             return stringWidthUnselected;
         }
         return fnt.stringWidth(text);
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @return the legacyRenderer
+     */
+    public boolean isLegacyRenderer() {
+        return legacyRenderer;
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @param legacyRenderer the legacyRenderer to set
+     */
+    public void setLegacyRenderer(boolean legacyRenderer) {
+        this.legacyRenderer = legacyRenderer;
     }
 }
