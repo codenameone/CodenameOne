@@ -904,6 +904,10 @@ public class Container extends Component implements Iterable<Component>{
     void removeComponentImplNoAnimationSafety(Component cmp) {
         Form parentForm = cmp.getComponentForm();
         layout.removeLayoutComponent(cmp);
+        
+        // the deinitizlize contract expects the component to be in a container but if this is a part of an animation 
+        // it might have been removed already to prevent conflict with remove operations
+        cmp.setParent(this);
         cmp.deinitializeImpl();
         components.remove(cmp);
         cmp.setParent(null);
