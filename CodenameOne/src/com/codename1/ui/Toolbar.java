@@ -620,7 +620,7 @@ public class Toolbar extends Container {
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
                 if (i == null) {
-                    i = Resources.getSystemResource().getImage("of_menu.png");
+                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"));
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 
