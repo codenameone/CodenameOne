@@ -4421,12 +4421,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
 //        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
 //                new Intent("SMS_DELIVERED"), 0);
-        if(i) {
-            Intent smsIntent = new Intent(Intent.ACTION_VIEW);
-            smsIntent.setType("vnd.android-dir/mms-sms");
-            smsIntent.putExtra("address", phoneNumber);
-            smsIntent.putExtra("sms_body",message);
+        if(i) {            
+            Intent smsIntent = null;
+            if(android.os.Build.VERSION.SDK_INT < 19){
+                smsIntent = new Intent(Intent.ACTION_VIEW);
+                smsIntent.setType("vnd.android-dir/mms-sms");
+                smsIntent.putExtra("address", phoneNumber);
+                smsIntent.putExtra("sms_body",message);
+            }else{
+                smsIntent = new Intent(Intent.ACTION_SENDTO);
+                smsIntent.setData(Uri.parse("smsto:" + Uri.encode(phoneNumber)));   
+                smsIntent.putExtra("sms_body", message); 
+            }
             activity.startActivity(smsIntent);            
+            
         } else {
             SmsManager sms = SmsManager.getDefault();
             ArrayList<String> parts = sms.divideMessage(message);
