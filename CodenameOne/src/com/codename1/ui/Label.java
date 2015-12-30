@@ -627,8 +627,14 @@ public class Label extends Component {
             tickerStartTime = System.currentTimeMillis();
             if(rightToLeft){
                 shiftText -= Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(shiftText + getStringWidth(getStyle().getFont()) < 0) {
+                    shiftText = getStringWidth(getStyle().getFont()); 
+                }
             }else{
                 shiftText += Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(getStringWidth(getStyle().getFont()) - shiftText < 0) {
+                    shiftText = -getStringWidth(getStyle().getFont()); 
+                }
             }     
             animateTicker = true;
         }                
