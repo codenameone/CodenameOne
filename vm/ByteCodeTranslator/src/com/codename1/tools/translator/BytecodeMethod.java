@@ -25,6 +25,8 @@ package com.codename1.tools.translator;
  
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.CustomIntruction;
+import com.codename1.tools.translator.bytecodes.CustomInvoke;
+import com.codename1.tools.translator.bytecodes.CustomJump;
 import com.codename1.tools.translator.bytecodes.Field;
 import com.codename1.tools.translator.bytecodes.IInc;
 import com.codename1.tools.translator.bytecodes.Instruction;
@@ -1172,6 +1174,7 @@ public class BytecodeMethod {
                             Jump jmp = (Jump)current;
                             instructions.remove(iter-2);
                             instructions.remove(iter-2);
+                            instructions.remove(iter-2);
                             //instructions.remove(iter-2);
                             iter-=2;
                             //instructionCount -= 2;
@@ -1196,9 +1199,11 @@ public class BytecodeMethod {
                             }
                                     
                             
-                            sb.append("if (").append(leftLiteral).append(operator).append(rightLiteral).append(") /* ").append(opName).append(" Optimized */ ");
-                            jmp.setCustomCompareCode(sb.toString());
-                            jmp.setOptimized(true);
+                            sb.append("if (").append(leftLiteral).append(operator).append(rightLiteral).append(") /* ").append(opName).append(" CustomJump */ ");
+                            CustomJump newJump = CustomJump.create(jmp, sb.toString());
+                            //jmp.setCustomCompareCode(sb.toString());
+                            newJump.setOptimized(true);
+                            instructions.add(iter, newJump);
                             instructionCount = instructions.size();
                             
                         }
@@ -1218,8 +1223,13 @@ public class BytecodeMethod {
                     if (iter > 1) {
                         Instruction leftArg = instructions.get(iter-2);
                         Instruction rightArg = instructions.get(iter-1);
+                        Instruction storeOp = null;
+                        if (iter + 1 < instructions.size()) {
+                            storeOp = instructions.get(iter+1);
+                        }
                         String leftLiteral = null;
                         String rightLiteral = null;
+                        String storeLiteral = null;
                         switch (leftArg.getOpcode()) {
                             case Opcodes.ICONST_0:
                                 leftLiteral = "0"; break;
@@ -1265,10 +1275,27 @@ public class BytecodeMethod {
                             }
                                 
                         }
+                        
+                        if (storeOp != null) {
+                            switch (storeOp.getOpcode()) {
+                                case Opcodes.ISTORE: {
+                                    if (storeOp instanceof VarOp) {
+                                        VarOp varStore = (VarOp)storeOp;
+                                        storeLiteral = "locals["+varStore.getIndex()+"].type = CN1_TYPE_INT; locals["+varStore.getIndex()+"].data.i = ";
+                                    }
+                                }
+                                    
+                            }
+                        }
                         if (rightLiteral != null && leftLiteral != null) {
+                            if (storeLiteral != null) {
+                                instructions.remove(iter+1);
+                                
+                            }
                             instructions.remove(iter-2);
                             instructions.remove(iter-2);
                             instructions.remove(iter-2);
+                            
                             iter-=2;
                             instructionCount -= 2;
                             StringBuilder sb = new StringBuilder();
@@ -1287,8 +1314,13 @@ public class BytecodeMethod {
                                 default :
                                     throw new RuntimeException("Invalid operator during optimization of binary integer operator");
                             }
-                            sb.append("    stack[stackPointer].type = CN1_TYPE_INT; stack[stackPointer++].data.i = ")
-                                    .append(leftLiteral).append(operator).append(rightLiteral)
+                            
+                            if (storeLiteral != null) {
+                                sb.append("    "+storeLiteral);
+                            } else {
+                                sb.append("    stack[stackPointer].type = CN1_TYPE_INT; stack[stackPointer++].data.i = ");
+                            }
+                            sb.append(leftLiteral).append(operator).append(rightLiteral)
                                     .append("; /* ").append(opName).append(" Optimized */\n");
                             Instruction newInst = new CustomIntruction(sb.toString(), sb.toString(), dependentClasses);
                             newInst.setOptimized(true);
@@ -1308,6 +1340,9 @@ public class BytecodeMethod {
                         Invoke inv = (Invoke)current;
                         List<ByteCodeMethodArg> invocationArgs = inv.getArgs();
                         int numArgs = invocationArgs.size();
+                        //if (current.getOpcode() != Opcodes.INVOKESTATIC) {
+                        //    numArgs++;
+                        //}
                         if (iter >= numArgs) {
                             String[] argLiterals = new String[numArgs];
                             for (int i=0; i<numArgs; i++) {
@@ -1378,6 +1413,54 @@ public class BytecodeMethod {
 
 
                                     }
+                                } else {
+                                    switch (instr.getOpcode()) {
+                                        
+                                        case Opcodes.ACONST_NULL: {
+                                            argLiterals[i] = "JAVA_NULL";
+                                            break;
+                                        }
+                                        
+                                        case Opcodes.ICONST_0: {
+                                            argLiterals[i] = "0";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_1: {
+                                            argLiterals[i] = "1";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_2: {
+                                            argLiterals[i] = "2";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_3: {
+                                            argLiterals[i] = "3";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_4: {
+                                            argLiterals[i] = "4";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_5: {
+                                            argLiterals[i] = "5";
+                                            break;
+                                        }
+                                        case Opcodes.ICONST_M1: {
+                                            argLiterals[i] = "-1";
+                                            break;
+                                        }
+                                        case Opcodes.LCONST_0: {
+                                            argLiterals[i] = "(JAVA_LONG)0";
+                                            break;
+                                        }
+                                        case Opcodes.LCONST_1: {
+                                            argLiterals[i] = "(JAVA_LONG)1";
+                                            break;
+                                        }
+
+
+                                    }
+                                    
                                 }
                             }
                             
@@ -1394,12 +1477,15 @@ public class BytecodeMethod {
                             // We have all of the arguments as literals.  Let's
                             // add them to our invoke instruction.
                             if (!missingLiteral) {
-                                
+                                CustomInvoke newInvoke = CustomInvoke.create(inv);
+                                instructions.remove(iter);
+                                instructions.add(iter, newInvoke);
                                 for (int i=0; i< numArgs; i++) {
                                     instructions.remove(iter-numArgs);
-                                    inv.setLiteralArg(i, argLiterals[i]);
+                                    newInvoke.setLiteralArg(i, argLiterals[i]);
                                 }
-                                inv.setOptimized(true);
+                                
+                                newInvoke.setOptimized(true);
                                 iter = 0;
                                 instructionCount = instructions.size();
                             }
