@@ -425,9 +425,9 @@ public class BytecodeMethod {
         return synchronizedMethod;
     }
     
-    private boolean hasLocalVariableWithIndex(int index) {
+    private boolean hasLocalVariableWithIndex(char qualifier, int index) {
         for (LocalVariable lv : localVariables) {
-            if (lv.getIndex() == index) {
+            if (lv.getIndex() == index && lv.getQualifier() == qualifier) {
                 return true;
             }
         }
@@ -528,7 +528,7 @@ public class BytecodeMethod {
                    
                 } else {
                     b.append("    ");
-                    if (!hasLocalVariableWithIndex(localsOffset)) {
+                    if (!hasLocalVariableWithIndex(arg.getQualifier(), localsOffset)) {
                         switch (arg.getQualifier()) {
                             case 'i' : b.append("JAVA_INT"); break;
                             case 'f' : b.append("JAVA_FLOAT"); break;
