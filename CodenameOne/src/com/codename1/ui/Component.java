@@ -1153,7 +1153,7 @@ public class Component implements Animation, StyleListener {
      * @param g the graphics object
      */
     public void paintBackgrounds(Graphics g) {
-        if(Display.getInstance().getImplementation().shouldPaintBackground()) {
+        if(Display.impl.shouldPaintBackground()) {
             drawPainters(g, this.getParent(), this, getAbsoluteX() + getScrollX(),
                     getAbsoluteY() + getScrollY(),
                     getWidth(), getHeight());
@@ -1264,7 +1264,7 @@ public class Component implements Animation, StyleListener {
 
             g.setClip(oX, oY, oWidth, oHeight);
         } else {
-            Display.getInstance().getImplementation().nothingWithinComponentPaint(this);
+            Display.impl.nothingWithinComponentPaint(this);
         }
     }
 
@@ -1795,7 +1795,7 @@ public class Component implements Animation, StyleListener {
      */
     protected void setScrollY(int scrollY) {
         if(this.scrollY != scrollY) {
-            CodenameOneImplementation ci = Display.getInstance().getImplementation();
+            CodenameOneImplementation ci = Display.impl;
             if(ci.isAsyncEditMode() && ci.isEditingText()) {
                 ci.hideTextEditor();
             }
@@ -4240,7 +4240,7 @@ public class Component implements Animation, StyleListener {
      */
     protected void laidOut() {
         if(!isCellRenderer()) {
-            CodenameOneImplementation ci = Display.getInstance().getImplementation();
+            CodenameOneImplementation ci = Display.impl;
             if(ci.isEditingText()) {
                 return;
             }
@@ -4908,7 +4908,7 @@ public class Component implements Animation, StyleListener {
      * remove this component from the painting queue
      */
     protected void cancelRepaints() {
-        Display.getInstance().getImplementation().cancelRepaint(this);
+        Display.impl.cancelRepaint(this);
     }
 
     /**
@@ -5079,29 +5079,27 @@ public class Component implements Animation, StyleListener {
         private Form previousTint;
         private Painter painter;
         Image radialCache;
-        private int cachedRadialBackgroundGradientStartColor;
-        private int cachedRadialBackgroundGradientEndColor;
-        private int cachedRadialWidth;
-        private int cachedRadialHeight;
-        private float cachedRadialBackgroundGradientRelativeX;
-        private float cachedRadialBackgroundGradientRelativeY;
-        private float cachedRadialBackgroundGradientRelativeSize;
         private Style constantStyle;
+        CodenameOneImplementation impl;
 
         public BGPainter(Motion wMotion, Motion hMotion) {
             this.wMotion = wMotion;
             this.hMotion = hMotion;
+            impl = Display.impl;
         }
 
         public BGPainter() {
+            impl = Display.impl;
         }
 
         public BGPainter(Style s) {
             constantStyle = s;
+            impl = Display.impl;
         }
 
         public BGPainter(Form parent, Painter p) {
             this.painter = p;
+            impl = Display.impl;
         }
 
         public void setPreviousForm(Form previous) {
@@ -5110,48 +5108,6 @@ public class Component implements Animation, StyleListener {
 
         public Form getPreviousForm() {
             return previousTint;
-        }
-
-        private void drawGradientBackground(Style s, Graphics g, int x, int y, int width, int height) {
-            switch (s.getBackgroundType()) {
-                case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
-                    g.fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                            x, y, width, height, true);
-                    return;
-                case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
-                    g.fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                            x, y, width, height, false);
-                    return;
-                case Style.BACKGROUND_GRADIENT_RADIAL:
-                    if(isInitialized() && Display.getInstance().areMutableImagesFast()) {
-                        if(radialCache == null || cachedRadialBackgroundGradientStartColor != s.getBackgroundGradientStartColor() ||
-                                cachedRadialBackgroundGradientEndColor != s.getBackgroundGradientEndColor() ||
-                                cachedRadialWidth != width || cachedRadialHeight != height ||
-                                cachedRadialBackgroundGradientRelativeX != s.getBackgroundGradientRelativeX() ||
-                                cachedRadialBackgroundGradientRelativeY != s.getBackgroundGradientRelativeY() ||
-                                cachedRadialBackgroundGradientRelativeSize != s.getBackgroundGradientRelativeSize()) {
-                            cachedRadialBackgroundGradientStartColor = s.getBackgroundGradientStartColor();
-                            cachedRadialBackgroundGradientEndColor = s.getBackgroundGradientEndColor();
-                            cachedRadialWidth = width;
-                            cachedRadialHeight = height;
-                            cachedRadialBackgroundGradientRelativeX = s.getBackgroundGradientRelativeX();
-                            cachedRadialBackgroundGradientRelativeY = s.getBackgroundGradientRelativeY();
-                            cachedRadialBackgroundGradientRelativeSize = s.getBackgroundGradientRelativeSize();
-                            radialCache = Image.createImage(width, height);
-                            radialCache.getGraphics().fillRectRadialGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                                0, 0, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
-                                s.getBackgroundGradientRelativeSize());
-                        }
-                        g.drawImage(radialCache, x, y);
-                    } else {
-                        g.fillRectRadialGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                                x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
-                                s.getBackgroundGradientRelativeSize());
-                    }
-                    return;
-            }
-            g.setColor(s.getBgColor());
-            g.fillRect(x, y, width, height, s.getBgTransparency());
         }
 
         public void paint(Graphics g, Rectangle rect) {
@@ -5166,172 +5122,14 @@ public class Component implements Animation, StyleListener {
                 } else {
                     s = getStyle();
                 }
-                paintImpl(g, rect, s);
+                int x = rect.getX() + g.getTranslateX();
+                int y = rect.getY() + g.getTranslateY();
+                int width = rect.getSize().getWidth();
+                int height = rect.getSize().getHeight();
+                impl.paintComponentBackground(g.getGraphics(), x, y, width, height, s);
             }
         }
 
-        private void paintImpl(Graphics g, Rectangle rect, Style s) {
-                int x = rect.getX();
-                int y = rect.getY();
-                int width = rect.getSize().getWidth();
-                int height = rect.getSize().getHeight();
-                if (width <= 0 || height <= 0) {
-                    return;
-                }
-                Image bgImage = s.getBgImage();
-                if (bgImage == null) {
-                    if(s.getBackgroundType() >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {
-                        drawGradientBackground(s, g, x, y, width, height);
-                        return;
-                    }
-                    g.setColor(s.getBgColor());
-                    g.fillRect(x, y, width, height, s.getBgTransparency());
-                } else {
-                    int iW = bgImage.getWidth();
-                    int iH = bgImage.getHeight();
-                    switch (s.getBackgroundType()) {
-                        case Style.BACKGROUND_NONE:
-                            if(s.getBgTransparency() != 0) {
-                                g.setColor(s.getBgColor());
-                                g.fillRect(x, y, width, height, s.getBgTransparency());
-                            }
-                            return;
-                        case Style.BACKGROUND_IMAGE_SCALED:
-                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x, y, width, height);
-                            } else {
-                                if (iW != width || iH != height) {
-                                    bgImage = bgImage.scaled(width, height);
-                                    s.setBgImage(bgImage, true);
-                                }
-                                g.drawImage(s.getBgImage(), x, y);
-                            }
-                            return;
-                        case Style.BACKGROUND_IMAGE_SCALED_FILL:
-                            float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));
-                            int bwidth = (int)(((float)iW) * r);
-                            int bheight = (int)(((float)iH) * r);
-                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);
-                            } else {
-                                if (iW != bwidth || iH != bheight) {
-                                    bgImage = bgImage.scaled(bwidth, bheight);
-                                    s.setBgImage(bgImage, true);
-                                }
-                                g.drawImage(s.getBgImage(), x + (width - bwidth) / 2, y + (height - bheight) / 2);
-                            }
-                            return;
-                        case Style.BACKGROUND_IMAGE_SCALED_FIT:
-                            if(s.getBgTransparency() != 0) {
-                                g.setColor(s.getBgColor());
-                                g.fillRect(x, y, width, height, s.getBgTransparency());
-                            }
-                            float r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
-                            int awidth = (int)(((float)iW) * r2);
-                            int aheight = (int)(((float)iH) * r2);
-                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
-                            } else {
-                                if (iW != awidth || iH != aheight) {
-                                    bgImage = bgImage.scaled(awidth, aheight);
-                                    s.setBgImage(bgImage, true);
-                                }
-                                g.drawImage(s.getBgImage(), x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
-                            }
-                            return;
-                        case Style.BACKGROUND_IMAGE_TILE_BOTH:
-                            g.tileImage(bgImage, x, y, width, height);
-                            return;
-                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.tileImage(bgImage, x, y, width, iH);
-                            return;
-                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.tileImage(bgImage, x, y + (height / 2 - iH / 2), width, iH);
-                            return;
-                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.tileImage(bgImage, x, y + (height - iH), width, iH);
-                            return;
-                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            for (int yPos = 0; yPos <= height; yPos += iH) {
-                                g.drawImage(s.getBgImage(), x, y + yPos);
-                            }
-                            return;
-                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            for (int yPos = 0; yPos <= height; yPos += iH) {
-                                g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y + yPos);
-                            }
-                            return;
-                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            for (int yPos = 0; yPos <= height; yPos += iH) {
-                                g.drawImage(s.getBgImage(), x + width - iW, y + yPos);
-                            }
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y);
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y + (height - iH));
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x, y + (height / 2 - iH / 2));
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + width - iW, y + (height / 2 - iH / 2));
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y + (height / 2 - iH / 2));
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x, y);
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + width - iW, y);
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x, y + (height - iH));
-                            return;
-                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
-                            g.setColor(s.getBgColor());
-                            g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + width - iW, y + (height - iH));
-                            return;
-                        case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
-                        case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
-                        case Style.BACKGROUND_GRADIENT_RADIAL:
-                            drawGradientBackground(s, g, x, y, width, height);
-                            return;
-                    }
-                }
-        }
-        
         public boolean animate() {
             if(wMotion.isFinished() && hMotion.isFinished()) {
                 getComponentForm().deregisterAnimated(this);

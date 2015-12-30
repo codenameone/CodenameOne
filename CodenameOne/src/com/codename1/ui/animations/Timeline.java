@@ -402,4 +402,12 @@ public final class Timeline extends Image implements Animation, Painter {
     public void setLoop(boolean loop) {
         this.loop = loop;
     }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    protected boolean requiresDrawImage() {
+        return true;
+    }
 }

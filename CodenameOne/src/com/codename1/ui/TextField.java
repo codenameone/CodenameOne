@@ -333,7 +333,7 @@ public class TextField extends TextArea {
      * @return a text field if native in place editing is unsupported and a text area if it is
      */
     public static TextArea create(String text, int columns) {
-        if(Display.getInstance().getImplementation().isNativeInputSupported()) {
+        if(Display.impl.isNativeInputSupported()) {
             return new TextArea(text, 1, columns);
         }
         return new TextField(text, columns);

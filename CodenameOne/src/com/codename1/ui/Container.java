@@ -794,7 +794,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     private void cancelRepaintsRecursively(Component c) {
-        cancelRepaintsRecursively(c, Display.getInstance().getImplementation());
+        cancelRepaintsRecursively(c, Display.impl);
     }
 
     void replace(final Component current, final Component next, boolean avoidRepaint) {
@@ -924,7 +924,7 @@ public class Container extends Component implements Iterable<Component>{
             cmp.setVisible(false);
         }
         setShouldCalcPreferredSize(true);
-        Display.getInstance().getImplementation().componentRemoved(cmp);
+        Display.impl.componentRemoved(cmp);
     }
 
     
@@ -1274,7 +1274,7 @@ public class Container extends Component implements Iterable<Component>{
                 size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2)+1;
             }
         }
-        CodenameOneImplementation impl = Display.getInstance().getImplementation();
+        CodenameOneImplementation impl = Display.impl;
         if(dontRecurseContainer) {
             for(int iter = startIter ; iter < size ; iter++) {
                 Component cmp = components.get(iter);

@@ -34,6 +34,8 @@ import com.codename1.ui.list.*;
  * overriding drawing/sizing methods appropriately.
  *
  * @author Chen Fishbein
+ * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate 
+ * our desire to reduce usage/reliance on this class. 
  */
 public abstract class LookAndFeel {
     private Component verticalScroll;
@@ -190,6 +192,7 @@ public abstract class LookAndFeel {
      * 
      * @param g graphics context
      * @param b component to draw
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public abstract void drawButton(Graphics g, Button b);
 
@@ -214,6 +217,7 @@ public abstract class LookAndFeel {
      * 
      * @param g graphics context
      * @param l component to draw
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public abstract void drawLabel(Graphics g, Label l);
 
