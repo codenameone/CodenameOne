@@ -47,9 +47,9 @@ public class VarOp extends Instruction {
         switch(opcode) {
             case Opcodes.ILOAD:
                 b.append("stack[stackPointer].type = CN1_TYPE_INT; /* ILOAD */ \n" +
-                        "    stack[stackPointer].data.i = locals[");
+                        "    stack[stackPointer].data.i = ilocals_");
                 b.append(var);
-                b.append("].data.i; \n    stackPointer++;\n");
+                b.append("_; \n    stackPointer++;\n");
                 return;
             case Opcodes.LLOAD:
                 b.append("BC_LLOAD(");
