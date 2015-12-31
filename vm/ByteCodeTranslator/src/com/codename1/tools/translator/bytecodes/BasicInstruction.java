@@ -30,7 +30,7 @@ import org.objectweb.asm.Opcodes;
  *
  * @author Shai Almog
  */
-public class BasicInstruction extends Instruction {
+public class BasicInstruction extends Instruction implements AssignableExpression  {
     private final int value;
     private int maxStack;
     private int maxLocals;
@@ -642,5 +642,119 @@ public class BasicInstruction extends Instruction {
 
     public boolean isComplexInstruction() {
         return opcode == Opcodes.ATHROW;
+    }
+
+    @Override
+    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+        StringBuilder b = new StringBuilder();
+        StringBuilder b2 = new StringBuilder();
+        if (typeVarName != null) {
+            b2.append(typeVarName).append(" = ");
+            
+        }
+        if (varName != null) {
+            b.append(varName).append(" = ");
+        }
+        switch(opcode) {
+            case Opcodes.ACONST_NULL:
+                b.append("JAVA_NULL /* ACONST_NULL */");
+                b2.append("CN1_TYPE_OBJECT");
+                break;
+                
+            case Opcodes.ICONST_M1:
+                b.append("-1 /* ICONST_M1 */");
+                b2.append("CN1_TYPE_INT");
+                break;
+                
+            case Opcodes.ICONST_0:
+                b.append("0 /* ICONST_0 */");
+                b2.append("CN1_TYPE_INT");
+                break;
+
+            case Opcodes.ICONST_1:
+                b.append("1 /* ICONST_1 */");
+                b2.append("CN1_TYPE_INT");
+                break;
+
+            case Opcodes.ICONST_2:
+                b.append("2 /* ICONST_2 */");
+                b2.append("CN1_TYPE_INT");
+                break;
+
+            case Opcodes.ICONST_3:
+                b.append("3 /* ICONST_3 */");
+                b2.append("CN1_TYPE_INT");
+                break;
+
+            case Opcodes.ICONST_4:
+                b.append("4/* ICONST_4 */");
+                b2.append("CN1_TYPE_INT");
+                break;
+
+            case Opcodes.ICONST_5:
+                b.append("5 /* ICONST_5 */");
+                b2.append("CN1_TYPE_INT");
+                break;
+
+            case Opcodes.LCONST_0:
+                b.append("0 /* LCONST_0 */");
+                b2.append("CN1_TYPE_LONG");
+                break;
+
+            case Opcodes.LCONST_1:
+                b.append("1 /* LCONST_1 */");
+                b2.append("CN1_TYPE_LONG");
+                break;
+
+            case Opcodes.FCONST_0:
+                b.append("0 /* FCONST_0 */");
+                b2.append("CN1_TYPE_FLOAT");
+                break;
+
+            case Opcodes.FCONST_1:
+                b.append("1 /* FCONST_1 */");
+                b2.append("CN1_TYPE_FLOAT");
+                break;
+
+            case Opcodes.FCONST_2:
+                b.append("2 /* FCONST_2 */");
+                b2.append("CN1_TYPE_FLOAT");
+                break;
+
+            case Opcodes.DCONST_0:
+                b.append("0 /* DCONST_0 */");
+                b2.append("CN1_TYPE_DOUBLE");
+                break;
+
+            case Opcodes.DCONST_1:
+                b.append("1 /* DCONST_1 */");
+                b2.append("CN1_TYPE_DOUBLE");
+                break;
+       
+                
+            // int instructions
+            case Opcodes.SIPUSH:
+            case Opcodes.BIPUSH:
+                b.append(value);
+                b.append("/* SIPUSH */");
+                b2.append("CN1_TYPE_INT");
+                break;                
+                
+            default:
+                return false;
+        }
+        
+        if (varName != null) {
+            sb.append("    ");
+            b.append("; \n");
+        }
+        
+        
+        if (typeVarName != null) {
+            sb.append(b2).append("; ");
+        }
+        sb.append(b);
+        
+        return true;
     }
 }
