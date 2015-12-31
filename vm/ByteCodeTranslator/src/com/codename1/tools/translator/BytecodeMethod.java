@@ -43,6 +43,7 @@ import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -70,6 +71,7 @@ public class BytecodeMethod {
         acceptStaticOnEquals = aAcceptStaticOnEquals;
     }
     private List<ByteCodeMethodArg> arguments = new ArrayList<ByteCodeMethodArg>();
+    private Set<LocalVariable> localVariables = new HashSet<LocalVariable>();
     private ByteCodeMethodArg returnType;
     private String methodName;
     private String clsName;
@@ -423,6 +425,15 @@ public class BytecodeMethod {
         return synchronizedMethod;
     }
     
+    private boolean hasLocalVariableWithIndex(char qualifier, int index) {
+        for (LocalVariable lv : localVariables) {
+            if (lv.getIndex() == index && lv.getQualifier() == qualifier) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public void appendMethodC(StringBuilder b) {
         if(nativeMethod) {
             return;
@@ -446,6 +457,26 @@ public class BytecodeMethod {
         }
         
         if(hasInstructions) {
+            Set<String> added = new HashSet<String>();
+            for (LocalVariable lv : localVariables) {
+                String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
+                if (!added.contains(variableName) && lv.getQualifier() != 'o') {
+                    added.add(variableName);
+                    b.append("    ");
+                    switch (lv.getQualifier()) {
+                        case 'i' :
+                            b.append("JAVA_INT"); break;
+                        case 'l' :
+                            b.append("JAVA_LONG"); break;
+                        case 'f' :
+                            b.append("JAVA_FLOAT"); break;
+                        case 'd' :
+                            b.append("JAVA_DOUBLE"); break;
+                    }
+                    b.append(" ").append(lv.getQualifier()).append("locals_").append(lv.getIndex()).append("_; /* ").append(lv.getOrigName()).append(" */\n");
+                }
+            }
+            
             if(staticMethod) {
                 if(methodName.equals("__CLINIT__")) {
                     b.append("    DEFINE_METHOD_STACK(");
@@ -481,23 +512,43 @@ public class BytecodeMethod {
             }
             int localsOffset = startOffset;
             for(int iter = 0 ; iter < arguments.size() ; iter++) {
-                b.append("    locals[");
-                b.append(localsOffset);
-                b.append("].data.");
                 ByteCodeMethodArg arg = arguments.get(iter);
-                b.append(arg.getQualifier());
-                b.append(" = __cn1Arg");
-                b.append(iter + 1);
-                b.append(";\n");
-                if(arg.isObject()) {
+                if (arg.getQualifier() == 'o') {
+                    b.append("    locals[");
+                    b.append(localsOffset);
+                    b.append("].data.");
+
+                    b.append(arg.getQualifier());
+                    b.append(" = __cn1Arg");
+                    b.append(iter + 1);
+                    b.append(";\n");
                     b.append("    locals[");
                     b.append(localsOffset);
                     b.append("].type = CN1_TYPE_OBJECT;\n");
+                   
                 } else {
-                    b.append("    locals[");
+                    b.append("    ");
+                    if (!hasLocalVariableWithIndex(arg.getQualifier(), localsOffset)) {
+                        switch (arg.getQualifier()) {
+                            case 'i' : b.append("JAVA_INT"); break;
+                            case 'f' : b.append("JAVA_FLOAT"); break;
+                            case 'd' : b.append("JAVA_DOUBLE"); break;
+                            case 'l' : b.append("JAVA_LONG"); break;
+                            default: b.append("JAVA_INT"); break;
+                        }
+                        b.append(" ");
+                        
+                    }
+                    b.append(arg.getQualifier());
+                    b.append("locals_");
                     b.append(localsOffset);
-                    b.append("].type = CN1_TYPE_PRIMITIVE;\n");
+                    b.append("_");
+                    b.append(" = __cn1Arg");
+                    b.append(iter + 1);
+                    b.append(";\n");
                 }
+                // For now we'll still allocate space for locals that we're not using
+                // so we keep the indexes the same for objects.
                 localsOffset++;
                 if(arg.isDoubleOrLong()) {
                     localsOffset++;
@@ -815,6 +866,7 @@ public class BytecodeMethod {
     
     public void addLocalVariable(String name, String desc, String signature, Label start, Label end, int index) {
         //addInstruction(0, new LocalVariable(name, desc, signature, start, end, index));
+        localVariables.add(new LocalVariable(name, desc, signature, start, end, index));
     }
     
     public void setSourceFile(String sourceFile) {
@@ -844,7 +896,22 @@ public class BytecodeMethod {
     }
     
     public void addVariableOperation(int opcode, int var) {
-        addInstruction(new VarOp(opcode, var));
+        VarOp op = new VarOp(opcode, var);
+        LocalVariable lv = null;
+        switch (opcode) {
+            case Opcodes.ISTORE:
+                lv = new LocalVariable("v"+var, "I", "I", null, null, var); break;
+            case Opcodes.LSTORE:
+                lv = new LocalVariable("v"+var, "J", "J", null, null, var); break;    
+            case Opcodes.FSTORE:
+                lv = new LocalVariable("v"+var, "F", "F", null, null, var); break;
+            case Opcodes.DSTORE:
+                lv = new LocalVariable("v"+var, "D", "D", null, null, var); break;
+        }
+        if (lv != null && !localVariables.contains(lv)) {
+            localVariables.add(lv);
+        }
+        addInstruction(op);
     }
     
     public void addTypeInstruction(int opcode, String type) {
@@ -1142,7 +1209,7 @@ public class BytecodeMethod {
                                 leftLiteral = "-1"; break;
                             case Opcodes.ILOAD: {
                                 VarOp varLeft = (VarOp)leftArg;
-                                leftLiteral = "locals["+varLeft.getIndex()+"].data.i";
+                                leftLiteral = "ilocals_"+varLeft.getIndex()+"_";
                                 break;
                             }
                                 
@@ -1165,7 +1232,7 @@ public class BytecodeMethod {
                                 rightLiteral = "-1"; break;
                             case Opcodes.ILOAD: {
                                 VarOp varRight = (VarOp)rightArg;
-                                rightLiteral = "locals["+varRight.getIndex()+"].data.i";
+                                rightLiteral = "ilocals_"+varRight.getIndex()+"_";
                                 break;
                             }
                                 
@@ -1215,6 +1282,10 @@ public class BytecodeMethod {
                    and local variables so that they don't need the intermediate
                    push and pop from the stack.
                 */
+                case Opcodes.IAND:
+                case Opcodes.IOR:
+                case Opcodes.ISHR:
+                case Opcodes.ISHL:
                 case Opcodes.IMUL:
                 case Opcodes.IDIV:
                 case Opcodes.IADD:
@@ -1247,7 +1318,7 @@ public class BytecodeMethod {
                                 leftLiteral = "-1"; break;
                             case Opcodes.ILOAD: {
                                 VarOp varLeft = (VarOp)leftArg;
-                                leftLiteral = "locals["+varLeft.getIndex()+"].data.i";
+                                leftLiteral = "ilocals_"+varLeft.getIndex()+"_";
                                 break;
                             }
                                 
@@ -1270,7 +1341,7 @@ public class BytecodeMethod {
                                 rightLiteral = "-1"; break;
                             case Opcodes.ILOAD: {
                                 VarOp varRight = (VarOp)rightArg;
-                                rightLiteral = "locals["+varRight.getIndex()+"].data.i";
+                                rightLiteral = "ilocals_"+varRight.getIndex()+"_";
                                 break;
                             }
                                 
@@ -1281,7 +1352,7 @@ public class BytecodeMethod {
                                 case Opcodes.ISTORE: {
                                     if (storeOp instanceof VarOp) {
                                         VarOp varStore = (VarOp)storeOp;
-                                        storeLiteral = "locals["+varStore.getIndex()+"].type = CN1_TYPE_INT; locals["+varStore.getIndex()+"].data.i = ";
+                                        storeLiteral = "ilocals_"+varStore.getIndex()+"_ = ";
                                     }
                                 }
                                     
@@ -1310,6 +1381,14 @@ public class BytecodeMethod {
                                     operator = "+"; opName = "IADD"; break;
                                 case Opcodes.ISUB:
                                     operator = "-"; opName = "ISUB"; break;
+                                case Opcodes.IAND:
+                                    operator = "&"; opName = "IAND"; break;
+                                case Opcodes.IOR:
+                                    operator = "|"; opName = "IOR"; break;
+                                case Opcodes.ISHR:
+                                    operator = ">>"; opName = "ISHR"; break;
+                                case Opcodes.ISHL:
+                                    operator = "<<"; opName = "ISHL"; break;
                                 
                                 default :
                                     throw new RuntimeException("Invalid operator during optimization of binary integer operator");
@@ -1355,7 +1434,7 @@ public class BytecodeMethod {
                                             break;
                                         }
                                         case Opcodes.ILOAD: {
-                                            argLiterals[i] = "locals["+var.getIndex()+"].data.i";
+                                            argLiterals[i] = "ilocals_"+var.getIndex()+"_";
                                             break;
                                         }
                                         case Opcodes.ACONST_NULL: {
@@ -1363,15 +1442,15 @@ public class BytecodeMethod {
                                             break;
                                         }
                                         case Opcodes.DLOAD: {
-                                            argLiterals[i] = "locals["+var.getIndex()+"].data.d";
+                                            argLiterals[i] = "dlocals_"+var.getIndex()+"_";
                                             break;
                                         }
                                         case Opcodes.FLOAD: {
-                                            argLiterals[i] = "locals["+var.getIndex()+"].data.f";
+                                            argLiterals[i] = "flocals_"+var.getIndex()+"_";
                                             break;
                                         }
                                         case Opcodes.LLOAD: {
-                                            argLiterals[i] = "locals["+var.getIndex()+"].data.l";
+                                            argLiterals[i] = "llocals_"+var.getIndex()+"_";
                                             break;
                                         }
                                         case Opcodes.ICONST_0: {

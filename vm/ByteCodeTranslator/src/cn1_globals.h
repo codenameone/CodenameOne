@@ -187,25 +187,25 @@ typedef struct clazz*       JAVA_CLASS;
 
 #define BC_ILOAD(local) { \
     stack[stackPointer].type = CN1_TYPE_INT; \
-    stack[stackPointer].data.i = locals[local].data.i; \
+    stack[stackPointer].data.i = ilocals_##local##_; \
     stackPointer++; \
 }
 
 #define BC_LLOAD(local) { \
     stack[stackPointer].type = CN1_TYPE_LONG; \
-    stack[stackPointer].data.l = locals[local].data.l; \
+    stack[stackPointer].data.l = llocals_##local##_; \
     stackPointer++; \
 }
 
 #define BC_FLOAD(local) { \
     stack[stackPointer].type = CN1_TYPE_FLOAT; \
-    stack[stackPointer].data.f = locals[local].data.f; \
+    stack[stackPointer].data.f = flocals_##local##_; \
     stackPointer++; \
 }
 
 #define BC_DLOAD(local) { \
     stack[stackPointer].type = CN1_TYPE_DOUBLE; \
-    stack[stackPointer].data.d = locals[local].data.d; \
+    stack[stackPointer].data.d = dlocals_##local##_; \
     stackPointer++; \
 }
 
@@ -218,23 +218,19 @@ typedef struct clazz*       JAVA_CLASS;
 
 
 #define BC_ISTORE(local) { stackPointer--; \
-    locals[local].type = CN1_TYPE_INT; \
-    locals[local].data.i = stack[stackPointer].data.i; \
+    ilocals_##local##_ = stack[stackPointer].data.i; \
     }
 
 #define BC_LSTORE(local) { stackPointer--; \
-    locals[local].type = CN1_TYPE_LONG; \
-    locals[local].data.l = stack[stackPointer].data.l; \
+    llocals_##local##_ = stack[stackPointer].data.l; \
     }
 
 #define BC_FSTORE(local) { stackPointer--; \
-    locals[local].type = CN1_TYPE_FLOAT; \
-    locals[local].data.f = stack[stackPointer].data.f; \
+    flocals_##local##_ = stack[stackPointer].data.f; \
     }
 
 #define BC_DSTORE(local) { stackPointer--; \
-    locals[local].type = CN1_TYPE_DOUBLE; \
-    locals[local].data.d = stack[stackPointer].data.d; \
+    dlocals_##local##_ = stack[stackPointer].data.d; \
     }
 
 #define BC_ASTORE(local) { stackPointer--; \
@@ -588,7 +584,7 @@ extern struct clazz* classesList[];
 // this needs to be fixed to actually return a JAVA_OBJECT...
 #define STRING_FROM_CONSTANT_POOL_OFFSET(off) constantPoolObjects[off]
 
-#define BC_IINC(val, num) locals[val].data.i += num;
+#define BC_IINC(val, num) ilocals_##val##_ += num;
 
 extern int instanceofFunction(int sourceClass, int destId);
 
