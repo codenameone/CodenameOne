@@ -219,7 +219,7 @@ public class Form extends Container {
         if(bottomPaddingMode) {
             return 0;
         }
-        return Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+        return Display.impl.getInvisibleAreaUnderVKB();
     }
         
     /**
@@ -1067,7 +1067,7 @@ public class Form extends Container {
         int b = Display.getInstance().getCommandBehavior();
         if (b == Display.COMMAND_BEHAVIOR_ICS) {
             if (getTitleComponent().getIcon() == null) {
-                Image i = Display.getInstance().getImplementation().getApplicationIconImage();
+                Image i = Display.impl.getApplicationIconImage();
                 if (i != null) {
                     int h = getTitleComponent().getStyle().getFont().getHeight();
                     i = i.scaled(h, h);
@@ -1562,7 +1562,7 @@ public class Form extends Container {
      * Displays the current form on the screen
      */
     public void show() {
-        Display.getInstance().getImplementation().onShow(this);
+        Display.impl.onShow(this);
         show(false);
     }
 
@@ -1608,7 +1608,7 @@ public class Form extends Container {
         super.initComponentImpl();
         dragged = null;
         if (Display.getInstance().isNativeCommands()) {
-            Display.getInstance().getImplementation().setNativeCommands(menuBar.getCommands());
+            Display.impl.setNativeCommands(menuBar.getCommands());
         }
         if (getParent() != null) {
             getParent().getComponentForm().registerAnimated(this);

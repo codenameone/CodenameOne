@@ -33,13 +33,16 @@ import com.codename1.ui.util.EventDispatcher;
 
 /**
  * Allows displaying labels and images with different alignment options, this class
- * is a base class for several components allowing them to declare alignement/icon
+ * is a base class for several components allowing them to declare alignment/icon
  * look in a similar way.
  * 
  * @author Chen Fishbein
  */
 public class Label extends Component {
-
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     */
+    private boolean legacyRenderer;
     private String text = "";
     
     private Image icon;
@@ -120,6 +123,9 @@ public class Label extends Component {
     public Label(Image icon) {
         this("");
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
@@ -133,6 +139,9 @@ public class Label extends Component {
     public Label(Image icon, String uiid) {
         this("", uiid);
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
@@ -146,6 +155,9 @@ public class Label extends Component {
     public Label(String text, Image icon, String uiid) {
         this(text, uiid);
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
@@ -158,6 +170,9 @@ public class Label extends Component {
     public Label(String text, Image icon) {
         this(text);
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
@@ -268,8 +283,14 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
-        if(icon != null && mask != null) {
-            maskedIcon = icon.applyMaskAutoScale(mask);
+        if(icon != null) {
+            if(icon.requiresDrawImage()) {
+                legacyRenderer = true;
+            }
+
+            if(mask != null) {
+                maskedIcon = icon.applyMaskAutoScale(mask);
+            }
         }
         this.icon = icon;
         setShouldCalcPreferredSize(true);
@@ -416,7 +437,30 @@ public class Label extends Component {
      * @inheritDoc
      */
     public void paint(Graphics g) {
-        getUIManager().getLookAndFeel().drawLabel(g, this);
+        if(legacyRenderer) {
+            getUIManager().getLookAndFeel().drawLabel(g, this);
+            return;
+        }
+        Object icn = null;
+        Image i = getIconFromState();
+        if(i != null) {
+            icn = i.getImage();
+        } else {
+            // optimize away a common usage pattern for drawing the background only
+            if(text == null || text.equals("") || text.equals(" ")) {
+                return;
+            }
+        }
+        //getUIManager().getLookAndFeel().drawLabel(g, this);
+        int cmpX = getX() + g.getTranslateX();
+        int cmpY = getY() + g.getTranslateY();
+        int cmpHeight = getHeight();
+        int cmpWidth = getWidth();
+        Style s = getStyle();
+        Font f = s.getFont();
+        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, text, 
+                icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
+                endsWith3Points, valign);
     }
 
     /**
@@ -462,7 +506,7 @@ public class Label extends Component {
     }
 
     Image getIconFromState() {
-        return getIcon();
+        return getMaskedIcon();
     }
 
     int getAvaliableSpaceForText() {
@@ -583,8 +627,14 @@ public class Label extends Component {
             tickerStartTime = System.currentTimeMillis();
             if(rightToLeft){
                 shiftText -= Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(shiftText + getStringWidth(getStyle().getFont()) < 0) {
+                    shiftText = getStringWidth(getStyle().getFont()); 
+                }
             }else{
                 shiftText += Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(getStringWidth(getStyle().getFont()) - shiftText < 0) {
+                    shiftText = -getStringWidth(getStyle().getFont()); 
+                }
             }     
             animateTicker = true;
         }                
@@ -844,5 +894,21 @@ public class Label extends Component {
             return stringWidthUnselected;
         }
         return fnt.stringWidth(text);
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @return the legacyRenderer
+     */
+    public boolean isLegacyRenderer() {
+        return legacyRenderer;
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @param legacyRenderer the legacyRenderer to set
+     */
+    public void setLegacyRenderer(boolean legacyRenderer) {
+        this.legacyRenderer = legacyRenderer;
     }
 }

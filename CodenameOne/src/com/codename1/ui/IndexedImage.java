@@ -452,4 +452,12 @@ class IndexedImage extends Image {
             return null;
         }
     }
+
+    /**
+     * @inheritDoc
+     */
+    @Override
+    protected boolean requiresDrawImage() {
+        return true;
+    }
 }

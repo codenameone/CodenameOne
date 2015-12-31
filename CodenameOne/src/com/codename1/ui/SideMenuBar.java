@@ -745,7 +745,15 @@ public class SideMenuBar extends MenuBar {
             }
             
             if (placement == null && !parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
-                titleArea.addComponent(BorderLayout.WEST, openButton);
+                if(parent.getUIManager().isThemeConstant("menuButtonTopBool", false)) {
+                        titleArea.addComponent(BorderLayout.WEST, BorderLayout.north(openButton));                    
+                } else {
+                    if(parent.getUIManager().isThemeConstant("menuButtonBottomBool", false)) {
+                        titleArea.addComponent(BorderLayout.WEST, BorderLayout.south(openButton));
+                    } else {
+                        titleArea.addComponent(BorderLayout.WEST, openButton);
+                    }
+                }
             }
             Component l = getTitleComponent();
             if (l.getParent() != null) {

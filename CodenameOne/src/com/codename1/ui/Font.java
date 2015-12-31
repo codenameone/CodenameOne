@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
@@ -120,6 +121,11 @@ public class Font {
     private Object font;
 
     private boolean ttf;
+
+    private String fontUniqueId;
+
+    private static HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
+    private static float fontReturnedHeight;
     
     /**
      * Creates a new Font
@@ -167,7 +173,7 @@ public class Font {
      * a file
      */
     public static boolean isTrueTypeFileSupported() {
-        return Display.getInstance().getImplementation().isTrueTypeSupported();
+        return Display.impl.isTrueTypeSupported();
     }
 
     /**
@@ -178,7 +184,7 @@ public class Font {
      * user submitted string
      */
     public static boolean isCreationByStringSupported() {
-        return Display.getInstance().getImplementation().isLookupFontSupported();
+        return Display.impl.isLookupFontSupported();
     }
 
     /**
@@ -187,7 +193,7 @@ public class Font {
      * @return true if the "native:" prefix is supported by loadTrueTypeFont
      */
     public static boolean isNativeFontSchemeSupported() {
-        return Display.getInstance().getImplementation().isNativeFontSchemeSupported();
+        return Display.impl.isNativeFontSchemeSupported();
     }
     
     /**
@@ -208,8 +214,13 @@ public class Font {
      * @return the font object created or null if true type fonts aren't supported on this platform
      */
     public static Font createTrueTypeFont(String fontName, String fileName) {
+        String alreadyLoaded = fileName + "_" + fontReturnedHeight + "_"+ Font.STYLE_PLAIN;
+        Font f = derivedFontCache.get(alreadyLoaded);
+        if(f != null) {
+            return f;
+        }
         if(fontName.startsWith("native:")) {
-            if(!Display.getInstance().getImplementation().isNativeFontSchemeSupported()) {
+            if(!Display.impl.isNativeFontSchemeSupported()) {
                 return null;
             }
         } else {
@@ -217,12 +228,16 @@ public class Font {
                 throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf: " + fileName);
             }
         }
-        Object font = Display.getInstance().getImplementation().loadTrueTypeFont(fontName, fileName);
+        Object font = Display.impl.loadTrueTypeFont(fontName, fileName);
         if(font == null) {
             return null;
         }
-        Font f = new Font(font);
+        f = new Font(font);
         f.ttf = true;
+        f.fontUniqueId = fontName;
+        float h = f.getHeight();
+        fontReturnedHeight = h;
+        derivedFontCache.put(fileName + "_" + h + "_"+ Font.STYLE_PLAIN, f);
         return f;
     }
     
@@ -236,9 +251,23 @@ public class Font {
      * @return scaled font instance
      */
     public Font derive(float sizePixels, int weight) {
-        Font f = new Font(Display.getInstance().getImplementation().deriveTrueTypeFont(font, sizePixels, weight));
-        f.ttf = true;
-        return f;
+        if(fontUniqueId != null) {
+            // derive should recycle instances of Font to allow smarter caching and logic on the native side of the fence
+            String key = fontUniqueId + "_" + sizePixels + "_"+ weight;
+            Font f = derivedFontCache.get(key);
+            if(f != null) {
+                return f;
+            }
+            f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+            derivedFontCache.put(key, f);
+            f.ttf = true;
+            return f;
+        } else {
+            // not sure if this ever happens but don't want to break that code
+            Font f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+            f.ttf = true;
+            return f;
+        }
     }
 
     /**
@@ -260,7 +289,7 @@ public class Font {
      * @return newly created font or null if creation failed
      */
     public static Font create(String lookup) {
-        Object n = Display.getInstance().getImplementation().loadNativeFont(lookup);
+        Object n = Display.impl.loadNativeFont(lookup);
         if(n == null) {
             return null;
         }
@@ -341,7 +370,7 @@ public class Font {
      * @return the width of the given characters in this font instance
      */
     public int charsWidth(char[] ch, int offset, int length){
-        return Display.getInstance().getImplementation().charsWidth(font, ch, offset, length);
+        return Display.impl.charsWidth(font, ch, offset, length);
     }
     
     /**
@@ -353,7 +382,7 @@ public class Font {
      * @return the width of the given string subset in this font instance
      */
     public int substringWidth(String str, int offset, int len){
-        return Display.getInstance().getImplementation().stringWidth(font, str.substring(offset, offset + len));
+        return Display.impl.stringWidth(font, str.substring(offset, offset + len));
     }
     
     /**
@@ -372,7 +401,7 @@ public class Font {
         if(str == " ") {
             return 5;
         }
-        return Display.getInstance().getImplementation().stringWidth(font, str);
+        return Display.impl.stringWidth(font, str);
     }
     
     /**
@@ -382,7 +411,7 @@ public class Font {
      * @return the width of the specific character when rendered alone
      */
     public int charWidth(char ch) {
-        return Display.getInstance().getImplementation().charWidth(font, ch);
+        return Display.impl.charWidth(font, ch);
     }
     
     /**
@@ -391,7 +420,7 @@ public class Font {
      * @return the total height of the font
      */
     public int getHeight() {
-        return Display.getInstance().getImplementation().getHeight(font);
+        return Display.impl.getHeight(font);
     }
     
     /**
@@ -458,7 +487,7 @@ public class Font {
      * @return Optional operation returning the font face for system fonts
      */
     public int getFace(){
-        return Display.getInstance().getImplementation().getFace(font);
+        return Display.impl.getFace(font);
     }
     
     /**
@@ -467,7 +496,7 @@ public class Font {
      * @return Optional operation returning the font size for system fonts
      */
     public int getSize(){
-        return Display.getInstance().getImplementation().getSize(font);
+        return Display.impl.getSize(font);
     }
 
     /**
@@ -476,7 +505,7 @@ public class Font {
      * @return Optional operation returning the font style for system fonts
      */
     public int getStyle() {
-        return Display.getInstance().getImplementation().getStyle(font);
+        return Display.impl.getStyle(font);
     }
     
     /**
@@ -542,7 +571,7 @@ public class Font {
     * @return the ascent in pixels
     */
    public int getAscent() {
-       return Display.getInstance().getImplementation().getFontAscent(font);
+       return Display.impl.getFontAscent(font);
    }
    
    /**
@@ -550,6 +579,6 @@ public class Font {
     * @return the descent in pixels
     */
    public int getDescent() {
-       return Display.getInstance().getImplementation().getFontDescent(font);
+       return Display.impl.getFontDescent(font);
    }
 }
