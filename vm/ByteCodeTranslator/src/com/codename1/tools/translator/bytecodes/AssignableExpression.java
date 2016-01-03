@@ -20,33 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.location;
-
-import android.app.IntentService;
-import android.content.Intent;
-import android.util.Log;
-import com.google.android.gms.location.FusedLocationProviderApi;
+package com.codename1.tools.translator.bytecodes;
 
 /**
- *
- * @author Chen
+ * Interface for an instruction that can be replaced by an expression and assigned
+ * to a variable.  
+ * @author shannah
  */
-public class BackgroundLocationHandler extends IntentService {
-
-    public BackgroundLocationHandler() {
-        super("com.codename1.location.BackgroundLocationHandler");
-    }
-
-    @Override
-    protected void onHandleIntent(Intent intent) {
-        String className = intent.getStringExtra("backgroundClass");
-        final android.location.Location location = intent.getParcelableExtra(FusedLocationProviderApi.KEY_LOCATION_CHANGED);
-
-        try {
-            LocationListener l = (LocationListener) Class.forName(className).newInstance();
-            l.locationUpdated(AndroidLocationPlayServiceManager.convert(location));
-        } catch (Exception e) {
-            Log.e("Codename One", "background location error", e);
-        }
-    }
+public interface AssignableExpression {
+    
+    /**
+     * Outputs C code to assign the expression to given variable.
+     * @param varName
+     * @param sb
+     * @return 
+     */
+    public boolean assignTo(String varName, String typeVarName, StringBuilder sb);
 }

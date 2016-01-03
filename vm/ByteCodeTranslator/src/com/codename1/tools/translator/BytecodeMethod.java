@@ -23,6 +23,7 @@
 
 package com.codename1.tools.translator;
  
+import com.codename1.tools.translator.bytecodes.AssignableExpression;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.CustomIntruction;
 import com.codename1.tools.translator.bytecodes.CustomInvoke;
@@ -1130,8 +1131,17 @@ public class BytecodeMethod {
                                     // this isn't followed by a return just store the field value
                                     instructions.remove(iter);
                                     instructions.remove(iter);
+                                    final Field finalNext = (Field)next;
+                                    finalNext.setUseThis(true);
                                     String s = ((Field)next).pushFieldFromThis();
-                                    instructions.add(iter, new CustomIntruction(s, s, dependentClasses));
+                                    instructions.add(iter, new CustomIntruction(s, s, dependentClasses, new AssignableExpression() {
+
+                                        @Override
+                                        public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+                                            return finalNext.assignTo(varName, typeVarName, sb);
+                                        }
+                                        
+                                    }));
                                     iter = 0;
                                     instructionCount = instructions.size();
                                     continue;
@@ -1176,6 +1186,32 @@ public class BytecodeMethod {
             }
             switch(currentOpcode) {
                 
+                case Opcodes.ASTORE:
+                case Opcodes.ISTORE:
+                case Opcodes.DSTORE:
+                case Opcodes.LSTORE:
+                case Opcodes.FSTORE: {
+                    if (iter > 0 && current instanceof VarOp) {
+                        VarOp currentVarOp = (VarOp) current;
+                        Instruction prev = instructions.get(iter-1);
+                        if (prev instanceof AssignableExpression) {
+                            AssignableExpression expr = (AssignableExpression)prev;
+                            StringBuilder sb = new StringBuilder();
+                            if (currentVarOp.assignFrom(expr, sb)) {
+                                instructions.remove(iter-1);
+                                instructions.remove(iter-1);
+                                instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
+                                iter = 0;
+                                instructionCount = instructions.size();
+                            }
+                            
+                        }
+                    }
+                    
+                    break;
+                }
+                    
+                
                 /* Try to optimize if statements that just use constants
                    and local variables so that they don't need the intermediate
                    push and pop from the stack.
@@ -1190,8 +1226,23 @@ public class BytecodeMethod {
                     if (iter > 1) {
                         Instruction leftArg = instructions.get(iter-2);
                         Instruction rightArg = instructions.get(iter-1);
+                        
                         String leftLiteral = null;
                         String rightLiteral = null;
+                        
+                        if (leftArg instanceof AssignableExpression) {
+                            StringBuilder sb = new StringBuilder();
+                            if (((AssignableExpression)leftArg).assignTo(null, null, sb)) {
+                                leftLiteral = sb.toString();
+                            }
+                        }
+                        if (rightArg instanceof AssignableExpression) {
+                            StringBuilder sb = new StringBuilder();
+                            if (((AssignableExpression)rightArg).assignTo(null, null, sb)) {
+                                rightLiteral = sb.toString();
+                            }
+                        }
+                        /*
                         switch (leftArg.getOpcode()) {
                             case Opcodes.ICONST_0:
                                 leftLiteral = "0"; break;
@@ -1237,6 +1288,7 @@ public class BytecodeMethod {
                             }
                                 
                         }
+                        */
                         if (rightLiteral != null && leftLiteral != null) {
                             Jump jmp = (Jump)current;
                             instructions.remove(iter-2);
