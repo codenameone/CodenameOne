@@ -755,14 +755,14 @@ class AndroidGraphics {
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         strWidth = drawLabelStringValign(nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, iconHeight,
                                 fontHeight, valign);
 
                         drawImage(icon, x + strWidth + gap, y);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
                         strWidth = drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
 
                         drawImage(icon, x + strWidth + gap, y + iconStringHGap);
                     }
