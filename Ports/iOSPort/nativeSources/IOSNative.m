@@ -6633,6 +6633,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT notificationId) {
+    if (notificationId == JAVA_NULL) {
+        return;
+    }
     NSString *nsId = toNSString(CN1_THREAD_STATE_PASS_ARG notificationId);
     dispatch_sync(dispatch_get_main_queue(), ^{
         UIApplication *app = [UIApplication sharedApplication];
@@ -6641,7 +6644,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_S
             UILocalNotification *n = [eventArray objectAtIndex:i];
             NSDictionary *userInfo = n.userInfo;
             NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey: @"__ios_id__"]];
-            if ([uid isEqualToString:uid]) {
+            if ([nsId isEqualToString:uid]) {
                 [app cancelLocalNotification:n];
             }
         }
@@ -7152,14 +7155,14 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 if (iconHeight > fontHeight) {
                     iconStringHGap = (iconHeight - fontHeight) / 2;
                     strWidth = drawLabelStringValign(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                                     tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight,
+                                                     tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, iconHeight,
                                                      fontHeight, valign);
                     
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x + strWidth + gap, y);
                 } else {
                     iconStringHGap = (fontHeight - iconHeight) / 2;
                     strWidth = drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                               tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                               tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
                     
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x + strWidth + gap, y + iconStringHGap);
                 }
