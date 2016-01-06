@@ -709,7 +709,7 @@ public class Calendar extends Container {
         protected void fireActionEvent() {
             componentChanged();
             super.fireActionEvent();
-            dispatcher.fireActionEvent(new ActionEvent(Calendar.this));
+            dispatcher.fireActionEvent(new ActionEvent(Calendar.this,ActionEvent.Type.Calendar));
         }
 
         public void actionPerformed(ActionEvent evt) {

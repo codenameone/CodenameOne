@@ -394,7 +394,7 @@ public class Button extends Label {
                 }
             }
         } else {
-            dispatcher.fireActionEvent(new ActionEvent(this, x, y));
+            dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed,x, y));
         }
         Display d = Display.getInstance();
         if(d.isBuiltinSoundsEnabled()) {
@@ -486,6 +486,7 @@ public class Button extends Label {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
+    	//super.pointerPressed(x,y);
         clearDrag();
         setDragActivated(false);
         pressed();
@@ -503,6 +504,8 @@ public class Button extends Label {
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
+        //super.pointerReleased(x,y);
+
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {
@@ -514,7 +517,7 @@ public class Button extends Label {
         // button shouldn't fire an event when a pointer is dragged into it
         if(state == STATE_PRESSED) {
             released(x, y);
-        }
+         }
         if(restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
         }

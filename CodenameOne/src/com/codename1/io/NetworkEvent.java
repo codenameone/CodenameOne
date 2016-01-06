@@ -67,7 +67,7 @@ public class NetworkEvent extends ActionEvent {
      * @param error the exception
      */
     public NetworkEvent(ConnectionRequest source, Exception error) {
-        super(source);
+        super(source,ActionEvent.Type.Exception);
         this.error = error;
     }
 
@@ -79,7 +79,7 @@ public class NetworkEvent extends ActionEvent {
      * @param message the error message
      */
     public NetworkEvent(ConnectionRequest request, int responseCode, String message) {
-        super(request);
+        super(request,ActionEvent.Type.Response);
         this.progressType = responseCode;
         this.message = message;
     }
@@ -92,7 +92,7 @@ public class NetworkEvent extends ActionEvent {
      * @param progressType
      */
     public NetworkEvent(ConnectionRequest request, int progressType) {
-        super(request);
+        super(request,ActionEvent.Type.Progress);
         this.progressType = progressType;
     }
 
@@ -103,7 +103,7 @@ public class NetworkEvent extends ActionEvent {
      * @param metaData the data associated with the event
      */
     public NetworkEvent(ConnectionRequest request, Object metaData) {
-        super(request);
+        super(request,ActionEvent.Type.Data);
         if(request != null){
             this.progressType = request.getResponseCode();
         }
