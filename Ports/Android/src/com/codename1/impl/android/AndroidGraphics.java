@@ -542,6 +542,7 @@ class AndroidGraphics {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
+        paint.setAlpha(255);
         if(!horizontal) {
             paint.setShader(new LinearGradient(x, y, 0, height, startColor, endColor, Shader.TileMode.MIRROR));
         } else {
@@ -559,6 +560,7 @@ class AndroidGraphics {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
+        paint.setAlpha(255);
         paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
         canvas.save();
         canvas.concat(getTransformMatrix());
@@ -572,6 +574,7 @@ class AndroidGraphics {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
+        paint.setAlpha(255);
         paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
         canvas.save();
         canvas.concat(getTransformMatrix());
