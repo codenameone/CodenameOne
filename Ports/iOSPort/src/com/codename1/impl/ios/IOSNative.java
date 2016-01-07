@@ -491,7 +491,9 @@ public final class IOSNative {
     
     native void drawTextureAlphaMask(long textureId, int color, int alpha, int x, int y, int w, int h);
     
-    
+    native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr); 
+
+    native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
     
     // End paths
 
@@ -553,5 +555,7 @@ public final class IOSNative {
      * @param nsObserverPeer The opaque Objective-C class that is being used as the observer.
      */
     native void removeNotificationCenterObserver(long nsObserverPeer);
+
+   
 
 }

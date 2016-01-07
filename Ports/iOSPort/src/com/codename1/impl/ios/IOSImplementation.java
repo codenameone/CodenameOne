@@ -3828,33 +3828,97 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         
+        private float[] tmpNativeDrawShape_buf = new float[6];
+        private float[] tmpNativeDrawShape_coords;
+        
+        private float[] getTmpNativeDrawShape_coords(int size) {
+            if (tmpNativeDrawShape_coords == null) {
+                tmpNativeDrawShape_coords = new float[size];
+            }
+            if (tmpNativeDrawShape_coords.length < size) {
+                float[] newArray = new float[size];
+                System.arraycopy(tmpNativeDrawShape_coords, 0, newArray, 0, tmpNativeDrawShape_coords.length);
+                tmpNativeDrawShape_coords = newArray;
+            }
+            return tmpNativeDrawShape_coords;
+        }
+        
+        private float[] growTmpNativeDrawShape_coords(int size, int factor) {
+            if (tmpNativeDrawShape_coords.length < size) {
+                float[] newArray = new float[size * factor];
+                System.arraycopy(tmpNativeDrawShape_coords, 0, newArray, 0, tmpNativeDrawShape_coords.length);
+                tmpNativeDrawShape_coords = newArray;
+            }
+            return tmpNativeDrawShape_coords;
+        }
+        
+        private byte[] getTmpNativeDrawShape_commands(int size) {
+            if (tmpNativeDrawShape_commands == null) {
+                tmpNativeDrawShape_commands = new byte[size];
+            }
+            if (tmpNativeDrawShape_commands.length < size) {
+                byte[] newArray = new byte[size];
+                System.arraycopy(tmpNativeDrawShape_commands, 0, newArray, 0, tmpNativeDrawShape_commands.length);
+                tmpNativeDrawShape_commands = newArray;
+            }
+            return tmpNativeDrawShape_commands;
+        }
+        
+        private byte[] growTmpNativeDrawShape_commands(int size, int factor) {
+            if (tmpNativeDrawShape_commands.length < size) {
+                byte[] newArray = new byte[size * factor];
+                System.arraycopy(tmpNativeDrawShape_commands, 0, newArray, 0, tmpNativeDrawShape_commands.length);
+                tmpNativeDrawShape_commands = newArray;
+            }
+            return tmpNativeDrawShape_commands;
+        }
+        
+        private byte[] tmpNativeDrawShape_commands;
+        
         /**
          * Draws a shape in the graphics context
          * @param shape
-         * @param lineWidth
-         * @param capStyle
-         * @param miterStyle
-         * @param miterLimit
-         * @param x
-         * @param y
-         * @param w
-         * @param h 
+         * @param stroke
          */
         void nativeDrawShape(Shape shape, Stroke stroke){//float lineWidth, int capStyle, int miterStyle, float miterLimit){
-      
+            if (shape.getClass() == GeneralPath.class) {
+                // GeneralPath gives us some easy access to the points
+                GeneralPath p = (GeneralPath)shape;
+                int commandsLen = p.getTypesSize();
+                int pointsLen = p.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                p.getTypes(commandsArr);
+                p.getPoints(pointsArr);
+                
+                nativeInstance.nativeDrawShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
+            } else {
+                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            }
+            
+            
         }
         
         
         /**
          * Fills a shape in the graphics context.
          * @param shape
-         * @param x
-         * @param y
-         * @param w
-         * @param h 
          */
         void nativeFillShape(Shape shape) {
-
+            if (shape.getClass() == GeneralPath.class) {
+                // GeneralPath gives us some easy access to the points
+                GeneralPath p = (GeneralPath)shape;
+                int commandsLen = p.getTypesSize();
+                int pointsLen = p.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                p.getTypes(commandsArr);
+                p.getPoints(pointsArr);
+                
+                nativeInstance.nativeFillShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr);
+            } else {
+                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            }
         }
         
        
@@ -3869,7 +3933,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         boolean isShapeSupported(){
-            return false;
+            return true;
         }
         
         boolean isAlphaMaskSupported(){

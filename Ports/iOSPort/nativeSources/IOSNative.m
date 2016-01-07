@@ -197,6 +197,7 @@ extern signed int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativ
 (void* peer, const char* str, int len);
 
 
+
 extern int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 (void* peer, int chr);
 
@@ -655,6 +656,232 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+/**
+ * Starts a new subpath. There is no segment from the previous vertex.
+ */
+static const JAVA_BYTE CN1_SEG_MOVETO  = 0;
+
+/**
+ * The current segment is a line.
+ */
+static const JAVA_BYTE CN1_SEG_LINETO  = 1;
+
+/**
+ * The current segment is a quadratic parametric curve. It is interpolated
+ * as t varies from 0 to 1 over the current point (CP), first control point
+ * (P1), and final interpolated control point (P2):
+ * <pre>{@code
+ * P(t) = B(2,0)*CP + B(2,1)*P1 + B(2,2)*P2
+ * 0 <= t <= 1
+ * B(n,m) = mth coefficient of nth degree Bernstein polynomial
+ * = C(n,m) * t^(m) * (1 - t)^(n-m)
+ * C(n,m) = Combinations of n things, taken m at a time
+ * = n! / (m! * (n-m)!) }</pre>
+ */
+static const JAVA_BYTE CN1_SEG_QUADTO  = 2;
+
+/**
+ * The current segment is a cubic parametric curve (more commonly known as a
+ * Bezier curve). It is interpolated as t varies from 0 to 1 over the
+ * current point (CP), first control point (P1), the second control point
+ * (P2), and final interpolated control point (P3):
+ * <pre>{@code P(t) = B(3,0)*CP + B(3,1)*P1 + B(3,2)*P2 + B(3,3)*P3
+ * 0 <= t <= 1
+ * B(n,m) = mth coefficient of nth degree Bernstein polynomial
+ * = C(n,m) * t^(m) * (1 - t)^(n-m)
+ * C(n,m) = Combinations of n things, taken m at a time
+ * = n! / (m! * (n-m)!)}</pre>
+ */
+static const JAVA_BYTE CN1_SEG_CUBICTO = 3;
+/**
+ * The current segment closes a loop by an implicit line to the previous {@link #SEG_MOVETO} coordinate.
+ */
+static const JAVA_BYTE CN1_SEG_CLOSE   = 4;
+
+
+/**
+* Join style constant to join strokes MITER (i.e. pointy)
+* Examples can be seen at <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
+* @see #setJoinStyle
+* @see #getJoinStyle
+*/
+static const JAVA_INT CN1_JOIN_MITER = 0;
+
+/**
+* Join style constant to join strokes rounded. 
+* Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
+* @see #setJoinStyle
+* @see #getJoinStyle
+*/
+static const JAVA_INT CN1_JOIN_ROUND = 1;
+
+/**
+* Join style constant to join strokes bevel.
+* Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm">here</a>.
+* @see #setJoinStyle
+* @see #getJoinStyle
+* 
+*/
+static const JAVA_INT CN1_JOIN_BEVEL = 2;
+
+/**
+* Cap style constant to cap strokes with a butt (or flat).
+* Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>.
+* @see #setCapStyle
+* @see #getCapStyle
+*/
+static const JAVA_INT CN1_CAP_BUTT = 0;
+
+/**
+* Cap style constant to cap strokes with a round end.
+* Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>
+* @see #setCapStyle
+* @see #getCapStyle
+*/
+static const JAVA_INT CN1_CAP_ROUND = 1;
+
+/**
+* Cap style constant to cap strokes with a square end.
+* Examples can be seen <a target="_blank" href="http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm">here</a>
+* @see #setCapStyle
+* @see #getCapStyle
+*/
+static const JAVA_INT CN1_CAP_SQUARE = 2;
+
+static CGContextRef drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextBeginPath(context);
+    JAVA_INT pointsIndex = 0;
+    JAVA_BYTE currType;
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* intArray = commandsArr;
+    JAVA_ARRAY_BYTE* commands = (JAVA_ARRAY_BYTE*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    org_xmlvm_runtime_XMLVMArray* floatArray = commandsArr;
+    JAVA_ARRAY_FLOAT* points = (JAVA_ARRAY_FLOAT*)floatArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+        JAVA_ARRAY_BYTE* commands = (JAVA_BYTE*)((JAVA_ARRAY)commandsArr)->data;
+        JAVA_ARRAY_FLOAT* points = (JAVA_FLOAT*)((JAVA_ARRAY)pointsArr)->data;
+#endif
+    
+        
+    CGFloat px1, px2, px3, px4, py1, py2, py3, py4;
+    for (JAVA_INT cmdIndex = 0; cmdIndex < commandsLen; cmdIndex++) {
+        currType = (JAVA_INT)commands[cmdIndex];
+        switch (currType) {
+            case CN1_SEG_MOVETO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                CGContextMoveToPoint(context, px1, py1);
+                break;
+            }
+                
+            case CN1_SEG_LINETO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                CGContextAddLineToPoint(context, px1, py1);
+                break;
+            }
+            
+            case CN1_SEG_QUADTO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                px2 = points[pointsIndex++];
+                py2 = points[pointsIndex++];
+                CGContextAddQuadCurveToPoint(context, px1, py1, px2, py2);
+                break;
+            }
+            
+            case CN1_SEG_CUBICTO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                px2 = points[pointsIndex++];
+                py2 = points[pointsIndex++];
+                px3 = points[pointsIndex++];
+                py3 = points[pointsIndex++];
+                CGContextAddCurveToPoint(context, px1, py1, px2, py2, px3, py3);
+                break;
+            }
+            
+            case CN1_SEG_CLOSE: {
+                CGContextClosePath(context);
+                break;
+            }
+        
+            
+              
+        }
+        
+    }
+    
+    return context;
+   
+
+}
+
+
+//native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
+void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+    POOL_BEGIN();
+    [UIColorFromRGB(color, alpha) set];
+    CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    CGContextFillPath(context);
+    POOL_END();
+    
+}
+//native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
+void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
+    POOL_BEGIN();
+    
+    CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    CGContextSaveGState(context);
+    [UIColorFromRGB(color, alpha) set];
+    CGContextSetLineWidth(context, lineWidth);
+    CGLineCap cap = kCGLineCapButt;
+    switch (capStyle) {
+        case CN1_CAP_BUTT: {
+            cap = kCGLineCapButt;
+            break;
+        }
+        
+        case CN1_CAP_ROUND: {
+            cap = kCGLineCapRound;
+            break;
+        }
+        
+        case CN1_CAP_SQUARE: {
+            cap = kCGLineCapSquare;
+            break;
+        }
+    }
+    CGContextSetLineCap(context, cap);
+    
+    CGLineJoin join =  kCGLineJoinMiter;
+    switch (joinStyle) {
+        case CN1_JOIN_MITER: {
+            join = kCGLineJoinMiter;
+            break;
+        }
+        case CN1_JOIN_ROUND: {
+            join = kCGLineJoinRound;
+            break;
+        }
+        case CN1_JOIN_BEVEL: {
+            join = kCGLineJoinBevel;
+            break;
+        }
+    }
+    CGContextSetLineJoin(context, join);
+    
+    CGContextSetMiterLimit(context, mitreLimit);
+    
+    CGContextStrokePath(context);
+    CGContextRestoreGState(context);
+    POOL_END();
+}
+
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
 {
