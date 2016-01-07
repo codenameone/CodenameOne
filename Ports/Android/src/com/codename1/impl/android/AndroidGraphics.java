@@ -79,7 +79,7 @@ class AndroidGraphics {
     private Transform transform;
     private Matrix convertedTransform;
     private boolean transformDirty = true;
-    
+
     private boolean clipFresh;
     private final RectF tmprectF = new RectF();
     private final Rect tmprect = new Rect();
@@ -87,7 +87,7 @@ class AndroidGraphics {
     private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
     private AndroidImplementation impl;
     private int alpha = 255;
-    
+
     AndroidGraphics(AndroidImplementation impl, Canvas canvas) {
         this.canvas = canvas;
         this.paint = new Paint();
@@ -141,7 +141,7 @@ class AndroidGraphics {
         canvas.drawBitmap((Bitmap) img, x, y, paint);
         canvas.restore();
     }
-    
+
     void drawImageImpl(Object img, int x, int y, int w, int h) {
         Bitmap b = (Bitmap) img;
         Rect src = new Rect();
@@ -156,14 +156,14 @@ class AndroidGraphics {
         dest.right = x + w;
         canvas.drawBitmap(b, src, dest, paint);
     }
-    
+
     public void drawImage(Object img, int x, int y, int w, int h) {
         canvas.save();
         canvas.concat(getTransformMatrix());
         drawImageImpl(img, x, y, w, h);
         canvas.restore();
     }
-    
+
     public void tileImage(Object img, int x, int y, int w, int h) {
         Bitmap b = (Bitmap) img;
         Rect dest = new Rect();
@@ -190,8 +190,8 @@ class AndroidGraphics {
             CN1Matrix4f m = (CN1Matrix4f)transform.getNativeTransform();
             float[] mMatrix3x3 = new float[9];
             float[] mMatrix4x4 = m.getData();
-           
-            
+
+
             mMatrix3x3[0] = mMatrix4x4[0];
             mMatrix3x3[1] = mMatrix4x4[4];
             mMatrix3x3[2] = mMatrix4x4[12];
@@ -201,23 +201,23 @@ class AndroidGraphics {
             mMatrix3x3[6] = mMatrix4x4[3];
             mMatrix3x3[7] = mMatrix4x4[7];
             mMatrix3x3[8] = mMatrix4x4[15];
-            
-            
+
+
             convertedTransform = new Matrix();
-            
+
             convertedTransform.setValues(mMatrix3x3);
-            
+
             transformDirty = false;
-           
-            
-            
-            
-            
+
+
+
+
+
         }
         return convertedTransform;
-        
+
     }
-    
+
     public void drawLine(int x1, int y1, int x2, int y2) {
         paint.setStyle(Paint.Style.FILL);
         canvas.save();
@@ -225,8 +225,8 @@ class AndroidGraphics {
         canvas.drawLine(x1, y1, x2, y2, paint);
         canvas.restore();
     }
-    
-    
+
+
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
         if (nPoints <= 1) {
             return;
@@ -242,7 +242,7 @@ class AndroidGraphics {
         canvas.drawPath(this.tmppath, paint);
         canvas.restore();
     }
-    
+
     public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
         if (nPoints <= 1) {
             return;
@@ -258,7 +258,7 @@ class AndroidGraphics {
         canvas.drawPath(this.tmppath, paint);
         canvas.restore();
     }
-    
+
     public void drawRGB(int[] rgbData, int offset, int x,
             int y, int w, int h, boolean processAlpha) {
         canvas.save();
@@ -267,19 +267,19 @@ class AndroidGraphics {
                 processAlpha, null);
         canvas.restore();
     }
-    
+
     public void drawRect(int x, int y, int width, int height) {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.STROKE);
         paint.setAntiAlias(false);
-        
+
         canvas.save();
         canvas.concat(getTransformMatrix());
-        canvas.drawRect(x, y, x + width, y + height, paint);        
+        canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         canvas.restore();
     }
-    
+
     public void drawRoundRect(int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
 
@@ -319,9 +319,9 @@ class AndroidGraphics {
                 -arcAngle, true, paint);
         canvas.restore();
     }
-    
+
     public void fillRect(int x, int y, int width, int height) {
-        
+
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
@@ -330,7 +330,7 @@ class AndroidGraphics {
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         canvas.restore();
-        
+
     }
 
    public void fillRect(int x, int y, int w, int h, byte alpha) {
@@ -373,6 +373,7 @@ class AndroidGraphics {
             setColor(s.getBgColor());
             fillRectImpl(x, y, width, height, s.getBgTransparency());
             canvas.restore();
+            return;
         } else {
             int iW = bgImageOrig.getWidth();
             int iH = bgImageOrig.getHeight();
@@ -409,6 +410,7 @@ class AndroidGraphics {
                 return;
                 case Style.BACKGROUND_IMAGE_TILE_BOTH:
                     tileImage(bgImage, x, y, width, height);
+                    canvas.restore();
                     return;
                 case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
                     setColor(s.getBgColor());
@@ -515,7 +517,7 @@ class AndroidGraphics {
             }
         }
     }
-    
+
     private void drawGradientBackground(Style s, int x, int y, int width, int height) {
         switch (s.getBackgroundType()) {
             case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
@@ -545,11 +547,12 @@ class AndroidGraphics {
         } else {
             paint.setShader(new LinearGradient(x, y, width, 0, startColor, endColor, Shader.TileMode.MIRROR));
         }
+        canvas.save();
         canvas.concat(getTransformMatrix());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         paint.setShader(null);
-        canvas.restore();        
+        canvas.restore();
     }
 
     public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
@@ -557,11 +560,12 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        canvas.save();
         canvas.concat(getTransformMatrix());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         paint.setShader(null);
-        canvas.restore();        
+        canvas.restore();
     }
 
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
@@ -569,16 +573,22 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        canvas.save();
         canvas.concat(getTransformMatrix());
         canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         paint.setShader(null);
-        canvas.restore();        
+        canvas.restore();
     }
-    
-    public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, 
-            Bitmap icon, Bitmap stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, 
+
+    public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text,
+            Bitmap icon, Bitmap stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide,
             int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
+        int clipX = getClipX();
+        int clipY = getClipY();
+        int clipW = getClipWidth();
+        int clipH = getClipHeight();
+
         Font cn1Font = style.getFont();
         Object nativeFont = cn1Font.getNativeFont();
         impl.setNativeFont(this, nativeFont);
@@ -731,8 +741,8 @@ class AndroidGraphics {
             textSpaceW = textSpaceW - preserveSpaceForState;
         }
 
-        if (icon == null) { 
-            // no icon only string 
+        if (icon == null) {
+            // no icon only string
             drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
                     textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
         } else {
@@ -745,14 +755,14 @@ class AndroidGraphics {
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         strWidth = drawLabelStringValign(nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, iconHeight,
                                 fontHeight, valign);
 
                         drawImage(icon, x + strWidth + gap, y);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
                         strWidth = drawLabelString(nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
 
                         drawImage(icon, x + strWidth + gap, y + iconStringHGap);
                     }
@@ -772,7 +782,7 @@ class AndroidGraphics {
                     break;
                 case Label.BOTTOM:
                     //center align the smaller
-                    if (iconWidth > strWidth) { 
+                    if (iconWidth > strWidth) {
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         drawImage(icon, x, y);
                         drawLabelString(nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,
@@ -787,7 +797,7 @@ class AndroidGraphics {
                     break;
                 case Label.TOP:
                     //center align the smaller
-                    if (iconWidth > strWidth) { 
+                    if (iconWidth > strWidth) {
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         drawLabelString(nativeFont, text, x + iconStringWGap, y, textSpaceW, isTickerRunning,
                                 tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
@@ -801,7 +811,8 @@ class AndroidGraphics {
                     break;
             }
         }
-        canvas.restore();        
+        canvas.restore();
+        setClip(clipX, clipY, clipW, clipH);
     }
 
     /**
@@ -964,7 +975,7 @@ class AndroidGraphics {
             canvas.drawText(str, x, y - font.getFontAscent(), font);
         }
     }
-    
+
     /**
      * Reverses alignment in the case of bidi
      */
@@ -1008,7 +1019,7 @@ class AndroidGraphics {
             canvas.getClipBounds(this.tmprect);
         }
     }
-    
+
     public int getClipHeight() {
         freshClip();
         return this.tmprect.height();
@@ -1042,7 +1053,7 @@ class AndroidGraphics {
     public int getColor() {
         return paint.getColor();
     }
-    
+
     public void resetAffine() {
         setTransform(Transform.makeIdentity());
         canvas.restore();
@@ -1067,11 +1078,11 @@ class AndroidGraphics {
         t.rotate(angle, x, y);
         setTransform(t);
     }
-    
+
     public final void fillBitmap(int color) {
-        canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);        
+        canvas.drawColor(color, PorterDuff.Mode.SRC_OVER);
     }
-    
+
     public void drawPath(Path p, Stroke stroke) {
         paint.setStyle(Paint.Style.STROKE);
         Stroke old = setStroke(stroke);
@@ -1081,7 +1092,7 @@ class AndroidGraphics {
         canvas.restore();
         setStroke(old);
     }
-    
+
     /**
      * Sets the stroke of the current Paint object.
      * @param stroke The stroke to set.
@@ -1093,10 +1104,10 @@ class AndroidGraphics {
         paint.setStrokeJoin(convertStrokeJoin(stroke.getJoinStyle()));
         paint.setStrokeMiter(stroke.getMiterLimit());
         paint.setStrokeWidth(stroke.getLineWidth());
-        
+
         return old;
     }
-    
+
     private int convertStrokeCap(Paint.Cap cap){
         if ( Paint.Cap.BUTT.equals(cap)){
             return Stroke.CAP_BUTT;
@@ -1108,7 +1119,7 @@ class AndroidGraphics {
             return Stroke.CAP_BUTT;
         }
     }
-    
+
     private Paint.Cap convertStrokeCap(int cap){
         switch ( cap ){
             case Stroke.CAP_BUTT:
@@ -1121,7 +1132,7 @@ class AndroidGraphics {
                 return Paint.Cap.BUTT;
         }
     }
-    
+
     private int convertStrokeJoin(Paint.Join join){
         if ( Paint.Join.BEVEL.equals(join)){
             return Stroke.JOIN_BEVEL;
@@ -1133,7 +1144,7 @@ class AndroidGraphics {
             return Stroke.JOIN_BEVEL;
         }
     }
-    
+
     private Paint.Join convertStrokeJoin(int join){
         switch ( join ){
             case Stroke.JOIN_BEVEL:
@@ -1146,7 +1157,7 @@ class AndroidGraphics {
                 return Paint.Join.BEVEL;
         }
     }
-    
+
     public void fillPath(Path p) {
         paint.setStyle(Paint.Style.FILL);
         canvas.save();
@@ -1154,7 +1165,7 @@ class AndroidGraphics {
         canvas.drawPath(p, paint);
         canvas.restore();
     }
-    
+
     public void setTransform(Transform transform) {
         this.transform = transform;
         transformDirty = true;
@@ -1163,5 +1174,5 @@ class AndroidGraphics {
     public Transform getTransform() {
         return transform;
     }
-    
+
 }

@@ -20,45 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package com.codename1.tools.translator.bytecodes;
 
-import org.objectweb.asm.Opcodes;
-
 /**
- *
- * @author Shai Almog
+ * Interface for an instruction that can be replaced by an expression and assigned
+ * to a variable.  
+ * @author shannah
  */
-public class IInc extends Instruction {
-    private int var;
-    private int num;
-    private static char[] ZERO_CHAR = new char[0];
-    public IInc(int var, int num) {
-        super(Opcodes.IINC);
-        this.var = var;
-        this.num = num;
-    }
-
-    @Override
-    public void appendInstruction(StringBuilder b) {
-        b.append("    BC_IINC(");
-        b.append(var);
-        b.append(", ");
-        b.append(num);
-        b.append(");\n");
-    }
-
-    @Override
-    public char[] getStackInputTypes() {
-        return ZERO_CHAR;
-    }
-
-    @Override
-    public char[] getStackOutputTypes() {
-        return ZERO_CHAR;
-    }
+public interface AssignableExpression {
     
-    
-
-    
+    /**
+     * Outputs C code to assign the expression to given variable.
+     * @param varName
+     * @param sb
+     * @return 
+     */
+    public boolean assignTo(String varName, String typeVarName, StringBuilder sb);
 }

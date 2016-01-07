@@ -6470,14 +6470,14 @@ public abstract class CodenameOneImplementation {
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         strWidth = drawLabelStringValign(nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight,
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, iconHeight,
                                 fontHeight, valign);
 
                         drawImage(nativeGraphics, icon, x + strWidth + gap, y);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
                         strWidth = drawLabelString(nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
 
                         drawImage(nativeGraphics, icon, x + strWidth + gap, y + iconStringHGap);
                     }

@@ -535,6 +535,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return Display.DENSITY_HIGH;
             case DisplayMetrics.DENSITY_XHIGH:
                 return Display.DENSITY_VERY_HIGH;
+            case 400: // DisplayMetrics.DENSITY_400
+            case 420: // DisplayMetrics.DENSITY_420
             case 480: // DisplayMetrics.DENSITY_XXHIGH
                 return Display.DENSITY_HD;
             case 560: // DisplayMetrics.DENSITY_560
@@ -1065,22 +1067,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if(t.isItalic()) {
                 fontStyle |= com.codename1.ui.Font.STYLE_ITALIC;
             }
-            CodenameOneTextPaint newPaint = new CodenameOneTextPaint();
+            CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
             newPaint.setAntiAlias(true);
             newPaint.setSubpixelText(true);
-            newPaint.setTypeface(t);
-            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, fontStyle, 
+            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, fontStyle,
                     com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
         }
         Typeface t = Typeface.createFromAsset(activity.getAssets(), fileName);
         if(t == null) {
             throw new RuntimeException("Font not found: " + fileName);
         }
-        CodenameOneTextPaint newPaint = new CodenameOneTextPaint();
+        CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
         newPaint.setAntiAlias(true);
         newPaint.setSubpixelText(true);
-        newPaint.setTypeface(t);
-        return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, 
+        return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM,
                 com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
     }
     
@@ -1137,8 +1137,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             fontstyle |= Typeface.ITALIC;
         }
         type = Typeface.create(type, fontstyle);
-        CodenameOneTextPaint newPaint = new CodenameOneTextPaint();
-        newPaint.setTypeface(type);
+        CodenameOneTextPaint newPaint = new CodenameOneTextPaint(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
         NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
@@ -1147,8 +1146,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object createFont(int face, int style, int size) {
-        Paint font = new CodenameOneTextPaint();
-        font.setAntiAlias(true);
         Typeface typeface = null;
         switch (face) {
             case Font.FACE_MONOSPACE:
@@ -1180,7 +1177,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 break;
         }
 
-        font.setTypeface(Typeface.create(typeface, fontstyle));
+        Paint font = new CodenameOneTextPaint(Typeface.create(typeface, fontstyle));
+        font.setAntiAlias(true);
         font.setUnderlineText((style & Font.STYLE_UNDERLINED) != 0);
         font.setTextSize(height);
         return new NativeFont(face, style, size, font);
@@ -1198,8 +1196,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object loadNativeFont(String lookup) {
         try {
             lookup = lookup.split(";")[0];
-            Paint font = new CodenameOneTextPaint();
-            font.setAntiAlias(true);
             int typeface = Typeface.NORMAL;
             String familyName = lookup.substring(0, lookup.indexOf("-"));
             String style = lookup.substring(lookup.indexOf("-") + 1, lookup.lastIndexOf("-"));
@@ -1212,7 +1208,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else if (style.equals("bold")) {
                 typeface = Typeface.BOLD;
             }
-            font.setTypeface(Typeface.create(familyName, typeface));
+            Paint font = new CodenameOneTextPaint(Typeface.create(familyName, typeface));
+            font.setAntiAlias(true);
             font.setTextSize(Integer.parseInt(size));
             return new NativeFont(0, 0, 0, font);
         } catch (Exception err) {
@@ -1242,8 +1239,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getDefaultFont() {
-        CodenameOneTextPaint paint = new CodenameOneTextPaint();
-        paint.set(this.defaultFont);
+        CodenameOneTextPaint paint = new CodenameOneTextPaint(this.defaultFont);
         return new NativeFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM, paint);
     }
 
@@ -1591,12 +1587,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
         
 
-    @Override
+    /*@Override
     public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
         ((AndroidGraphics)nativeGraphics).drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text, 
                 (Bitmap)icon, (Bitmap)stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth, 
                 isTickerRunning, tickerShiftText, endsWith3Points, valign);
-    }
+    }*/
 
    
     @Override
@@ -4458,12 +4454,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
 //        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
 //                new Intent("SMS_DELIVERED"), 0);
-        if(i) {
-            Intent smsIntent = new Intent(Intent.ACTION_VIEW);
-            smsIntent.setType("vnd.android-dir/mms-sms");
-            smsIntent.putExtra("address", phoneNumber);
-            smsIntent.putExtra("sms_body",message);
+        if(i) {            
+            Intent smsIntent = null;
+            if(android.os.Build.VERSION.SDK_INT < 19){
+                smsIntent = new Intent(Intent.ACTION_VIEW);
+                smsIntent.setType("vnd.android-dir/mms-sms");
+                smsIntent.putExtra("address", phoneNumber);
+                smsIntent.putExtra("sms_body",message);
+            }else{
+                smsIntent = new Intent(Intent.ACTION_SENDTO);
+                smsIntent.setData(Uri.parse("smsto:" + Uri.encode(phoneNumber)));   
+                smsIntent.putExtra("sms_body", message); 
+            }
             activity.startActivity(smsIntent);            
+            
         } else {
             SmsManager sms = SmsManager.getDefault();
             ArrayList<String> parts = sms.divideMessage(message);

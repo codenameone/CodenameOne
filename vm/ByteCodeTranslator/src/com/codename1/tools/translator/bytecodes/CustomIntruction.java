@@ -30,17 +30,24 @@ import java.util.List;
  * 
  * @author Shai Almog
  */
-public class CustomIntruction extends Instruction {
+public class CustomIntruction extends Instruction implements AssignableExpression {
     private String code;
     private String complexCode;
     private List<String> dependencies;
+    private AssignableExpression assignableExpression;
     
-    public CustomIntruction(String code, String complexCode, List<String> dependencies) {
+    public CustomIntruction(String code, String complexCode, List<String> dependencies, AssignableExpression assignable) {
         super(-1);
         this.code = code;
         this.complexCode = complexCode;
         this.dependencies = dependencies;
+        this.assignableExpression = assignable;
     }
+    
+    public CustomIntruction(String code, String complexCode, List<String> dependencies) {
+        this(code, complexCode, dependencies, null);
+    }
+    
     
     public void appendInstruction(StringBuilder b, List<Instruction> l) {
         if(hasInstructions) {
@@ -55,4 +62,22 @@ public class CustomIntruction extends Instruction {
             dependencyList.addAll(dependencies);
         }
     }
+    
+    public void setAssignableExpression(AssignableExpression ex) {
+        assignableExpression = ex;
+    }
+    
+    public AssignableExpression getAssignableExpression() {
+        return assignableExpression;
+    }
+
+    @Override
+    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+        if (assignableExpression != null) {
+            return assignableExpression.assignTo(varName, typeVarName, sb);
+        }
+        return false;
+    }
+    
+    
 }

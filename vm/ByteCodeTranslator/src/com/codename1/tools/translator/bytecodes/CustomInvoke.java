@@ -20,7 +20,6 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
@@ -34,41 +33,29 @@ import org.objectweb.asm.Opcodes;
 
 /**
  *
- * @author Shai Almog
+ * @author shannah
  */
-public class Invoke extends Instruction {
+public class CustomInvoke extends Instruction {
     private String owner;
     private String name;
     private String desc;
     private boolean itf;
-    private char[] stackInputTypes;
-    private char[] stackOutputTypes;
+    private String[] literalArgs;
+    private int origOpcode;
     
     
-    public Invoke(int opcode, String owner, String name, String desc, boolean itf) {
-        super(opcode);
+    public CustomInvoke(int opcode, String owner, String name, String desc, boolean itf) {
+        super(-1);
+        this.origOpcode = opcode;
         this.owner = owner;
         this.name = name;
         this.desc = desc;
         this.itf = itf;
     }
     
-    String getOwner() {
-        return owner;
+    public static CustomInvoke create(Invoke invoke) {
+        return new CustomInvoke(invoke.getOpcode(), invoke.getOwner(), invoke.getName(), invoke.getDesc(), invoke.isItf());
     }
-    
-    String getName() {
-        return name;
-    }
-    
-    String getDesc() {
-        return desc;
-    }
-    
-    boolean isItf() {
-        return itf;
-    }
-    
 
     public boolean isMethodUsed(String desc, String name) {
         return this.desc.equals(desc) && name.equals(name);
@@ -87,7 +74,7 @@ public class Invoke extends Instruction {
         }
 
         StringBuilder bld = new StringBuilder();
-        if(opcode != Opcodes.INVOKEINTERFACE && opcode != Opcodes.INVOKEVIRTUAL) {
+        if(origOpcode != Opcodes.INVOKEINTERFACE && origOpcode != Opcodes.INVOKEVIRTUAL) {
             return;
         }         
         bld.append(owner.replace('/', '_').replace('$', '_'));
@@ -133,14 +120,14 @@ public class Invoke extends Instruction {
         }
         
         StringBuilder bld = new StringBuilder();
-        if(opcode == Opcodes.INVOKEINTERFACE || opcode == Opcodes.INVOKEVIRTUAL) {
+        if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
             b.append("    ");
             bld.append("virtual_");
         } else {
             b.append("    ");
         }
         
-        if(opcode == Opcodes.INVOKESTATIC) {
+        if(origOpcode == Opcodes.INVOKESTATIC) {
             // find the actual class of the static method to workaround javac not defining it correctly
             ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
             owner = findActualOwner(bc);
@@ -162,11 +149,15 @@ public class Invoke extends Instruction {
         bld.append("__");
         ArrayList<String> args = new ArrayList<String>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
+        int numLiteralArgs = this.getNumLiteralArgs();
+        if (numLiteralArgs > 0) {
+            b.append("/* CustomInvoke */");
+        }
         boolean noPop = false;
         if(returnVal == null) {
             b.append(bld);
         } else {
-            if(args.size() == 0 && opcode == Opcodes.INVOKESTATIC) {
+            if(args.size() - numLiteralArgs == 0 && origOpcode == Opcodes.INVOKESTATIC) {
                 // special case for static method
                 if(returnVal.equals("JAVA_OBJECT")) {
                     b.append("PUSH_OBJ");
@@ -205,9 +196,9 @@ public class Invoke extends Instruction {
         
         
         
-        if(opcode != Opcodes.INVOKESTATIC) {
+        if(origOpcode != Opcodes.INVOKESTATIC) {
             b.append(", stack[stackPointer - ");
-            b.append(args.size() + 1);
+            b.append(args.size() + 1 - numLiteralArgs);
             b.append("].data.o");
         }
         int offset = args.size();
@@ -216,13 +207,15 @@ public class Invoke extends Instruction {
         for(String a : args) {
             
             b.append(", ");
-            
-            b.append("stack[stackPointer - ");
-            b.append(offset);
-            b.append("].data.");
-            b.append(a);
-            offset--;
-            
+            if (literalArgs != null && literalArgs[argIndex] != null) {
+                b.append(literalArgs[argIndex]);
+            } else {
+                b.append("stack[stackPointer - ");
+                b.append(offset);
+                b.append("].data.");
+                b.append(a);
+                offset--;
+            }
             argIndex++;
         }
         if(noPop) {
@@ -231,16 +224,16 @@ public class Invoke extends Instruction {
         }
         if(returnVal != null) {
             b.append(");\n");
-            if(opcode != Opcodes.INVOKESTATIC) {
-                if(args.size() > 0) {
+            if(origOpcode != Opcodes.INVOKESTATIC) {
+                if(args.size() - numLiteralArgs > 0) {
                     b.append("    stackPointer -= ");
-                    b.append(args.size());
+                    b.append(args.size() - numLiteralArgs);
                     b.append(";\n");
                 }
             } else {
-                if(args.size() > 1) {
+                if(args.size() - numLiteralArgs > 1) {
                     b.append("    stackPointer -= ");
-                    b.append(args.size() - 1);
+                    b.append(args.size() - numLiteralArgs - 1);
                     b.append(";\n");
                 }
             }
@@ -266,21 +259,15 @@ public class Invoke extends Instruction {
                 }
             }
             
-            /*if(opcode != Opcodes.INVOKESTATIC) {
-                b.append(args.size() + 1);
-            } else {
-                b.append(args.size());
-            }
-            b.append(");\n");      */
             
             return;
         }
         b.append("); ");
         int val; 
-        if(opcode != Opcodes.INVOKESTATIC) {
-            val = args.size() + 1;
+        if(origOpcode != Opcodes.INVOKESTATIC) {
+            val = args.size() + 1 - numLiteralArgs;
         } else {
-            val = args.size();
+            val = args.size() - numLiteralArgs;
         }
         if(val > 0) {
             /*b.append("popMany(threadStateData, ");            
@@ -298,64 +285,27 @@ public class Invoke extends Instruction {
     public List<ByteCodeMethodArg> getArgs() {
         return Util.getMethodArgs(desc);
     }
-
-    @Override
-    public char[] getStackInputTypes() {
-        if (stackInputTypes == null) {
-            List<ByteCodeMethodArg> args = getArgs();
-            int thisArg = 0;
-            if (opcode != Opcodes.INVOKESTATIC) {
-                thisArg++;
-                
-            }
-            stackInputTypes = new char[args.size() + thisArg];
-            if (opcode != Opcodes.INVOKESTATIC) {
-                stackInputTypes[0] = 'o';
-            }
-            int len = args.size();
-            for (int i=0; i<len; i++) {
-                stackInputTypes[i+thisArg] = args.get(i).getQualifier();
-            }
+    
+    public void setLiteralArg(int index, String arg) {
+        if (literalArgs == null) {
+            literalArgs = new String[getArgs().size()];
         }
-        return stackInputTypes;
-    }
-
-    @Override
-    public char[] getStackOutputTypes() {
-        if (stackOutputTypes == null) {
-            String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>());
-            if (returnVal == null) {
-                stackOutputTypes = new char[0];
-            } else {
-                stackOutputTypes = new char[1];
-                if(returnVal.equals("JAVA_OBJECT")) {
-                    stackOutputTypes[0] = 'o';
-                } else {
-                    if(returnVal.equals("JAVA_INT")) {
-                        stackOutputTypes[0] = 'i';
-                    } else {
-                        if(returnVal.equals("JAVA_LONG")) {
-                            stackOutputTypes[0] = 'l';
-                        } else {
-                            if(returnVal.equals("JAVA_DOUBLE")) {
-                                stackOutputTypes[0] = 'd';
-                            } else {
-                                if(returnVal.equals("JAVA_FLOAT")) {
-                                    stackOutputTypes[0] = 'f';
-                                } else {
-                                    throw new UnsupportedOperationException("Unknown type: " + returnVal);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        if (index >= literalArgs.length) {
+            throw new RuntimeException("Attempt to set literal arg "+index+" on method invocation that only takes "+literalArgs.length+" args.  Method: "+owner+"."+name+" "+desc);
         }
-        return stackOutputTypes;
+        literalArgs[index] = arg;
     }
     
-    
-    
-    
-    
+    private int getNumLiteralArgs() {
+        if (literalArgs == null) {
+            return 0;
+        }
+        int count = 0;
+        for (int i=0; i < literalArgs.length; i++) {
+            if (literalArgs[i] != null) {
+                count++;
+            }
+        }
+        return count;
+    }
 }

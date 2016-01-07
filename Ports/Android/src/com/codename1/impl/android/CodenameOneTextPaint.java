@@ -23,6 +23,7 @@
 package com.codename1.impl.android;
 
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.text.TextPaint;
 
 /**
@@ -33,7 +34,16 @@ import android.text.TextPaint;
 public class CodenameOneTextPaint extends TextPaint {
     int fontHeight = -1;
     private int ascent = -1;
-    
+
+    public CodenameOneTextPaint(Typeface tf) {
+        super.setTypeface(tf);
+    }
+
+    @Override
+    public Typeface setTypeface(Typeface typeface) {
+        throw new RuntimeException("Can't set typeface in runtime!");
+    }
+
     public int getFontAscent() {
         if(ascent < 0) {
             ascent = getFontMetricsInt().ascent;

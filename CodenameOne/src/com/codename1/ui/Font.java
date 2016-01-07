@@ -125,6 +125,7 @@ public class Font {
     private String fontUniqueId;
 
     private static HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
+    private static float fontReturnedHeight;
     
     /**
      * Creates a new Font
@@ -213,6 +214,11 @@ public class Font {
      * @return the font object created or null if true type fonts aren't supported on this platform
      */
     public static Font createTrueTypeFont(String fontName, String fileName) {
+        String alreadyLoaded = fileName + "_" + fontReturnedHeight + "_"+ Font.STYLE_PLAIN;
+        Font f = derivedFontCache.get(alreadyLoaded);
+        if(f != null) {
+            return f;
+        }
         if(fontName.startsWith("native:")) {
             if(!Display.impl.isNativeFontSchemeSupported()) {
                 return null;
@@ -226,11 +232,11 @@ public class Font {
         if(font == null) {
             return null;
         }
-        Font f = new Font(font);
+        f = new Font(font);
         f.ttf = true;
         f.fontUniqueId = fontName;
         float h = f.getHeight();
-        
+        fontReturnedHeight = h;
         derivedFontCache.put(fileName + "_" + h + "_"+ Font.STYLE_PLAIN, f);
         return f;
     }
@@ -253,7 +259,7 @@ public class Font {
                 return f;
             }
             f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
-            derivedFontCache.put(fontUniqueId + "_" + sizePixels + "_"+ weight, f);
+            derivedFontCache.put(key, f);
             f.ttf = true;
             return f;
         } else {
