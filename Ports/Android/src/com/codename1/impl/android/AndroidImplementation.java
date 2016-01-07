@@ -1568,16 +1568,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void paintComponentBackground(Object graphics, int x, int y, int width, int height, Style s) {
+        if(!asyncView) {
+            super.paintComponentBackground(graphics, x, y, width, height, s);
+            return;
+        }
         ((AndroidGraphics) graphics).paintComponentBackground(x, y, width, height, s);
     }
 
     @Override
     public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        if(!asyncView) {
+            super.fillLinearGradient(graphics, startColor, endColor, x, y, width, height, horizontal);
+            return;
+        }
         ((AndroidGraphics)graphics).fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
 
     @Override
     public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        if(!asyncView) {
+            super.fillRectRadialGradient(graphics, startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+            return;
+        }
         ((AndroidGraphics)graphics).fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
     }
 
