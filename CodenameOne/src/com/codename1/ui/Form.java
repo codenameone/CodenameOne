@@ -520,11 +520,11 @@ public class Form extends Container {
         
         if(oldWidth != w && oldHeight != h){
             if (orientationListener != null) {
-                orientationListener.fireActionEvent(new ActionEvent(this));
+                orientationListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.OrientationChange));
             }
         }
         if (sizeChangedListener != null) {
-            sizeChangedListener.fireActionEvent(new ActionEvent(this, w, h));
+            sizeChangedListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.SizeChange, w, h));
         }
         
         repaint();
@@ -1482,7 +1482,7 @@ public class Form extends Container {
      * rather than implementing many command instances
      */
     void actionCommandImpl(Command cmd) {
-        actionCommandImpl(cmd, new ActionEvent(cmd));
+        actionCommandImpl(cmd, new ActionEvent(cmd,ActionEvent.Type.Command));
     }
 
     /**
@@ -1667,7 +1667,7 @@ public class Form extends Container {
         setLightweightMode(false);
         onShowCompleted();
         if (showListener != null) {
-            showListener.fireActionEvent(new ActionEvent(this));
+            showListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Show));
         }
         if(editOnShow != null) {
             editOnShow.startEditingAsync();
@@ -2174,7 +2174,7 @@ public class Form extends Container {
         stickyDrag = null;
         dragStopFlag = false;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         //check if the click is relevant to the menu bar.
         if (menuBar.contains(x, y)) {
@@ -2300,7 +2300,7 @@ public class Form extends Container {
         }
         autoRelease(x, y);
         if (pointerDraggedListeners != null) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
 
         if (dragged != null) {
@@ -2350,7 +2350,7 @@ public class Form extends Container {
         }
         autoRelease(x[0], y[0]);
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x[0], y[0]));
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]));
         }
 
         if (dragged != null) {
@@ -2511,7 +2511,7 @@ public class Form extends Container {
             }
         }
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, x, y);
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
             if(ev.isConsumed()) {
                 return;

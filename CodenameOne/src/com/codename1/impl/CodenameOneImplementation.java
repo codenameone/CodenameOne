@@ -4534,7 +4534,7 @@ public abstract class CodenameOneImplementation {
      * @param content content of the message
      */
     protected void log(String content) {
-        logger.actionPerformed(new ActionEvent(content));
+        logger.actionPerformed(new ActionEvent(content,ActionEvent.Type.Log));
     }
 
     /**
@@ -4708,7 +4708,7 @@ public abstract class CodenameOneImplementation {
                 b.addActionListener(new ActionListener() {
 
                     public void actionPerformed(ActionEvent evt) {
-                        response.actionPerformed(new ActionEvent(node));
+                        response.actionPerformed(new ActionEvent(node,ActionEvent.Type.Other));
                         d.dispose();
                     }
                 });

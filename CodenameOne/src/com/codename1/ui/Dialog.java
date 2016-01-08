@@ -831,13 +831,13 @@ public class Dialog extends Form {
         if(commandsAsButtons) {
             if(MenuBar.isLSK(keyCode)) {
                 if(buttonCommands != null && buttonCommands.length > 0) {
-                    dispatchCommand(buttonCommands[0], new ActionEvent(buttonCommands[0]));
+                    dispatchCommand(buttonCommands[0], new ActionEvent(buttonCommands[0],ActionEvent.Type.KeyRelease));
                     return;
                 }
             }
             if(MenuBar.isRSK(keyCode)) {
                 if(buttonCommands != null && buttonCommands.length > 1) {
-                    dispatchCommand(buttonCommands[1], new ActionEvent(buttonCommands[1]));
+                    dispatchCommand(buttonCommands[1], new ActionEvent(buttonCommands[1],ActionEvent.Type.KeyRelease));
                     return;
                 }
             }
@@ -914,7 +914,7 @@ public class Dialog extends Form {
             disposeImpl();
         }
         if (showListener != null) {
-            showListener.fireActionEvent(new ActionEvent(this));
+            showListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Show));
         }
     }
     
