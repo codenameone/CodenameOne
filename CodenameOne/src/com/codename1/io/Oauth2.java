@@ -397,7 +397,8 @@ public class Oauth2 {
         Hashtable retVal = new Hashtable();
 
         String[] params = Util.split(url, "&");
-        for (int i = 0; i < params.length; i++) {
+        int plen = params.length;
+        for (int i = 0; i < plen; i++) {
             if (params[i].indexOf("=") > 0) {
                 String[] keyVal = Util.split(params[i], "=");
                 retVal.put(keyVal[0], keyVal[1]);

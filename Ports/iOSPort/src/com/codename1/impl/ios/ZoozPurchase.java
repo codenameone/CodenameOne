@@ -91,8 +91,9 @@ class ZoozPurchase extends Purchase implements Runnable {
     }
 
     public synchronized Product[] getProducts(String[] skus) {
-        final Product[] p = new Product[skus.length];
-        for(int iter = 0 ; iter < p.length ; iter++) {
+        int numSkus = skus.length;
+        final Product[] p = new Product[numSkus];
+        for(int iter = 0 ; iter < numSkus ; iter++) {
             p[iter] = new Product();
         }
         fetchProductsFailed = false;

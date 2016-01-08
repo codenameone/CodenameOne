@@ -1160,7 +1160,8 @@ public class UIManager {
     private int[] toIntArray(String str) {
         int[] retVal = new int[4];
         str = str + ",";
-        for (int i = 0; i < retVal.length; i++) {
+        int rlen = retVal.length;
+        for (int i = 0; i < rlen; i++) {
             retVal[i] = Integer.parseInt(str.substring(0, str.indexOf(",")));
             str = str.substring(str.indexOf(",") + 1, str.length());
         }
@@ -1170,7 +1171,8 @@ public class UIManager {
     private static Image parseImage(String value) throws IOException {
         int index = 0;
         byte[] imageData = new byte[value.length() / 2];
-        while (index < value.length()) {
+        int vlen = value.length();
+        while (index < vlen) {
             String byteStr = value.substring(index, index + 2);
             imageData[index / 2] = Integer.valueOf(byteStr, 16).byteValue();
             index += 2;
@@ -1300,7 +1302,8 @@ public class UIManager {
                 if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen; iter++) {
                         String val = tokenized[iter];
                         String actual = (String)bundle.get("@im-" + val);
                         // val can be null for builtin input mode types...
@@ -1336,7 +1339,8 @@ public class UIManager {
                 if(vkbInputMode != null && vkbInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
                     VirtualKeyboard.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen ; iter++) {
                         String val = tokenized[iter];
                         String[][] res = getInputMode("@vkb-", tokenized[iter], resourceBundle);
                         if(res != null) {
@@ -1348,7 +1352,8 @@ public class UIManager {
                 if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen ; iter++) {
                         String val = tokenized[iter];
                         String actual = (String)resourceBundle.get("@im-" + val);
                         // val can be null for builtin input mode types...
@@ -1387,7 +1392,8 @@ public class UIManager {
 
     private String[] toStringArray(Vector v) {
         String[] arr = new String[v.size()];
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             arr[iter] = (String)v.elementAt(iter);
         }
         return arr;

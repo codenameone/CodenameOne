@@ -1923,7 +1923,8 @@ public final class Display {
     private int[] readArrayStackArgument(int offset) {
         int[] a = new int[inputEventStackTmp[offset]];
         offset++;
-        for(int iter = 0 ; iter < a.length ; iter++) {
+        int alen = a.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             a[iter] = inputEventStackTmp[offset + iter];
         }
         return a;

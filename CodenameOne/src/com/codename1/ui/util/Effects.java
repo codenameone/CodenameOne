@@ -88,16 +88,16 @@ public class Effects {
         RGBImage rgbImg = new RGBImage(new int[w * (h + spacing) + mirrorHeight], w, h + ((int)(h  * mirrorRatio) + spacing));
         source.toRGB(rgbImg, 0, 0, 0, 0, w, h);
         int[] imageData = rgbImg.getRGB();
-
+        int ilen = imageData.length;
         for(int iter = 0 ; iter < mirrorHeight ; iter++) {
             int sourcePos = w * h - iter - 1;
             int off = iter % w;
             off = w - off + iter - off;
-            int mirrorPos = imageData.length - (mirrorHeight - off) + (spacing * w);
+            int mirrorPos = ilen - (mirrorHeight - off) + (spacing * w);
             int color = imageData[sourcePos];
 
             // if the color is not transparent
-            if((color & 0xff000000) != 0 && mirrorPos < imageData.length) {
+            if((color & 0xff000000) != 0 && mirrorPos < ilen) {
                 int alpha = (int)(alphaRatio * ((float)mirrorHeight - iter) / ((float)mirrorHeight));
                 imageData[mirrorPos] = (imageData[sourcePos] & 0xffffff) | ((alpha << 24) & 0xff000000);
             }

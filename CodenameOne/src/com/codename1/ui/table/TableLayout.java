@@ -338,7 +338,8 @@ public class TableLayout extends Layout {
 
             int currentX = left;
             int availableReminder = pWidth;
-            for(int iter = 0 ; iter < columnSizes.length ; iter++) {
+            int cslen = columnSizes.length;
+            for(int iter = 0 ; iter < cslen ; iter++) {
                 columnSizes[iter] = getColumnWidthPixels(iter, pWidth, availableReminder);
                 availableReminder -= columnSizes[iter];
             }
@@ -381,7 +382,8 @@ public class TableLayout extends Layout {
             }
 
             int currentY = top;
-            for(int iter = 0 ; iter < rowSizes.length ; iter++) {
+            int rlen = rowSizes.length;
+            for(int iter = 0 ; iter < rlen ; iter++) {
                 if(parent.isScrollableY()) {
                     rowSizes[iter] = getRowHeightPixels(iter, pHeight, -1);
                 } else {
@@ -391,9 +393,9 @@ public class TableLayout extends Layout {
                 currentY += rowSizes[iter];
             }
 
-
-            for(int r = 0 ; r < rowSizes.length ; r++) {
-                for(int c = 0 ; c < columnSizes.length ; c++) {
+            int clen = columnSizes.length;
+            for(int r = 0 ; r < rlen ; r++) {
+                for(int c = 0 ; c < clen ; c++) {
                     Constraint con = tablePositions[r * columns + c];
                     int conX, conY, conW, conH;
                     if(con != null && con != H_SPAN_CONSTRAINT && con != V_SPAN_CONSTRAINT && con != VH_SPAN_CONSTRAINT) {

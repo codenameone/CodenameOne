@@ -83,7 +83,8 @@ public class DefaultListModel<T> implements ListModel<T> {
             items = new Object[] {};
         }
         java.util.List vec = new ArrayList(items.length);
-        for(int iter = 0 ; iter < items.length ; iter++) {
+        int ilen = items.length;
+        for(int iter = 0 ; iter < ilen ; iter++) {
             vec.add(items[iter]);
         }
         return vec;

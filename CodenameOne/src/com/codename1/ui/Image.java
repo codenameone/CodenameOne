@@ -206,8 +206,9 @@ public class Image {
      */
     public Object createMask() {
         int[] rgb = getRGBCached();
-        byte[] mask = new byte[rgb.length];
-        for(int iter = 0 ; iter < rgb.length ; iter++) {
+        int rlen = rgb.length;
+        byte[] mask = new byte[rlen];
+        for(int iter = 0 ; iter < rlen ; iter++) {
             mask[iter] = (byte)(rgb[iter] & 0xff);
         }
         return new IndexedImage(getWidth(), getHeight(), null, mask);
@@ -269,7 +270,8 @@ public class Image {
         if(mWidth != getWidth() || mHeight != getHeight()) {
             throw new IllegalArgumentException("Mask and image sizes don't match");
         }
-        for(int iter = 0 ; iter < maskData.length ; iter++) {
+        int mdlen = maskData.length;
+        for(int iter = 0 ; iter < mdlen ; iter++) {
             int maskAlpha = maskData[iter] & 0xff;
             maskAlpha = (maskAlpha << 24) & 0xff000000;
             rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;

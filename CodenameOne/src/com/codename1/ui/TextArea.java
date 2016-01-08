@@ -751,7 +751,8 @@ public class TextArea extends Component {
     }
     
     private int indexOf(char[] t, char c, int offset, int length) {
-        for(int iter = offset ; iter < t.length && iter < offset+length; iter++) {
+        int tlen = t.length;
+        for(int iter = offset ; iter < tlen && iter < offset+length; iter++) {
             if(t[iter] == c) {
                 return iter;
            }
@@ -842,7 +843,8 @@ public class TextArea extends Component {
             } else {
                 // special case for the edge case of "no room".
                 // Its important since sometimes this case occurs in the GUI builder by accident
-                for(int iter = 0 ; iter < text.length ; iter++) {
+                int tlen = text.length;
+                for(int iter = 0 ; iter < tlen ; iter++) {
                     rowStrings.add("" + text[iter]);
                 }
             }
@@ -992,7 +994,8 @@ public class TextArea extends Component {
                     } else {
                         // special case for the edge case of "no room".
                         // Its important since sometimes this case occurs in the GUI builder by accident
-                        for(int iter = 0 ; iter < text.length ; iter++) {
+                        int tlen = text.length;
+                        for(int iter = 0 ; iter < tlen ; iter++) {
                             rowStrings.add("" + text[iter]);
                         }
                     }
@@ -1407,7 +1410,8 @@ public class TextArea extends Component {
     public static void autoDetectWidestChar(String s) {
         Font f = UIManager.getInstance().getComponentStyle("TextArea").getFont();
         int widest = 0;
-        for(int iter = 0 ; iter < s.length() ; iter++) {
+        int slen = s.length();
+        for(int iter = 0 ; iter < slen ; iter++) {
             char c = s.charAt(iter);
             int w = f.charWidth(c);
             if(w > widest) {

@@ -145,7 +145,8 @@ public class XMLParser {
         if (userDefinedCharEntities==null) {
             userDefinedCharEntities=new Hashtable();
         }
-        for(int i=0;i<symbols.length;i++) {
+        int slen = symbols.length;
+        for(int i=0;i<slen;i++) {
             if (symbols[i]!=null) {
                 userDefinedCharEntities.put(trimCharEntity(symbols[i]),new Integer(startcode+i));
             }
@@ -548,13 +549,14 @@ public class XMLParser {
             } else if ((c=='[') && (c2=='C')) { // CDATA?
                 c=(char)read(is);
                 int idx=0;
-                while ((idx<CDATA_STR.length()) && (c==CDATA_STR.charAt(idx))) {
+                int clen = CDATA_STR.length();
+                while ((idx<clen) && (c==CDATA_STR.charAt(idx))) {
                     idx++;
-                    if (idx<CDATA_STR.length()) {
+                    if (idx<clen) {
                         c=(char)read(is);
                     }
                 }
-                if (idx==CDATA_STR.length()) { //found CDATA
+                if (idx==clen) { //found CDATA
                     return parseCommentOrXMLDeclaration(is,"]]>"); //parse doctypes i.e. <!DOCTYPE .... > as comments as well - i.e. ignore them
                 } else { // some other unknown tag
                     return parseCommentOrXMLDeclaration(is,">"); //parse doctypes i.e. <!DOCTYPE .... > as comments as well - i.e. ignore them
@@ -639,7 +641,8 @@ public class XMLParser {
                 if (lastChar!='/') { // If this is an empty tag, no need to search for its closing tag as there's none...
                     String endTag = new StringBuilder().append('<').append('/').append(tagName).append('>').toString();
                     int index=0;
-                    while(index<endTag.length()) {
+                    int elen = endTag.length();
+                    while(index<elen) {
                         int i = read(is);
 
                         // Fix for http://code.google.com/p/codenameone/issues/detail?id=900

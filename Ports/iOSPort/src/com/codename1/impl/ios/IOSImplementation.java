@@ -5051,9 +5051,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public String[] getAllContacts(boolean withNumbers) {
         int[] c = new int[nativeInstance.getContactCount(withNumbers)];
+        int clen = c.length;
         nativeInstance.getContactRefIds(c, withNumbers);
-        String[] r = new String[c.length];
-        for(int iter = 0 ; iter < c.length ; iter++) {
+        String[] r = new String[clen];
+        for(int iter = 0 ; iter < clen ; iter++) {
             r[iter] = "" + c[iter];
         }
         return r;
@@ -5968,7 +5969,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
         String[] s = new String[nativeInstance.getResponseHeaderCount(n.peer)];
-        for(int iter = 0 ; iter < s.length ; iter++) {
+        int slen = s.length;
+        for(int iter = 0 ; iter < slen ; iter++) {
             s[iter] = nativeInstance.getResponseHeaderName(n.peer, iter);
         }
         return s;
@@ -6126,7 +6128,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.getResourcesDir()
                 };
         }
-        for(int iter = 0 ; iter < roots.length ; iter++) {
+        int rlen = roots.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             if(roots[iter].startsWith("/")) {
                 roots[iter] = "file:/" + roots[iter];
             }
@@ -7116,7 +7119,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             String[] strs = (String[])data;
             int offset = -1;
             if(currentValue != null) {
-                for(int iter = 0 ; iter < strs.length ; iter++) {
+                int slen = strs.length;
+                for(int iter = 0 ; iter < slen ; iter++) {
                     if(strs[iter].equals(currentValue)) {
                         offset = iter;
                         break;

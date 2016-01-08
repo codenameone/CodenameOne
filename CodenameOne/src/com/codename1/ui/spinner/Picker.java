@@ -82,7 +82,8 @@ public class Picker extends Button {
                             String[] strArr = (String[])metaData;
                             gs.setModel(new DefaultListModel(strArr));
                             if(value != null) {
-                                for(int iter = 0 ; iter < strArr.length ; iter++) {
+                                int slen = strArr.length;
+                                for(int iter = 0 ; iter < slen ; iter++) {
                                     if(strArr[iter].equals(value)) {
                                         gs.getModel().setSelectedIndex(iter);
                                         break;
@@ -236,7 +237,8 @@ public class Picker extends Button {
      * @param strs string array
      */
     public void setStrings(String[] strs) {
-        for (int i = 0; i < strs.length; i++) {
+        int slen = strs.length;
+        for (int i = 0; i < slen; i++) {
             String str = strs[i];
             strs[i] = getUIManager().localize(str, str);
         }

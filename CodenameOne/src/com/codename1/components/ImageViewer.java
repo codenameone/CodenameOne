@@ -140,7 +140,8 @@ public class ImageViewer extends Component {
                 return null;
             }
             Image[] a = new Image[getImageList().getSize()];
-            for(int iter = 0 ; iter < a.length ; iter++) {
+            int alen = a.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 a[iter] = getImageList().getItemAt(iter);
             }
             return a;

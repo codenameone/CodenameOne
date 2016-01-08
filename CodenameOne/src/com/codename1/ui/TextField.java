@@ -445,14 +445,15 @@ public class TextField extends TextArea {
             firstUppercaseInputMode.addElement("Abc");
             inputModes = new Hashtable();
             Hashtable upcase = new Hashtable();
-            for(int iter = 0 ; iter < DEFAULT_KEY_CODES.length ; iter++) {
+            int dlen = DEFAULT_KEY_CODES.length;
+            for(int iter = 0 ; iter < dlen ; iter++) {
                 upcase.put(new Integer('0' + iter), DEFAULT_KEY_CODES[iter]);
             }
             
             inputModes.put("ABC", upcase);
 
             Hashtable lowcase = new Hashtable();
-            for(int iter = 0 ; iter < DEFAULT_KEY_CODES.length ; iter++) {
+            for(int iter = 0 ; iter < dlen ; iter++) {
                 lowcase.put(new Integer('0' + iter), DEFAULT_KEY_CODES[iter].toLowerCase());
             }
             inputModes.put("abc", lowcase);
@@ -979,7 +980,8 @@ public class TextField extends TextArea {
         }
 
         if(isChangeInputMode(keyCode)) {
-            for(int iter = 0 ; iter < inputModeOrder.length ; iter++) {
+            int ilen = inputModeOrder.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 if(inputModeOrder[iter].equals(inputMode)) {
                     iter++;
                     if(iter < inputModeOrder.length) {
@@ -1092,7 +1094,8 @@ public class TextField extends TextArea {
     protected Container createSymbolTable() {
         char[] symbolArray = getSymbolTable();
         Container symbols = new Container(new GridLayout(symbolArray.length / 5, 5));
-        for(int iter = 0 ; iter < symbolArray.length ; iter++) {
+        int slen = symbolArray.length;
+        for(int iter = 0 ; iter < slen ; iter++) {
             Button button = new Button(new Command("" + symbolArray[iter]));
             button.setUIID("VKBButton");
             button.setAlignment(CENTER);
@@ -1303,7 +1306,8 @@ public class TextField extends TextArea {
             }
             if(replaceMenu && originalCommands == null) {
                 originalCommands = new Command[f.getCommandCount()];
-                for(int iter = 0 ; iter < originalCommands.length ; iter++) {
+                int olen = originalCommands.length;
+                for(int iter = 0 ; iter < olen ; iter++) {
                     originalCommands[iter] = f.getCommand(iter);
                 }
                 f.removeAllCommands();
@@ -1388,7 +1392,8 @@ public class TextField extends TextArea {
             }
             f.setClearCommand(originalClearCommand);
             if(replaceMenu && originalCommands != null) {
-                for(int iter = originalCommands.length - 1 ; iter >= 0 ; iter--) {
+                int olen = originalCommands.length;
+                for(int iter = olen - 1 ; iter >= 0 ; iter--) {
                     f.addCommand(originalCommands[iter]);
                 }
                 originalCommands = null;

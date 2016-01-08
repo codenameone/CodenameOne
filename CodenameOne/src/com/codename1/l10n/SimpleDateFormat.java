@@ -803,7 +803,8 @@ public class SimpleDateFormat extends DateFormat {
      */
     int parseAmPmMarker(String source, int ofs) throws ParseException {
         String markers[] = getDateFormatSymbols().getAmPmStrings();
-        for (int i = 0; i < markers.length; i++) {
+        int mlen = markers.length;
+        for (int i = 0; i < mlen; i++) {
             if (markers[i].equalsIgnoreCase(source)) {
                 return i;
             }
@@ -873,13 +874,15 @@ public class SimpleDateFormat extends DateFormat {
             return (parseNumber(month, offset, "month", 1, 12) - 1) + Calendar.JANUARY;
         }
         String months[] = getDateFormatSymbols().getMonths();
-        for (int i = 0; i < months.length; i++) {
+        int mlen = months.length;
+        for (int i = 0; i < mlen; i++) {
             if (month.equalsIgnoreCase(months[i])) {
                 return i + Calendar.JANUARY;
             }
         }
         months = getDateFormatSymbols().getShortMonths();
-        for (int i = 0; i < months.length; i++) {
+        mlen = months.length;
+        for (int i = 0; i < mlen; i++) {
             if (month.equalsIgnoreCase(months[i])) {
                 return i + Calendar.JANUARY;
             }
@@ -1007,7 +1010,8 @@ public class SimpleDateFormat extends DateFormat {
      * @return the index of the end of field, or -1 if couldn't determine.
      */
     int findEndText(String source, int ofs) {
-        for (int i = ofs; i < source.length(); i++) {
+        int slen = source.length();
+        for (int i = ofs; i < slen; i++) {
             if (isAlpha(source.charAt(i)) == false && isNumeric(source.charAt(i)) == false) {
                 return i;
             }
@@ -1042,7 +1046,8 @@ public class SimpleDateFormat extends DateFormat {
     List<String> parseDatePattern(String pattern) {
         List<String> tokens = new Vector<String>();
         String tmp = null;
-        for (int i = 0; i < pattern.length(); i++) {
+        int plen = pattern.length();
+        for (int i = 0; i < plen; i++) {
             char ch = pattern.charAt(i);
             // Handle literal text enclosed in quotes
             if (ch == EXPLICIT_LITERAL) {
@@ -1066,7 +1071,7 @@ public class SimpleDateFormat extends DateFormat {
                     tmp = null;
                 }
                 int n;
-                for (n = i; n < pattern.length(); n++) {
+                for (n = i; n < plen; n++) {
                     ch = pattern.charAt(n);
                     if (PATTERN_LETTERS.indexOf(ch) != -1) {
                         break;

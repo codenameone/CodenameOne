@@ -166,7 +166,8 @@ public class BigInteger
     {
         TBigInteger[] presults = peer.divideAndRemainder(val.peer);
         BigInteger[] out = new BigInteger[presults.length];
-        for (int i=0; i<presults.length; i++) {
+        int plen = presults.length;
+        for (int i=0; i<plen; i++) {
             out[i] = new BigInteger(presults[i]);
         }
         return out;
