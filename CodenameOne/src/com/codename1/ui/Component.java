@@ -26,6 +26,7 @@ package com.codename1.ui;
 import com.codename1.cloud.BindTarget;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.geom.Point;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -40,6 +41,7 @@ import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -2855,7 +2857,7 @@ public class Component implements Animation, StyleListener {
         Form p = getComponentForm();
         
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
         
         if(dragAndDropInitialized) {
@@ -3076,7 +3078,7 @@ public class Component implements Animation, StyleListener {
     public void pointerPressed(int x, int y) {
         dragActivated = false;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         clearDrag();
         if(isDragAndDropOperation(x, y)) {
@@ -3120,7 +3122,7 @@ public class Component implements Animation, StyleListener {
      */
     public void pointerReleased(int x, int y) {
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, x, y);
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
             if(ev.isConsumed()) {
                 return;
@@ -3261,7 +3263,7 @@ public class Component implements Animation, StyleListener {
                 p.repaint(x, y, getWidth(), getHeight());
                 getParent().scrollRectToVisible(x, y, getWidth(), getHeight(), getParent());
                 if(dropListener != null) {
-                    ActionEvent ev = new ActionEvent(this, dropTargetComponent, x, y);
+                    ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
                     dropListener.fireActionEvent(ev);
                     if(!ev.isConsumed()) {
                         dropTargetComponent.drop(this, x, y);
@@ -3271,7 +3273,7 @@ public class Component implements Animation, StyleListener {
                 }
             } else {
                 if(dragOverListener != null) {
-                    ActionEvent ev = new ActionEvent(this, null, x, y);
+                    ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag,null, x, y);
                     dragOverListener.fireActionEvent(ev);
                 }
                 p.repaint();

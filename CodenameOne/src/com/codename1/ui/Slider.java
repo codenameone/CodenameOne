@@ -585,7 +585,7 @@ public class Slider extends Label {
     }
     
     private void fireActionEventImpl() {
-        actionListeners.fireActionEvent(new ActionEvent(this));
+        actionListeners.fireActionEvent(new ActionEvent(this,ActionEvent.Type.PointerPressed));
     }
 
     /**

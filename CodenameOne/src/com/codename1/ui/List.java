@@ -1515,7 +1515,7 @@ public class List<T> extends Component {
      * @inheritDoc
      */
     protected void fireActionEvent() {
-        fireActionEvent(new ActionEvent(eventSource));
+        fireActionEvent(new ActionEvent(eventSource,ActionEvent.Type.Other));
     }
 
     
@@ -1975,7 +1975,7 @@ public class List<T> extends Component {
                 int index = pointerSelect(x, y);
                 updateAnimationPosition(index - getSelectedIndex());
                 setSelectedIndex(index);
-                fireActionEvent(new ActionEvent(eventSource));
+                fireActionEvent(new ActionEvent(eventSource,ActionEvent.Type.Other));
                 return;
             } 
             

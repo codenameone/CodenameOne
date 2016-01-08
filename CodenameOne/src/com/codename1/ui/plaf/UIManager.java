@@ -940,7 +940,7 @@ public class UIManager {
         selectedStyles.clear();
         imageCache.clear();
         if (themelisteners != null) {
-            themelisteners.fireActionEvent(new ActionEvent(themeProps));
+            themelisteners.fireActionEvent(new ActionEvent(themeProps,ActionEvent.Type.Theme));
         }
         buildTheme(themeProps);
         current.refreshTheme(true);

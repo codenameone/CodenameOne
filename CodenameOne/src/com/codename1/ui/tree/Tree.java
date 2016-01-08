@@ -553,7 +553,7 @@ public class Tree extends Container {
 
         public void actionPerformed(ActionEvent evt) {
             if(current != null) {
-                leafListener.fireActionEvent(new ActionEvent(current));
+                leafListener.fireActionEvent(new ActionEvent(current,ActionEvent.Type.Other));
                 return;
             }
             Component c = (Component)evt.getSource();
