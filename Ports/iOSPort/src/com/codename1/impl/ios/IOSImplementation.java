@@ -2048,9 +2048,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void setTransform(Object graphics, Transform transform) {
-        ((NativeGraphics)graphics).transform = transform;
-        ((NativeGraphics)graphics).transformApplied = false;
-        ((NativeGraphics)graphics).applyTransform();
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.transform = transform;
+        ng.transformApplied = false;
+        ng.checkControl();
+        ng.applyTransform();
         
     }
     
@@ -2070,7 +2072,26 @@ public class IOSImplementation extends CodenameOneImplementation {
             0, 0
         );
     }
+    
+    public void setNativeTransformMutable(Transform transform){
+        Matrix t = (Matrix)transform.getNativeTransform();
+        float[] m = t.getData();
+        
+        
+        // Note that Matrix is stored in column-major format but GLKMatrix is stored in row-major
+        // that's why we transpose it here.
+        //Log.p("....Setting transform.....");
+        nativeInstance.nativeSetTransformMutable(
+            m[0], m[4], m[8], m[12],
+            m[1], m[5], m[9], m[13],
+            m[2], m[6], m[10], m[14],
+            m[3], m[7], m[11], m[15],
+            0, 0
+        );
+    }
 
+    
+    
     @Override
     public boolean transformEqualsImpl(Transform t1, Transform t2) {
         if ( t1 != null ){
@@ -3707,7 +3728,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void applyTransform(){
-            
+            if (!transformApplied) {
+                setNativeTransformMutable(this.transform);
+                transformApplied = true;
+            }
         }
         
         public void pushClip(){
@@ -3925,7 +3949,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         
         boolean isTransformSupported(){
-            return false;
+            return true;
         }
         
         boolean isPerspectiveTransformSupported(){
@@ -3944,15 +3968,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         //----------------------------------------------------------------------
         
         public void resetAffine() {
+            this.transform.setIdentity();
+            transformApplied = false;
+            this.applyTransform();
         }
 
         public void scale(float x, float y) {
+            this.transform.scale(x, y, 1);
+            transformApplied = false;
+            this.applyTransform();
         }
 
         public void rotate(float angle) {
+            this.transform.rotate(angle, 0, 0);
+            transformApplied = false;
         }
 
         public void rotate(float angle, int x, int y) {
+            this.transform.rotate(angle, x, y);
+            transformApplied = false;
+            this.applyTransform();
         }
         
         public void translate(int x, int y){

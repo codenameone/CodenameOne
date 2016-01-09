@@ -70,6 +70,9 @@ BOOL vkbAlwaysOpen = NO;
 BOOL viewDidAppearRepaint = YES;
 JAVA_BOOLEAN lowMemoryMode = 0;
 
+static CGAffineTransform currentMutableTransform;
+static BOOL currentMutableTransformSet = NO;
+
 // keyboard width and height.  Updated when keyboard is shown and hidden
 int vkbHeight = 0;
 int vkbWidth = 0;
@@ -620,7 +623,9 @@ int maxVal(int a, int b) {
 CGContextRef roundRect(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
-    
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGRect rrect = CGRectMake(x, y, width, height);
     CGFloat radius = MAX(arcWidth, arcHeight);
     CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect);
@@ -704,6 +709,9 @@ CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, 
     
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     if(width == height) {
         int radius = MIN(width, height) / 2;
         if (fill){
@@ -864,11 +872,117 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_flo
 #endif
 }
 
+void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(JAVA_OBJECT instanceObject,
+                                                                                                                                                                               JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                                               JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                                               JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                                               JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                                                                                                               JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                               )
+{
+#ifdef USE_ES2
+    POOL_BEGIN();
+    currentMutableTransformSet = NO;
+    GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
+                                              b0,b1,b2,b3,
+                                              c0,c1,c2,c3,
+                                              d0,d1,d2,d3);
+    CATransform3D output;
+    GLfloat glMatrix[16];
+    CGFloat caMatrix[16];
+
+    memcpy(glMatrix, m.m, sizeof(glMatrix)); //insert GL matrix data to the buffer
+    for(int i=0; i<16; i++) caMatrix[i] = glMatrix[i]; //this will do the typecast if needed
+
+    output = *((CATransform3D *)caMatrix);
+    
+    if (!CATransform3DIsIdentity(output)) {
+        CGAffineTransform affine = CATransform3DGetAffineTransform(output);
+        currentMutableTransform = affine;
+        currentMutableTransformSet = YES;
+    }
+    POOL_END();
+#endif
+}
+
+
+
+CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextBeginPath(context);
+    JAVA_INT pointsIndex = 0;
+    JAVA_BYTE currType;
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* intArray = commandsArr;
+    JAVA_ARRAY_BYTE* commands = (JAVA_ARRAY_BYTE*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    org_xmlvm_runtime_XMLVMArray* floatArray = commandsArr;
+    JAVA_ARRAY_FLOAT* points = (JAVA_ARRAY_FLOAT*)floatArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    JAVA_ARRAY_BYTE* commands = (JAVA_BYTE*)((JAVA_ARRAY)commandsArr)->data;
+    JAVA_ARRAY_FLOAT* points = (JAVA_FLOAT*)((JAVA_ARRAY)pointsArr)->data;
+#endif
+    
+    
+    CGFloat px1, px2, px3, px4, py1, py2, py3, py4;
+    for (JAVA_INT cmdIndex = 0; cmdIndex < commandsLen; cmdIndex++) {
+        currType = (JAVA_INT)commands[cmdIndex];
+        switch (currType) {
+            case CN1_SEG_MOVETO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                CGContextMoveToPoint(context, px1, py1);
+                break;
+            }
+                
+            case CN1_SEG_LINETO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                CGContextAddLineToPoint(context, px1, py1);
+                break;
+            }
+                
+            case CN1_SEG_QUADTO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                px2 = points[pointsIndex++];
+                py2 = points[pointsIndex++];
+                CGContextAddQuadCurveToPoint(context, px1, py1, px2, py2);
+                break;
+            }
+                
+            case CN1_SEG_CUBICTO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                px2 = points[pointsIndex++];
+                py2 = points[pointsIndex++];
+                px3 = points[pointsIndex++];
+                py3 = points[pointsIndex++];
+                CGContextAddCurveToPoint(context, px1, py1, px2, py2, px3, py3);
+                break;
+            }
+                
+            case CN1_SEG_CLOSE: {
+                CGContextClosePath(context);
+                break;
+            }
+                
+                
+                
+        }
+        
+    }
+    
+    return context;
+}
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
+    if (currentMutableTransformSet) {
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     [i drawInRect:CGRectMake(x, y, width, height)];
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl finished");
 }
@@ -1068,6 +1182,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGContextMoveToPoint(context, x1, y1);
     CGContextAddLineToPoint(context, x2, y2);
     CGContextStrokePath(context);
@@ -1101,6 +1218,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGContextFillRect(context, CGRectMake(x, y, width, height));
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
 }
@@ -1121,6 +1241,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGContextStrokeRect(context, CGRectMake(x, y, width, height));
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl finished");
 }
@@ -1181,6 +1304,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSaveGState(context);
     [CodenameOne_GLViewController instance].currentMutableImage = (BRIDGE_CAST GLUIImage*)peer;
+    currentMutableTransformSet = NO;
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl finished");
 }
 
@@ -1191,6 +1315,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
     GLUIImage *gl = [CodenameOne_GLViewController instance].currentMutableImage;
     [gl setImage:img];
     [CodenameOne_GLViewController instance].currentMutableImage = nil;
+    currentMutableTransformSet = NO;
     return (BRIDGE_CAST void*)gl;
 }
 
@@ -2594,6 +2719,10 @@ BOOL prefersStatusBarHidden = NO;
 	POOL_BEGIN();
     UIColor* col = UIColorFromRGB(color,alpha);
     [col set];
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
 	[str drawAtPoint:CGPointMake(x, y) withFont:font];
     //NSLog(@"Drawing the string %@ at %i, %i", str, x, y);
 	POOL_END();
