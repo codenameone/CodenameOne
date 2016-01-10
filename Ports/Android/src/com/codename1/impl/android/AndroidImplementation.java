@@ -3578,10 +3578,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         public void setProperty(final String key, final Object value) {
-            if(key.equals("compatPaintMode")) {
-                compatPaintMode = true;
-                return;
-            }
             act.runOnUiThread(new Runnable() {
                 public void run() {
                     WebSettings s = web.getSettings();
