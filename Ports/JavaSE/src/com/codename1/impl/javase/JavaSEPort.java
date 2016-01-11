@@ -477,7 +477,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
         if (formChangeListener != null) {
-            formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f));
+            formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f,com.codename1.ui.events.ActionEvent.Type.Show));
         }
     }
 
@@ -6187,13 +6187,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                             File tmp = File.createTempFile("temp", "." + imageTypes[0]);
                             tmp.deleteOnExit();
                             copyFile(selected, tmp);
-                            result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'));
+                            result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'),
+                            				com.codename1.ui.events.ActionEvent.Type.File);
                         } catch(IOException err) {
                             err.printStackTrace();
                         }
                     } 
                 } else {
-                    result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                    result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'),
+                    		com.codename1.ui.events.ActionEvent.Type.File);
                 }
                 final com.codename1.ui.events.ActionEvent finalResult = result;
                 Display.getInstance().callSerially(new Runnable() {

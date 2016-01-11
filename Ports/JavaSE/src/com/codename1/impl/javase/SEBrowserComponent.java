@@ -82,7 +82,7 @@ public class SEBrowserComponent extends PeerComponent {
                 if (t1.startsWith("Loading http:") || t1.startsWith("Loading file:") || t1.startsWith("Loading https:")) {
                     String url = t1.substring("Loading ".length());
                     if (!url.equals(currentURL)) {
-                        p.fireWebEvent("onStart", new ActionEvent(url));
+                        p.fireWebEvent("onStart", new ActionEvent(url,ActionEvent.Type.Progress));
                     }
                     currentURL = url;
                 } else if ("Loading complete".equals(t1)) {
@@ -98,7 +98,7 @@ public class SEBrowserComponent extends PeerComponent {
                 System.out.println(t.getData());
                 String msg = t.getData();
                 if (msg.startsWith("!cn1_message:")) {
-                    p.fireWebEvent("onMessage", new ActionEvent(msg.substring("!cn1_message:".length())));
+                    p.fireWebEvent("onMessage", new ActionEvent(msg.substring("!cn1_message:".length()),ActionEvent.Type.Progress));
                 }
             }
             
@@ -126,15 +126,15 @@ public class SEBrowserComponent extends PeerComponent {
             public void changed(ObservableValue ov, State oldState, State newState) {
                 String url = web.getEngine().getLocation();
                 if (newState == State.SCHEDULED) {
-                    p.fireWebEvent("onStart", new ActionEvent(url));
+                    p.fireWebEvent("onStart", new ActionEvent(url,ActionEvent.Type.Progress));
                 } else if (newState == State.RUNNING) {
-                    p.fireWebEvent("onLoadResource", new ActionEvent(url));
+                    p.fireWebEvent("onLoadResource", new ActionEvent(url,ActionEvent.Type.Progress));
                     
                 } else if (newState == State.SUCCEEDED) {
                     if (!p.isNativeScrollingEnabled()) {
                         web.getEngine().executeScript("document.body.style.overflow='hidden'");
                     }
-                    p.fireWebEvent("onLoad", new ActionEvent(url));
+                    p.fireWebEvent("onLoad", new ActionEvent(url,ActionEvent.Type.Progress));
                     
                 }
                 currentURL = url;
@@ -146,12 +146,12 @@ public class SEBrowserComponent extends PeerComponent {
             public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
                 if(t1 == null) {
                     if(t == null) {
-                        p.fireWebEvent("onError", new ActionEvent("Unknown error", -1));
+                        p.fireWebEvent("onError", new ActionEvent("Unknown error", ActionEvent.Type.Exception, -1));
                     } else {
-                        p.fireWebEvent("onError", new ActionEvent(t.getMessage(), -1));
+                        p.fireWebEvent("onError", new ActionEvent(t.getMessage(), ActionEvent.Type.Exception,-1));
                     }
                 } else {
-                    p.fireWebEvent("onError", new ActionEvent(t1.getMessage(), -1));
+                    p.fireWebEvent("onError", new ActionEvent(t1.getMessage(),ActionEvent.Type.Exception, -1));
                 }
             }
         });

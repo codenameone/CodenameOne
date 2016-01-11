@@ -486,6 +486,7 @@ public class Button extends Label {
      * @inheritDoc
      */
     public void pointerPressed(int x, int y) {
+    	//super.pointerPressed(x,y);
         clearDrag();
         setDragActivated(false);
         pressed();
@@ -503,6 +504,8 @@ public class Button extends Label {
      * @inheritDoc
      */
     public void pointerReleased(int x, int y) {
+        //super.pointerReleased(x,y);
+
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {

@@ -826,7 +826,7 @@ public final class Graphics {
      * @param imageWidth size of the location within the image to draw
      * @param imageHeight size of the location within the image to draw
      */
-    void drawImageArea(Image img, int x, int y, int imageX, int imageY, int imageWidth, int imageHeight) {
+    public void drawImageArea(Image img, int x, int y, int imageX, int imageY, int imageWidth, int imageHeight) {
         img.drawImageArea(this, nativeGraphics, x, y, imageX, imageY, imageWidth, imageHeight);
     }
 

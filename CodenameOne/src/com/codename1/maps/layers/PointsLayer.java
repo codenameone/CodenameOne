@@ -157,7 +157,7 @@ public class PointsLayer extends AbstractLayer {
         for (int i = 0; i < points.size(); i++) {
             PointLayer point = (PointLayer) points.elementAt(i);
             if (box.contains(point)) {
-                dispatcher.fireActionEvent(new ActionEvent(point));
+                dispatcher.fireActionEvent(new ActionEvent(point,ActionEvent.Type.PointerPressed));
                 return;
             }
         }

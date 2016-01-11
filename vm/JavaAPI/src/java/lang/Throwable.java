@@ -22,6 +22,9 @@
  */
 
 package java.lang;
+
+import java.io.PrintStream;
+
 /**
  * The Throwable class is the superclass of all errors and exceptions in the Java language. Only objects that are instances of this class (or of one of its subclasses) are thrown by the Java Virtual Machine or can be thrown by the Java throw statement. Similarly, only this class or one of its subclasses can be the argument type in a catch clause.
  * Instances of two subclasses, Error and Exception, are conventionally used to indicate that exceptional situations have occurred. Typically, these instances are freshly created in the context of the exceptional situation so as to include relevant information (such as stack trace data).
@@ -79,7 +82,14 @@ public class Throwable{
     public void printStackTrace(){
         System.out.println(stack);
     }
-
+    
+/**
+ * prints this throwable to the designated stream.
+ * @param s
+ */
+    public void printStackTrace(PrintStream s) {
+    	s.println(stack);
+    }
     /**
      * Returns a short description of this Throwable object. If this Throwable object was
      * with an error message string, then the result is the concatenation of three strings: The name of the actual class of this object ": " (a colon and a space) The result of the
