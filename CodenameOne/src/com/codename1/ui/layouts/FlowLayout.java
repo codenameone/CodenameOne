@@ -282,7 +282,7 @@ public class FlowLayout extends Layout{
             int prefW = cmp.getPreferredW()+ cmp.getStyle().getMargin(false, Component.RIGHT)+ cmp.getStyle().getMargin(false, Component.LEFT);
             w += prefW;
             //we need to break a line
-            if (parentWidth > parentPadding && w >= parentWidth && i > 0) {
+            if (parentWidth > parentPadding && w > parentWidth && i > 0) {
                 height += cmp.getPreferredH() + cmp.getStyle().getMargin(false, Component.TOP) + cmp.getStyle().getMargin(false, Component.BOTTOM);
                 width = Math.max(w, width);
                 w = prefW;
