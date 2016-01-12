@@ -33,33 +33,39 @@ import com.codename1.ui.Component;
  */
 public class ActionEvent {
 	
-	// [ddyer 1/2016] adds subtype annotations to actionevents.  The general philosophy
-	// is that existing consumers of actionevents who do not know about these type indicators
-	// will not see any differences, so this change will be innocuous to the existing code
-	//
-	// there's evidence of a lot of ad-hoc use of the available state of actionevents
-	// in the absence of these subtypes, 
-	
-	/**
-	 * The event type, as declared when the event is created.
-	 * 
-	 * @author Ddyer
-	 *
-	 */
-	public enum Type {
+    // [ddyer 1/2016] adds subtype annotations to actionevents.  The general philosophy
+    // is that existing consumers of actionevents who do not know about these type indicators
+    // will not see any differences, so this change will be innocuous to the existing code
+    //
+    // there's evidence of a lot of ad-hoc use of the available state of actionevents
+    // in the absence of these subtypes, 
 
-		Other,					// unspecified, someone called one of the old undifferentiated constructors.
-		Command,				// some type of command 
-		Pointer, PointerPressed, PointerReleased, PointerDrag, Swipe,	// pointer activity
-		KeyPress, KeyRelease,	// key activity
-		Exception, Response,Progress,Data, 	// network activity
-		Calendar,			// calendar
-		Edit,Done,			// text area
-		File,JavaScript,Log,	// file system
-		Theme, Show, SizeChange, OrientationChange	// window status changes
-		} ;
-	private Type trigger;
-	public Type getEventType() { return(trigger); }
+    /**
+     * The event type, as declared when the event is created.
+     * 
+     * @author Ddyer
+     *
+     */
+    public enum Type {
+
+            Other,					// unspecified, someone called one of the old undifferentiated constructors.
+            Command,				// some type of command 
+            Pointer, PointerPressed, PointerReleased, PointerDrag, Swipe,	// pointer activity
+            KeyPress, KeyRelease,	// key activity
+            Exception, Response,Progress,Data, 	// network activity
+            Calendar,			// calendar
+            Edit,Done,			// text area
+            File,JavaScript,Log,	// file system
+            Theme, Show, SizeChange, OrientationChange	// window status changes
+            } ;
+    private Type trigger;
+    
+    /**
+     * Returns the type of the given event allowing us to have more generic event handling code and useful
+     * for debugging
+     * @return the Type enum
+     */
+    public Type getEventType() { return(trigger); }
 	
     private boolean consumed;
     
@@ -74,7 +80,6 @@ public class ActionEvent {
      * Creates a new instance of ActionEvent.  This is unused locally, but provided so existing customer code
      * with still work.
      * @param source element for the action event
-     * @param the type of the event
      */
     public ActionEvent(Object source) {
         this.source = source;
@@ -84,7 +89,7 @@ public class ActionEvent {
     /**
      * Creates a new instance of ActionEvent
      * @param source element for the action event
-     * @param the {@link Type } of the event
+     * @param type the {@link Type } of the event
      */
     public ActionEvent(Object source,Type type) {
         this.source = source;
@@ -95,7 +100,7 @@ public class ActionEvent {
      * Creates a new instance of ActionEvent as a pointer event
      *
      * @param source element for the pointer event
-     * @param the {@link Type } of the event
+     * @param type the {@link Type } of the event
      * @param x (or sometimes width) associated with the event
      * @param y (or sometimes height)associated with the event
      */
@@ -110,7 +115,7 @@ public class ActionEvent {
      * Creates a new instance of ActionEvent for a command
      *
      * @param source element command
-     * @param the {@link Type } of the event
+     * @param type the {@link Type } of the event
      * @param sourceComponent the triggering component
      * @param x the x position of the pointer event
      * @param y the y position of the pointer event
@@ -126,7 +131,7 @@ public class ActionEvent {
      * Creates a new instance of ActionEvent for a drop operation
      *
      * @param dragged the dragged component
-     * @param the {@link Type } of the event
+     * @param type the {@link Type } of the event
      * @param drop the drop target component
      * @param x the x position of the pointer event
      * @param y the y position of the pointer event
@@ -144,7 +149,7 @@ public class ActionEvent {
      * Creates a new instance of ActionEvent.  The key event is really just
      * a numeric code, not indicative of a key press
      * @param source element for the action event
-     * @param the {@link Type } of the event
+     * @param type the {@link Type } of the event
      * @param keyEvent the key that triggered the event
      */
     public ActionEvent(Object source, Type type , int keyEvent) {
