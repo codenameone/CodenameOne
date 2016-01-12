@@ -118,7 +118,7 @@ public abstract class AdsService extends ConnectionRequest {
         if (size > 0) {
             String s = new String(out.toByteArray(), 0, size, "UTF-8");
             currentAd = s;
-            fireResponseListener(new ActionEvent(currentAd));
+            fireResponseListener(new ActionEvent(currentAd,ActionEvent.Type.Response));
         }
     }
 

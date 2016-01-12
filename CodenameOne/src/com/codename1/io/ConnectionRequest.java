@@ -363,7 +363,8 @@ public class ConnectionRequest implements IOProgressListener {
                 String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
                 if(cookies != null && cookies.length > 0){
                     Vector cook = new Vector();
-                    for(int iter = 0 ; iter < cookies.length ; iter++) {
+                    int clen = cookies.length;
+                    for(int iter = 0 ; iter < clen ; iter++) {
                         Cookie coo = parseCookieHeader(cookies[iter]);
                         if(coo != null) {
                             cook.addElement(coo);
@@ -371,7 +372,8 @@ public class ConnectionRequest implements IOProgressListener {
                         }
                     }
                     Cookie [] arr = new Cookie[cook.size()];
-                    for (int i = 0; i < arr.length; i++) {
+                    int arlen = arr.length;
+                    for (int i = 0; i < arlen; i++) {
                         arr[i] = (Cookie) cook.elementAt(i);
                     }
                     impl.addCookie(arr);
@@ -841,7 +843,8 @@ public class ConnectionRequest implements IOProgressListener {
                     continue;
                 }
                 String[] val = (String[])requestVal;
-                for(int iter = 0 ; iter < val.length - 1; iter++) {
+                int vlen = val.length;
+                for(int iter = 0 ; iter < vlen - 1; iter++) {
                     b.append(key);
                     b.append("=");
                     b.append(val[iter]);
@@ -849,7 +852,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 b.append(key);
                 b.append("=");
-                b.append(val[val.length - 1]);
+                b.append(val[vlen - 1]);
                 if(e.hasMoreElements()) {
                     b.append("&");
                 }
@@ -883,7 +886,8 @@ public class ConnectionRequest implements IOProgressListener {
                     continue;
                 }
                 String[] valArray = (String[])requestVal;
-                for(int iter = 0 ; iter < valArray.length - 1; iter++) {
+                int vlen = valArray.length;
+                for(int iter = 0 ; iter < vlen - 1; iter++) {
                     val.append(key);
                     val.append("=");
                     val.append(valArray[iter]);
@@ -891,7 +895,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 val.append(key);
                 val.append("=");
-                val.append(valArray[valArray.length - 1]);
+                val.append(valArray[vlen - 1]);
                 if(e.hasMoreElements()) {
                     val.append("&");
                 }
@@ -1088,12 +1092,14 @@ public class ConnectionRequest implements IOProgressListener {
         // copying the array to prevent mutation
         String[] v = new String[value.length];
         if(post) {
-            for(int iter = 0 ; iter < value.length ; iter++) {
+            int vlen = value.length;
+            for(int iter = 0 ; iter < vlen ; iter++) {
                 v[iter] = Util.encodeBody(value[iter]);
             }
             addArg(Util.encodeBody(key), v);
         } else {
-            for(int iter = 0 ; iter < value.length ; iter++) {
+            int vlen = value.length;
+            for(int iter = 0 ; iter < vlen ; iter++) {
                 v[iter] = Util.encodeUrl(value[iter]);
             }
             addArg(Util.encodeUrl(key), v);

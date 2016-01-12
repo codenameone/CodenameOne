@@ -105,16 +105,20 @@ public class Tree extends Container {
         public Vector getChildren(Object parent) {
             if(parent == null) {
                 Vector v = new Vector();
-                for(int iter = 0 ; iter < arr[0].length ; iter++) {
+                int a0len = arr[0].length;
+                for(int iter = 0 ; iter < a0len ; iter++) {
                     v.addElement(arr[0][iter]);
                 }
                 return v;
             }
+            int alen = arr.length;
+            int aolen = arr[0].length;
             Vector v = new Vector();
-            for(int iter = 0 ; iter < arr[0].length ; iter++) {
+            for(int iter = 0 ; iter < aolen ; iter++) {
                 if(parent == arr[0][iter]) {
-                    if(arr.length > iter + 1 && arr[iter + 1] != null) {
-                        for(int i = 0 ; i < arr[iter + 1].length ; i++) {
+                    if(alen > iter + 1 && arr[iter + 1] != null) {
+                        int ailen = arr[iter + 1].length;
+                        for(int i = 0 ; i < ailen ; i++) {
                             v.addElement(arr[iter + 1][i]);
                         }
                     }
@@ -328,7 +332,8 @@ public class Tree extends Container {
      */
     public void expandPath(boolean animate, Object... path) {
         Container c = this;
-        for(int iter = 0 ; iter < path.length ; iter++) {
+        int plen = path.length;
+        for(int iter = 0 ; iter < plen ; iter++) {
             c = expandPathNode(animate, c, path[iter]);
         }
     }
@@ -339,10 +344,11 @@ public class Tree extends Container {
      */
     public void collapsePath(Object... path) {
         Container c = this;
-        for(int iter = 0 ; iter < path.length - 1; iter++) {
+        int plen = path.length;
+        for(int iter = 0 ; iter < plen - 1; iter++) {
             c = expandPathNode(isInitialized(), c, path[iter]);
         }        
-        collapsePathNode(c, path[path.length - 1]);
+        collapsePathNode(c, path[plen - 1]);
     }
     
     private void collapseNode(Component c) {
@@ -547,7 +553,7 @@ public class Tree extends Container {
 
         public void actionPerformed(ActionEvent evt) {
             if(current != null) {
-                leafListener.fireActionEvent(new ActionEvent(current));
+                leafListener.fireActionEvent(new ActionEvent(current,ActionEvent.Type.Other));
                 return;
             }
             Component c = (Component)evt.getSource();

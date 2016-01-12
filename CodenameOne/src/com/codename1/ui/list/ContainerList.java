@@ -308,7 +308,8 @@ public class ContainerList extends Container {
     public Object getPropertyValue(String name) {
         if(name.equals("ListItems")) {
             Object[] obj = new Object[model.getSize()];
-            for(int iter = 0 ; iter < obj.length ; iter++) {
+            int olen = obj.length;
+            for(int iter = 0 ; iter < olen ; iter++) {
                 obj[iter] = model.getItemAt(iter);
             }
             return obj;

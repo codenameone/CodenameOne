@@ -77,7 +77,8 @@ class EvaluatorFactory {
 	 */
 	private static boolean isNumeric(String text) {
 		text = text.trim();
-		for (int i = 0; i < text.length(); i++) {
+                int tlen = text.length();
+		for (int i = 0; i < tlen; i++) {
 			if (Character.isDigit(text.charAt(i)) == false) {
 				return false;
 			}

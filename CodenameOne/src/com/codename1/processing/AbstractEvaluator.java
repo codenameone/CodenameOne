@@ -276,7 +276,8 @@ abstract class AbstractEvaluator implements Evaluator {
      */
     protected boolean isNumeric(String text) {
         text = text.trim();
-        for (int i = 0; i < text.length(); i++) {
+        int tlen = text.length();
+        for (int i = 0; i < tlen; i++) {
             if (Character.isDigit(text.charAt(i)) == false) {
                 return false;
             }
@@ -293,7 +294,8 @@ abstract class AbstractEvaluator implements Evaluator {
      */
     protected String stripQuotes(String rvalue) {
         StringBuffer buf = new StringBuffer();
-        for (int i = 0; i < rvalue.length(); i++) {
+        int rvlen = rvalue.length();
+        for (int i = 0; i < rvlen; i++) {
             char ch = rvalue.charAt(i);
             if (ch != '\'' && ch != '\"') {
                 buf.append(ch);

@@ -63,7 +63,8 @@ public final class Timeline extends Image implements Animation, Painter {
      */
     public void lock() {
         if(animations != null) {
-            for(int iter = 0 ; iter < animations.length ; iter++) {
+            int alen = animations.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 animations[iter].lock();
             }
         }
@@ -75,7 +76,8 @@ public final class Timeline extends Image implements Animation, Painter {
      */
     public void unlock() {
         if(animations != null) {
-            for(int iter = 0 ; iter < animations.length ; iter++) {
+            int alen = animations.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 animations[iter].unlock();
             }
         }
@@ -208,7 +210,8 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     private void paintScaled(Graphics g, float scaleX, float scaleY) {
-        for(int iter = 0 ; iter < animations.length ; iter++) {
+        int alen = animations.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             int s = animations[iter].getStartTime();
             if(s > -1 && s > time) {
                 continue;
@@ -360,7 +363,8 @@ public final class Timeline extends Image implements Animation, Painter {
      * @return an animation object or null if no animation object is at that position.
      */
     public AnimationObject getAnimationAt(int x, int y) {
-        for(int iter = 0 ; iter < animations.length ; iter++) {
+        int alen = animations.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             float scaleX = 1;
             float scaleY = 1;
             if(scaledTo != null) {

@@ -660,7 +660,8 @@ public class Result {
             throws IllegalArgumentException {
         final List jarr = _internalGetAsArray(path);
         final String[] arr = new String[jarr == null ? 0 : jarr.size()];
-        for (int i = 0; i < arr.length; i++) {
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
             arr[i] = (String) element.getText();
         }
@@ -715,7 +716,8 @@ public class Result {
             throws IllegalArgumentException {
         final List jarr = _internalGetAsArray(path);
         final int[] arr = new int[jarr == null ? 0 : jarr.size()];
-        for (int i = 0; i < arr.length; i++) {
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
             String s = (String) element.getText();
             arr[i] = Integer.parseInt(s);
@@ -741,7 +743,8 @@ public class Result {
             throws IllegalArgumentException {
         final List jarr = _internalGetAsArray(path);
         final long[] arr = new long[jarr == null ? 0 : jarr.size()];
-        for (int i = 0; i < arr.length; i++) {
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
             String s = (String) element.getText();
             arr[i] = Long.parseLong(s);
@@ -767,7 +770,8 @@ public class Result {
             throws IllegalArgumentException {
         final List jarr = _internalGetAsArray(path);
         final double[] arr = new double[jarr == null ? 0 : jarr.size()];
-        for (int i = 0; i < arr.length; i++) {
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
             String s = (String) element.getText();
             arr[i] = Double.parseDouble(s);
@@ -791,7 +795,8 @@ public class Result {
             throws IllegalArgumentException {
         final List jarr = _internalGetAsArray(path);
         final boolean[] arr = new boolean[jarr == null ? 0 : jarr.size()];
-        for (int i = 0; i < arr.length; i++) {
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
             StructuredContent element = (StructuredContent) jarr.get(i);
             String s = (String) element.getText();
             boolean b = false;

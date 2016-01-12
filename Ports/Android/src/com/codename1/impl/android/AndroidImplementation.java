@@ -202,6 +202,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static boolean textureView = false;
     private Media background;
     private boolean asyncEditMode = false;
+    private boolean compatPaintMode;
     
     /**
      * This method in used internally for ads
@@ -1568,7 +1569,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void paintComponentBackground(Object graphics, int x, int y, int width, int height, Style s) {
-        if(!asyncView) {
+        if((!asyncView) || compatPaintMode) {
             super.paintComponentBackground(graphics, x, y, width, height, s);
             return;
         }

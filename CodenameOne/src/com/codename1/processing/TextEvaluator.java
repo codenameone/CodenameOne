@@ -84,7 +84,8 @@ class TextEvaluator extends AbstractEvaluator {
 		if (v == null) {
 			return null;
 		}
-		for (int i = 0; i < v.length; i++) {
+                int vlen = v.length;
+		for (int i = 0; i < vlen; i++) {
 			if (isNumeric(rvalue) && isNumeric(v[i])) {
 				int l = Integer.parseInt(v[i]);
 				int r = Integer.parseInt(rvalue);
@@ -115,7 +116,8 @@ class TextEvaluator extends AbstractEvaluator {
 		if (v == null) {
 			return null;
 		}
-		for (int i = 0; i < v.length; i++) {
+                int vlen = v.length;
+		for (int i = 0; i < vlen; i++) {
 			if (isNumeric(rvalue) && isNumeric(v[i])) {
 				int l = Integer.parseInt(v[i]);
 				int r = Integer.parseInt(rvalue);
@@ -146,7 +148,8 @@ class TextEvaluator extends AbstractEvaluator {
 		if (v == null) {
 			return null;
 		}
-		for (int i = 0; i < v.length; i++) {
+                int vlen = v.length;
+		for (int i = 0; i < vlen; i++) {
 			if (isNumeric(rvalue) && isNumeric(v[i])) {
 				int l = Integer.parseInt(v[i]);
 				int r = Integer.parseInt(rvalue);

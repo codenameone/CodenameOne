@@ -2586,7 +2586,8 @@ public abstract class CodenameOneImplementation {
      */
     public boolean isOpaque(Image codenameOneImage, Object nativeImage) {
         int[] rgb = codenameOneImage.getRGBCached();
-        for (int iter = 0; iter < rgb.length; iter++) {
+        int rlen = rgb.length;
+        for (int iter = 0; iter < rlen; iter++) {
             if ((rgb[iter] & 0xff000000) != 0xff000000) {
                 return false;
             }
@@ -3848,7 +3849,8 @@ public abstract class CodenameOneImplementation {
         if(cookies == null){
             cookies = new Hashtable();
         }
-        for (int i = 0; i < cookiesArray.length; i++) {
+        int calen = cookiesArray.length;
+        for (int i = 0; i < calen; i++) {
             Cookie cookie = cookiesArray[i];
             Hashtable h = (Hashtable)cookies.get(cookie.getDomain());
             if(h == null){
@@ -4242,7 +4244,8 @@ public abstract class CodenameOneImplementation {
      */
     public void clearStorage() {
         String[] l = listStorageEntries();
-        for(int iter = 0 ; iter < l.length ; iter++) {
+        int llen = l.length;
+        for(int iter = 0 ; iter < llen ; iter++) {
             deleteStorageFile(l[iter]);
         }
     }
@@ -4534,7 +4537,7 @@ public abstract class CodenameOneImplementation {
      * @param content content of the message
      */
     protected void log(String content) {
-        logger.actionPerformed(new ActionEvent(content));
+        logger.actionPerformed(new ActionEvent(content,ActionEvent.Type.Log));
     }
 
     /**
@@ -4708,7 +4711,7 @@ public abstract class CodenameOneImplementation {
                 b.addActionListener(new ActionListener() {
 
                     public void actionPerformed(ActionEvent evt) {
-                        response.actionPerformed(new ActionEvent(node));
+                        response.actionPerformed(new ActionEvent(node,ActionEvent.Type.Other));
                         d.dispose();
                     }
                 });
@@ -4914,7 +4917,8 @@ public abstract class CodenameOneImplementation {
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         String[] arr = getAllContacts(withNumbers);
         Contact[] retVal = new Contact[arr.length];
-        for(int iter = 0 ; iter  < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter  < alen ; iter++) {
             retVal[iter] = getContactById(arr[iter], includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
         }
         return retVal;
@@ -6614,10 +6618,11 @@ public abstract class CodenameOneImplementation {
                     int index = 1;
                     int widest = charWidth(nativeFont, 'W');
                     int pointsW = stringWidth(nativeFont, points);
-                    while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, nativeFont) && index < text.length()) {
+                    int textLen = text.length();
+                    while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, nativeFont) && index < textLen) {
                         index++;
                     }
-                    text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;
+                    text = text.substring(0, Math.min(textLen, Math.max(1, index - 1))) + points;
                     txtW = stringWidth(nativeFont, text);
                 }
             }

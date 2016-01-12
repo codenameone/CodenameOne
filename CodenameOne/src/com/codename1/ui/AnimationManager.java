@@ -124,13 +124,17 @@ public final class AnimationManager {
         parentForm.getContentPane().addScrollListener(new ScrollListener() {
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                 if(scrollY >= 0) {
+                    boolean changed = false;
                     for(ComponentAnimation c : cna) {
                         if(scrollY < c.getMaxSteps()) {
                             c.setStep(scrollY);
                             c.updateAnimationState();
+                            changed = true;
                         }
                     } 
-                    parentForm.revalidate();
+                    if(changed) {
+                        parentForm.revalidate();
+                    }
                 }
             }
         });

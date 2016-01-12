@@ -325,7 +325,7 @@ public class Oauth2 {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(err));
+                            al.actionPerformed(new ActionEvent(err,ActionEvent.Type.Exception));
                         }
                     }
 
@@ -334,7 +334,7 @@ public class Oauth2 {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires)));
+                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires),ActionEvent.Type.Response));
                         }
                     }
                 };
@@ -358,7 +358,7 @@ public class Oauth2 {
                     backToForm.showBack();
                 }
                 if (al != null) {
-                    al.actionPerformed(new ActionEvent(new IOException(error)));
+                    al.actionPerformed(new ActionEvent(new IOException(error),ActionEvent.Type.Exception));
                 }
             } else {
                 boolean success = url.indexOf("#") > -1;
@@ -376,7 +376,7 @@ public class Oauth2 {
                         backToForm.showBack();
                     }
                     if (al != null) {
-                        al.actionPerformed(new ActionEvent(new AccessToken(token, expires)));
+                        al.actionPerformed(new ActionEvent(new AccessToken(token, expires),ActionEvent.Type.Response));
                     }
                 }
             }
@@ -397,7 +397,8 @@ public class Oauth2 {
         Hashtable retVal = new Hashtable();
 
         String[] params = Util.split(url, "&");
-        for (int i = 0; i < params.length; i++) {
+        int plen = params.length;
+        for (int i = 0; i < plen; i++) {
             if (params[i].indexOf("=") > 0) {
                 String[] keyVal = Util.split(params[i], "=");
                 retVal.put(keyVal[0], keyVal[1]);
