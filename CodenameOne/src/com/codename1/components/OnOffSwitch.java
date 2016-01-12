@@ -175,7 +175,7 @@ public class OnOffSwitch extends Container {
     }
     
     private void fireActionEvent(){
-        dispatcher.fireActionEvent(new ActionEvent(this,ActionEvent.Type.PointerPressed));
+        dispatcher.fireActionEvent(new ActionEvent(this));
         Display d = Display.getInstance();
         if(d.isBuiltinSoundsEnabled()) {
             d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);

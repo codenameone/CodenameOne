@@ -1087,7 +1087,7 @@ public class SideMenuBar extends MenuBar {
             void actionCommandImpl(Command cmd, ActionEvent ev) {
                 if (cmd instanceof SideMenuBar.CommandWrapper) {
                     cmd = ((SideMenuBar.CommandWrapper) cmd).cmd;
-                    ev = new ActionEvent(cmd,ActionEvent.Type.Command);
+                    ev = new ActionEvent(cmd);
                 }
                 final Command c = cmd;
                 final ActionEvent e = ev;
@@ -1659,7 +1659,7 @@ public class SideMenuBar extends MenuBar {
             
             public void run() {
                 if(Display.getInstance().isEdt()) {
-                    ActionEvent e = new ActionEvent(cmd,ActionEvent.Type.Command);
+                    ActionEvent e = new ActionEvent(cmd);
                     parent.dispatchCommand(cmd, e);
                     return;
                 }

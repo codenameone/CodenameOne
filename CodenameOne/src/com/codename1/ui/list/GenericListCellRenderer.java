@@ -746,7 +746,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     Map h = (Map)selection;
                     Command cmd = (Command)h.get("$navigation");
                     if(cmd != null) {
-                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd,ActionEvent.Type.Command));
+                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd));
                         return;
                     }
                     for(int iter = 0 ; iter < selectedEntries.length ; iter++) {

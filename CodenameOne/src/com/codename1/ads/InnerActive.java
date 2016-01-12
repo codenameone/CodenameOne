@@ -188,7 +188,7 @@ public class InnerActive extends AdsService{
 //            Storage.getInstance().flushStorageCache();            
 //            addParam(this, "cid", cid);
 //        }
-        fireResponseListener(new ActionEvent(s,ActionEvent.Type.Response));        
+        fireResponseListener(new ActionEvent(s));        
     }
 
 }

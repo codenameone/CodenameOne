@@ -1698,7 +1698,7 @@ public class TextField extends TextArea {
                 });
                 return;
             }
-            doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done));
+            doneListener.actionPerformed(new ActionEvent(this));
         }
     }
     

@@ -38,7 +38,7 @@ class JavascriptEvent extends ActionEvent {
     Object[] args;
     String method;
     public JavascriptEvent(JSObject source, String method, Object[] args){
-        super(source,ActionEvent.Type.JavaScript);
+        super(source);
         this.args = args;
         this.method = method;
     }

@@ -1104,7 +1104,7 @@ public class TextArea extends Component {
      */
     void fireActionEvent() {
         if(actionListeners != null) {
-            ActionEvent evt = new ActionEvent(this,ActionEvent.Type.Edit);
+            ActionEvent evt = new ActionEvent(this);
             actionListeners.fireActionEvent(evt);
         }
         if(bindListeners != null) {

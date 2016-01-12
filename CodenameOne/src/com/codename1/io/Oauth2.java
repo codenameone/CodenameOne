@@ -325,7 +325,7 @@ public class Oauth2 {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(err,ActionEvent.Type.Exception));
+                            al.actionPerformed(new ActionEvent(err));
                         }
                     }
 
@@ -334,7 +334,7 @@ public class Oauth2 {
                             backToForm.showBack();
                         }
                         if (al != null) {
-                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires),ActionEvent.Type.Response));
+                            al.actionPerformed(new ActionEvent(new AccessToken(token, expires)));
                         }
                     }
                 };
@@ -358,7 +358,7 @@ public class Oauth2 {
                     backToForm.showBack();
                 }
                 if (al != null) {
-                    al.actionPerformed(new ActionEvent(new IOException(error),ActionEvent.Type.Exception));
+                    al.actionPerformed(new ActionEvent(new IOException(error)));
                 }
             } else {
                 boolean success = url.indexOf("#") > -1;
@@ -376,7 +376,7 @@ public class Oauth2 {
                         backToForm.showBack();
                     }
                     if (al != null) {
-                        al.actionPerformed(new ActionEvent(new AccessToken(token, expires),ActionEvent.Type.Response));
+                        al.actionPerformed(new ActionEvent(new AccessToken(token, expires)));
                     }
                 }
             }
