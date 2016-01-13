@@ -413,8 +413,8 @@ public final class IOSNative {
 
     native String getUserAgentString();
     
-    native void openDatePicker(int type, long time, int x, int y, int w, int h);
-    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h);
+    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
+    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
 
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
