@@ -185,14 +185,16 @@ class AndroidGraphics {
     private void tileImageImpl(Object img, int x, int y, int w, int h) {
         Bitmap b = (Bitmap) img;
         Rect dest = new Rect();
-        dest.top = y;
+        dest.top = 0;
         dest.bottom = h;
-        dest.left = x;
+        dest.left = 0;
         dest.right = w;
         BitmapShader shader = new BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
         Paint tilePainter = new Paint();
         tilePainter.setShader(shader);
         tilePainter.setAntiAlias(false);
+        canvas.translate(x, y);
+        canvas.concat(getTransformMatrix());
         canvas.drawRect(dest, tilePainter);
     }
     
