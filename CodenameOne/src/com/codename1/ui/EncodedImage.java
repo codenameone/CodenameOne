@@ -201,7 +201,8 @@ public class EncodedImage extends Image {
         int dpi = Display.getInstance().getDeviceDensity();
         int bestFitOffset = 0;
         int bestFitDPI = 0;
-        for(int iter = 0 ; iter < dpis.length ; iter++) {
+        int dlen = dpis.length;
+        for(int iter = 0 ; iter < dlen ; iter++) {
             int currentDPI = dpis[iter];
             if(dpi == currentDPI) {
                 bestFitOffset = iter;

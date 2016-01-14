@@ -765,7 +765,8 @@ public class Border {
                 (isSame(outerBorder, b.outerBorder))
                 );
             if(v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {
-                for(int iter = 0 ; iter < images.length ; iter++) {
+                int ilen = images.length;
+                for(int iter = 0 ; iter < ilen ; iter++) {
                     if(images[iter] != b.images[iter]) {
                         return false;
                     }
@@ -1109,7 +1110,8 @@ public class Border {
                             p.paint(bgPaint.getGraphics(), new Rectangle(0, 0, width, height));
                             imageRGB = bgPaint.getRGB();
                         }
-                        for(int iter = 0 ; iter < rgb.length ; iter++) {
+                        int rlen = rgb.length;
+                        for(int iter = 0 ; iter < rlen ; iter++) {
                             if(rgb[iter] == transColor) {
                                 imageRGB[iter] = 0;
                             }
@@ -1761,7 +1763,8 @@ public class Border {
      */
     public void lock() {
         if(images != null) {
-            for(int iter = 0 ; iter < images.length ; iter++) {
+            int ilen = images.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 if(images[iter] != null) {
                     images[iter].lock();
                 }
@@ -1775,7 +1778,8 @@ public class Border {
      */
     public void unlock() {
         if(images != null) {
-            for(int iter = 0 ; iter < images.length ; iter++) {
+            int ilen = images.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 if(images[iter] != null) {
                     images[iter].unlock();
                 }

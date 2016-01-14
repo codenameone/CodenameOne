@@ -413,8 +413,8 @@ public final class IOSNative {
 
     native String getUserAgentString();
     
-    native void openDatePicker(int type, long time, int x, int y, int w, int h);
-    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h);
+    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
+    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
 
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
@@ -481,6 +481,13 @@ public final class IOSNative {
             float d0, float d1, float d2, float d3,
             int originX, int originY
     );
+    native void nativeSetTransformMutable( 
+            float a0, float a1, float a2, float a3, 
+            float b0, float b1, float b2, float b3,
+            float c0, float c1, float c2, float c3,
+            float d0, float d1, float d2, float d3,
+            int originX, int originY
+    );
     
     
     native boolean nativeIsTransformSupportedGlobal();
@@ -491,7 +498,9 @@ public final class IOSNative {
     
     native void drawTextureAlphaMask(long textureId, int color, int alpha, int x, int y, int w, int h);
     
-    
+    native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr); 
+
+    native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
     
     // End paths
 
@@ -553,5 +562,7 @@ public final class IOSNative {
      * @param nsObserverPeer The opaque Objective-C class that is being used as the observer.
      */
     native void removeNotificationCenterObserver(long nsObserverPeer);
+
+   
 
 }

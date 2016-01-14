@@ -340,12 +340,14 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
                 getDialogStyle().getMargin(false, RIGHT));
         int availableSpace = rowW - length * buttonMargins;
         int buttonSpace = (availableSpace) / length;
-        for (int i = 0; i < currentKeyboardChars.length; i++) {
+        int clen = currentKeyboardChars.length;
+        for (int i = 0; i < clen; i++) {
             int rowWidth = rowW;
             row = new Container(new BoxLayout(BoxLayout.X_AXIS));
             row.getUnselectedStyle().setMargin(0, 0, 0, 0);
             Vector specialsButtons = new Vector();
-            for (int j = 0; j < currentKeyboardChars[i].length; j++) {
+            int cilen = currentKeyboardChars[i].length;
+            for (int j = 0; j < cilen; j++) {
                 String txt = currentKeyboardChars[i][j];
                 Button b = null;
                 if (txt.startsWith("$") && txt.endsWith("$") && txt.length() > 1) {

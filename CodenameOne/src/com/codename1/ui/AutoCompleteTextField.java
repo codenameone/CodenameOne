@@ -435,7 +435,8 @@ public class AutoCompleteTextField extends TextField {
      */
     public String[] getCompletion() {
         String[] r = new String[filter.getUnderlying().getSize()];
-        for(int iter = 0 ; iter < r.length ; iter++) {
+        int rlen = r.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             r[iter] = (String)filter.getUnderlying().getItemAt(iter);
         }
         return r;

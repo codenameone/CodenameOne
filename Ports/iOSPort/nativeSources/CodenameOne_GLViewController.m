@@ -70,6 +70,9 @@ BOOL vkbAlwaysOpen = NO;
 BOOL viewDidAppearRepaint = YES;
 JAVA_BOOLEAN lowMemoryMode = 0;
 
+static CGAffineTransform currentMutableTransform;
+static BOOL currentMutableTransformSet = NO;
+
 // keyboard width and height.  Updated when keyboard is shown and hidden
 int vkbHeight = 0;
 int vkbWidth = 0;
@@ -620,7 +623,9 @@ int maxVal(int a, int b) {
 CGContextRef roundRect(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
-    
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGRect rrect = CGRectMake(x, y, width, height);
     CGFloat radius = MAX(arcWidth, arcHeight);
     CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect);
@@ -704,6 +709,9 @@ CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, 
     
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     if(width == height) {
         int radius = MIN(width, height) / 2;
         if (fill){
@@ -864,11 +872,117 @@ void com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_flo
 #endif
 }
 
+void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(JAVA_OBJECT instanceObject,
+                                                                                                                                                                               JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                                               JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                                               JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                                               JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                                                                                                               JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                               )
+{
+#ifdef USE_ES2
+    POOL_BEGIN();
+    currentMutableTransformSet = NO;
+    GLKMatrix4 m = GLKMatrix4MakeAndTranspose(a0,a1,a2,a3,
+                                              b0,b1,b2,b3,
+                                              c0,c1,c2,c3,
+                                              d0,d1,d2,d3);
+    CATransform3D output;
+    GLfloat glMatrix[16];
+    CGFloat caMatrix[16];
+
+    memcpy(glMatrix, m.m, sizeof(glMatrix)); //insert GL matrix data to the buffer
+    for(int i=0; i<16; i++) caMatrix[i] = glMatrix[i]; //this will do the typecast if needed
+
+    output = *((CATransform3D *)caMatrix);
+    
+    if (!CATransform3DIsIdentity(output)) {
+        CGAffineTransform affine = CATransform3DGetAffineTransform(output);
+        currentMutableTransform = affine;
+        currentMutableTransformSet = YES;
+    }
+    POOL_END();
+#endif
+}
+
+
+
+CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextBeginPath(context);
+    JAVA_INT pointsIndex = 0;
+    JAVA_BYTE currType;
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* intArray = commandsArr;
+    JAVA_ARRAY_BYTE* commands = (JAVA_ARRAY_BYTE*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    org_xmlvm_runtime_XMLVMArray* floatArray = commandsArr;
+    JAVA_ARRAY_FLOAT* points = (JAVA_ARRAY_FLOAT*)floatArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+#else
+    JAVA_ARRAY_BYTE* commands = (JAVA_BYTE*)((JAVA_ARRAY)commandsArr)->data;
+    JAVA_ARRAY_FLOAT* points = (JAVA_FLOAT*)((JAVA_ARRAY)pointsArr)->data;
+#endif
+    
+    
+    CGFloat px1, px2, px3, px4, py1, py2, py3, py4;
+    for (JAVA_INT cmdIndex = 0; cmdIndex < commandsLen; cmdIndex++) {
+        currType = (JAVA_INT)commands[cmdIndex];
+        switch (currType) {
+            case CN1_SEG_MOVETO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                CGContextMoveToPoint(context, px1, py1);
+                break;
+            }
+                
+            case CN1_SEG_LINETO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                CGContextAddLineToPoint(context, px1, py1);
+                break;
+            }
+                
+            case CN1_SEG_QUADTO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                px2 = points[pointsIndex++];
+                py2 = points[pointsIndex++];
+                CGContextAddQuadCurveToPoint(context, px1, py1, px2, py2);
+                break;
+            }
+                
+            case CN1_SEG_CUBICTO: {
+                px1 = points[pointsIndex++];
+                py1 = points[pointsIndex++];
+                px2 = points[pointsIndex++];
+                py2 = points[pointsIndex++];
+                px3 = points[pointsIndex++];
+                py3 = points[pointsIndex++];
+                CGContextAddCurveToPoint(context, px1, py1, px2, py2, px3, py3);
+                break;
+            }
+                
+            case CN1_SEG_CLOSE: {
+                CGContextClosePath(context);
+                break;
+            }
+                
+                
+                
+        }
+        
+    }
+    
+    return context;
+}
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
+    if (currentMutableTransformSet) {
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     [i drawInRect:CGRectMake(x, y, width, height)];
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl finished");
 }
@@ -1068,6 +1182,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGContextMoveToPoint(context, x1, y1);
     CGContextAddLineToPoint(context, x2, y2);
     CGContextStrokePath(context);
@@ -1101,6 +1218,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGContextFillRect(context, CGRectMake(x, y, width, height));
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
 }
@@ -1121,6 +1241,9 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
     CGContextStrokeRect(context, CGRectMake(x, y, width, height));
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl finished");
 }
@@ -1181,6 +1304,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSaveGState(context);
     [CodenameOne_GLViewController instance].currentMutableImage = (BRIDGE_CAST GLUIImage*)peer;
+    currentMutableTransformSet = NO;
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl finished");
 }
 
@@ -1191,6 +1315,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
     GLUIImage *gl = [CodenameOne_GLViewController instance].currentMutableImage;
     [gl setImage:img];
     [CodenameOne_GLViewController instance].currentMutableImage = nil;
+    currentMutableTransformSet = NO;
     return (BRIDGE_CAST void*)gl;
 }
 
@@ -1705,7 +1830,7 @@ BOOL patch = NO;
 int keyboardSlideOffset;
 int keyboardHeight;
 
-#ifdef CN1_NEW_KEYBOARD_HANDLING
+
 - (void)keyboardWillHide:(NSNotification *)n
 {
     @synchronized([CodenameOne_GLViewController instance]) {
@@ -1756,103 +1881,13 @@ int keyboardHeight;
  }
 
 
-#else
-- (void)keyboardWillHide:(NSNotification *)n
-{
-    @synchronized([CodenameOne_GLViewController instance]) {
-        [currentTarget removeAllObjects];
-    }
-    keyboardIsShown = NO;
-    
-    // vkbHeight and vkbWidth may be redundant with keyboardWidth value
-    // These are exposed in Java by the getVKBWidth() and getVKBHeight()
-    // native methods, and are used to calculate padding for bottom form padding keyboard.
-    vkbHeight = 0;
-    vkbWidth = 0;
-    
-    // Callback to java to handle case when keyboard is hidden -- for async editing
-    // with bottom form padding currently so that the form can readjust its padding
-    // to use the new space.
-    com_codename1_impl_ios_IOSImplementation_keyboardWillBeHidden__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    
-    if(!modifiedViewHeight || isVKBAlwaysOpen()) {
-        return;
-    }
-#ifdef NEW_CODENAME_ONE_VM
-    repaintUI();
-#else
-    com_codename1_impl_ios_IOSImplementation_paintNow__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-#endif
-    NSDictionary* userInfo = [n userInfo];
-    
-    // get the size of the keyboard
-    CGRect keyboardEndFrame;
-    [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
-    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
-    
-    keyboardHeight = keyboardFrame.size.height;
-    
-    // resize the scrollview
-    CGRect viewFrame = self.view.frame;
-    // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
-    
-    int patchSize = 3;
-    if(isIOS8()) {
-        patchSize = 2;
-    }
-    
-    keyboardSlideOffset = 0;
-
-    
-    // https://github.com/codenameone/CodenameOne/issues/1074
-#ifdef __IPHONE_7_0
-    if (isIOS7()) {
-        prefersStatusBarHidden = NO;
-        [self setNeedsStatusBarAppearanceUpdate];
-    }
-#endif
-    
-    if(patch) {
-        if (isIOS8()) {
-            viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
-        } else {
-            if(displayHeight > displayWidth) {
-                 viewFrame.origin.y += keyboardHeight / patchSize * upsideDownMultiplier;
-            } else {
-                viewFrame.origin.x -= keyboardHeight / patchSize * upsideDownMultiplier;
-            }
-        }
-    } else {
-        if (isIOS8()) {
-            viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
-        } else {
-            if(displayHeight > displayWidth) {
-                viewFrame.origin.y += keyboardHeight * upsideDownMultiplier;
-            } else {
-                viewFrame.origin.x -= keyboardHeight * upsideDownMultiplier;
-            }
-        }
-    }
-    /*float y = editingComponent.frame.origin.y;
-     y += keyboardSize.height;
-     editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
-    
-    [UIView beginAnimations:nil context:NULL];
-    [UIView setAnimationBeginsFromCurrentState:YES];
-    [UIView setAnimationDuration:0.3];
-    [self.view setFrame:viewFrame];
-    [UIView commitAnimations];
-}
-
-#endif
-
 BOOL prefersStatusBarHidden = NO;
 
 - (BOOL) prefersStatusBarHidden {
     return prefersStatusBarHidden;
 }
 
-#ifdef CN1_NEW_KEYBOARD_HANDLING
+
 - (void)keyboardWillShow:(NSNotification *)n
 {
     // Hide the datepicker if it is currently showing.
@@ -1917,112 +1952,6 @@ BOOL prefersStatusBarHidden = NO;
     }
     keyboardIsShown = YES;
 }
-
-
-#else
-
-- (void)keyboardWillShow:(NSNotification *)n
-{
-    // Hide the datepicker if it is currently showing.
-    [self datePickerCancel];
-    
-    if(editingComponent == nil) {
-        modifiedViewHeight = NO;
-        return;
-    }
-    NSDictionary* userInfo = [n userInfo];
-    
-    // get the size of the keyboard
-    CGRect keyboardEndFrame;
-    [[userInfo objectForKey:UIKeyboardFrameEndUserInfoKey] getValue:&keyboardEndFrame];
-    CGRect keyboardFrame = [self.view convertRect:keyboardEndFrame toView:nil];
-
-    keyboardHeight = keyboardFrame.size.height;
-    vkbHeight = (JAVA_INT)keyboardHeight;
-    vkbWidth = (JAVA_INT)keyboardFrame.size.width;
-    
-    // Callback to Java for async editing so that it can resize the form to account for the
-    // keyboard taking up space.
-    com_codename1_impl_ios_IOSImplementation_keyboardWillBeShown__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-    
-    // This is an ivar I'm using to ensure that we do not do the frame size adjustment on the UIScrollView if the keyboard is already shown.  This can happen if the user, after fixing editing a UITextField, scrolls the resized UIScrollView to another UITextField and attempts to edit the next UITextField.  If we were to resize the UIScrollView again, it would be disastrous.  NOTE: The keyboard notification will fire even when the keyboard is already shown.
-    if (keyboardIsShown || isVKBAlwaysOpen()) {
-        return;
-    }
-    
-    // resize the noteView
-    CGRect viewFrame = self.view.frame;
-    // I'm also subtracting a constant kTabBarHeight because my UIScrollView was offset by the UITabBar so really only the portion of the keyboard that is leftover pass the UITabBar is obscuring my UIScrollView.
-    
-    patch = NO;
-    keyboardSlideOffset = 0;
-    if(editCompoentY + editCompoentH < displayHeight / scaleValue - keyboardHeight) {
-        if(!forceSlideUpField) {
-            modifiedViewHeight = NO;
-            return;
-        } else {
-            patch = YES;
-        }
-    } else {
-        if(editCompoentY < keyboardHeight) {
-            patch = YES;
-        }
-    }
-    modifiedViewHeight = YES;
-
-    int patchSize = 3;
-    if(isIOS8()) {
-        patchSize = 2;
-    }
-    
-    //https://github.com/codenameone/CodenameOne/issues/1074
-#ifdef __IPHONE_7_0
-    if (isIOS7()) {
-        prefersStatusBarHidden = YES;
-        [self setNeedsStatusBarAppearanceUpdate];
-    }
-#endif
-    if(patch) {
-        if (isIOS8()){
-            viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
-            keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
-        } else {
-            if(displayHeight > displayWidth) {
-                viewFrame.origin.y -= (keyboardHeight / patchSize) * upsideDownMultiplier;
-                keyboardSlideOffset = -(keyboardHeight / patchSize) * upsideDownMultiplier;
-            } else {
-                viewFrame.origin.x += (keyboardHeight / patchSize) * upsideDownMultiplier;
-                keyboardSlideOffset = (keyboardHeight / patchSize) * upsideDownMultiplier;
-            }
-        }
-    } else {
-        if (isIOS8()){
-            viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
-            keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
-        } else {
-            if(displayHeight > displayWidth) {
-                viewFrame.origin.y -= keyboardHeight * upsideDownMultiplier;
-                keyboardSlideOffset = -keyboardHeight * upsideDownMultiplier;
-            } else {
-                viewFrame.origin.x += keyboardHeight * upsideDownMultiplier;
-                keyboardSlideOffset = keyboardHeight * upsideDownMultiplier;
-            }
-        }
-    }
-    
-    /*float y = editingComponent.frame.origin.y;
-     y -= keyboardSize.height;
-     editingComponent.frame = CGRectMake(editCompoentX, y, editCompoentW, editCompoentH);*/
-    
-    [UIView beginAnimations:nil context:NULL];
-    [UIView setAnimationBeginsFromCurrentState:YES];
-    [UIView setAnimationDuration:0.3];
-    [self.view setFrame:viewFrame];
-    [UIView commitAnimations];
-    
-    keyboardIsShown = YES;
-}
-#endif
 
 - (void)dealloc
 {
@@ -2594,6 +2523,10 @@ BOOL prefersStatusBarHidden = NO;
 	POOL_BEGIN();
     UIColor* col = UIColorFromRGB(color,alpha);
     [col set];
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
 	[str drawAtPoint:CGPointMake(x, y) withFont:font];
     //NSLog(@"Drawing the string %@ at %i, %i", str, x, y);
 	POOL_END();

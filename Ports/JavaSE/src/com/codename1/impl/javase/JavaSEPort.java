@@ -5170,15 +5170,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         LinkedList<Shape> clipStack = new LinkedList<Shape>();
     }
     
+    private Object lastNativeGraphics;
+    private Transform lastNativeGraphicsTransform;
+    
     private void setNativeScreenGraphicsTransform(Object nativeGraphics, com.codename1.ui.Transform transform){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             ((NativeScreenGraphics)nativeGraphics).transform = transform;
+        } else {
+            lastNativeGraphics = nativeGraphics;
+            lastNativeGraphicsTransform = transform;
         }
     }
     
     private com.codename1.ui.Transform getNativeScreenGraphicsTransform(Object nativeGraphics){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             return ((NativeScreenGraphics)nativeGraphics).transform;
+        } else if (lastNativeGraphics == nativeGraphics) {
+            return lastNativeGraphicsTransform;
         }
         return null;
     }
@@ -7536,6 +7544,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 return shrink(arr, size);
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 err.printStackTrace();
                 errorMessage = err.toString();
                 return null;
@@ -7557,6 +7566,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 os.write(param);
                 os.flush();
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 errorMessage = err.toString();
                 err.printStackTrace();
             }

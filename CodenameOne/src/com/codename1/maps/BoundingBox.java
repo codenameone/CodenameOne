@@ -133,7 +133,8 @@ public class BoundingBox {
         double west = coords[0].getLongitude();
 
         boolean projected = true;
-        for (int i = 0; i < coords.length; i++) {
+        int clen = coords.length;
+        for (int i = 0; i < clen; i++) {
             Coord c = coords[i];
             projected = c.isProjected();
             north = Math.max(north, c.getLatitude());

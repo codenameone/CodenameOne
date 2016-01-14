@@ -68,7 +68,8 @@ class IndexedImage extends Image {
 
     private void initOpaque() {
         if(palette != null) {
-            for(int iter = 0 ; iter < palette.length ; iter++) {
+            int plen = palette.length;
+            for(int iter = 0 ; iter < plen ; iter++) {
                 if((palette[iter] & 0xff000000) != 0xff000000) {
                     setOpaque(false);
                     return;
@@ -92,7 +93,8 @@ class IndexedImage extends Image {
         
         // byte based package image
         imageDataByte = new byte[width * height];
-        for(int iter = 0 ; iter < imageDataByte.length ; iter++) {
+        int ilen = imageDataByte.length;
+        for(int iter = 0 ; iter < ilen ; iter++) {
             imageDataByte[iter] = (byte)paletteOffset(rgb[iter]);
         }
         initOpaque();
@@ -105,7 +107,8 @@ class IndexedImage extends Image {
      * @return offset within the palette array
      */
     private int paletteOffset(int rgb) {
-        for(int iter = 0 ; iter < palette.length ; iter++) {
+        int plen = palette.length;
+        for(int iter = 0 ; iter < plen ; iter++) {
             if(rgb == palette[iter]) {
                 return iter;
             }
@@ -129,7 +132,8 @@ class IndexedImage extends Image {
      */
     public Image subImage(int x, int y, int width, int height, boolean processAlpha)  {
         byte[] arr = new byte[width * height];
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             int destY = iter / width;
             int destX = iter % width;
             int offset = x + destX + ((y + destY) * this.width);
@@ -153,7 +157,8 @@ class IndexedImage extends Image {
         int[] newPalette = new int[palette.length];
         System.arraycopy(palette, 0, newPalette, 0, palette.length);
         int alphaInt = (((int)alpha) << 24) & 0xff000000;
-        for(int iter = 0 ; iter < palette.length ; iter++) {
+        int plen = palette.length;
+        for(int iter = 0 ; iter < plen ; iter++) {
             if((palette[iter] & 0xff000000) != 0) {
                 newPalette[iter] = (palette[iter] & 0xffffff) | alphaInt;
             }
@@ -377,8 +382,10 @@ class IndexedImage extends Image {
      * @inheritDoc
      */
     int[] getRGBImpl() {
-        int[] rgb = new int[width * height];
-        for(int iter = 0 ; iter < rgb.length ; iter++) {
+        int rlen = width * height;
+        int[] rgb = new int[rlen];
+        
+        for(int iter = 0 ; iter < rlen ; iter++) {
             int i = imageDataByte[iter] & 0xff;
             rgb[iter] = palette[i];
         }
@@ -416,7 +423,8 @@ class IndexedImage extends Image {
             out.writeShort(width);
             out.writeShort(height);
             out.writeByte(palette.length);
-            for (int iter = 0; iter < palette.length; iter++) {
+            int plen = palette.length;
+            for (int iter = 0; iter < plen; iter++) {
                 out.writeInt(palette[iter]);
             }
             out.write(imageDataByte);
@@ -441,7 +449,8 @@ class IndexedImage extends Image {
             int width = input.readShort();
             int height = input.readShort();
             int[] palette = new int[input.readByte() & 0xff];
-            for (int iter = 0; iter < palette.length; iter++) {
+            int plen = palette.length;
+            for (int iter = 0; iter < plen; iter++) {
                 palette[iter] = input.readInt();
             }
             byte[] arr = new byte[width * height];

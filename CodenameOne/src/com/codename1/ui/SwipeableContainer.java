@@ -223,7 +223,7 @@ public class SwipeableContainer extends Container {
                     openedToLeft = false;
                     openedToRight = false;
                 }else{
-                    dispatcher.fireActionEvent(new ActionEvent(this));                
+                    dispatcher.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Swipe));                
                 }
             }
             return !finished;

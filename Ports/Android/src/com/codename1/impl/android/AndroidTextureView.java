@@ -41,9 +41,11 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
 
     private CodenameOneView cn1View;
     private volatile boolean created = false;
+    private AndroidImplementation implementation;
 
     public AndroidTextureView(Activity activity, AndroidImplementation implementation) {
         super(activity);
+        this.implementation = implementation;
         setId(2001);
 
         cn1View = new CodenameOneView(activity, this, implementation, false);
@@ -126,6 +128,9 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
                 }
             }
         }
+        if (implementation.isAsyncEditMode() && implementation.isEditingText()) {
+            InPlaceEditView.reLayoutEdit();
+        }
     }
 
     public void flushGraphics() {
@@ -149,6 +154,9 @@ public class AndroidTextureView extends TextureView implements CodenameOneSurfac
                     Log.e("Codename One", "unlockCanvasAndPost err", e);                    
                 }
             }
+        }
+        if (implementation.isAsyncEditMode() && implementation.isEditingText()) {
+            InPlaceEditView.reLayoutEdit();
         }
     }
 

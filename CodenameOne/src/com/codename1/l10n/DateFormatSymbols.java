@@ -113,7 +113,8 @@ public class DateFormatSymbols implements Cloneable {
 			if (zoneStrings == null) {
 				String ids[] = TimeZone.getAvailableIDs();
 				String newZoneStrings[][] = new String[ids.length][5];
-				for (int i = 0; i < ids.length; i++) {
+                                int ilen = ids.length;
+				for (int i = 0; i < ilen; i++) {
 					newZoneStrings[i][ZONE_ID] = ids[i]; // - time zone ID
 					String key = ids[i].toUpperCase();
 					newZoneStrings[i][ZONE_LONGNAME] = getLocalizedValue(L10N_ZONE_LONGNAME + key, ids[i]);
@@ -147,7 +148,8 @@ public class DateFormatSymbols implements Cloneable {
 
 	String[] createShortforms(String longForms[], String l10nKey) {
 		String shortForms[] = new String[longForms.length];
-		for (int i = 0; i < shortForms.length; i++) {
+                int sflen = shortForms.length;
+		for (int i = 0; i < sflen; i++) {
 			String shortForm = getLocalizedValue(l10nKey + longForms[i].toUpperCase(), null);
 			if (shortForm != null) {
 				shortForms[i] = shortForm;
@@ -178,8 +180,9 @@ public class DateFormatSymbols implements Cloneable {
 				if (resourceBundle == null) {
 					return WEEKDAYS;
 				}
-				String newWeekdays[] = new String[WEEKDAYS.length];
-				for (int i = 0; i < WEEKDAYS.length; i++) {
+                                int wlen = WEEKDAYS.length;
+				String newWeekdays[] = new String[wlen];
+				for (int i = 0; i < wlen; i++) {
 					String key = WEEKDAYS[i].toUpperCase();
 					newWeekdays[i] = getLocalizedValue(L10N_WEEKDAY_LONGNAME + key, WEEKDAYS[i]);
 				}
@@ -225,8 +228,9 @@ public class DateFormatSymbols implements Cloneable {
 				if (resourceBundle == null) {
 					return MONTHS;
 				}
-				String newMonths[] = new String[MONTHS.length];
-				for (int i = 0; i < MONTHS.length; i++) {
+                                int mlen = MONTHS.length;
+				String newMonths[] = new String[mlen];
+				for (int i = 0; i < mlen; i++) {
 					String key = MONTHS[i].toUpperCase();
 					newMonths[i] = getLocalizedValue(L10N_MONTH_LONGNAME + key, MONTHS[i]);
 				}

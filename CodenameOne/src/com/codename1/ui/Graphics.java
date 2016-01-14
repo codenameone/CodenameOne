@@ -757,6 +757,12 @@ public final class Graphics {
      * @param relativeSize  indicates the relative size of the gradient within the drawing region
      */
     public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        // people do that a lot sadly...
+        if(startColor == endColor) {
+            setColor(startColor);
+            fillRect(x, y, width, height, (byte)0xff);
+            return;
+        }
         impl.fillRectRadialGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, relativeX, relativeY, relativeSize);
     }
 
@@ -773,6 +779,12 @@ public final class Graphics {
      * @param horizontal indicating wheter it is a horizontal fill or vertical
      */
     public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        // people do that a lot sadly...
+        if(startColor == endColor) {
+            setColor(startColor);
+            fillRect(x, y, width, height, (byte)0xff);
+            return;
+        }
         impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
     }
 

@@ -212,7 +212,8 @@ public class ArrowLinesLayer extends LinesLayer {
         }
 
         public void rotate(double aDir) {
-            for (int i = 0; i < _nodes.length; i++) {
+            int nlen =  _nodes.length;
+            for (int i = 0; i < nlen; i++) {
                 _nodes[i] = new Point(rotateX(_nodes[i].getX(), _nodes[i].getY(), aDir),
                         rotateY(_nodes[i].getX(), _nodes[i].getY(), aDir));
             }
@@ -227,7 +228,8 @@ public class ArrowLinesLayer extends LinesLayer {
         }
 
         public void translate(int x, int y) {
-            for (int i = 0; i < _nodes.length; i++) {
+            int nlen = _nodes.length;
+            for (int i = 0; i < nlen; i++) {
                 _nodes[i] = new Point(_nodes[i].getX() + x, _nodes[i].getY() + y);
             }
         }

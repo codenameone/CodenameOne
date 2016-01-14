@@ -86,14 +86,15 @@ class ContainsEvaluator extends AbstractEvaluator {
 		}
 		String rvalues[] = explode(rvalue);
 		int i;
+                int lvlen = lvalues.length;
 		for (String r : rvalues) { 
-			for (i = 0; i < lvalues.length; i++) {
+			for (i = 0; i < lvlen; i++) {
 				String l = lvalues[i];
 				if (l.equalsIgnoreCase(r)) {
 					break;
 				}
 			}
-			if (i == lvalues.length) {
+			if (i == lvlen) {
 				return null;
 			}
 		}

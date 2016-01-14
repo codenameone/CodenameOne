@@ -972,7 +972,7 @@ public final class Display {
             }
             if(!impl.handleEDTException(err)) {
                 if(errorHandler != null) {
-                    errorHandler.fireActionEvent(new ActionEvent(err));
+                    errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
                 } else {
                     Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                 }
@@ -1002,7 +1002,7 @@ public final class Display {
                 }
                 if(!impl.handleEDTException(err)) {
                     if(errorHandler != null) {
-                        errorHandler.fireActionEvent(new ActionEvent(err));
+                        errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
                     } else {
                         Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                     }
@@ -1923,7 +1923,8 @@ public final class Display {
     private int[] readArrayStackArgument(int offset) {
         int[] a = new int[inputEventStackTmp[offset]];
         offset++;
-        for(int iter = 0 ; iter < a.length ; iter++) {
+        int alen = a.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             a[iter] = inputEventStackTmp[offset + iter];
         }
         return a;

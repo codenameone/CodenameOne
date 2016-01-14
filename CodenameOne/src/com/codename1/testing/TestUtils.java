@@ -275,7 +275,7 @@ public class TestUtils {
         Form f = Display.getInstance().getCurrent();
         Command c = f.getBackCommand();
         assertBool(c != null, "The current form doesn't have a back command at this moment! for form name " + f.getName());
-        f.dispatchCommand(c, new ActionEvent(c));
+        f.dispatchCommand(c, new ActionEvent(c,ActionEvent.Type.Command));
         waitFor(20);
     }
 
@@ -291,7 +291,7 @@ public class TestUtils {
         for(int iter = 0 ; iter < f.getCommandCount() ; iter++) {
             Command c = f.getCommand(iter);
             if(name.equals(c.getCommandName())) {
-                f.dispatchCommand(c, new ActionEvent(c));
+                f.dispatchCommand(c, new ActionEvent(c,ActionEvent.Type.Command));
                 return;
             }
         }

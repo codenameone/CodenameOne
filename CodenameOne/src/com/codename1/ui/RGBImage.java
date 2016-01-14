@@ -79,7 +79,8 @@ public class RGBImage extends Image {
      */
     public Image subImage(int x, int y, int width, int height, boolean processAlpha)  {
         int[] arr = new int[width * height];
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             int destY = iter / width;
             int destX = iter % width;
             int offset = x + destX + ((y + destY) * this.width);
@@ -142,7 +143,8 @@ public class RGBImage extends Image {
         int[] arr = new int[rgb.length];
         System.arraycopy(rgb, 0, arr, 0, rgb.length);
         int alphaInt = (((int)alpha) << 24) & 0xff000000;
-        for(int iter = 0 ; iter < rgb.length ; iter++) {
+        int rlen = rgb.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             if((arr[iter] & 0xff000000) != 0) {
                 arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
             }

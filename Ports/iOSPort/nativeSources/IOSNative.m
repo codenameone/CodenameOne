@@ -197,6 +197,7 @@ extern signed int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativ
 (void* peer, const char* str, int len);
 
 
+
 extern int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
 (void* peer, int chr);
 
@@ -655,6 +656,80 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+
+extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
+
+static CGContextRef drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+
+    return Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    
+   
+
+}
+
+
+//native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
+void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+    POOL_BEGIN();
+    [UIColorFromRGB(color, alpha) set];
+    CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    CGContextFillPath(context);
+    POOL_END();
+    
+}
+//native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
+void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
+    POOL_BEGIN();
+    
+    CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    CGContextSaveGState(context);
+    [UIColorFromRGB(color, alpha) set];
+    CGContextSetLineWidth(context, lineWidth);
+    CGLineCap cap = kCGLineCapButt;
+    switch (capStyle) {
+        case CN1_CAP_BUTT: {
+            cap = kCGLineCapButt;
+            break;
+        }
+        
+        case CN1_CAP_ROUND: {
+            cap = kCGLineCapRound;
+            break;
+        }
+        
+        case CN1_CAP_SQUARE: {
+            cap = kCGLineCapSquare;
+            break;
+        }
+    }
+    CGContextSetLineCap(context, cap);
+    
+    CGLineJoin join =  kCGLineJoinMiter;
+    switch (joinStyle) {
+        case CN1_JOIN_MITER: {
+            join = kCGLineJoinMiter;
+            break;
+        }
+        case CN1_JOIN_ROUND: {
+            join = kCGLineJoinRound;
+            break;
+        }
+        case CN1_JOIN_BEVEL: {
+            join = kCGLineJoinBevel;
+            break;
+        }
+    }
+    CGContextSetLineJoin(context, join);
+    
+    CGContextSetMiterLimit(context, mitreLimit);
+    
+    CGContextStrokePath(context);
+    CGContextRestoreGState(context);
+    POOL_END();
+}
+
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
 {
@@ -4728,7 +4803,13 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     }
     repaintUI();
 }
-void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+    if (preferredWidth == 0) {
+        preferredWidth = 320 * scaleValue;
+    }
+    if (preferredHeight == 0) {
+        preferredHeight = 260 * scaleValue;
+    }
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
@@ -4750,13 +4831,14 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             [pickerView selectRow:selection inComponent:0 animated:NO];
         }
         pickerView.delegate = [CodenameOne_GLViewController instance];
+        
         if(isIPad()) {
             datepickerPopover = YES;
             stringPickerSelection = -1;
             UIViewController *vc = [[UIViewController alloc] init];
             UIView *popoverView = [[UIView alloc] init];
             [vc setView:popoverView];
-            [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
+            //[vc setContentSizeForViewInPopover:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue)];
             
 #ifndef CN1_USE_ARC
             UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
@@ -4793,15 +4875,29 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 #endif
             [toolbar setItems:itemsArray];
             
-            [popoverView addSubview:toolbar];
-            [popoverView addSubview:pickerView];
-            pickerView.frame = CGRectMake(0, 44, pickerView.frame.size.width, pickerView.frame.size.height);
             
+            [popoverView addSubview:pickerView];
+            [popoverView addSubview:toolbar];
+            
+            pickerView.frame = CGRectMake(0, - preferredHeight/scaleValue * 0.5, preferredWidth/scaleValue, preferredHeight/scaleValue * 2);
+
+            popoverView.frame = CGRectMake(0, 0, preferredWidth/scaleValue, preferredHeight/scaleValue);
+            
+            //pickerView.frame = CGRectMake(0, 44, preferredWidth/scaleValue, preferredHeight/scaleValue);
+            //[popoverView layoutSubviews];
+            [vc setContentSizeForViewInPopover:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue + 44) ];
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
             
+            
+            
+            
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+            
+            [uip setPopoverContentSize:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue) animated:YES];
+
+            
         } else {
             if(isIOS7()) {
                 showPopupPickerView(CN1_THREAD_GET_STATE_PASS_ARG pickerView);
@@ -4847,7 +4943,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 }
 
 
-void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
@@ -5630,6 +5726,31 @@ void com_codename1_impl_ios_IOSNative_nativeSetTransform___float_float_float_flo
                                                                                                                                                                    )
 {
     com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int
+    (
+     instanceObject, a0, a1, a2, a3,
+     b0, b1, b2, b3,
+     c0, c1, c2, c3,
+     d0, d1, d2, d3,
+     originX, originY
+     );
+}
+
+extern void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int( JAVA_OBJECT instanceObject,
+                                                                                                                                                                                      JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                                                      JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                                                      JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                                                      JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                                                                                                                      JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                                      );
+void com_codename1_impl_ios_IOSNative_nativeSetTransformMutable___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+                                                                                                                                                                   JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                                   JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                                   JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                                   JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                                                                                                   JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                   )
+{
+    com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int
     (
      instanceObject, a0, a1, a2, a3,
      b0, b1, b2, b3,

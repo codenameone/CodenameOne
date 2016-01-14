@@ -762,7 +762,8 @@ public class UIBuilder { //implements Externalizable {
 
     private Object[] readObjectArrayForListModel(DataInputStream in, Resources res) throws IOException {
         Object[] elements = new Object[in.readInt()];
-        for(int iter = 0 ; iter < elements.length ; iter++) {
+        int elen = elements.length;
+        for(int iter = 0 ; iter < elen ; iter++) {
             switch(in.readByte()) {
                 case 1: // String
                     elements[iter] = in.readUTF();
@@ -913,7 +914,8 @@ public class UIBuilder { //implements Externalizable {
             // resource might have been removed we need to fail gracefully
             String[] uiNames = res.getUIResourceNames();
             String currentName = in.readUTF();
-            for(int iter = 0 ; iter < uiNames.length ; iter++) {
+            int ulen = uiNames.length;
+            for(int iter = 0 ; iter < ulen ; iter++) {
                 if(uiNames[iter].equals(currentName)) {
                     return createContainer(res, currentName);
                 }

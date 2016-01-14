@@ -157,7 +157,8 @@ public class MediaManager {
     public static Media createMediaRecorder(String path, String mimeType) throws IOException {
         boolean supportedMime = false;
         String [] supported  = getAvailableRecordingMimeTypes();
-        for (int i = 0; i < supported.length; i++) {
+        int slen = supported.length;
+        for (int i = 0; i < slen; i++) {
             String mime = supported[i];
             if(mime.equals(mimeType)){
                 supportedMime = true;

@@ -367,7 +367,8 @@ public class NetworkManager {
             if(aps == null) {
                 aps = new Vector();
                 String[] ids = getAPIds();
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                int idlen = ids.length;
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_WLAN) {
                         aps.insertElementAt(ids[iter ], 0);
@@ -379,7 +380,7 @@ public class NetworkManager {
                 }
                 
                 // add all the 2G networks at the end
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_NETWORK2G) {
                         aps.addElement(ids[iter]);
@@ -447,7 +448,8 @@ public class NetworkManager {
                             return;
                         }
                         // check for timeout violations on the currently executing threads
-                        for(int iter = 0 ; iter < networkThreads.length ; iter++) {
+                        int ntlen = networkThreads.length;
+                        for(int iter = 0 ; iter < ntlen ; iter++) {
                             ConnectionRequest c = networkThreads[iter].getCurrentRequest();
                             if(c != null) {
                                 int cTimeout = Math.min(timeout, c.getTimeout());

@@ -580,7 +580,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 //display ******** if it is a password field
                 String displayText = "";
                 if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
-                    for (int j = 0; j < rowText.length(); j++) {
+                    int rlen = rowText.length();
+                    for (int j = 0; j < rlen; j++) {
                         displayText += passwordChar;
                     }
                 } else {
@@ -672,7 +673,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
         Style style = l.getStyle();
         int gap = l.getGap();
-        for (int i = 0; i < icons.length; i++) {
+        int ilen = icons.length;
+        for (int i = 0; i < ilen; i++) {
             Image icon = icons[i];
             if (icon != null) {
                 prefW = Math.max(prefW, icon.getWidth());
@@ -1240,7 +1242,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         int index = 1;
                         int widest = f.charWidth('W');
                         int pointsW = f.stringWidth(points);
-                        while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, f) && index < text.length()){
+                        int tlen = text.length();
+                        while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, f) && index < tlen){
                             index++;
                         }
                         text = text.substring(0, Math.min(text.length(), Math.max(1, index-1))) + points;
@@ -1300,7 +1303,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             // show the last character in a password field
             if (ta.isPendingCommit()) {
                 if (text.length() > 0) {
-                    for (int j = 0; j < text.length() - 1; j++) {
+                    int tlen = text.length();
+                    for (int j = 0; j < tlen - 1; j++) {
                         displayText += passwordChar;
                     }
                     displayText += text.charAt(text.length() - 1);

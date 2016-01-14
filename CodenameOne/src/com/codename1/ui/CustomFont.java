@@ -99,7 +99,8 @@ class CustomFont extends Font {
         
         // default to black colored font
         bitmap.getRGB(imageArray, 0, 0, 0, imageWidth, imageHeight);
-        for(int iter = 0 ; iter < imageArray.length ; iter++) {
+        int ilen = imageArray.length;
+        for(int iter = 0 ; iter < ilen ; iter++) {
             // extract the red component from the font image
             // shift the alpha 8 bits to the left
             // apply the alpha to the image
@@ -163,7 +164,8 @@ class CustomFont extends Font {
         if(newColor != color && !checkCacheCurrentColor(newColor)) {
             color = newColor & 0xffffff;
             int[] imageArray = getImageArray();
-            for(int iter = 0 ; iter < imageArray.length ; iter++) {
+            int ilen = imageArray.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 // extract the red component from the font image
                 // shift the alpha 8 bits to the left
                 // apply the alpha to the image
@@ -202,7 +204,8 @@ class CustomFont extends Font {
      */
     public void addContrast(byte value) {
         int[] imageArray = getImageArray();
-        for(int iter = 0 ; iter < imageArray.length ; iter++) {
+        int ilen = imageArray.length;
+        for(int iter = 0 ; iter < ilen ; iter++) {
             int alpha = (imageArray[iter] >> 24) & 0xff;
             if(alpha != 0) {
                 alpha = Math.min(alpha + value, 255);
@@ -222,7 +225,8 @@ class CustomFont extends Font {
      */
     void drawString(Graphics g, String str, int x, int y) {
         if(Display.getInstance().isBidiAlgorithm()) {
-            for(int i = 0 ; i < str.length() ; i++) {
+            int slen = str.length();
+            for(int i = 0 ; i < slen ; i++) {
                 if(Display.getInstance().isRTL(str.charAt(i))) {
                     str = Display.getInstance().convertBidiLogicalToVisual(str);
                     break;
@@ -237,7 +241,8 @@ class CustomFont extends Font {
 
         if(clipY <= y + getHeight() && clipY + clipHeight >= y) {
             char c;
-            for ( int i = 0; i < str.length(); i++ ) {
+            int slen = str.length();
+            for ( int i = 0; i < slen; i++ ) {
                 c = str.charAt(i);
                 int position = charsets.indexOf(c);
                 if(position < 0) {
@@ -369,7 +374,8 @@ class CustomFont extends Font {
        if(o != null && o.getClass() == getClass()) {
            CustomFont f = (CustomFont)o;
            if(charsets.equals(f.charsets)) {
-               for(int iter = 0 ; iter < cutOffsets.length ; iter++) {
+               int clen = cutOffsets.length;
+               for(int iter = 0 ; iter < clen ; iter++) {
                    if(cutOffsets[iter] != f.cutOffsets[iter]) {
                        return false;
                    }

@@ -266,7 +266,8 @@ static GLuint getOGLProgram(){
 
 #else
 -(void)execute {
-    GLuint textureName = [DrawStringTextureCache checkCache:str f:font c:color a:255];
+    DrawStringTextureCache* cache = [DrawStringTextureCache checkCache:str f:font c:color a:255];
+    GLuint textureName = [cache textureName];
     int w = (int)[str sizeWithFont:font].width;
     int h = (int)[font lineHeight];
     int p2w = nextPowerOf2(w);

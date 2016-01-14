@@ -190,7 +190,8 @@ public class TarHeader {
     public static int getNameBytes(StringBuffer name, byte[] buf, int offset, int length) {
         int i;
 
-        for (i = 0; i < length && i < name.length(); ++i) {
+        int nlen = name.length();
+        for (i = 0; i < length && i < nlen; ++i) {
             buf[offset + i] = (byte) name.charAt( i );
         }
 

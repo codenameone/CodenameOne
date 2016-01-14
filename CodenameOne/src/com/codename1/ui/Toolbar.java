@@ -120,6 +120,22 @@ public class Toolbar extends Container {
         }
     }
 
+    /**
+     * Makes the title align to the center accurately by doing it at the layout level which also takes into 
+     * account right/left commands
+     * @param cent whether the title should be centered
+     */
+    public void setTitleCentered(boolean cent) {
+        ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+    } 
+    
+    /**
+     * Returns true if the title is centered via the layout
+     * @return true if the title is centered
+     */
+    public boolean isTitleCentered() {
+        return ((BorderLayout)getLayout()).getCenterBehavior() == BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
+    }
 
     /**
      * Creates a static side menu that doesn't fold instead of the standard sidemenu.
