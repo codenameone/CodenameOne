@@ -540,6 +540,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
                 currentEditing = null;
                 callHideTextEditor();
+                if (nativeInstance.isAsyncEditMode()) {
+                    nativeInstance.setNativeEditingComponentVisible(false);
+                }
                 synchronized(EDITING_LOCK) {
                     EDITING_LOCK.notify();
                 }
@@ -800,6 +803,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                             }
                             instance.currentEditing = null;
                             instance.callHideTextEditor();
+                            if (nativeInstance.isAsyncEditMode()) {
+                                nativeInstance.setNativeEditingComponentVisible(false);
+                            }
                             EDITING_LOCK.notify();
                         }
                         Form current = Display.getInstance().getCurrent();

@@ -563,6 +563,15 @@ public final class IOSNative {
      */
     native void removeNotificationCenterObserver(long nsObserverPeer);
 
+    /**
+     * This one simply hides the native editing component, but doesn't fold the 
+     * keyboard or remove the component.  It is used to bridge the gap in async
+     * edit mode between when the user clicks "next" and when the next 
+     * editing component is ready.
+     * @param b 
+     */
+    native void setNativeEditingComponentVisible(boolean b) ;
+
    
 
 }
