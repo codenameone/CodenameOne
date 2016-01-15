@@ -27,8 +27,6 @@ package com.codename1.location;
  * is inactive. Usage:
  * 
  * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
- * <noscript>Open the javadoc in your browser to see the full sample at https://www.codenameone.com/javadoc/</noscript>
- * Direct link to sample: <a href="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd" target="_blank">https://gist.github.com/codenameone/b0fa5280bde905a8f0cd</a>.
  *
  * @author Chen
  */

@@ -3048,8 +3048,27 @@ public final class Display {
      * user location in the background. Usage:
      * 
      * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
-     * <noscript>Open the javadoc in your browser to see the full sample at https://www.codenameone.com/javadoc/</noscript>
-     * Direct link to sample: <a href="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd" target="_blank">https://gist.github.com/codenameone/b0fa5280bde905a8f0cd</a>.
+<noscript><pre>{@code public class GeofenceListenerImpl implements GeofenceListener {
+    public void onExit(String id) {
+        System.out.println("Exited "+id);
+    }
+
+    public void onEntered(String id) {
+        System.out.println("Entered "+id);
+    }
+}
+Form hi = new Form("Hi World");
+hi.addComponent(new Label("Hi World"));
+        
+Location loc = new Location();
+loc.setLatitude(51.5033630);
+loc.setLongitude(-0.1276250);
+        
+Geofence gf = new Geofence("test", loc, 100, 100000);
+        
+LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
+        
+hi.show();}</pre></noscript>
      * 
      * @return LocationManager Object
      */
