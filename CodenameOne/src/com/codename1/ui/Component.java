@@ -341,7 +341,11 @@ public class Component implements Animation, StyleListener {
     
     /**
      * Returns a "meta style" that allows setting styles once to all the different Style objects, the getters for this
-     * style will be meaningless and will return 0 values.
+     * style will be meaningless and will return 0 values. Usage:
+     * 
+     * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
+     * <noscript>Open the javadoc in your browser to see the full sample at https://www.codenameone.com/javadoc/</noscript>
+     * Direct link to sample: <a href="https://gist.github.com/codenameone/31a32bdcf014a9e55a95" target="_blank">https://gist.github.com/codenameone/31a32bdcf014a9e55a95</a>.
      * @return a unified style object for the purpose of setting on object object instances
      */
     public Style getAllStyles() {
