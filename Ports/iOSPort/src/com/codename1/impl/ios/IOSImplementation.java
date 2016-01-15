@@ -92,6 +92,7 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.Picker;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -539,6 +540,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
                 currentEditing = null;
                 callHideTextEditor();
+                if (nativeInstance.isAsyncEditMode()) {
+                    nativeInstance.setNativeEditingComponentVisible(false);
+                }
                 synchronized(EDITING_LOCK) {
                     EDITING_LOCK.notify();
                 }
@@ -799,6 +803,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                             }
                             instance.currentEditing = null;
                             instance.callHideTextEditor();
+                            if (nativeInstance.isAsyncEditMode()) {
+                                nativeInstance.setNativeEditingComponentVisible(false);
+                            }
                             EDITING_LOCK.notify();
                         }
                         Form current = Display.getInstance().getCurrent();
@@ -7143,13 +7150,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
         datePickerResult = -2;
-        int x = 0, y = 0, w = 20, h = 20;
+        int x = 0, y = 0, w = 20, h = 20, preferredHeight = 0, preferredWidth = 0;
+        
         if(source != null) {
             x = source.getAbsoluteX();
             y = source.getAbsoluteY();
             w = source.getWidth();
             h = source.getHeight();
         }
+        
+        if (source instanceof Picker) {
+            Picker p = (Picker)source;
+            preferredHeight = p.getPreferredPopupHeight();
+            preferredWidth = p.getPreferredPopupWidth();
+        }
+        
         if(type == Display.PICKER_TYPE_STRINGS) {
             String[] strs = (String[])data;
             int offset = -1;
@@ -7162,7 +7177,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     }
                 }
             }
-            nativeInstance.openStringPicker(strs, offset, x, y, w, h);
+            nativeInstance.openStringPicker(strs, offset, x, y, w, h, preferredWidth, preferredHeight);
         } else {
             long time;
             if(currentValue instanceof Integer) {
@@ -7173,7 +7188,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 time = ((java.util.Date)currentValue).getTime();
             }
-            nativeInstance.openDatePicker(type, time, x, y, w, h);
+            nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight);
         }
         // wait for the native code to complete
         Display.getInstance().invokeAndBlock(new Runnable() {
