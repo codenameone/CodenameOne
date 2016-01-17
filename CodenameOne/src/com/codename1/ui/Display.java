@@ -2772,6 +2772,11 @@ public final class Display {
             Container.blockOverdraw = true;
             return;
         }
+        if(key.startsWith("platformHint.")) {
+            impl.setPlatformHint(key, value);
+            return;
+        }
+        
         if(localProperties == null) {
             localProperties = new HashMap<String, String>();
         }

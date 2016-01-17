@@ -6721,7 +6721,15 @@ public abstract class CodenameOneImplementation {
         }
         return align;
     }
-   
+
+    /**
+     * Makes it easier to pass hints to the underlying implementation for quicker hacks/pipelines
+     * @param key the key
+     * @param value the value
+     */
+    public void setPlatformHint(String key, String value) {
+    }
+    
     //METHODS FOR DEALING Local Notifications
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
     }

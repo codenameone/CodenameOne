@@ -87,6 +87,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     private final AndroidGraphics internalGraphics;
     private final AndroidImplementation implementation;
     private boolean paintViewOnBuffer = false;
+    static boolean legacyPaintLogic = true;
 
     public AndroidAsyncView(Activity activity, AndroidImplementation implementation) {
         super(activity);
@@ -542,10 +543,23 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         }
                 
         @Override
-        public void paintComponentBackground(int x, int y, int width, int height, Style s) {
+        public void paintComponentBackground(final int x, final int y, final int width, final int height, final Style s) {
             if (alpha == 0 || width <= 0 || height <= 0) {
                 return;
             }
+            
+            if(legacyPaintLogic) {
+                final int al = alpha;
+                pendingRenderingOperations.add(new AsyncOp(clip) {
+                    @Override
+                    public void execute(AndroidGraphics underlying) {
+                        underlying.setAlpha(al);
+                        underlying.paintComponentBackground(x, y, width, height, s);
+                    }
+                });
+                return;
+            }
+
             AsyncPaintPosition bgPaint = (AsyncPaintPosition)StyleAccessor.getCachedData(s);
             if(bgPaint == null) {
                 final byte backgroundType = s.getBackgroundType() ;
