@@ -73,7 +73,7 @@ import com.codename1.ui.plaf.Style;
  */
 class AndroidGraphics {
 
-    private Canvas canvas;
+    protected Canvas canvas;
     private Paint paint;
     private CodenameOneTextPaint font;
     private Transform transform;
@@ -84,7 +84,7 @@ class AndroidGraphics {
     private final RectF tmprectF = new RectF();
     private final Rect tmprect = new Rect();
     private final Path tmppath = new Path();
-    private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
+    protected final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
     private AndroidImplementation impl;
     private int alpha = 255;
 
@@ -199,7 +199,7 @@ class AndroidGraphics {
     }
     
 
-    private Matrix getTransformMatrix(){
+    protected Matrix getTransformMatrix(){
         if ( transformDirty ){
         	// Conversion from 4x4 to 3x3
         	// See http://www.w3.org/TR/2009/WD-SVG-Transforms-20090320/#_4x4-to-3x3-conversion

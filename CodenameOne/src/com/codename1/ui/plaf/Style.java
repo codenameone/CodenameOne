@@ -439,7 +439,10 @@ public class Style {
     private EventDispatcher listeners;
 
     Object roundRectCache;
-
+    
+    // used by the Android port, do not remove!
+    Object nativeOSCache;
+    
     /**
      * Each component when it draw itself uses this Object 
      * to determine in what colors it should use.
@@ -1861,6 +1864,7 @@ public class Style {
     
     private void firePropertyChanged(String propertName) {
         roundRectCache = null;
+        nativeOSCache = null;
         if (listeners == null) {
             return;
         }

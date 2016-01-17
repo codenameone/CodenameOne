@@ -24,11 +24,13 @@ package com.codename1.impl.android;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -37,12 +39,15 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.ui.Painter;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Rectangle;
 import java.util.ArrayList;
 import com.codename1.ui.Transform;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.StyleAccessor;
 
 public class AndroidAsyncView extends View implements CodenameOneSurface {
 
@@ -65,6 +70,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             }
         }
 
+        public void prepare() {}
+        
         public void executeWithClip(AndroidGraphics underlying) {
             underlying.setClip(clipX, clipY, clipW, clipH);
             execute(underlying);
@@ -76,7 +83,6 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     private ArrayList<AsyncOp> renderingOperations = new ArrayList<AsyncOp>();
     private ArrayList<AsyncOp> pendingRenderingOperations = new ArrayList<AsyncOp>();
     private final CodenameOneView cn1View;
-    private int clipX, clipY, clipW, clipH;
     private final AndroidGraphics graphics;
     private final AndroidGraphics internalGraphics;
     private final AndroidImplementation implementation;
@@ -182,13 +188,14 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         ArrayList<AsyncOp> tmp = renderingOperations;
         renderingOperations = pendingRenderingOperations;
         pendingRenderingOperations = tmp;
+        
+        for (AsyncOp o : renderingOperations) {
+            o.prepare();
+        }        
+        
         if (rect == null) {
             postInvalidate();
         } else {
-            clipX = rect.left;
-            clipY = rect.top;
-            clipW = rect.right - rect.left;
-            clipH = rect.bottom - rect.top;
             postInvalidate(rect.left, rect.top, rect.right, rect.bottom);
         }
         graphics.setClip(0, 0, cn1View.width, cn1View.height);
@@ -484,22 +491,321 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 }
             });
         }
+        
+        abstract class AsyncPaintPosition extends AsyncOp{
+            int x;
+            int y;
+            int width;
+            int height;
+            int alpha;
+            
+            // the pending values allow changing this op on the Codename One EDT while the Android thread
+            // renders it
+            int pendingX;
+            int pendingY;
+            int pendingWidth;
+            int pendingHeight;
+            int pendingAlpha;
 
+            int pendingClipX;
+            int pendingClipY;
+            int pendingClipW;
+            int pendingClipH;
+
+            public AsyncPaintPosition(Rectangle clip) {
+                super(clip);
+                pendingClipX = clipX;
+                pendingClipY = clipY;
+                pendingClipW = clipW;
+                pendingClipH= clipH;
+            }
+
+            @Override
+            public void prepare() {
+                x = pendingX;
+                y = pendingY;
+                height = pendingHeight;
+                width = pendingWidth;
+                alpha = pendingAlpha;
+                clipX = pendingClipX;
+                clipY = pendingClipY;
+                clipW = pendingClipW;
+                clipH = pendingClipH;
+            }
+
+            @Override
+            public void execute(AndroidGraphics underlying) {
+                executeImpl(underlying);
+            }
+            
+            public abstract void executeImpl(AndroidGraphics underlying);
+        }
+                
         @Override
-        public void paintComponentBackground(final int x, final int y, final int width, final int height, final Style s) {
+        public void paintComponentBackground(int x, int y, int width, int height, Style s) {
             if (alpha == 0 || width <= 0 || height <= 0) {
                 return;
             }
-            final int al = alpha;
-            pendingRenderingOperations.add(new AsyncOp(clip) {
-                @Override
-                public void execute(AndroidGraphics underlying) {
-                    underlying.setAlpha(al);
-                    underlying.paintComponentBackground(x, y, width, height, s);
+            AsyncPaintPosition bgPaint = (AsyncPaintPosition)StyleAccessor.getCachedData(s);
+            if(bgPaint == null) {
+                final byte backgroundType = s.getBackgroundType() ;
+                Image bgImageOrig = s.getBgImage();
+                if (bgImageOrig == null) {
+                    if(backgroundType >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {
+                        // TODO get gradients to work again...
+                    } else {
+                        // solid color paint
+                        byte bgt = s.getBgTransparency();
+                        if(bgt == 0) {
+                            return;
+                        }
+                        bgPaint = paintBackgroundSolidColor(bgt, s, bgPaint);
+                    }
+                } else {
+                    switch(backgroundType) {
+                        case Style.BACKGROUND_NONE:
+                            byte bgt = s.getBgTransparency();
+                            if(bgt == 0) {
+                                return;
+                            }
+                            bgPaint = paintBackgroundSolidColor(bgt, s, bgPaint);
+                            break;
+                        case Style.BACKGROUND_IMAGE_SCALED:
+                            final Paint bgImageScalePaint = new Paint();
+                            bgImageScalePaint.setXfermode(PORTER);
+                            final Bitmap b = (Bitmap) bgImageOrig.getImage();
+                            final Rect src = new Rect();
+                            src.top = 0;
+                            src.bottom = b.getHeight();
+                            src.left = 0;
+                            src.right = b.getWidth();
+                            
+                            bgPaint = new AsyncPaintPosition(clip) {                                
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+                                    Rect dest = new Rect();
+                                    dest.top = y;
+                                    dest.bottom = y + height;
+                                    dest.left = x;
+                                    dest.right = x + width;
+                                    bgImageScalePaint.setAlpha(alpha);
+                                    underlying.canvas.drawBitmap(b, src, dest, bgImageScalePaint);
+                                }
+                            };
+                            break;
+                        case Style.BACKGROUND_IMAGE_SCALED_FILL:
+                            final Paint bgImageScaleFillPaint = new Paint();
+                            bgImageScaleFillPaint.setXfermode(PORTER);
+                            final Bitmap bFill = (Bitmap) bgImageOrig.getImage();
+                            final Rect srcFill = new Rect();
+                            srcFill.top = 0;
+                            srcFill.bottom = bFill.getHeight();
+                            srcFill.left = 0;
+                            srcFill.right = bFill.getWidth();
+                            final int iW = bgImageOrig.getWidth();
+                            final int iH = bgImageOrig.getHeight();
+                            
+                            bgPaint = new AsyncPaintPosition(clip) {                                
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+                                    Rect dest = new Rect();
+                                    float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));
+                                    int bwidth = (int)(((float)iW) * r);
+                                    int bheight = (int)(((float)iH) * r);
+                                    x = x + (width - bwidth) / 2;
+                                    y = y + (height - bheight) / 2; 
+                                    dest.top = y;
+                                    dest.bottom = y + bheight;
+                                    dest.left = x;
+                                    dest.right = x + bwidth;
+                                    bgImageScaleFillPaint.setAlpha(alpha);
+                                    underlying.canvas.drawBitmap(bFill, srcFill, dest, bgImageScaleFillPaint);
+                                }
+                            };
+                            break;
+                        case Style.BACKGROUND_IMAGE_SCALED_FIT:
+                            final Paint bgImageScaleFitPaint = new Paint();
+                            final Paint bgImageScaleFitColorPaint = new Paint();
+                            final byte bgtScaleFitColorAlpha = s.getBgTransparency();
+                            int cc = ((bgtScaleFitColorAlpha << 24) & 0xff000000) | (s.getBgColor() & 0xffffff);
+                            bgImageScaleFitColorPaint.setAntiAlias(false);
+                            bgImageScaleFitColorPaint.setStyle(Paint.Style.FILL);
+                            bgImageScaleFitColorPaint.setColor(cc);
+                            bgImageScaleFitPaint.setAlpha(255);
+
+                            final Bitmap bFit = (Bitmap) bgImageOrig.getImage();
+                            final Rect srcFit = new Rect();
+                            srcFit.top = 0;
+                            srcFit.bottom = bFit.getHeight();
+                            srcFit.left = 0;
+                            srcFit.right = bFit.getWidth();
+                            final int iWFit = bgImageOrig.getWidth();
+                            final int iHFit = bgImageOrig.getHeight();
+                            
+                            bgPaint = new AsyncPaintPosition(clip) {                                
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+                                    if(alpha > 0) {
+                                        bgImageScaleFitColorPaint.setAlpha(alpha);
+                                        underlying.canvas.drawRect(x, y, x + width, y + height, bgImageScaleFitColorPaint);
+                                        return;
+                                    }
+                                    Rect dest = new Rect();
+                                    float r2 = Math.min(((float)width) / ((float)iWFit), ((float)height) / ((float)iHFit));
+                                    int awidth = (int)(((float)iWFit) * r2);
+                                    int aheight = (int)(((float)iHFit) * r2);
+
+                                    x = x + (width - awidth) / 2;
+                                    y = y + (height - aheight) / 2; 
+                                    dest.top = y;
+                                    dest.bottom = y + aheight;
+                                    dest.left = x;
+                                    dest.right = x + awidth;
+                                    underlying.canvas.drawBitmap(bFit, srcFit, dest, bgImageScaleFitPaint);
+                                }
+                            };
+                            break;
+                        case Style.BACKGROUND_IMAGE_TILE_BOTH:
+                            final Paint bgImageTiledBothPaint = new Paint();
+                            Bitmap bitmapTileBoth = (Bitmap) bgImageOrig.getImage();
+                            BitmapShader shader = new BitmapShader(bitmapTileBoth, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+                            bgImageTiledBothPaint.setShader(shader);
+                            bgImageTiledBothPaint.setAntiAlias(false);
+                            
+                            bgPaint = new AsyncPaintPosition(clip) {                                
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+                                    Rect dest = new Rect();
+                                    dest.top = 0;
+                                    dest.bottom = height;
+                                    dest.left = 0;
+                                    dest.right = width;
+                                    bgImageTiledBothPaint.setAlpha(alpha);
+                                    underlying.canvas.save();
+                                    underlying.canvas.translate(x, y);
+                                    underlying.canvas.concat(getTransformMatrix());
+                                    underlying.canvas.drawRect(dest, bgImageTiledBothPaint);
+                                    underlying.canvas.restore();
+                                }
+                            };
+                            break;
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
+                            final Paint bgImageTiledPaint = new Paint();
+                            final Paint bgColorTiledPaint = new Paint();
+                            final byte bgtTiledColorAlpha = s.getBgTransparency();
+                            int c = ((bgtTiledColorAlpha << 24) & 0xff000000) | (s.getBgColor() & 0xffffff);
+                            bgColorTiledPaint.setAntiAlias(false);
+                            bgColorTiledPaint.setStyle(Paint.Style.FILL);
+                            bgColorTiledPaint.setColor(c);
+                            bgImageTiledPaint.setAlpha(255);
+                            final Bitmap bitmapTile = (Bitmap) bgImageOrig.getImage();
+                            BitmapShader shaderTile = new BitmapShader(bitmapTile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+                            bgImageTiledPaint.setShader(shaderTile);
+                            bgImageTiledPaint.setAntiAlias(false);
+                            
+                            bgPaint = new AsyncPaintPosition(clip) {                                
+                                @Override
+                                public void executeImpl(AndroidGraphics underlying) {
+                                    // fill the solid color
+                                    underlying.canvas.drawRect(x, y, x + width, y + height, bgColorTiledPaint);
+
+                                    switch(backgroundType) {
+                                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+                                            height = Math.min(bitmapTile.getHeight(), height);
+                                            break;
+                                                    
+                                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER: {
+                                            int iH = bitmapTile.getHeight();
+                                            y = y + (height / 2 - iH / 2);
+                                            height = iH;
+                                            break;
+                                        }
+                                            
+                                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM: {
+                                            int iH = bitmapTile.getHeight();
+                                            y = y + (height - iH);
+                                            height = iH;
+                                            break;
+                                        }
+                                        
+                                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT: 
+                                            width = bitmapTile.getWidth();
+                                            break;
+                                        
+                                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER: {
+                                            int iW = bitmapTile.getWidth();
+                                            x = x + (width / 2 - iW / 2);
+                                            width = iW;
+                                            break;
+                                        }
+                                        
+                                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT: {
+                                            int iW = bitmapTile.getWidth();
+                                            x = x + width - iW;
+                                            width = iW;
+                                        }                                        
+                                    }
+                                    Rect dest = new Rect();
+                                    dest.top = 0;
+                                    dest.bottom = height;
+                                    dest.left = 0;
+                                    dest.right = width;
+                                    underlying.canvas.save();
+                                    underlying.canvas.translate(x, y);
+                                    underlying.canvas.concat(getTransformMatrix());
+                                    underlying.canvas.drawRect(dest, bgImageTiledPaint);
+                                    underlying.canvas.restore();
+                                }
+                            };
+                            break;
+                    }
                 }
-            });
+                StyleAccessor.setCachedData(s, bgPaint);
+            } else {
+                if (clip == null) {
+                    bgPaint.pendingClipW = cn1View.width;
+                    bgPaint.pendingClipH = cn1View.height;
+                    bgPaint.pendingClipX = 0;
+                    bgPaint.pendingClipY = 0;
+                } else {
+                    bgPaint.pendingClipW = clip.getWidth();
+                    bgPaint.pendingClipH = clip.getHeight();
+                    bgPaint.pendingClipX = clip.getX();
+                    bgPaint.pendingClipY = clip.getY();
+                }
+            }
+            bgPaint.pendingX = x;
+            bgPaint.pendingY = y;
+            bgPaint.pendingHeight = height;
+            bgPaint.pendingWidth = width;
+            bgPaint.pendingAlpha = alpha;
+            
+            pendingRenderingOperations.add(bgPaint);
         }
 
+        private AsyncPaintPosition paintBackgroundSolidColor(final byte bgt, Style s, AsyncPaintPosition bgPaint) {
+            int c = ((bgt << 24) & 0xff000000) | (s.getBgColor() & 0xffffff);
+            final Paint pnt = new Paint();
+            pnt.setStyle(Paint.Style.FILL);
+            pnt.setColor(c);
+            pnt.setAntiAlias(false);
+            bgPaint = new AsyncPaintPosition(clip) {
+                @Override
+                public void executeImpl(AndroidGraphics underlying) {
+                    if(bgt == 0) {
+                        return;
+                    }
+                    underlying.canvas.drawRect(x, y, x + width, y + height, pnt);
+                }
+            };
+            return bgPaint;
+        }
+        
         @Override
         public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, final int cmpWidth, final Style style, final String text,
                                        final Bitmap icon, final Bitmap stateIcon, final int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide,
