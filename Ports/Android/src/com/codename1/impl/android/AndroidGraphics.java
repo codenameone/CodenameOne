@@ -361,7 +361,7 @@ class AndroidGraphics {
 
    public void fillRectImpl(int x, int y, int w, int h, byte alpha) {
         if(alpha != 0) {
-            int oldAlpha = alpha;
+            int oldAlpha = getAlpha();
             setAlpha(alpha & 0xff);
 
             boolean antialias = paint.isAntiAlias();

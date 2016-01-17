@@ -369,7 +369,9 @@ public final class Graphics {
     /**
      * Fills a circular or elliptical arc based on the given angles and bounding 
      * box. The resulting arc begins at startAngle and extends for arcAngle 
-     * degrees.
+     * degrees. Usage:
+     * 
+     * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
      * 
      * @param x the x coordinate of the upper-left corner of the arc to be filled.
      * @param y the y coordinate of the upper-left corner of the arc to be filled.

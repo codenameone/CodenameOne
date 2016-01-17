@@ -42,7 +42,7 @@ public class Socket {
      * Returns true if sockets are supported in this port, false otherwise
      * @return true if sockets are supported in this port, false otherwise
      */
-    public boolean isSupported() {
+    public static boolean isSupported() {
         return Util.getImplementation().isSocketAvailable();
     }
     
@@ -51,7 +51,7 @@ public class Socket {
      * false invocations of listen will always fail
      * @return true if server sockets are supported in this port, false otherwise
      */
-    public boolean isServerSocketSupported() {
+    public static boolean isServerSocketSupported() {
         return Util.getImplementation().isServerSocketAvailable();
     }
 
