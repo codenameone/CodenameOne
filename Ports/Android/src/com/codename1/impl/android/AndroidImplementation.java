@@ -178,7 +178,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static final int DROID_IMPL_KEY_MUTE = -23459;
     static int[] leftSK = new int[]{DROID_IMPL_KEY_MENU};
     CodenameOneSurface myView = null;
-    private CodenameOneTextPaint defaultFont;
+    CodenameOneTextPaint defaultFont;
     private final char[] tmpchar = new char[1];
     private final Rect tmprect = new Rect();
     protected int defaultFontHeight;

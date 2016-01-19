@@ -74,7 +74,7 @@ import com.codename1.ui.plaf.Style;
 class AndroidGraphics {
 
     protected Canvas canvas;
-    private Paint paint;
+    protected Paint paint;
     private CodenameOneTextPaint font;
     private Transform transform;
     private Matrix convertedTransform;
@@ -85,7 +85,7 @@ class AndroidGraphics {
     private final Rect tmprect = new Rect();
     private final Path tmppath = new Path();
     protected final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
-    private AndroidImplementation impl;
+    AndroidImplementation impl;
     private int alpha = 255;
 
     AndroidGraphics(AndroidImplementation impl, Canvas canvas) {
@@ -999,7 +999,7 @@ class AndroidGraphics {
     /**
      * Reverses alignment in the case of bidi
      */
-    private int reverseAlignForBidi(boolean rtl, int align) {
+    protected final int reverseAlignForBidi(boolean rtl, int align) {
         if (rtl) {
             switch (align) {
                 case Component.RIGHT:

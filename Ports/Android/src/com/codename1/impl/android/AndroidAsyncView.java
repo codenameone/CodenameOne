@@ -26,10 +26,13 @@ import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RadialGradient;
 import android.graphics.Rect;
+import android.graphics.Region;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.view.KeyEvent;
@@ -39,7 +42,9 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.Painter;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextField;
@@ -493,6 +498,12 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             });
         }
         
+        class AndroidStyleCache {
+            AsyncPaintPosition backgroundPainter;
+            CodenameOneTextPaint textPaint;
+            Paint iconPaint;
+        }
+        
         abstract class AsyncPaintPosition extends AsyncOp{
             int x;
             int y;
@@ -512,7 +523,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             int pendingClipY;
             int pendingClipW;
             int pendingClipH;
-
+            
             public AsyncPaintPosition(Rectangle clip) {
                 super(clip);
                 pendingClipX = clipX;
@@ -542,6 +553,41 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             public abstract void executeImpl(AndroidGraphics underlying);
         }
                 
+        AsyncPaintPosition createGradientPaint(Style s) {
+            final Paint paint = new Paint();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setAntiAlias(true);
+            paint.setAlpha(255);
+            final byte bgType = s.getBackgroundType();
+            final int startColor = s.getBackgroundGradientStartColor();
+            final int endColor = s.getBackgroundGradientEndColor();
+            
+            AsyncPaintPosition ap = new AsyncPaintPosition(clip) {
+                int lastHeight;
+                int lastWidth;
+                @Override
+                public void executeImpl(AndroidGraphics underlying) {
+                    if(width != lastWidth || height != lastHeight) {
+                        lastWidth = width;
+                        lastHeight = height;
+                        switch(bgType) {
+                            case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                                paint.setShader(new LinearGradient(0, 0, 0, height, startColor, endColor, Shader.TileMode.MIRROR));
+                                break;
+                            case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                                paint.setShader(new LinearGradient(0, 0, width, 0, startColor, endColor, Shader.TileMode.MIRROR));
+                                break;
+                            case Style.BACKGROUND_GRADIENT_RADIAL:
+                                paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+                                break;
+                        }
+                        underlying.canvas.drawRect(x, y, x + width, y + height, paint);
+                    }
+                }
+            };
+            return ap;
+        }
+        
         @Override
         public void paintComponentBackground(final int x, final int y, final int width, final int height, final Style s) {
             if (alpha == 0 || width <= 0 || height <= 0) {
@@ -560,13 +606,17 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 return;
             }
 
-            AsyncPaintPosition bgPaint = (AsyncPaintPosition)StyleAccessor.getCachedData(s);
+            AndroidStyleCache sc = (AndroidStyleCache)StyleAccessor.getCachedData(s);
+            AsyncPaintPosition bgPaint = null;
+            if(sc != null) {
+                bgPaint = sc.backgroundPainter;
+            }
             if(bgPaint == null) {
                 final byte backgroundType = s.getBackgroundType() ;
                 Image bgImageOrig = s.getBgImage();
                 if (bgImageOrig == null) {
                     if(backgroundType >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {
-                        // TODO get gradients to work again...
+                        bgPaint = createGradientPaint(s);
                     } else {
                         // solid color paint
                         byte bgt = s.getBgTransparency();
@@ -662,7 +712,6 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     if(alpha > 0) {
                                         bgImageScaleFitColorPaint.setAlpha(alpha);
                                         underlying.canvas.drawRect(x, y, x + width, y + height, bgImageScaleFitColorPaint);
-                                        return;
                                     }
                                     Rect dest = new Rect();
                                     float r2 = Math.min(((float)width) / ((float)iWFit), ((float)height) / ((float)iHFit));
@@ -777,9 +826,31 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                 }
                             };
                             break;
+                            
+                            case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+                            case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+                                bgPaint = paintAlignedImage(s, bgImageOrig, backgroundType);
+                                break;
+
+                            case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+                            case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+                            case Style.BACKGROUND_GRADIENT_RADIAL:
+                                bgPaint = createGradientPaint(s);
+                                break;                            
                     }
                 }
-                StyleAccessor.setCachedData(s, bgPaint);
+                if(sc == null) {
+                    sc = new AndroidStyleCache();
+                    StyleAccessor.setCachedData(s, sc);
+                }
+                sc.backgroundPainter = bgPaint;
             } else {
                 if (clip == null) {
                     bgPaint.pendingClipW = cn1View.width;
@@ -802,6 +873,78 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             pendingRenderingOperations.add(bgPaint);
         }
 
+        private AsyncPaintPosition paintAlignedImage(Style s, final Image bgImageOrig, final byte position) {
+            final Paint bgImageAlignPaint = new Paint();
+            final Paint bgImageAlignColorPaint = new Paint();
+            final byte bgt = s.getBgTransparency();
+            int cc = ((bgt << 24) & 0xff000000) | (s.getBgColor() & 0xffffff);
+            bgImageAlignColorPaint.setAntiAlias(false);
+            bgImageAlignColorPaint.setStyle(Paint.Style.FILL);
+            bgImageAlignColorPaint.setColor(cc);
+            bgImageAlignPaint.setAlpha(255);
+
+            final Bitmap b = (Bitmap) bgImageOrig.getImage();
+            final Rect src = new Rect();
+            final int iW = bgImageOrig.getWidth();
+            final int iH = bgImageOrig.getHeight();
+            src.top = 0;
+            src.bottom = iH;
+            src.left = 0;
+            src.right = iW;
+                            
+            return new AsyncPaintPosition(clip) {                                
+                @Override
+                public void executeImpl(AndroidGraphics underlying) {
+                    if(alpha > 0) {
+                        bgImageAlignColorPaint.setAlpha(alpha);
+                        underlying.canvas.drawRect(x, y, x + width, y + height, bgImageAlignColorPaint);
+                    }
+                    Rect dest = new Rect();
+                    switch(position) {
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+                            dest.top = y;
+                            dest.left = x + (width / 2 - iW / 2);
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+                            dest.top = y + height - iH;
+                            dest.left = x + (width / 2 - iW / 2);
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+                            dest.top = y + (height / 2 - iH / 2);
+                            dest.left = x;
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+                            dest.top = y + (height / 2 - iH / 2);
+                            dest.left = x + width - iW;
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+                            dest.top = y + (height / 2 - iH / 2);
+                            dest.left = x + (width / 2 - iW / 2);
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+                            dest.top = y;
+                            dest.left = x;
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+                            dest.top = y;
+                            dest.left = x + width - iW;
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+                            dest.top = y + (height - iH);
+                            dest.left = x;
+                            break;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+                            dest.top = y + (height - iH);
+                            dest.left = x + width - iW;
+                            break;
+                    }
+                    dest.bottom = y + iH;
+                    dest.right = x + iW;
+                    underlying.canvas.drawBitmap(b, src, dest, bgImageAlignPaint);
+                }
+            };
+        }
+        
         private AsyncPaintPosition paintBackgroundSolidColor(final byte bgt, Style s, AsyncPaintPosition bgPaint) {
             int c = ((bgt << 24) & 0xff000000) | (s.getBgColor() & 0xffffff);
             final Paint pnt = new Paint();
@@ -821,24 +964,441 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         }
         
         @Override
-        public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, final int cmpWidth, final Style style, final String text,
-                                       final Bitmap icon, final Bitmap stateIcon, final int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide,
+        public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, int cmpWidth, final Style style, String text,
+                                       final Bitmap icon, final Bitmap stateIcon, int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide,
                                        final int textPosition, final int stringWidth, final boolean isTickerRunning, final int tickerShiftText, final boolean endsWith3Points, final int valign) {
+            if (text == null) {
+                text = "";
+            }
+            int fontHeight = 0;
+            Font cn1Font = style.getFont();
+            if (text.length() > 0) {
+                fontHeight = cn1Font.getHeight();
+            } else {
+                if (icon == null) {
+                    return;
+                }
+            }
+            
+            AndroidStyleCache styleCache =  (AndroidStyleCache)StyleAccessor.getCachedData(style);
+            if(styleCache == null) {
+                styleCache = new AndroidStyleCache();
+                StyleAccessor.setCachedData(style, styleCache);
+            }
+            if(styleCache.textPaint == null) {
+                Object nativeFont = cn1Font.getNativeFont();
+                if (nativeFont == null) {
+                    nativeFont = impl.defaultFont;
+                }
+                if (nativeFont instanceof AndroidImplementation.NativeFont) {
+                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) ((AndroidImplementation.NativeFont) nativeFont).font);
+                } else {
+                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) font);
+                }
+                
+                int c = (alpha << 24) | (style.getFgColor() & 0xffffff);
+                styleCache.textPaint.setColor(c);
+            }          
+            final CodenameOneTextPaint nativeFont = styleCache.textPaint;
+            
+            int iconWidth = 0;
+            int iconHeight = 0;
+            if(icon != null) {
+                iconWidth = icon.getWidth();
+                iconHeight = icon.getHeight();
+            }
+
+            int textDecoration = style.getTextDecoration();
+            int stateIconSize = 0;
+            int stateIconYPosition = 0;
+
+            int leftPadding = style.getPaddingLeft(rtl);
+            int rightPadding = style.getPaddingRight(rtl);
+            int topPadding = style.getPaddingTop();
+            int bottomPadding = style.getPaddingBottom();
+
+            if (stateIcon != null) {
+                stateIconSize = stateIcon.getWidth();
+                stateIconYPosition = cmpY + topPadding
+                        + (cmpHeight - topPadding
+                        - bottomPadding) / 2 - stateIconSize / 2;
+                int tX = cmpX;
+                if (isOppositeSide) {
+                    if (rtl) {
+                        tX += leftPadding;
+                    } else {
+                        tX = tX + cmpWidth - leftPadding - stateIconSize;
+                    }
+                    cmpWidth -= leftPadding - stateIconSize;
+                } else {
+                    preserveSpaceForState = stateIconSize + gap;
+                    if (rtl) {
+                        tX = tX + cmpWidth - leftPadding - stateIconSize;
+                    } else {
+                        tX += leftPadding;
+                    }
+                }
+
+                drawImage(stateIcon, tX, stateIconYPosition);
+            }
+
+            //default for bottom left alignment
+            int x = cmpX + leftPadding + preserveSpaceForState;
+            int y = cmpY + topPadding;
+
+            int align = reverseAlignForBidi(rtl, style.getAlignment());
+
+            int textPos = reverseAlignForBidi(rtl, textPosition);
+
+            //set initial x,y position according to the alignment and textPosition
+            switch (align) {
+                case Component.LEFT:
+                    switch (textPos) {
+                        case Label.LEFT:
+                        case Label.RIGHT:
+                            y = y + (cmpHeight - (topPadding + bottomPadding + Math.max(((icon != null) ? iconHeight : 0), fontHeight))) / 2;
+                            break;
+                        case Label.BOTTOM:
+                        case Label.TOP:
+                            y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;
+                            break;
+                    }
+                    break;
+                case Component.CENTER:
+                    switch (textPos) {
+                        case Label.LEFT:
+                        case Label.RIGHT:
+                            x = x + (cmpWidth - (preserveSpaceForState
+                                    + leftPadding
+                                    + rightPadding
+                                    + ((icon != null) ? iconWidth + gap : 0)
+                                    + stringWidth)) / 2;
+                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                            y = y + (cmpHeight - (topPadding
+                                    + bottomPadding
+                                    + Math.max(((icon != null) ? iconHeight : 0),
+                                            fontHeight))) / 2;
+                            break;
+                        case Label.BOTTOM:
+                        case Label.TOP:
+                            x = x + (cmpWidth - (preserveSpaceForState + leftPadding
+                                    + rightPadding
+                                    + Math.max(((icon != null) ? iconWidth + gap : 0),
+                                            stringWidth))) / 2;
+                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                            y = y + (cmpHeight - (topPadding
+                                    + bottomPadding
+                                    + ((icon != null) ? iconHeight + gap : 0)
+                                    + fontHeight)) / 2;
+                            break;
+                    }
+                    break;
+                case Component.RIGHT:
+                    switch (textPos) {
+                        case Label.LEFT:
+                        case Label.RIGHT:
+                            x = cmpX + cmpWidth - rightPadding
+                                    - (((icon != null) ? (iconWidth + gap) : 0)
+                                    + stringWidth);
+                            if (rtl) {
+                                x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);
+                            } else {
+                                x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                            }
+                            y = y + (cmpHeight - (topPadding
+                                    + bottomPadding
+                                    + Math.max(((icon != null) ? iconHeight : 0),
+                                            fontHeight))) / 2;
+                            break;
+                        case Label.BOTTOM:
+                        case Label.TOP:
+                            x = cmpX + cmpWidth - rightPadding
+                                    - (Math.max(((icon != null) ? (iconWidth) : 0),
+                                            stringWidth));
+                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                            y = y + (cmpHeight - (topPadding
+                                    + bottomPadding
+                                    + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;
+                            break;
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            int textSpaceW = cmpWidth - rightPadding - leftPadding;
+
+            if (icon != null && (textPos == Label.RIGHT || textPos == Label.LEFT)) {
+                textSpaceW = textSpaceW - iconWidth;
+            }
+
+            if (stateIcon != null) {
+                textSpaceW = textSpaceW - stateIconSize;
+            } else {
+                textSpaceW = textSpaceW - preserveSpaceForState;
+            }
+            
+            
             if (clip == null) {
                 clip = new Rectangle(cmpX, cmpY, cmpWidth, cmpHeight);
             } else {
                 clip = clip.intersection(cmpX, cmpY, cmpWidth, cmpHeight);
             }
+            
             final int al = alpha;
+            final String finalText = text;
+            final int finalTextSpaceW = textSpaceW;
+            final int finalTextDecoration = textDecoration;
+            final int finalFontHeight = fontHeight;
+            final int finalTextPos = textPos;
+
+            final int finalIconHeight = iconHeight;
+            final int finalIconWidth = iconWidth;
+            
+            final int clipXX = getClipX();
+            final int clipYX = getClipY();
+            final int clipWX = getClipWidth();
+            final int clipHX = getClipHeight();
+            final int finalX = x;
+            final int finalY = y;
+
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
-                    underlying.setAlpha(al);
-                    underlying.drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState,
-                            gap, rtl, isOppositeSide, textPosition, stringWidth, isTickerRunning, tickerShiftText, endsWith3Points, valign);
+                    if (icon == null) {
+                        // no icon only string
+                        drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning, tickerShiftText,
+                                finalTextDecoration, rtl, endsWith3Points, stringWidth, finalFontHeight);
+                    } else {
+                        int strWidth = stringWidth;
+                        int iconStringWGap;
+                        int iconStringHGap;
+
+                        switch (finalTextPos) {
+                            case Label.LEFT:
+                                if (finalIconHeight > finalFontHeight) {
+                                    iconStringHGap = (finalIconHeight - finalFontHeight) / 2;
+                                    strWidth = drawLabelStringValign(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning,
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, finalIconHeight,
+                                            finalFontHeight, valign);
+
+                                    underlying.canvas.drawBitmap(icon, finalX + strWidth + gap, finalY, underlying.paint);
+                                } else {
+                                    iconStringHGap = (finalFontHeight - finalIconHeight) / 2;
+                                    strWidth = drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning,
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight);
+
+                                    underlying.canvas.drawBitmap(icon, finalX + strWidth + gap, finalY + iconStringHGap, underlying.paint);
+                                }
+                                break;
+                            case Label.RIGHT:
+                                if (finalIconHeight > finalFontHeight) {
+                                    iconStringHGap = (finalIconHeight - finalFontHeight) / 2;
+                                    underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
+                                    underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
+                                    drawLabelStringValign(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, iconStringHGap, finalIconHeight, finalFontHeight, valign);
+                                } else {
+                                    iconStringHGap = (finalFontHeight - finalIconHeight) / 2;
+                                    underlying.canvas.drawBitmap(icon, finalX, finalY + iconStringHGap, underlying.paint);
+                                    drawLabelString(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                }
+                                break;
+                            case Label.BOTTOM:
+                                //center align the smaller
+                                if (finalIconWidth > strWidth) {
+                                    iconStringWGap = (finalIconWidth - strWidth) / 2;
+                                    underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
+                                    drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY + finalIconHeight + gap, finalTextSpaceW,
+                                            isTickerRunning, tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                } else {
+                                    iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;
+                                    underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY, underlying.paint);
+
+                                    drawLabelString(underlying, nativeFont, finalText, finalX, finalY + finalIconHeight + gap, finalTextSpaceW, isTickerRunning,
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                }
+                                break;
+                            case Label.TOP:
+                                //center align the smaller
+                                if (finalIconWidth > strWidth) {
+                                    iconStringWGap = (finalIconWidth - strWidth) / 2;
+                                    drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY, finalTextSpaceW, isTickerRunning,
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                    underlying.canvas.drawBitmap(icon, finalX, finalY + finalFontHeight + gap, underlying.paint);
+                                } else {
+                                    iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;
+                                    drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning, tickerShiftText,
+                                            finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                    underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY + finalFontHeight + gap, underlying.paint);
+                                }
+                                break;
+                        }
+                    }
+                    underlying.setClip(clipXX, clipYX, clipWX, clipHX);
                 }
             });
+            
         }
+                
+        /**
+         * Implements the drawString for the text component and adjust the valign
+         * assuming the icon is in one of the sides
+         */
+        private int drawLabelStringValign(AndroidGraphics underlying, 
+                CodenameOneTextPaint nativeFont, String str, int x, int y, int textSpaceW,
+                boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl,
+                boolean endsWith3Points, int textWidth,
+                int iconStringHGap, int iconHeight, int fontHeight, int valign) {
+            switch (valign) {
+                case Component.TOP:
+                    return drawLabelString(underlying, nativeFont, str, x, y, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+                case Component.CENTER:
+                    return drawLabelString(underlying, nativeFont, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+                default:
+                    return drawLabelString(underlying, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+            }
+        }
+
+        /**
+         * Implements the drawString for the text component and adjust the valign
+         * assuming the icon is in one of the sides
+         */
+        private int drawLabelString(AndroidGraphics underlying, CodenameOneTextPaint nativeFont, String text, int x, int y, int textSpaceW,
+                boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl, boolean endsWith3Points, int textWidth,
+                int fontHeight) {
+            int cx = underlying.getClipX();
+            int cy = underlying.getClipY();
+            int cw = underlying.getClipWidth();
+            int ch = underlying.getClipHeight();
+            underlying.clipRect(x, cy, textSpaceW, ch);
+
+            int drawnW = drawLabelText(underlying, textDecoration, rtl, isTickerRunning, endsWith3Points, nativeFont,
+                    textWidth, textSpaceW, tickerShiftText, text, x, y, fontHeight);
+
+            underlying.setClip(cx, cy, cw, ch);
+
+            return drawnW;
+        }
+        
+        private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Object f) {
+            if (length * charWidth < width) {
+                return true;
+            }
+            length = Math.min(s.length(), length);
+            return impl.stringWidth(f, s.substring(0, length)) < width;
+        }
+
+        /**
+         * Draws the text of a label
+         *
+         * @param nativeGraphics graphics context
+         * @param textDecoration decoration information for the text
+         * @param text the text for the label
+         * @param x position for the label
+         * @param y position for the label
+         * @param txtW stringWidth(text) equivalent which is faster than just
+         * invoking string width all the time
+         * @param textSpaceW the width available for the component
+         * @return the space used by the drawing
+         */
+        protected int drawLabelText(AndroidGraphics underlying, int textDecoration, boolean rtl, boolean isTickerRunning,
+                boolean endsWith3Points, CodenameOneTextPaint nativeFont, int txtW, int textSpaceW, int shiftText, String text, int x, int y, int fontHeight) {
+            if ((!isTickerRunning) || rtl) {
+                //if there is no space to draw the text add ... at the end
+                if (txtW > textSpaceW && textSpaceW > 0) {
+                    // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+                    // the allowed space is handled differently in RTL, this is due to the reverse algorithm
+                    // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+                    // trimming characters from the end of the text (as done with LTR) won't do.
+                    // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+                    // the downside is that a part of a letter may be shown here as well.
+
+                    if (rtl) {
+                        if ((!isTickerRunning) && endsWith3Points) {
+                            String points = "...";
+                            int pointsW = impl.stringWidth(nativeFont, points);
+                            drawString(underlying, nativeFont, points, shiftText + x, y, textDecoration, fontHeight);
+                            clipRect(pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);
+                        }
+                        x = x - txtW + textSpaceW;
+                    } else if (endsWith3Points) {
+                        String points = "...";
+                        int index = 1;
+                        int widest = impl.charWidth(nativeFont, 'W');
+                        int pointsW = impl.stringWidth(nativeFont, points);
+                        while (fastCharWidthCheck(text, index, textSpaceW - pointsW, widest, nativeFont) && index < text.length()) {
+                            index++;
+                        }
+                        text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;
+                        txtW = impl.stringWidth(nativeFont, text);
+                    }
+                }
+            }
+
+            drawString(underlying, nativeFont, text, shiftText + x, y, textDecoration, fontHeight);
+            return Math.min(txtW, textSpaceW);
+        }
+
+        /**
+         * Draw a string using the current font and color in the x,y coordinates.
+         * The font is drawn from the top position and not the baseline.
+         *
+         * @param nativeGraphics the graphics context
+         * @param nativeFont the font used
+         * @param str the string to be drawn.
+         * @param x the x coordinate.
+         * @param y the y coordinate.
+         * @param textDecoration Text decoration bitmask (See Style's
+         * TEXT_DECORATION_* constants)
+         */
+        private void drawString(AndroidGraphics underlying, CodenameOneTextPaint nativeFont, String str, int x, int y, int textDecoration, int fontHeight) {
+            // this if has only the minor effect of providing a slighly faster execution path
+            if (textDecoration != 0) {
+                boolean raised = (textDecoration & Style.TEXT_DECORATION_3D) != 0;
+                boolean lowerd = (textDecoration & Style.TEXT_DECORATION_3D_LOWERED) != 0;
+                boolean north = (textDecoration & Style.TEXT_DECORATION_3D_SHADOW_NORTH) != 0;
+                if (raised || lowerd || north) {
+                    textDecoration = textDecoration & (~Style.TEXT_DECORATION_3D) & (~Style.TEXT_DECORATION_3D_LOWERED) & (~Style.TEXT_DECORATION_3D_SHADOW_NORTH);
+                    int c = getColor();
+                    int a = getAlpha();
+                    int newColor = 0;
+                    int offset = -2;
+                    if (lowerd) {
+                        offset = 2;
+                        newColor = 0xffffff;
+                    } else if (north) {
+                        offset = 2;
+                    }
+                    setColor(newColor);
+                    if (a == 0xff) {
+                        setAlpha(140);
+                    }
+                    drawString(underlying, nativeFont, str, x, y + offset, textDecoration, fontHeight);
+                    setAlpha(a);
+                    setColor(c);
+                    drawString(underlying, nativeFont, str, x, y, textDecoration, fontHeight);
+                    return;
+                }
+                underlying.canvas.drawText(str, x, y - font.getFontAscent(), nativeFont);
+                if ((textDecoration & Style.TEXT_DECORATION_UNDERLINE) != 0) {
+                    underlying.paint.setStyle(Paint.Style.FILL);
+                    underlying.canvas.drawLine(x, y + fontHeight - 1, x + impl.stringWidth(nativeFont, str), y + fontHeight - 1, underlying.paint);
+                }
+                if ((textDecoration & Style.TEXT_DECORATION_STRIKETHRU) != 0) {
+                    underlying.paint.setStyle(Paint.Style.FILL);
+                    underlying.canvas.drawLine(x, y + fontHeight / 2, x + impl.stringWidth(nativeFont, str), y + fontHeight / 2, underlying.paint);
+                }
+                if ((textDecoration & Style.TEXT_DECORATION_OVERLINE) != 0) {
+                    underlying.paint.setStyle(Paint.Style.FILL);
+                    underlying.canvas.drawLine(x, y, x + impl.stringWidth(nativeFont, str), y, underlying.paint);
+                }
+            } else {
+                underlying.canvas.drawText(str, x, y - nativeFont.getFontAscent(), nativeFont);
+            }
+        }
+        
 
         @Override
         public void fillArc(final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {

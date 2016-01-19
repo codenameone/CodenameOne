@@ -35,6 +35,12 @@ public class CodenameOneTextPaint extends TextPaint {
     int fontHeight = -1;
     private int ascent = -1;
 
+    public CodenameOneTextPaint(CodenameOneTextPaint paint) {
+        super(paint);
+        this.fontHeight = paint.fontHeight;
+        this.ascent = ascent;
+    }
+
     public CodenameOneTextPaint(Typeface tf) {
         super.setTypeface(tf);
     }
