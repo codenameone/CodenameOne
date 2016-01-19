@@ -37,8 +37,22 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.WeakHashMap;
 
 /**
- * Shows a "Washing Machine" infinite progress indication animation
- *
+ * <p>Shows a "Washing Machine" infinite progress indication animation, to customize the image you can either 
+ * use the infiniteImage theme constant or the <code>setAnimation</code> method. The image is rotated
+ * automatically so don't use an animated image or anything like that as it would fail with the rotation logic.</p>
+ * 
+ * <p>This class can be used in one of two ways either by embedding the component into the UI thru something
+ * like this:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/bddead645fcd8ee33e9c.js"></script>
+ * 
+ * <p>
+ * Notice that this can be used within a custom dialog too.<br />
+ * A second approach allows showing the infinite progress over the entire screen which blocks all input. This tints
+ * the background while the infinite progress rotates:
+ * </p>
+ *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+ * 
  * @author Shai Almog
  */
 public class InfiniteProgress extends Component {
@@ -69,7 +83,10 @@ public class InfiniteProgress extends Component {
     }
     
     /**
-     * Shows the infinite progress over the whole screen
+     * Shows the infinite progress over the whole screen, the blocking can be competed by calling <code>dispose()</code> 
+     * on the returned <code>Dialog</code>.
+     *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+     * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
      */
     public Dialog showInifiniteBlocking() {
         Form f = Display.getInstance().getCurrent();
@@ -196,6 +213,7 @@ public class InfiniteProgress extends Component {
     }
 
     /**
+     * Allows setting the image that will be rotated as part of this effect
      * @param animation the animation to set
      */
     public void setAnimation(Image animation) {
