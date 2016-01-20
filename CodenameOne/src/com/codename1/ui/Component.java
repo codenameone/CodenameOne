@@ -4183,6 +4183,18 @@ public class Component implements Animation, StyleListener {
         this.isScrollVisible = isScrollVisible;
     }
 
+    void lockStyleImages(Style stl) {
+        Image i = stl.getBgImage();
+        if(i != null) {
+            i.lock();
+        } else {
+            Border b = stl.getBorder();
+            if(b != null) {
+                b.lock();
+            }
+        }
+    }
+    
     /**
      * Invoked internally to initialize and bind the component
      */
@@ -4191,15 +4203,7 @@ public class Component implements Animation, StyleListener {
             initialized = true;
             UIManager manager = getUIManager();
             Style stl = getStyle();
-            Image i = stl.getBgImage();
-            if(i != null) {
-                i.lock();
-            } else {
-                Border b = stl.getBorder();
-                if(b != null) {
-                    b.lock();
-                }
-            }
+            lockStyleImages(stl);
             manager.getLookAndFeel().bind(this);
             checkAnimation();
             if(isRTL() && isScrollableX()){
