@@ -1613,7 +1613,6 @@ public class Form extends Container {
         if (getParent() != null) {
             getParent().getComponentForm().registerAnimated(this);
         }
-        lockStyleImages(getUnselectedStyle());
     }
 
     /**

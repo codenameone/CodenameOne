@@ -435,6 +435,7 @@ public class Component implements Animation, StyleListener {
 
     private void initStyle() {
         unSelectedStyle = getUIManager().getComponentStyle(getUIID());
+        lockStyleImages(unSelectedStyle);
         if (unSelectedStyle != null) {
             unSelectedStyle.addStyleListener(this);
             if (unSelectedStyle.getBgPainter() == null) {

@@ -210,6 +210,7 @@ public class Dialog extends Form {
         super.getTitleComponent().setVisible(false);
         super.getTitleArea().setVisible(false);
         super.getTitleArea().setUIID("Container");
+        lockStyleImages(getUnselectedStyle());
         titleArea.setVisible(false);
 
         dialogContentPane = new Container();
