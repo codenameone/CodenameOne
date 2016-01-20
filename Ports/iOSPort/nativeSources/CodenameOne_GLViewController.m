@@ -620,12 +620,8 @@ int maxVal(int a, int b) {
     return b;
 }
 
-CGContextRef roundRect(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
+CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     [UIColorFromRGB(color, alpha) set];
-    CGContextRef context = UIGraphicsGetCurrentContext();
-    if (currentMutableTransformSet) {
-        CGContextConcatCTM(context, currentMutableTransform);
-    }
     CGRect rrect = CGRectMake(x, y, width, height);
     CGFloat radius = MAX(arcWidth, arcHeight);
     CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect);
@@ -641,7 +637,15 @@ CGContextRef roundRect(int color, int alpha, int x, int y, int width, int height
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-    CGContextStrokePath(roundRect(color, alpha, x, y, width, height, arcWidth, arcHeight));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+    CGContextStrokePath(roundRect(context, color, alpha, x, y, width, height, arcWidth, arcHeight));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal() {
@@ -667,7 +671,8 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalI
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
-    CGContextStrokePath(roundRect(color, alpha, 0, 0, width, height, arcWidth, arcHeight));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextStrokePath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
@@ -682,13 +687,22 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
-    CGContextFillPath(roundRect(color, alpha, x, y, width, height, arcWidth, arcHeight));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+    CGContextFillPath(roundRect(context, color, alpha, x, y, width, height, arcWidth, arcHeight));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
-    CGContextFillPath(roundRect(color, alpha, 0, 0, width, height, arcWidth, arcHeight));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextFillPath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
@@ -701,17 +715,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
 }
 
 #define PI 3.14159265358979323846
-CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle, BOOL fill) {
+CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, int width, int height, int startAngle, int angle, BOOL fill) {
     if (angle < 0) {
         startAngle += angle;
         angle = -angle;
     }
     
     [UIColorFromRGB(color, alpha) set];
-    CGContextRef context = UIGraphicsGetCurrentContext();
-    if (currentMutableTransformSet) {
-        CGContextConcatCTM(context, currentMutableTransform);
-    }
     if(width == height) {
         int radius = MIN(width, height) / 2;
         if (fill){
@@ -752,12 +762,28 @@ CGContextRef drawArc(int color, int alpha, int x, int y, int width, int height, 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    CGContextStrokePath(drawArc(color, alpha, x, y, width, height, startAngle, angle, NO));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+    CGContextStrokePath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, NO));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    CGContextFillPath(drawArc(color, alpha, x, y, width, height, startAngle, angle, YES));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+    CGContextFillPath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, YES));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl
@@ -979,11 +1005,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
+    CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
-        CGContextRef context = UIGraphicsGetCurrentContext();
+        CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
     [i drawInRect:CGRectMake(x, y, width, height)];
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl finished");
 }
 
@@ -1183,11 +1213,15 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
     CGContextMoveToPoint(context, x1, y1);
     CGContextAddLineToPoint(context, x2, y2);
     CGContextStrokePath(context);
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl finished");
 }
 
@@ -1219,9 +1253,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
     CGContextFillRect(context, CGRectMake(x, y, width, height));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
 }
 
@@ -1242,9 +1280,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
     CGContextStrokeRect(context, CGRectMake(x, y, width, height));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl finished");
 }
 
@@ -2525,9 +2567,13 @@ BOOL prefersStatusBarHidden = NO;
     [col set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
 	[str drawAtPoint:CGPointMake(x, y) withFont:font];
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
     //NSLog(@"Drawing the string %@ at %i, %i", str, x, y);
 	POOL_END();
 }
