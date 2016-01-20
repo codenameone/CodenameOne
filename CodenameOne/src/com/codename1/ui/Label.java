@@ -177,7 +177,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getBaselineResizeBehavior() {
         switch(valign) {
@@ -225,7 +225,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
@@ -251,7 +251,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void deinitializeImpl() {
         super.deinitializeImpl(); 
@@ -427,14 +427,14 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         return super.paramString() + ", text = " +getText() + ", gap = " + gap;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(legacyRenderer) {
@@ -464,7 +464,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
@@ -563,7 +563,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void tryDeregisterAnimated() {
     }
@@ -619,7 +619,7 @@ public class Label extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         boolean animateTicker = false;
@@ -700,28 +700,28 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"maskName"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] { String.class };
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("maskName")) {
@@ -731,7 +731,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("maskName")) {
@@ -759,21 +759,21 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"text"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {String.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -787,7 +787,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -804,7 +804,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("text")) {
@@ -814,7 +814,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("text")) {

@@ -254,7 +254,7 @@ public class EncodedImage extends Image {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getImage() {
         return getInternalImpl().getImage();
@@ -341,14 +341,14 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isLocked() {
         return locked;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void asyncLock(final Image internal) {
         if(!locked) {
@@ -390,7 +390,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void lock() {
         if(!locked) {
@@ -402,7 +402,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unlock() {
         if(locked) {
@@ -428,42 +428,42 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image subImage(int x, int y, int width, int height, boolean processAlpha)  {
         return getInternalImpl().subImage(x, y, width, height, processAlpha);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image rotate(int degrees) {
         return getInternalImpl().rotate(degrees);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image modifyAlpha(byte alpha) {
         return getInternalImpl().modifyAlpha(alpha);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image modifyAlpha(byte alpha, int removeColor) {
         return getInternalImpl().modifyAlpha(alpha, removeColor);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Graphics getGraphics() {        
         return null;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getWidth() {
         if(width > -1) {
@@ -474,7 +474,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getHeight() {
         if(height > -1) {
@@ -485,7 +485,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         Display.impl.drawingEncodedImage(this);
@@ -498,7 +498,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         Display.impl.drawingEncodedImage(this);
@@ -506,7 +506,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void getRGB(int[] rgbData,
             int offset,
@@ -518,7 +518,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void toRGB(RGBImage image,
             int destX,
@@ -531,21 +531,21 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaledWidth(int width) {
         return getInternalImpl().scaledWidth(width);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaledHeight(int height) {
         return getInternalImpl().scaledHeight(height);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaledSmallerRatio(int width, int height) {
         return getInternalImpl().scaledSmallerRatio(width, height);
@@ -593,7 +593,7 @@ public class EncodedImage extends Image {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaled(int width, int height) {
         // J2ME/RIM don't support image IO and Windows Phone doesn't support PNG which prevents
@@ -606,21 +606,21 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void scale(int width, int height) {
         getInternalImpl().scale(width, height);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return false;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOpaque() {
         if(opaqueChecked) {

@@ -74,7 +74,7 @@ public class ScaleImageLabel extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected Dimension calcPreferredSize() {

@@ -951,14 +951,14 @@ public final class GeneralPath implements Shape {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator() {
         return new Iterator(this);
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(Transform m) {
         Iterator out = (Iterator) getPathIterator();
@@ -1000,7 +1000,7 @@ public final class GeneralPath implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public Shape intersection(Rectangle rect){
         return ShapeUtil.intersection(rect, this);
@@ -1026,7 +1026,7 @@ public final class GeneralPath implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean contains(int x, int y){
         return contains((float)x, (float)y);

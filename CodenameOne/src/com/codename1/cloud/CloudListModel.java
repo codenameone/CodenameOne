@@ -235,7 +235,7 @@ public class CloudListModel implements ListModel {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getItemAt(int index) {
         if(keys != null && index < keys.length && index > -1){
@@ -299,7 +299,7 @@ public class CloudListModel implements ListModel {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize() {
         if(keys == null) {
@@ -358,14 +358,14 @@ public class CloudListModel implements ListModel {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSelectedIndex() {
         return selectedIndex;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
         int oldIndex = selectedIndex;
@@ -374,28 +374,28 @@ public class CloudListModel implements ListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangedListener(DataChangedListener l) {
         modelListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangedListener(DataChangedListener l) {
         modelListener.removeListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
@@ -404,7 +404,7 @@ public class CloudListModel implements ListModel {
     /**
      * <b>Notice</b> this method does NOT commit the data, after committing the data
      * the cache MUST be cleared!
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(Object item) {
         CloudObject cld = (CloudObject)item;
@@ -417,7 +417,7 @@ public class CloudListModel implements ListModel {
     /**
      * <b>Notice</b> this method does NOT commit the data, after committing the data
      * the cache MUST be cleared!
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index) {
         Object o = getItemAt(index);

@@ -72,7 +72,7 @@ public class FlowLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {
         int x = parent.getStyle().getPadding(parent.isRTL(), Component.LEFT);
@@ -262,7 +262,7 @@ public class FlowLayout extends Layout{
     private Dimension dim = new Dimension(0, 0);
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public  Dimension getPreferredSize(Container parent) {
         int parentWidth = parent.getWidth();
@@ -298,7 +298,7 @@ public class FlowLayout extends Layout{
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "FlowLayout";
@@ -381,7 +381,7 @@ public class FlowLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return super.equals(o) && ((FlowLayout)o).orientation == orientation &&

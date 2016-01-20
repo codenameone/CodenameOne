@@ -41,7 +41,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
     protected static final Object LOCK = new Object();
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
         String url = docInfo.getUrl();
@@ -54,7 +54,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public InputStream resourceRequested(DocumentInfo docInfo) {
         return null; 

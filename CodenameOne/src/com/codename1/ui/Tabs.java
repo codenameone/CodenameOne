@@ -151,7 +151,7 @@ public class Tabs extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager manager) {
         super.initLaf(manager);
@@ -179,7 +179,7 @@ public class Tabs extends Container {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
@@ -195,7 +195,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -204,7 +204,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         Form form = this.getComponentForm();
@@ -217,7 +217,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
@@ -230,7 +230,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         boolean b = super.animate();
@@ -811,7 +811,7 @@ public class Tabs extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         String className = getClass().getName();
@@ -1325,14 +1325,14 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"titles", "icons", "selectedIcons"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), 
@@ -1341,14 +1341,14 @@ public class Tabs extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[]", "Image[]", "Image[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("titles")) {
@@ -1377,7 +1377,7 @@ public class Tabs extends Container {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("titles")) {

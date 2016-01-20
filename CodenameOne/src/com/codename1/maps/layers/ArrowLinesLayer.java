@@ -56,7 +56,7 @@ public class ArrowLinesLayer extends LinesLayer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public ArrowLinesLayer(Projection p, String name) {
         super(p, name);

@@ -99,7 +99,7 @@ public class GlassTutorial implements Painter {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Rectangle rect) {
         if(internal == null) {

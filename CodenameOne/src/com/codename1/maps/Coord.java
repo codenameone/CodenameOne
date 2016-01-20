@@ -98,7 +98,7 @@ public class Coord {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return new StringBuilder().append("{'longitude':").append(getLongitude()).append(", 'latitude':").
@@ -125,7 +125,7 @@ public class Coord {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object other) {
         if (!(other instanceof Coord)) {
@@ -136,7 +136,7 @@ public class Coord {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         int hash = 5;

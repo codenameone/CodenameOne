@@ -564,14 +564,14 @@ public final class CloudObject implements Externalizable {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getVersion() {
         return 1;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void externalize(DataOutputStream out) throws IOException {
         Util.writeUTF(cloudId, out);
@@ -588,7 +588,7 @@ public final class CloudObject implements Externalizable {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void internalize(int version, DataInputStream in) throws IOException {
         cloudId = Util.readUTF(in);
@@ -609,7 +609,7 @@ public final class CloudObject implements Externalizable {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         if(!(o instanceof CloudObject)) {
@@ -626,7 +626,7 @@ public final class CloudObject implements Externalizable {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         if(cloudId != null) {

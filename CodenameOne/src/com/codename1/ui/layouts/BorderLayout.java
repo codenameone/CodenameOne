@@ -123,7 +123,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addLayoutComponent(Object name, Component comp, Container c) {
         // helper check for a common mistake...
@@ -159,7 +159,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeLayoutComponent(Component comp) {
         if (comp == portraitCenter) {
@@ -199,7 +199,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container target) {
         Style s = target.getStyle();
@@ -358,7 +358,7 @@ public class BorderLayout extends Layout {
     private Dimension dim = new Dimension(0, 0);
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Dimension getPreferredSize(Container parent) {
         dim.setWidth(0);
@@ -481,7 +481,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "BorderLayout";
@@ -518,7 +518,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         if(super.equals(o) && centerBehavior == ((BorderLayout)o).centerBehavior) {
@@ -575,7 +575,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOverlapSupported(){
         return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW;
@@ -598,14 +598,14 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isConstraintTracking() {
         return false;
     }    
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean obscuresPotential(Container parent) {
         return getCenter() != null;

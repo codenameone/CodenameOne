@@ -246,56 +246,56 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Layout getLayout() {
         return dialogContentPane.getLayout();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getTitle() {
         return dialogTitle.getText();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Component cmp) {
         dialogContentPane.addComponent(cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Object constraints, Component cmp) {
         dialogContentPane.addComponent(constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Object constraints, Component cmp) {
         dialogContentPane.addComponent(index, constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Component cmp) {
         dialogContentPane.addComponent(index, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeAll() {
         dialogContentPane.removeAll();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeComponent(Component cmp) {
         dialogContentPane.removeComponent(cmp);
@@ -303,21 +303,21 @@ public class Dialog extends Form {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Label getTitleComponent() {
         return dialogTitle;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Style getTitleStyle() {
         return dialogTitle.getStyle();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setLayout(Layout layout) {
         dialogContentPane.setLayout(layout);
@@ -328,14 +328,14 @@ public class Dialog extends Form {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitle(String title) {
         dialogTitle.setText(title);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitleComponent(Label title) {
         super.getContentPane().removeComponent(dialogTitle);
@@ -355,7 +355,7 @@ public class Dialog extends Form {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitleComponent(Label title, Transition t) {
         super.getContentPane().replace(dialogTitle, title, t);
@@ -563,7 +563,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void sizeChangedInternal(int w, int h) {
         if(disposeOnRotation) {
@@ -840,7 +840,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         if(commandsAsButtons) {
@@ -915,7 +915,7 @@ public class Dialog extends Form {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void onShow() {
         if (dialogType > 0) {
@@ -934,14 +934,14 @@ public class Dialog extends Form {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void showBack() {
         showImpl(true);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
@@ -1414,7 +1414,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         isTimedOut();
@@ -1646,7 +1646,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
@@ -1660,7 +1660,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
@@ -1696,7 +1696,7 @@ public class Dialog extends Form {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void repaint(Component cmp) {
         if(getParent() != null){

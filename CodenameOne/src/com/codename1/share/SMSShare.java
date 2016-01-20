@@ -49,7 +49,7 @@ public class SMSShare extends ShareService {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void share(final String toShare) {
         final Form currentForm = Display.getInstance().getCurrent();
@@ -134,7 +134,7 @@ public class SMSShare extends ShareService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean canShareImage() {
         return false;

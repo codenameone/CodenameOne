@@ -432,7 +432,7 @@ class ResourceThreadQueue {
         }
 
         /**
-         * {@inheritDoc}
+         * {{@inheritDoc}}
          */
         public void run() {
                 DocumentInfo docInfo=cssDocInfo!=null?cssDocInfo:new DocumentInfo(imageUrl,DocumentInfo.TYPE_IMAGE);
@@ -441,7 +441,7 @@ class ResourceThreadQueue {
         }
 
         /**
-         * {@inheritDoc}
+         * {{@inheritDoc}}
          */
         public void streamReady(InputStream is,DocumentInfo docInfo) {
             try {

@@ -109,7 +109,7 @@ class HTMLTable extends Table {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     protected boolean shouldDrawInnerBorderAfterRow(int row) {
         if (innerBorderGroups) {

@@ -87,28 +87,28 @@ public class ImageViewer extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void resetFocusable() {
         setFocusable(true);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"eagerLock", "image", "imageList", "swipePlaceholder"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean shouldBlockSideSwipe() {
         return true;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {Boolean.class, Image.class, 
@@ -116,14 +116,14 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"Boolean", "Image", "Image[]", "Image"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("eagerLock")) {
@@ -153,7 +153,7 @@ public class ImageViewer extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("eagerLock")) {
@@ -180,7 +180,7 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void initComponent() {
@@ -244,7 +244,7 @@ public class ImageViewer extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void deinitialize() {
@@ -263,7 +263,7 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void keyReleased(int key) {
@@ -281,7 +281,7 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void pointerPressed(int x, int y) {
@@ -311,7 +311,7 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void pointerReleased(int x, int y) {
@@ -338,7 +338,7 @@ public class ImageViewer extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void pointerDragged(int x, int y) {
@@ -394,7 +394,7 @@ public class ImageViewer extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void laidOut() {
@@ -403,7 +403,7 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected boolean pinch(float scale) {
@@ -470,7 +470,7 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override    
     protected Dimension calcPreferredSize() {
@@ -481,7 +481,7 @@ public class ImageViewer extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean animate() {
@@ -495,7 +495,7 @@ public class ImageViewer extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void paint(Graphics g) {
@@ -542,7 +542,7 @@ public class ImageViewer extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void paintBackground(Graphics g) {

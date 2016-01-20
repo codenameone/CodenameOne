@@ -557,7 +557,7 @@ public class Font {
     }
     
     /**
-    * @inheritDoc
+    * {@inheritDoc}
     */
    public boolean equals(Object o) {
        if(ttf) {

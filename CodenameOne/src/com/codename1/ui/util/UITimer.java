@@ -123,7 +123,7 @@ public class UITimer {
     
     class Internal implements Runnable, Animation {
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public boolean animate() {
             testEllapse();
@@ -131,7 +131,7 @@ public class UITimer {
         }
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void paint(Graphics g) {
         }

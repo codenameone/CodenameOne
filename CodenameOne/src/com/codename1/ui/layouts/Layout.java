@@ -94,14 +94,14 @@ public abstract class Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return o != null && o.getClass() == getClass();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         return getClass().getName().hashCode();

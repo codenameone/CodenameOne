@@ -121,28 +121,28 @@ public class PeerComponent extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         return false;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         return super.calcPreferredSize();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcScrollSize() {
         return super.calcScrollSize();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         Form.activePeerCount--;
@@ -150,34 +150,34 @@ public class PeerComponent extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void focusGained() {
         super.focusGained();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void focusLost() {
         super.focusLost();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean handlesInput() {
         return super.handlesInput();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         Form.activePeerCount++;
@@ -185,25 +185,25 @@ public class PeerComponent extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyRepeated(int keyCode) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         onPositionSizeChangeImpl();
@@ -234,92 +234,92 @@ public class PeerComponent extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void onParentPositionChange() {        
         onPositionSizeChangeImpl();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void paintBackground(Graphics g) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paintBackgrounds(Graphics g) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void paintBorder(Graphics g) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void paintScrollbarX(Graphics g) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void paintScrollbarY(Graphics g) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void paintScrollbars(Graphics g) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int[] x, int[] y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int[] x, int[] y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int[] x, int[] y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
     }

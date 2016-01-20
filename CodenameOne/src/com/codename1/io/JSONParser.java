@@ -419,7 +419,7 @@ public class JSONParser implements JSONParseCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void startBlock(String blockName) {
         if (parseStack.size() == 0) {
@@ -442,14 +442,14 @@ public class JSONParser implements JSONParseCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void endBlock(String blockName) {
         parseStack.remove(parseStack.size() - 1);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void startArray(String arrayName) {
         java.util.List<Object> currentVector;
@@ -475,14 +475,14 @@ public class JSONParser implements JSONParseCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void endArray(String arrayName) {
         parseStack.remove(parseStack.size() - 1);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void stringToken(String tok) {
         if (isStackHash()) {
@@ -500,7 +500,7 @@ public class JSONParser implements JSONParseCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void numericToken(double tok) {
         if (isStackHash()) {
@@ -512,7 +512,7 @@ public class JSONParser implements JSONParseCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void longToken(long tok) {
         if (isStackHash()) {
@@ -524,13 +524,13 @@ public class JSONParser implements JSONParseCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyValue(String key, String value) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAlive() {
         return true;

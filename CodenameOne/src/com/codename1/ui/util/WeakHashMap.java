@@ -37,7 +37,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     private final HashMap<K, Object> map = new HashMap<K, Object>();
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public int size() {
@@ -45,7 +45,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean isEmpty() {
@@ -53,7 +53,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean containsKey(Object key) {
@@ -69,7 +69,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public V get(Object key) {
@@ -81,7 +81,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public V put(K key, V value) {
@@ -90,7 +90,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public V remove(Object key) {
@@ -102,7 +102,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
@@ -112,7 +112,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void clear() {
@@ -120,7 +120,7 @@ public class WeakHashMap<K, V> implements Map<K, V> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public Set<K> keySet() {

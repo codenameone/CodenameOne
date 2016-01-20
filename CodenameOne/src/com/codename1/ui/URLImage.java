@@ -257,7 +257,7 @@ public class URLImage extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Image getInternal() {
         if(imageData == null) {
@@ -268,7 +268,7 @@ public class URLImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public byte[] getImageData() {
         if(imageData != null) {
@@ -278,7 +278,7 @@ public class URLImage extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(repaintImage) {
@@ -293,7 +293,7 @@ public class URLImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return repaintImage || imageData == null;

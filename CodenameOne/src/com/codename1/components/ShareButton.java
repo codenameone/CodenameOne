@@ -166,21 +166,21 @@ public class ShareButton extends Button implements ActionListener{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[]{"textToShare"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
         return new Class[]{String.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if (name.equals("textToShare")) {
@@ -190,7 +190,7 @@ public class ShareButton extends Button implements ActionListener{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if (name.equals("textToShare")) {

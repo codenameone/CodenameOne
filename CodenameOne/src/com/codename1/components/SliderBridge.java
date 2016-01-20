@@ -84,7 +84,7 @@ public class SliderBridge extends Slider {
             private int soFar;
 
             /**
-             * @inheritDoc
+             * {@inheritDoc}
              */
             public void actionPerformed(ActionEvent evt) {
                 if(sources != null) {

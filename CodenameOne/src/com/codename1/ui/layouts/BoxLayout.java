@@ -65,7 +65,7 @@ public class BoxLayout extends Layout{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {        
         int width = parent.getLayoutWidth() - parent.getSideGap() - parent.getStyle().getPadding(false, Component.RIGHT) - parent.getStyle().getPadding(false, Component.LEFT);
@@ -160,7 +160,7 @@ public class BoxLayout extends Layout{
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Dimension getPreferredSize(Container parent) {
         int width = 0;
@@ -196,7 +196,7 @@ public class BoxLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         if(axis == X_AXIS) {
@@ -206,7 +206,7 @@ public class BoxLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return super.equals(o) && axis == ((BoxLayout)o).axis;

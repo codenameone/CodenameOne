@@ -237,14 +237,14 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public T getItemAt(int index) {
         return underlying.getItemAt(getFilterOffset(index));
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize() {
         if(filter == null) {
@@ -254,14 +254,14 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSelectedIndex() {
         return Math.max(0, getUnderlyingOffset(underlying.getSelectedIndex()));
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
         if(index < 0) {
@@ -272,49 +272,49 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangedListener(DataChangedListener l) {
         listeners.add(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangedListener(DataChangedListener l) {
         listeners.remove(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addSelectionListener(SelectionListener l) {
         underlying.addSelectionListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeSelectionListener(SelectionListener l) {
         underlying.removeSelectionListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(T item) {
         underlying.addItem(item);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index) {
         underlying.removeItem(getFilterOffset(index));
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void dataChanged(int type, int index) {
         if(index > -1) {

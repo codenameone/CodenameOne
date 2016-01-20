@@ -110,7 +110,7 @@ public class InfiniteProgress extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
@@ -121,7 +121,7 @@ public class InfiniteProgress extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         super.deinitialize();
@@ -129,7 +129,7 @@ public class InfiniteProgress extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if (Display.getInstance().getCurrent() != this.getComponentForm()) {
@@ -142,7 +142,7 @@ public class InfiniteProgress extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         if(animation == null) {
@@ -170,7 +170,7 @@ public class InfiniteProgress extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if (this.getComponentForm() != null && Display.getInstance().getCurrent() != this.getComponentForm()) {
@@ -221,21 +221,21 @@ public class InfiniteProgress extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"animation"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {Image.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("animation")) {
@@ -245,7 +245,7 @@ public class InfiniteProgress extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("animation")) {

@@ -165,7 +165,7 @@ public class InnerActive extends AdsService{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException {
         StringBuffer buf = new StringBuffer();

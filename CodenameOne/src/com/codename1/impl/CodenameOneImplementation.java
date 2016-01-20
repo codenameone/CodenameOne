@@ -5058,7 +5058,7 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public abstract L10NManager getLocalizationManager();
     

@@ -59,7 +59,7 @@ public class BoundingBox {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "SW: " + _southWest + " NE: " + _northEast;
@@ -97,7 +97,7 @@ public class BoundingBox {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object other) {
         if (!(other instanceof BoundingBox)) {
@@ -108,7 +108,7 @@ public class BoundingBox {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         int hash = 5;

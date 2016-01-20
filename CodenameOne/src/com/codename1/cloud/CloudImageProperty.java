@@ -66,7 +66,7 @@ public class CloudImageProperty implements CustomProperty {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object propertyValue(CloudObject obj, String propertyName) {
         final String key = (String)obj.getObject(idProperty);

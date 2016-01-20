@@ -91,7 +91,7 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public T getItemAt(int index) {
         if(index < getSize() && index >= 0){
@@ -101,21 +101,21 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize() {
         return items.size();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSelectedIndex() {
         return selectedIndex;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(T item){
         items.add(item);
@@ -146,7 +146,7 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index){
         if(index < getSize() && index >= 0){
@@ -168,7 +168,7 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
         int oldIndex = selectedIndex;
@@ -177,14 +177,14 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangedListener(DataChangedListener l) {
         dataListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangedListener(DataChangedListener l) {
         dataListener.removeListener(l);
@@ -200,14 +200,14 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);

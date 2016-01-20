@@ -258,14 +258,14 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void show() {
         super.showPacked(BorderLayout.SOUTH, true);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void autoAdjust(int w, int h) {
         //if the t9 input is currently editing do not dispose dialog
@@ -512,7 +512,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
@@ -523,7 +523,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
@@ -534,7 +534,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         if(showTooltips) {
@@ -651,7 +651,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
         }
     }
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void actionCommand(Command cmd) {
         super.actionCommand(cmd);
@@ -724,7 +724,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void dispose() {
         if (field != null) {
@@ -742,7 +742,7 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void onShow() {
         super.onShow();

@@ -1007,7 +1007,7 @@ public class Image {
     }
 
     /**
-     * @inheritDoc 
+     * {@inheritDoc} 
      */
     public boolean animate() {
         if(imageTime == -1) {

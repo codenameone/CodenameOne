@@ -57,7 +57,7 @@ public class TableLayout extends Layout {
         int actualColumn = -1;
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public String toString() {
             return "row: " + row + " column: " + column + " width: " + width + " height: " + height + " hspan: " + 
@@ -309,7 +309,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {
         try {
@@ -592,7 +592,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Dimension getPreferredSize(Container parent) {
         Style s = parent.getStyle();
@@ -666,7 +666,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addLayoutComponent(Object value, Component comp, Container c) {
         Constraint con = null;
@@ -814,7 +814,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeLayoutComponent(Component comp) {
         // reflow the table
@@ -846,7 +846,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getComponentConstraint(Component comp) {
         for(int r = 0 ; r < rows ; r++) {
@@ -947,21 +947,21 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "TableLayout";
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return super.equals(o) && ((TableLayout)o).getRows() == getRows() && ((TableLayout)o).getColumns() == getColumns();
     }
         
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isConstraintTracking() {
         return true;

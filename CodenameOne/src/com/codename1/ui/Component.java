@@ -3838,7 +3838,7 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(!visible){
@@ -4312,7 +4312,7 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void styleChanged(String propertyName, Style source) {
         //changing the Font, Padding, Margin may casue the size of the Component to Change

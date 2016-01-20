@@ -54,7 +54,7 @@ public class LinesLayer extends AbstractLayer {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public LinesLayer(Projection p, String name) {
         super(p, name);
@@ -63,7 +63,7 @@ public class LinesLayer extends AbstractLayer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Tile screenTile) {
         g.setColor(_lineColor);
@@ -120,7 +120,7 @@ public class LinesLayer extends AbstractLayer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public BoundingBox boundingBox() {
         BoundingBox bbox = null;

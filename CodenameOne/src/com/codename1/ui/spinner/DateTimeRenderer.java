@@ -103,7 +103,7 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
         if(value instanceof String) {

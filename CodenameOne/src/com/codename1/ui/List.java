@@ -273,7 +273,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -285,7 +285,7 @@ public class List<T> extends Component {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         dataChanged(0, 0);
@@ -300,7 +300,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void laidOut() {
         super.laidOut();
@@ -313,7 +313,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
@@ -346,7 +346,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSideGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
@@ -357,7 +357,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollableY() {
         return (getScrollDimension().getHeight() > getHeight() || isAlwaysTensile()) && getHeight() > 0 && (fixedSelection < FIXED_NONE_BOUNDRY) &&
@@ -365,7 +365,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollableX() {
         return (getScrollDimension().getWidth() > getWidth()) && (fixedSelection < FIXED_NONE_BOUNDRY) &&
@@ -457,7 +457,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Rectangle getVisibleBounds() {
         Rectangle pos = new Rectangle();
@@ -471,7 +471,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
         if(!isScrollable()) {
@@ -546,7 +546,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
@@ -792,7 +792,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         ListCellRenderer r = getRenderer();
@@ -843,7 +843,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setHandlesInput(boolean b) {
         Form f = getComponentForm();
@@ -861,7 +861,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         boolean h = handlesInput();
@@ -873,14 +873,14 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isSelectableInteraction() {
         return true;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
@@ -909,7 +909,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         // scrolling events are in keyPressed to provide immediate feedback
@@ -1191,7 +1191,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         getUIManager().getLookAndFeel().drawList(g, this);
@@ -1512,7 +1512,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireActionEvent() {
         fireActionEvent(new ActionEvent(eventSource,ActionEvent.Type.Other));
@@ -1573,7 +1573,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusGainedInternal() {
         super.focusGainedInternal();
@@ -1583,7 +1583,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusLostInternal() {
         super.focusLostInternal();
@@ -1714,7 +1714,7 @@ public class List<T> extends Component {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void longPointerPress(int x, int y) {
         if(!isEnabled()) {
@@ -1730,7 +1730,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         if(!isEnabled()) {
@@ -1768,7 +1768,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
         clearDrag();
@@ -1782,7 +1782,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         pointerDraggedImpl(x, y);
@@ -1834,7 +1834,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Rectangle getSelectedRect() {
         Style style = getStyle();
@@ -1936,7 +1936,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
         pointerReleasedImpl(x[0], y[0], true, false);
@@ -2015,14 +2015,14 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         pointerReleasedImpl(x, y, false, false);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         if(shouldShowHint()) {
@@ -2084,7 +2084,7 @@ public class List<T> extends Component {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         // parent is performing the animation we shouldn't do anything in this case
@@ -2183,7 +2183,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isTactileTouch(int x, int y) {
         // provide touch feedback only when pressing an entry in the list and not for the entire list
@@ -2208,7 +2208,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getGridPosY() {
         int gridSize = getElementSize(false, true).getHeight() + itemGap;
@@ -2229,7 +2229,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getGridPosX() {
         int gridSize = getElementSize(false, true).getWidth() + itemGap;
@@ -2238,7 +2238,7 @@ public class List<T> extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         String elemSizeStr = "element size = ";

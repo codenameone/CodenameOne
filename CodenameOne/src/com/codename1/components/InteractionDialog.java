@@ -91,63 +91,63 @@ public class InteractionDialog extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Layout getLayout() {
         return contentPane.getLayout();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getTitle() {
         return title.getText();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Component cmp) {
         contentPane.addComponent(cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Object constraints, Component cmp) {
         contentPane.addComponent(constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Object constraints, Component cmp) {
         contentPane.addComponent(index, constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Component cmp) {
         contentPane.addComponent(index, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeAll() {
         contentPane.removeAll();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeComponent(Component cmp) {
         contentPane.removeComponent(cmp);
@@ -155,21 +155,21 @@ public class InteractionDialog extends Container {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Label getTitleComponent() {
         return title;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setLayout(Layout layout) {
         contentPane.setLayout(layout);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitle(String title) {
         this.title.setText(title);
@@ -213,7 +213,7 @@ public class InteractionDialog extends Container {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void dispose() {
         Container p = getParent();

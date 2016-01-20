@@ -217,28 +217,28 @@ public class GenericSpinner extends BaseSpinner {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"model", "renderer", "items", "columns"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {ListModel.class, ListCellRenderer.class, com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), Integer.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"ListModel", "ListCellRenderer", "String[]", "int"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("items")) {
@@ -266,7 +266,7 @@ public class GenericSpinner extends BaseSpinner {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("items")) {

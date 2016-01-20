@@ -96,21 +96,21 @@ public class GoogleMapsProvider extends TiledProvider{
      
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int maxZoomLevel() {
         return 18;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String attribution() {
         return "Google";
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Tile tileFor(BoundingBox bbox) {
         StringBuilder sb = new StringBuilder(_url);

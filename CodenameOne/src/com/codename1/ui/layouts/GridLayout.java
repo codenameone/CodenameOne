@@ -85,7 +85,7 @@ public class GridLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */    
     public void layoutContainer(Container parent) {
         int width = parent.getLayoutWidth() - parent.getSideGap() - parent.getStyle().getPadding(false, Component.RIGHT) - parent.getStyle().getPadding(false, Component.LEFT);
@@ -141,7 +141,7 @@ public class GridLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */    
     public Dimension getPreferredSize(Container parent) {        
         int width = 0;
@@ -173,7 +173,7 @@ public class GridLayout extends Layout{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "GridLayout";
@@ -194,7 +194,7 @@ public class GridLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return super.equals(o) && ((GridLayout)o).getRows() == getRows() &&
@@ -238,7 +238,7 @@ public class GridLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean obscuresPotential(Container parent) {
         return parent.getComponentCount() == rows * columns || autoFit;

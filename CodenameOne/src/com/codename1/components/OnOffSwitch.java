@@ -75,7 +75,7 @@ public class OnOffSwitch extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         if(iosMode) {
@@ -85,7 +85,7 @@ public class OnOffSwitch extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void resetFocusable() {
         setFocusable(true);
@@ -132,7 +132,7 @@ public class OnOffSwitch extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isStickyDrag() {
         return true;
@@ -182,7 +182,7 @@ public class OnOffSwitch extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(iosMode) {
@@ -293,21 +293,21 @@ public class OnOffSwitch extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         super.deinitialize();
     }    
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         if(iosMode) {
@@ -317,7 +317,7 @@ public class OnOffSwitch extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         dragged = true;
@@ -378,7 +378,7 @@ public class OnOffSwitch extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         if(animationLock) {
@@ -501,7 +501,7 @@ public class OnOffSwitch extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -531,7 +531,7 @@ public class OnOffSwitch extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -542,7 +542,7 @@ public class OnOffSwitch extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("on")) {
@@ -561,7 +561,7 @@ public class OnOffSwitch extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("on")) {

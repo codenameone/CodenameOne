@@ -633,7 +633,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setUnselectedStyle(Style style) {
         style.setMargin(Component.TOP, 0, true);
@@ -1310,7 +1310,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1338,7 +1338,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1407,7 +1407,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -1710,7 +1710,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
         return DRAG_REGION_NOT_DRAGGABLE;

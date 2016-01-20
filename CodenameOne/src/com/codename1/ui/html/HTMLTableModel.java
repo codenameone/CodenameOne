@@ -183,35 +183,35 @@ class HTMLTableModel implements TableModel{
     // TableModel methods:
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public int getRowCount() {
         return rows.size();
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public int getColumnCount() {
         return maxColumn;
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public String getColumnName(int i) {
         return "";
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean isCellEditable(int row, int column) {
         return false;
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public Object getValueAt(int row, int column) {
         if (row>=rows.size()) {
@@ -225,7 +225,7 @@ class HTMLTableModel implements TableModel{
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void setValueAt(int row, int column, Object o) {
         Vector columns=(Vector)rows.elementAt(row);
@@ -235,14 +235,14 @@ class HTMLTableModel implements TableModel{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangeListener(DataChangedListener d) {
         dispatcher.addListener(d);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangeListener(DataChangedListener d) {
         dispatcher.removeListener(d);

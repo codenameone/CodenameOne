@@ -40,7 +40,7 @@ public class JUnitXMLReporting extends TestReporting {
     private int failed;
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void startingTestCase(UnitTest test) {
         testCases += "<testcase classname=\"" + test.getClass().getName() + "\" >";
@@ -48,21 +48,21 @@ public class JUnitXMLReporting extends TestReporting {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void logMessage(String message) {
         output += message + "\n";
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void logException(Throwable err) {
         testCases += "<error type=\"" + err.getClass().getName() + "\">" + err.toString() + "</error>\n";
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void finishedTestCase(UnitTest test, boolean passed) {
         if(passed) {
@@ -77,7 +77,7 @@ public class JUnitXMLReporting extends TestReporting {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void writeReport(OutputStream os) throws IOException {
         os.write(("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n"
@@ -88,7 +88,7 @@ public class JUnitXMLReporting extends TestReporting {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void testExecutionFinished() {
     }

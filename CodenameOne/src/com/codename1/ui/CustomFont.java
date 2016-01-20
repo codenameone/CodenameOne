@@ -111,7 +111,7 @@ class CustomFont extends Font {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int charWidth(char ch) {
         int i = charsets.indexOf(ch);
@@ -122,7 +122,7 @@ class CustomFont extends Font {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getHeight() {
         return imageHeight;
@@ -176,7 +176,7 @@ class CustomFont extends Font {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void drawChar(Graphics g, char character, int x, int y) {
         int clipX = g.getClipX();
@@ -200,7 +200,7 @@ class CustomFont extends Font {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addContrast(byte value) {
         int[] imageArray = getImageArray();
@@ -309,14 +309,14 @@ class CustomFont extends Font {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getCharset() {
         return charsets;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int charsWidth(char[] ch, int offset, int length){
         int retVal = 0;
@@ -328,14 +328,14 @@ class CustomFont extends Font {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int substringWidth(String str, int offset, int len){
         return charsWidth(str.toCharArray(), offset, len);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int stringWidth(String str){
         if( str==null || str.length()==0)
@@ -344,28 +344,28 @@ class CustomFont extends Font {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getFace(){
         return 0;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize(){
         return 0;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getStyle() {
         return 0;
     }
     
     /**
-    * @inheritDoc
+    * {@inheritDoc}
     */
    public boolean equals(Object o) {
        if(o == this) {

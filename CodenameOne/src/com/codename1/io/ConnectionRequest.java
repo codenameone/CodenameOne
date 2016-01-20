@@ -1306,7 +1306,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void ioStreamUpdate(Object source, int bytes) {
         if(!isKilled()) {
@@ -1432,7 +1432,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         if(url != null) {
@@ -1446,7 +1446,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         if(o != null && o.getClass() == getClass()) {
