@@ -1139,6 +1139,11 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 Object nativeFont = cn1Font.getNativeFont();
                 if (nativeFont == null) {
                     nativeFont = impl.defaultFont;
+                    
+                    // this is happening too early, some things aren't initialized yet
+                    if(nativeFont == null) {
+                        return;
+                    }
                 }
                 if (nativeFont instanceof AndroidImplementation.NativeFont) {
                     styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) ((AndroidImplementation.NativeFont) nativeFont).font);
