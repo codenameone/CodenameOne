@@ -50,9 +50,17 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Rectangle;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+
 import com.codename1.ui.Transform;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.StyleAccessor;
+import java.util.WeakHashMap;
 
 public class AndroidAsyncView extends View implements CodenameOneSurface {
 
@@ -108,6 +116,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
     @Override
     protected void onDraw(Canvas c) {
+        // **************************
+        // Commented out debuging code useful for hand tuning the drawing logic performance
+        // **************************
+        //long time = System.currentTimeMillis();
         boolean paintOnBuffer = paintViewOnBuffer ||
                 implementation.isEditingText() ||
                 InPlaceEditView.isKeyboardShowing() ||
@@ -118,8 +130,24 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         if (paintOnBuffer) {
             g = cn1View.getGraphics();
         }
+
+        //final HashMap<String, Long> slowest = new HashMap<>();
+        //final HashMap<String, Long> counts = new HashMap<>();
+
         for (AsyncOp o : renderingOperations) {
+            //long ntime = System.nanoTime();
             o.executeWithClip(g);
+            /*ntime = System.nanoTime() - ntime;
+            String s = o.toString();
+            Long l = slowest.get(s);
+            if(l == null) {
+                slowest.put(s, ntime);
+                counts.put(s, Long.valueOf(1));
+            } else {
+                slowest.put(s, l.longValue() + ntime);
+                Long ll = counts.get(s);
+                counts.put(s, ll.longValue() + 1);
+            }*/
         }
         synchronized (RENDERING_OPERATIONS_LOCK) {
             renderingOperations.clear();
@@ -132,6 +160,34 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         if (implementation.isAsyncEditMode() && implementation.isEditingText()) {
             InPlaceEditView.reLayoutEdit();
         }
+        /*long etime = System.currentTimeMillis();
+        if(etime - time >= 16) {
+            System.out.println("JANK... " + (etime - time));
+
+            ArrayList<String> sortedSlowest = new ArrayList<>(slowest.keySet());
+            Collections.sort(sortedSlowest, new Comparator<String>() {
+                @Override
+                public int compare(String lhs, String rhs) {
+                    return (int) (slowest.get(rhs).longValue() - slowest.get(lhs).longValue());
+                }
+            });
+
+
+            ArrayList<String> sortedCounts = new ArrayList<>(counts.keySet());
+            Collections.sort(sortedCounts, new Comparator<String>() {
+                @Override
+                public int compare(String lhs, String rhs) {
+                    return (int) (counts.get(rhs).longValue() - counts.get(lhs).longValue());
+                }
+            });
+            for(int iter = 0 ; iter < Math.min(5, sortedSlowest.size()) ; iter++) {
+                String name = sortedSlowest.get(iter);
+                System.out.println("Slowest entry " + iter + " is " + name + " for " + slowest.get(name));
+
+                name = sortedCounts.get(iter);
+                System.out.println("Most entries " + iter + " is " + name + " for " + counts.get(name));
+            }
+        }*/
     }
 
     public void setPaintViewOnBuffer(boolean paintViewOnBuffer) {
@@ -301,6 +357,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 public void execute(AndroidGraphics underlying) {
                     underlying.rotate(angle, x, y);
                 }
+                public String toString() {
+                    return "rotate";
+                }
             });
         }
 
@@ -310,6 +369,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 @Override
                 public void execute(AndroidGraphics underlying) {
                     underlying.rotate(angle);
+                }
+                public String toString() {
+                    return "rotate (no pivot)";
                 }
             });
         }
@@ -321,6 +383,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 public void execute(AndroidGraphics underlying) {
                     underlying.scale(x, y);
                 }
+                public String toString() {
+                    return "scale";
+                }
             });
         }
 
@@ -330,6 +395,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 @Override
                 public void execute(AndroidGraphics underlying) {
                     underlying.resetAffine();
+                }
+                public String toString() {
+                    return "resetAffine";
                 }
             });
         }
@@ -413,6 +481,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
                 }
+                public String toString() {
+                    return "fillRoundRect";
+                }
             });
         }
 
@@ -429,6 +500,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.setAlpha(al);
                     underlying.fillRect(x, y, width, height);
+                }
+                public String toString() {
+                    return "fillRectA";
                 }
             });
         }
@@ -449,6 +523,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.fillRect(x, y, w, h);
                     underlying.setAlpha(preAlpha);
                 }
+                public String toString() {
+                    return "fillRectB";
+                }
             });
         }
 
@@ -463,6 +540,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 public void execute(AndroidGraphics underlying) {
                     underlying.setAlpha(al);
                     underlying.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
+                }
+                public String toString() {
+                    return "fillLinearGradient";
                 }
             });
         }
@@ -480,6 +560,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setAlpha(al);
                     underlying.fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
                 }
+                public String toString() {
+                    return "fillRectRadialGradient";
+                }
             });
         }
 
@@ -494,6 +577,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 public void execute(AndroidGraphics underlying) {
                     underlying.setAlpha(al);
                     underlying.fillRadialGradient(startColor, endColor, x, y, width, height);
+                }
+                public String toString() {
+                    return "fillRadialGradient";
                 }
             });
         }
@@ -584,6 +670,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                         underlying.canvas.drawRect(x, y, x + width, y + height, paint);
                     }
                 }
+                public String toString() {
+                    return "GradientPaint";
+                }
             };
             return ap;
         }
@@ -601,6 +690,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     public void execute(AndroidGraphics underlying) {
                         underlying.setAlpha(al);
                         underlying.paintComponentBackground(x, y, width, height, s);
+                    }
+                    public String toString() {
+                        return "paintComponentBackground - Legacy";
                     }
                 });
                 return;
@@ -655,6 +747,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     bgImageScalePaint.setAlpha(alpha);
                                     underlying.canvas.drawBitmap(b, src, dest, bgImageScalePaint);
                                 }
+                                public String toString() {
+                                    return "BackgroundScaledImage";
+                                }
                             };
                             break;
                         case Style.BACKGROUND_IMAGE_SCALED_FILL:
@@ -684,6 +779,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     dest.right = x + bwidth;
                                     bgImageScaleFillPaint.setAlpha(alpha);
                                     underlying.canvas.drawBitmap(bFill, srcFill, dest, bgImageScaleFillPaint);
+                                }
+                                public String toString() {
+                                    return "ScaledImageFill";
                                 }
                             };
                             break;
@@ -726,6 +824,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     dest.right = x + awidth;
                                     underlying.canvas.drawBitmap(bFit, srcFit, dest, bgImageScaleFitPaint);
                                 }
+                                public String toString() {
+                                    return "ScaledImageFit";
+                                }
                             };
                             break;
                         case Style.BACKGROUND_IMAGE_TILE_BOTH:
@@ -749,6 +850,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     underlying.canvas.concat(getTransformMatrix());
                                     underlying.canvas.drawRect(dest, bgImageTiledBothPaint);
                                     underlying.canvas.restore();
+                                }
+                                public String toString() {
+                                    return "ImageTileBoth";
                                 }
                             };
                             break;
@@ -823,6 +927,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     underlying.canvas.concat(getTransformMatrix());
                                     underlying.canvas.drawRect(dest, bgImageTiledPaint);
                                     underlying.canvas.restore();
+                                }
+                                public String toString() {
+                                    return "BackgroundImageTile";
                                 }
                             };
                             break;
@@ -942,6 +1049,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     dest.right = x + iW;
                     underlying.canvas.drawBitmap(b, src, dest, bgImageAlignPaint);
                 }
+                public String toString() {
+                    return "BackgroundImageAlign";
+                }
             };
         }
         
@@ -959,15 +1069,55 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     }
                     underlying.canvas.drawRect(x, y, x + width, y + height, pnt);
                 }
+                public String toString() {
+                    return "SolidColorBackground";
+                }
             };
             return bgPaint;
         }
+
+        class DrawStringCache {
+            String text;
+            int fgColor;
+            CodenameOneTextPaint font;
+
+            public DrawStringCache(String text, int color, CodenameOneTextPaint font) {
+                this.text = text;
+                this.fgColor = color;
+                this.font = font;
+            }
+
+            public DrawStringCache(String text, Style s) {
+                this.text = text;
+                this.fgColor = s.getFgColor();
+                Object nativeFont = s.getFont().getNativeFont();
+                if(nativeFont == null) {
+                    this.font = impl.defaultFont;
+                } else {
+                    if(nativeFont instanceof AndroidImplementation.NativeFont) {
+                        nativeFont = ((AndroidImplementation.NativeFont)nativeFont).font;
+                    }
+                }
+                this.font = (CodenameOneTextPaint)nativeFont;
+            }
+
+            public boolean equals(Object o) {
+                // == is totally fine here for the text which should be interned, the font might be cloned though...
+                return text == ((DrawStringCache)o).text && fgColor == ((DrawStringCache)o).fgColor && font.equals(((DrawStringCache)o).font);
+            }
+
+            public int hashCode() {
+                return text.hashCode();
+            }
+        }
+
+        WeakHashMap<DrawStringCache, Bitmap> drawStringCache = new WeakHashMap<DrawStringCache, Bitmap>();
         
         @Override
         public void drawLabelComponent(final int cmpX, final int cmpY, final int cmpHeight, int cmpWidth, final Style style, String text,
                                        final Bitmap icon, final Bitmap stateIcon, int preserveSpaceForState, final int gap, final boolean rtl, final boolean isOppositeSide,
                                        final int textPosition, final int stringWidth, final boolean isTickerRunning, final int tickerShiftText, final boolean endsWith3Points, final int valign) {
-            if (text == null) {
+            if (text == null || text.equals(" ")) {
                 text = "";
             }
             int fontHeight = 0;
@@ -1144,8 +1294,24 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             } else {
                 clip = clip.intersection(cmpX, cmpY, cmpWidth, cmpHeight);
             }
-            
-            final int al = alpha;
+
+            Bitmap stringBmp = null;
+            if(style.getTextDecoration() == 0 && cmpWidth > 0 && stringWidth > 0 && text.length() > 0 && fontHeight > 0) {
+                DrawStringCache dc = new DrawStringCache(text, style);
+                stringBmp = drawStringCache.get(dc);
+                if (stringBmp == null) {
+                    Bitmap bitmap = Bitmap.createBitmap(Math.min(cmpWidth, stringWidth), fontHeight,
+                            Bitmap.Config.ARGB_8888);
+                    Canvas cnv = new Canvas(bitmap);
+                    cnv.drawText(text, 0, nativeFont.getFontAscent() * -1, nativeFont);
+                    stringBmp = bitmap;
+                    drawStringCache.put(dc, stringBmp);
+                }
+            }
+
+            final Bitmap textCache = stringBmp;
+
+            //final int al = alpha;
             final String finalText = text;
             final int finalTextSpaceW = textSpaceW;
             final int finalTextDecoration = textDecoration;
@@ -1168,7 +1334,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     if (icon == null) {
                         // no icon only string
                         drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning, tickerShiftText,
-                                finalTextDecoration, rtl, endsWith3Points, stringWidth, finalFontHeight);
+                                finalTextDecoration, rtl, endsWith3Points, stringWidth, finalFontHeight, textCache);
                     } else {
                         int strWidth = stringWidth;
                         int iconStringWGap;
@@ -1180,13 +1346,13 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     iconStringHGap = (finalIconHeight - finalFontHeight) / 2;
                                     strWidth = drawLabelStringValign(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning,
                                             tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, finalIconHeight,
-                                            finalFontHeight, valign);
+                                            finalFontHeight, valign, textCache);
 
                                     underlying.canvas.drawBitmap(icon, finalX + strWidth + gap, finalY, underlying.paint);
                                 } else {
                                     iconStringHGap = (finalFontHeight - finalIconHeight) / 2;
                                     strWidth = drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
 
                                     underlying.canvas.drawBitmap(icon, finalX + strWidth + gap, finalY + iconStringHGap, underlying.paint);
                                 }
@@ -1197,12 +1363,13 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
                                     underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
                                     drawLabelStringValign(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, iconStringHGap, finalIconHeight, finalFontHeight, valign);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, iconStringHGap, finalIconHeight, finalFontHeight,
+                                            valign, textCache);
                                 } else {
                                     iconStringHGap = (finalFontHeight - finalIconHeight) / 2;
                                     underlying.canvas.drawBitmap(icon, finalX, finalY + iconStringHGap, underlying.paint);
                                     drawLabelString(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
                                 }
                                 break;
                             case Label.BOTTOM:
@@ -1211,13 +1378,13 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     iconStringWGap = (finalIconWidth - strWidth) / 2;
                                     underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
                                     drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY + finalIconHeight + gap, finalTextSpaceW,
-                                            isTickerRunning, tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                            isTickerRunning, tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
                                 } else {
                                     iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;
                                     underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY, underlying.paint);
 
                                     drawLabelString(underlying, nativeFont, finalText, finalX, finalY + finalIconHeight + gap, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
                                 }
                                 break;
                             case Label.TOP:
@@ -1225,18 +1392,28 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                 if (finalIconWidth > strWidth) {
                                     iconStringWGap = (finalIconWidth - strWidth) / 2;
                                     drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
                                     underlying.canvas.drawBitmap(icon, finalX, finalY + finalFontHeight + gap, underlying.paint);
                                 } else {
                                     iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;
                                     drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning, tickerShiftText,
-                                            finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight);
+                                            finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
                                     underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY + finalFontHeight + gap, underlying.paint);
                                 }
                                 break;
                         }
                     }
                     underlying.setClip(clipXX, clipYX, clipWX, clipHX);
+                }
+                public String toString() {
+                    if(icon == null) {
+                        return "drawLabelComponent null icon";
+                    }
+                    if(finalText.length() > 0) {
+                        return "drawLabelComponent with icon & text";
+                    } else {
+                        return "drawLabelComponent with icon";
+                    }
                 }
             });
             
@@ -1250,14 +1427,17 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 CodenameOneTextPaint nativeFont, String str, int x, int y, int textSpaceW,
                 boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl,
                 boolean endsWith3Points, int textWidth,
-                int iconStringHGap, int iconHeight, int fontHeight, int valign) {
+                int iconStringHGap, int iconHeight, int fontHeight, int valign, Bitmap textCache) {
+            if(str.length() == 0) {
+                return 0;
+            }
             switch (valign) {
                 case Component.TOP:
-                    return drawLabelString(underlying, nativeFont, str, x, y, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+                    return drawLabelString(underlying, nativeFont, str, x, y, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight, textCache);
                 case Component.CENTER:
-                    return drawLabelString(underlying, nativeFont, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+                    return drawLabelString(underlying, nativeFont, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight, textCache);
                 default:
-                    return drawLabelString(underlying, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+                    return drawLabelString(underlying, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight, textCache);
             }
         }
 
@@ -1267,7 +1447,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
          */
         private int drawLabelString(AndroidGraphics underlying, CodenameOneTextPaint nativeFont, String text, int x, int y, int textSpaceW,
                 boolean isTickerRunning, int tickerShiftText, int textDecoration, boolean rtl, boolean endsWith3Points, int textWidth,
-                int fontHeight) {
+                int fontHeight, Bitmap textCache) {
+            if(text.length() == 0) {
+                return 0;
+            }
             int cx = underlying.getClipX();
             int cy = underlying.getClipY();
             int cw = underlying.getClipWidth();
@@ -1275,11 +1458,13 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             underlying.clipRect(x, cy, textSpaceW, ch);
 
             int drawnW = drawLabelText(underlying, textDecoration, rtl, isTickerRunning, endsWith3Points, nativeFont,
-                    textWidth, textSpaceW, tickerShiftText, text, x, y, fontHeight);
+                    textWidth, textSpaceW, tickerShiftText, text, x, y, fontHeight, textCache);
 
             underlying.setClip(cx, cy, cw, ch);
-
             return drawnW;
+            //underlying.canvas.drawText(text, x, y - nativeFont.getFontAscent(), nativeFont);
+
+            //return textSpaceW;
         }
         
         private boolean fastCharWidthCheck(String s, int length, int width, int charWidth, Object f) {
@@ -1293,7 +1478,6 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         /**
          * Draws the text of a label
          *
-         * @param nativeGraphics graphics context
          * @param textDecoration decoration information for the text
          * @param text the text for the label
          * @param x position for the label
@@ -1304,7 +1488,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
          * @return the space used by the drawing
          */
         protected int drawLabelText(AndroidGraphics underlying, int textDecoration, boolean rtl, boolean isTickerRunning,
-                boolean endsWith3Points, CodenameOneTextPaint nativeFont, int txtW, int textSpaceW, int shiftText, String text, int x, int y, int fontHeight) {
+                boolean endsWith3Points, CodenameOneTextPaint nativeFont, int txtW, int textSpaceW, int shiftText, String text,
+                int x, int y, int fontHeight, Bitmap textCache) {
             if ((!isTickerRunning) || rtl) {
                 //if there is no space to draw the text add ... at the end
                 if (txtW > textSpaceW && textSpaceW > 0) {
@@ -1319,7 +1504,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                         if ((!isTickerRunning) && endsWith3Points) {
                             String points = "...";
                             int pointsW = impl.stringWidth(nativeFont, points);
-                            drawString(underlying, nativeFont, points, shiftText + x, y, textDecoration, fontHeight);
+                            drawString(underlying, nativeFont, points, shiftText + x, y, textDecoration, fontHeight, textCache);
                             clipRect(pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);
                         }
                         x = x - txtW + textSpaceW;
@@ -1337,7 +1522,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 }
             }
 
-            drawString(underlying, nativeFont, text, shiftText + x, y, textDecoration, fontHeight);
+            drawString(underlying, nativeFont, text, shiftText + x, y, textDecoration, fontHeight, textCache);
             return Math.min(txtW, textSpaceW);
         }
 
@@ -1345,7 +1530,6 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
          * Draw a string using the current font and color in the x,y coordinates.
          * The font is drawn from the top position and not the baseline.
          *
-         * @param nativeGraphics the graphics context
          * @param nativeFont the font used
          * @param str the string to be drawn.
          * @param x the x coordinate.
@@ -1353,7 +1537,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
          * @param textDecoration Text decoration bitmask (See Style's
          * TEXT_DECORATION_* constants)
          */
-        private void drawString(AndroidGraphics underlying, CodenameOneTextPaint nativeFont, String str, int x, int y, int textDecoration, int fontHeight) {
+        private void drawString(AndroidGraphics underlying, CodenameOneTextPaint nativeFont, String str, int x, int y, int textDecoration, int fontHeight, Bitmap textCache) {
             // this if has only the minor effect of providing a slighly faster execution path
             if (textDecoration != 0) {
                 boolean raised = (textDecoration & Style.TEXT_DECORATION_3D) != 0;
@@ -1375,10 +1559,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     if (a == 0xff) {
                         setAlpha(140);
                     }
-                    drawString(underlying, nativeFont, str, x, y + offset, textDecoration, fontHeight);
+                    drawString(underlying, nativeFont, str, x, y + offset, textDecoration, fontHeight, textCache);
                     setAlpha(a);
                     setColor(c);
-                    drawString(underlying, nativeFont, str, x, y, textDecoration, fontHeight);
+                    drawString(underlying, nativeFont, str, x, y, textDecoration, fontHeight, textCache);
                     return;
                 }
                 underlying.canvas.drawText(str, x, y - font.getFontAscent(), nativeFont);
@@ -1395,7 +1579,11 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.canvas.drawLine(x, y, x + impl.stringWidth(nativeFont, str), y, underlying.paint);
                 }
             } else {
-                underlying.canvas.drawText(str, x, y - nativeFont.getFontAscent(), nativeFont);
+                if(textCache != null) {
+                    underlying.canvas.drawBitmap(textCache, x, y, nativeFont);
+                } else {
+                    underlying.canvas.drawText(str, x, y - nativeFont.getFontAscent(), nativeFont);
+                }
             }
         }
         
@@ -1411,6 +1599,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.fillArc(x, y, width, height, startAngle, arcAngle);
                 }
+                public String toString() {
+                    return "fillArc";
+                }
             });
         }
 
@@ -1425,6 +1616,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.drawArc(x, y, width, height, startAngle, arcAngle);
                 }
+                public String toString() {
+                    return "drawArc";
+                }
             });
         }
 
@@ -1433,13 +1627,43 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             final int col = this.color;
             final CodenameOneTextPaint font = (CodenameOneTextPaint)getFont();
             final int alph = this.alpha;
+
+            Bitmap stringBmp = null;
+            if(!legacyPaintLogic) {
+                int stringWidth = (int) Math.ceil(font.measureText(str));
+                if (font.fontHeight < 0) {
+                    font.fontHeight = font.getFontMetricsInt(font.getFontMetricsInt());
+                }
+
+                if (stringWidth > 0 && font.fontHeight > 0) {
+                    DrawStringCache dc = new DrawStringCache(str, col, font);
+                    stringBmp = drawStringCache.get(dc);
+                    if (stringBmp == null) {
+                        Bitmap bitmap = Bitmap.createBitmap(stringWidth, font.fontHeight,
+                                Bitmap.Config.ARGB_8888);
+                        Canvas cnv = new Canvas(bitmap);
+                        cnv.drawText(str, 0, font.getFontAscent() * -1, font);
+                        stringBmp = bitmap;
+                        drawStringCache.put(dc, stringBmp);
+                    }
+                }
+            }
+
+            final Bitmap textCache = stringBmp;
             pendingRenderingOperations.add(new AsyncOp(clip) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
-                    underlying.setFont(font);
-                    font.setColor(col);
-                    font.setAlpha(alph);
-                    underlying.drawString(str, x, y);
+                    if(textCache != null) {
+                        underlying.canvas.drawBitmap(textCache, x, y, underlying.paint);
+                    } else {
+                        underlying.setFont(font);
+                        font.setColor(col);
+                        font.setAlpha(alph);
+                        underlying.drawString(str, x, y);
+                    }
+                }
+                public String toString() {
+                    return "drawString";
                 }
             });
         }
@@ -1455,6 +1679,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
                 }
+                public String toString() {
+                    return "drawRoundRect";
+                }
             });
         }
 
@@ -1469,6 +1696,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.drawRect(x, y, width, height);
                 }
+                public String toString() {
+                    return "drawRect";
+                }
             });
         }
 
@@ -1481,6 +1711,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setPaint(imagePaint);
                     underlying.drawRGB(rgbData, offset, x, y, w, h, processAlpha);
                     underlying.setPaint(p);
+                }
+                public String toString() {
+                    return "drawRGB";
                 }
             });
         }
@@ -1496,6 +1729,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.fillPolygon(xPoints, yPoints, nPoints);
                 }
+                public String toString() {
+                    return "fillPolygon";
+                }
             });
         }
 
@@ -1510,6 +1746,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setColor(col);
                     underlying.drawPolygon(xPoints, yPoints, nPoints);
                 }
+
+                public String toString() {
+                    return "drawPolygon";
+                }
             });
         }
 
@@ -1523,6 +1763,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setAlpha(alph);
                     underlying.setColor(col);
                     underlying.drawLine(x1, y1, x2, y2);
+                }
+                public String toString() {
+                    return "drawLine";
                 }
             });
         }
@@ -1539,6 +1782,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.tileImage(img, x, y, w, h);
                     underlying.setPaint(p);
                 }
+                public String toString() {
+                    return "tileImage";
+                }
             });
         }
 
@@ -1553,6 +1799,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     imagePaint.setAlpha(alph);
                     underlying.drawImage(img, x, y, w, h);
                     underlying.setPaint(p);
+                }
+                public String toString() {
+                    return "drawImageWH";
                 }
             });
         }
@@ -1569,6 +1818,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.drawImage(img, x, y);
                     underlying.setPaint(p);
                 }
+                public String toString() {
+                    return "drawImage";
+                }
             });
         }
 
@@ -1582,6 +1834,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     underlying.setAlpha(alph);
                     underlying.setColor(col);
                     underlying.drawPath(p, stroke);
+                }
+                public String toString() {
+                    return "drawPath";
                 }
             });
         }
@@ -1598,6 +1853,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     //underlying.setTransform(transform);
                     underlying.fillPath(p);
                 }
+                public String toString() {
+                    return "fillPath";
+                }
             });
         }
 
@@ -1607,6 +1865,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 @Override
                 public void execute(AndroidGraphics underlying) {
                     underlying.setTransform(transform);
+                }
+                public String toString() {
+                    return "setTransform";
                 }
             });
         }
@@ -1623,12 +1884,6 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         @Override
         void setColor(final int clr) {
             this.color = clr;
-            /*pendingRenderingOperations.add(new AsyncOp(clip) {
-             @Override
-             public void execute(AndroidGraphics underlying) {
-             underlying.setColor(clr);
-             }
-             });*/
         }
 
         private CodenameOneTextPaint font;
