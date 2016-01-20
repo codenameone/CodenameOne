@@ -49,7 +49,15 @@ public final class AnimationManager {
      * @return true if an animation is currently in progress
      */
     public boolean isAnimating() {
-        return anims.size() > 0;
+        int size = anims.size();
+        if(size == 0) {
+            return false;
+        }
+        if(size > 1) {
+            return true;
+        }
+        // special case where an animation finished but wasn't removed from the queue just yet...
+        return anims.get(0).isInProgress();
     }
     
     void updateAnimations() {

@@ -73,8 +73,8 @@ import com.codename1.ui.plaf.Style;
  */
 class AndroidGraphics {
 
-    private Canvas canvas;
-    private Paint paint;
+    protected Canvas canvas;
+    protected Paint paint;
     private CodenameOneTextPaint font;
     private Transform transform;
     private Matrix convertedTransform;
@@ -84,8 +84,8 @@ class AndroidGraphics {
     private final RectF tmprectF = new RectF();
     private final Rect tmprect = new Rect();
     private final Path tmppath = new Path();
-    private final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
-    private AndroidImplementation impl;
+    protected final static PorterDuffXfermode PORTER = new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER);
+    AndroidImplementation impl;
     private int alpha = 255;
 
     AndroidGraphics(AndroidImplementation impl, Canvas canvas) {
@@ -199,7 +199,7 @@ class AndroidGraphics {
     }
     
 
-    private Matrix getTransformMatrix(){
+    protected Matrix getTransformMatrix(){
         if ( transformDirty ){
         	// Conversion from 4x4 to 3x3
         	// See http://www.w3.org/TR/2009/WD-SVG-Transforms-20090320/#_4x4-to-3x3-conversion
@@ -352,7 +352,7 @@ class AndroidGraphics {
 
    public void fillRect(int x, int y, int w, int h, byte alpha) {
         if(alpha != 0) {
-            int oldAlpha = alpha;
+            int oldAlpha = getAlpha();
             setAlpha(alpha & 0xff);
             fillRect(x, y, w, h);
             setAlpha(oldAlpha);
@@ -999,7 +999,7 @@ class AndroidGraphics {
     /**
      * Reverses alignment in the case of bidi
      */
-    private int reverseAlignForBidi(boolean rtl, int align) {
+    protected final int reverseAlignForBidi(boolean rtl, int align) {
         if (rtl) {
             switch (align) {
                 case Component.RIGHT:

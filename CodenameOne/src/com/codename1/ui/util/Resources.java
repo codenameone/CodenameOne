@@ -1247,7 +1247,11 @@ public class Resources {
                 return f;
             }
         }
-        return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
+        f = Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
+        if(f.getHeight() > fontSize) {
+            f = f.derive(fontSize - (f.getHeight() - fontSize), f.getStyle());
+        }
+        return f;
     }
 
     Hashtable loadTheme(String id, boolean newerVersion) throws IOException {

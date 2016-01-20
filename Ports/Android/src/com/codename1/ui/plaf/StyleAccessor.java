@@ -20,47 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.android;
 
-import android.graphics.Paint;
-import android.graphics.Typeface;
-import android.text.TextPaint;
+package com.codename1.ui.plaf;
 
 /**
- * A version of paint that caches font height for performance
+ * Allows placing cache data within a style object to make painting the style much faster
  *
  * @author Shai Almog
  */
-public class CodenameOneTextPaint extends TextPaint {
-    int fontHeight = -1;
-    private int ascent = -1;
-
-    public CodenameOneTextPaint(CodenameOneTextPaint paint) {
-        super(paint);
-        this.fontHeight = paint.fontHeight;
-        this.ascent = paint.ascent;
-    }
-
-    public CodenameOneTextPaint(Typeface tf) {
-        super.setTypeface(tf);
-    }
-
-    @Override
-    public Typeface setTypeface(Typeface typeface) {
-        throw new RuntimeException("Can't set typeface in runtime!");
-    }
-
-    public int getFontAscent() {
-        if(ascent < 0) {
-            ascent = getFontMetricsInt().ascent;
-        }
-        return ascent;
+public class StyleAccessor {
+    public static Object getCachedData(Style s) {
+        return s.nativeOSCache;
     }
     
-    public CodenameOneTextPaint() {
-    }
-
-    public CodenameOneTextPaint(Paint p) {
-        super(p);
+    public static void setCachedData(Style s, Object o) {
+        s.nativeOSCache = o;
     }
 }

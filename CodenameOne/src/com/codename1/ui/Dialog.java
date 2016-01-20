@@ -40,19 +40,31 @@ import java.util.Hashtable;
 import java.util.Map;
 
 /**
- * A dialog is a form that occupies a part of the screen and appears as a modal
+ * <p>A dialog is a form that occupies a part of the screen and appears as a modal
  * entity to the developer. Dialogs allow us to prompt users for information and
- * rely on the information being available on the next line after the show method.
+ * rely on the information being available on the next line after the show method.</p>
  * <p>Modality indicates that a dialog will block the calling thread even if the
  * calling thread is the EDT. Notice that a dialog will not release the block
- * until dispose is called even if show() from another form is called!
+ * until dispose is called even if show() from another form is called! Events are still performed thanks
+ * to the <code>invokeAndBlock</code> capability of the <code>Display</code> class.</p>
  * <p>To determine the size of the dialog use the show method that accepts 4 integer
  * values, notice that these values accept margin from the four sides rather than x, y, width
- * and height values!
- * <p>To style the dialog you would usually want to style the content pane rather than
- * the dialog itself.
+ * and height values!</p>
+ * <p>To style the dialog its important to either use the <code>getDialogStyle()</code> or 
+ * <code>setDialogUIID</code> methods rather than styling the dialog object directly.</p>
+ * <p>
+ * The <code>Dialog</code> class also includes support for popup dialog which is a dialog type that is positioned
+ * next to a component or screen area and points an arrow at that location. 
+ * </p>
+ * 
+ * <p>Typical dialog usage looks like this:</p>
+ * <script src="https://gist.github.com/codenameone/bbf5378aec028230ce93.js"></script>
+ * 
+ * <p>See this sample for showing a dialog at the bottom of the screen:</p>
+ * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
  *
  * @author Shai Almog
+ * @see Display#invokeAndBlock(java.lang.Runnable) 
  */
 public class Dialog extends Form {
 
@@ -210,6 +222,7 @@ public class Dialog extends Form {
         super.getTitleComponent().setVisible(false);
         super.getTitleArea().setVisible(false);
         super.getTitleArea().setUIID("Container");
+        lockStyleImages(getUnselectedStyle());
         titleArea.setVisible(false);
 
         dialogContentPane = new Container();
@@ -422,13 +435,15 @@ public class Dialog extends Form {
     }
 
     /**
-     * This method shows the form as a modal alert allowing us to produce a behavior
+     * <p>This method shows the form as a modal alert allowing us to produce a behavior
      * of an alert/dialog box. This method will block the calling thread even if the
      * calling thread is the EDT. Notice that this method will not release the block
-     * until dispose is called even if show() from another form is called!
+     * until dispose is called even if show() from another form is called!</p>
      * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
      * dialogs where you would want the underlying form to "peek" from behind the 
-     * form. 
+     * form. </p>
+     * See this sample for showing a dialog at the bottom of the screen:
+     * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
      * 
      * @param top space in pixels between the top of the screen and the form
      * @param bottom space in pixels between the bottom of the screen and the form
