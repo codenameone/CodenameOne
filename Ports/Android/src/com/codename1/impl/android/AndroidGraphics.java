@@ -352,7 +352,7 @@ class AndroidGraphics {
 
    public void fillRect(int x, int y, int w, int h, byte alpha) {
         if(alpha != 0) {
-            int oldAlpha = alpha;
+            int oldAlpha = getAlpha();
             setAlpha(alpha & 0xff);
             fillRect(x, y, w, h);
             setAlpha(oldAlpha);
