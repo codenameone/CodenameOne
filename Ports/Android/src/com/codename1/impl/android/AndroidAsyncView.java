@@ -689,7 +689,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     @Override
                     public void execute(AndroidGraphics underlying) {
                         underlying.setAlpha(al);
-                        underlying.paintComponentBackground(x, y, width, height, s);
+                        underlying.paintComponentBackground(s.getBackgroundType(), s.getBgImage(), s.getBgColor(), s.getBgTransparency(), s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(), s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(), s.getBackgroundGradientRelativeSize(), x, y, width, height);
                     }
                     public String toString() {
                         return "paintComponentBackground - Legacy";
