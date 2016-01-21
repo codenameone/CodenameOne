@@ -35,6 +35,16 @@ import com.codename1.charts.compat.Paint;
  */
 public class ChartUtil {
     private Canvas c = new Canvas();
+    
+    /**
+     * Draws the given chart onto the given graphics
+     * 
+     * @param g the graphics object
+     * @param chart the chart object
+     * @param bounds the bounds in which the chart should be drawn within the graphics
+     * @param absX
+     * @param absY 
+     */
     public void paintChart(Graphics g, AbstractChart chart, Rectangle bounds, int absX, int absY){
         c.g = g;
         c.bounds = bounds;

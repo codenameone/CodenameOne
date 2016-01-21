@@ -24,7 +24,12 @@ package com.codename1.system;
 
 /**
  * This is a marker interface that should be extended by a user interface in order
- * to indicate that said interface is implemented in native code. 
+ * to indicate that said interface is implemented in native code. To understand more 
+ * about native interfaces you can check out this 
+ * <a href="https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html">
+ * quick "How Do I?" tutorial</a>.<br />
+ * Alternatively you can dig deeper into <a href="https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html">
+ * this tutorial for integrating 3rd party native libraries</a>.
  *
  * @author Shai Almog
  */

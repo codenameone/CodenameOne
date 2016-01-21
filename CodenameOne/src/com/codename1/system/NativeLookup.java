@@ -27,6 +27,12 @@ import java.util.HashMap;
 /**
  * Creates an instance of the native interface which will call the underlying
  * platform using the convention documented in the package docs.
+ * To understand more 
+ * about native interfaces you can check out this 
+ * <a href="https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html">
+ * quick "How Do I?" tutorial</a>.<br />
+ * Alternatively you can dig deeper into <a href="https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html">
+ * this tutorial for integrating 3rd party native libraries</a>.
  * 
  * @author Shai Almog
  */
