@@ -789,7 +789,7 @@ public class TextArea extends Component {
     private void initRowString() {
         // this superficially fixes the problem with text
     	// all displayed on one line.
-    	if(false && !Display.getInstance().isEdt()) {
+    	if(!Display.getInstance().isEdt()) {
             if(rowStrings == null) {
                 rowStrings = new ArrayList();
                 rowStrings.add(getText());
