@@ -72,6 +72,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
         public abstract void execute(AndroidGraphics underlying);
     }
+    private static final Object RENDERING_OPERATIONS_LOCK = new Object();
     private ArrayList<AsyncOp> renderingOperations = new ArrayList<AsyncOp>();
     private ArrayList<AsyncOp> pendingRenderingOperations = new ArrayList<AsyncOp>();
     private final CodenameOneView cn1View;
@@ -108,7 +109,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         for (AsyncOp o : renderingOperations) {
             o.executeWithClip(g);
         }
-        renderingOperations.clear();
+        synchronized (RENDERING_OPERATIONS_LOCK) {
+            renderingOperations.clear();
+            RENDERING_OPERATIONS_LOCK.notify();
+        }
 
         if (paintOnBuffer) {
             cn1View.d(c);
@@ -162,7 +166,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         int counter = 0;
         while (!renderingOperations.isEmpty()) {
             try {
-                Thread.sleep(5);
+                synchronized (RENDERING_OPERATIONS_LOCK) {
+                    RENDERING_OPERATIONS_LOCK.wait(5);
+                }
 
                 // don't let the EDT die here
                 counter++;

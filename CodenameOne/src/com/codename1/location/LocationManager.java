@@ -26,10 +26,14 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 
 /**
- * The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener, important: in 
+ * <p>The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener, important: in 
  * order to use location on iOS you will need to define the build argument ios.locationUsageDescription.
  * This build argument should be used to describe to Apple &amp; the users why you need to use the location 
- * functionality.
+ * functionality.</p>
+ * 
+ * <p>Usage:</p>
+ * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
+ * 
  */
 public abstract class LocationManager {
     

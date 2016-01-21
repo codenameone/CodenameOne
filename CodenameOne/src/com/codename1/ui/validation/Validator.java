@@ -383,6 +383,8 @@ public class Validator {
     /**
      * Binds an event listener to the given component
      * @param cmp the component to bind the data listener to
+     * @deprecated this method was exposed by accident, constraint implicitly calls it and you don't need to 
+     * call it directly. It will be made protected in a future update to Codename One!
      */
     public void bindDataListener(Component cmp) {
         if(showErrorMessageForFocusedComponent) {

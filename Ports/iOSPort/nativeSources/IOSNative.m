@@ -4803,7 +4803,13 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     }
     repaintUI();
 }
-void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+    if (preferredWidth == 0) {
+        preferredWidth = 320 * scaleValue;
+    }
+    if (preferredHeight == 0) {
+        preferredHeight = 260 * scaleValue;
+    }
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
@@ -4825,13 +4831,14 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             [pickerView selectRow:selection inComponent:0 animated:NO];
         }
         pickerView.delegate = [CodenameOne_GLViewController instance];
+        
         if(isIPad()) {
             datepickerPopover = YES;
             stringPickerSelection = -1;
             UIViewController *vc = [[UIViewController alloc] init];
             UIView *popoverView = [[UIView alloc] init];
             [vc setView:popoverView];
-            [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
+            //[vc setContentSizeForViewInPopover:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue)];
             
 #ifndef CN1_USE_ARC
             UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
@@ -4868,15 +4875,29 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 #endif
             [toolbar setItems:itemsArray];
             
-            [popoverView addSubview:toolbar];
-            [popoverView addSubview:pickerView];
-            pickerView.frame = CGRectMake(0, 44, pickerView.frame.size.width, pickerView.frame.size.height);
             
+            [popoverView addSubview:pickerView];
+            [popoverView addSubview:toolbar];
+            
+            pickerView.frame = CGRectMake(0, - preferredHeight/scaleValue * 0.5, preferredWidth/scaleValue, preferredHeight/scaleValue * 2);
+
+            popoverView.frame = CGRectMake(0, 0, preferredWidth/scaleValue, preferredHeight/scaleValue);
+            
+            //pickerView.frame = CGRectMake(0, 44, preferredWidth/scaleValue, preferredHeight/scaleValue);
+            //[popoverView layoutSubviews];
+            [vc setContentSizeForViewInPopover:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue + 44) ];
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
             
+            
+            
+            
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+            
+            [uip setPopoverContentSize:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue) animated:YES];
+
+            
         } else {
             if(isIOS7()) {
                 showPopupPickerView(CN1_THREAD_GET_STATE_PASS_ARG pickerView);
@@ -4922,7 +4943,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 }
 
 
-void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
@@ -5171,6 +5192,19 @@ void com_codename1_impl_ios_IOSNative_hideTextEditing__(CN1_THREAD_STATE_MULTI_A
             [editingComponent resignFirstResponder];
             [editingComponent becomeFirstResponder];
             editingComponent.hidden = YES;
+        }
+        POOL_END();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setNativeEditingComponentVisible___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN b) {
+    if(editingComponent == nil) {
+        return;
+    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if(editingComponent != nil) {
+            editingComponent.hidden = !b;
         }
         POOL_END();
     });
