@@ -41,6 +41,7 @@ import java.util.Vector;
  * Notice: keys starting with CN1 are reserved for internal usage!
  *
  * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public final class CloudObject implements Externalizable {
     /**
