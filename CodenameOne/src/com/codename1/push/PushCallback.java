@@ -72,8 +72,8 @@ public interface PushCallback {
     /**
      * Invoked when push registration is complete to pass the device ID to the application.
      * 
-     * @param deviceId a String uniquely identifying this device within the server
-     * allowing the server API to push directly to this device.
+     * @param deviceId OS native push id you should not use this value and instead use <code>Push.getPushKey()</code>
+     * @see Push#getPushKey() 
      */
     public void registeredForPush(String deviceId);
     
