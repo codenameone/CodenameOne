@@ -36,6 +36,7 @@ import java.util.Vector;
  * Seamlessly creates a cloud based searchable list model
  *
  * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public class CloudListModel implements ListModel {
     
@@ -115,7 +116,7 @@ public class CloudListModel implements ListModel {
      * @param type the type of object shown on the list
      * @param visibilityScope the scope of the list (CloudObject.ACCESS_* values)
      * @param index the index by which we limit the entries
-     * @param value the queryValue for the given index
+     * @param queryValue the queryValue for the given index
      * @param ascending whether the sort is ascending or descending 
      */
     public CloudListModel(String type, int visibilityScope, int index, String queryValue, boolean ascending) {
