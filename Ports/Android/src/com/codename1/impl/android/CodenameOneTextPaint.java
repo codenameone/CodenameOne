@@ -45,11 +45,6 @@ public class CodenameOneTextPaint extends TextPaint {
         super.setTypeface(tf);
     }
 
-    @Override
-    public Typeface setTypeface(Typeface typeface) {
-        throw new RuntimeException("Can't set typeface in runtime!");
-    }
-
     public int getFontAscent() {
         if(ascent < 0) {
             ascent = getFontMetricsInt().ascent;
