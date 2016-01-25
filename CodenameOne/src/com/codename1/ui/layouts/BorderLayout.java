@@ -31,13 +31,48 @@ import com.codename1.ui.plaf.Style;
 import java.util.HashMap;
 
 /**
- * A border layout lays out a container, arranging and resizing its 
+ * <p>A border layout lays out a container, arranging and resizing its 
  * components to fit in five regions: north, south, east, west, and center. 
  * Each region may contain no more than one component, and is identified by a 
  * corresponding constant: NORTH, SOUTH, EAST, WEST, and CENTER. 
  * When adding a component to a container with a border layout, use one of 
- * these five constants.
+ * these five constants.</p>
+ * <p>
+ * The border layout scales all of the components within it to match the available 
+ * constraints. The NORTH &amp; SOUTH components use their preferred height but
+ * are stretched to take up the full width available. The EAST &amp; WEST do the same
+ * for the reverse axis however they leave room for the NORTH/SOUTH entries if they
+ * are defined.<br />
+ * The CENTER constraint will take up the rest of the available space regardless of its preferred
+ * size. This is normally very useful, however in some cases we would prefer that the center
+ * component will actually position itself in the middle of the available space. For this we have
+ * the <code>setCenterBehavior</code> method.
+ * </p>
+ * <p>
+ * Because of its scaling behavior scrolling a border layout makes no sense. However it is a 
+ * common mistake to apply a border layout to a scrollable container or trying to make a border
+ * layout scrollable. That is why the {@link com.codename1.ui.Container} class explicitly blocks
+ * scrolling on a BorderLayout.<br />
+ * Typical usage of this class:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/23e642b1a749e2f37e68.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/border-layout.png" alt="Border Layout" />
  *
+ * <p>
+ * When defining the center behavior we can get very different results:
+ * </p>
+ *<script src="https://gist.github.com/codenameone/108aa105386ed7c340ad.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/border-layout-center.png" alt="Border Layout Center" />
+ * 
+ * <p>Notice that in the case of RTL (right to left language also known as bidi) the
+ * EAST and WEST values are implicitly reversed as shown in this image:
+ * </p>
+ * <img src="https://www.codenameone.com/img/developer-guide/border-layout-RTL.png" alt="Border Layout bidi/RTL" />
+ * 
+ * <p>
+ * You can read further in the <a href="https://www.codenameone.com/manual/basics.html#_border_layout">BorderLayout section in the developer guide</a>.
+ * </p>
+ * 
  * @author Nir Shabi, Shai Almog
  */
 public class BorderLayout extends Layout {

@@ -48,10 +48,13 @@ import java.util.Collection;
 import java.util.HashMap;
 
 /**
- * Base class for all the widgets in the toolkit using the composite pattern in 
- * a similar way to the AWT Container/Component relationship. All components are
- * potentially animated (need to be registered in {@link Display}). 
+ * <p>The component class is the basis of all UI widgets in Codename One, to arrange multiple components 
+ * together we use the Container class which itself “IS A” Component subclass. The Container is a 
+ * Component that contains Components effectively allowing us to nest Containers infinitely to build any type 
+ * of visual hierarchy we want by nesting Containers.
+ * </p>
  * 
+ * @see Container
  * @author Chen Fishbein
  */
 public class Component implements Animation, StyleListener {

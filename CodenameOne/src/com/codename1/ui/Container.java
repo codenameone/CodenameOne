@@ -42,10 +42,31 @@ import java.util.Iterator;
 import java.util.Vector;
 
 /**
- * A composite pattern with {@link Component}, allows nesting and arranging multiple
+ * <p>A composite pattern with {@link Component}, allows nesting and arranging multiple
  * components using a pluggable layout manager architecture. Containers can be nested
- * one within the other to form elaborate UI's.
- *
+ * one within the other to form elaborate UI's. By default Containers use {@link com.codename1.ui.layouts.FlowLayout}
+ * which isn't ideal for most use cases.</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/component-uml.png" alt="Component/Container Relationship Diagram" />
+ * <p>
+ * Components within the Container <b>MUST</b> be arranged using a layout manager! <br />
+ * This allows the UI to adapt to different resolutions, DPI, orientation changes etc. seamlessly. Invoking any
+ * bounds setting method will produce unpredictable results. To learn about layout managers check out the 
+ * <a href="https://www.codenameone.com/manual/basics.html#_layout_managers">relevant section in the developer guide</a>.
+ * </p>
+ *<p>
+ * A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
+ * a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
+ * performance as a bonus.
+ * </p>
+ * <p>
+ * Many components within Codename One (e.g. {@link com.codename1.ui.tree.Tree}, 
+ * {@link com.codename1.ui.table.Table}, 
+ * {@link com.codename1.components.MultiButton} etc.) derive from Container instead of Component. This allows
+ * such components to provide very rich functionality by building on top of the existing functionality.
+ * Container also provides the lead component functionality that allows treating an entire Container hierarchy
+ * as a single component. This is discussed in depth within the <a href="https://www.codenameone.com/manual/misc-features.html#_lead_component">developer guide</a>.
+ * </p>
+ * 
  * @see com.codename1.ui.layouts
  * @see Component
  * @author Chen Fishbein
