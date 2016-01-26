@@ -49,7 +49,7 @@ import java.util.HashMap;
 
 /**
  * <p>The component class is the basis of all UI widgets in Codename One, to arrange multiple components 
- * together we use the Container class which itself “IS A” Component subclass. The Container is a 
+ * together we use the Container class which itself "IS A" Component subclass. The Container is a 
  * Component that contains Components effectively allowing us to nest Containers infinitely to build any type 
  * of visual hierarchy we want by nesting Containers.
  * </p>
