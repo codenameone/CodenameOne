@@ -30,8 +30,41 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
 /**
- * Flows elements in a row so they can spill over when reaching line end
+ * <p>FlowLayout is the default layout manager for Codename One Containers and Forms. It places components
+ * in a row one after another based on their preferred size. When it reaches the edge of the container it will break
+ * a line and start a new row. </p>
+ * <script src="https://gist.github.com/codenameone/124cab8d0c1da82756f1.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/flow-layout.png" alt="Result of FlowLayout code" />
+ * 
+ * <p>
+ * Since flow layout isn't a constraint based layout it has a bunch of very useful enclose methods that can significantly 
+ * reduce the code required to create the same UI e.g.:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/3481c77f93726745ad28.js"></script>
+ * 
+ * <p>
+ * This class works nicely for simple elements, however since Codename One doesn't reflow recursively (for performance)
+ * it can't accurately handle complex layouts. As a result when an element of varying size is placed in a flow layout
+ * this confuses the line breaking logic and fails in odd ways. That is why this layout should only be used for relatively
+ * simple use cases.
+ * </p>
  *
+ * <p>
+ * Flow layout supports aligning the component horizontally and vertically, it defaults to the top left alignment for 
+ * LTR languages. E.g. the following alignments are supported thru the usage of <code>setAlign</code> &amp;
+ * <code>setValign</code>.
+ * </p>
+ * <p>E.g. you can align to the center</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/flow-layout-center.png" alt="Flow layout align center" />
+ * 
+ * <p>You can align to the right</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/flow-layout-right.png" alt="Flow layout align right" />
+ * 
+ * <p>You can align to the center and the middle horizontally</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/flow-layout-center-middle.png" alt="Flow layout align middle" />
+ * 
+ * <p>There are quite a few additional combinations that are possible with these API's.</p>
+ * 
  * @author Nir Shabi
  */
 public class FlowLayout extends Layout{
