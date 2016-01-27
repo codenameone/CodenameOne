@@ -1585,11 +1585,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             super.paintComponentBackground(graphics, x, y, width, height, s);
             return;
         }
-        Image img = s.getBgImage();
-        if(img != null && img.requiresDrawImage()) {
-            super.paintComponentBackground(graphics, x, y, width, height, s);
-            return;
-        }
         ((AndroidGraphics) graphics).paintComponentBackground(x, y, width, height, s);
     }
 
