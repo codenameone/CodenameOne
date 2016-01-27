@@ -5138,6 +5138,142 @@ public class Component implements Animation, StyleListener {
                 int y = rect.getY() + g.getTranslateY();
                 int width = rect.getSize().getWidth();
                 int height = rect.getSize().getHeight();
+                Image img = s.getBgImage();
+                if(img != null && img.requiresDrawImage()) {
+                    // damn no native painting...
+                    int iW = img.getWidth();
+                    int iH = img.getHeight();
+                    switch (s.getBackgroundType()) {
+                        case Style.BACKGROUND_IMAGE_SCALED:
+                            if (Display.impl.isScaledImageDrawingSupported()) {
+                                g.drawImage(img, x, y, width, height);
+                            } else {
+                                if (iW != width || iH != height) {
+                                    img = img.scaled(width, height);
+                                    s.setBgImage(img, true);
+                                }
+                                g.drawImage(img, x, y);
+                            }
+                            return;
+                        case Style.BACKGROUND_IMAGE_SCALED_FILL:
+                            float r = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));
+                            int bwidth = (int) (((float) iW) * r);
+                            int bheight = (int) (((float) iH) * r);
+                            if (Display.impl.isScaledImageDrawingSupported()) {
+                                g.drawImage(img, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);
+                            } else {
+                                if (iW != bwidth || iH != bheight) {
+                                    img = img.scaled(bwidth, bheight);
+                                    s.setBgImage(img, true);
+                                }
+                                g.drawImage(img, x + (width - bwidth) / 2, y + (height - bheight) / 2);
+                            }
+                            return;
+                        case Style.BACKGROUND_IMAGE_SCALED_FIT:
+                            if (s.getBgTransparency() != 0) {
+                                g.setColor(s.getBgColor());
+                                g.fillRect(x, y, width, height, s.getBgTransparency());
+                            }
+                            float r2 = Math.min(((float) width) / ((float) iW), ((float) height) / ((float) iH));
+                            int awidth = (int) (((float) iW) * r2);
+                            int aheight = (int) (((float) iH) * r2);
+                            if (Display.impl.isScaledImageDrawingSupported()) {
+                                g.drawImage(img, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
+                            } else {
+                                if (iW != awidth || iH != aheight) {
+                                    img = img.scaled(awidth, aheight);
+                                    s.setBgImage(img, true);
+                                }
+                                g.drawImage(img, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
+                            }
+                            return;
+                        case Style.BACKGROUND_IMAGE_TILE_BOTH:
+                            g.tileImage(img, x, y, width, height);
+                            return;
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.tileImage(img, x, y, width, iH);
+                            return;
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.tileImage(img, x, y + (height / 2 - iH / 2), width, iH);
+                            return;
+                        case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.tileImage(img, x, y + (height - iH), width, iH);
+                            return;
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            for (int yPos = 0; yPos <= height; yPos += iH) {
+                                g.drawImage(img, x, y + yPos);
+                            }
+                            return;
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            for (int yPos = 0; yPos <= height; yPos += iH) {
+                                g.drawImage(img, x + (width / 2 - iW / 2), y + yPos);
+                            }
+                            return;
+                        case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            for (int yPos = 0; yPos <= height; yPos += iH) {
+                                g.drawImage(img, x + width - iW, y + yPos);
+                            }
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x + (width / 2 - iW / 2), y);
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x + (width / 2 - iW / 2), y + (height - iH));
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x, y + (height / 2 - iH / 2));
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x + width - iW, y + (height / 2 - iH / 2));
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x + (width / 2 - iW / 2), y + (height / 2 - iH / 2));
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x, y);
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x + width - iW, y);
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x, y + (height - iH));
+                            return;
+                        case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+                            g.setColor(s.getBgColor());
+                            g.fillRect(x, y, width, height, s.getBgTransparency());
+                            g.drawImage(img, x + width - iW, y + (height - iH));
+                            return;
+                    }
+                } 
+                
                 impl.paintComponentBackground(g.getGraphics(), x, y, width, height, s);
             }
         }
