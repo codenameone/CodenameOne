@@ -2236,6 +2236,16 @@ public class Form extends Container {
                 if(cmp != null) {
                     cmp = ((Container)cmp).getComponentAt(x, y);
                     if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                        if(cmp.hasLead) {
+                            Container leadParent;
+                            if (cmp instanceof Container) {
+                                leadParent = ((Container) cmp).getLeadParent();
+                            } else {
+                                leadParent = cmp.getParent().getLeadParent();
+                            }
+                            setFocused(leadParent);
+                            cmp = cmp.getLeadComponent();
+                        }
                         cmp.initDragAndDrop(x, y);
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
@@ -2571,8 +2581,21 @@ public class Form extends Container {
                         Component cmp = ((BorderLayout)super.getLayout()).getWest();
                         if(cmp != null) {
                             cmp = ((Container)cmp).getComponentAt(x, y);
-                            if (cmp != null && cmp.isEnabled()) {
-                                cmp.pointerReleased(x, y);
+                            if (cmp != null && cmp.isEnabled()) {                                
+                                if(cmp.hasLead) {
+                                    Container leadParent;
+                                    if (cmp instanceof Container) {
+                                        leadParent = ((Container) cmp).getLeadParent();
+                                    } else {
+                                        leadParent = cmp.getParent().getLeadParent();
+                                    }
+                                    leadParent.repaint();
+                                    setFocused(leadParent);
+                                    cmp = cmp.getLeadComponent();
+                                    cmp.pointerReleased(x, y);
+                                } else {
+                                    cmp.pointerReleased(x, y);
+                                }
                             }
                         }
                     }
