@@ -1581,7 +1581,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void paintComponentBackground(Object graphics, int x, int y, int width, int height, Style s) {
-        if((!asyncView) || compatPaintMode) {
+        if((!asyncView) || compatPaintMode ) {
+            super.paintComponentBackground(graphics, x, y, width, height, s);
+            return;
+        }
+        Image img = s.getBgImage();
+        if(img != null && img.requiresDrawImage()) {
             super.paintComponentBackground(graphics, x, y, width, height, s);
             return;
         }

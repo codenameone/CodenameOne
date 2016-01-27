@@ -229,7 +229,7 @@ public class RGBImage extends Image {
      * {@inheritDoc}
      */
     @Override
-    protected boolean requiresDrawImage() {
+    public boolean requiresDrawImage() {
         return true;
     }
 }

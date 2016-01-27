@@ -1116,7 +1116,7 @@ public class Image {
      * 
      * @return true if a drawImage call is a required
      */
-    protected boolean requiresDrawImage() {
+    public boolean requiresDrawImage() {
         return false;
     }
 }

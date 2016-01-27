@@ -4917,7 +4917,7 @@ public class FontImage extends Image {
      * {@inheritDoc}
      */
     @Override
-    protected boolean requiresDrawImage() {
+    public boolean requiresDrawImage() {
         return true;
     }
 }

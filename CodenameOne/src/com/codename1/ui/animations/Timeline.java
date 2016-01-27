@@ -411,7 +411,7 @@ public final class Timeline extends Image implements Animation, Painter {
      * {@inheritDoc}
      */
     @Override
-    protected boolean requiresDrawImage() {
+    public boolean requiresDrawImage() {
         return true;
     }
 }
