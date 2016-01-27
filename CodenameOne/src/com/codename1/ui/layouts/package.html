@@ -1,8 +1,3 @@
-<!-- 
-    Document   : package
-    Created on : Oct 11, 2007, 10:38:26 AM
-    Author     : Shai Almog
--->
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
   <head>
@@ -11,10 +6,26 @@
     <body>
         <p>
             Layout managers allow a {@link com.codename1.ui.Container} to 
-            arrange its components by a set of rules that would be adapted for specific
-            screen/font sizes. A layout manager is an arranging algorithm encapsulated
-            by an interface, the interface implementation places components absolutely based
-            on "hints" received.
+            arrange its components by a set of rules that adapt to specific
+            densities (ppi - pixels per inch). A layout manager is an arranging algorithm encapsulated
+            by an abstract class implementation that places components absolutely based
+            on the "hints" received.
         </p>
+        <h2>Layout Managers that ship with Codename One</h2>
+        <p>
+            {@link FlowLayout} is default layout manager, simple, flexible and with a few caveats.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/flow-layout.png" alt="Simple FlowLayout" />
+
+        <p>
+            {@link BorderLayout} is ubiquitous thru Codename One code. 
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/border-layout.png" alt="Border Layout" />
+
+        <p>
+            {@link BorderLayout} can also behave differently based on the center behavior flag
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/border-layout-center.png" alt="Border Layout Center" />
+        
     </body>
 </html>
