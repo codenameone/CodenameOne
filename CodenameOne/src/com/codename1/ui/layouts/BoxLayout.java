@@ -32,7 +32,7 @@ import com.codename1.ui.plaf.UIManager;
 /**
  * <p>Layout manager that places elements in a row (<code>X_AXIS</code>) or column (<code>Y_AXIS</code>) 
  * according to box orientation. Box is a very simple and predictable layout that serves as the "workhorse" of 
- * component lists in Codename One<br />
+ * component lists in Codename One<br>
  * You can create a box layout Y UI using syntax such as this</p>
  * 
  * <script src="https://gist.github.com/codenameone/99f5e43061b4c6413d16.js"></script>
@@ -48,7 +48,7 @@ import com.codename1.ui.plaf.UIManager;
  * The <code>BoxLayout</code> keeps the preferred size of its destination orientation and scales elements on the other axis. 
  * Specifically <code>X_AXIS</code> will keep the preferred width of the component while growing all
  * the components vertically to match in size. Its <code>Y_AXIS</code> counterpart keeps the preferred height
- * while growing the components horizontally.<br />
+ * while growing the components horizontally.<br>
  * This behavior is very useful since it allows elements to align as they would all have the same size.
  * </p>
  * <p>

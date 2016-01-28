@@ -47,7 +47,7 @@ import com.codename1.ui.util.WeakHashMap;
  * <script src="https://gist.github.com/codenameone/bddead645fcd8ee33e9c.js"></script>
  * 
  * <p>
- * Notice that this can be used within a custom dialog too.<br />
+ * Notice that this can be used within a custom dialog too.<br>
  * A second approach allows showing the infinite progress over the entire screen which blocks all input. This tints
  * the background while the infinite progress rotates:
  * </p>

@@ -32,7 +32,7 @@ import com.codename1.ui.plaf.Style;
 /**
  * <p>The components are arranged in a grid based on available space, all cells in the grid are given exactly
  * the same size which matches the largest preferred size or available space. The main use case for this layout
- * is a grid of icons e.g. like one would see in the iPhone home screen. <br />
+ * is a grid of icons e.g. like one would see in the iPhone home screen. <br>
  * If the number of rows * columns is smaller than the number of components added a new row is implicitly added to the grid.
  * However, if the number of components is smaller than available cells (won't fill the last row) blank spaces will
  * be left in place.
@@ -51,7 +51,7 @@ import com.codename1.ui.plaf.Style;
  * <p>
  * Grid also has an autoFit attribute that can be used to automatically calculate the column count based on 
  * available space and preferred width. This is really useful for working with UI's where the device orientation
- * might change.<br />
+ * might change.<br>
  * There is also a terse syntax for working with a grid that has two versions, one that uses the "auto fit" option and
  * another that accepts the column names. Heres a sample of the terse syntax coupled with the auto fit screenshots
  * of the same code in two orientations:

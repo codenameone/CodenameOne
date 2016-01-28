@@ -2306,7 +2306,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Creates an animation that will transform the current component to the styling of the destination UIID when
      * completed. Notice that fonts will only animate within the truetype and native familiy and we recommend that you
-     * don't shift weight/typeface/style as this might diminish the effect.<br />
+     * don't shift weight/typeface/style as this might diminish the effect.<br>
      * <b>Important: </b> Only unselected styles are animated but once the animation completes all styles are applied.
      * @param destUIID the UIID to which this component will gradually shift
      * @param duration the duration of the animation or the number of steps

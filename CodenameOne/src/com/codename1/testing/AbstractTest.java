@@ -46,7 +46,7 @@ public abstract class AbstractTest implements UnitTest {
     }
 
     /**
-     * Defaults to two minutes.<br />
+     * Defaults to two minutes.<br>
      * {@inheritDoc}
      */
     public int getTimeoutMillis() {

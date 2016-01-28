@@ -48,7 +48,7 @@ import java.util.Vector;
  * which isn't ideal for most use cases.</p>
  * <img src="https://www.codenameone.com/img/developer-guide/component-uml.png" alt="Component/Container Relationship Diagram" />
  * <p>
- * Components within the Container <b>MUST</b> be arranged using a layout manager! <br />
+ * Components within the Container <b>MUST</b> be arranged using a layout manager! <br>
  * This allows the UI to adapt to different resolutions, DPI, orientation changes etc. seamlessly. Invoking any
  * bounds setting method will produce unpredictable results. To learn about layout managers check out the 
  * <a href="https://www.codenameone.com/manual/basics.html#_layout_managers">relevant section in the developer guide</a>.
@@ -2326,7 +2326,7 @@ public class Container extends Component implements Iterable<Component>{
      * a component that isn't within the container. However, unlike the replace functionality which
      * uses a transition and assumes the position of the component (and is hence quite flexible) morph
      * can move and resize the component. E.g. after entering text into a text field and pressing submit
-     * it can "morph" into a chat bubble located in a different part of the screen.<br/>
+     * it can "morph" into a chat bubble located in a different part of the screen.<br>
      * It is the responsibility of the caller to remove the source component (if desired) and revalidate the 
      * container when the animation completes.
      * 
@@ -2344,7 +2344,7 @@ public class Container extends Component implements Iterable<Component>{
      * a component that isn't within the container. However, unlike the replace functionality which
      * uses a transition and assumes the position of the component (and is hence quite flexible) morph
      * can move and resize the component. E.g. after entering text into a text field and pressing submit
-     * it can "morph" into a chat bubble located in a different part of the screen.<br/>
+     * it can "morph" into a chat bubble located in a different part of the screen.<br>
      * It is the responsibility of the caller to remove the source component (if desired) and revalidate the 
      * container when the animation completes.
      * 

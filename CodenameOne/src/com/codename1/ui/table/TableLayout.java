@@ -98,6 +98,7 @@ import java.util.Vector;
  * We go into further details on this in the <a href="https://www.codenameone.com/manual/basics.html#_table_layout">developer guide</a> 
  * so check that out.</p>
  * <script src="https://gist.github.com/codenameone/573f73164df4af00b7b1.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/table-layout-constraints.png" alt="TableLayout with complex constraints" />
  *
  * @author Shai Almog
  */

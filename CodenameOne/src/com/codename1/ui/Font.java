@@ -201,9 +201,9 @@ public class Font {
     /**
      * Creates a true type font with the given name/filename (font name might be different from the file name
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
-     * order to be detectable. The file name should contain no slashes or any such value.<br />
+     * order to be detectable. The file name should contain no slashes or any such value.<br>
      * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
-     * to use the font name matching the weight, so the weight argument to derive will be ignored!<br />
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!<br>
      * This system also supports a special "native:" prefix that uses system native fonts e.g. HelveticaNeue
      * on iOS and Roboto on Android. It supports the following types:
      * native:MainThin, native:MainLight, native:MainRegular, native:MainBold, native:MainBlack,
@@ -245,7 +245,7 @@ public class Font {
     
     /**
      * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
-     * will only work in the case of truetype fonts!<br/>
+     * will only work in the case of truetype fonts!<br>
      * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
      * to use the font name matching the weight, so the weight argument to derive will be ignored!
      * @param sizePixels the size of the font in pixels

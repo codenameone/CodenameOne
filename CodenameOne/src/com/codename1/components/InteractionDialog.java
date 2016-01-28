@@ -41,7 +41,7 @@ import com.codename1.ui.plaf.UIManager;
 /**
  * Unlike a regular dialog the interaction dialog only looks like a dialog,
  * it resides in the layered pane and can be used to implement features where 
- * interaction with the background form is still required.<br />
+ * interaction with the background form is still required.<br>
  * Since this code is designed for interaction all "dialogs" created thru here are
  * modless and never block.
  *

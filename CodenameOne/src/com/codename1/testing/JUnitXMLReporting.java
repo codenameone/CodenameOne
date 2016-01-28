@@ -29,7 +29,7 @@ import java.io.OutputStream;
 /**
  * Produces test reporting in the format of JUnit XML for compatibility with
  * tools that consume JUnit test case results see http://code.google.com/p/codenameone/issues/detail?id=446
- * for more details.<br/>
+ * for more details.<br>
  *
  * @author Shai Almog
  */
