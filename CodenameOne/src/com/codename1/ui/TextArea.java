@@ -1690,4 +1690,19 @@ public class TextArea extends Component {
             Display.getInstance().stopEditing(this);
         }
     }
+
+    /**
+     * {@inheritDoc}
+     * We override get style here to return the selected style when editing
+     * @return the selected style if editing, <code>super.getStyle()</code> otherwise
+     */
+    @Override
+    public Style getStyle() {
+        if(isEditing()) {
+            return getSelectedStyle();
+        }
+        return super.getStyle(); 
+    }
+    
+    
 }
