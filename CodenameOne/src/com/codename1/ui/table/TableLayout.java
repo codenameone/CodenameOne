@@ -65,7 +65,7 @@ import java.util.Vector;
  * <p>Notice that table layout constraints can't be reused for more than one component.<br>
  * The constraint class supports the following attributes:</p>
  *
- * <table summary="">
+ * <table summary="" border="1">
  *   <tr>
  *        <td> column       </td><td> The column for the table cell. This defaults to -1 which will just place the component in the next available cell</td>
  *   </tr>
