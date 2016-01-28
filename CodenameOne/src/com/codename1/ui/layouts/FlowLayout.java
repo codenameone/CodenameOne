@@ -65,6 +65,7 @@ import com.codename1.ui.plaf.UIManager;
  * 
  * <p>There are quite a few additional combinations that are possible with these API's.</p>
  * 
+ * @see BoxLayout see the box layout X which is often a better choice than flow layout.
  * @author Nir Shabi
  */
 public class FlowLayout extends Layout{
@@ -423,7 +424,9 @@ public class FlowLayout extends Layout{
     }
     
     /**
-     * Shorthand for Container.encloseIn(new FlowLayout(), cmps);
+     * Shorthand for Container.encloseIn(new FlowLayout(), cmps); see:
+     * <script src="https://gist.github.com/codenameone/3481c77f93726745ad28.js"></script>
+     * 
      * @param cmps the components to enclose in a new container
      * @return the new container
      */
