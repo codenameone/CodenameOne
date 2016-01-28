@@ -370,7 +370,8 @@ public class ComboBox<T> extends List<T> {
         Command result = showPopupDialog(popupDialog, l);
         Form.comboLock = false;
         parentForm.setTintColor(tint);
-        if(result == popupDialog.getMenuBar().getCancelMenuItem()) {
+        if(result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() ||
+                 popupDialog.wasDisposedDueToRotation()) {
             setSelectedIndex(originalSel);
         }
     }

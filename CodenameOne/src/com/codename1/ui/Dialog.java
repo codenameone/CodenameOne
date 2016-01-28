@@ -181,6 +181,11 @@ public class Dialog extends Form {
 
     private boolean disposeWhenPointerOutOfBounds = false;
     private boolean pressedOutOfBounds;
+    
+    /**
+     * Returns true if the dialog was disposed automatically due to device rotation
+     */
+    private boolean disposedDueToRotation;
     private Label dialogTitle;
     private Container dialogContentPane;
 
@@ -567,6 +572,7 @@ public class Dialog extends Form {
      */
     void sizeChangedInternal(int w, int h) {
         if(disposeOnRotation) {
+            disposedDueToRotation = true;
             dispose();
             Form frm = getPreviousForm();
             if(frm != null){
@@ -924,6 +930,8 @@ public class Dialog extends Form {
     }
 
     void onShowCompletedImpl() {
+        pressedOutOfBounds = false;
+        disposedDueToRotation = false;
         onShowCompleted();
         if(isDisposed()) {
             disposeImpl();
@@ -1672,6 +1680,14 @@ public class Dialog extends Form {
             pressedOutOfBounds = false;        
         }
     }
+
+    /**
+     * Returns true if a dialog that was disposed did it because of a pointer out of bounds
+     * @return true when a dialog was disposed due to pointer out of bounds.
+     */
+    public boolean wasDisposedDueToOutOfBoundsTouch() {
+        return pressedOutOfBounds;
+    }
     
     /**
      * Screen orientation position for the upcoming dialog. By default
@@ -1835,5 +1851,13 @@ public class Dialog extends Form {
      */
     public void setPopupDirectionBiasPortrait(Boolean popupDirectionBiasPortrait) {
         this.popupDirectionBiasPortrait = popupDirectionBiasPortrait;
+    }
+
+    /**
+     * Returns true if the dialog was disposed automatically due to device rotation
+     * @return the disposedDueToRotation value
+     */
+    public boolean wasDisposedDueToRotation() {
+        return disposedDueToRotation;
     }
 }
