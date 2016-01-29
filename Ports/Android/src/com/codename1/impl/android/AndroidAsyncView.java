@@ -1086,7 +1086,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 this.fgColor = color;
                 this.font = font;
                 if(font == null) {
-                    font = impl.defaultFont;
+                    this.font = impl.defaultFont;
                 } 
             }
 
