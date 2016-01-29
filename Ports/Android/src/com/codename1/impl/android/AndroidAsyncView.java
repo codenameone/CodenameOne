@@ -1085,6 +1085,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 this.text = text;
                 this.fgColor = color;
                 this.font = font;
+                if(font == null) {
+                    font = impl.defaultFont;
+                } 
             }
 
             public DrawStringCache(String text, Style s) {
@@ -1097,6 +1100,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     if(nativeFont instanceof AndroidImplementation.NativeFont) {
                         nativeFont = ((AndroidImplementation.NativeFont)nativeFont).font;
                     }
+                    if(nativeFont == null) {
+                        nativeFont = impl.defaultFont;
+                    } 
                 }
                 this.font = (CodenameOneTextPaint)nativeFont;
             }
