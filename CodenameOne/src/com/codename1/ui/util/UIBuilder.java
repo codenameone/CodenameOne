@@ -2688,7 +2688,7 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public final int getVersion() {
         return 1;
@@ -2715,7 +2715,7 @@ public class UIBuilder { //implements Externalizable {
     }*/
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public final void externalize(DataOutputStream out) throws IOException {
         Util.writeObject(baseFormNavigationStack, out);
@@ -2743,7 +2743,7 @@ public class UIBuilder { //implements Externalizable {
     //}
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public final void internalize(int version, DataInputStream in) throws IOException {
         baseFormNavigationStack = (Vector)Util.readObject(in);
@@ -2752,7 +2752,7 @@ public class UIBuilder { //implements Externalizable {
     }*/
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public String getObjectId() {
         return "StateMachine";

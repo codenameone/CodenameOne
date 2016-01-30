@@ -43,7 +43,7 @@ public class ReplaceableImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public byte[] getImageData() {
         replaced = false;
@@ -72,7 +72,7 @@ public class ReplaceableImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(replaced) {
@@ -82,14 +82,14 @@ public class ReplaceableImage extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return true;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOpaque() {
         return opaque;

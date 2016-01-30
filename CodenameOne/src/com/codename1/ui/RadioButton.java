@@ -119,7 +119,7 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -143,7 +143,7 @@ public class RadioButton extends Button {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "Radio Button " + getText();
@@ -191,7 +191,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void released(int x, int y) {
         // prevent the radio button from being "turned off"
@@ -202,7 +202,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(isToggle()) {
@@ -213,7 +213,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getRadioButtonPreferredSize(this);
@@ -229,7 +229,7 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void fireActionEvent() {
         if(group != null) {
@@ -297,21 +297,21 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"selected"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {Boolean.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -325,7 +325,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -342,7 +342,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("selected")) {
@@ -355,7 +355,7 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("selected")) {

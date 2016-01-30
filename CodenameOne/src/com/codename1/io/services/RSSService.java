@@ -90,7 +90,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException {
         results = new Vector();
@@ -231,7 +231,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         return Dialog.show("Parsing Error", description, "Continue", "Cancel");

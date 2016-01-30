@@ -99,7 +99,7 @@ public class SwipeableContainer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         Form form = this.getComponentForm();
@@ -112,7 +112,7 @@ public class SwipeableContainer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();

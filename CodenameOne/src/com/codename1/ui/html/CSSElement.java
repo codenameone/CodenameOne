@@ -1048,7 +1048,7 @@ class CSSElement extends HTMLElement {
 
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public String getAttributeName(Integer attrKey) {
         return CSS_ATTRIBUTE_ROOTS[attrKey.intValue()-CSS_STYLE_ID_OFFSET];

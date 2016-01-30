@@ -221,7 +221,7 @@ public class Tile {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return getClass().getName() + " dimension: " + dimension + " bbox: " + bbox;

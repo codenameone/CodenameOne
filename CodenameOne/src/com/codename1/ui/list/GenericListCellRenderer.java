@@ -275,7 +275,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         Component cmp;
@@ -434,7 +434,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
@@ -573,14 +573,14 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getListFocusComponent(List list) {
         return focusComponent;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getFocusComponent(Component list) {
         return focusComponent;
@@ -671,7 +671,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         private int selectAllOffset;
         
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public boolean animate() {
             boolean hasAnimations = false;
@@ -735,13 +735,13 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         }
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void paint(Graphics g) {
         }
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void actionPerformed(ActionEvent evt) {
             if(evt.getComponent() instanceof Button) {

@@ -91,7 +91,7 @@ class SpinnerNumberModel implements ListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getItemAt(int index) {
         if(realValues) {
@@ -102,7 +102,7 @@ class SpinnerNumberModel implements ListModel {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize() {
         return (int)((max - min) / step);
@@ -110,7 +110,7 @@ class SpinnerNumberModel implements ListModel {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSelectedIndex() {
         // equivalent to round
@@ -121,7 +121,7 @@ class SpinnerNumberModel implements ListModel {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
         int oldIndex = getSelectedIndex();
@@ -131,41 +131,41 @@ class SpinnerNumberModel implements ListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangedListener(DataChangedListener l) {
         dataListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangedListener(DataChangedListener l) {
         dataListener.removeListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(Object item) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index) {
     }

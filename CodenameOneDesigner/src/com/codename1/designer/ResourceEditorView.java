@@ -236,7 +236,7 @@ public class ResourceEditorView extends FrameView {
         AnalyticsService.visit("Startup", "");
         QuitAction.INSTANCE.setResource(loadedResources);
         initComponents();
-        
+                
         jMenu7.add(new AbstractAction("560") {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -586,6 +586,16 @@ public class ResourceEditorView extends FrameView {
         systemLFMenu.setSelected(currentLF.equals(UIManager.getSystemLookAndFeelClassName()));
     }
 
+    public boolean isGuiBuilderApp(){
+        if(loadedFile != null){
+            File parentDir = loadedFile.getParentFile();
+            File userStateMachineFile = new File(parentDir, "userclasses/StateMachine.java");
+            if (userStateMachineFile.exists()) {
+                return true;
+            }
+        }
+        return false;
+    }
     
     public File getPlatformOverrideFile() {
         if(loadedFile != null) {
@@ -3901,6 +3911,11 @@ public static void openInIDE(File f, int lineNumber) {
     }
 
     public String showAddUiResourceDialog() {
+        
+        if(!isGuiBuilderApp()){
+            JOptionPane.showMessageDialog(mainPanel, "Notice, this is not a visual project type.");
+        }
+        
         AddUIResource addResource = new AddUIResource(mainPanel, loadedResources);
 
         if(addResource.isOkPressed()) {

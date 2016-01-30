@@ -401,7 +401,7 @@ public class TestUtils {
      * If this is the first time the test is run then the screenshot is taken
      * and saved under the given name in the devices storage. The test passes
      * for this case but a warning is printed to the console. The name will have
-     * .png appended to it so it will be identified.<br/>
+     * .png appended to it so it will be identified.<br>
      * This test will only work on devices that support the ImageIO API with PNG
      * file format.
      *

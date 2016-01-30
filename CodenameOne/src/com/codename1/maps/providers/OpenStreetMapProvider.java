@@ -37,14 +37,14 @@ public class OpenStreetMapProvider extends TiledProvider {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String attribution() {
         return "(c) OpenStreetMap (and) contributors, CC-BY-SA";
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int maxZoomLevel() {
         return 18;

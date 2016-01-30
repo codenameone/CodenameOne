@@ -62,14 +62,14 @@ public class FileEncodedImageAsync extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void resetCache() {
         super.resetCache();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Image getInternal() {
         if(imageData == null) {
@@ -83,7 +83,7 @@ public class FileEncodedImageAsync extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public byte[] getImageData() {
         if(imageData != null) {
@@ -128,7 +128,7 @@ public class FileEncodedImageAsync extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(changePending) {
@@ -141,7 +141,7 @@ public class FileEncodedImageAsync extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return true;

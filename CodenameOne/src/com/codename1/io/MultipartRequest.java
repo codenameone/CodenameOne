@@ -150,7 +150,7 @@ public class MultipartRequest extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addArgumentNoEncoding(String key, String value) {
         args.put(key, value);
@@ -161,7 +161,7 @@ public class MultipartRequest extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addArgument(String name, String value) {
         args.put(name, value);
@@ -211,7 +211,7 @@ public class MultipartRequest extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void buildRequestBody(OutputStream os) throws IOException {
         Writer writer = null;

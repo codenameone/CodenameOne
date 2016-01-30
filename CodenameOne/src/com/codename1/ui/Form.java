@@ -317,7 +317,7 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAlwaysTensile() {
         return getContentPane().isAlwaysTensile();
@@ -347,7 +347,7 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setAlwaysTensile(boolean alwaysTensile) {
         getContentPane().setAlwaysTensile(alwaysTensile);
@@ -812,7 +812,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -1054,7 +1054,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setLayout(Layout layout) {
         if(layout instanceof BorderLayout) {
@@ -1136,14 +1136,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Object constraints, Component cmp) {
         contentPane.addComponent(constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Object constraints, Component cmp) {
         contentPane.addComponent(index, constraints, cmp);
@@ -1159,14 +1159,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void replace(Component current, Component next, Transition t) {
         contentPane.replace(current, next, t);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void replaceAndWait(Component current, Component next, Transition t) {
         contentPane.replaceAndWait(current, next, t);
@@ -1277,7 +1277,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if (getParent() != null) {
@@ -1343,7 +1343,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         // when changing the theme when a title/menu bar is not visible the refresh
@@ -1592,7 +1592,7 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
@@ -1602,7 +1602,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
@@ -1616,7 +1616,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSmoothScrolling(boolean smoothScrolling) {
         // invoked by the constructor for component
@@ -1626,21 +1626,21 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isSmoothScrolling() {
         return contentPane.isSmoothScrolling();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getScrollAnimationSpeed() {
         return contentPane.getScrollAnimationSpeed();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollAnimationSpeed(int animationSpeed) {
         contentPane.setScrollAnimationSpeed(animationSpeed);
@@ -1843,7 +1843,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void repaint(Component cmp) {
         if (getParent() != null) {
@@ -1856,7 +1856,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public final Form getComponentForm() {
         if (getParent() != null) {
@@ -1992,7 +1992,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void longKeyPress(int keyCode) {
         if (focused != null) {
@@ -2003,7 +2003,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void longPointerPress(int x, int y) {
         if (focused != null && focused.contains(x, y)) {
@@ -2033,7 +2033,7 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -2071,7 +2071,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Layout getLayout() {
         return contentPane.getLayout();
@@ -2094,7 +2094,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -2140,7 +2140,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyRepeated(int keyCode) {
         if (focused != null) {
@@ -2168,7 +2168,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
@@ -2236,6 +2236,16 @@ public class Form extends Container {
                 if(cmp != null) {
                     cmp = ((Container)cmp).getComponentAt(x, y);
                     if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                        if(cmp.hasLead) {
+                            Container leadParent;
+                            if (cmp instanceof Container) {
+                                leadParent = ((Container) cmp).getLeadParent();
+                            } else {
+                                leadParent = cmp.getParent().getLeadParent();
+                            }
+                            setFocused(leadParent);
+                            cmp = cmp.getLeadComponent();
+                        }
                         cmp.initDragAndDrop(x, y);
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
@@ -2291,7 +2301,7 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         // disable the drag stop flag if we are dragging again
@@ -2396,7 +2406,7 @@ public class Form extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
 
@@ -2418,7 +2428,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverPressed(int[] x, int[] y) {
         Container actual = getActualPane();
@@ -2433,7 +2443,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
 
@@ -2484,7 +2494,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
@@ -2571,8 +2581,21 @@ public class Form extends Container {
                         Component cmp = ((BorderLayout)super.getLayout()).getWest();
                         if(cmp != null) {
                             cmp = ((Container)cmp).getComponentAt(x, y);
-                            if (cmp != null && cmp.isEnabled()) {
-                                cmp.pointerReleased(x, y);
+                            if (cmp != null && cmp.isEnabled()) {                                
+                                if(cmp.hasLead) {
+                                    Container leadParent;
+                                    if (cmp instanceof Container) {
+                                        leadParent = ((Container) cmp).getLeadParent();
+                                    } else {
+                                        leadParent = cmp.getParent().getLeadParent();
+                                    }
+                                    leadParent.repaint();
+                                    setFocused(leadParent);
+                                    cmp = cmp.getLeadComponent();
+                                    cmp.pointerReleased(x, y);
+                                } else {
+                                    cmp.pointerReleased(x, y);
+                                }
                             }
                         }
                     }
@@ -2599,21 +2622,21 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollableY(boolean scrollableY) {
         getContentPane().setScrollableY(scrollableY);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollableX(boolean scrollableX) {
         getContentPane().setScrollableX(scrollableX);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getComponentIndex(Component cmp) {
         return getContentPane().getComponentIndex(cmp);
@@ -2928,7 +2951,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     boolean moveScrollTowards(int direction, Component c) {
         //if the current focus item is in a scrollable Container
@@ -3014,7 +3037,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setRTL(boolean r) {
         super.setRTL(r);
@@ -3024,7 +3047,7 @@ public class Form extends Container {
     private boolean inInternalPaint;
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(!inInternalPaint) {
@@ -3045,21 +3068,21 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollable() {
         return getContentPane().isScrollable();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setVisible(boolean visible) {
         super.setVisible(visible);
@@ -3101,7 +3124,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         return super.paramString() + ", title = " + title
@@ -3179,14 +3202,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] { "titleUIID", "titleAreaUIID" };
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -3196,14 +3219,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("titleUIID")) {
@@ -3220,7 +3243,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("titleUIID")) {

@@ -114,7 +114,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void initComponent() {
         if(service != null) {
@@ -136,7 +136,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         if (refreshAd) {
@@ -151,7 +151,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         Form parent = getComponentForm();
@@ -168,7 +168,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int code) {
         if (Display.getInstance().getGameAction(code) == Display.GAME_FIRE) {
@@ -178,7 +178,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         if (!isDragActivated()) {
@@ -259,13 +259,13 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void titleUpdated(HTMLComponent htmlC, String title) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
         if (status == STATUS_COMPLETED) {
@@ -293,28 +293,28 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String fieldSubmitted(HTMLComponent htmlC, TextArea ta, String actionURL, String id, String value, int type, String errorMsg) {
         return value;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getAutoComplete(HTMLComponent htmlC, String actionURL, String id) {
         return "";
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getLinkProperties(HTMLComponent htmlC, String url) {
         return LINK_REGULAR;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean linkClicked(HTMLComponent htmlC, String url) {
         //this is relevant when the Ad is in Full Screen mode
@@ -324,44 +324,44 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt, HTMLComponent htmlC, HTMLElement element) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void focusGained(Component cmp, HTMLComponent htmlC, HTMLElement element) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void focusLost(Component cmp, HTMLComponent htmlC, HTMLElement element) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void dataChanged(int type, int index, HTMLComponent htmlC, TextField textField, HTMLElement element) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         return true;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void selectionChanged(int oldSelected, int newSelected, HTMLComponent htmlC, com.codename1.ui.List list, HTMLElement element) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */ 
     public void setHeight(int height) {
         float percent = ((float)height/(float)Display.getInstance().getDisplayHeight());
@@ -494,14 +494,14 @@ public class Ads extends Container implements HTMLCallback {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[]{"appId", "updateDuration", "age", "gender", "category", "location", "keywords"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
         Class c = new String[0].getClass();
@@ -509,14 +509,14 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "int", "String", "String", "String", "String", "String[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if (name.equals("appId")) {
@@ -544,7 +544,7 @@ public class Ads extends Container implements HTMLCallback {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if (name.equals("appId")) {

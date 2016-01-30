@@ -99,7 +99,7 @@ public class Dimension2D {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "width = " + width + " height = " +height;

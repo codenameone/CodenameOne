@@ -77,7 +77,7 @@ public class CachedDataService extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleException(Exception err) {
         data.setFetching(false);
@@ -85,7 +85,7 @@ public class CachedDataService extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleErrorResponseCode(int code, String message) {
         data.setFetching(false);
@@ -98,7 +98,7 @@ public class CachedDataService extends ConnectionRequest {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readHeaders(Object connection) throws IOException {
         String last = getHeader(connection, "Last-Modified");
@@ -110,7 +110,7 @@ public class CachedDataService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException  {
         data.setData(Util.readInputStream(input));

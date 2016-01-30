@@ -382,7 +382,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleException(Exception err) {
         if(onErrorListeners != null) {
@@ -392,7 +392,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleErrorResponseCode(int code, String message) {
         if(onErrorListeners != null) {
@@ -767,7 +767,7 @@ public class ImageDownloadService extends ConnectionRequest {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void postResponse() {
         // trigger an exception in case of an invalid image
@@ -844,7 +844,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException  {
         int imageScaleWidth = -1, imageScaleHeight = -1;
@@ -912,7 +912,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return (o instanceof ImageDownloadService) && ((ImageDownloadService)o).cacheId != null && 

@@ -52,7 +52,7 @@ public class Album extends FBObject {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Album(Hashtable props) {
         super(props);

@@ -35,13 +35,14 @@ public class CodenameOneTextPaint extends TextPaint {
     int fontHeight = -1;
     private int ascent = -1;
 
-    public CodenameOneTextPaint(Typeface tf) {
-        super.setTypeface(tf);
+    public CodenameOneTextPaint(CodenameOneTextPaint paint) {
+        super(paint);
+        this.fontHeight = paint.fontHeight;
+        this.ascent = paint.ascent;
     }
 
-    @Override
-    public Typeface setTypeface(Typeface typeface) {
-        throw new RuntimeException("Can't set typeface in runtime!");
+    public CodenameOneTextPaint(Typeface tf) {
+        super.setTypeface(tf);
     }
 
     public int getFontAscent() {

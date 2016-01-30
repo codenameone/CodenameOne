@@ -76,7 +76,7 @@ public class ProxyHttpTile extends Tile {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean paint(Graphics g) {
         if(_tile == null){

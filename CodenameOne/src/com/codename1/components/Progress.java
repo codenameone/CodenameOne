@@ -90,7 +90,7 @@ public class Progress extends Dialog implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void actionCommand(Command cmd) {
         if(Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() < 2) {
@@ -109,7 +109,7 @@ public class Progress extends Dialog implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void dispose() {
         NetworkManager.getInstance().removeProgressListener(this);
@@ -135,7 +135,7 @@ public class Progress extends Dialog implements ActionListener {
     private boolean showing;
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt) {
          NetworkEvent ev = (NetworkEvent)evt;

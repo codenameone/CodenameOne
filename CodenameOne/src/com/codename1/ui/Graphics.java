@@ -401,7 +401,7 @@ public final class Graphics {
 
     private void drawStringImpl(String str, int x, int y) {
         // remove a commonly used trick to create a spacer label from the paint queue
-        if(str.length() == 0 || str == " ") {
+        if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
             return;
         }
         if(!(current instanceof CustomFont)) {
@@ -421,6 +421,10 @@ public final class Graphics {
      * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
      */
     public void drawString(String str, int x, int y,int textDecoration) {
+        // remove a commonly used trick to create a spacer label from the paint queue
+        if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
+            return;
+        }
         Object nativeFont = null;
         if(current != null) {
             nativeFont = current.getNativeFont();

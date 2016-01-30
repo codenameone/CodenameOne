@@ -175,7 +175,7 @@ public class HTMLParser extends XMLParser {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     protected String getSupportedStandardName() {
         return "XHTML-MP 1.0";

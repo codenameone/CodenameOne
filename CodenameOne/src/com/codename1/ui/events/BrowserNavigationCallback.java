@@ -26,10 +26,10 @@ package com.codename1.ui.events;
  * <b>Important: Calls to this interface are always performed on a separate
  * thread from the EDT! They are performed on the native webkit rendering
  * thread or native event dispatch thread, this interface MUST NEVER block
- * or synchronize against the EDT which WILL lead to deadlocks. </b><br/>
+ * or synchronize against the EDT which WILL lead to deadlocks. </b><br>
  * This interface can be used to bind functionality to URL navigation
  * which is a very portable way to invoke Java functionality from the
- * JavaScript side of things.<br />
+ * JavaScript side of things.<br>
  * This interface should be applied to the BrowserComponent or WebBrowser
  * class.
  * 
@@ -40,7 +40,7 @@ public interface BrowserNavigationCallback {
      * <b>Important: Calls to this interface are always performed on a separate
      * thread from the EDT! They are performed on the native webkit rendering
      * thread or native event dispatch thread, this interface MUST NEVER block
-     * or synchronize against the EDT which WILL lead to deadlocks. </b><br/>
+     * or synchronize against the EDT which WILL lead to deadlocks. </b><br>
      * This method can be used to bind functionality to URL navigation
      * which is a very portable way to invoke Java functionality from the
      * JavaScript side of things. The method should return true if navigation

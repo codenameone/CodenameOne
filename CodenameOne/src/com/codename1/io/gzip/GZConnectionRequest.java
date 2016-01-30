@@ -36,7 +36,7 @@ public class GZConnectionRequest extends ConnectionRequest {
     private boolean isGzipped;
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readHeaders(Object connection) throws IOException {
         super.readHeaders(connection);

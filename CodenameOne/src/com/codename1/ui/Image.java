@@ -1007,7 +1007,7 @@ public class Image {
     }
 
     /**
-     * @inheritDoc 
+     * {@inheritDoc} 
      */
     public boolean animate() {
         if(imageTime == -1) {
@@ -1116,7 +1116,7 @@ public class Image {
      * 
      * @return true if a drawImage call is a required
      */
-    protected boolean requiresDrawImage() {
+    public boolean requiresDrawImage() {
         return false;
     }
 }

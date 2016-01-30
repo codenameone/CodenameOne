@@ -92,7 +92,7 @@ public class PainterChain implements Painter {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Rectangle rect) {
         int clen = chain.length;

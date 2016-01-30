@@ -62,7 +62,7 @@ public class LikeButton extends Button implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt) {
         if(!FaceBookAccess.getInstance().isAuthenticated()) {
@@ -101,28 +101,28 @@ public class LikeButton extends Button implements ActionListener {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[]{"appId", "redirectURI", "clientSecret", "postId", "permissions"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class, String.class, new String[0].getClass()};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "String", "String", "String", "String[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if (name.equals("appId")) {
@@ -144,7 +144,7 @@ public class LikeButton extends Button implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if (name.equals("appId")) {

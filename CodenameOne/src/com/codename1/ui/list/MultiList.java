@@ -51,7 +51,7 @@ public class MultiList extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
@@ -94,7 +94,7 @@ public class MultiList extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -107,7 +107,7 @@ public class MultiList extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -135,7 +135,7 @@ public class MultiList extends List {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("placeholder")) {
@@ -145,7 +145,7 @@ public class MultiList extends List {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("placeholder")) {

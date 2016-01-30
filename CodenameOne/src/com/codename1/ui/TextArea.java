@@ -352,7 +352,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -385,7 +385,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setWidth(int width) {
         if(width != getWidth()) {
@@ -481,7 +481,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         super.keyPressed(keyCode);
@@ -522,21 +522,21 @@ public class TextArea extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         onClick();
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isSelectableInteraction() {
         return editable;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);
@@ -555,7 +555,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollableY() {
         return isFocusable() && getScrollDimension().getHeight() > getHeight();
@@ -589,14 +589,14 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
         requestFocus();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
         requestFocus();
@@ -607,7 +607,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         // prevent a drag operation from going into edit mode
@@ -637,7 +637,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusGainedInternal() {
         super.focusGainedInternal();
@@ -645,7 +645,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusLostInternal() {
         super.focusLostInternal();
@@ -1033,7 +1033,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         
@@ -1054,7 +1054,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         if(shouldShowHint()) {
@@ -1069,7 +1069,7 @@ public class TextArea extends Component {
     }
         
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcScrollSize(){
         return getUIManager().getLookAndFeel().getTextAreaSize(this, false);
@@ -1120,7 +1120,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void onEditComplete(String text) {
         if (!Display.getInstance().getImplementation().isAsyncEditMode()) {
@@ -1548,21 +1548,21 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"text"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {String.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -1576,7 +1576,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -1593,7 +1593,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("text")) {
@@ -1603,7 +1603,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("text")) {
@@ -1692,4 +1692,19 @@ public class TextArea extends Component {
             Display.getInstance().stopEditing(this);
         }
     }
+
+    /**
+     * {@inheritDoc}
+     * We override get style here to return the selected style when editing
+     * @return the selected style if editing, <code>super.getStyle()</code> otherwise
+     */
+    @Override
+    public Style getStyle() {
+        if(isEditing()) {
+            return getSelectedStyle();
+        }
+        return super.getStyle(); 
+    }
+    
+    
 }

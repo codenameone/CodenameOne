@@ -41,7 +41,7 @@ import com.codename1.ui.plaf.Style;
 public class LayeredLayout extends Layout {
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
@@ -68,7 +68,7 @@ public class LayeredLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Dimension getPreferredSize(Container parent) {
         int maxWidth = 0;
@@ -86,21 +86,21 @@ public class LayeredLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "LayeredLayout";
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOverlapSupported() {
         return true;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean obscuresPotential(Container parent) {
         return true;

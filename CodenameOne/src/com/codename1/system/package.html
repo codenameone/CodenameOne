@@ -4,17 +4,19 @@
   </head>
     <body>
         <p>
-            Low level calls into the Codename One system, including support for making platform native API calls. Notice
+            Low level calls into the Codename One system, including 
+            <a href="https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html">
+            support for making platform native API calls</a>. Notice
             that when we say "native" we do not mean C/C++ always but rather the platforms "native" environment. So in the
-            case of J2ME the Java code will be invoked with full access to the J2ME API's, in case of iOS an Objective-C
+            case of Android the Java code will be invoked with full access to the Android API's, in case of iOS an Objective-C
             message would be sent and so forth.
         </p>
         <p>
             Native interfaces are designed to only allow primitive types, Strings, arrays (single dimension only!) of primitives
             and PeerComponent values. Any other type of parameter/return type is prohibited. However, once in the native layer
-            the native code can act freely and query the Java layer for additional information. <br/>
+            the native code can act freely and query the Java layer for additional information. <br>
             Furthermore, native methods should avoid features such as overloading, varargs (or any Java 5+ feature for that matter)
-            to allow portability for languages that do not support such features (e.g. C).<br/>
+            to allow portability for languages that do not support such features (e.g. C).<br>
             Important! Do not rely on pass by reference/value behavior since they vary between platforms.
         </p>
         <p>
@@ -36,7 +38,7 @@
             }
         </pre>
         <p>
-            Then to use that interface use MyNative my = (MyNative)NativeLookup.create(MyNative.class);<br/>
+            Then to use that interface use MyNative my = (MyNative)NativeLookup.create(MyNative.class);<br>
             Notice that for this to work you must implement the native code on all supported platforms!
         </p>
         <p>
@@ -81,11 +83,11 @@
         
         <p>
             PeerComponent return values are automatically translated to the platform native peer as an expected return
-            value. E.g. for a native method such as this: PeerComponent createPeer();<br/>
-            Android native implementation would need: View createPeer();<br/>
-            While RIM would expect: Field createPeer()<br/>
+            value. E.g. for a native method such as this: PeerComponent createPeer();<br>
+            Android native implementation would need: View createPeer();<br>
+            While RIM would expect: Field createPeer()<br>
             The iphone would need to return a pointer to a view e.g.: - (UIView*)createPeer;
-            J2ME doesn't support native peers hence any method that returns a native peer would always return null.<br/>
+            J2ME doesn't support native peers hence any method that returns a native peer would always return null.<br>
         </p>
     </body>
 </html>

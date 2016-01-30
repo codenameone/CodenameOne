@@ -111,7 +111,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initMenuBar(Form parent) {
         if (parent.getClientProperty("Menu") != null) {
@@ -166,7 +166,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void removeAllCommands() {
@@ -195,7 +195,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void unInstallMenuBar() {
@@ -230,7 +230,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void installMenuBar() {
         if (parent.getClientProperty("Menu") != null) {
@@ -352,7 +352,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
         if (getUIManager().isThemeConstant("sideMenuFoldedSwipeBool", true)) {
@@ -506,7 +506,7 @@ public class SideMenuBar extends MenuBar {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addCommand(Command cmd) {
         if (cmd.getClientProperty("TitleCommand") != null) {
@@ -534,7 +534,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBackCommand(Command backCommand) {
         super.setBackCommand(backCommand);
@@ -557,7 +557,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void addCommand(Command cmd, int index) {
         if (cmd.getClientProperty("TitleCommand") != null) {
@@ -611,7 +611,7 @@ public class SideMenuBar extends MenuBar {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void removeCommand(Command cmd) {
         super.removeCommand(cmd);
@@ -1055,7 +1055,7 @@ public class SideMenuBar extends MenuBar {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Button createTouchCommandButton(final Command c) {
 

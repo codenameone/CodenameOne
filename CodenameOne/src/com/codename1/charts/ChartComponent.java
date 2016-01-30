@@ -184,8 +184,8 @@ public class ChartComponent extends Component {
 
     /**
      * Converts screen coordinates to chart coordinates.
-     * @param x 
-     * @param y
+     * @param x screen x position
+     * @param y screen y position
      * @return The chart coordinate corresponding to the given screen coordinate.
      */
     public Point screenToChartCoord(int x, int y){
@@ -199,8 +199,13 @@ public class ChartComponent extends Component {
         return new Point(x-getAbsoluteX(), y-getAbsoluteY());
     }
     
-    
-    
+    /**
+     * Returns the screen position from a chart coordinate
+     *
+     * @param x the x position within the chart
+     * @param y the y position within the chart
+     * @return a position within the screen
+     */
     public Point chartToScreenCoord(int x, int y){
         x += getAbsoluteX();
         y += getAbsoluteY();
@@ -213,6 +218,11 @@ public class ChartComponent extends Component {
         return new Point(x, y);
     }
     
+    /**
+     * Converts a chart coordinate spaced shape to the same shape in the screen coordinate space
+     * @param s shape in screen coordinates
+     * @return same shape using chart space coordinates
+     */
     public Shape screenToChartShape(Shape s){
         GeneralPath p = new GeneralPath();
         Transform t = Transform.makeIdentity();
@@ -223,7 +233,12 @@ public class ChartComponent extends Component {
         p.append(s.getPathIterator(t), false);
         return p;
     }
-    
+        
+    /**
+     * Converts a screen coordinate spaced shape to the same shape in the chart  coordinate space
+     * @param s shape in chart  coordinates
+     * @return same shape using screen coordinate space
+     */
     public Shape chartToScreenShape(Shape s){
         GeneralPath p = new GeneralPath();
         Transform inverse = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());

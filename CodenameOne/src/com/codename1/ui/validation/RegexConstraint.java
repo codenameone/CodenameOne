@@ -81,7 +81,7 @@ public class RegexConstraint implements Constraint {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean isValid(Object value) {
@@ -89,7 +89,7 @@ public class RegexConstraint implements Constraint {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public String getDefaultFailMessage() {

@@ -76,7 +76,7 @@ public class Slider extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setUIID(String id) {
         super.setUIID(id);
@@ -91,14 +91,14 @@ public class Slider extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isStickyDrag() {
         return true;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void initComponent() {
         if(infinite) {
@@ -110,7 +110,7 @@ public class Slider extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void deinitialize() {
         if(infinite) {
@@ -122,7 +122,7 @@ public class Slider extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(infinite) {
@@ -190,7 +190,7 @@ public class Slider extends Label {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -253,7 +253,7 @@ public class Slider extends Label {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Style getStyle() {
         if(paintingFull) {
@@ -429,7 +429,7 @@ public class Slider extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         if(!editable) {
@@ -475,21 +475,21 @@ public class Slider extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         setHandlesInput(!handlesInput());
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isSelectableInteraction() {
         return editable;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         if(!editable) {
@@ -501,7 +501,7 @@ public class Slider extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int code) {
         super.keyReleased(code);
@@ -509,7 +509,7 @@ public class Slider extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int code) {
         if(editable && handlesInput()) {
@@ -705,7 +705,7 @@ public class Slider extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean shouldBlockSideSwipe() {
         return editable && !vertical;

@@ -128,7 +128,7 @@ class IndexedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image subImage(int x, int y, int width, int height, boolean processAlpha)  {
         byte[] arr = new byte[width * height];
@@ -151,7 +151,7 @@ class IndexedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image modifyAlpha(byte alpha) {
         int[] newPalette = new int[palette.length];
@@ -174,7 +174,7 @@ class IndexedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void getRGB(int[] rgbData,
             int offset,
@@ -268,7 +268,7 @@ class IndexedImage extends Image {
     static int[] lineCache;
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
          if(lineCache == null || lineCache.length < width * 3) {
@@ -302,21 +302,21 @@ class IndexedImage extends Image {
     }    
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getWidth() {
         return width;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getHeight() {
         return height;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void scale(int width, int height) {
         IndexedImage p = (IndexedImage)scaled(width, height);
@@ -327,7 +327,7 @@ class IndexedImage extends Image {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaled(int width, int height) {
         int srcWidth = getWidth();
@@ -379,7 +379,7 @@ class IndexedImage extends Image {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     int[] getRGBImpl() {
         int rlen = width * height;
@@ -463,10 +463,10 @@ class IndexedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
-    protected boolean requiresDrawImage() {
+    public boolean requiresDrawImage() {
         return true;
     }
 }

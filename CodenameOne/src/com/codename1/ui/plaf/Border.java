@@ -736,7 +736,7 @@ public class Border {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean equals(Object obj) {
         if (obj != null && obj.getClass() == getClass()) {

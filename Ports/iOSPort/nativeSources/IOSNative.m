@@ -4804,12 +4804,24 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     repaintUI();
 }
 void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+
     if (preferredWidth == 0) {
         preferredWidth = 320 * scaleValue;
     }
+    
+    // There are only 3 valid heights for the picker in iPad
+    //http://stackoverflow.com/a/7672577/2935174
     if (preferredHeight == 0) {
-        preferredHeight = 260 * scaleValue;
+        preferredHeight = 216 * scaleValue;
+    } else if (preferredHeight <= 162) {
+        preferredHeight = 162;
+    } else if (preferredHeight <= 180) {
+        preferredHeight = 180;
+    } else {
+        preferredHeight = 216;
     }
+    
+    
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
@@ -4838,7 +4850,6 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             UIViewController *vc = [[UIViewController alloc] init];
             UIView *popoverView = [[UIView alloc] init];
             [vc setView:popoverView];
-            //[vc setContentSizeForViewInPopover:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue)];
             
 #ifndef CN1_USE_ARC
             UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
@@ -4879,23 +4890,16 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             [popoverView addSubview:pickerView];
             [popoverView addSubview:toolbar];
             
-            pickerView.frame = CGRectMake(0, - preferredHeight/scaleValue * 0.5, preferredWidth/scaleValue, preferredHeight/scaleValue * 2);
-
-            popoverView.frame = CGRectMake(0, 0, preferredWidth/scaleValue, preferredHeight/scaleValue);
-            
-            //pickerView.frame = CGRectMake(0, 44, preferredWidth/scaleValue, preferredHeight/scaleValue);
-            //[popoverView layoutSubviews];
-            [vc setContentSizeForViewInPopover:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue + 44) ];
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
             
-            
-            
-            
             uip.delegate = [CodenameOne_GLViewController instance];
+            uip.popoverContentSize = CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue);
+            
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
             
-            [uip setPopoverContentSize:CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue) animated:YES];
+            pickerView.frame = CGRectMake(0, 22, preferredWidth/scaleValue, preferredHeight/scaleValue);
+            popoverView.frame = CGRectMake(0, 0, preferredWidth/scaleValue, preferredHeight/scaleValue);
 
             
         } else {

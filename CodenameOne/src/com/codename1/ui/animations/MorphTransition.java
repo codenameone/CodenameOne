@@ -49,7 +49,7 @@ public class MorphTransition extends Transition {
     private MorphTransition() {}
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Transition copy(boolean reverse){
         MorphTransition m = create(duration);
@@ -91,7 +91,7 @@ public class MorphTransition extends Transition {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public final void initTransition() {
         animationMotion = Motion.createEaseInOutMotion(0, 255, duration);
@@ -160,7 +160,7 @@ public class MorphTransition extends Transition {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(!finished) {
@@ -212,7 +212,7 @@ public class MorphTransition extends Transition {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         int oldAlpha = g.getAlpha();

@@ -20,24 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.system;
+
+package com.codename1.ui.plaf;
 
 /**
- * This is a marker interface that should be extended by a user interface in order
- * to indicate that said interface is implemented in native code. To understand more 
- * about native interfaces you can check out this 
- * <a href="https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html">
- * quick "How Do I?" tutorial</a>.<br>
- * Alternatively you can dig deeper into <a href="https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html">
- * this tutorial for integrating 3rd party native libraries</a>.
+ * Allows placing cache data within a style object to make painting the style much faster
  *
  * @author Shai Almog
  */
-public interface NativeInterface {
-    /**
-     * Indicates whether this native interface is supported on the current platform
-     * 
-     * @return true if the native interface is supported on the given platform
-     */
-    public boolean isSupported();
+public class StyleAccessor {
+    public static Object getCachedData(Style s) {
+        return s.nativeOSCache;
+    }
+    
+    public static void setCachedData(Style s, Object o) {
+        s.nativeOSCache = o;
+    }
 }
