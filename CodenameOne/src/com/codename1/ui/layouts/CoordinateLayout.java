@@ -33,6 +33,7 @@ import com.codename1.ui.geom.Dimension;
  * The layout 
  *
  * @author Chen Fishbein
+ * @deprecated the usage of this layout is strongly discouraged as elements will not adapt to the right position/size
  */
 public class CoordinateLayout extends Layout{
     
