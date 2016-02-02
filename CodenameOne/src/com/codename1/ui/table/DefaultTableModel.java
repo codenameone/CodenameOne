@@ -27,8 +27,14 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * A default implementation of the table model based on a two dimensional array.
+ * <p>A default implementation of the table model based on a two dimensional array.
+ * </p>
  *
+ * <script src="https://gist.github.com/codenameone/6b106772ad1d58c50270.js"></script>
+ * 
+ * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" alt="Table with customize cells using the pinstripe effect" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png" alt="Picker table cell during edit" />
+ * 
  * @author Shai Almog
  */
 public class DefaultTableModel implements TableModel {
