@@ -86,6 +86,9 @@ public class ScaleImageButton extends Button {
     @Override
     protected Dimension calcPreferredSize() {
         Image i = getIcon();
+        if(i == null) {
+            return new Dimension();
+        }
         Style s = getStyle();
         return new Dimension(i.getWidth() + s.getPaddingLeft(false) + s.getPaddingRight(false), i.getHeight() +
                 s.getPaddingTop() + s.getPaddingBottom());
