@@ -1049,8 +1049,10 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * Creates a table layout container that grows the last column horizontally, the number of rows is automatically
-     * calculated based on the number of columns
+     * <p>Creates a table layout container that grows the last column horizontally, the number of rows is automatically
+     * calculated based on the number of columns. See usage:</p>
+     *<script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
      * @param columns the number of columns
      * @param cmps components to add
      * @return a newly created table layout container with the components in it
@@ -1061,8 +1063,11 @@ public class TableLayout extends Layout {
 
 
     /**
-     * Creates a table layout container, the number of rows is automatically calculated based on the number 
-     * of columns
+     * <p>Creates a table layout container, the number of rows is automatically calculated based on the number 
+     * of columns. See usage:</p>
+     *<script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
+     * 
      * @param columns the number of columns
      * @param growHorizontally true to grow the last column to fit available width
      * @param cmps components to add
