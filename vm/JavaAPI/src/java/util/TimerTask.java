@@ -21,6 +21,7 @@ public abstract class TimerTask implements Runnable {
     long initialDelay;
     long repeatDelay;
     boolean canceled;
+    Timer parent;
     
     protected TimerTask() {}
 
@@ -37,10 +38,17 @@ public abstract class TimerTask implements Runnable {
         if(canceled) {
             return;
         }
+        if(parent != null && parent.canceled) {
+            return;
+        }
         run();
         if(repeatDelay > 0) {
             while(!canceled) {
                 Thread.sleep(repeatDelay);
+                if(parent != null && parent.canceled) {
+                    return;
+                }
+                
                 lastExecution = System.currentTimeMillis();
                 run();
             }

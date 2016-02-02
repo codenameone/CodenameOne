@@ -23,9 +23,15 @@
 package com.codename1.push;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Preferences;
 import com.codename1.ui.Display;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Map;
 
 /**
  * Utility class for sending a push message to a different device 
@@ -51,6 +57,8 @@ public class Push {
      * @param iosCertificatePassword the password for the push certificate
      * @return true if the message reached the Codename One server successfully, this makes no guarantee
      * of delivery.
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
      */
     public static boolean sendPushMessage(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
@@ -80,6 +88,8 @@ public class Push {
      * @param bbPort the port of the blackberry push
      * @return true if the message reached the Codename One server successfully, this makes no guarantee
      * of delivery.
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
      */
     public static boolean sendPushMessage(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
@@ -101,6 +111,8 @@ public class Push {
      * @param googleAuthKey authorization key from the google play store
      * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
      * @param iosCertificatePassword the password for the push certificate
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
      */
     public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
@@ -122,6 +134,8 @@ public class Push {
      * @param bbApp the application id to authenticate on push for RIM devices
      * @param bbPass the application password credentials authenticate on push for RIM devices
      * @param bbPort the port of the blackberry push
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
      */
     public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
@@ -160,6 +174,8 @@ public class Push {
      * Returns the push device key if the device was previously successfully registered for push
      * otherwise returns null
      * @return the device key that can be used to push to this specific device.
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to getPushKey()
      */
     public static String getDeviceKey() {
         long l = Preferences.get("push_id", (long)-1);
@@ -168,4 +184,197 @@ public class Push {
         }
         return "" + l;
     }
+    
+    /**
+     * Returns the push device key if the device was previously successfully registered for push
+     * otherwise returns null
+     * @return the device key that can be used to push to this specific device.
+     */    
+    public static String getPushKey() {
+        String key = Preferences.get("push_key", null);
+        if(key != null) {
+            String pushPrefix = Display.getInstance().getProperty("cn1_push_prefix", null);
+            if(pushPrefix != null) {
+                return "cn1-" + pushPrefix + "-" + key;
+            }
+        }
+        return null;
+    }
+    
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the 
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     * 
+     * @param token the authorization token from the account settings in the CodenameOne website, this is used
+     * to associate push quotas with your app
+     * @param body the body of the message
+     * @param deviceKey the device key that will receive the push message (can't be null!)
+     * @param production whether pushing to production or test/sandbox environment 
+     * @param googleAuthKey authorization key from the google play store
+     * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
+     * @param iosCertificatePassword the password for the push certificate
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     */
+    public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
+            String iosCertificateURL, String iosCertificatePassword) {
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", 1, deviceKey);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        return cr.successful;
+    }
+    
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the 
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     * 
+     * @param token the authorization token from the account settings in the CodenameOne website, this is used
+     * to associate push quotas with your app
+     * @param body the body of the message
+     * @param production whether pushing to production or test/sandbox environment 
+     * @param googleAuthKey authorization key from the google play store
+     * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
+     * @param iosCertificatePassword the password for the push certificate
+     * @param pushType the type for the push in the server, this is useful for sending hidden pushes (type 2) should default
+     * to 0 or 1
+     * @param deviceKey set of devices that should receive the push
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     */
+    public static boolean sendPushMessage(String token, String body, boolean production, String googleAuthKey, 
+            String iosCertificateURL, String iosCertificatePassword, int pushType, String... deviceKey) {
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", pushType, deviceKey);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        return cr.successful;
+    }
+    
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the 
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     * 
+     * @param token the authorization token from the account settings in the CodenameOne website, this is used
+     * to associate push quotas with your app
+     * @param body the body of the message
+     * @param deviceKey an optional parameter (can be null) when sending to a specific device
+     * @param production whether pushing to production or test/sandbox environment 
+     * @param googleAuthKey authorization key from the google play store
+     * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
+     * @param iosCertificatePassword the password for the push certificate
+     * @param bbUrl the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
+     * for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+     * @param bbApp the application id to authenticate on push for RIM devices
+     * @param bbPass the application password credentials authenticate on push for RIM devices
+     * @param bbPort the port of the blackberry push
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     */
+    public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, 1, deviceKey);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        return cr.successful;
+    }
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the 
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     * 
+     * @param token the authorization token from the account settings in the CodenameOne website, this is used
+     * to associate push quotas with your app
+     * @param body the body of the message
+     * @param deviceKey an optional parameter (can be null) when sending to a specific device
+     * @param production whether pushing to production or test/sandbox environment 
+     * @param googleAuthKey authorization key from the google play store
+     * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
+     * @param iosCertificatePassword the password for the push certificate
+     */
+    public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
+            String iosCertificateURL, String iosCertificatePassword) {
+        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", 1, deviceKey));
+    }
+    
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the 
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     * 
+     * @param token the authorization token from the account settings in the CodenameOne website, this is used
+     * to associate push quotas with your app
+     * @param body the body of the message
+     * @param deviceKey an optional parameter (can be null) when sending to a specific device
+     * @param production whether pushing to production or test/sandbox environment 
+     * @param googleAuthKey authorization key from the google play store
+     * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
+     * @param iosCertificatePassword the password for the push certificate
+     * @param bbUrl the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
+     * for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+     * @param bbApp the application id to authenticate on push for RIM devices
+     * @param bbPass the application password credentials authenticate on push for RIM devices
+     * @param bbPort the port of the blackberry push
+     */
+    public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, 1, deviceKey));
+    }
+    
+    static class PushConnection extends ConnectionRequest {
+        boolean successful;
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                JSONParser jp = new JSONParser();
+                Map<String, Object> data = jp.parseJSON(new InputStreamReader(input, "UTF-8"));
+                String error = (String)data.get("error");
+                if(error != null) {
+                    // this is an error response...
+                    Log.p(error);
+                    Log.p("Full error: " + data);
+                    successful = false;
+                } else {
+                    successful = true;
+                }
+            }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            successful = false;
+        }
+
+        @Override
+        protected void handleException(Exception err) {
+            successful = false;
+            Log.e(err);
+        }
+    }
+
+    private static PushConnection createPushMessage(String token, String body, boolean production, String googleAuthKey, 
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort, int type, String... deviceKeys) {
+        PushConnection cr = new PushConnection();
+        cr.setPost(true);
+        cr.setUrl("https://push.codenameone.com/push/push");
+        cr.addArgument("token", token);
+        cr.addArguments("device", deviceKeys);
+        cr.addArgument("type", "" +type);
+        cr.addArgument("auth", googleAuthKey);
+        cr.addArgument("certPassword", iosCertificatePassword);
+        cr.addArgument("cert", iosCertificateURL);
+        cr.addArgument("body", body);
+        cr.addArgument("burl", bbUrl);
+        cr.addArgument("bbAppId", bbApp);
+        cr.addArgument("bbPass", bbPass);
+        cr.addArgument("bbPort", bbPort);
+        if(production) {
+            cr.addArgument("production", "true");
+        } else {
+            cr.addArgument("production", "false");
+        }
+        cr.setFailSilently(true);
+        return cr;
+    }
+
 }

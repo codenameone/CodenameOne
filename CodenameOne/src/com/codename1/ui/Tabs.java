@@ -107,7 +107,7 @@ public class Tabs extends Container {
      * of either: <code>Component.TOP</code>, <code>Component.BOTTOM</code>,
      * <code>Component.LEFT</code>, or <code>Component.RIGHT</code>.
      *
-     * @param tabPlacement the placement for the tabs relative to the content
+     * @param tabP the placement for the tabs relative to the content
      */
     public Tabs(int tabP) {
         super(new BorderLayout());
@@ -151,7 +151,7 @@ public class Tabs extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager manager) {
         super.initLaf(manager);
@@ -179,7 +179,7 @@ public class Tabs extends Container {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
@@ -195,7 +195,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -204,7 +204,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         Form form = this.getComponentForm();
@@ -217,7 +217,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
@@ -230,7 +230,7 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         boolean b = super.animate();
@@ -484,7 +484,9 @@ public class Tabs extends Container {
             return;
         }
         final Component b = tab;
-        b.setUIID(tabUIID);
+        if(tabUIID != null) {
+            b.setUIID(tabUIID);
+        }
 
         b.addFocusListener(focusListener);
         
@@ -492,7 +494,9 @@ public class Tabs extends Container {
             public void actionPerformed(ActionEvent evt) {
 
                 if(selectedTab != null){
-                    selectedTab.setUIID(tabUIID);
+                    if(tabUIID != null) {
+                        selectedTab.setUIID(tabUIID);
+                    }
                     selectedTab.setShouldCalcPreferredSize(true);
                     selectedTab.repaint();
                     int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);
@@ -807,7 +811,7 @@ public class Tabs extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         String className = getClass().getName();
@@ -1037,7 +1041,16 @@ public class Tabs extends Container {
     }
 
     /**
-     * The UIID for a tab component which defaults to Tab
+     * <p>The UIID for a tab button which defaults to Tab.
+     * Tab buttons used to have two separate styles for selected and unselected. This was later consolidated so 
+     * the tabs behave as a single toggle button (radio button) however one thing that remained is a call to 
+     * <code>setUIID</code> that is implicitly made to restore the original "Tab" style. </p>
+     * 
+     * <p>Effectively Tabs invokes the <code>setUIID</code> call on the Tab switch so if you want to manipulate
+     * the tab UIID manually (have one red and one green tab) this is a problem.</>.
+     * <p>To enable such code add all the tabs then just just invoke <code>setTabUIID(null)</code> to disable 
+     * this behavior.</p>
+     * 
      * @param tabUIID the tabUIID to set
      */
     public void setTabUIID(String tabUIID) {
@@ -1321,14 +1334,14 @@ public class Tabs extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"titles", "icons", "selectedIcons"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), 
@@ -1337,14 +1350,14 @@ public class Tabs extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[]", "Image[]", "Image[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("titles")) {
@@ -1373,7 +1386,7 @@ public class Tabs extends Container {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("titles")) {

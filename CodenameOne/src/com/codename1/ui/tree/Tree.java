@@ -105,16 +105,20 @@ public class Tree extends Container {
         public Vector getChildren(Object parent) {
             if(parent == null) {
                 Vector v = new Vector();
-                for(int iter = 0 ; iter < arr[0].length ; iter++) {
+                int a0len = arr[0].length;
+                for(int iter = 0 ; iter < a0len ; iter++) {
                     v.addElement(arr[0][iter]);
                 }
                 return v;
             }
+            int alen = arr.length;
+            int aolen = arr[0].length;
             Vector v = new Vector();
-            for(int iter = 0 ; iter < arr[0].length ; iter++) {
+            for(int iter = 0 ; iter < aolen ; iter++) {
                 if(parent == arr[0][iter]) {
-                    if(arr.length > iter + 1 && arr[iter + 1] != null) {
-                        for(int i = 0 ; i < arr[iter + 1].length ; i++) {
+                    if(alen > iter + 1 && arr[iter + 1] != null) {
+                        int ailen = arr[iter + 1].length;
+                        for(int i = 0 ; i < ailen ; i++) {
                             v.addElement(arr[iter + 1][i]);
                         }
                     }
@@ -130,28 +134,28 @@ public class Tree extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"data"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[][]"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("data")) {
@@ -161,7 +165,7 @@ public class Tree extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("data")) {
@@ -238,11 +242,11 @@ public class Tree extends Container {
         nodeImage = nodeIcon;
     }
 
-    private Container expandNode(Component c) {
-        return expandNode(c, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));
+    private Container expandNode(boolean animate, Component c) {
+        return expandNodeImpl(animate, c);
     }
     
-    private Container expandNode(Component c, Transition t) {
+    private Container expandNodeImpl(boolean animate, Component c) {
         Container p = c.getParent().getLeadParent();
         if(p != null) {
             c = p;
@@ -255,10 +259,14 @@ public class Tree extends Container {
         Container dest = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         parent.addComponent(BorderLayout.CENTER, dest);
         buildBranch(o, depth, dest);
-        // prevent a race condition on node expansion contraction
-        parent.animateHierarchyAndWait(300);
-        if(multilineMode) {
-            revalidate();
+        if(isInitialized() && animate) {
+            // prevent a race condition on node expansion contraction
+            parent.animateHierarchyAndWait(300);
+            if(multilineMode) {
+                revalidate();
+            }
+        } else {
+            parent.revalidate();
         }
         return dest;
     }
@@ -268,7 +276,7 @@ public class Tree extends Container {
         return e != null && e.equals("true");
     }
     
-    private Container expandPathNode(Container parent, Object node) {
+    private Container expandPathNode(boolean animate, Container parent, Object node) {
         int cc = parent.getComponentCount();
         for(int iter = 0 ; iter < cc ; iter++) {
             Component current = parent.getComponentAt(iter);
@@ -282,7 +290,7 @@ public class Tree extends Container {
                     if(isExpanded(current)) {
                         return (Container)bl.getCenter();
                     }
-                    return expandNode(current, null);
+                    return expandNodeImpl(animate, current);
                 }
             }
         }
@@ -314,9 +322,19 @@ public class Tree extends Container {
      * @param path the path to expand
      */
     public void expandPath(Object... path) {
+        expandPath(isInitialized(), path);
+    }
+    
+    /**
+     * Expands the tree path
+     * @param path the path to expand
+     * @param animate whether to animate expansion
+     */
+    public void expandPath(boolean animate, Object... path) {
         Container c = this;
-        for(int iter = 0 ; iter < path.length ; iter++) {
-            c = expandPathNode(c, path[iter]);
+        int plen = path.length;
+        for(int iter = 0 ; iter < plen ; iter++) {
+            c = expandPathNode(animate, c, path[iter]);
         }
     }
     
@@ -326,10 +344,11 @@ public class Tree extends Container {
      */
     public void collapsePath(Object... path) {
         Container c = this;
-        for(int iter = 0 ; iter < path.length - 1; iter++) {
-            c = expandPathNode(c, path[iter]);
+        int plen = path.length;
+        for(int iter = 0 ; iter < plen - 1; iter++) {
+            c = expandPathNode(isInitialized(), c, path[iter]);
         }        
-        collapsePathNode(c, path[path.length - 1]);
+        collapsePathNode(c, path[plen - 1]);
     }
     
     private void collapseNode(Component c) {
@@ -500,7 +519,7 @@ public class Tree extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         Dimension d = super.calcPreferredSize();
@@ -534,7 +553,7 @@ public class Tree extends Container {
 
         public void actionPerformed(ActionEvent evt) {
             if(current != null) {
-                leafListener.fireActionEvent(new ActionEvent(current));
+                leafListener.fireActionEvent(new ActionEvent(current,ActionEvent.Type.Other));
                 return;
             }
             Component c = (Component)evt.getSource();
@@ -546,7 +565,7 @@ public class Tree extends Container {
             if(e != null && e.equals("true")) {
                 collapseNode(c);
             } else {
-                expandNode(c);
+                expandNode(isInitialized(), c);
             }
         }
     }

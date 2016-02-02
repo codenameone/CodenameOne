@@ -74,7 +74,7 @@ public class ContainerList extends Container {
     public ContainerList(ListModel m) {
         init(m);
     }
-
+    
     private void init(ListModel m) {
         setModel(m);
         setUIID("ContainerList");
@@ -102,6 +102,7 @@ public class ContainerList extends Container {
         for(int iter = 0 ; iter < getComponentCount() ; iter++) {
             getComponentAt(iter).setShouldCalcPreferredSize(true);
         }
+        setScrollSize(null);
         if(isInitialized()) {
             revalidate();
         }
@@ -181,7 +182,7 @@ public class ContainerList extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         if(model != null) {
@@ -194,7 +195,7 @@ public class ContainerList extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         if (this.model != null && listener != null) {
@@ -281,33 +282,34 @@ public class ContainerList extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"ListItems", "Renderer"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getObjectArrayClass(), CellRenderer.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"Object[]", "CellRenderer"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("ListItems")) {
             Object[] obj = new Object[model.getSize()];
-            for(int iter = 0 ; iter < obj.length ; iter++) {
+            int olen = obj.length;
+            for(int iter = 0 ; iter < olen ; iter++) {
                 obj[iter] = model.getItemAt(iter);
             }
             return obj;
@@ -319,7 +321,7 @@ public class ContainerList extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("ListItems")) {
@@ -340,7 +342,7 @@ public class ContainerList extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
         if(!isScrollable()) {
@@ -407,7 +409,7 @@ public class ContainerList extends Container {
 
         
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void pointerReleasedImpl(int x, int y, boolean longPress) {
             if (!isDragActivated()) {
@@ -437,7 +439,7 @@ public class ContainerList extends Container {
         }
         
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void keyReleased(int keyCode) {
             super.keyReleased(keyCode);
@@ -445,7 +447,13 @@ public class ContainerList extends Container {
                 fireActionEvent(new ActionEvent(ContainerList.this, keyCode));
             }
         }
-        
+                
+        @Override
+        public Dimension getPreferredSize() {
+            ContainerList.this.setScrollSize(null);
+            return calcPreferredSize();
+        }
+
         public Dimension calcPreferredSize() {
             Component c = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());
             if(getWidth() <= 0) {

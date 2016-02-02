@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.impl.android;
+package com.codename1.media;
 
 import android.app.Activity;
 import android.content.Context;
@@ -31,6 +31,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import java.io.InputStream;
@@ -40,7 +41,7 @@ import java.util.Vector;
  *
  * @author Chen
  */
-class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener {
+public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener {
     private static final int MEDIA_INFO_BUFFERING_START = 701;
     private static final int MEDIA_INFO_BUFFERING_END = 702;
     private MediaPlayer player;

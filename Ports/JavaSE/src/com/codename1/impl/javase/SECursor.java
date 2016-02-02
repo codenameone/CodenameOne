@@ -46,7 +46,13 @@ public class SECursor implements Cursor, Row{
     public SECursor(ResultSet resultSet) {
         this.resultSet = resultSet;
     }
-    
+
+    @Override
+    protected void finalize() throws Throwable {
+        if(!closed) {
+            System.out.println("**** WARNING! DB Cursor was released by the GC without being closed first! This might cause crashes on iOS *****");
+        }
+    }
     
     @Override
     public boolean first() throws IOException {

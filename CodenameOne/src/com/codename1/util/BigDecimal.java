@@ -20,8 +20,10 @@ public class BigDecimal {
     private static final BigInteger ZERO = BigInteger.valueOf(0);
     private static final BigInteger ONE = BigInteger.valueOf(1);
 
-    private final BigInteger bigInt;
-    private final int scale;
+    //private final BigInteger bigInt;
+    //private final int scale;
+    
+    TBigDecimal peer;
 
     /**
      * Returns a <code>BigDecimal</code> representing the same numerical
@@ -46,121 +48,105 @@ public class BigDecimal {
      */
     public BigDecimal(BigInteger bigInt, int scale)
     {
-        if (scale < 0)
-        {
-            throw new IllegalArgumentException("scale may not be negative");
-        }
-
-        this.bigInt = bigInt;
-        this.scale = scale;
+        peer = new TBigDecimal(bigInt.peer, scale);
     }
 
     private BigDecimal(BigDecimal limBigDec)
     {
-        bigInt = limBigDec.bigInt;
-        scale = limBigDec.scale;
+        peer = new TBigDecimal(limBigDec.toString());
     }
 
-    private void checkScale(BigDecimal b)
-    {
-        if (scale != b.scale)
-        {
-            throw new IllegalArgumentException("Only BigDecimal of " +
-                "same scale allowed in arithmetic operations");
-        }
+    private BigDecimal(TBigDecimal peer) {
+        this.peer = peer;
     }
 
     public BigDecimal adjustScale(int newScale)
     {
-        if (newScale < 0)
-        {
-            throw new IllegalArgumentException("scale may not be negative");
-        }
-
-        if (newScale == scale)
-        {
-            return new BigDecimal(this);
-        }
-
-        return new BigDecimal(bigInt.shiftLeft(newScale - scale),
-                newScale);
+        return new BigDecimal(peer.setScale(newScale));
     }
 
     public BigDecimal add(BigDecimal b)
     {
-        checkScale(b);
-        return new BigDecimal(bigInt.add(b.bigInt), scale);
+        return new BigDecimal(peer.add(b.peer));
     }
 
     public BigDecimal add(BigInteger b)
     {
-        return new BigDecimal(bigInt.add(b.shiftLeft(scale)), scale);
+        return new BigDecimal(peer.add(new TBigDecimal(b.peer, 0)));
     }
 
     public BigDecimal negate()
     {
-        return new BigDecimal(bigInt.negate(), scale);
+        return new BigDecimal(peer.negate());
     }
 
     public BigDecimal subtract(BigDecimal b)
     {
-        return add(b.negate());
+        return new BigDecimal(peer.subtract(b.peer));
     }
 
     public BigDecimal subtract(BigInteger b)
     {
-        return new BigDecimal(bigInt.subtract(b.shiftLeft(scale)),
-                scale);
+        return new BigDecimal(peer.subtract(new TBigDecimal(b.peer, 0)));
     }
 
     public BigDecimal multiply(BigDecimal b)
     {
-        checkScale(b);
-        return new BigDecimal(bigInt.multiply(b.bigInt), scale + scale);
+        return new BigDecimal(peer.multiply(b.peer));
     }
 
     public BigDecimal multiply(BigInteger b)
     {
-        return new BigDecimal(bigInt.multiply(b), scale);
+        return new BigDecimal(peer.multiply(new TBigDecimal(b.peer, 0)));
     }
 
     public BigDecimal divide(BigDecimal b)
     {
-        checkScale(b);
-        BigInteger dividend = bigInt.shiftLeft(scale);
-        return new BigDecimal(dividend.divide(b.bigInt), scale);
+        return new BigDecimal(peer.divide(b.peer));
     }
 
     public BigDecimal divide(BigInteger b)
     {
-        return new BigDecimal(bigInt.divide(b), scale);
+        return new BigDecimal(peer.divide(new TBigDecimal(b.peer, 0)));
     }
 
     public BigDecimal shiftLeft(int n)
     {
-        return new BigDecimal(bigInt.shiftLeft(n), scale);
+        throw new RuntimeException("Not implemented yet");
     }
 
     public int compareTo(BigDecimal val)
     {
-        checkScale(val);
-        return bigInt.compareTo(val.bigInt);
+        return peer.compareTo(val.peer);
     }
 
     public int compareTo(BigInteger val)
     {
-        return bigInt.compareTo(val.shiftLeft(scale));
+        return peer.compareTo(new TBigDecimal(val.peer, 0));
     }
 
     public BigInteger floor()
     {
-        return bigInt.shiftRight(scale);
+        BigInteger out = new BigInteger(peer.toBigInteger());
+        if (peer.signum() < 0) {
+            return out.subtract(new BigInteger("1",0));
+        }
+        return out;
     }
 
     public BigInteger round()
     {
-        BigDecimal oneHalf = new BigDecimal(ONE, 1);
-        return add(oneHalf.adjustScale(scale)).floor();
+       BigInteger out = new BigInteger(peer.toBigInteger());
+       BigDecimal outD = new BigDecimal(out, 0);
+       
+       BigInteger next = peer.signum() < 0 ? out.subtract(BigInteger.ONE) : out.add(BigInteger.ONE);
+       BigDecimal nextD = new BigDecimal(next, 0);
+       
+       BigDecimal diffThis = new BigDecimal(outD.peer.abs().subtract(peer.abs()).abs());
+       BigDecimal diffNext = new BigDecimal(outD.peer.abs().subtract(nextD.peer.abs()).abs());
+       
+       return diffThis.compareTo(diffNext) > 0 ? out : next;
+       
     }
 
     public int intValue()
@@ -185,49 +171,12 @@ public class BigDecimal {
        */
     public int getScale()
     {
-        return scale;
+        return peer.scale();
     }
 
     public String toString()
     {
-        if (scale == 0)
-        {
-            return bigInt.toString();
-        }
-
-        BigInteger floorBigInt = floor();
-        
-        BigInteger fract = bigInt.subtract(floorBigInt.shiftLeft(scale));
-        if (bigInt.signum() == -1)
-        {
-            fract = ONE.shiftLeft(scale).subtract(fract);
-        }
-
-        if ((floorBigInt.signum() == -1) && (!(fract.equals(ZERO))))
-        {
-            floorBigInt = floorBigInt.add(ONE);
-        }
-        String leftOfPoint = floorBigInt.toString();
-
-        char[] fractCharArr = new char[scale];
-        String fractStr = fract.toString(2);
-        int fractLen = fractStr.length();
-        int zeroes = scale - fractLen;
-        for (int i = 0; i < zeroes; i++)
-        {
-            fractCharArr[i] = '0';
-        }
-        for (int j = 0; j < fractLen; j++)
-        {
-            fractCharArr[zeroes + j] = fractStr.charAt(j);
-        }
-        String rightOfPoint = new String(fractCharArr);
-
-        StringBuffer sb = new StringBuffer(leftOfPoint);
-        sb.append(".");
-        sb.append(rightOfPoint);
-
-        return sb.toString();
+        return peer.toString();
     }
 
     public boolean equals(Object o)
@@ -243,12 +192,12 @@ public class BigDecimal {
         }
 
         BigDecimal other = (BigDecimal)o;
-        return ((bigInt.equals(other.bigInt)) && (scale == other.scale));
+        return peer.equals(other.peer);
     }
 
     public int hashCode()
     {
-        return bigInt.hashCode() ^ scale;
+        return peer.hashCode();
     }
 
 }

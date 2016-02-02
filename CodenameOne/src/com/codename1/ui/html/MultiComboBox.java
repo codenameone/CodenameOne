@@ -101,7 +101,7 @@ class MultiComboBox extends List {
     // Overiding List's methods to provide for multiple selection and OPTGROUP support:
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void addItem(Object item) {
         super.addItem(item);
@@ -111,7 +111,7 @@ class MultiComboBox extends List {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void setSelectedItem(Object item) {
         super.setSelectedItem(item);
@@ -119,7 +119,7 @@ class MultiComboBox extends List {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     protected void fireActionEvent() {
         if (multiple) {
@@ -132,7 +132,7 @@ class MultiComboBox extends List {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
@@ -152,7 +152,7 @@ class MultiComboBox extends List {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     protected void fireClicked() {
         boolean h = handlesInput();
@@ -166,7 +166,7 @@ class MultiComboBox extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         // scrolling events are in keyPressed to provide immediate feedback

@@ -58,7 +58,8 @@ import com.codename1.ui.util.EventDispatcher;
  * @author Chen Fishbein
  */
 public class Style {
-
+    private Style[] proxyTo;
+    
     /**
      * Background color attribute name for the theme hashtable 
      */
@@ -438,7 +439,10 @@ public class Style {
     private EventDispatcher listeners;
 
     Object roundRectCache;
-
+    
+    // used by the Android port, do not remove!
+    Object nativeOSCache;
+    
     /**
      * Each component when it draw itself uses this Object 
      * to determine in what colors it should use.
@@ -451,6 +455,19 @@ public class Style {
         modifiedFlag = 0;
     }
 
+    /**
+     * Creates a "proxy" style whose setter methods map to the methods in the given styles passed and whose
+     * getter methods are meaningless
+     * 
+     * @param styles the styles to which we will proxy
+     * @return a proxy style object
+     */
+    public static Style createProxyStyle(Style... styles) {
+        Style s = new Style();
+        s.proxyTo = styles;
+        return s;
+    }
+    
     /**
      * Creates a full copy of the given style. Notice that if the original style was modified 
      * manually (by invoking setters on it) it would not chnage when changing a theme/look and feel,
@@ -782,6 +799,12 @@ public class Style {
      * @see com.codename1.ui.Component#RIGHT
      */
     public void setAlignment(int align, boolean override){
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setAlignment(align, override);
+            }
+            return;
+        }
         if (this.align != align) {
             this.align = align;
             if(!override){
@@ -911,6 +934,12 @@ public class Style {
      * @param underline true to turn underline on, false to turn it off
      */
     public void setUnderline(boolean underline) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setUnderline(underline);
+            }
+            return;
+        }
         if (underline!=isUnderline()) {
             if (underline) {
                 textDecoration|=TEXT_DECORATION_UNDERLINE;
@@ -936,6 +965,12 @@ public class Style {
      * @param raised indicates a raised or lowered effect
      */
     public void set3DText(boolean t, boolean raised) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.set3DText(t, raised);
+            }
+            return;
+        }
         if(raised) {
             if (t!=isRaised3DText()) {
                 textDecoration = textDecoration & (~TEXT_DECORATION_3D_LOWERED);
@@ -962,6 +997,12 @@ public class Style {
      * @param north true to enable 3d text with the shadow on top false otherwise
      */
     public void set3DTextNorth(boolean north) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.set3DTextNorth(north);
+            }
+            return;
+        }
         textDecoration = TEXT_DECORATION_3D_SHADOW_NORTH;
     }
     
@@ -997,6 +1038,12 @@ public class Style {
      * @param overline true to turn overline on, false to turn it off
      */
     public void setOverline(boolean overline) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setOverline(overline);
+            }
+            return;
+        }
         if (overline!=isOverline()) {
             if (overline) {
                 textDecoration|=TEXT_DECORATION_OVERLINE;
@@ -1022,6 +1069,12 @@ public class Style {
      * @param strikethru true to turn strike through on, false to turn it off
      */
     public void setStrikeThru(boolean strikethru) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setStrikeThru(strikethru);
+            }
+            return;
+        }
         if (strikethru!=isStrikeThru()) {
             if (strikethru) {
                 textDecoration|=TEXT_DECORATION_STRIKETHRU;
@@ -1067,6 +1120,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setTextDecoration(int textDecoration, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setTextDecoration(textDecoration, override);
+            }
+            return;
+        }
         this.textDecoration = textDecoration;
         if (this.textDecoration != textDecoration) {
             this.textDecoration = textDecoration;
@@ -1122,11 +1181,17 @@ public class Style {
      * Sets the Component transparency level. Valid values should be a 
      * number between 0-255
      * 
-     * @param transparency int value between 0-255
+     * @param opacity  int value between 0-255
      * @param override If set to true allows the look and feel/theme to override 
      * the value in this attribute when changing a theme/look and feel
      */
     public void setOpacity(int opacity, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setOpacity(opacity, override);
+            }
+            return;
+        }
         if (opacity < 0 || opacity > 255) {
             throw new IllegalArgumentException("valid values are between 0-255");
         }
@@ -1159,6 +1224,12 @@ public class Style {
      * @param right number of pixels to padd
      */
     public void setPadding(int top, int bottom, int left, int right) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPadding(top, bottom, left, right);
+            }
+            return;
+        }
         if (top < 0 || left < 0 || right < 0 || bottom < 0) {
             throw new IllegalArgumentException("padding cannot be negative");
         }
@@ -1195,6 +1266,12 @@ public class Style {
      * @param right number of margin using the current unit
      */
     public void setMargin(int top, int bottom, int left, int right) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMargin(top, bottom, left, right);
+            }
+            return;
+        }
         if (top < 0 || left < 0 || right < 0 || bottom < 0) {
             throw new IllegalArgumentException("margin cannot be negative");
         }
@@ -1245,6 +1322,75 @@ public class Style {
         }
 
         return padding[orientation];
+    }
+    
+    /**
+     * Returns the left padding in pixel or right padding in an RTL situation
+     * @param rtl indicates a right to left language
+     * @return the padding in pixels
+     */
+    public int getPaddingLeft(boolean rtl) {
+        if (rtl) {
+            return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
+        }
+        return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+    }
+    
+    
+    /**
+     * Returns the right padding in pixel or left padding in an RTL situation
+     * @param rtl indicates a right to left language
+     * @return the padding in pixels
+     */
+    public int getPaddingRight(boolean rtl) {
+        if (rtl) {
+            return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+        }
+        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
+    }
+    
+    /**
+     * Returns the top padding in pixel 
+     * @return the padding in pixels
+     */
+    public int getPaddingTop() {
+        return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP);
+    }
+    
+    /**
+     * Returns the bottom padding in pixel 
+     * @return the padding in pixels
+     */
+    public int getPaddingBottom() {
+        return convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);
+    }
+    
+    /**
+     * Returns the right margin in pixel or left margin in an RTL situation
+     * @param rtl indicates a right to left language
+     * @return the margin in pixels
+     */
+    public int getMarginRight(boolean rtl) {
+        if (rtl) {
+            return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+        }
+        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
+    }
+    
+    /**
+     * Returns the top margin in pixel 
+     * @return the margin in pixels
+     */
+    public int getMarginTop() {
+        return convertUnit(marginUnit, margin[Component.TOP], Component.TOP);
+    }
+    
+    /**
+     * Returns the bottom margin in pixel 
+     * @return the margin in pixels
+     */
+    public int getMarginBottom() {
+        return convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);
     }
 
     /**
@@ -1345,6 +1491,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBgColor(int bgColor, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBgColor(bgColor, override);
+            }
+            return;
+        }
         if (this.bgColor != bgColor) {
             this.bgColor = bgColor;
             if (!override) {
@@ -1362,6 +1514,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBgImage(Image bgImage, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBgImage(bgImage, override);
+            }
+            return;
+        }
         if (this.bgImage != bgImage) {
             this.bgImage = bgImage;
             if(!override){
@@ -1382,6 +1540,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBackgroundType(byte backgroundType, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBackgroundType(backgroundType, override);
+            }
+            return;
+        }
         if (this.backgroundType != backgroundType) {
             this.backgroundType = backgroundType;
             if(!override){
@@ -1404,6 +1568,12 @@ public class Style {
      * @deprecated the functionality of this method is now covered by background type
      */
     private void setBackgroundAlignment(byte backgroundAlignment, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBackgroundAlignment(backgroundAlignment, override);
+            }
+            return;
+        }
         if (this.backgroundAlignment != backgroundAlignment) {
             this.backgroundAlignment = backgroundAlignment;
             if(!override){
@@ -1443,6 +1613,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBackgroundGradientStartColor(int backgroundGradientStartColor, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBackgroundGradientStartColor(backgroundGradientStartColor, override);
+            }
+            return;
+        }
         if (((Integer) getBackgroundGradient()[0]).intValue() != backgroundGradientStartColor) {
             getBackgroundGradient()[0] = new Integer(backgroundGradientStartColor);
             if (!override) {
@@ -1460,6 +1636,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBackgroundGradientEndColor(int backgroundGradientEndColor, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBackgroundGradientEndColor(backgroundGradientEndColor, override);
+            }
+            return;
+        }
         if (((Integer) getBackgroundGradient()[1]).intValue() != backgroundGradientEndColor) {
             getBackgroundGradient()[1] = new Integer(backgroundGradientEndColor);
             if (!override) {
@@ -1478,6 +1660,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBackgroundGradientRelativeX(float backgroundGradientRelativeX, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBackgroundGradientRelativeX(backgroundGradientRelativeX, override);
+            }
+            return;
+        }
         if (((Float) getBackgroundGradient()[2]).floatValue() != backgroundGradientRelativeX) {
             getBackgroundGradient()[2] = new Float(backgroundGradientRelativeX);
             if (!override) {
@@ -1495,6 +1683,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBackgroundGradientRelativeY(float backgroundGradientRelativeY, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBackgroundGradientRelativeY(backgroundGradientRelativeY, override);
+            }
+            return;
+        }
         if (((Float) getBackgroundGradient()[3]).floatValue() != backgroundGradientRelativeY) {
             getBackgroundGradient()[3] = new Float(backgroundGradientRelativeY);
             if (!override) {
@@ -1513,6 +1707,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBackgroundGradientRelativeSize(float backgroundGradientRelativeSize, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBackgroundGradientRelativeSize(backgroundGradientRelativeSize, override);
+            }
+            return;
+        }
         if (((Float) getBackgroundGradient()[4]).floatValue() != backgroundGradientRelativeSize) {
             getBackgroundGradient()[4] = new Float(backgroundGradientRelativeSize);
             if (!override) {
@@ -1530,6 +1730,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setFgColor(int fgColor, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setFgColor(fgColor, override);
+            }
+            return;
+        }
         if (this.fgColor != fgColor) {
             this.fgColor = fgColor;
             if (!override) {
@@ -1547,6 +1753,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setFont(Font font, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setFont(font, override);
+            }
+            return;
+        }
         if (this.font == null && font != null ||
                 (this.font != null && !this.font.equals(font))) {
             this.font = font;
@@ -1567,6 +1779,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBgTransparency(int transparency, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBgTransparency(transparency, override);
+            }
+            return;
+        }
         if (transparency < 0 || transparency > 255) {
             throw new IllegalArgumentException("valid values are between 0-255");
         }
@@ -1590,6 +1808,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setPadding(int orientation, int gap,boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPadding(orientation, gap, override);
+            }
+            return;
+        }
         if (orientation < Component.TOP || orientation > Component.RIGHT) {
             throw new IllegalArgumentException("wrong orientation " + orientation);
         }
@@ -1616,6 +1840,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setMargin(int orientation, int gap, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMargin(orientation, gap, override);
+            }
+            return;
+        }
         if (orientation < Component.TOP || orientation > Component.RIGHT) {
             throw new IllegalArgumentException("wrong orientation " + orientation);
         }
@@ -1634,6 +1864,7 @@ public class Style {
     
     private void firePropertyChanged(String propertName) {
         roundRectCache = null;
+        nativeOSCache = null;
         if (listeners == null) {
             return;
         }
@@ -1693,6 +1924,12 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setBorder(Border border, boolean override) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBorder(border, override);
+            }
+            return;
+        }
         if ((this.border == null && border != null) ||
                 (this.border != null && !this.border.equals(border))) {
             this.border = border;
@@ -1729,6 +1966,12 @@ public class Style {
      * @param bgPainter new painter to install into the style
      */
     public void setBgPainter(Painter bgPainter) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setBgPainter(bgPainter);
+            }
+            return;
+        }
         this.bgPainter = bgPainter;
         firePropertyChanged(PAINTER);
     }
@@ -1748,6 +1991,12 @@ public class Style {
      * @param paddingUnit the paddingUnit to set
      */
     public void setPaddingUnit(byte... paddingUnit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingUnit(paddingUnit);
+            }
+            return;
+        }
         this.paddingUnit = paddingUnit;
     }
 
@@ -1766,6 +2015,12 @@ public class Style {
      * @param marginUnit the marginUnit to set
      */
     public void setMarginUnit(byte... marginUnit) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginUnit(marginUnit);
+            }
+            return;
+        }
         this.marginUnit = marginUnit;
     }
 }

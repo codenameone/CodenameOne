@@ -25,6 +25,7 @@ package com.codename1.ui.events;
 
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 
 /**
  * Event object delivered when an {@link ActionListener} callback is invoked
@@ -32,7 +33,34 @@ import com.codename1.ui.Component;
  * @author Chen Fishbein
  */
 public class ActionEvent {
+	
+    /**
+     * The event type, as declared when the event is created.
+     * 
+     * @author Ddyer
+     *
+     */
+    public enum Type {
 
+            Other,					// unspecified, someone called one of the old undifferentiated constructors.
+            Command,				// some type of command 
+            Pointer, PointerPressed, PointerReleased, PointerDrag, Swipe,	// pointer activity
+            KeyPress, KeyRelease,	// key activity
+            Exception, Response,Progress,Data, 	// network activity
+            Calendar,			// calendar
+            Edit,Done,			// text area
+            File,JavaScript,Log,	// file system
+            Theme, Show, SizeChange, OrientationChange	// window status changes
+            } ;
+    private Type trigger;
+    
+    /**
+     * Returns the type of the given event allowing us to have more generic event handling code and useful
+     * for debugging
+     * @return the Type enum
+     */
+    public Type getEventType() { return(trigger); }
+	
     private boolean consumed;
     
     private Object source;
@@ -41,14 +69,90 @@ public class ActionEvent {
     private int keyEvent = -1;
     private int y = -1;
     private boolean longEvent = false;
+    
     /**
-     * Creates a new instance of ActionEvent
+     * Creates a new instance of ActionEvent.  This is unused locally, but provided so existing customer code
+     * with still work.
      * @param source element for the action event
      */
     public ActionEvent(Object source) {
         this.source = source;
+        this.trigger = Type.Other;
+    }
+    
+    /**
+     * Creates a new instance of ActionEvent
+     * @param source element for the action event
+     * @param type the {@link Type } of the event
+     */
+    public ActionEvent(Object source,Type type) {
+        this.source = source;
+        this.trigger = type;
     }
 
+    /**
+     * Creates a new instance of ActionEvent as a pointer event
+     *
+     * @param source element for the pointer event
+     * @param type the {@link Type } of the event
+     * @param x (or sometimes width) associated with the event
+     * @param y (or sometimes height)associated with the event
+     */
+    public ActionEvent(Object source, Type type, int x, int y) {
+        this.source = source;
+        this.keyEvent = x;
+        this.y = y;
+        this.trigger = type;
+    }
+    
+    /**
+     * Creates a new instance of ActionEvent for a command
+     *
+     * @param source element command
+     * @param type the {@link Type } of the event
+     * @param sourceComponent the triggering component
+     * @param x the x position of the pointer event
+     * @param y the y position of the pointer event
+     */
+    public ActionEvent(Command source, Type type, Component sourceComponent, int x, int y) {
+        this.source = source;
+        this.sourceComponent = sourceComponent;
+        this.keyEvent = x;
+        this.y = y;
+        this.trigger = type;
+    }
+    /**
+     * Creates a new instance of ActionEvent for a drop operation
+     *
+     * @param dragged the dragged component
+     * @param type the {@link Type } of the event
+     * @param drop the drop target component
+     * @param x the x position of the pointer event
+     * @param y the y position of the pointer event
+     */
+    public ActionEvent(Component dragged, Type type, Component drop, int x, int y) {
+        this.source = dragged;
+        this.sourceComponent = drop;
+        this.keyEvent = x;
+        this.y = y;
+        this.trigger = type;
+    }
+    
+    
+    /**
+     * Creates a new instance of ActionEvent.  The key event is really just
+     * a numeric code, not indicative of a key press
+     * @param source element for the action event
+     * @param type the {@link Type } of the event
+     * @param keyEvent the key that triggered the event
+     */
+    public ActionEvent(Object source, Type type , int keyEvent) {
+        this.source = source;
+        this.keyEvent = keyEvent;
+        this.trigger = type;
+    }
+    
+    
     /**
      * Creates a new instance of ActionEvent
      * @param source element for the action event
@@ -57,6 +161,7 @@ public class ActionEvent {
     public ActionEvent(Object source, int keyEvent) {
         this.source = source;
         this.keyEvent = keyEvent;
+        this.trigger = Type.KeyRelease;
     }
 
     /**
@@ -69,6 +174,7 @@ public class ActionEvent {
         this.source = source;
         this.keyEvent = keyEvent;
         this.longEvent = longClick;
+        this.trigger = Type.KeyPress;
     }
     
     /**
@@ -84,10 +190,11 @@ public class ActionEvent {
         this.keyEvent = x;
         this.y = y;
         this.longEvent = longPointer;
+        this.trigger = Type.PointerReleased;
     }
     
     /**
-     * Creates a new instance of ActionEvent as a pointer event
+     * Creates a new instance of ActionEvent as a generic pointer event.  
      *
      * @param source element for the pointer event
      * @param x the x position of the pointer event
@@ -97,6 +204,7 @@ public class ActionEvent {
         this.source = source;
         this.keyEvent = x;
         this.y = y;
+        this.trigger = Type.Pointer;
     }
 
     /**
@@ -112,6 +220,7 @@ public class ActionEvent {
         this.sourceComponent = sourceComponent;
         this.keyEvent = x;
         this.y = y;
+        this.trigger = Type.Command;
     }
 
     /**
@@ -127,6 +236,7 @@ public class ActionEvent {
         this.sourceComponent = drop;
         this.keyEvent = x;
         this.y = y;
+        this.trigger = Type.PointerDrag;
     }
     
     /**
@@ -160,7 +270,36 @@ public class ActionEvent {
     }
 
     /**
-     * Returns the source component object
+     * Identical to {@link ActionEvent#getComponent()} except for the fact that a lead component will be returned 
+     * if such a lead component is available. This is important for components such as {@link com.codename1.components.MultiButton}
+     * which will return the underlying button instead.
+     * @return the component that sent the event 
+     */
+    public Component getActualComponent() {
+        Component c = getComponent();
+        if(c != null) {
+            Container lead;
+            if(c instanceof Container) {
+                lead = ((Container)c).getLeadParent();
+            } else {
+                lead = c.getParent().getLeadParent();
+            }
+            if(lead != null) {
+                return lead;
+            }
+        }
+        return c;
+    }
+    
+    /**
+     * <p>Returns the component that generated the event. <b>important</b> this might not be the actual component.
+     * In case of a lead component such as {@link com.codename1.components.MultiButton} the underlying 
+     * {@link com.codename1.ui.Button} will be returned and not the {@link com.codename1.components.MultiButton} 
+     * itself. To get the component that you would logically think of as the source component use the {@code getActualComponent}
+     * method.</p>
+     * <p>If you are in doubt use the {@code getActualComponent} method.</p>
+     * 
+     * @see ActionEvent#getActualComponent() - you should probably use {@code getActualComponent} instead of this method
      * @return a component
      */
     public Component getComponent() {

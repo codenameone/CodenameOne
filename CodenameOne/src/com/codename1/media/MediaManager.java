@@ -36,6 +36,22 @@ import java.io.InputStream;
  */
 public class MediaManager {
 
+
+    /**
+     * Creates an audio media that can be played in the background.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media
+     * 
+     * @throws IOException if creation of media from the given URI has failed
+     */ 
+    public static Media createBackgroundMedia(String uri) throws IOException {
+        return Display.getInstance().createBackgroundMedia(uri);
+    }
+    
     /**
      * Creates a Media from a given URI
      * 
@@ -141,7 +157,8 @@ public class MediaManager {
     public static Media createMediaRecorder(String path, String mimeType) throws IOException {
         boolean supportedMime = false;
         String [] supported  = getAvailableRecordingMimeTypes();
-        for (int i = 0; i < supported.length; i++) {
+        int slen = supported.length;
+        for (int i = 0; i < slen; i++) {
             String mime = supported[i];
             if(mime.equals(mimeType)){
                 supportedMime = true;

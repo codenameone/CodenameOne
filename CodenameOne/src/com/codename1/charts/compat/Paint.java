@@ -55,7 +55,9 @@ public class Paint {
         Font f = getTypeface();
         if ( f != null ){
             char[] chars = text.toCharArray();
-            for ( int i=0; i<chars.length && i<widths.length; i++){
+            int clen = chars.length;
+            int wlen = widths.length;
+            for ( int i=0; i<clen && i<wlen; i++){
                 widths[i] = f.charWidth(chars[i]);
             }
         } else {
@@ -73,12 +75,14 @@ public class Paint {
             int inc = measureForwards ? 1 : -1;
             
             float currWidth = 0f;
-            for ( int i=start; (measureForwards && i<chars.length) || (!measureForwards && i>=0) ; i+=inc){
+            int clen = chars.length;
+            int wlen = measuredWidth != null ? measuredWidth.length : -1;
+            for ( int i=start; (measureForwards && i<clen) || (!measureForwards && i>=0) ; i+=inc){
                 tmp = f.charWidth(chars[i]);
                 if ( currWidth + tmp > maxWidth ){
                     return i;
                 }
-                if ( measuredWidth != null && i < measuredWidth.length ){
+                if (i < wlen ){
                     measuredWidth[i] = tmp;
                 }
                 currWidth += tmp;
@@ -116,7 +120,8 @@ public class Paint {
         Font f = getTypeface();
         float h = 0f;
         if ( f != null ){
-            for ( int i=start; i<chars.length && i<start+count; i++){
+            int clen = chars.length;
+            for ( int i=start; i<clen && i<start+count; i++){
                 float nh = f.getHeight();
                 h = nh > h ? nh : h;
             }
@@ -136,7 +141,8 @@ public class Paint {
         float out = 0f;
         Font f = getTypeface();
         if ( f != null ){
-            for ( int i=start; i< chars.length && i < start+count; i++){
+            int clen = chars.length;
+            for ( int i=start; i< clen && i < start+count; i++){
                 out += f.charWidth(chars[i]);
             }
         } else {

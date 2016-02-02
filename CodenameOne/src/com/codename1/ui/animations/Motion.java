@@ -23,6 +23,9 @@
  */
 package com.codename1.ui.animations;
 
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.MathUtil;
+
 /**
  * Abstracts the notion of physical motion over time from a numeric location to
  * another. This class can be subclassed to implement any motion equation for
@@ -63,15 +66,18 @@ public class Motion {
 
     private static final int DECELERATION = 3;
     private static final int CUBIC = 4;
+    private static final int COLOR_LINEAR = 5;
+    private static final int EXPONENTIAL_DECAY = 6;
     
     private int sourceValue;
     private int destinationValue;
+    private int targetPosition;
     private int duration;
     private long startTime;
-    private float initVelocity,  friction;
+    private double initVelocity,  friction;
     private int lastReturnedValue;
+    private int [] previousLastReturnedValue = new int[3];
     private long currentMotionTime = -1;
-
     private float p0, p1, p2, p3;
     
     /**
@@ -89,8 +95,19 @@ public class Motion {
         if(slowMotion) {
             this.duration *= 50;
         }
+        previousLastReturnedValue[0] = -1;        
     }
 
+    /**
+     * Sends the motion to the end time instantly which is useful for flushing an animation
+     */
+    public void finish() {
+        if(!isFinished()) {
+            startTime = System.currentTimeMillis() - duration;
+            currentMotionTime = -1;
+        }
+    }
+    
     /**
      * Construct a velocity motion
      * 
@@ -103,6 +120,15 @@ public class Motion {
         this.initVelocity = initVelocity;
         this.friction = friction;
         duration = (int) ((Math.abs(initVelocity)) / friction);
+        previousLastReturnedValue[0] = -1;        
+    }
+    
+    protected Motion(int sourceValue, double initVelocity, double friction) {
+        this.sourceValue = sourceValue;
+        this.initVelocity = initVelocity;
+        this.friction = friction;
+        duration = (int) ((Math.abs(initVelocity)) / friction);
+        previousLastReturnedValue[0] = -1;        
     }
 
     
@@ -192,6 +218,24 @@ public class Motion {
         return l;
     }
     
+    
+    /**
+     * Creates a linear motion starting from source value all the way to destination value for a color value.
+     * Unlike a regular linear motion a color linear motion is shifted based on channels where red, green & blue 
+     * get shifted separately.
+     * 
+     * @param sourceValue the color from which we are starting 
+     * @param destinationValue the destination color
+     * @param duration the length in milliseconds of the motion (time it takes to get from sourceValue to
+     * destinationValue)
+     * @return new motion object
+     */
+    public static Motion createLinearColorMotion(int sourceValue, int destinationValue, int duration) {
+        Motion l = new Motion(sourceValue, destinationValue, duration);
+        l.motionType = COLOR_LINEAR;
+        return l;
+    }
+
     /**
      * Creates a spline motion starting from source value all the way to destination value
      * 
@@ -236,6 +280,17 @@ public class Motion {
         frictionMotion.destinationValue = maxValue;
         frictionMotion.motionType = FRICTION;
         return frictionMotion;
+    }
+    
+    
+    public static Motion createExponentialDecayMotion(int sourceValue, int maxValue, double initVelocity, double timeConstant) {
+        Motion decayMotion = new Motion(sourceValue, initVelocity, timeConstant);
+        decayMotion.destinationValue = maxValue;
+        decayMotion.targetPosition = sourceValue + (int)(initVelocity * (double)UIManager.getInstance().getThemeConstant("DecayMotionScaleFactorInt", 950));
+        decayMotion.motionType = EXPONENTIAL_DECAY;
+        decayMotion.duration = (int)(6 * timeConstant);
+        return decayMotion;
+        
     }
     
     /**
@@ -288,10 +343,7 @@ public class Motion {
      * @return true if System.currentTimeMillis() > duration + startTime or the last returned value is the destination value
      */
     public boolean isFinished() {
-        if(currentMotionTime < 0) {
-            return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue;
-        }
-        return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue;
+        return getCurrentMotionTime() > duration || destinationValue == lastReturnedValue || (EXPONENTIAL_DECAY == motionType && previousLastReturnedValue[0] == lastReturnedValue);
     }
 
     private int getSplineValue() {
@@ -361,7 +413,70 @@ public class Motion {
         }
         return current;        
     }
-    
+
+//    private int[] values = new int[1000];
+//    private int[] times = new int[1000];
+//    private int vOff;
+//    
+//    /**
+//     * Returns the value for the motion for the current clock time. 
+//     * The value is dependent on the Motion type.
+//     * 
+//     * @return a value that is relative to the source value
+//     */
+//    public int getValue() {
+//        int v = getValueImpl();
+//        if(isFinished() && vOff > 0) {
+//            System.out.println("initVelocity:\t"+initVelocity + "\tfriction:\t" + friction + "\tdestinationValue:\t" + destinationValue + "\tsourceValue:\t" + sourceValue);
+//            System.out.println("Value\tTime");
+//            for(int iter = 0 ; iter < vOff ; iter++) {
+//                System.out.println("" + values[iter] + "\t" + times[iter]);
+//            }
+//            vOff = 0;
+//        } else {
+//            values[vOff] = v;
+//            int time = (int) getCurrentMotionTime();
+//            times[vOff] = time;
+//
+//            vOff++;
+//        }
+//        
+//        return v;
+//    }
+//    
+//    /**
+//     * Returns the value for the motion for the current clock time. 
+//     * The value is dependent on the Motion type.
+//     * 
+//     * @return a value that is relative to the source value
+//     */
+//    private int getValueImpl() {
+//        if(currentMotionTime > -1 && startTime > getCurrentMotionTime()) {
+//            return sourceValue;
+//        }
+//        switch(motionType) {
+//            case SPLINE:
+//                lastReturnedValue = getSplineValue();
+//                break;
+//            case CUBIC:
+//                lastReturnedValue = getCubicValue();
+//                break;
+//            case FRICTION:
+//                lastReturnedValue = getFriction();
+//                break;
+//            case DECELERATION:
+//                lastReturnedValue = getRubber();
+//                break;
+//            case COLOR_LINEAR:
+//                lastReturnedValue = getColorLinear();
+//                break;
+//            default:
+//                lastReturnedValue = getLinear();
+//                break;
+//        }
+//        return lastReturnedValue;
+//    }
+
     /**
      * Returns the value for the motion for the current clock time. 
      * The value is dependent on the Motion type.
@@ -372,6 +487,10 @@ public class Motion {
         if(currentMotionTime > -1 && startTime > getCurrentMotionTime()) {
             return sourceValue;
         }
+        
+        previousLastReturnedValue[0] = previousLastReturnedValue[1];
+        previousLastReturnedValue[1] = previousLastReturnedValue[2];
+        previousLastReturnedValue[2] = lastReturnedValue;
         switch(motionType) {
             case SPLINE:
                 lastReturnedValue = getSplineValue();
@@ -385,13 +504,19 @@ public class Motion {
             case DECELERATION:
                 lastReturnedValue = getRubber();
                 break;
+            case COLOR_LINEAR:
+                lastReturnedValue = getColorLinear();
+                break;
+            case EXPONENTIAL_DECAY:
+                lastReturnedValue = getExponentialDecay();
+                break;
             default:
                 lastReturnedValue = getLinear();
                 break;
         }
         return lastReturnedValue;
     }
-
+    
     private int getLinear() {
         //make sure we reach the destination value.
         if(isFinished()){
@@ -412,12 +537,57 @@ public class Motion {
             return Math.min(destinationValue, val);
         }
     }
+
+    private int getColorLinear() {
+        if(isFinished()){
+            return destinationValue;
+        }
+        float totalTime = duration;
+        float currentTime = (int) getCurrentMotionTime();
+        if(currentMotionTime > -1) {
+            currentTime -= startTime;
+            totalTime -= startTime;
+        }
+        
+        int sourceR = (sourceValue >> 16) & 0xff;
+        int destR = (destinationValue >> 16) & 0xff;
+        int sourceG = (sourceValue >> 8) & 0xff;
+        int destG = (destinationValue >> 8) & 0xff;
+        int sourceB = sourceValue & 0xff;
+        int destB = destinationValue & 0xff;
+        
+        int disR = destR - sourceR;
+        int disG = destG - sourceG;
+        int disB = destB - sourceB;
+        int valR = (int)(sourceR + (currentTime / totalTime * disR));
+        int valG = (int)(sourceG + (currentTime / totalTime * disG));
+        int valB = (int)(sourceB + (currentTime / totalTime * disB));
+        
+        if(destR < sourceR) {
+            valR = Math.max(destR, valR);
+        } else {
+            valR = Math.min(destR, valR);
+        }
+        
+        if(destG < sourceG) {
+            valG = Math.max(destG, valG);
+        } else {
+            valG = Math.min(destG, valG);
+        }
+        
+        if(destB < sourceB) {
+            valB = Math.max(destB, valB);
+        } else {
+            valB = Math.min(destB, valB);
+        }
+        return (((valR) << 16) & 0xff0000) | (((valG) << 8) & 0xff00) | (valB & 0xff);
+    }
     
     private int getFriction() {
         int time = (int) getCurrentMotionTime();
         int retVal = 0;
 
-        retVal = (int)((Math.abs(initVelocity) * time) - (friction * (((float)time * time) / 2)));
+        retVal = (int)((Math.abs(initVelocity) * time) - (friction * (((double)time * time) / 2)));
         if (initVelocity < 0) {
             retVal *= -1;
         }
@@ -427,6 +597,22 @@ public class Motion {
         } else {
             return Math.max(retVal, destinationValue);
         }
+    }
+    
+    private int getExponentialDecay() {
+        //amplitude = initialVelocity * scaleFactor;
+        //targetPosition = position + amplitude;
+        //timestamp = Date.now();
+        double elapsed = getCurrentMotionTime();
+        double timeConstant = friction;
+        double amplitude = targetPosition - sourceValue;
+        int position = (int)Math.round(targetPosition - amplitude * MathUtil.exp(-elapsed / timeConstant));
+        if(destinationValue > sourceValue) {
+            return Math.min(position, destinationValue);
+        } else {
+            return Math.max(position, destinationValue);
+        }
+        
     }
 
     private int getRubber() {

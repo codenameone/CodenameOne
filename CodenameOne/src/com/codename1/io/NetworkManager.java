@@ -24,6 +24,7 @@
 
 package com.codename1.io;
 
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -290,14 +291,15 @@ public class NetworkManager {
                         if(currentRequest.getDisposeOnCompletion() != null && !currentRequest.isRedirecting()) {
                             // there may be a race condition where the dialog hasn't yet appeared but the
                             // network request completed
-                            while(Display.getInstance().getCurrent() != currentRequest.getDisposeOnCompletion() && !currentRequest.isKilled()) {
-                                try {
-                                    Thread.sleep(10);
-                                } catch (InterruptedException ex) {
-                                    ex.printStackTrace();
-                                }
-                            }
-                            currentRequest.getDisposeOnCompletion().dispose();
+                            final ConnectionRequest finalReq = currentRequest;
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    Dialog dlg = finalReq.getDisposeOnCompletion();
+                                    if (dlg != null) {
+                                        dlg.dispose();
+                                    }
+                                } 
+                            });
                         }
                     }
                     currentRequest = null;
@@ -365,7 +367,8 @@ public class NetworkManager {
             if(aps == null) {
                 aps = new Vector();
                 String[] ids = getAPIds();
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                int idlen = ids.length;
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_WLAN) {
                         aps.insertElementAt(ids[iter ], 0);
@@ -377,7 +380,7 @@ public class NetworkManager {
                 }
                 
                 // add all the 2G networks at the end
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_NETWORK2G) {
                         aps.addElement(ids[iter]);
@@ -445,7 +448,8 @@ public class NetworkManager {
                             return;
                         }
                         // check for timeout violations on the currently executing threads
-                        for(int iter = 0 ; iter < networkThreads.length ; iter++) {
+                        int ntlen = networkThreads.length;
+                        for(int iter = 0 ; iter < ntlen ; iter++) {
                             ConnectionRequest c = networkThreads[iter].getCurrentRequest();
                             if(c != null) {
                                 int cTimeout = Math.min(timeout, c.getTimeout());
@@ -482,7 +486,8 @@ public class NetworkManager {
     }
 
     /**
-     * Shuts down the network thread 
+     * Shuts down the network thread, this will trigger failures if you have network requests
+     * @deprecated This method is for internal use only
      */
     public void shutdown() {
         running = false;
@@ -733,9 +738,9 @@ public class NetworkManager {
     }
 
     /**
-     * Adds a generic listener to a network error that is invoked before the exception is propogated.
+     * Adds a generic listener to a network error that is invoked before the exception is propagated.
      * Notice that this doesn't apply to server error codes!
-     * Consume the event in order to prevent it from propogating further.
+     * Consume the event in order to prevent it from propagating further.
      *
      * @param e callback will be invoked with the Exception as the source object
      */

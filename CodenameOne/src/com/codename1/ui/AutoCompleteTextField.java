@@ -51,7 +51,7 @@ public class AutoCompleteTextField extends TextField {
      * Constructor with completion suggestions
      * @param completion a String array of suggestion for completion
      */ 
-    public AutoCompleteTextField(String[] completion) {
+    public AutoCompleteTextField(String... completion) {
         this(new DefaultListModel<String>(completion));
     }
 
@@ -87,7 +87,7 @@ public class AutoCompleteTextField extends TextField {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void initComponent() {
@@ -103,7 +103,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void deinitialize() {
@@ -123,7 +123,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void setText(String text) {
@@ -145,6 +145,7 @@ public class AutoCompleteTextField extends TextField {
         Form f = getComponentForm();
         boolean v = filter.getSize() > 0 && getText().length() >= minimumLength;
         if(v != popup.isVisible()) {
+            popup.getComponentAt(0).setScrollY(0);
             popup.setVisible(v);
             popup.setEnabled(v);
             f.repaint();
@@ -175,6 +176,7 @@ public class AutoCompleteTextField extends TextField {
         if(filter != null && popup != null) {
             boolean v = filter.getSize() > 0 && text.length() >= minimumLength;
             if(v != popup.isVisible()) {
+                popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(v);
                 popup.setEnabled(v);
 
@@ -206,7 +208,7 @@ public class AutoCompleteTextField extends TextField {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int k) {
         if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -220,7 +222,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int k) {
         if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -317,6 +319,11 @@ public class AutoCompleteTextField extends TextField {
             popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
             topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
         }
+        if(f.getToolbar() != null) {
+            // we need to add the status bar which is now missing from the titlebar entry
+            Style s = getUIManager().getComponentStyle("StatusBar");
+            topMargin += s.getPadding(TOP) + s.getPadding(BOTTOM);
+        }
         popup.getUnselectedStyle().setMargin(TOP, Math.max(0, topMargin));
         popup.getSelectedStyle().setMargin(TOP, Math.max(0, topMargin));                    
         popup.setPreferredH(popupHeight);
@@ -371,6 +378,7 @@ public class AutoCompleteTextField extends TextField {
                 }
             } else {
                 if (contains(evt.getX(), evt.getY())) {
+                    popup.getComponentAt(0).setScrollY(0);
                     popup.setVisible(true);
                     popup.setEnabled(true);
                     evt.consume();
@@ -383,42 +391,59 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"completion"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("completion")) {
-            String[] r = new String[filter.getUnderlying().getSize()];
-            for(int iter = 0 ; iter < r.length ; iter++) {
-                r[iter] = (String)filter.getUnderlying().getItemAt(iter);
-            }
-            return r;
+            return getCompletion();
         }
         return null;
     }
 
     /**
-     * @inheritDoc
+     * Sets the completion values
+     * @param completion the completion values
+     */
+    public void setCompletion(String... completion) {
+        filter = new FilterProxyListModel<String>(new DefaultListModel<String>(completion));        
+    }
+    
+    /**
+     * Returns the completion values
+     * @return array of completion entries
+     */
+    public String[] getCompletion() {
+        String[] r = new String[filter.getUnderlying().getSize()];
+        int rlen = r.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
+            r[iter] = (String)filter.getUnderlying().getItemAt(iter);
+        }
+        return r;
+    }
+    
+    /**
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("completion")) {

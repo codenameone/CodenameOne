@@ -149,7 +149,7 @@ public class DefaultCrashReporter implements CrashReport {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void exception(Throwable t) {
         Preferences.set("$CN1_pendingCrash", true);

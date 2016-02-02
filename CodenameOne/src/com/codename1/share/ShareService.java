@@ -31,7 +31,7 @@ public abstract class ShareService extends Command{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt) {
         if(image != null){

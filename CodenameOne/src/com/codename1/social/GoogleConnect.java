@@ -22,9 +22,9 @@
  */
 package com.codename1.social;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
 import java.util.Hashtable;
 
 /**
@@ -86,6 +86,32 @@ public class GoogleConnect extends Login{
         
         Oauth2 auth = new Oauth2(oauth2URL, clientId, redirectURI, scope, tokenURL, clientSecret, params);
         return auth;
+    }
+
+    @Override
+    protected boolean validateToken(String token) {
+        //make a call to the API if the return value is 40X the token is not 
+        //valid anymore
+        final boolean[] retval = new boolean[1];
+        retval[0] = true;
+        ConnectionRequest req = new ConnectionRequest() {
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                //access token not valid anymore
+                if (code >= 400 && code <= 410) {
+                    retval[0] = false;
+                    return;
+                }
+                super.handleErrorResponseCode(code, message);
+            }
+
+        };
+        req.setPost(false);
+        req.setUrl("https://www.googleapis.com/plus/v1/people/me");
+        req.addRequestHeader("Authorization", "Bearer " + token);
+        NetworkManager.getInstance().addToQueueAndWait(req);
+        return retval[0];
+
     }
     
 }

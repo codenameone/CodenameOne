@@ -111,7 +111,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initMenuBar(Form parent) {
         if (parent.getClientProperty("Menu") != null) {
@@ -155,8 +155,8 @@ public class SideMenuBar extends MenuBar {
         if (b != null && !b.transitionRunning) {
             b.parent.addShowListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    callback.run();
                     b.parent.removeShowListener(this);
+                    callback.run();
                 }
             });
             b.closeMenu();
@@ -166,7 +166,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void removeAllCommands() {
@@ -195,7 +195,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void unInstallMenuBar() {
@@ -220,7 +220,7 @@ public class SideMenuBar extends MenuBar {
         if (i != null) {
             ob.setIcon(i);
         } else {
-            ob.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU);
         }
         Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
         if (p != null) {
@@ -230,7 +230,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void installMenuBar() {
         if (parent.getClientProperty("Menu") != null) {
@@ -352,7 +352,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
         if (getUIManager().isThemeConstant("sideMenuFoldedSwipeBool", true)) {
@@ -380,13 +380,21 @@ public class SideMenuBar extends MenuBar {
                 if(uiid == null){
                     uiid = "TitleCommand";
                 }
+                int txtPosition = Component.RIGHT;
+                Integer pos = (Integer)rightCommand.getClientProperty("textPosition");
+                if(pos != null){
+                    txtPosition = pos.intValue();
+                }
+                
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
-                    Button b = new Button(rightCommand);
+                    final Button b = new Button(rightCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
+                    b.setTextPosition(txtPosition);
+                    
                     BorderLayout bl = (BorderLayout) l;
-                    Component east = bl.getEast();
+                    final Component east = bl.getEast();
                     if (east == null) {
                         getTitleAreaContainer().addComponent(BorderLayout.EAST, b);
                     } else {
@@ -414,6 +422,7 @@ public class SideMenuBar extends MenuBar {
                                     continue;
                                 }                            
                             }
+
                             east.getParent().removeComponent(east);
                             Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));
                             buttons.addComponent(east);
@@ -437,12 +446,19 @@ public class SideMenuBar extends MenuBar {
                 if(uiid == null){
                     uiid = "TitleCommand";
                 }
+                int txtPosition = Component.RIGHT;
+                Integer pos = (Integer)leftCommand.getClientProperty("textPosition");
+                if(pos != null){
+                    txtPosition = pos.intValue();
+                }
                 
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     Button b = new Button(leftCommand);
                     b.setUIID(uiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
+                    b.setTextPosition(txtPosition);
+                    
                     BorderLayout bl = (BorderLayout) l;
                     Component west = bl.getWest();
                     if (west == null) {
@@ -490,7 +506,7 @@ public class SideMenuBar extends MenuBar {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addCommand(Command cmd) {
         if (cmd.getClientProperty("TitleCommand") != null) {
@@ -518,7 +534,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBackCommand(Command backCommand) {
         super.setBackCommand(backCommand);
@@ -541,7 +557,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void addCommand(Command cmd, int index) {
         if (cmd.getClientProperty("TitleCommand") != null) {
@@ -585,7 +601,7 @@ public class SideMenuBar extends MenuBar {
                 continue;
             }
             if(c instanceof Button && ((Button)c).getCommand() == cmd) {
-                Container cc = getParent();
+                Container cc = c.getParent();
                 if(cc != null) {
                     cc.removeComponent(c);
                 }
@@ -595,7 +611,7 @@ public class SideMenuBar extends MenuBar {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void removeCommand(Command cmd) {
         super.removeCommand(cmd);
@@ -729,7 +745,15 @@ public class SideMenuBar extends MenuBar {
             }
             
             if (placement == null && !parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
-                titleArea.addComponent(BorderLayout.WEST, openButton);
+                if(parent.getUIManager().isThemeConstant("menuButtonTopBool", false)) {
+                        titleArea.addComponent(BorderLayout.WEST, BorderLayout.north(openButton));                    
+                } else {
+                    if(parent.getUIManager().isThemeConstant("menuButtonBottomBool", false)) {
+                        titleArea.addComponent(BorderLayout.WEST, BorderLayout.south(openButton));
+                    } else {
+                        titleArea.addComponent(BorderLayout.WEST, openButton);
+                    }
+                }
             }
             Component l = getTitleComponent();
             if (l.getParent() != null) {
@@ -789,7 +813,7 @@ public class SideMenuBar extends MenuBar {
             if (i != null) {
                 rightSideButton.setIcon(i);
             } else {
-                rightSideButton.setIcon(Resources.getSystemResource().getImage("mobile-menu.png"));
+                FontImage.setMaterialIcon(rightSideButton, FontImage.MATERIAL_MENU);
             }
             Image p = (Image) uim.getThemeImageConstant("rightSideMenuPressImage");
             if (p != null) {
@@ -916,17 +940,34 @@ public class SideMenuBar extends MenuBar {
      * @return the Component to display on the navigation
      */
     protected Container createSideNavigationComponent(Vector commands, String placement) {
+        return createSideNavigationPanel(commands, placement);
+    }
+    
+    /**
+     * Creates an empty side navigation panel.
+     */ 
+    protected Container constructSideNavigationComponent(){
+        return constructSideNavigationPanel();
+    }
+    
+    Container constructSideNavigationPanel(){
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        menu.setUIID("SideNavigationPanel");
+        menu.setScrollableY(true);
+        return menu;
+    }
+    
+    Container createSideNavigationPanel(Vector commands, String placement) {
+        Container menu = constructSideNavigationComponent();
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             Container bar = new Container();
             bar.setUIID("StatusBarSideMenu");
-            menu.addComponent(bar);
+            addComponentToSideMenu(menu, bar);
         }
-        menu.setUIID("SideNavigationPanel");
-        menu.setScrollableY(true);
         if (!getUIManager().isThemeConstant("sideMenuTensileDragBool", true)) {
             menu.setTensileDragEnabled(false);
         }
+        
         for (int iter = commands.size() - 1; iter > -1; iter--) {
             Command c = (Command) commands.elementAt(iter);
             if (c.getClientProperty(COMMAND_PLACEMENT_KEY) != placement) {
@@ -937,15 +978,15 @@ public class SideMenuBar extends MenuBar {
                 if (cmp.getParent() != null) {
                     cmp.getParent().removeAll();
                 }
-                if (c.getClientProperty(COMMAND_ACTIONABLE) != null) {
+                if (c.getClientProperty(COMMAND_ACTIONABLE) != null && c.getClientProperty(COMMAND_ACTIONABLE).equals(Boolean.TRUE)) {
                     Container cnt = new Container(new BorderLayout());
                     cnt.addComponent(BorderLayout.CENTER, cmp);
                     Button btn = createTouchCommandButton(c);
                     btn.setParent(cnt);
                     cnt.setLeadComponent(btn);
-                    menu.addComponent(cnt);
+                    addComponentToSideMenu(menu, cnt);
                 } else {
-                    menu.addComponent(cmp);
+                    addComponentToSideMenu(menu, cmp);
                 }
                 initTitleBarStatus();
             } else {
@@ -954,7 +995,7 @@ public class SideMenuBar extends MenuBar {
                         c.getIcon() == null) {
                     continue;
                 }
-                menu.addComponent(createTouchCommandButton(c));
+                addComponentToSideMenu(menu, createTouchCommandButton(c));
             }
         }
         UIManager uim = menu.getUIManager();
@@ -996,9 +1037,25 @@ public class SideMenuBar extends MenuBar {
             return main;
         }
     }
-
+    
     /**
-     * @inheritDoc
+     * This method responsible to add a Component to the side navigation panel.
+     *
+     * @param menu the Menu Container that was created in the
+     * constructSideNavigationComponent() method
+     *
+     * @param cmp the Component to add to the side menu
+     */
+    protected void addComponentToSideMenu(Container menu, Component cmp){
+        addComponentToSideMenuImpl(menu, cmp);
+    }
+    
+    void addComponentToSideMenuImpl(Container menu, Component cmp){
+        menu.addComponent(cmp);    
+    }
+    
+    /**
+     * {@inheritDoc}
      */
     protected Button createTouchCommandButton(final Command c) {
 
@@ -1030,7 +1087,7 @@ public class SideMenuBar extends MenuBar {
             void actionCommandImpl(Command cmd, ActionEvent ev) {
                 if (cmd instanceof SideMenuBar.CommandWrapper) {
                     cmd = ((SideMenuBar.CommandWrapper) cmd).cmd;
-                    ev = new ActionEvent(cmd);
+                    ev = new ActionEvent(cmd,ActionEvent.Type.Command);
                 }
                 final Command c = cmd;
                 final ActionEvent e = ev;
@@ -1602,7 +1659,7 @@ public class SideMenuBar extends MenuBar {
             
             public void run() {
                 if(Display.getInstance().isEdt()) {
-                    ActionEvent e = new ActionEvent(cmd);
+                    ActionEvent e = new ActionEvent(cmd,ActionEvent.Type.Command);
                     parent.dispatchCommand(cmd, e);
                     return;
                 }

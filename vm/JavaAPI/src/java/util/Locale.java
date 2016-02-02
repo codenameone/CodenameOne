@@ -38,7 +38,18 @@ public class Locale {
     
     public Locale() {
         language = getOSLanguage();
-        country = "US";//getOSCountry();
+        int pos;
+        if (language != null && (pos = language.indexOf('-')) != -1) {
+            country = language.substring(pos+1);
+            language = language.substring(0, pos);
+        }
+        if (language != null && (pos = language.indexOf('_')) != -1) {
+            country = language.substring(pos+1);
+            language = language.substring(0, pos);
+        }
+        if (country == null) {
+            country = "US";//getOSCountry();
+        }
     }
     
     public static Locale getDefault() {

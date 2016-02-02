@@ -198,8 +198,8 @@ public class TarEntry {
      */
     public long computeCheckSum(byte[] buf) {
         long sum = 0;
-
-        for (int i = 0; i < buf.length; ++i) {
+        int blen = buf.length;
+        for (int i = 0; i < blen; ++i) {
             sum += 255 & buf[i];
         }
 
@@ -237,7 +237,8 @@ public class TarEntry {
         offset = Octal.getOctalBytes( this.header.devMajor, outbuf, offset, TarHeader.DEVLEN );
         offset = Octal.getOctalBytes( this.header.devMinor, outbuf, offset, TarHeader.DEVLEN );
 
-        for (; offset < outbuf.length;)
+        int oblen = outbuf.length;
+        for (; offset < oblen;)
             outbuf[offset++] = 0;
 
         long checkSum = this.computeCheckSum( outbuf );

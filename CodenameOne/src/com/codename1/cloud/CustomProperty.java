@@ -31,6 +31,7 @@ package com.codename1.cloud;
  * assigned to the given property!
  *
  * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public interface CustomProperty {
     /**

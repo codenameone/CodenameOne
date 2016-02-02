@@ -67,7 +67,7 @@ class SpinnerDateModel implements ListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getItemAt(int index) {
         return new Date(min + DAY * index + 12 * 60 * 60000);
@@ -75,7 +75,7 @@ class SpinnerDateModel implements ListModel {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize() {
         return (int)((max - min) / DAY);
@@ -83,7 +83,7 @@ class SpinnerDateModel implements ListModel {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSelectedIndex() {
         return (int)((currentValue - min) / DAY);
@@ -91,7 +91,7 @@ class SpinnerDateModel implements ListModel {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
         int oldIndex = getSelectedIndex();
@@ -101,41 +101,41 @@ class SpinnerDateModel implements ListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangedListener(DataChangedListener l) {
         dataListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangedListener(DataChangedListener l) {
         dataListener.removeListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(Object item) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index) {
     }

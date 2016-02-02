@@ -46,6 +46,7 @@ public final class IOSNative {
     native int getDisplayWidth();
     native int getDisplayHeight();
     native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar);
+    native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
     native long createImageFromARGB(int[] argb, int width, int height);
@@ -131,7 +132,11 @@ public final class IOSNative {
 
     native void flashBacklight(int duration);
 
-    native boolean isMinimized();
+    // SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
+    // tracking on the java side.  It caused the app to still be minimized inside start()
+    // method.  
+    // Related to this issue https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/codenameone-discussions/Ajo2fArN8mc/KrF_e9cTDwAJ
+    //native boolean isMinimized();
     
     native boolean minimizeApplication();
 
@@ -210,12 +215,12 @@ public final class IOSNative {
 
     native String getBrowserURL(long browserPeer);
     
-    native long createVideoComponent(String url);
-    native long createVideoComponent(byte[] video);
-    native long createVideoComponentNSData(long video);
-    native long createNativeVideoComponent(String url);
-    native long createNativeVideoComponent(byte[] video);
-    native long createNativeVideoComponentNSData(long video);
+    native long createVideoComponent(String url, int onCompletionCallbackId);
+    native long createVideoComponent(byte[] video, int onCompletionCallbackId);
+    native long createVideoComponentNSData(long video, int onCompletionCallbackId);
+    native long createNativeVideoComponent(String url, int onCompletionCallbackId);
+    native long createNativeVideoComponent(byte[] video, int onCompletionCallbackId);
+    native long createNativeVideoComponentNSData(long video, int onCompletionCallbackId);
 
     native void startVideoComponent(long peer); 
     
@@ -267,7 +272,7 @@ public final class IOSNative {
     native long openConnection(String url, int timeout);
     native void connect(long peer);
     native void setMethod(long peer, String mtd);
-    
+    native void setChunkedStreamingMode(long peer, int len);
     native int getResponseCode(long peer);
 
     native String getResponseMessage(long peer);
@@ -288,6 +293,7 @@ public final class IOSNative {
     
     native String getUDID();
     native String getOSVersion();
+    native String getDeviceName();
     
     // location manager
     native long createCLLocation();
@@ -301,9 +307,13 @@ public final class IOSNative {
     native double getLocationVelocity(long location);
     native long getLocationTimeStamp(long location);
 
-    native void startUpdatingLocation(long clLocation);
+    native void startUpdatingLocation(long clLocation, int priority);
     native void stopUpdatingLocation(long clLocation);
+    native void startUpdatingBackgroundLocation(long clLocation);
+    native void stopUpdatingBackgroundLocation(long clLocation);
     
+    native void addGeofencing(long clLocation, double lat, double lng, double radius, long expiration, String id);
+    native void removeGeofencing(long clLocation, String id);
     
     // capture
     native void captureCamera(boolean movie);
@@ -403,8 +413,8 @@ public final class IOSNative {
 
     native String getUserAgentString();
     
-    native void openDatePicker(int type, long time, int x, int y, int w, int h);
-    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h);
+    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
+    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
 
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
@@ -471,6 +481,13 @@ public final class IOSNative {
             float d0, float d1, float d2, float d3,
             int originX, int originY
     );
+    native void nativeSetTransformMutable( 
+            float a0, float a1, float a2, float a3, 
+            float b0, float b1, float b2, float b3,
+            float c0, float c1, float c2, float c3,
+            float d0, float d1, float d2, float d3,
+            int originX, int originY
+    );
     
     
     native boolean nativeIsTransformSupportedGlobal();
@@ -481,7 +498,9 @@ public final class IOSNative {
     
     native void drawTextureAlphaMask(long textureId, int color, int alpha, int x, int y, int w, int h);
     
-    
+    native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr); 
+
+    native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
     
     // End paths
 
@@ -533,5 +552,26 @@ public final class IOSNative {
     public native void googleLogout();
 
     public native void inviteFriends(String appLinkUrl, String previewImageUrl);
+    
+    native void sendLocalNotification(String id, String alertTitle, String alertBody, String alertSound, int badgeNumber, long fireDate, int repeatType);
+
+    native void cancelLocalNotification(String id);
+
+    /**
+     * Removes an observer from NSNotificationCenter
+     * @param nsObserverPeer The opaque Objective-C class that is being used as the observer.
+     */
+    native void removeNotificationCenterObserver(long nsObserverPeer);
+
+    /**
+     * This one simply hides the native editing component, but doesn't fold the 
+     * keyboard or remove the component.  It is used to bridge the gap in async
+     * edit mode between when the user clicks "next" and when the next 
+     * editing component is ready.
+     * @param b 
+     */
+    native void setNativeEditingComponentVisible(boolean b) ;
+
+   
 
 }

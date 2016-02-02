@@ -940,7 +940,7 @@ public class UIManager {
         selectedStyles.clear();
         imageCache.clear();
         if (themelisteners != null) {
-            themelisteners.fireActionEvent(new ActionEvent(themeProps));
+            themelisteners.fireActionEvent(new ActionEvent(themeProps,ActionEvent.Type.Theme));
         }
         buildTheme(themeProps);
         current.refreshTheme(true);
@@ -975,7 +975,7 @@ public class UIManager {
         defaultSelectedStyle = createStyle("", "sel#", true);
     }
     
-    private Style createStyle(String id, String prefix, boolean selected) {
+    Style createStyle(String id, String prefix, boolean selected) {
         Style style;
         String originalId = id;
         if (prefix != null && prefix.length() > 0) {
@@ -1021,6 +1021,7 @@ public class UIManager {
             border = themeProps.get(id + Style.BORDER);
             Object bgImage = themeProps.get(id + Style.BG_IMAGE);
             String transperency = (String) themeProps.get(id + Style.TRANSPARENCY);
+            String opacity = (String) themeProps.get(id + Style.OPACITY);
             String margin = (String) themeProps.get(id + Style.MARGIN);
             String padding = (String) themeProps.get(id + Style.PADDING);
             Object font = themeProps.get(id + Style.FONT);
@@ -1045,6 +1046,16 @@ public class UIManager {
                     transperency = (String) themeProps.get(originalId + Style.TRANSPARENCY);
                     if (transperency != null) {
                         style.setBgTransparency(Integer.valueOf(transperency).intValue());
+                    }
+                }
+            }
+            if (opacity != null) {
+                style.setOpacity(Integer.valueOf(opacity).intValue());
+            } else {
+                if (selected) {
+                    opacity = (String) themeProps.get(originalId + Style.OPACITY);
+                    if (opacity != null) {
+                        style.setBgTransparency(Integer.valueOf(opacity).intValue());
                     }
                 }
             }
@@ -1149,7 +1160,8 @@ public class UIManager {
     private int[] toIntArray(String str) {
         int[] retVal = new int[4];
         str = str + ",";
-        for (int i = 0; i < retVal.length; i++) {
+        int rlen = retVal.length;
+        for (int i = 0; i < rlen; i++) {
             retVal[i] = Integer.parseInt(str.substring(0, str.indexOf(",")));
             str = str.substring(str.indexOf(",") + 1, str.length());
         }
@@ -1159,7 +1171,8 @@ public class UIManager {
     private static Image parseImage(String value) throws IOException {
         int index = 0;
         byte[] imageData = new byte[value.length() / 2];
-        while (index < value.length()) {
+        int vlen = value.length();
+        while (index < vlen) {
             String byteStr = value.substring(index, index + 2);
             imageData[index / 2] = Integer.valueOf(byteStr, 16).byteValue();
             index += 2;
@@ -1289,7 +1302,8 @@ public class UIManager {
                 if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen; iter++) {
                         String val = tokenized[iter];
                         String actual = (String)bundle.get("@im-" + val);
                         // val can be null for builtin input mode types...
@@ -1325,7 +1339,8 @@ public class UIManager {
                 if(vkbInputMode != null && vkbInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
                     VirtualKeyboard.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen ; iter++) {
                         String val = tokenized[iter];
                         String[][] res = getInputMode("@vkb-", tokenized[iter], resourceBundle);
                         if(res != null) {
@@ -1337,7 +1352,8 @@ public class UIManager {
                 if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen ; iter++) {
                         String val = tokenized[iter];
                         String actual = (String)resourceBundle.get("@im-" + val);
                         // val can be null for builtin input mode types...
@@ -1376,7 +1392,8 @@ public class UIManager {
 
     private String[] toStringArray(Vector v) {
         String[] arr = new String[v.size()];
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             arr[iter] = (String)v.elementAt(iter);
         }
         return arr;
@@ -1458,6 +1475,7 @@ public class UIManager {
         try {
             Resources theme = Resources.openLayered(resourceFile);
             UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+            Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
             e.printStackTrace();
@@ -1476,6 +1494,7 @@ public class UIManager {
         try {
             Resources theme = Resources.openLayered(resourceFile);
             UIManager.getInstance().setThemeProps(theme.getTheme(resName));
+            Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
             e.printStackTrace();

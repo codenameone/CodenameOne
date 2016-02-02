@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.TextArea;
@@ -47,6 +48,15 @@ public class SpanButton extends Container {
         this("");
     }
     
+    /**
+     * Constructor accepting default text and uiid for the text
+     * @param txt the text
+     * @param textUiid the new text UIID
+     */
+    public SpanButton(String txt, String textUiid) {
+        this(txt);
+        text.setUIID(textUiid);
+    }
     
     /**
      * Constructor accepting default text
@@ -177,10 +187,25 @@ public class SpanButton extends Container {
     public String getIconPosition() {
         return (String)getLayout().getComponentConstraint(actualButton);
     }
-    
 
     /**
-     * @inheritDoc
+     * Sets the command for the component
+     * @param cmd the command
+     */
+    public void setCommand(Command cmd) {
+        actualButton.setCommand(cmd);
+    }
+    
+    /**
+     * Returns the command instance of the button
+     * @return the command instance of the button
+     */
+    public Command getCommand() {
+        return actualButton.getCommand();
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -189,7 +214,7 @@ public class SpanButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -202,14 +227,14 @@ public class SpanButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "Image", "String", "String", "String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("text")) {
@@ -231,7 +256,7 @@ public class SpanButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("text")) {

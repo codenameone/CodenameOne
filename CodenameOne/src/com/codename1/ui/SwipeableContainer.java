@@ -99,7 +99,7 @@ public class SwipeableContainer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         Form form = this.getComponentForm();
@@ -112,7 +112,7 @@ public class SwipeableContainer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
@@ -223,7 +223,7 @@ public class SwipeableContainer extends Container {
                     openedToLeft = false;
                     openedToRight = false;
                 }else{
-                    dispatcher.fireActionEvent(new ActionEvent(this));                
+                    dispatcher.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Swipe));                
                 }
             }
             return !finished;

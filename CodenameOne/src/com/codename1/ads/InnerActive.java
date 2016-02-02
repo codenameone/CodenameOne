@@ -152,8 +152,9 @@ public class InnerActive extends AdsService{
         addParam(this, "mn", Display.getInstance().getProperty("MSISDN", null));
         String [] keywords = ads.getKeywords();
         if(keywords != null && keywords.length > 0){
+            int klen = keywords.length;
             String k = "";
-            for (int i = 0; i < keywords.length; i++) {
+            for (int i = 0; i < klen; i++) {
                 k += "," + keywords[i];
             }
             addParam(this, "k", k.substring(1));
@@ -164,7 +165,7 @@ public class InnerActive extends AdsService{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException {
         StringBuffer buf = new StringBuffer();
@@ -188,7 +189,7 @@ public class InnerActive extends AdsService{
 //            Storage.getInstance().flushStorageCache();            
 //            addParam(this, "cid", cid);
 //        }
-        fireResponseListener(new ActionEvent(s));        
+        fireResponseListener(new ActionEvent(s,ActionEvent.Type.Response));        
     }
 
 }

@@ -26,15 +26,23 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 
 /**
- * The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener, important: in 
+ * <p>The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener, important: in 
  * order to use location on iOS you will need to define the build argument ios.locationUsageDescription.
  * This build argument should be used to describe to Apple &amp; the users why you need to use the location 
- * functionality.
+ * functionality.</p>
+ * 
+ * <p>Usage:</p>
+ * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
+ * 
  */
 public abstract class LocationManager {
     
     private static LocationListener listener;
+    
+    private static LocationRequest request;
 
+    private static Class backgroundlistener;
+    
     public static final int AVAILABLE = 0;
     
     public static final int OUT_OF_SERVICE = 1;
@@ -171,6 +179,7 @@ public abstract class LocationManager {
         synchronized (this) {
             if (listener != null) {
                 clearListener();
+                request = null;
             }
             listener = l;
             if (l == null) {
@@ -179,7 +188,73 @@ public abstract class LocationManager {
             bindListener();
         }
     }
+    
+    /**
+     * Sets a LocationListener on the device, use this method if you need to be
+     * updated on the device Locations rather then calling getCurrentLocation.
+     * @param l a LocationListener or null to stop the current listener 
+     * from getting updates
+     * @param req provide the settings in which we are interested to get updates
+     * to the Listener.
+     */
+    public void setLocationListener(final LocationListener l, LocationRequest req) {
+        setLocationListener(l);
+        request = req;
+    }
 
+    /**
+     * Use this method to track background location updates when the application 
+     * is not running anymore.
+     * Do not perform long operations here, iOS wake-up time is very short(around 10 seconds).
+     * Notice this listener can sends events also when the app is in the foreground, therefore
+     * it is recommended to check the app state before deciding how to process this event.
+     * Use Display.isMinimized() to know if the app is currently running.
+     * 
+     * @param locationListener a class that implements the LocationListener interface
+     * this class must have an empty constructor since the underlying implementation will
+     * try to create an instance and invoke the locationUpdated method
+     */
+    public void setBackgroundLocationListener(Class locationListener) {
+        synchronized (this) {
+            if (backgroundlistener != null) {
+                clearBackgroundListener();
+            }
+            backgroundlistener = locationListener;
+            if (locationListener == null) {
+                return;
+            }
+            bindBackgroundListener();
+        }        
+    }
+    
+    /**
+     * Adds a geo fence listener to gets an event once the device is in/out of 
+     * the Geofence range.
+     * The GeoFence events can arrive in the background therefore it is 
+     * recommended to check the app state before deciding how to process this event.
+     * Use Display.isMinimized() to know if the app is currently running.
+     * if isGeofenceSupported() returns false this method does nothing
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
+     * 
+     * @param listener a Class that implements the GeofenceListener interface 
+     * this class must have an empty constructor
+     * @param gf a Geofence to track
+     */
+    public void addGeoFencing(Class GeofenceListenerClass, Geofence gf) {
+    }
+
+    /**
+     * Stop tracking a Geofence
+     * if isGeofenceSupported() returns false this method does nothing
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
+     * 
+     * @param id a Geofence id to stop tracking
+     */ 
+    public void removeGeoFencing(String id) {
+    }
+    
     /**
      * Allows the implementation to notify the location listener of changes to location
      * @return location listener instance
@@ -187,16 +262,47 @@ public abstract class LocationManager {
     protected LocationListener getLocationListener() {
         return listener;
     }
+
+    /**
+     * Gets the LocationRequest
+     */ 
+    protected LocationRequest getRequest() {
+        return request;
+    }    
+
+    /**
+     * Gets the LocationListener class that handles background location updates.
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the
+     * <code>ios.background_modes</code> build hint with a value that includes 
+     * "location" for background locations to work.</p>
+     */ 
+    protected Class getBackgroundLocationListener() {
+        return backgroundlistener;
+    }
     
     /**
-     * Allows the implementation to track events
+     * Bind the LocationListener to get events
      */
     protected abstract void bindListener();
     
     /**
-     * Allows the implementation to track events
+     * Stop deliver events for the LocationListener
      */
     protected abstract void clearListener();
+
+    
+    /**
+     * Bind the Background LocationListener to get events
+     */
+    protected void bindBackgroundListener(){
+    }
+    
+    /**
+     * Stop deliver events for the Background LocationListener
+     */
+    protected void clearBackgroundListener(){    
+    }
     
     /**
      * Returns true if the platform is able to detect if the GPS is on or off.
@@ -204,6 +310,28 @@ public abstract class LocationManager {
      * @return true if platform is able to detect GPS on/off
      */ 
     public boolean isGPSDetectionSupported(){
+        return false;
+    }
+
+    /**
+     * Returns true if the platform is able to track background location.
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for background locations to work.</p>
+     * 
+     * @return true if platform supports background location
+     */ 
+    public boolean isBackgroundLocationSupported(){
+        return false;
+    }
+
+    /**
+     * Returns true if the platform supports Geofence
+     * 
+     * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
+     * 
+     * @return true if platform supports Geofence
+     */ 
+    public boolean isGeofenceSupported(){
         return false;
     }
     
@@ -214,4 +342,5 @@ public abstract class LocationManager {
     public boolean isGPSEnabled(){
         throw new RuntimeException("GPS Detection is not supported");
     }
+
 }

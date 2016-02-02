@@ -169,7 +169,7 @@ public class RSSReader extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
@@ -320,21 +320,21 @@ public class RSSReader extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"limit", "url", "blockList", "progressTitle", "displayProgressPercentage", "target"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {Integer.class, String.class, Boolean.class, String.class, Boolean.class, Container.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("limit")) {
@@ -372,7 +372,7 @@ public class RSSReader extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("limit")) {

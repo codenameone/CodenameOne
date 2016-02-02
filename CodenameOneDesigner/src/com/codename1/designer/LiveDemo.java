@@ -24,9 +24,22 @@ package com.codename1.designer;
 
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.List;
 import com.codename1.ui.RadioButton;
+import com.codename1.ui.Slider;
+import com.codename1.ui.Tabs;
+import com.codename1.ui.TextField;
+import com.codename1.ui.Toolbar;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
 /**
@@ -41,12 +54,40 @@ public class LiveDemo {
     
     public void start() {
         Form previewForm = new Form("Preview Theme");
-        previewForm.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-        previewForm.addComponent(new Label("This is a Label"));
-        previewForm.addComponent(new Button("This is a Button"));
-        previewForm.addComponent(new CheckBox("This is a CheckBox"));
-        previewForm.addComponent(new RadioButton("This is a Radio Button"));
-        previewForm.addComponent(new CheckBox("This is a CheckBox"));
+        
+        previewForm.setLayout(new BorderLayout());
+        
+        Container first = new Container(new BoxLayout(BoxLayout.Y_AXIS));
+        first.addComponent(new Label("This is a Label"));
+        first.addComponent(new Button("This is a Button"));
+        TextField txt = new TextField();
+        txt.setHint("This is a TextField");
+        first.addComponent(txt);
+        first.addComponent(new CheckBox("This is a CheckBox"));
+        RadioButton rb1 = new RadioButton("This is a Radio Button 1");
+        rb1.setGroup("group");
+        first.addComponent(rb1);
+        RadioButton rb2 = new RadioButton("This is a Radio Button 2");
+        rb2.setGroup("group");
+        first.addComponent(rb2);
+        final Slider s = new Slider();
+        s.setText("50%");
+        s.setProgress(50);
+        s.setEditable(true);
+        s.setRenderPercentageOnTop(true);
+        first.addComponent(s);
+        
+        Button b1 = new Button("Show a Dialog");
+        b1.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                Dialog.show("Dialog Title", "Dialog Body", "Ok", "Cancel");
+            }
+        });
+        first.addComponent(b1);
+        
+        previewForm.add(BorderLayout.CENTER, first);
         previewForm.show();
     }
 

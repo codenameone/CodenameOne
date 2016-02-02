@@ -6,6 +6,9 @@
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
+extern int CN1modelViewMatrixVersion;
+extern int CN1projectionMatrixVersion;
+extern int CN1transformMatrixVersion;
 extern GLuint CN1activeProgram;
 static GLuint program=0;
 static GLuint vertexShader;
@@ -24,6 +27,9 @@ static const GLshort textureCoordinates[] = {
     1, 0,
 };
 
+static int currentCN1modelViewMatrixVersion=-1;
+static int currentCN1projectionMatrixVersion=-1;
+static int currentCN1transformMatrixVersion=-1;
 
 static NSString *fragmentShaderSrc =
 @"precision highp float;\n"
@@ -103,21 +109,21 @@ static GLuint getOGLProgram(){
     
     //_glEnable(GL_TEXTURE_2D);
     
-    float w = width;
-    float h = height;
-    float actualImageWidth = [img getImage].size.width;
-    float actualImageHeight = [img getImage].size.height;
-    float actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
-    float actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+    //float w = width;
+    //float h = height;
+    GLfloat actualImageWidth = [img getImage].size.width;
+    GLfloat actualImageHeight = [img getImage].size.height;
+    GLfloat actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+    GLfloat actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
     GLuint tex = [img getTexture:(int)actualImageWidth texHeight:(int)actualImageHeight];
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
     glBindTexture(GL_TEXTURE_2D, tex);
     GLErrorLog;
-    float blankPixelsW = actualImageWidthP2 - actualImageWidth;
-    float blankPixelsH = actualImageHeightP2 - actualImageHeight;
-    w += ceil(blankPixelsW * w / actualImageWidth);//nextPowerOf2(w);//actualImageWidthP2 - actualImageWidth;
-    h += ceil(blankPixelsH * h/ actualImageHeight); //nextPowerOf2(h);//actualImageHeightP2 - actualImageHeight;
+    //float blankPixelsW = actualImageWidthP2 - actualImageWidth;
+    //float blankPixelsH = actualImageHeightP2 - actualImageHeight;
+    //w += ceil(blankPixelsW * w / actualImageWidth);//nextPowerOf2(w);//actualImageWidthP2 - actualImageWidth;
+    //h += ceil(blankPixelsH * h/ actualImageHeight); //nextPowerOf2(h);//actualImageHeightP2 - actualImageHeight;
     
     // offset from y coord... to deal with differences between simulator and
     // device
@@ -125,14 +131,27 @@ static GLuint getOGLProgram(){
 #if TARGET_IPHONE_SIMULATOR
     // for some lame reason, the simulator positions things just a tad different
     // than the device.  This is an attempt to play an out-of-tune piano.
-    dy=0.5;
+    dy=0;  // WTF:  Now the simulator seems to work correctly without a differential
+           // And have problems with a differential.
 #endif
     
     GLfloat vertexes[] = {
         x, y+dy,
-        x + w, y+dy,
-        x, y + h,
-        x + w, y + h
+        x + width, y+dy,
+        x, y + height,
+        x + width, y + height
+    };
+    
+    GLfloat nY = 1.0;
+    GLfloat wX = 0;
+    GLfloat sY = 1.0 - actualImageHeight / actualImageHeightP2;
+    GLfloat eX = actualImageWidth/actualImageWidthP2;
+    
+    GLfloat textureCoordinates[] = {
+        wX, nY,
+        eX, nY,
+        wX, sY,
+        eX, sY
     };
     //NSLog(@"drawImage(%i, %i, %i, %i, %i, %i)", x, y, w, h, width, height);
     
@@ -153,15 +172,25 @@ static GLuint getOGLProgram(){
     glEnableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
 
-    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
+    glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, textureCoordinates);
     GLErrorLog;
     
-    glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
-    GLErrorLog;
+    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
+        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
+        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
+    
+        GLErrorLog;
+    }
+    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
+        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
+        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
+        GLErrorLog;
+    }
+    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
+        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
+        GLErrorLog;
+        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
+    }
     
     glUniform1i(textureUniform, 0);
     GLErrorLog;

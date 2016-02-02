@@ -33,7 +33,7 @@ static BOOL firstTime=YES;
 
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 extern UIView *editingComponent;
-extern BOOL vkbAlwaysOpen;
+extern BOOL isVKBAlwaysOpen();
 extern void repaintUI();
 
 @interface EAGLView (PrivateMethods)
@@ -254,7 +254,7 @@ extern BOOL isRetinaBug();
         } else {
             stringEdit(YES, -2, ((UITextField*)editingComponent).text);
         }
-        if(vkbAlwaysOpen) {
+        if(isVKBAlwaysOpen()) {
             com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         } else {
             [editingComponent resignFirstResponder];
@@ -279,7 +279,7 @@ extern BOOL isRetinaBug();
         } else {
             stringEdit(YES, -2, ((UITextField*)editingComponent).text);
         }
-        if(vkbAlwaysOpen) {
+        if(isVKBAlwaysOpen()) {
             com_codename1_impl_ios_TextEditUtil_editNextTextArea__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         } else {
             [editingComponent resignFirstResponder];
@@ -339,7 +339,7 @@ extern int currentlyEditingMaxLength;
         }
         //if there is one then goto the edit next textarea
         //com_codename1_impl_ios_TextEditUtil_editNextTextArea__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-        if(vkbAlwaysOpen) {
+        if(isVKBAlwaysOpen()) {
             com_codename1_impl_ios_TextEditUtil_editNextTextArea__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         } else {
             [editingComponent resignFirstResponder];

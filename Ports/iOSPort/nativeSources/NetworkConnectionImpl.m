@@ -36,6 +36,7 @@ int connections = 0;
 {
     self = [super init];
     if (self) {
+        chunkedStreamingLen = -1;
         contentLength = -1;
         request = nil;
         allHeaderFields = nil;
@@ -75,6 +76,13 @@ int connections = 0;
     [request setHTTPMethod:mtd];
 }
 
+-(void)setChunkedStreamingLen:(int)len {
+    chunkedStreamingLen = len;
+    if (!isIOS8() && len > -1) {
+        NSLog(@"Attempt to set chunked streaming mode detected.  Chunked streaming mode is only supported in iOS 8 and higher");
+    }
+}
+
 - (int)getResponseCode {
     return responseCode;
 }
@@ -101,7 +109,7 @@ int connections = 0;
 
 -(void)setBody:(NSString*)file {
 #ifdef __IPHONE_8_0
-    if (isIOS8()) {
+    if (isIOS8() && chunkedStreamingLen > -1) {
         NSInputStream * input = [NSInputStream inputStreamWithFileAtPath:fixFilePath(file)];
         [request setHTTPBodyStream: input];
      } else {

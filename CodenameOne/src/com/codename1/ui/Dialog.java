@@ -40,19 +40,31 @@ import java.util.Hashtable;
 import java.util.Map;
 
 /**
- * A dialog is a form that occupies a part of the screen and appears as a modal
+ * <p>A dialog is a form that occupies a part of the screen and appears as a modal
  * entity to the developer. Dialogs allow us to prompt users for information and
- * rely on the information being available on the next line after the show method.
+ * rely on the information being available on the next line after the show method.</p>
  * <p>Modality indicates that a dialog will block the calling thread even if the
  * calling thread is the EDT. Notice that a dialog will not release the block
- * until dispose is called even if show() from another form is called!
+ * until dispose is called even if show() from another form is called! Events are still performed thanks
+ * to the <code>invokeAndBlock</code> capability of the <code>Display</code> class.</p>
  * <p>To determine the size of the dialog use the show method that accepts 4 integer
  * values, notice that these values accept margin from the four sides rather than x, y, width
- * and height values!
- * <p>To style the dialog you would usually want to style the content pane rather than
- * the dialog itself.
+ * and height values!</p>
+ * <p>To style the dialog its important to either use the <code>getDialogStyle()</code> or 
+ * <code>setDialogUIID</code> methods rather than styling the dialog object directly.</p>
+ * <p>
+ * The <code>Dialog</code> class also includes support for popup dialog which is a dialog type that is positioned
+ * next to a component or screen area and points an arrow at that location. 
+ * </p>
+ * 
+ * <p>Typical dialog usage looks like this:</p>
+ * <script src="https://gist.github.com/codenameone/bbf5378aec028230ce93.js"></script>
+ * 
+ * <p>See this sample for showing a dialog at the bottom of the screen:</p>
+ * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
  *
  * @author Shai Almog
+ * @see Display#invokeAndBlock(java.lang.Runnable) 
  */
 public class Dialog extends Form {
 
@@ -169,9 +181,20 @@ public class Dialog extends Form {
 
     private boolean disposeWhenPointerOutOfBounds = false;
     private boolean pressedOutOfBounds;
+    
+    /**
+     * Returns true if the dialog was disposed automatically due to device rotation
+     */
+    private boolean disposedDueToRotation;
     private Label dialogTitle;
     private Container dialogContentPane;
 
+    /**
+     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     */
+    private Boolean popupDirectionBiasPortrait;
+    
     /**
      * Constructs a Dialog with a title
      * 
@@ -204,6 +227,7 @@ public class Dialog extends Form {
         super.getTitleComponent().setVisible(false);
         super.getTitleArea().setVisible(false);
         super.getTitleArea().setUIID("Container");
+        lockStyleImages(getUnselectedStyle());
         titleArea.setVisible(false);
 
         dialogContentPane = new Container();
@@ -227,56 +251,56 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Layout getLayout() {
         return dialogContentPane.getLayout();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getTitle() {
         return dialogTitle.getText();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Component cmp) {
         dialogContentPane.addComponent(cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Object constraints, Component cmp) {
         dialogContentPane.addComponent(constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Object constraints, Component cmp) {
         dialogContentPane.addComponent(index, constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Component cmp) {
         dialogContentPane.addComponent(index, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeAll() {
         dialogContentPane.removeAll();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeComponent(Component cmp) {
         dialogContentPane.removeComponent(cmp);
@@ -284,21 +308,21 @@ public class Dialog extends Form {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Label getTitleComponent() {
         return dialogTitle;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Style getTitleStyle() {
         return dialogTitle.getStyle();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setLayout(Layout layout) {
         dialogContentPane.setLayout(layout);
@@ -309,14 +333,14 @@ public class Dialog extends Form {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitle(String title) {
         dialogTitle.setText(title);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitleComponent(Label title) {
         super.getContentPane().removeComponent(dialogTitle);
@@ -336,7 +360,7 @@ public class Dialog extends Form {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitleComponent(Label title, Transition t) {
         super.getContentPane().replace(dialogTitle, title, t);
@@ -416,13 +440,15 @@ public class Dialog extends Form {
     }
 
     /**
-     * This method shows the form as a modal alert allowing us to produce a behavior
+     * <p>This method shows the form as a modal alert allowing us to produce a behavior
      * of an alert/dialog box. This method will block the calling thread even if the
      * calling thread is the EDT. Notice that this method will not release the block
-     * until dispose is called even if show() from another form is called!
+     * until dispose is called even if show() from another form is called!</p>
      * <p>Modal dialogs Allow the forms "content" to "hang in mid air" this is especially useful for
      * dialogs where you would want the underlying form to "peek" from behind the 
-     * form. 
+     * form. </p>
+     * See this sample for showing a dialog at the bottom of the screen:
+     * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
      * 
      * @param top space in pixels between the top of the screen and the form
      * @param bottom space in pixels between the bottom of the screen and the form
@@ -542,10 +568,11 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void sizeChangedInternal(int w, int h) {
         if(disposeOnRotation) {
+            disposedDueToRotation = true;
             dispose();
             Form frm = getPreviousForm();
             if(frm != null){
@@ -570,105 +597,7 @@ public class Dialog extends Form {
      */
     protected void autoAdjust(int w, int h) {
         if (autoAdjustDialogSize) {
-            Component contentPane = super.getContentPane();
-            Component title = super.getTitleComponent();
-            int prefHeight = contentPane.getPreferredH();
-            int prefWidth = contentPane.getPreferredW();
-            Style contentPaneStyle = contentPane.getStyle();
-            Style titleStyle = title.getStyle();
-
-            // if the dialog is packed we can scale it far more accurately based on intention
-            if (position != null) {
-                int menuHeight = 0;
-                if (getSoftButtonCount() > 1) {
-                    Component menuBar = getSoftButton(0).getParent();
-                    Style menuStyle = menuBar.getStyle();
-                    menuHeight = menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
-                }
-                prefWidth = Math.min(prefWidth, w);
-                h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
-                int topBottom = Math.max(0, (h - prefHeight) / 2);
-                int leftRight = Math.max(0, (w - prefWidth) / 2);
-                int top = topBottom, bottom = topBottom;
-                int left = leftRight, right = leftRight;
-
-                if (position.equals(BorderLayout.EAST)) {
-                    left = Math.max(0, w - prefWidth);
-                    right = 0;
-                } else {
-                    if (position.equals(BorderLayout.WEST)) {
-                        right = 0;
-                        left = Math.max(0, w - prefWidth);
-                    } else {
-                        if (position.equals(BorderLayout.NORTH)) {
-                            top = 0;
-                            bottom = Math.max(0, h - prefHeight);
-                        } else {
-                            if (position.equals(BorderLayout.SOUTH)) {
-                                top = Math.max(0, h - prefHeight);
-                                bottom = 0;
-                            }
-                        }
-                    }
-                }
-
-                titleStyle.setMargin(Component.TOP, 0, true);
-                titleStyle.setMargin(Component.BOTTOM, 0, true);
-                titleStyle.setMargin(Component.LEFT, 0, true);
-                titleStyle.setMargin(Component.RIGHT, 0, true);
-
-                contentPaneStyle.setMargin(Component.TOP, top, true);
-                contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                contentPaneStyle.setMargin(Component.LEFT, left, true);
-                contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                return;
-            } else {
-                int oldW = getWidth();
-                int oldH = getHeight();
-                if (oldW != w || oldH != h) {
-                    // try to preserve the old size of the dialog if we still have room for it...
-                    if(prefWidth <= w && prefHeight <= h) {
-                        float oldLeftRightDistRatio = 1;
-                        if(left + right != 0) {
-                            oldLeftRightDistRatio = ((float)left) / ((float)left + right);
-                        }
-                        float oldTopBottomDistRatio = 1;
-                        if(left + right != 0) {
-                            oldTopBottomDistRatio = ((float)top) / ((float)top + bottom);
-                        }
-                        top = Math.max(0, (int)((h - prefHeight) * oldTopBottomDistRatio));
-                        left = Math.max(0, (int)((w - prefWidth) * oldLeftRightDistRatio));
-                        bottom = Math.max(0, (h - prefHeight) - top);
-                        right = Math.max(0, (w - prefWidth) - left);
-
-                        titleStyle.setMargin(Component.TOP, 0, true);
-                        titleStyle.setMargin(Component.BOTTOM, 0, true);
-                        titleStyle.setMargin(Component.LEFT, 0, true);
-                        titleStyle.setMargin(Component.RIGHT, 0, true);
-
-                        contentPaneStyle.setMargin(Component.TOP, top, true);
-                        contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
-                        contentPaneStyle.setMargin(Component.LEFT, left, true);
-                        contentPaneStyle.setMargin(Component.RIGHT, right, true);
-                        return;
-                    } else {
-                        float ratioW = ((float) w) / ((float) oldW);
-                        float ratioH = ((float) h) / ((float) oldH);
-
-                        Style s = getDialogStyle();
-
-                        s.setMargin(TOP, (int) (s.getMargin(false, TOP) * ratioH));
-                        s.setMargin(BOTTOM, (int) (s.getMargin(false, BOTTOM) * ratioH));
-                        s.setMargin(LEFT, (int) (s.getMargin(isRTL(), LEFT) * ratioW));
-                        s.setMargin(RIGHT, (int) (s.getMargin(isRTL(), RIGHT) * ratioW));
-
-                        titleStyle.setMargin(TOP, (int) (titleStyle.getMargin(false, TOP) * ratioH));
-                        titleStyle.setMargin(LEFT, (int) (titleStyle.getMargin(isRTL(), LEFT) * ratioW));
-                        titleStyle.setMargin(RIGHT, (int) (titleStyle.getMargin(isRTL(), RIGHT) * ratioW));
-                        return;
-                    }
-                }
-            }
+            growOrShrinkImpl(w, h);
         }
     }
     
@@ -803,7 +732,7 @@ public class Dialog extends Form {
      * will dispose the form
      * @return the command pressed by the user
      */
-    public static Command show(String title, Component body, Command[] cmds) {
+    public static Command show(String title, Component body, Command... cmds) {
         return show(title, body, cmds, defaultDialogType, null);
     }
 
@@ -917,19 +846,19 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         if(commandsAsButtons) {
             if(MenuBar.isLSK(keyCode)) {
                 if(buttonCommands != null && buttonCommands.length > 0) {
-                    dispatchCommand(buttonCommands[0], new ActionEvent(buttonCommands[0]));
+                    dispatchCommand(buttonCommands[0], new ActionEvent(buttonCommands[0],ActionEvent.Type.KeyRelease));
                     return;
                 }
             }
             if(MenuBar.isRSK(keyCode)) {
                 if(buttonCommands != null && buttonCommands.length > 1) {
-                    dispatchCommand(buttonCommands[1], new ActionEvent(buttonCommands[1]));
+                    dispatchCommand(buttonCommands[1], new ActionEvent(buttonCommands[1],ActionEvent.Type.KeyRelease));
                     return;
                 }
             }
@@ -992,7 +921,7 @@ public class Dialog extends Form {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void onShow() {
         if (dialogType > 0) {
@@ -1001,24 +930,26 @@ public class Dialog extends Form {
     }
 
     void onShowCompletedImpl() {
+        pressedOutOfBounds = false;
+        disposedDueToRotation = false;
         onShowCompleted();
         if(isDisposed()) {
             disposeImpl();
         }
         if (showListener != null) {
-            showListener.fireActionEvent(new ActionEvent(this));
+            showListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Show));
         }
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void showBack() {
         showImpl(true);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
@@ -1202,7 +1133,12 @@ public class Dialog extends Form {
         int y = 0;
         Command result;
 
-        boolean showPortrait = Display.getInstance().isPortrait();
+        boolean showPortrait;
+        if(popupDirectionBiasPortrait != null) {
+            showPortrait = popupDirectionBiasPortrait.booleanValue();
+        } else {
+            showPortrait = Display.getInstance().isPortrait();
+        }
 
         // if we don't have enough space then disregard device orientation
         if(showPortrait) {
@@ -1486,7 +1422,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         isTimedOut();
@@ -1718,7 +1654,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
@@ -1732,7 +1668,7 @@ public class Dialog extends Form {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
@@ -1743,6 +1679,14 @@ public class Dialog extends Form {
         }else{
             pressedOutOfBounds = false;        
         }
+    }
+
+    /**
+     * Returns true if a dialog that was disposed did it because of a pointer out of bounds
+     * @return true when a dialog was disposed due to pointer out of bounds.
+     */
+    public boolean wasDisposedDueToOutOfBoundsTouch() {
+        return pressedOutOfBounds;
     }
     
     /**
@@ -1768,7 +1712,7 @@ public class Dialog extends Form {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void repaint(Component cmp) {
         if(getParent() != null){
@@ -1779,5 +1723,141 @@ public class Dialog extends Form {
             Display.getInstance().repaint(cmp);
         }
     }
-    
+
+    /**
+     * Allows a dialog component to grow or shrink to its new preferred size
+     */
+    public void growOrShrink() {
+        getDialogComponent().setShouldCalcPreferredSize(true);
+        growOrShrinkImpl(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+        forceRevalidate();
+    }
+
+    private void growOrShrinkImpl(int w, int h) {
+        Component contentPane = super.getContentPane();
+        Component title = super.getTitleComponent();
+        int prefHeight = contentPane.getPreferredH();
+        int prefWidth = contentPane.getPreferredW();
+        Style contentPaneStyle = contentPane.getStyle();
+        Style titleStyle = title.getStyle();
+
+        // if the dialog is packed we can scale it far more accurately based on intention
+        if (position != null) {
+            int menuHeight = 0;
+            if (getSoftButtonCount() > 1) {
+                Component menuBar = getSoftButton(0).getParent();
+                Style menuStyle = menuBar.getStyle();
+                menuHeight = menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
+            }
+            prefWidth = Math.min(prefWidth, w);
+            h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
+            int topBottom = Math.max(0, (h - prefHeight) / 2);
+            int leftRight = Math.max(0, (w - prefWidth) / 2);
+            int top = topBottom, bottom = topBottom;
+            int left = leftRight, right = leftRight;
+
+            if (position.equals(BorderLayout.EAST)) {
+                left = Math.max(0, w - prefWidth);
+                right = 0;
+            } else {
+                if (position.equals(BorderLayout.WEST)) {
+                    right = 0;
+                    left = Math.max(0, w - prefWidth);
+                } else {
+                    if (position.equals(BorderLayout.NORTH)) {
+                        top = 0;
+                        bottom = Math.max(0, h - prefHeight);
+                    } else {
+                        if (position.equals(BorderLayout.SOUTH)) {
+                            top = Math.max(0, h - prefHeight);
+                            bottom = 0;
+                        }
+                    }
+                }
+            }
+
+            titleStyle.setMargin(Component.TOP, 0, true);
+            titleStyle.setMargin(Component.BOTTOM, 0, true);
+            titleStyle.setMargin(Component.LEFT, 0, true);
+            titleStyle.setMargin(Component.RIGHT, 0, true);
+
+            contentPaneStyle.setMargin(Component.TOP, top, true);
+            contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
+            contentPaneStyle.setMargin(Component.LEFT, left, true);
+            contentPaneStyle.setMargin(Component.RIGHT, right, true);
+            return;
+        } else {
+            int oldW = getWidth();
+            int oldH = getHeight();
+            if (oldW != w || oldH != h) {
+                // try to preserve the old size of the dialog if we still have room for it...
+                if(prefWidth <= w && prefHeight <= h) {
+                    float oldLeftRightDistRatio = 1;
+                    if(left + right != 0) {
+                        oldLeftRightDistRatio = ((float)left) / ((float)left + right);
+                    }
+                    float oldTopBottomDistRatio = 1;
+                    if(left + right != 0) {
+                        oldTopBottomDistRatio = ((float)top) / ((float)top + bottom);
+                    }
+                    top = Math.max(0, (int)((h - prefHeight) * oldTopBottomDistRatio));
+                    left = Math.max(0, (int)((w - prefWidth) * oldLeftRightDistRatio));
+                    bottom = Math.max(0, (h - prefHeight) - top);
+                    right = Math.max(0, (w - prefWidth) - left);
+
+                    titleStyle.setMargin(Component.TOP, 0, true);
+                    titleStyle.setMargin(Component.BOTTOM, 0, true);
+                    titleStyle.setMargin(Component.LEFT, 0, true);
+                    titleStyle.setMargin(Component.RIGHT, 0, true);
+
+                    contentPaneStyle.setMargin(Component.TOP, top, true);
+                    contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);
+                    contentPaneStyle.setMargin(Component.LEFT, left, true);
+                    contentPaneStyle.setMargin(Component.RIGHT, right, true);
+                    return;
+                } else {
+                    float ratioW = ((float) w) / ((float) oldW);
+                    float ratioH = ((float) h) / ((float) oldH);
+
+                    Style s = getDialogStyle();
+
+                    s.setMargin(TOP, (int) (s.getMargin(false, TOP) * ratioH));
+                    s.setMargin(BOTTOM, (int) (s.getMargin(false, BOTTOM) * ratioH));
+                    s.setMargin(LEFT, (int) (s.getMargin(isRTL(), LEFT) * ratioW));
+                    s.setMargin(RIGHT, (int) (s.getMargin(isRTL(), RIGHT) * ratioW));
+
+                    titleStyle.setMargin(TOP, (int) (titleStyle.getMargin(false, TOP) * ratioH));
+                    titleStyle.setMargin(LEFT, (int) (titleStyle.getMargin(isRTL(), LEFT) * ratioW));
+                    titleStyle.setMargin(RIGHT, (int) (titleStyle.getMargin(isRTL(), RIGHT) * ratioW));
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     * @return the popupDirectionBiasPortrait
+     */
+    public Boolean getPopupDirectionBiasPortrait() {
+        return popupDirectionBiasPortrait;
+    }
+
+    /**
+     * Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+     * its set to a value it biases the system towards a fixed direction for the popup dialog.
+     * @param popupDirectionBiasPortrait the popupDirectionBiasPortrait to set
+     */
+    public void setPopupDirectionBiasPortrait(Boolean popupDirectionBiasPortrait) {
+        this.popupDirectionBiasPortrait = popupDirectionBiasPortrait;
+    }
+
+    /**
+     * Returns true if the dialog was disposed automatically due to device rotation
+     * @return the disposedDueToRotation value
+     */
+    public boolean wasDisposedDueToRotation() {
+        return disposedDueToRotation;
+    }
 }

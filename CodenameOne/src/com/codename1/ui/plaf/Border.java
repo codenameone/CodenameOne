@@ -102,6 +102,8 @@ public class Border {
 
     private static Border empty;
     
+    private boolean emptyType;
+    
     /**
      * Prevents usage of new operator, use the factory methods in the class or subclass
      * to create new border types.
@@ -239,7 +241,17 @@ public class Border {
      * @return a border than draws nothing
      */
     public static Border createEmpty() {
-        return new Border();
+        Border b = new Border();
+        b.emptyType = true;
+        return b;
+    }
+    
+    /**
+     * Indicates whether this is an empty border
+     * @return true if this is an empty border
+     */
+    public boolean isEmptyBorder() {
+        return emptyType;
     }
     
     /**
@@ -724,7 +736,7 @@ public class Border {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean equals(Object obj) {
         if (obj != null && obj.getClass() == getClass()) {
@@ -753,7 +765,8 @@ public class Border {
                 (isSame(outerBorder, b.outerBorder))
                 );
             if(v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {
-                for(int iter = 0 ; iter < images.length ; iter++) {
+                int ilen = images.length;
+                for(int iter = 0 ; iter < ilen ; iter++) {
                     if(images[iter] != b.images[iter]) {
                         return false;
                     }
@@ -1097,7 +1110,8 @@ public class Border {
                             p.paint(bgPaint.getGraphics(), new Rectangle(0, 0, width, height));
                             imageRGB = bgPaint.getRGB();
                         }
-                        for(int iter = 0 ; iter < rgb.length ; iter++) {
+                        int rlen = rgb.length;
+                        for(int iter = 0 ; iter < rlen ; iter++) {
                             if(rgb[iter] == transColor) {
                                 imageRGB[iter] = 0;
                             }
@@ -1161,10 +1175,6 @@ public class Border {
                 }
                 break;
             case TYPE_IMAGE: {
-                int clipX = g.getClipX();
-                int clipY = g.getClipY();
-                int clipWidth = g.getClipWidth();
-                int clipHeight = g.getClipHeight();
                 Image topLeft = images[4]; 
                 Image topRight = images[5];
                 Image bottomLeft = images[6];
@@ -1173,16 +1183,13 @@ public class Border {
                 y += topLeft.getHeight();
                 height -= (topLeft.getHeight() + bottomLeft.getHeight());
                 width -= (topLeft.getWidth() + topRight.getWidth());
-                g.clipRect(x, y, width, height);
                 if(center != null){
                     g.tileImage(center, x, y, width, height);
                 }
                 Image top = images[0];  Image bottom = images[1];
                 Image left = images[2]; Image right = images[3];
                 Image bottomRight = images[7];
-                
-                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
-                
+                                
                 x = xParameter;
                 y = yParameter;
                 width = widthParameter;
@@ -1230,16 +1237,11 @@ public class Border {
                     }
                 }
 
-                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderLine(g, topLeft, topRight, top, x, y, width, arrowUpImage, arrowPosition, false);
-                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderLine(g, bottomLeft, bottomRight, bottom, x, y + height - bottom.getHeight(), width, arrowDownImage, arrowPosition, true);
-                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderColumn(g, topLeft, bottomLeft, left, x, y, height, arrowLeftImage, arrowPosition, false);
-                setClipScaled(g, clipX, clipY, clipWidth, clipHeight);
                 drawImageBorderColumn(g, topRight, bottomRight, right, x + width - right.getWidth(), y, height, arrowRightImage, arrowPosition, true);
                                 
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
                 break;
             }
             case TYPE_IMAGE_SCALED: {
@@ -1289,11 +1291,6 @@ public class Border {
                 break;
             }
             case TYPE_IMAGE_HORIZONTAL: {
-                int clipX = g.getClipX();
-                int clipY = g.getClipY();
-                int clipWidth = g.getClipWidth();
-                int clipHeight = g.getClipHeight();
-                //g.pushClip();
                 Image left = images[0];
                 Image right = images[1];
                 Image center = images[2];
@@ -1304,37 +1301,16 @@ public class Border {
 
                 g.drawImage(left, x, y);
                 g.drawImage(right, x + width - right.getWidth(), y);
-                x += left.getWidth();
-                width -= (left.getWidth() + right.getWidth());
-                g.clipRect(x, y, width, height);
-                int centerWidth = center.getWidth();
-                for(int xCount = x ; xCount < x + width ; xCount += centerWidth) {
-                    g.drawImage(center, xCount, y);
-                }
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
-                //g.popClip();
+                g.tileImage(center, x + left.getWidth(), y, width - left.getWidth() - right.getWidth(), center.getHeight());
                 break;
             }
             case TYPE_IMAGE_VERTICAL: {
-                int clipX = g.getClipX();
-                int clipY = g.getClipY();
-                int clipWidth = g.getClipWidth();
-                int clipHeight = g.getClipHeight();
-                //g.pushClip();
                 Image top = images[0];
                 Image bottom = images[1];
                 Image center = images[2];
                 g.drawImage(top, x, y);
                 g.drawImage(bottom, x, y + height - bottom.getHeight());
-                y += top.getHeight();
-                height -= (top.getHeight() + bottom.getHeight());
-                g.clipRect(x, y, width, height);
-                int centerHeight = center.getHeight();
-                for(int yCount = y ; yCount < y + height ; yCount += centerHeight) {
-                    g.drawImage(center, x, yCount);
-                }
-                g.setClip(clipX, clipY, clipWidth, clipHeight);
-                //g.popClip();
+                g.tileImage(center, x, y + top.getHeight(), center.getWidth(), height - top.getHeight() - bottom.getHeight());
                 break;
             }
         }
@@ -1669,66 +1645,31 @@ public class Border {
     }
     
     private void drawImageBorderLine(Graphics g, Image left, Image right, Image center, final int x, int y, int width, Image arrow, int imagePosition, boolean farEdge) {
-        int currentWidth = width - right.getWidth();
-        if(currentWidth > 0) {
-            int currentX = x;
-            currentX += left.getWidth();
-            int cx = g.getClipX();
-            int cy = g.getClipY();
-            int cw = g.getClipWidth();
-            int ch = g.getClipHeight();
-            //g.pushClip();
-            g.clipRect(currentX, y, currentWidth - left.getWidth(), center.getHeight());
+        if(width - right.getWidth() > 0) {
+            g.tileImage(center, x + left.getWidth(), y, width - right.getWidth() - left.getWidth(), center.getHeight());
             if(arrow != null) {
-                int destX = currentX + currentWidth;
-                int centerWidth = center.getWidth();
-                for(; currentX < destX ; currentX += centerWidth) {
-                    g.drawImage(center, currentX, y);
-                }
                 imagePosition = Math.max(imagePosition, left.getWidth());
-                imagePosition = Math.min(imagePosition, destX - x - arrow.getWidth() - right.getWidth());
-                g.setClip(cx, cy, cw, ch);
-                //g.popClip();
+                imagePosition = Math.min(imagePosition, width - arrow.getWidth() - right.getWidth());
                 if(farEdge) {
                     g.drawImage(arrow, x + imagePosition, y + center.getHeight() - arrow.getHeight());
                 } else {
                     g.drawImage(arrow, x + imagePosition, y);
                 }
-            } else {
-                g.tileImage(center, currentX, y, currentWidth, center.getHeight());
-                //g.popClip();
             }
         }
     }
 
     private void drawImageBorderColumn(Graphics g, Image top, Image bottom, Image center, int x, final int y, int height, Image arrow, int imagePosition, boolean farEdge) {
-        int currentHeight = height - bottom.getHeight();
-        if(currentHeight > 0) {
-            int currentY = y + top.getHeight();
-            int cx = g.getClipX();
-            int cy = g.getClipY();
-            int cw = g.getClipWidth();
-            int ch = g.getClipHeight();
-            //g.pushClip();
-            g.clipRect(x, currentY, center.getWidth(), currentHeight - top.getHeight());
+        if(height - bottom.getHeight() > 0) {
+            g.tileImage(center, x, y + top.getHeight(), center.getWidth(), height - top.getHeight() - bottom.getHeight());
             if(arrow != null) {
-                int destY = currentY + currentHeight;
-                int centerHeight = center.getHeight();
-                for(; currentY < destY ; currentY += centerHeight) {
-                    g.drawImage(center, x, currentY);
-                }
                 imagePosition = Math.max(imagePosition, top.getHeight());
-                imagePosition = Math.min(imagePosition, destY - y - arrow.getHeight() - bottom.getHeight());
-                g.setClip(cx, cy, cw, ch);
-                //g.popClip();
+                imagePosition = Math.min(imagePosition, height - arrow.getHeight() - bottom.getHeight());
                 if(farEdge) {
                     g.drawImage(arrow, x + center.getWidth() - arrow.getWidth(), y + imagePosition);
                 } else {
                     g.drawImage(arrow, x, y + imagePosition);
                 }
-            } else {
-                g.tileImage(center, x, currentY, center.getWidth(), currentHeight);
-                //g.popClip();
             }
         } 
     }
@@ -1822,7 +1763,8 @@ public class Border {
      */
     public void lock() {
         if(images != null) {
-            for(int iter = 0 ; iter < images.length ; iter++) {
+            int ilen = images.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 if(images[iter] != null) {
                     images[iter].lock();
                 }
@@ -1836,7 +1778,8 @@ public class Border {
      */
     public void unlock() {
         if(images != null) {
-            for(int iter = 0 ; iter < images.length ; iter++) {
+            int ilen = images.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 if(images[iter] != null) {
                     images[iter].unlock();
                 }

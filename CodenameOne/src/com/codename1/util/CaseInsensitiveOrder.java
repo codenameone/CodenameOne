@@ -33,7 +33,7 @@ import java.util.Comparator;
 public class CaseInsensitiveOrder implements Comparator<String> {
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int compare(String s1, String s2) {
         int n1 = s1.length();

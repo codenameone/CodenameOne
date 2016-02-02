@@ -124,7 +124,7 @@ public class TwitterRESTService extends ConnectionRequest {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException  {
         InputStreamReader i = new InputStreamReader(input, "UTF-8");

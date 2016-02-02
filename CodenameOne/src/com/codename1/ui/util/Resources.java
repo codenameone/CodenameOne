@@ -76,6 +76,11 @@ public class Resources {
     static final byte MAGIC_PASSWORD = (byte)0xFE;
 
     /**
+     * This variable is used by new GUI builder apps to keep track of the applications resources
+     */
+    private static Resources globalResources;
+    
+    /**
      * @return the failOnMissingTruetype
      */
     public static boolean isFailOnMissingTruetype() {
@@ -129,6 +134,7 @@ public class Resources {
      */
     private static Object cachedResource;
     private static String lastLoadedName;
+    private static int lastLoadedDPI;
 
     private static boolean runtimeMultiImages;
     
@@ -188,7 +194,8 @@ public class Resources {
         int width = input.readInt();
         int height = input.readInt();
         AnimationObject[] animations = new AnimationObject[input.readShort()];
-        for(int iter = 0 ; iter < animations.length ; iter++) {
+        int alen = animations.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             String name = input.readUTF();
             int startTime = input.readInt();
             int animDuration = input.readInt();
@@ -268,7 +275,8 @@ public class Resources {
             if(password) {
                 magic = (byte)decode(magic & 0xff);
                 char[] chars = id.toCharArray();
-                for(int i = 0 ; i < chars.length ; i++) {
+                int clen = chars.length;
+                for(int i = 0 ; i < clen ; i++) {
                     chars[i] = (char)decode(chars[i] & 0xffff);
                 }
                 id = new String(chars);
@@ -374,7 +382,8 @@ public class Resources {
         minorVersion = input.readShort();
         
         metaData = new String[input.readShort()];
-        for(int iter = 0 ; iter < metaData.length ; iter++) {
+        int mlen = metaData.length;
+        for(int iter = 0 ; iter < mlen ; iter++) {
             metaData[iter] = input.readUTF();
         }
     }
@@ -418,7 +427,8 @@ public class Resources {
     public String[] getResourceNames() {
         String[] arr = new String[resourceTypes.size()];
         Iterator<String> e = resourceTypes.keySet().iterator();
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             arr[iter] = (String)e.next();
         }
         return arr;
@@ -541,7 +551,8 @@ public class Resources {
 
     private static String[] toStringArray(ArrayList<String> v) {
         String[] s = new String[v.size()];
-        for(int iter = 0 ; iter < s.length ; iter++) {
+        int slen = v.size();
+        for(int iter = 0 ; iter < slen ; iter++) {
             s[iter] = (String)v.get(iter);
         }
         return s;
@@ -683,7 +694,8 @@ public class Resources {
         Resources r = open(resource + ".res", dpi);
         
         String[] over = Display.getInstance().getPlatformOverrides();
-        for(int iter = 0 ; iter < over.length ; iter++) {
+        int olen = over.length;
+        for(int iter = 0 ; iter < olen ; iter++) {
             InputStream i = Display.getInstance().getResourceAsStream(classLoader, resource + "_" + over[iter] + ".ovr");
             if(i != null) {
                 r.override(i);
@@ -704,7 +716,7 @@ public class Resources {
      */
     public static Resources open(String resource, int dpi) throws IOException {
         try {
-            if(lastLoadedName != null && lastLoadedName.equals(resource)) {
+            if(lastLoadedName != null && lastLoadedName.equals(resource) && lastLoadedDPI == dpi) {
                 Resources r = (Resources)Display.getInstance().extractHardRef(cachedResource);
                 if(r != null) {
                     return r;
@@ -722,6 +734,7 @@ public class Resources {
                 return r;
             }
             
+            lastLoadedDPI = dpi;
             lastLoadedName = resource;
             cachedResource = Display.getInstance().createSoftWeakRef(r);
             return r;
@@ -909,14 +922,16 @@ public class Resources {
         }
         if(value[0].equals("s")) {
             Image[] images = new Image[value.length - 1];
-            for(int iter = 0 ; iter < images.length ; iter++) {
+            int ilen = images.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 images[iter] = getImage(value[iter + 1]);
             }
            return Border.createImageScaledBorder(images[0], images[1], images[2],
                images[3], images[4], images[5], images[6], images[7], images[8]); 
         }
         Image[] images = new Image[value.length];
-        for(int iter = 0 ; iter < value.length ; iter++) {
+        int vlen = value.length;
+        for(int iter = 0 ; iter < vlen ; iter++) {
             images[iter] = getImage(value[iter]);
         }
         switch(images.length) {
@@ -1264,6 +1279,11 @@ public class Resources {
             // if this is a short numeric value for transparency
             if(key.endsWith("ransparency")) {
                 theme.put(key, "" + (input.readByte() & 0xff));
+                continue;
+            } 
+            
+            if(key.endsWith("opacity")) {
+                theme.put(key, "" + (input.readInt() & 0xff));
                 continue;
             } 
 
@@ -1664,7 +1684,8 @@ public class Resources {
             size = 256;
         }
         int[] palette = new int[size];
-        for(int iter = 0 ; iter < palette.length ; iter++) {
+        int plen = palette.length;
+        for(int iter = 0 ; iter < plen ; iter++) {
             palette[iter] = input.readInt();
         }
         int width = input.readShort();
@@ -1686,5 +1707,23 @@ public class Resources {
             ex.printStackTrace();
         }
         return null;
+    }
+    
+    /**
+     * Global resources are used by new GUI builder apps to keep track of the applications resources
+     * 
+     * @param res the resource object used by default in the GUI builder forms
+     */
+    public static void setGlobalResources(Resources res) {
+        globalResources = res;
+    }
+    
+    /**
+     * Global resources are used by new GUI builder apps to keep track of the applications resources
+     * 
+     * @return the resource object used by default in the GUI builder forms
+     */
+    public static Resources getGlobalResources() {
+        return globalResources;
     }
 }

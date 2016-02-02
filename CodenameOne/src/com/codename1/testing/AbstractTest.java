@@ -34,20 +34,20 @@ import com.codename1.ui.TextArea;
  */
 public abstract class AbstractTest implements UnitTest {
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void prepare() {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void cleanup() {
     }
 
     /**
-     * Defaults to two minutes.<br />
-     * @inheritDoc
+     * Defaults to two minutes.<br>
+     * {@inheritDoc}
      */
     public int getTimeoutMillis() {
         return 120000;
@@ -56,7 +56,7 @@ public abstract class AbstractTest implements UnitTest {
     /**
      * Returns false, default tests run in their own thread.
      *
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean shouldExecuteOnEDT() {
         return false;
@@ -524,6 +524,42 @@ public abstract class AbstractTest implements UnitTest {
      */
     public void assertArrayEqual(Object[] expected, Object[] actual, String errorMessage) {
         TestUtils.assertArrayEqual(expected, actual, errorMessage);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertException(RuntimeException exception, Runnable expression) {
+        TestUtils.assertException(exception, expression);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertException(RuntimeException exception, Runnable expression, String message) {
+        TestUtils.assertException(exception, expression, message);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertNoException(Runnable expression) {
+        TestUtils.assertNoException(expression);
+    }
+
+    /**
+     * This method just invokes the test utils method, it is here for convenience
+     *
+     * @see TestUtils
+     */
+    public void assertNoException(Runnable expression, String message) {
+        TestUtils.assertNoException(expression, message);
     }
 
     /**

@@ -26,10 +26,12 @@ package com.codename1.ui;
 import com.codename1.cloud.BindTarget;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.geom.Point;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -39,16 +41,20 @@ import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 
 /**
- * Base class for all the widgets in the toolkit using the composite pattern in 
- * a similar way to the AWT Container/Component relationship. All components are
- * potentially animated (need to be registered in {@link Display}). 
+ * <p>The component class is the basis of all UI widgets in Codename One, to arrange multiple components 
+ * together we use the Container class which itself "IS A" Component subclass. The Container is a 
+ * Component that contains Components effectively allowing us to nest Containers infinitely to build any type 
+ * of visual hierarchy we want by nesting Containers.
+ * </p>
  * 
+ * @see Container
  * @author Chen Fishbein
  */
 public class Component implements Animation, StyleListener {
@@ -183,6 +189,7 @@ public class Component implements Animation, StyleListener {
     private Style pressedStyle;
     private Style selectedStyle;
     private Style disabledStyle;
+    private Style allStyles;
     private Container parent;
     private boolean focused = false;
     private boolean handlesInput = false;
@@ -299,6 +306,7 @@ public class Component implements Animation, StyleListener {
     EventDispatcher pointerPressedListeners;
     EventDispatcher pointerReleasedListeners;
     EventDispatcher pointerDraggedListeners;
+    boolean isUnselectedStyle;
     
     boolean isDragAndDropInitialized() {
         return dragAndDropInitialized;
@@ -332,6 +340,20 @@ public class Component implements Animation, StyleListener {
                 cc.sameWidth = c;
             }
         }
+    }
+    
+    /**
+     * Returns a "meta style" that allows setting styles once to all the different Style objects, the getters for this
+     * style will be meaningless and will return 0 values. Usage:
+     * 
+     * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
+     * @return a unified style object for the purpose of setting on object object instances
+     */
+    public Style getAllStyles() {
+        if(allStyles == null) {
+            allStyles = Style.createProxyStyle(getUnselectedStyle(), getSelectedStyle(), getPressedStyle(), getDisabledStyle());
+        }
+        return allStyles;
     }
     
     /**
@@ -416,6 +438,7 @@ public class Component implements Animation, StyleListener {
 
     private void initStyle() {
         unSelectedStyle = getUIManager().getComponentStyle(getUIID());
+        lockStyleImages(unSelectedStyle);
         if (unSelectedStyle != null) {
             unSelectedStyle.addStyleListener(this);
             if (unSelectedStyle.getBgPainter() == null) {
@@ -588,7 +611,9 @@ public class Component implements Animation, StyleListener {
      */
     public void setX(int x) {
         bounds.setX(x);
-        onParentPositionChange();
+        if(Form.activePeerCount > 0) {
+            onParentPositionChange();
+        }
     }
 
     /**
@@ -600,7 +625,9 @@ public class Component implements Animation, StyleListener {
      */
     public void setY(int y) {
         bounds.setY(y);
-        onParentPositionChange();
+        if(Form.activePeerCount > 0) {
+            onParentPositionChange();
+        }
     }
     
     /**
@@ -1134,7 +1161,7 @@ public class Component implements Animation, StyleListener {
      * @param g the graphics object
      */
     public void paintBackgrounds(Graphics g) {
-        if(Display.getInstance().getImplementation().shouldPaintBackground()) {
+        if(Display.impl.shouldPaintBackground()) {
             drawPainters(g, this.getParent(), this, getAbsoluteX() + getScrollX(),
                     getAbsoluteY() + getScrollY(),
                     getWidth(), getHeight());
@@ -1245,7 +1272,7 @@ public class Component implements Animation, StyleListener {
 
             g.setClip(oX, oY, oWidth, oHeight);
         } else {
-            Display.getInstance().getImplementation().nothingWithinComponentPaint(this);
+            Display.impl.nothingWithinComponentPaint(this);
         }
     }
 
@@ -1544,8 +1571,8 @@ public class Component implements Animation, StyleListener {
             Border b = par.getBorder();
             if (b.isBackgroundPainter()) {
                 g.translate(-par.getX(), -par.getY());
-                b.paintBorderBackground(g, par);
-                b.paint(g, par);
+                par.paintBorderBackground(g);
+                par.paintBorder(g);
                 g.translate(par.getX() - transX, par.getY() - transY);
                 return;
             }
@@ -1592,8 +1619,9 @@ public class Component implements Animation, StyleListener {
 
     /**
      * Returns the scrollable parent of this component
+     * @return the component itself or its parent which is scrollable
      */
-    protected Component getScrollable() {
+    public Component getScrollable() {
         if(isScrollable()) {
             return this;
         }
@@ -1744,7 +1772,9 @@ public class Component implements Animation, StyleListener {
             scrollXtmp = Math.max(scrollXtmp, 0);
         }
         if (isScrollableX()) {
-            onParentPositionChange();
+            if(Form.activePeerCount > 0) {
+                onParentPositionChange();
+            }
             repaint();
         }
         if(scrollListeners != null){
@@ -1773,7 +1803,7 @@ public class Component implements Animation, StyleListener {
      */
     protected void setScrollY(int scrollY) {
         if(this.scrollY != scrollY) {
-            CodenameOneImplementation ci = Display.getInstance().getImplementation();
+            CodenameOneImplementation ci = Display.impl;
             if(ci.isAsyncEditMode() && ci.isEditingText()) {
                 ci.hideTextEditor();
             }
@@ -1786,16 +1816,18 @@ public class Component implements Animation, StyleListener {
             int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
-        }         
+        }
         if (isScrollableY()) {
-            onParentPositionChange();            
+            if(Form.activePeerCount > 0) {
+                onParentPositionChange();
+            }
             repaint();
         }
         if(scrollListeners != null){
             scrollListeners.fireScrollEvent(this.scrollX, scrollYtmp, this.scrollX, this.scrollY);
         }
         this.scrollY = scrollYtmp;
-        onScrollY(scrollY);
+        onScrollY(this.scrollY);
     }
 
     /**
@@ -2214,6 +2246,18 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Returns the animation manager of the parent form or null if this component isn't currently associated with a form
+     * @return the animation manager instance
+     */
+    public AnimationManager getAnimationManager() {
+        Form f = getComponentForm();
+        if(f == null) {
+            return null;
+        }
+        return f.getAnimationManager();
+    }
+
+    /**
      * Scroll animation speed in milliseconds allowing a developer to slow down or accelerate
      * the smooth animation mode
      * 
@@ -2223,6 +2267,317 @@ public class Component implements Animation, StyleListener {
         return animationSpeed;
     }
 
+    class AnimationTransitionPainter implements Painter{
+        int alpha;
+        Style originalStyle;
+        Style destStyle;
+        Painter original;
+        Painter dest;
+
+        public void paint(Graphics g, Rectangle rect) {
+            int oAlpha = g.getAlpha();
+            if(alpha == 0) {
+                unSelectedStyle = originalStyle;
+                original.paint(g, rect);
+                return;
+            }
+            if(alpha == 255) {
+                unSelectedStyle = destStyle;
+                dest.paint(g, rect);
+                unSelectedStyle = originalStyle;
+                return;
+            }
+            int opa = unSelectedStyle.getBgTransparency() & 0xff;
+            unSelectedStyle.setBgTransparency(255 - alpha);
+            g.setAlpha(255 - alpha);
+            original.paint(g, rect);
+            unSelectedStyle.setBgTransparency(opa);
+            unSelectedStyle = destStyle;
+            opa = unSelectedStyle.getBgTransparency() & 0xff;
+            g.setAlpha(alpha);
+            unSelectedStyle.setBgTransparency(alpha);
+            dest.paint(g, rect);
+            unSelectedStyle.setBgTransparency(opa);
+            unSelectedStyle = originalStyle;
+            g.setAlpha(oAlpha);
+        }        
+    }
+    
+    /**
+     * Creates an animation that will transform the current component to the styling of the destination UIID when
+     * completed. Notice that fonts will only animate within the truetype and native familiy and we recommend that you
+     * don't shift weight/typeface/style as this might diminish the effect.<br>
+     * <b>Important: </b> Only unselected styles are animated but once the animation completes all styles are applied.
+     * @param destUIID the UIID to which this component will gradually shift
+     * @param duration the duration of the animation or the number of steps
+     * @return an animation component that can either be stepped or played
+     */
+    public ComponentAnimation createStyleAnimation(final String destUIID, final int duration) {
+        final Style sourceStyle = getUnselectedStyle();
+        final Style destStyle = getUIManager().getComponentStyle(destUIID);
+        
+        int d = duration;
+        
+        Motion m = null;
+        if(sourceStyle.getFgColor() != destStyle.getFgColor()) {
+            m = Motion.createLinearColorMotion(sourceStyle.getFgColor(), destStyle.getFgColor(), d);
+        }
+        final Motion fgColorMotion = m;
+        m = null;
+        
+        if(sourceStyle.getFont().getHeight() != destStyle.getFont().getHeight() && sourceStyle.getFont().isTTFNativeFont()) {
+            // allows for fractional font sizes
+            m = Motion.createLinearMotion(sourceStyle.getFont().getHeight() * 100, destStyle.getFont().getHeight() * 100, d);
+        }
+
+        final Motion fontMotion = m;
+        m = null;
+
+        if(sourceStyle.getPadding(TOP) != destStyle.getPadding(TOP)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(TOP), destStyle.getPadding(TOP), d);
+        }
+        final Motion paddingTop = m;
+        m = null;
+
+        if(sourceStyle.getPadding(BOTTOM) != destStyle.getPadding(BOTTOM)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(BOTTOM), destStyle.getPadding(BOTTOM), d);
+        }
+        final Motion paddingBottom = m;
+        m = null;
+
+        if(sourceStyle.getPadding(LEFT) != destStyle.getPadding(LEFT)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(LEFT), destStyle.getPadding(LEFT), d);
+        }
+        final Motion paddingLeft = m;
+        m = null;
+
+        if(sourceStyle.getPadding(RIGHT) != destStyle.getPadding(RIGHT)) {
+            m = Motion.createLinearMotion(sourceStyle.getPadding(RIGHT), destStyle.getPadding(RIGHT), d);
+        }
+        final Motion paddingRight = m;
+        m = null;
+
+        if(sourceStyle.getMargin(TOP) != destStyle.getMargin(TOP)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(TOP), destStyle.getMargin(TOP), d);
+        }
+        final Motion marginTop = m;
+        m = null;
+
+        if(sourceStyle.getMargin(BOTTOM) != destStyle.getMargin(BOTTOM)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(BOTTOM), destStyle.getMargin(BOTTOM), d);
+        }
+        final Motion marginBottom = m;
+        m = null;
+
+        if(sourceStyle.getMargin(LEFT) != destStyle.getMargin(LEFT)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(LEFT), destStyle.getMargin(LEFT), d);
+        }
+        final Motion marginLeft = m;
+        m = null;
+
+        if(sourceStyle.getMargin(RIGHT) != destStyle.getMargin(RIGHT)) {
+            m = Motion.createLinearMotion(sourceStyle.getMargin(RIGHT), destStyle.getMargin(RIGHT), d);
+        }
+        final Motion marginRight = m;
+        m = null;
+
+        if(paddingLeft != null || paddingRight != null || paddingTop != null || paddingBottom != null) {
+            // convert the padding to pixels for smooth animation
+            int left = sourceStyle.getPadding(LEFT);
+            int right = sourceStyle.getPadding(RIGHT);
+            int top = sourceStyle.getPadding(TOP);
+            int bottom = sourceStyle.getPadding(BOTTOM);
+            sourceStyle.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+            sourceStyle.setPadding(top, bottom, left, right);
+        }
+        
+        if(marginLeft != null || marginRight != null || marginTop != null || marginBottom != null) {
+            // convert the margin to pixels for smooth animation
+            int left = sourceStyle.getMargin(LEFT);
+            int right = sourceStyle.getMargin(RIGHT);
+            int top = sourceStyle.getMargin(TOP);
+            int bottom = sourceStyle.getMargin(BOTTOM);
+            sourceStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+            sourceStyle.setMargin(top, bottom, left, right);
+        }
+
+        final AnimationTransitionPainter ap = new AnimationTransitionPainter();
+        if(sourceStyle.getBgTransparency() != 0 || destStyle.getBgTransparency() != 0 ||
+                (sourceStyle.getBorder() != null && sourceStyle.getBorder().isEmptyBorder()) || 
+                (destStyle.getBorder() != null && destStyle.getBorder().isEmptyBorder()) || 
+                sourceStyle.getBgImage() != null || destStyle.getBgImage() != null) {
+            ap.original = sourceStyle.getBgPainter();
+            ap.dest = destStyle.getBgPainter();
+            ap.originalStyle = sourceStyle;
+            ap.destStyle = destStyle;
+            if(ap.dest == null) {
+                ap.dest = new BGPainter();
+            }
+            sourceStyle.setBgPainter(ap);
+        }
+        
+        final Motion bgMotion = Motion.createLinearMotion(0, 255, d);
+        
+        return new ComponentAnimation() {
+            private boolean finished;
+            private boolean stepMode;
+            
+            @Override
+            public boolean isStepModeSupported() {
+                return true;
+            }
+
+            @Override
+            public int getMaxSteps() {
+                return duration;
+            }
+
+            
+            @Override
+            public void setStep(int step) {
+                stepMode = true;
+                if(!finished) {
+                    if(bgMotion != null) {
+                        bgMotion.setCurrentMotionTime(step);
+                    }
+                    if(fgColorMotion != null) {
+                        fgColorMotion.setCurrentMotionTime(step);
+                    }
+                    if(fontMotion != null) {
+                        fontMotion.setCurrentMotionTime(step);
+                    }
+                    if(paddingTop != null) {
+                        paddingTop.setCurrentMotionTime(step);
+                    }
+                    if(paddingBottom != null) {
+                        paddingBottom.setCurrentMotionTime(step);
+                    }
+                    if(paddingLeft != null) {
+                        paddingLeft.setCurrentMotionTime(step);
+                    }
+                    if(paddingRight != null) {
+                        paddingRight.setCurrentMotionTime(step);
+                    }
+                    if(marginTop != null) {
+                        marginTop.setCurrentMotionTime(step);
+                    }
+                    if(marginBottom != null) {
+                        marginBottom.setCurrentMotionTime(step);
+                    }
+                    if(marginLeft != null) {
+                        marginLeft.setCurrentMotionTime(step);
+                    }
+                    if(marginRight != null) {
+                        marginRight.setCurrentMotionTime(step);
+                    }
+                }
+                super.setStep(step);
+            }
+            
+            @Override
+            public boolean isInProgress() {
+                return stepMode ||
+                        !((bgMotion == null || bgMotion.isFinished()) && 
+                        (fgColorMotion == null || fgColorMotion.isFinished()) &&
+                        (paddingLeft == null || paddingLeft.isFinished()) &&
+                        (paddingRight == null || paddingRight.isFinished()) &&
+                        (paddingTop == null || paddingTop.isFinished()) &&
+                        (paddingBottom == null || paddingBottom.isFinished()) &&
+                        (marginLeft == null || marginLeft.isFinished()) &&
+                        (marginRight == null || marginRight.isFinished()) &&
+                        (marginTop == null || marginTop.isFinished()) &&
+                        (marginBottom == null || marginBottom.isFinished()) &&
+                        (fontMotion == null || fontMotion.isFinished()));
+            }
+
+            @Override
+            protected void updateState() {
+                if(finished) {
+                    return;
+                }
+                                
+                if(!isInProgress()) {
+                    finished = true;
+                    setUIID(destUIID);
+                } else {
+                    if(fgColorMotion != null) {
+                        sourceStyle.setFgColor(fgColorMotion.getValue());
+                    }
+                    if(bgMotion != null) {
+                        ap.alpha = bgMotion.getValue();
+                    }
+                    if(fontMotion != null) {
+                        Font fnt = sourceStyle.getFont();
+                        fnt = fnt.derive(((float)fontMotion.getValue()) / 100.0f, fnt.getStyle());
+                        sourceStyle.setFont(fnt);
+                    }
+                    if(paddingTop != null) {
+                        sourceStyle.setPadding(TOP, paddingTop.getValue());
+                    }
+                    if(paddingBottom != null) {
+                        sourceStyle.setPadding(BOTTOM, paddingBottom.getValue());
+                    }
+                    if(paddingLeft != null) {
+                        sourceStyle.setPadding(LEFT, paddingLeft.getValue());
+                    }
+                    if(paddingRight != null) {
+                        sourceStyle.setPadding(RIGHT, paddingRight.getValue());
+                    }
+                    if(marginTop != null) {
+                        sourceStyle.setMargin(TOP, marginTop.getValue());
+                    }
+                    if(marginBottom != null) {
+                        sourceStyle.setMargin(BOTTOM, marginBottom.getValue());
+                    }
+                    if(marginLeft != null) {
+                        sourceStyle.setMargin(LEFT, marginLeft.getValue());
+                    }
+                    if(marginRight != null) {
+                        sourceStyle.setMargin(RIGHT, marginRight.getValue());
+                    }
+                }
+            }
+
+            @Override
+            public void flush() {
+                if(bgMotion != null) {
+                    bgMotion.finish();
+                }
+                if(fgColorMotion != null) {
+                    fgColorMotion.finish();
+                }
+                if(fontMotion != null) {
+                    fontMotion.finish();
+                }
+                if(paddingTop != null) {
+                    paddingTop.finish();
+                }
+                if(paddingBottom != null) {
+                    paddingBottom.finish();
+                }
+                if(paddingLeft != null) {
+                    paddingLeft.finish();
+                }
+                if(paddingRight != null) {
+                    paddingRight.finish();
+                }
+                if(marginTop != null) {
+                    marginTop.finish();
+                }
+                if(marginBottom != null) {
+                    marginBottom.finish();
+                }
+                if(marginLeft != null) {
+                    marginLeft.finish();
+                }
+                if(marginRight != null) {
+                    marginRight.finish();
+                }
+                updateState();
+            }
+        };
+    }
+    
     /**
      * Scroll animation speed in milliseconds allowing a developer to slow down or accelerate
      * the smooth animation mode
@@ -2330,7 +2685,7 @@ public class Component implements Animation, StyleListener {
      * Invoked by subclasses interested in handling pinch to zoom events, if true is returned 
      * other drag events will not be broadcast
      * 
-     * @param the scaling of the pinch operation a number larger than 1 means scaling up and smaller than 1 means scaling down.
+     * @param scale the scaling of the pinch operation a number larger than 1 means scaling up and smaller than 1 means scaling down.
      * It is recommended that code would threshold the number (so a change between 1.0 and 1.02 shouldn't necessarily trigger zoom).
      * Notice that this number is relevant to current zoom levels and unaware of them so you should also enforce limits of maximum/minimum
      * zoom levels.
@@ -2474,12 +2829,15 @@ public class Component implements Animation, StyleListener {
      * @return a component drop target or null if no drop target is available at that coordinate
      */
     private Component findDropTarget(Component source, int x, int y) {
-        Component c = getComponentForm().findDropTargetAt(x, y);
-        while(c != null) {
-            if(c.isDropTarget() && c.draggingOver(source, x - c.getAbsoluteX() - c.getScrollX(), y- c.getAbsoluteY() - c.getScrollY())) {
-                return c;
+        Form f = getComponentForm();
+        if(f != null) {
+            Component c = f.findDropTargetAt(x, y);
+            while(c != null) {
+                if(c.isDropTarget() && c.draggingOver(source, x - c.getAbsoluteX() - c.getScrollX(), y- c.getAbsoluteY() - c.getScrollY())) {
+                    return c;
+                }
+                c = c.getParent();
             }
-            c = c.getParent();
         }
         return null;
     }
@@ -2505,7 +2863,7 @@ public class Component implements Animation, StyleListener {
         Form p = getComponentForm();
         
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
         
         if(dragAndDropInitialized) {
@@ -2560,7 +2918,7 @@ public class Component implements Animation, StyleListener {
             while(scrollParent != null && !scrollParent.isScrollable()){
                 scrollParent = scrollParent.getParent();
             }
-            if(scrollParent != null){                
+            if(scrollParent != null){
                 Style s = getStyle();
                 int w = getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT);
                 int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
@@ -2726,7 +3084,7 @@ public class Component implements Animation, StyleListener {
     public void pointerPressed(int x, int y) {
         dragActivated = false;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         clearDrag();
         if(isDragAndDropOperation(x, y)) {
@@ -2770,7 +3128,7 @@ public class Component implements Animation, StyleListener {
      */
     public void pointerReleased(int x, int y) {
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, x, y);
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
             if(ev.isConsumed()) {
                 return;
@@ -2884,8 +3242,16 @@ public class Component implements Animation, StyleListener {
             dragOverListener = null;
         }
     }
+    
+    /**
+     * Callback indicating that the drag has finished either via drop or by releasing the component
+     * @param x the x location 
+     * @param y the y location
+     */
+    protected void dragFinished(int x, int y) {
+    }
 
-    void dragFinished(int x, int y) {
+    void dragFinishedImpl(int x, int y) {
         if(dragAndDropInitialized && dragActivated) {
             Form p = getComponentForm();
             p.setDraggedComponent(null);
@@ -2903,7 +3269,7 @@ public class Component implements Animation, StyleListener {
                 p.repaint(x, y, getWidth(), getHeight());
                 getParent().scrollRectToVisible(x, y, getWidth(), getHeight(), getParent());
                 if(dropListener != null) {
-                    ActionEvent ev = new ActionEvent(this, dropTargetComponent, x, y);
+                    ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
                     dropListener.fireActionEvent(ev);
                     if(!ev.isConsumed()) {
                         dropTargetComponent.drop(this, x, y);
@@ -2913,7 +3279,7 @@ public class Component implements Animation, StyleListener {
                 }
             } else {
                 if(dragOverListener != null) {
-                    ActionEvent ev = new ActionEvent(this, null, x, y);
+                    ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag,null, x, y);
                     dragOverListener.fireActionEvent(ev);
                 }
                 p.repaint();
@@ -2930,6 +3296,7 @@ public class Component implements Animation, StyleListener {
         }
         dragActivated = false;
         dragAndDropInitialized = false;
+        dragFinished(x, y);
     }
 
     /**
@@ -3063,10 +3430,22 @@ public class Component implements Animation, StyleListener {
             }
             if(!shouldScrollX) {
                 if(speed < 0) {
-                    draggedMotionY = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
+                    if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
+                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
+                        
+                        draggedMotionY = Motion.createExponentialDecayMotion(scroll, -tl/2, speed, timeConstant);
+                    } else {
+                        draggedMotionY = Motion.createFrictionMotion(scroll, -tl/2, speed, 0.0007f);
+                    }
                 } else {
-                    draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
-                            getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2, speed, 0.0007f);
+                    if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
+                        int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
+                        draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() - 
+                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2,  speed, timeConstant);
+                    } else {
+                        draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
+                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2, speed, 0.0007f);
+                    }
                 }
             } else {
                 if(speed < 0) {
@@ -3107,6 +3486,7 @@ public class Component implements Animation, StyleListener {
         if (unSelectedStyle == null) {
             initStyle();
         }
+        isUnselectedStyle = false;
 
         if(hasLead) {
             Component lead = getLeadComponent();
@@ -3123,6 +3503,7 @@ public class Component implements Animation, StyleListener {
                     return getSelectedStyle();
                 }
             }
+            isUnselectedStyle = true;
             return unSelectedStyle;
         }
 
@@ -3137,6 +3518,7 @@ public class Component implements Animation, StyleListener {
         if (hasFocus() && Display.getInstance().shouldRenderSelection(this)) {
             return getSelectedStyle();
         }
+        isUnselectedStyle = true;
         return unSelectedStyle;
     }
 
@@ -3459,7 +3841,7 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(!visible){
@@ -3745,6 +4127,18 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Draws the component border background if such a border exists.
+     * 
+     * @param g graphics context on which the border is painted
+     */
+    protected void paintBorderBackground(Graphics g) {
+        Border b = getBorder();
+        if (b != null) {
+            b.paintBorderBackground(g, this);
+        }
+    }
+    
+    /**
      * Used as an optimization to mark that this component is currently being
      * used as a cell renderer
      * 
@@ -3793,6 +4187,18 @@ public class Component implements Animation, StyleListener {
         this.isScrollVisible = isScrollVisible;
     }
 
+    void lockStyleImages(Style stl) {
+        Image i = stl.getBgImage();
+        if(i != null) {
+            i.lock();
+        } else {
+            Border b = stl.getBorder();
+            if(b != null) {
+                b.lock();
+            }
+        }
+    }
+    
     /**
      * Invoked internally to initialize and bind the component
      */
@@ -3801,15 +4207,7 @@ public class Component implements Animation, StyleListener {
             initialized = true;
             UIManager manager = getUIManager();
             Style stl = getStyle();
-            Image i = stl.getBgImage();
-            if(i != null) {
-                i.lock();
-            } else {
-                Border b = stl.getBorder();
-                if(b != null) {
-                    b.lock();
-                }
-            }
+            lockStyleImages(stl);
             manager.getLookAndFeel().bind(this);
             checkAnimation();
             if(isRTL() && isScrollableX()){
@@ -3854,7 +4252,7 @@ public class Component implements Animation, StyleListener {
      */
     protected void laidOut() {
         if(!isCellRenderer()) {
-            CodenameOneImplementation ci = Display.getInstance().getImplementation();
+            CodenameOneImplementation ci = Display.impl;
             if(ci.isEditingText()) {
                 return;
             }
@@ -3869,10 +4267,10 @@ public class Component implements Animation, StyleListener {
                     getScrollDimension().getWidth()) {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
-            if(!isScrollableY()){
+            if(!isScrollableY() && getScrollY() > 0){
                 setScrollY(0);
             }
-            if(!isScrollableX()){
+            if(!isScrollableX() && getScrollX() > 0){
                 setScrollX(0);
             }
         }
@@ -3917,7 +4315,7 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void styleChanged(String propertyName, Style source) {
         //changing the Font, Padding, Margin may casue the size of the Component to Change
@@ -4522,7 +4920,7 @@ public class Component implements Animation, StyleListener {
      * remove this component from the painting queue
      */
     protected void cancelRepaints() {
-        Display.getInstance().getImplementation().cancelRepaint(this);
+        Display.impl.cancelRepaint(this);
     }
 
     /**
@@ -4634,6 +5032,51 @@ public class Component implements Animation, StyleListener {
     public Object getComponentState() {
         return null;
     }
+
+    /**
+     * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
+     * This method also optionally sets the margin to 0 so the component will be truly hidden
+     * 
+     * @param b true to hide the component and false to show it
+     * @param changeMargin indicates margin should be set to 0
+     */
+    public void setHidden(boolean b, boolean changeMargin) {
+        if(b) {
+            if(!sizeRequestedByUser) {
+                if(changeMargin) {
+                    getAllStyles().setMargin(0, 0, 0, 0);
+                }
+                setPreferredSize(new Dimension());
+            }
+        } else {
+            setPreferredSize(null);
+            if(changeMargin) {
+                if(getUnselectedStyle().getMargin(LEFT) == 0) {
+                    setUIID(getUIID());
+                }
+            }
+        }
+    }
+    
+    /**
+     * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
+     * Also toggles the UIID to "Container" and back to allow padding/margin to be removed. Since the visible flag
+     * just hides the component without "removing" the space it occupies this is the flag that can be used to truly
+     * hide a component within the UI.
+     * 
+     * @param b true to hide the component and false to show it
+     */
+    public void setHidden(boolean b) {
+        setHidden(b, true);
+    }    
+    
+    /**
+     * Returns true if the component was explicitly hidden by the user
+     * @return true if the component is hidden, notice that the hidden property and visible property have different meanings in the API!
+     */
+    public boolean isHidden() {
+        return sizeRequestedByUser && preferredSize != null && preferredSize.getWidth() == 0 && preferredSize.getHeight() == 0;
+    }
     
     /**
      * If getComponentState returned a value the setter can update the value and restore
@@ -4648,29 +5091,27 @@ public class Component implements Animation, StyleListener {
         private Form previousTint;
         private Painter painter;
         Image radialCache;
-        private int cachedRadialBackgroundGradientStartColor;
-        private int cachedRadialBackgroundGradientEndColor;
-        private int cachedRadialWidth;
-        private int cachedRadialHeight;
-        private float cachedRadialBackgroundGradientRelativeX;
-        private float cachedRadialBackgroundGradientRelativeY;
-        private float cachedRadialBackgroundGradientRelativeSize;
         private Style constantStyle;
+        CodenameOneImplementation impl;
 
         public BGPainter(Motion wMotion, Motion hMotion) {
             this.wMotion = wMotion;
             this.hMotion = hMotion;
+            impl = Display.impl;
         }
 
         public BGPainter() {
+            impl = Display.impl;
         }
 
         public BGPainter(Style s) {
             constantStyle = s;
+            impl = Display.impl;
         }
 
         public BGPainter(Form parent, Painter p) {
             this.painter = p;
+            impl = Display.impl;
         }
 
         public void setPreviousForm(Form previous) {
@@ -4679,48 +5120,6 @@ public class Component implements Animation, StyleListener {
 
         public Form getPreviousForm() {
             return previousTint;
-        }
-
-        private void drawGradientBackground(Style s, Graphics g, int x, int y, int width, int height) {
-            switch (s.getBackgroundType()) {
-                case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
-                    g.fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                            x, y, width, height, true);
-                    return;
-                case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
-                    g.fillLinearGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                            x, y, width, height, false);
-                    return;
-                case Style.BACKGROUND_GRADIENT_RADIAL:
-                    if(isInitialized() && Display.getInstance().areMutableImagesFast()) {
-                        if(radialCache == null || cachedRadialBackgroundGradientStartColor != s.getBackgroundGradientStartColor() ||
-                                cachedRadialBackgroundGradientEndColor != s.getBackgroundGradientEndColor() ||
-                                cachedRadialWidth != width || cachedRadialHeight != height ||
-                                cachedRadialBackgroundGradientRelativeX != s.getBackgroundGradientRelativeX() ||
-                                cachedRadialBackgroundGradientRelativeY != s.getBackgroundGradientRelativeY() ||
-                                cachedRadialBackgroundGradientRelativeSize != s.getBackgroundGradientRelativeSize()) {
-                            cachedRadialBackgroundGradientStartColor = s.getBackgroundGradientStartColor();
-                            cachedRadialBackgroundGradientEndColor = s.getBackgroundGradientEndColor();
-                            cachedRadialWidth = width;
-                            cachedRadialHeight = height;
-                            cachedRadialBackgroundGradientRelativeX = s.getBackgroundGradientRelativeX();
-                            cachedRadialBackgroundGradientRelativeY = s.getBackgroundGradientRelativeY();
-                            cachedRadialBackgroundGradientRelativeSize = s.getBackgroundGradientRelativeSize();
-                            radialCache = Image.createImage(width, height);
-                            radialCache.getGraphics().fillRectRadialGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                                0, 0, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
-                                s.getBackgroundGradientRelativeSize());
-                        }
-                        g.drawImage(radialCache, x, y);
-                    } else {
-                        g.fillRectRadialGradient(s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(),
-                                x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
-                                s.getBackgroundGradientRelativeSize());
-                    }
-                    return;
-            }
-            g.setColor(s.getBgColor());
-            g.fillRect(x, y, width, height, s.getBgTransparency());
         }
 
         public void paint(Graphics g, Rectangle rect) {
@@ -4735,165 +5134,147 @@ public class Component implements Animation, StyleListener {
                 } else {
                     s = getStyle();
                 }
-                int x = rect.getX();
-                int y = rect.getY();
+                int x = rect.getX() + g.getTranslateX();
+                int y = rect.getY() + g.getTranslateY();
                 int width = rect.getSize().getWidth();
                 int height = rect.getSize().getHeight();
-                if (width <= 0 || height <= 0) {
-                    return;
-                }
-                Image bgImage = s.getBgImage();
-                if (bgImage == null) {
-                    if(s.getBackgroundType() >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {
-                        drawGradientBackground(s, g, x, y, width, height);
-                        return;
-                    }
-                    g.setColor(s.getBgColor());
-                    g.fillRect(x, y, width, height, s.getBgTransparency());
-                } else {
-                    int iW = bgImage.getWidth();
-                    int iH = bgImage.getHeight();
+                Image img = s.getBgImage();
+                if(img != null && img.requiresDrawImage()) {
+                    // damn no native painting...
+                    int iW = img.getWidth();
+                    int iH = img.getHeight();
                     switch (s.getBackgroundType()) {
-                        case Style.BACKGROUND_NONE:
-                            if(s.getBgTransparency() != 0) {
-                                g.setColor(s.getBgColor());
-                                g.fillRect(x, y, width, height, s.getBgTransparency());
-                            }
-                            return;
                         case Style.BACKGROUND_IMAGE_SCALED:
-                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x, y, width, height);
+                            if (Display.impl.isScaledImageDrawingSupported()) {
+                                g.drawImage(img, x, y, width, height);
                             } else {
                                 if (iW != width || iH != height) {
-                                    bgImage = bgImage.scaled(width, height);
-                                    s.setBgImage(bgImage, true);
+                                    img = img.scaled(width, height);
+                                    s.setBgImage(img, true);
                                 }
-                                g.drawImage(s.getBgImage(), x, y);
+                                g.drawImage(img, x, y);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED_FILL:
-                            float r = Math.max(((float)width) / ((float)iW), ((float)height) / ((float)iH));
-                            int bwidth = (int)(((float)iW) * r);
-                            int bheight = (int)(((float)iH) * r);
-                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);
+                            float r = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));
+                            int bwidth = (int) (((float) iW) * r);
+                            int bheight = (int) (((float) iH) * r);
+                            if (Display.impl.isScaledImageDrawingSupported()) {
+                                g.drawImage(img, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);
                             } else {
                                 if (iW != bwidth || iH != bheight) {
-                                    bgImage = bgImage.scaled(bwidth, bheight);
-                                    s.setBgImage(bgImage, true);
+                                    img = img.scaled(bwidth, bheight);
+                                    s.setBgImage(img, true);
                                 }
-                                g.drawImage(s.getBgImage(), x + (width - bwidth) / 2, y + (height - bheight) / 2);
+                                g.drawImage(img, x + (width - bwidth) / 2, y + (height - bheight) / 2);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_SCALED_FIT:
-                            if(s.getBgTransparency() != 0) {
+                            if (s.getBgTransparency() != 0) {
                                 g.setColor(s.getBgColor());
                                 g.fillRect(x, y, width, height, s.getBgTransparency());
                             }
-                            float r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
-                            int awidth = (int)(((float)iW) * r2);
-                            int aheight = (int)(((float)iH) * r2);
-                            if(Display.getInstance().getImplementation().isScaledImageDrawingSupported()) {
-                                g.drawImage(bgImage, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
+                            float r2 = Math.min(((float) width) / ((float) iW), ((float) height) / ((float) iH));
+                            int awidth = (int) (((float) iW) * r2);
+                            int aheight = (int) (((float) iH) * r2);
+                            if (Display.impl.isScaledImageDrawingSupported()) {
+                                g.drawImage(img, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
                             } else {
                                 if (iW != awidth || iH != aheight) {
-                                    bgImage = bgImage.scaled(awidth, aheight);
-                                    s.setBgImage(bgImage, true);
+                                    img = img.scaled(awidth, aheight);
+                                    s.setBgImage(img, true);
                                 }
-                                g.drawImage(s.getBgImage(), x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
+                                g.drawImage(img, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_BOTH:
-                            g.tileImage(bgImage, x, y, width, height);
+                            g.tileImage(img, x, y, width, height);
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.tileImage(bgImage, x, y, width, iH);
+                            g.tileImage(img, x, y, width, iH);
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.tileImage(bgImage, x, y + (height / 2 - iH / 2), width, iH);
+                            g.tileImage(img, x, y + (height / 2 - iH / 2), width, iH);
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.tileImage(bgImage, x, y + (height - iH), width, iH);
+                            g.tileImage(img, x, y + (height - iH), width, iH);
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
                             for (int yPos = 0; yPos <= height; yPos += iH) {
-                                g.drawImage(s.getBgImage(), x, y + yPos);
+                                g.drawImage(img, x, y + yPos);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
                             for (int yPos = 0; yPos <= height; yPos += iH) {
-                                g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y + yPos);
+                                g.drawImage(img, x + (width / 2 - iW / 2), y + yPos);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
                             for (int yPos = 0; yPos <= height; yPos += iH) {
-                                g.drawImage(s.getBgImage(), x + width - iW, y + yPos);
+                                g.drawImage(img, x + width - iW, y + yPos);
                             }
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_TOP:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y);
+                            g.drawImage(img, x + (width / 2 - iW / 2), y);
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y + (height - iH));
+                            g.drawImage(img, x + (width / 2 - iW / 2), y + (height - iH));
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x, y + (height / 2 - iH / 2));
+                            g.drawImage(img, x, y + (height / 2 - iH / 2));
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + width - iW, y + (height / 2 - iH / 2));
+                            g.drawImage(img, x + width - iW, y + (height / 2 - iH / 2));
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + (width / 2 - iW / 2), y + (height / 2 - iH / 2));
+                            g.drawImage(img, x + (width / 2 - iW / 2), y + (height / 2 - iH / 2));
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x, y);
+                            g.drawImage(img, x, y);
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + width - iW, y);
+                            g.drawImage(img, x + width - iW, y);
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x, y + (height - iH));
+                            g.drawImage(img, x, y + (height - iH));
                             return;
                         case Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
                             g.setColor(s.getBgColor());
                             g.fillRect(x, y, width, height, s.getBgTransparency());
-                            g.drawImage(s.getBgImage(), x + width - iW, y + (height - iH));
-                            return;
-                        case Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
-                        case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
-                        case Style.BACKGROUND_GRADIENT_RADIAL:
-                            drawGradientBackground(s, g, x, y, width, height);
+                            g.drawImage(img, x + width - iW, y + (height - iH));
                             return;
                     }
-                }
+                } 
+                
+                impl.paintComponentBackground(g.getGraphics(), x, y, width, height, s);
             }
         }
 

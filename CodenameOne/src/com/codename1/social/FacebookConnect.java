@@ -24,7 +24,10 @@ package com.codename1.social;
 
 import com.codename1.facebook.FaceBookAccess;
 import com.codename1.io.AccessToken;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
+import com.codename1.util.Callback;
 
 /**
  * Invokes the native bundled facebook SDK to login/logout of facebook, notice
@@ -202,6 +205,22 @@ public class FacebookConnect extends Login{
      */ 
     public void inviteFriends(String appLinkUrl, String previewImageUrl){
     }
+
+    /**
+     * Opens and invite dialog to invite friends to the app
+     * https://developers.facebook.com/docs/app-invites
+     * 
+     * @param appLinkUrl App Link for what should be opened when the recipient 
+     * clicks on the install/play button on the app invite page.
+     * @param previewImageUrl url to an image to be used in the invite, can be null
+     * @param cb a Callback to be used when we need to know if the Facebook invite was successful.
+     * If the invite was successful the onSucess method will be called
+     * If the user canceled the onError method will be called with error code -1.
+     * If an error occurred the onError method will be called with error code 0.
+     * 
+     */ 
+    public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
+    }
     
     /**
      * Returns true if inviteFriends is implemented, it is supported on iOS and 
@@ -211,5 +230,30 @@ public class FacebookConnect extends Login{
      */ 
     public boolean isInviteFriendsSupported(){
         return false;
+    }
+
+    @Override
+    protected boolean validateToken(String token) {
+        //make a call to the API if the return value is 40X the token is not 
+        //valid anymore
+        final boolean[] retval = new boolean[1];
+        retval[0] = true;
+        ConnectionRequest req = new ConnectionRequest() {
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                //access token not valid anymore
+                if (code >= 400 && code <= 410) {
+                    retval[0] = false;
+                    return;
+                }
+                super.handleErrorResponseCode(code, message);
+            }
+
+        };
+        req.setPost(false);
+        req.setUrl("https://graph.facebook.com/v2.4/me");
+        req.addArgumentNoEncoding("access_token", token);
+        NetworkManager.getInstance().addToQueueAndWait(req);
+        return retval[0];
     }
 }

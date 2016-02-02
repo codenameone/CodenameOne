@@ -29,6 +29,9 @@
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
+extern int CN1modelViewMatrixVersion;
+extern int CN1projectionMatrixVersion;
+extern int CN1transformMatrixVersion;
 extern GLuint CN1activeProgram;
 static GLuint program=0;
 static GLuint vertexShader;
@@ -40,12 +43,15 @@ static GLuint textureUniform;
 static GLuint colorUniform;
 static GLuint vertexCoordAtt;
 static GLuint textureCoordAtt;
-static const GLshort textureCoordinates[] = {
+static GLfloat textureCoordinates[] = {
     0, 1,
     1, 1,
     0, 0,
     1, 0,
 };
+static int currentCN1modelViewMatrixVersion=-1;
+static int currentCN1projectionMatrixVersion=-1;
+static int currentCN1transformMatrixVersion=-1;
 
 
 static NSString *fragmentShaderSrc =
@@ -136,11 +142,18 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
 }
 #ifdef USE_ES2
 -(void)execute {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     
     int imageWidth = (int)[[img getImage] size].width;
     int imageHeight = (int)[[img getImage] size].height;
+    
+    if (imageWidth <=0 || imageHeight <= 0) {
+        return;
+    }
     GLuint tex = [img getTexture:imageWidth texHeight:imageHeight];
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
@@ -154,33 +167,108 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     glEnableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
     
-    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
-    GLErrorLog;
-    glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
-    GLErrorLog;
+    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
+        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
+        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
+        
+        GLErrorLog;
+    }
+    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
+        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
+        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
+        GLErrorLog;
+    }
+    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
+        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
+        GLErrorLog;
+        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
+    }
     glUniform1i(textureUniform, 0);
     GLErrorLog;
     glUniform4fv(colorUniform, 1, color.v);
     GLErrorLog;
     
-    //glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    //GLErrorLog;
+    int numTiles = ceil((float)width / (float)imageWidth) * ceil((float)height / (float)imageHeight);
     
-    for (int xPos = 0; xPos <= width; xPos += imageWidth) {
+    // For tileImage we use GL_TRIANGLES instead of TRIANGLE_STRIP because it is easier to batch and
+    // connect texture coordinates to vertex coordinates.  This means that each quad requires 6 coordinates
+    // instead of 4 - but we can batch all tiles in a single drawArrays call which should more than
+    // make up for the extra overhead.
+    
+    GLfloat* vertexes = malloc(12 * numTiles * sizeof(GLfloat));
+    GLfloat* texCoords = malloc(12 * numTiles * sizeof(GLfloat));
+    
+
+    
+    int p2w = nextPowerOf2(imageWidth);
+    int p2h = nextPowerOf2(imageHeight);
+    
+    GLfloat wRatio = (GLfloat)imageWidth / (GLfloat)p2w;
+    GLfloat hRatio = (GLfloat)imageHeight / (GLfloat)p2h;
+    
+    GLfloat t0Y = 1.0 - hRatio;
+    GLfloat t0X = 0;
+    GLfloat t1Y = 1;
+    GLfloat t1X = wRatio;
+    
+    
+    int tileOffset = 0;
+    for (int xPos = 0; xPos < width; xPos += imageWidth) {
         for (int yPos = 0; yPos < height; yPos += imageHeight) {
-            GLfloat* vertexes = createVertexArray(x + xPos, y + yPos, imageWidth, imageHeight);
-            glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
-            GLErrorLog;
+            texCoords[tileOffset+0] = t0X;//0;
+            texCoords[tileOffset+1] = t1Y;//1;
+            texCoords[tileOffset+2] = t1X;//1;
+            texCoords[tileOffset+3] = t1Y;//1;
+            texCoords[tileOffset+4] = t0X;//0;
+            texCoords[tileOffset+5] = t0Y;//0;
             
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-            GLErrorLog;
-            free(vertexes);
+            texCoords[tileOffset+6] = t0X;//0;  // Same as 4
+            texCoords[tileOffset+7] = t0Y;//0;  // Same as 5
+            texCoords[tileOffset+8] = t1X;//1;  // Same as 2
+            texCoords[tileOffset+9] = t1Y;//1;  // Same as 3
+            
+            texCoords[tileOffset+10] = t1X;//1;
+            texCoords[tileOffset+11] = t0Y;//0;
+            
+            vertexes[tileOffset+0] = x+xPos;
+            vertexes[tileOffset+1] = y+yPos;
+            vertexes[tileOffset+2] = vertexes[tileOffset+0] + imageWidth;//p2w;
+            vertexes[tileOffset+3] = vertexes[tileOffset+1];
+            vertexes[tileOffset+4] = vertexes[tileOffset+0];
+            vertexes[tileOffset+5] = vertexes[tileOffset+1] + imageHeight;//p2h;
+            
+            vertexes[tileOffset+6] = vertexes[tileOffset+0];        // Same as 4
+            vertexes[tileOffset+7] = vertexes[tileOffset+1] + imageHeight;//p2h;  // Same as 5
+            vertexes[tileOffset+8] = vertexes[tileOffset+0] + imageWidth;//p2w;  // Same as 2
+            vertexes[tileOffset+9] = vertexes[tileOffset+1];        // Same as 3
+            
+            vertexes[tileOffset+10] = vertexes[tileOffset+2];
+            vertexes[tileOffset+11] = vertexes[tileOffset+5];
+            
+            if (xPos + imageWidth > width) {
+                vertexes[tileOffset+2] = vertexes[tileOffset+8] =  vertexes[tileOffset+10] = x + width;
+                texCoords[tileOffset+2] = texCoords[tileOffset+8] = texCoords[tileOffset+10] = (GLfloat)(width-xPos)/ (GLfloat)p2w;
+            }
+            if (yPos + imageHeight > height) {
+                vertexes[tileOffset+5] = vertexes[tileOffset+7] = vertexes[tileOffset+11] = y + height;
+                texCoords[tileOffset+5] = texCoords[tileOffset+7] = texCoords[tileOffset+11] = 1.0 - (GLfloat)(height-yPos) / (GLfloat)p2h;
+            }
+            
+            tileOffset += 12;
         }
     }
+    
+    glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, texCoords);
+    GLErrorLog;
+    
+    glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
+    GLErrorLog;
+    
+    glDrawArrays(GL_TRIANGLES, 0, 6 * numTiles);
+    GLErrorLog;
+    
+    free(vertexes);
+    free(texCoords);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glDisableVertexAttribArray(textureCoordAtt);
     GLErrorLog;
@@ -190,9 +278,7 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
     
     glBindTexture(GL_TEXTURE_2D, 0);
     GLErrorLog;
-    
-    //glUseProgram(CN1activeProgram);
-    //GLErrorLog;
+
 }
 
 #else

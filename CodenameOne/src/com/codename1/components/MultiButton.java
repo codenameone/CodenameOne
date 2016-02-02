@@ -55,6 +55,15 @@ public class MultiButton extends Container {
     private String group;  
     
     /**
+     * Initializes a multibutton with the first line of text
+     * @param line1 first line of text
+     */
+    public MultiButton(String line1) {
+        this();
+        setTextLine1(line1);
+    }
+    
+    /**
      * Default constructor allowing the designer to create an instance of this class
      */
     public MultiButton() {
@@ -94,6 +103,34 @@ public class MultiButton extends Container {
         if(i != null) {
             emblem.setIcon(i);
         }
+    }
+    
+    /**
+     * Changes the layout so the lines of the button are grouped together
+     * @param l true to group the lines together
+     */
+    public void setLinesTogetherMode(boolean l) {
+        if(l != isLinesTogetherMode()) {
+            if(l) {
+                firstRow.getParent().removeComponent(firstRow);
+                Container p = secondRow.getParent();
+                p.addComponent(0, firstRow);
+                Container pp = p.getParent();
+                pp.removeComponent(p);
+                pp.addComponent(BorderLayout.CENTER, p);
+            } else {
+                secondRow.getParent().removeComponent(secondRow);
+                thirdRow.getParent().addComponent(0, secondRow);
+            }
+        }
+    }
+    
+    /**
+     * Indicates if the lines are grouped together on this button
+     * @return 
+     */
+    public boolean isLinesTogetherMode() {
+        return firstRow.getParent() == secondRow.getParent();
     }
     
     /**
@@ -705,7 +742,7 @@ public class MultiButton extends Container {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -718,7 +755,7 @@ public class MultiButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -753,7 +790,7 @@ public class MultiButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("line1")) {
@@ -856,7 +893,7 @@ public class MultiButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("line1")) {

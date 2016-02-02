@@ -126,7 +126,8 @@ public class XMLWriter {
 
     private String encodeIfRequired(String text) {
         if (encodeText) {
-            for (int i = 0; i < escapes.length; i++) {
+            int elen = escapes.length;
+            for (int i = 0; i < elen; i++) {
                 text = StringUtil.replaceAll(text, escapes[i][0], escapes[i][1]);
             }
         }

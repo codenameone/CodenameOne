@@ -95,7 +95,7 @@ public class ComboBox<T> extends List<T> {
      * 
      * @param items set of items placed into the combo box model
      */
-    public ComboBox(Object[] items) {
+    public ComboBox(Object... items) {
         this(new DefaultListModel(items));
     }
 
@@ -130,7 +130,7 @@ public class ComboBox<T> extends List<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setUIID(String uiid) {
         super.setUIID(uiid);
@@ -146,7 +146,7 @@ public class ComboBox<T> extends List<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getBaseline(int width, int height) {
         Component selected;
@@ -162,13 +162,13 @@ public class ComboBox<T> extends List<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void laidOut() {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Rectangle getSelectedRect() {
         // the implemenation from list doesn't make sense here, restore the component implementation
@@ -176,34 +176,34 @@ public class ComboBox<T> extends List<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Rectangle getVisibleBounds() {
         return getBounds();
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int selection) {
         super.setSelectedIndex(selection, false);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int selection, boolean scroll) {
         super.setSelectedIndex(selection, false);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
     }
@@ -352,7 +352,7 @@ public class ComboBox<T> extends List<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         List<T> l = createPopupList();
@@ -370,7 +370,8 @@ public class ComboBox<T> extends List<T> {
         Command result = showPopupDialog(popupDialog, l);
         Form.comboLock = false;
         parentForm.setTintColor(tint);
-        if(result == popupDialog.getMenuBar().getCancelMenuItem()) {
+        if(result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() ||
+                 popupDialog.wasDisposedDueToRotation()) {
             setSelectedIndex(originalSel);
         }
     }
@@ -401,7 +402,7 @@ public class ComboBox<T> extends List<T> {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
@@ -420,20 +421,20 @@ public class ComboBox<T> extends List<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
     }
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         if(isEnabled()) {
@@ -442,21 +443,21 @@ public class ComboBox<T> extends List<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         getUIManager().getLookAndFeel().drawComboBox(g, this);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getComboBoxPreferredSize(this);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getOrientation() {
         return COMBO;

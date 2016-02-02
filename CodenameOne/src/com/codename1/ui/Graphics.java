@@ -56,7 +56,7 @@ public final class Graphics {
      */
     Graphics(Object nativeGraphics) {
         setGraphics(nativeGraphics);
-        impl = Display.getInstance().getImplementation();
+        impl = Display.impl;
     }
 
     /**
@@ -369,7 +369,9 @@ public final class Graphics {
     /**
      * Fills a circular or elliptical arc based on the given angles and bounding 
      * box. The resulting arc begins at startAngle and extends for arcAngle 
-     * degrees.
+     * degrees. Usage:
+     * 
+     * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
      * 
      * @param x the x coordinate of the upper-left corner of the arc to be filled.
      * @param y the y coordinate of the upper-left corner of the arc to be filled.
@@ -399,7 +401,7 @@ public final class Graphics {
 
     private void drawStringImpl(String str, int x, int y) {
         // remove a commonly used trick to create a spacer label from the paint queue
-        if(str.length() == 0 || str == " ") {
+        if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
             return;
         }
         if(!(current instanceof CustomFont)) {
@@ -419,52 +421,15 @@ public final class Graphics {
      * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
      */
     public void drawString(String str, int x, int y,int textDecoration) {
-        if(str.length() == 0) {
+        // remove a commonly used trick to create a spacer label from the paint queue
+        if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
             return;
         }
-        
-        // this if has only the minor effect of providing a slighly faster execution path
-        if(textDecoration != 0) {
-            boolean raised = (textDecoration & Style.TEXT_DECORATION_3D)!=0;
-            boolean lowerd = (textDecoration & Style.TEXT_DECORATION_3D_LOWERED)!=0;
-            boolean north = (textDecoration & Style.TEXT_DECORATION_3D_SHADOW_NORTH)!=0;
-            if (raised || lowerd || north) {
-                textDecoration = textDecoration & (~Style.TEXT_DECORATION_3D) & (~Style.TEXT_DECORATION_3D_LOWERED) & (~Style.TEXT_DECORATION_3D_SHADOW_NORTH);
-                int c = getColor();
-                int a = getAlpha();
-                int newColor = 0;
-                int offset = -2;
-                if(lowerd) {
-                    offset  = 2;
-                    newColor = 0xffffff;
-                } else {
-                    if(north) {
-                        offset  = 2;
-                    }
-                }
-                setColor(newColor);
-                if(a == 0xff) {
-                    setAlpha(140);
-                }
-                drawString(str, x, y + offset, textDecoration);
-                setAlpha(a);
-                setColor(c);
-                drawString(str, x, y, textDecoration);
-                return;
-            }
-            drawStringImpl(str, x, y);
-            if ((textDecoration & Style.TEXT_DECORATION_UNDERLINE)!=0) {
-                drawLine(x, y+current.getHeight()-1, x+current.stringWidth(str), y+current.getHeight()-1);
-            }
-            if ((textDecoration & Style.TEXT_DECORATION_STRIKETHRU)!=0) {
-                drawLine(x, y+current.getHeight()/2, x+current.stringWidth(str), y+current.getHeight()/2);
-            }
-            if ((textDecoration & Style.TEXT_DECORATION_OVERLINE)!=0) {
-                drawLine(x, y, x+current.stringWidth(str), y);
-            }
-        } else {
-            drawStringImpl(str, x, y);
+        Object nativeFont = null;
+        if(current != null) {
+            nativeFont = current.getNativeFont();
         }
+        impl.drawString(nativeGraphics, nativeFont, str, x + xTranslate, y + yTranslate, textDecoration);
     }
     
     /**
@@ -798,6 +763,12 @@ public final class Graphics {
      * @param relativeSize  indicates the relative size of the gradient within the drawing region
      */
     public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        // people do that a lot sadly...
+        if(startColor == endColor) {
+            setColor(startColor);
+            fillRect(x, y, width, height, (byte)0xff);
+            return;
+        }
         impl.fillRectRadialGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, relativeX, relativeY, relativeSize);
     }
 
@@ -814,6 +785,12 @@ public final class Graphics {
      * @param horizontal indicating wheter it is a horizontal fill or vertical
      */
     public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        // people do that a lot sadly...
+        if(startColor == endColor) {
+            setColor(startColor);
+            fillRect(x, y, width, height, (byte)0xff);
+            return;
+        }
         impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
     }
 
@@ -827,12 +804,7 @@ public final class Graphics {
      * @param alpha the alpha values specify semitransparency
      */
     public void fillRect(int x, int y, int w, int h, byte alpha) {
-        if(alpha != 0) {
-            int oldAlpha = impl.getAlpha(nativeGraphics);
-            impl.setAlpha(nativeGraphics, alpha & 0xff);
-            impl.fillRect(nativeGraphics, x + xTranslate, y + yTranslate, w, h);
-            impl.setAlpha(nativeGraphics, oldAlpha);
-        }
+        impl.fillRect(nativeGraphics, x, y, w, h, alpha);
     }
 
     /**

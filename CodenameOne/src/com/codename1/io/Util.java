@@ -59,8 +59,6 @@ public class Util {
 
     private static boolean charArrayBugTested;
     private static boolean charArrayBug;
-    private static boolean xmlVMInstanceofBug;
-    private static boolean xmlVMInstanceofBugTested;
 
     static {
         register("EncodedImage", EncodedImage.class);
@@ -329,11 +327,6 @@ public class Util {
             return;
         }
         
-        if(!xmlVMInstanceofBugTested) {
-            xmlVMInstanceofBug = Display.getInstance().getPlatformName().equals("ios");
-            xmlVMInstanceofBugTested = true;
-        }
-
         if(instanceofObjArray(o)) {
             Object[] v = (Object[])o;
             out.writeUTF("ObjectArray");
@@ -533,7 +526,8 @@ public class Util {
 
             if ("ObjectArray".equals(type)) {
                 Object[] v = new Object[input.readInt()];
-                for (int iter = 0; iter < v.length; iter++) {
+                int vlen = v.length;
+                for (int iter = 0; iter < vlen; iter++) {
                     v[iter] = readObject(input);
                 }
                 return v;
@@ -545,35 +539,40 @@ public class Util {
             }
             if ("LongArray".equals(type)) {
                 long[] v = new long[input.readInt()];
-                for (int iter = 0; iter < v.length; iter++) {
+                int vlen = v.length;
+                for (int iter = 0; iter < vlen; iter++) {
                     v[iter] = input.readLong();
                 }
                 return v;
             }
             if ("ShortArray".equals(type)) {
                 short[] v = new short[input.readInt()];
-                for (int iter = 0; iter < v.length; iter++) {
+                int vlen = v.length;
+                for (int iter = 0; iter < vlen; iter++) {
                     v[iter] = input.readShort();
                 }
                 return v;
             }
             if ("DoubleArray".equals(type)) {
                 double[] v = new double[input.readInt()];
-                for (int iter = 0; iter < v.length; iter++) {
+                int vlen = v.length;
+                for (int iter = 0; iter < vlen; iter++) {
                     v[iter] = input.readDouble();
                 }
                 return v;
             }
             if ("FloatArray".equals(type)) {
                 float[] v = new float[input.readInt()];
-                for (int iter = 0; iter < v.length; iter++) {
+                int vlen = v.length;
+                for (int iter = 0; iter < vlen; iter++) {
                     v[iter] = input.readFloat();
                 }
                 return v;
             }
             if ("IntArray".equals(type)) {
                 int[] v = new int[input.readInt()];
-                for (int iter = 0; iter < v.length; iter++) {
+                int vlen = v.length;
+                for (int iter = 0; iter < vlen; iter++) {
                     v[iter] = input.readInt();
                 }
                 return v;
@@ -756,7 +755,8 @@ public class Util {
    
     private static String encode(char[] buf, String spaceChar) {
         final StringBuilder sbuf = new StringBuilder(buf.length * 3);
-        for (int i = 0; i < buf.length; i++) {
+        int blen = buf.length;
+        for (int i = 0; i < blen; i++) {
             final char ch = buf[i];
             if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') ||
                     (ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '!'
@@ -825,7 +825,8 @@ public class Util {
      */
     public static String encodeBody(final byte[] buf) {
         char[] b = new char[buf.length];
-        for(int iter = 0 ; iter < buf.length ; iter++) {
+        int blen = buf.length;
+        for(int iter = 0 ; iter < blen ; iter++) {
             b[iter] = (char)buf[iter];
         }
         return encode(b, "+");
@@ -1021,7 +1022,7 @@ public class Util {
     public static int readAll(InputStream i, byte b[]) throws IOException {
         int len = b.length;
         int n = 0;
-    	while (n < len) {
+        while (n < len) {
             int count = i.read(b, n, len - n);
             if (count < 0) {
                 return n;
@@ -1207,6 +1208,7 @@ public class Util {
         cr.setPost(false);
         cr.setFailSilently(true);
         cr.setUrl(url);
+        cr.setDuplicateSupported(true);
         if(callback != null) {
             cr.addResponseListener(callback);
         }

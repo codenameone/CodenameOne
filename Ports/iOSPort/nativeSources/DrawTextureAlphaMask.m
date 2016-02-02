@@ -26,6 +26,9 @@
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
+extern int CN1modelViewMatrixVersion;
+extern int CN1projectionMatrixVersion;
+extern int CN1transformMatrixVersion;
 extern GLuint CN1activeProgram;
 static GLuint program=0;
 static GLuint vertexShader;
@@ -43,6 +46,9 @@ static const GLshort textureCoordinates[] = {
     0, 1,
     1, 1,
 };
+static int currentCN1modelViewMatrixVersion=-1;
+static int currentCN1projectionMatrixVersion=-1;
+static int currentCN1transformMatrixVersion=-1;
 
 
 static NSString *fragmentShaderSrc =
@@ -128,10 +134,9 @@ static GLuint getOGLProgram(){
         NSLog(@"Attempt to draw null texture.  Skipping");
     }
     glUseProgram(getOGLProgram());
-    //GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
-    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0, \
-                                       ((float)((color >> 8) & 0xff))/255.0, ((float)(color & 0xff))/255.0, ((float)alpha)/255.0);
-    
+    float alph = ((float)alpha)/255.0;
+    GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0*alph, \
+                                       ((float)((color >> 8) & 0xff))/255.0*alph, ((float)(color & 0xff))/255.0*alph, alph);
     //GlColorFromRGB(color, alpha);
     //GLErrorLog;
     
@@ -189,12 +194,22 @@ static GLuint getOGLProgram(){
     glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
     GLErrorLog;
     
-    glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
-    GLErrorLog;
+    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
+        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
+        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
+        
+        GLErrorLog;
+    }
+    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
+        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
+        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
+        GLErrorLog;
+    }
+    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
+        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
+        GLErrorLog;
+        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
+    }
     
     glUniform1i(textureUniform, 0);
     GLErrorLog;

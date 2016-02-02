@@ -77,7 +77,12 @@ import java.util.Vector;
 import com.codename1.io.Cookie;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
+import com.codename1.location.Geofence;
+import com.codename1.location.GeofenceListener;
+import com.codename1.location.LocationRequest;
 import com.codename1.media.MediaManager;
+import com.codename1.notifications.LocalNotification;
+import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -87,9 +92,11 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.Picker;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+
 
 /**
  *
@@ -97,7 +104,7 @@ import java.io.ByteArrayOutputStream;
  */
 public class IOSImplementation extends CodenameOneImplementation {
     public static IOSNative nativeInstance = new IOSNative();
-    
+    private static LocalNotificationCallback localNotificationCallback;
     private static PurchaseCallback purchaseCallback;
     private static RestoreCallback restoreCallback;
     private int timeout = 120000;
@@ -118,6 +125,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private NativePathRenderer globalPathRenderer;
     private NativePathStroker globalPathStroker;
+    
+    private boolean isActive=false;
+    private final ArrayList<Runnable> onActiveListeners = new ArrayList<Runnable>();
+    
     
     /**
      * A pool that will cause java objects to be retained if they are passed 
@@ -276,13 +287,21 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isAsyncEditMode();
     }
     
+    // This is a bit of a hack to work around the fact that setScrollY() automatically
+    // calls hideTextEditor when async editing is enabled.  Sometimes we want to
+    // just scroll the text field into view and don't want this to happen.
+    private int doNotHideTextEditorSemaphore=0;
+    
     @Override
     public void hideTextEditor() {
+        if (doNotHideTextEditorSemaphore > 0) {
+            return;
+        }
         if(textEditorHidden) {
             return;
         }
         Form current = getCurrentForm();
-        if(current.isFormBottomPaddingEditingMode() && current.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && current.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
             current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
             current.forceRevalidate();
         } 
@@ -296,6 +315,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(textEditorHidden) {
             return false;
         }
+        //return c == currentEditing;
         return super.isEditingText(c);
     }
 
@@ -304,6 +324,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         /*if(textEditorHidden) {
             return false;
         }*/
+        //return currentEditing != null;
         return super.isEditingText();
     }
 
@@ -326,7 +347,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(f == cmp.getComponentForm()) {
                             cmp.requestFocus();
                         }
-                        if(f.isFormBottomPaddingEditingMode() && f.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && f.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
                             f.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                             f.forceRevalidate();
                             return;
@@ -361,6 +382,65 @@ public class IOSImplementation extends CodenameOneImplementation {
         return 0;
     }
     
+    
+    private static void updateNativeTextEditorFrame() {
+        if (instance.currentEditing != null) {
+            TextArea cmp = instance.currentEditing;
+            final Style stl = cmp.getStyle();
+            final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            instance.doNotHideTextEditorSemaphore++;
+            try {
+                instance.currentEditing.requestFocus();
+            } finally {
+                instance.doNotHideTextEditorSemaphore--;
+            }
+            int x = cmp.getAbsoluteX() + cmp.getScrollX();
+            int y = cmp.getAbsoluteY() + cmp.getScrollY();
+            int w = cmp.getWidth();
+            int h = cmp.getHeight();
+            int pt = stl.getPadding(false, Component.TOP);
+            int pb = stl.getPadding(false, Component.BOTTOM);
+            int pl = stl.getPadding(rtl, Component.LEFT);
+            int pr = stl.getPadding(rtl, Component.RIGHT);
+            if(cmp.isSingleLineTextArea()) {
+                switch(cmp.getVerticalAlignment()) {
+                    case TextArea.CENTER:
+                        if(h > cmp.getPreferredH()) {
+                            y += (h / 2 - cmp.getPreferredH() / 2);
+                        }
+                        break;
+                    case TextArea.BOTTOM:
+                        if(h > cmp.getPreferredH()) {
+                            y += (h - cmp.getPreferredH());
+                        }
+                        break;
+                }
+            }
+            
+            int maxH = Display.getInstance().getDisplayHeight() - nativeInstance.getVKBHeight();
+            
+            if (h > maxH ) {
+                // For text areas, we don't want the keyboard to cover part of the 
+                // typing region.  So we will try to size the component to 
+                // to only go up to the top edge of the keyboard
+                // that should allow the OS to enable scrolling properly.... at least
+                // in theory.
+                h = maxH;
+            }
+            
+            nativeInstance.resizeNativeTextView(x,
+                    y,
+                    w,
+                    h,
+                    pt,
+                    pr,
+                    pb,
+                    pl
+            );
+
+        }
+    }
+    
     /**
      * Callback for native.  Called when keyboard is shown.  Used for async editing 
      * with formBottomPaddingEditingMode.
@@ -369,17 +449,44 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(nativeInstance.isAsyncEditMode()) {
             // revalidate the parent since the size of form is now larger due to the vkb
             final Form current = Display.getInstance().getCurrent();
+            final Component currentEditingFinal = instance.currentEditing;
             if(current.isFormBottomPaddingEditingMode()) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        
-                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
-                        current.revalidate();
+                        if (current != null) {
+                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            current.revalidate();
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    updateNativeTextEditorFrame();
+                                }
+                            });
+                        }
                     }
                 });
             } else {
-                current.revalidate();
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        if (current != null) {
+                            if (instance.currentEditing != null) {
+                                instance.doNotHideTextEditorSemaphore++;
+                                try {
+                                    instance.currentEditing.requestFocus();
+                                } finally {
+                                    instance.doNotHideTextEditorSemaphore--;
+                                }
+                                current.revalidate();
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        updateNativeTextEditorFrame();
+                                    }
+                                });
+                            }
+                            
+                        }
+                    }
+                });
             }
         }
     }
@@ -393,7 +500,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
             @Override
             public void run() {
-                Display.getInstance().getCurrent().revalidate();
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    current.revalidate();
+                }
             }
             
         });
@@ -409,26 +519,93 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static final Object EDITING_LOCK = new Object(); 
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, final int i) {
-        if(isAsyncEditMode() && currentEditing != null && currentEditing != cmp && cmp instanceof TextArea) {
-            // fire action event when editing and pressing the next text field
-            Display.getInstance().onEditingComplete(cmp, ((TextArea)cmp).getText());
+        
+        // The very first time we try to edit a string, let's determine if the 
+        // system default is to do async editing.  If the system default
+        // is not yet set, we set it here, and it will be used as the default from now on
+        //  We do this because the nativeInstance.isAsyncEditMode() value changes
+        // to reflect the currently edited field so it isn't a good way to keep a
+        // system default.
+        String defaultAsyncEditingSetting = Display.getInstance().getProperty("ios.VKBAlwaysOpen", null);
+        if (defaultAsyncEditingSetting == null) {
+            defaultAsyncEditingSetting = nativeInstance.isAsyncEditMode() ? "true" : "false";
+            Display.getInstance().setProperty("ios.VKBAlwaysOpen", defaultAsyncEditingSetting);
+            
         }
-        if(!cmp.hasFocus()) {
-            cmp.requestFocus();
-            if(isAsyncEditMode()) {
-                // flush the EDT so the focus will work...
+        boolean asyncEdit = "true".equals(defaultAsyncEditingSetting) ? true : false;
+        //Log.p("Application default for async editing is "+asyncEdit);
+        
+        try {
+            if (currentEditing != cmp && currentEditing != null && currentEditing instanceof TextArea) {
+                Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
+                currentEditing = null;
+                callHideTextEditor();
+                if (nativeInstance.isAsyncEditMode()) {
+                    nativeInstance.setNativeEditingComponentVisible(false);
+                }
+                synchronized(EDITING_LOCK) {
+                    EDITING_LOCK.notify();
+                }
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        editString(cmp, maxSize, constraint, text, i);
+                        Display.getInstance().editString(cmp, maxSize, constraint, text, i);
                     }
                 });
+                return;
             }
-        }
-        Form parentForm = cmp.getComponentForm();
-        if(!parentForm.isFormBottomPaddingEditingMode()) {
-            Boolean b = (Boolean)cmp.getClientProperty("ios.async");
-            if(isAsyncEditMode() && b == null) {
-                // check whether the parent has a scrollable parent
+            
+           if(!cmp.hasFocus()) {
+                doNotHideTextEditorSemaphore++;
+                try {
+                    cmp.requestFocus();
+                } finally {
+                    doNotHideTextEditorSemaphore--;
+                }
+                
+                // Notice here that we are checking isAsyncEditMode() which looks
+                // at the previously edited text area.  Not the async mode
+                // of our upcoming field.
+                if(isAsyncEditMode()) {
+                    // flush the EDT so the focus will work...
+
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Display.getInstance().editString(cmp, maxSize, constraint, text, i);
+                        }
+                    });
+                    return;
+                }
+            }
+            
+           // Check if the form has any setting for asyncEditing that should override
+           // the application defaults.
+            Form parentForm = cmp.getComponentForm();
+            if (parentForm == null) {
+                //Log.p("Attempt to edit text area that is not on a form.  This is not supported");
+                return;
+            }
+            if (parentForm.getClientProperty("asyncEditing") != null) {
+                Object async = parentForm.getClientProperty("asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Form overriding asyncEdit due to asyncEditing client property: "+asyncEdit);
+                }
+            }
+            
+            if (parentForm.getClientProperty("ios.asyncEditing") != null) {
+                Object async = parentForm.getClientProperty("ios.asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Form overriding asyncEdit due to ios.asyncEditing client property: "+asyncEdit);
+                }
+                
+            }
+            
+            // If the system default is to use async editing, we need to check
+            // the form to make sure that it is scrollable.  If it is not 
+            // scrollable, then this field should default to Non-async
+            // editing - and should instead revert to legacy editing mode.
+            if(asyncEdit && !parentForm.isFormBottomPaddingEditingMode()) {
                 Container p = cmp.getParent();
                 while(p != null) {
                     if(p.isScrollableY()) {
@@ -437,163 +614,216 @@ public class IOSImplementation extends CodenameOneImplementation {
                     p = p.getParent();
                 }
                 // no scrollabel parent automatically configure the text field for legacy mode
-                if(p == null) {
-                    b = Boolean.FALSE;
-                    cmp.putClientProperty("ios.async", b);
-                    Display.getInstance().setProperty("ios.async", "true");
+                //nativeInstance.setAsyncEditMode(p != null);
+                asyncEdit = p != null;
+                //Log.p("Overriding asyncEdit due to form scrollability: "+asyncEdit);
+                
+            } else if (parentForm.isFormBottomPaddingEditingMode()){
+                // If form uses bottom padding mode, then we will always
+                // use async edit (unless the field explicitly overrides it).
+                asyncEdit = true;
+                //Log.p("Overriding asyncEdit due to form bottom padding edit mode: "+asyncEdit);
+            }
+
+            
+            // If the field itself explicitly sets async editing behaviour
+            // then this will override all other settings.
+            if (cmp.getClientProperty("asyncEditing") != null) {
+                Object async = cmp.getClientProperty("asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Overriding asyncEdit due to field asyncEditing client property: "+asyncEdit);
                 }
             }
-            if(b != null) {
-                nativeInstance.setAsyncEditMode(b.booleanValue());
-            } else {
-                String a = Display.getInstance().getProperty("ios.async", null);
-                if(a != null) {
-                    nativeInstance.setAsyncEditMode(a.equals("true"));
+            
+            if (cmp.getClientProperty("ios.asyncEditing") != null) {
+                Object async = cmp.getClientProperty("ios.asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Overriding asyncEdit due to field ios.asyncEditing client property: "+asyncEdit);
+                }
+                
+            }
+            
+            // Finally we set the async edit mode for this field.
+            //System.out.println("Async edit mode is "+asyncEdit);
+            nativeInstance.setAsyncEditMode(asyncEdit);
+            
+            textEditorHidden = false;
+            currentEditing = (TextArea)cmp;
+
+            //register the edited TextArea to support moving to the next field
+            TextEditUtil.setCurrentEditComponent(cmp); 
+
+            final NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
+            boolean forceSlideUpTmp = false;
+            final Form current = Display.getInstance().getCurrent();
+            if(current instanceof Dialog && !isTablet()) {
+                // special case, if we are editing a small dialog we want to move it
+                // so the bottom of the dialog shows within the screen. This is
+                // described in issue 505
+                Dialog dlg = (Dialog)current;
+                Component c = dlg.getDialogComponent();
+                if(c.getHeight() < Display.getInstance().getDisplayHeight() / 2 && 
+                        c.getAbsoluteY() + c.getHeight() > Display.getInstance().getDisplayHeight() / 2) {
+                    forceSlideUpTmp = true;
                 }
             }
-        } 
-        
-        textEditorHidden = false;
-        currentEditing = (TextArea)cmp;
-        
-        //register the edited TextArea to support moving to the next field
-        TextEditUtil.setCurrentEditComponent(cmp); 
-
-        final NativeFont fnt = f(cmp.getStyle().getFont().getNativeFont());
-        boolean forceSlideUpTmp = false;
-        final Form current = Display.getInstance().getCurrent();
-        if(current instanceof Dialog && !isTablet()) {
-            // special case, if we are editing a small dialog we want to move it
-            // so the bottom of the dialog shows within the screen. This is
-            // described in issue 505
-            Dialog dlg = (Dialog)current;
-            Component c = dlg.getDialogComponent();
-            if(c.getHeight() < Display.getInstance().getDisplayHeight() / 2 && 
-                    c.getAbsoluteY() + c.getHeight() > Display.getInstance().getDisplayHeight() / 2) {
-                forceSlideUpTmp = true;
-            }
-        }
-        final boolean forceSlideUp = forceSlideUpTmp;
-
-        if(isAsyncEditMode()) {
-            // revalidate the parent since the size of form is now larger due to the vkb
-            if(current.isFormBottomPaddingEditingMode()) {
-                Display.getInstance().callSerially(new Runnable() {
-                    public void run() {
-                        current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                        current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, getInvisibleAreaUnderVKB());
-                        current.forceRevalidate();
-                    }
-                });
+            final boolean forceSlideUp = forceSlideUpTmp;
+            
+            /*
+            if(isAsyncEditMode()) {
+                // revalidate the parent since the size of form is now larger due to the vkb
+                if(current.isFormBottomPaddingEditingMode()) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, getInvisibleAreaUnderVKB());
+                            current.forceRevalidate();
+                        }
+                    });
+                } else {
+                    current.revalidate();
+                }
             } else {
-                current.revalidate();
-            }
-        } else {
+                cmp.repaint();
+            }*/
             cmp.repaint();
-        }
-        
-        // give the repaint one cycle to "do its magic...
-        final Style stl = currentEditing.getStyle();
-        final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                int x = cmp.getAbsoluteX() + cmp.getScrollX();
-                int y = cmp.getAbsoluteY() + cmp.getScrollY();
-                int w = cmp.getWidth();
-                int h = cmp.getHeight();
-                int pt = stl.getPadding(false, Component.TOP);
-                int pb = stl.getPadding(false, Component.BOTTOM);
-                int pl = stl.getPadding(rtl, Component.LEFT);
-                int pr = stl.getPadding(rtl, Component.RIGHT);
-                if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
-                    switch(currentEditing.getVerticalAlignment()) {
-                        case TextArea.CENTER:
-                            if(h > cmp.getPreferredH()) {
-                                y += (h / 2 - cmp.getPreferredH() / 2);
-                            }
-                            break;
-                        case TextArea.BOTTOM:
-                            if(h > cmp.getPreferredH()) {
-                                y += (h - cmp.getPreferredH());
-                            }
-                            break;
+            // give the repaint one cycle to "do its magic...
+            final Style stl = currentEditing.getStyle();
+            final boolean rtl = UIManager.getInstance().getLookAndFeel().isRTL();
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    int x = cmp.getAbsoluteX() + cmp.getScrollX();
+                    int y = cmp.getAbsoluteY() + cmp.getScrollY();
+                    int w = cmp.getWidth();
+                    int h = cmp.getHeight();
+                    int pt = stl.getPadding(false, Component.TOP);
+                    int pb = stl.getPadding(false, Component.BOTTOM);
+                    int pl = stl.getPadding(rtl, Component.LEFT);
+                    int pr = stl.getPadding(rtl, Component.RIGHT);
+                    if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
+                        switch(currentEditing.getVerticalAlignment()) {
+                            case TextArea.CENTER:
+                                if(h > cmp.getPreferredH()) {
+                                    y += (h / 2 - cmp.getPreferredH() / 2);
+                                }
+                                break;
+                            case TextArea.BOTTOM:
+                                if(h > cmp.getPreferredH()) {
+                                    y += (h - cmp.getPreferredH());
+                                }
+                                break;
+                        }
+                    }
+                    String hint = null;
+                    if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
+                        hint = currentEditing.getHint();
+                    }
+                    if(isAsyncEditMode()) {
+                        // request focus triggers a scroll which flicks the textEditorHidden flag
+                        doNotHideTextEditorSemaphore++;
+                        try {
+                            cmp.requestFocus();
+                        } finally {
+                            doNotHideTextEditorSemaphore--;
+                        }
+                        textEditorHidden = false;
+                    }
+                    boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
+                    if ( currentEditing != null ){
+                        nativeInstance.editStringAt(x,
+                                y,
+                                w,
+                                h,
+                                fnt.peer, currentEditing.isSingleLineTextArea(),
+                                currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
+                                stl.getFgColor(), 0,//peer, 
+                                pt,
+                                pb,
+                                pl,
+                                pr, hint, showToolbar);
                     }
                 }
-                String hint = null;
-                if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
-                    hint = currentEditing.getHint();
-                }
-                if(isAsyncEditMode()) {
-                    // request focus triggers a scroll which flicks the textEditorHidden flag
-                    cmp.requestFocus();
-                    textEditorHidden = false;
-                }
-                boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
-                if ( currentEditing != null ){
-                    nativeInstance.editStringAt(x,
-                            y,
-                            w,
-                            h,
-                            fnt.peer, currentEditing.isSingleLineTextArea(),
-                            currentEditing.getRows(), maxSize, constraint, text, forceSlideUp,
-                            stl.getFgColor(), 0,//peer, 
-                            pt,
-                            pb,
-                            pl,
-                            pr, hint, showToolbar);
-                }
+            });
+            if(isAsyncEditMode()) {
+                return;
             }
-        });
-        if(isAsyncEditMode()) {
-            return;
-        }
-        editNext = false;
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            @Override
-            public void run() {
-                synchronized(EDITING_LOCK) {
-                    while(instance.currentEditing == cmp) {
-                        try {
-                            EDITING_LOCK.wait(20);
-                        } catch (InterruptedException ex) {
+            editNext = false;
+            
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized(EDITING_LOCK) {
+                        while(instance.currentEditing == cmp) {
+                            try {
+                                EDITING_LOCK.wait(20);
+                            } catch (InterruptedException ex) {
+                            }
                         }
                     }
                 }
+            });
+            
+            if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
+                cmp.getComponentForm().revalidate();
             }
-        });
-        if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
-            cmp.getComponentForm().revalidate();
-        }
-        if(editNext) {
-            editNext = false;
-            TextEditUtil.editNextTextArea();
+            if(editNext) {
+                editNext = false;
+                TextEditUtil.editNextTextArea();
+            }
+        } finally {
+            
         }
     }
     
+    // Callback for native code
+    public static void resizeNativeTextComponentCallback() {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                updateNativeTextEditorFrame();
+            }
+        });
+    }
+    
+    
     // callback for native code!
-    public static void editingUpdate(String s, int cursorPositon, boolean finished) {
-        if(instance.currentEditing != null) {
-            if(finished) {
-                editNext = cursorPositon == -2;
-                synchronized(EDITING_LOCK) {
-                    instance.currentEditing.setText(s);
-                    Display.getInstance().onEditingComplete(instance.currentEditing, s);
-                    if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextField) {
-                        ((TextField)instance.currentEditing).fireDoneEvent();
+    public static void editingUpdate(final String s, final int cursorPositon, final boolean finished) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if(instance.currentEditing != null) {
+                    if(finished) {
+                        editNext = cursorPositon == -2;
+                        synchronized(EDITING_LOCK) {
+                            instance.currentEditing.setText(s);
+                            Display.getInstance().onEditingComplete(instance.currentEditing, s);
+                            if(editNext && instance.currentEditing != null && instance.currentEditing instanceof TextField) {
+                                ((TextField)instance.currentEditing).fireDoneEvent();
+                            }
+                            instance.currentEditing = null;
+                            instance.callHideTextEditor();
+                            if (nativeInstance.isAsyncEditMode()) {
+                                nativeInstance.setNativeEditingComponentVisible(false);
+                            }
+                            EDITING_LOCK.notify();
+                        }
+                        Form current = Display.getInstance().getCurrent();
+                        if (current != null && current.isFormBottomPaddingEditingMode()) {
+                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+                        }
+                    } else {
+                        instance.currentEditing.setText(s);
                     }
-                    instance.currentEditing = null;
-                    EDITING_LOCK.notify();
+                    if(instance.currentEditing instanceof TextField && cursorPositon > -1) {
+                        ((TextField)instance.currentEditing).setCursorPosition(cursorPositon);
+                    }
+                } else {
+                    System.out.println("Editing null component!!" + s);
                 }
-            } else {
-                instance.currentEditing.setText(s);
             }
-            if(instance.currentEditing instanceof TextField && cursorPositon > -1) {
-                ((TextField)instance.currentEditing).setCursorPosition(cursorPositon);
-            }
-        } else {
-            System.out.println("Editing null component!!" + s);
-        }
+        });
+        
     }
 
     public void releaseImage(Object image) {
@@ -723,6 +953,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     public static void setIosMode(String l) {
         iosMode = l;
     }
+    
+    private static boolean waitForAnimationLock(Form f) {
+        while (!f.grabAnimationLock()) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    Util.sleep(20);
+                }
+            });
+        }
+        boolean obtained =  Display.getInstance().getCurrent() == f;
+        if (!obtained) {
+            f.releaseAnimationLock();
+        }
+        return obtained;
+    }
+    
+    
     
     /**
      * Installs the native theme, this is only applicable if hasNativeTheme() returned true. Notice that this method
@@ -1024,14 +1271,22 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                     }
                 }
-                ng.clip = new Rectangle(x, y, width, height);
+                if (ng.clip == null || !(ng.clip instanceof Rectangle)) {
+                    ng.clip = new Rectangle(x, y, width, height);
+                } else {
+                    ((Rectangle)ng.clip).setBounds(x, y, width, height);
+                }
                 if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
                     ng.setNativeClipping(x, y, width, height, ng.clipApplied);
                     ng.clipApplied = true;
                     ng.clipDirty = true;
                 }
             } else {
-                ng.clip = new Rectangle(x,y,width,height);
+                if (ng.clip == null || !(ng.clip instanceof Rectangle)) {
+                    ng.clip = new Rectangle(x,y,width,height);
+                } else {
+                    ((Rectangle)ng.clip).setBounds(x, y, width, height);
+                }
                 GeneralPath gp = new GeneralPath();
                 gp.append(ng.clip.getPathIterator(ng.transform), false);
                 //gp.append(ng.clip.getPathIterator(ng.transform), false);
@@ -1167,7 +1422,13 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return;
                 }
                 
-                Shape newClip = s.intersection(ng.reusableRect);
+                Shape newClip = null;
+                if (s.getClass() == Rectangle.class && ng.clip.getClass() == Rectangle.class) {
+                    ((Rectangle)s).intersection(ng.reusableRect, (Rectangle)ng.clip);
+                    newClip = ng.clip;
+                } else {
+                    newClip = s.intersection(ng.reusableRect);
+                }
                 if ( newClip.isRectangle() ){
                     Rectangle r = newClip.getBounds();
                     ng.clip = r;
@@ -1794,9 +2055,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void setTransform(Object graphics, Transform transform) {
-        ((NativeGraphics)graphics).transform = transform;
-        ((NativeGraphics)graphics).transformApplied = false;
-        ((NativeGraphics)graphics).applyTransform();
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.transform = transform;
+        ng.transformApplied = false;
+        ng.checkControl();
+        ng.applyTransform();
         
     }
     
@@ -1816,7 +2079,26 @@ public class IOSImplementation extends CodenameOneImplementation {
             0, 0
         );
     }
+    
+    public void setNativeTransformMutable(Transform transform){
+        Matrix t = (Matrix)transform.getNativeTransform();
+        float[] m = t.getData();
+        
+        
+        // Note that Matrix is stored in column-major format but GLKMatrix is stored in row-major
+        // that's why we transpose it here.
+        //Log.p("....Setting transform.....");
+        nativeInstance.nativeSetTransformMutable(
+            m[0], m[4], m[8], m[12],
+            m[1], m[5], m[9], m[13],
+            m[2], m[6], m[10], m[14],
+            m[3], m[7], m[11], m[15],
+            0, 0
+        );
+    }
 
+    
+    
     @Override
     public boolean transformEqualsImpl(Transform t1, Transform t2) {
         if ( t1 != null ){
@@ -2048,12 +2330,23 @@ public class IOSImplementation extends CodenameOneImplementation {
             // we don't need to allocate for the case of a cache hit
             recycle.peer = peer;
             recycle.txt = str;
+            
             Integer i = stringWidthCache.get(recycle);
             if(i != null) {
                 return i.intValue();
             }
             int val = nativeInstance.stringWidthNative(peer, str);
             FontStringCache c = new FontStringCache(str, peer);
+            if (stringWidthCache.size() > 10000) {
+                // If the cache grows too big, let's clear it out.
+                // We could use a more advanced algorithm, but right now
+                // I just want to fix possible memory leak.
+                
+                // Each FontStringCache object is 48 bytes.  So 48 x 10000 = 480K
+                // So we will allow a maximum footprint of 480K for this cache.
+                // When it reaches 480K, we'll just clear it out.
+                stringWidthCache.clear();
+            }
             stringWidthCache.put(c, new Integer(val));
             return val;
         }
@@ -2191,15 +2484,59 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     class Loc extends LocationManager {
         private long peer;
-        private boolean locationUpdating;
-
+        private boolean locationUpdating, backgroundLocationUpdating;
+        private static final String PREFS_BACKGROUND_LOCATION_LISTENER_CLASS = "ios.backgroundLocationListener";
+        private static final String PREFS_BACKGROUND_LOCATION_UPDATING = "ios.backgroundLocationUpdating";
+        private static final String PREFS_GEOFENCE_LISTENER_CLASS = "ios.geofenceListenerClass";
+        private LocationListener backgroundLocationListenerInstance;
+        private Map<String,String> geofenceListeners;
+        private Map<String,Long> geofenceExpirations;
+        
         protected void finalize() throws Throwable {
             //super.finalize();
             if(peer != 0) {
                 nativeInstance.releasePeer(peer);
             }
         }
+        
+        LocationListener getBackgroundLocationListenerInstance() {
+            if (backgroundLocationListenerInstance == null) {
+                Class cls = getBackgroundLocationListener();
+                if (cls != null) {
+                    try {
+                        backgroundLocationListenerInstance = (LocationListener)cls.newInstance();
+                    } catch (Throwable t) {
+                        Log.e(t);
+                        throw new RuntimeException(t.getMessage());
+                    }
+                }
+            }
+            return backgroundLocationListenerInstance;
+        }
+        
+        @Override
+        public Class getBackgroundLocationListener() {
+            Class superVal = super.getBackgroundLocationListener();
+            if (superVal == null && !"".equals(Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, ""))) {
+                String backgroundLocationListenerClassName = Preferences.get(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, "");
+                try {
+                    Class backgroundLocationListenerClass = (Class)Class.forName(backgroundLocationListenerClassName);
+                    super.setBackgroundLocationListener(backgroundLocationListenerClass);
+                } catch (Throwable t) {}
+            }
+            return super.getBackgroundLocationListener(); //To change body of generated methods, choose Tools | Templates.
+        }
 
+        @Override
+        public void setBackgroundLocationListener(Class locationListener) {
+            if (locationListener != null) {
+                Preferences.set(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, locationListener.getCanonicalName());
+            } else {
+                Preferences.set(PREFS_BACKGROUND_LOCATION_LISTENER_CLASS, null);
+            }
+            super.setBackgroundLocationListener(locationListener); //To change body of generated methods, choose Tools | Templates.
+        }
+        
         private long getLocation() {
             if(peer < 0) {
                 return peer;
@@ -2213,10 +2550,26 @@ public class IOSImplementation extends CodenameOneImplementation {
             return peer;
         }
 
+        /**
+         * If the app is running in the background and a background listener
+         * is registered, and active, then this will return the background listener
+         * instance.  Otherwise this should return the regular location listener.
+         * @return 
+         */
+        public LocationListener getActiveLocationListener() {
+            if (Display.getInstance().isMinimized() 
+                    && Preferences.get(PREFS_BACKGROUND_LOCATION_UPDATING, false)
+                    && getBackgroundLocationListenerInstance() != null) {
+                return getBackgroundLocationListenerInstance();
+            } else {
+                return getLocationListener();
+            }
+        }
+        
         public LocationListener getLocationListener() {
             return super.getLocationListener();
         }
-        
+ 
         @Override
         public Location getCurrentLocation() {
             long p = getLocation();
@@ -2254,6 +2607,104 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         }
+
+        private Map<String,String> geofenceListeners() {
+            if (geofenceListeners == null) {
+                if (Storage.getInstance().exists("ios.geofenceListeners")) {
+                    geofenceListeners = (Map)Storage.getInstance().readObject("ios.geofenceListeners");
+                } else {
+                    geofenceListeners = new HashMap<String,String>();
+                }
+            }
+            return geofenceListeners;
+        }
+        
+        private Map<String,Long> geofenceExpirations() {
+            if (geofenceExpirations == null) {
+                if (Storage.getInstance().exists("ios.geofenceExpirations")) {
+                    geofenceExpirations = (Map)Storage.getInstance().readObject("ios.geofenceExpirations");
+                } else {
+                    geofenceExpirations = new HashMap<String,Long>();
+                }
+            }
+            return geofenceExpirations;
+        }
+        
+        private void synchronizeGeofenceListeners() {
+            if (geofenceListeners != null) {
+                Storage.getInstance().writeObject("ios.geofenceListeners", geofenceListeners);
+            }
+        }
+        private void synchronizeGeofenceExpirations() {
+            if (geofenceExpirations != null) {
+                Storage.getInstance().writeObject("ios.geofenceExpirations", geofenceExpirations);
+            }
+        }
+        
+        GeofenceListener getGeofenceListener(String id) {
+            if (geofenceListeners().containsKey(id)) {
+                Class cls = null;
+                try {
+                    cls = Class.forName(geofenceListeners.get(id)); 
+                    if (cls == null) {
+                        return null;
+                    }
+                    return (GeofenceListener)cls.newInstance();
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
+                
+            }
+            return null;
+        }
+        
+        synchronized void clearExpiredGeofences() {
+            List<String> toRemove = new ArrayList<String>();
+            for (String id : geofenceExpirations().keySet()) {
+                if (geofenceExpirations().get(id) < System.currentTimeMillis()) {
+                    toRemove.add(id);
+                }
+            }
+            for (String id : toRemove) {
+                geofenceListeners().remove(id);
+                geofenceExpirations().remove(id);
+                nativeInstance.removeGeofencing(peer, id);
+            }
+            if (!toRemove.isEmpty()) {
+                synchronizeGeofenceExpirations();
+                synchronizeGeofenceListeners();
+            }
+            
+        }
+        
+        @Override
+        public void addGeoFencing(Class GeofenceListenerClass, Geofence gf) {
+            clearExpiredGeofences();
+            
+            if (gf.getExpiration() > 0) {
+                long expiresAt = System.currentTimeMillis() + gf.getExpiration();
+                geofenceExpirations().put(gf.getId(), expiresAt);
+                synchronizeGeofenceExpirations();
+            }
+            geofenceListeners().put(gf.getId(), GeofenceListenerClass.getCanonicalName());
+            synchronizeGeofenceListeners();
+            nativeInstance.addGeofencing(peer, gf.getLoc().getLatitude(), gf.getLoc().getLongitude(), gf.getRadius(), gf.getExpiration(), gf.getId());
+            super.addGeoFencing(GeofenceListenerClass, gf); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void removeGeoFencing(String id) {
+            geofenceListeners().remove(id);
+            geofenceExpirations().remove(id);
+            synchronizeGeofenceListeners();
+            synchronizeGeofenceExpirations();
+            nativeInstance.removeGeofencing(peer, id);
+        }
+
+        @Override
+        public boolean isGeofenceSupported() {
+            return true;
+        }
         
         @Override
         protected void bindListener() {
@@ -2263,7 +2714,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                     return;
                 }
                 locationUpdating = true;
-                nativeInstance.startUpdatingLocation(p);
+                int priority = LocationRequest.PRIORITY_MEDIUM_ACCUARCY;
+                if (this.getRequest() != null) {
+                    priority = this.getRequest().getPriority();
+                }
+                nativeInstance.startUpdatingLocation(p, priority);
             }
         }
 
@@ -2278,7 +2733,52 @@ public class IOSImplementation extends CodenameOneImplementation {
                 nativeInstance.stopUpdatingLocation(p);
             }
         }
+        
+        @Override
+        protected void bindBackgroundListener() {
+            //boolean backgroundLocationUpdatingPref = Preferences.get(PREFS_BACKGROUND_LOCATION_UPDATING, false);
+            if (!backgroundLocationUpdating) {
+                long p = getLocation();
+                if(p <= 0) {
+                    return;
+                }
+                Preferences.set(PREFS_BACKGROUND_LOCATION_UPDATING, true);
+                backgroundLocationUpdating = true;
+                nativeInstance.startUpdatingBackgroundLocation(p);
+            }
+        }
+        
+        /**
+         * Method called specially when the app is started with the significant
+         * location change service.  It shoudl start up the location listener
+         * to receive location updates while in the background.
+         */
+        void startBackgroundListener() {
+            // This should kick start the background listener
+            // and significant change service.
+            getBackgroundLocationListenerInstance();
+            
+        }
 
+        @Override
+        protected void clearBackgroundListener() {
+            //boolean backgroundLocationUpdating = Preferences.get(PREFS_BACKGROUND_LOCATION_UPDATING, false);
+            if(backgroundLocationUpdating) {
+                long p = getLocation();
+                if(p <= 0) {
+                    return;
+                }
+                Preferences.set(PREFS_BACKGROUND_LOCATION_UPDATING, false);
+                backgroundLocationUpdating = false;
+                nativeInstance.stopUpdatingBackgroundLocation(p);
+            }
+        }
+
+        @Override
+        public boolean isBackgroundLocationSupported() {
+            return true;
+        }
+        
         @Override
         public Location getLastKnownLocation() {
             return getCurrentLocation();
@@ -2292,7 +2792,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public static void locationUpdate() {
         if(lm != null) {
-            final LocationListener ls = lm.getLocationListener();
+            final LocationListener ls = lm.getActiveLocationListener();
             lm.setStatus();
             if(ls != null) {
                 Display.getInstance().callSerially(new Runnable() {
@@ -2304,7 +2804,46 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
     }
+    
+    public static void onGeofenceEnter(final String id) {
+        if (lm != null) {
+            final GeofenceListener ls = lm.getGeofenceListener(id);
+            if (ls != null) {
+                Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
+                    public void run() {
+                        ls.onEntered(id);
+                    }
+                    
+                });
+            }
+            lm.clearExpiredGeofences();
+        }
+    }
+    
+    public static void onGeofenceExit(final String id) {
+        if (lm != null) {
+            final GeofenceListener ls = lm.getGeofenceListener(id);
+            if (ls != null) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        ls.onExit(id);
+                    }
+                    
+                });
+            }
+            lm.clearExpiredGeofences();
+        }
+    }
+    
+    public static void appDidLaunchWithLocation() {
+        ((Loc)LocationManager.getLocationManager()).startBackgroundListener();
+        
+    }
+    
     public LocationManager getLocationManager() {
         if(lm == null) {
             lm = new Loc();
@@ -2336,6 +2875,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             captureCallback = null;
         }
     }
+    
     
     public void captureAudio(ActionListener response) {
         String p = FileSystemStorage.getInstance().getAppHomePath();
@@ -2516,12 +3056,89 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     
+    static class IOSMediaCallback {
+        Runnable onCompletion;
+        long nsObserverPeer;
+        
+    }
     
+    /**
+     * Map of media callbacks.  This allows onCompletion callbacks to be fired
+     * from native code.
+     */
+    final HashMap<Integer,IOSMediaCallback> mediaCallbacks = new HashMap<Integer,IOSMediaCallback>();
+    
+    /**
+     * Serial id for media callbacks
+     */
+    int nextMediaCallbackId = 1;
+    
+    /**
+     * Registers a media callback and assigns it an ID.
+     * @param r The callback associated with the given id.
+     * @return An ID that can be used from {@link #fireMediaCallback} to execute
+     * the callback.
+     */
+    int registerMediaCallback(Runnable r) {
+        if (r != null) {
+            IOSMediaCallback cb = new IOSMediaCallback();
+            cb.onCompletion = r;
+            synchronized(instance.mediaCallbacks) {
+                int id = instance.nextMediaCallbackId++;
+                instance.mediaCallbacks.put(id, cb);
+                return id;
+            }
+        }
+        return 0;
+    }
+    
+    /**
+     * Called from native code to fire media callback.
+     * @param id ID that was assigned in {@link #registerMediaCallback(java.lang.Runnable) }
+     */
+    static void fireMediaCallback(int id) {
+        IOSMediaCallback cb = instance.mediaCallbacks.get(id);
+        if (cb != null) {
+            Display.getInstance().callSerially(cb.onCompletion);
+        }
+    }
+    
+    /**
+     * Removes a media callback
+     * @param id ID of the media callback to remove.  Generated by the {@link #registerMediaCallback(java.lang.Runnable) } method.
+     */
+    void removeMediaCallback(int id) {
+        IOSMediaCallback cb = null;
+        synchronized(mediaCallbacks) {
+            cb = mediaCallbacks.get(id);
+            mediaCallbacks.remove(id);
+        }
+        if (cb != null && cb.nsObserverPeer != 0) {
+            // TODO.. implement this... need to remove the observer
+            nativeInstance.removeNotificationCenterObserver(cb.nsObserverPeer);
+        }
+    }
+    
+    /**
+     * Called from native code to bind an opaque objective-c object that is
+     * the registered observer from NSNotificationCenter with the ID of
+     * the callback that it calls.  This allows it to later be removed
+     * from the Java side.
+     * @param callbackId The callback ID of the media callback (as generated by {@link #registerMediaCallback(java.lang.Runnable) }
+     * @param nsObserverPeer The Objective-C observer that was registered with NSNotificationCenter
+     */
+    static void bindNSObserverPeerToMediaCallback(long nsObserverPeer, int callbackId) {
+        IOSMediaCallback cb = instance.mediaCallbacks.get(callbackId);
+        if (cb != null) {
+            cb.nsObserverPeer = nsObserverPeer;
+        }
+    }
     
     class IOSMedia implements Media {
         private String uri;
         private boolean isVideo;
-        private Runnable onCompletion;
+        //private Runnable onCompletion;
+        int onCompletionCallbackId;
         private InputStream stream;
         private String mimeType;
         private PeerComponent component;
@@ -2532,7 +3149,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
             this.uri = uri;
             this.isVideo = isVideo;
-            this.onCompletion = onCompletion;
+            this.onCompletionCallbackId = registerMediaCallback(onCompletion);
             if(!isVideo) {
                 moviePlayerPeer = nativeInstance.createAudio(uri, onCompletion);
             }
@@ -2541,7 +3158,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public IOSMedia(InputStream stream, String mimeType, Runnable onCompletion) {
             this.stream = stream;
             this.mimeType = mimeType;
-            this.onCompletion = onCompletion;            
+            this.onCompletionCallbackId = registerMediaCallback(onCompletion);            
             isVideo = mimeType.indexOf("video") > -1;
             if(!isVideo) {
                 try {
@@ -2558,17 +3175,17 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(isVideo) {
                 if(nativePlayer) {
                     if(uri != null) {
-                        moviePlayerPeer = nativeInstance.createNativeVideoComponent(uri);
+                        moviePlayerPeer = nativeInstance.createNativeVideoComponent(uri, onCompletionCallbackId);
                     } else {
                         try {
                             long val = getNSData(stream);
                             if(val > 0) {
-                                moviePlayerPeer = nativeInstance.createNativeVideoComponentNSData(val);
+                                moviePlayerPeer = nativeInstance.createNativeVideoComponentNSData(val, onCompletionCallbackId);
                                 Util.cleanup(stream);
                             } else {
                                 byte[] data = Util.readInputStream(stream);
                                 Util.cleanup(stream);
-                                moviePlayerPeer = nativeInstance.createNativeVideoComponent(data);
+                                moviePlayerPeer = nativeInstance.createNativeVideoComponent(data, onCompletionCallbackId);
                             }
                         } catch (IOException ex) {
                             ex.printStackTrace();
@@ -2606,7 +3223,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(!isVideo) {
                     nativeInstance.cleanupAudio(moviePlayerPeer);                    
                 }
-                //nativeInstance.releasePeer(moviePlayerPeer);
+                removeMediaCallback(onCompletionCallbackId);
+                // SJH Nov. 13, 2015:  Uncommenting this because it seems that 
+                // we do need to release the peer when we're cleaning up.
+                nativeInstance.releasePeer(moviePlayerPeer);
                 moviePlayerPeer = 0;
             }
         }
@@ -2674,18 +3294,20 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         @Override
         public Component getVideoComponent() {
-            if(uri != null) {
-                moviePlayerPeer = nativeInstance.createVideoComponent(uri);
-                component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
-            } else {
-                try {
-                    byte[] data = toByteArray(stream);
-                    Util.cleanup(stream);
-                    moviePlayerPeer = nativeInstance.createVideoComponent(data);
+            if (component == null) {
+                if(uri != null) {
+                    moviePlayerPeer = nativeInstance.createVideoComponent(uri, onCompletionCallbackId);
                     component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                    return new Label("Error loading video " + ex);
+                } else {
+                    try {
+                        byte[] data = toByteArray(stream);
+                        Util.cleanup(stream);
+                        moviePlayerPeer = nativeInstance.createVideoComponent(data, onCompletionCallbackId);
+                        component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                        return new Label("Error loading video " + ex);
+                    }
                 }
             }
             return component;
@@ -3113,7 +3735,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void applyTransform(){
-            
+            if (!transformApplied) {
+                setNativeTransformMutable(this.transform);
+                transformApplied = true;
+            }
         }
         
         public void pushClip(){
@@ -3234,40 +3859,104 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         
+        private float[] tmpNativeDrawShape_buf = new float[6];
+        private float[] tmpNativeDrawShape_coords;
+        
+        private float[] getTmpNativeDrawShape_coords(int size) {
+            if (tmpNativeDrawShape_coords == null) {
+                tmpNativeDrawShape_coords = new float[size];
+            }
+            if (tmpNativeDrawShape_coords.length < size) {
+                float[] newArray = new float[size];
+                System.arraycopy(tmpNativeDrawShape_coords, 0, newArray, 0, tmpNativeDrawShape_coords.length);
+                tmpNativeDrawShape_coords = newArray;
+            }
+            return tmpNativeDrawShape_coords;
+        }
+        
+        private float[] growTmpNativeDrawShape_coords(int size, int factor) {
+            if (tmpNativeDrawShape_coords.length < size) {
+                float[] newArray = new float[size * factor];
+                System.arraycopy(tmpNativeDrawShape_coords, 0, newArray, 0, tmpNativeDrawShape_coords.length);
+                tmpNativeDrawShape_coords = newArray;
+            }
+            return tmpNativeDrawShape_coords;
+        }
+        
+        private byte[] getTmpNativeDrawShape_commands(int size) {
+            if (tmpNativeDrawShape_commands == null) {
+                tmpNativeDrawShape_commands = new byte[size];
+            }
+            if (tmpNativeDrawShape_commands.length < size) {
+                byte[] newArray = new byte[size];
+                System.arraycopy(tmpNativeDrawShape_commands, 0, newArray, 0, tmpNativeDrawShape_commands.length);
+                tmpNativeDrawShape_commands = newArray;
+            }
+            return tmpNativeDrawShape_commands;
+        }
+        
+        private byte[] growTmpNativeDrawShape_commands(int size, int factor) {
+            if (tmpNativeDrawShape_commands.length < size) {
+                byte[] newArray = new byte[size * factor];
+                System.arraycopy(tmpNativeDrawShape_commands, 0, newArray, 0, tmpNativeDrawShape_commands.length);
+                tmpNativeDrawShape_commands = newArray;
+            }
+            return tmpNativeDrawShape_commands;
+        }
+        
+        private byte[] tmpNativeDrawShape_commands;
+        
         /**
          * Draws a shape in the graphics context
          * @param shape
-         * @param lineWidth
-         * @param capStyle
-         * @param miterStyle
-         * @param miterLimit
-         * @param x
-         * @param y
-         * @param w
-         * @param h 
+         * @param stroke
          */
         void nativeDrawShape(Shape shape, Stroke stroke){//float lineWidth, int capStyle, int miterStyle, float miterLimit){
-      
+            if (shape.getClass() == GeneralPath.class) {
+                // GeneralPath gives us some easy access to the points
+                GeneralPath p = (GeneralPath)shape;
+                int commandsLen = p.getTypesSize();
+                int pointsLen = p.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                p.getTypes(commandsArr);
+                p.getPoints(pointsArr);
+                
+                nativeInstance.nativeDrawShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
+            } else {
+                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            }
+            
+            
         }
         
         
         /**
          * Fills a shape in the graphics context.
          * @param shape
-         * @param x
-         * @param y
-         * @param w
-         * @param h 
          */
         void nativeFillShape(Shape shape) {
-
+            if (shape.getClass() == GeneralPath.class) {
+                // GeneralPath gives us some easy access to the points
+                GeneralPath p = (GeneralPath)shape;
+                int commandsLen = p.getTypesSize();
+                int pointsLen = p.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                p.getTypes(commandsArr);
+                p.getPoints(pointsArr);
+                
+                nativeInstance.nativeFillShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr);
+            } else {
+                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            }
         }
         
        
         
         
         boolean isTransformSupported(){
-            return false;
+            return true;
         }
         
         boolean isPerspectiveTransformSupported(){
@@ -3275,7 +3964,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         boolean isShapeSupported(){
-            return false;
+            return true;
         }
         
         boolean isAlphaMaskSupported(){
@@ -3286,15 +3975,26 @@ public class IOSImplementation extends CodenameOneImplementation {
         //----------------------------------------------------------------------
         
         public void resetAffine() {
+            this.transform.setIdentity();
+            transformApplied = false;
+            this.applyTransform();
         }
 
         public void scale(float x, float y) {
+            this.transform.scale(x, y, 1);
+            transformApplied = false;
+            this.applyTransform();
         }
 
         public void rotate(float angle) {
+            this.transform.rotate(angle, 0, 0);
+            transformApplied = false;
         }
 
         public void rotate(float angle, int x, int y) {
+            this.transform.rotate(angle, x, y);
+            transformApplied = false;
+            this.applyTransform();
         }
         
         public void translate(int x, int y){
@@ -3543,7 +4243,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int weight;
         float height;
         int maxStringLength = -1;
-        private Map<Character, Integer> widthCache = new HashMap<Character, Integer>();
+        private final Map<Character, Integer> widthCache = new HashMap<Character, Integer>();
         
         public NativeFont() {
         }
@@ -4144,7 +4844,71 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public String getAppArg() {
+        // We need special handling of AppArg to avoid race conditions.
+        // AppArg is guaranteed to be set by the time 
+        // applicationDidBecomeActive() is called, so in some cases
+        // calling AppArg inside the start() method of the lifecycle will
+        // get a stale value.
+        // See the lifecycle here:
+        // https://developer.apple.com/library/ios/documentation/iPhone/Conceptual/iPhoneOSProgrammingGuide/Inter-AppCommunication/Inter-AppCommunication.html#//apple_ref/doc/uid/TP40007072-CH6-SW13
+        if (!minimized && !isActive && Display.getInstance().isEdt()) {
+            // !minimized = applicationWillEnterForeground has already run
+            // !isActive = applicationDidBecomeActive hasn't been called yet.
+            // => We will do some "waiting" to give the AppArg a chance
+            // to be changed.
+            // We only defer access to AppArg if we are on the EDT
+            // to avoid a possible dead-lock when on the main thread
+            // The case we are concerned about is only when
+            // calling inside the start() method, so this will be
+            // on the EDT.
+            // In all other cases, this property should just return
+            // unhindered.
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    final Object lock = new Object();
+                    final boolean[] complete = new boolean[1];
+                    callOnActive(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            complete[0] = true;
+                            synchronized(lock) {
+                                lock.notifyAll();
+                            }
+                        }
+
+                    });
+                    while (!complete[0]) {
+                        synchronized(lock) {
+                            try {
+                                lock.wait(100); // Wait long enough for the url handler
+                                                // to kick in.
+                                // I think it's better just to skip and move on
+                                // after 100ms rather than wait indefinitely just
+                                // in case we are running in the background
+                                break;
+                            } catch (InterruptedException ex) {
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+
+            
+        }
+        return super.getAppArg();
+    }
+
+    
+    
+    @Override
     public String getProperty(String key, String defaultValue) {
+        if(key.equalsIgnoreCase("cn1_push_prefix")) {
+            return "ios";
+        }
         if(key.equalsIgnoreCase("Platform")) {
             return "iOS";
         }
@@ -4171,9 +4935,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         if("OSVer".equals(key)) {
             return nativeInstance.getOSVersion();
         }
+        if("DeviceName".equals(key)) {
+            return nativeInstance.getDeviceName();
+        }
         if(key.equalsIgnoreCase("UDID")) {
             return nativeInstance.getUDID();
         }
+        
         return super.getProperty(key, defaultValue);
     }
 
@@ -4233,7 +5001,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isMinimized() {
-        return minimized || nativeInstance.isMinimized();
+        // SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
+        // tracking on the java side.  It caused the app to still be minimized inside start()
+        // method.  
+        // Related to this issue https://groups.google.com/forum/?utm_medium=email&utm_source=footer#!msg/codenameone-discussions/Ajo2fArN8mc/KrF_e9cTDwAJ
+        //return minimized || nativeInstance.isMinimized();
+        return minimized;
     }
 
     @Override
@@ -4320,9 +5093,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public String[] getAllContacts(boolean withNumbers) {
         int[] c = new int[nativeInstance.getContactCount(withNumbers)];
+        int clen = c.length;
         nativeInstance.getContactRefIds(c, withNumbers);
-        String[] r = new String[c.length];
-        for(int iter = 0 ; iter < c.length ; iter++) {
+        String[] r = new String[clen];
+        for(int iter = 0 ; iter < clen ; iter++) {
             r[iter] = "" + c[iter];
         }
         return r;
@@ -4416,8 +5190,53 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isTrueTypeSupported() {
-        // TODO
         return true;
+    }
+
+    @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
+    }
+    
+    
+
+    private String nativeFontName(String fontName) {
+        if(fontName != null && fontName.startsWith("native:")) {
+            if("native:MainThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLight";
+            }
+            if("native:MainLight".equals(fontName)) {
+                return "HelveticaNeue-Light";
+            }
+            if("native:MainRegular".equals(fontName)) {
+                return "HelveticaNeue-Medium";
+            }
+            
+            if("native:MainBold".equals(fontName)) {
+                return "HelveticaNeue-Bold";
+            }
+            
+            if("native:MainBlack".equals(fontName)) {
+                return "HelveticaNeue-CondensedBlack";
+            }
+            
+            if("native:ItalicThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLightItalic";
+            }
+            
+            if("native:ItalicLight".equals(fontName)) {
+                return "HelveticaNeue-LightItalic";
+            }
+            
+            if("native:ItalicRegular".equals(fontName)) {
+                return "HelveticaNeue-MediumItalic";
+            }
+            
+            if("native:ItalicBold".equals(fontName) || "native:ItalicBlack".equals(fontName)) {
+                return "HelveticaNeue-BoldItalic";
+            }
+        }            
+        return fontName;
     }
 
     @Override
@@ -4426,6 +5245,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         fnt.face = com.codename1.ui.Font.FACE_SYSTEM;
         fnt.size = com.codename1.ui.Font.SIZE_MEDIUM;
         fnt.style = com.codename1.ui.Font.STYLE_PLAIN;
+        fontName = nativeFontName(fontName);
         fnt.name = fontName;
         fnt.peer = nativeInstance.createTruetypeFont(fontName);
         return fnt;
@@ -4664,7 +5484,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
-
+    
     public static void appendData(long peer, byte[] data) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
@@ -4850,6 +5670,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean ensureConnectionLock;
         String error;
         public final Object LOCK = new Object();
+        
+        
+        public void setChunkedStreamingMode(int len) {
+            nativeInstance.setChunkedStreamingMode(peer, len);
+        }
         
         public void ensureConnection() throws IOException {
             synchronized(LOCK) {
@@ -5072,6 +5897,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    @Override
+    public void setChunkedStreamingMode(Object connection, int bufferLen) {
+        ((NetworkConnection)connection).setChunkedStreamingMode(bufferLen);
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public void setHeader(Object connection, String key, String val) {
         nativeInstance.addHeader(((NetworkConnection)connection).peer, key, val);
     }
@@ -5086,7 +5919,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         NetworkConnection n = (NetworkConnection)connection;
         n.body = new FileBackedOutputStream();
-        return n.body;
+        return new BufferedOutputStream(n.body);
     }
 
     /**
@@ -5178,7 +6011,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
         String[] s = new String[nativeInstance.getResponseHeaderCount(n.peer)];
-        for(int iter = 0 ; iter < s.length ; iter++) {
+        int slen = s.length;
+        for(int iter = 0 ; iter < slen ; iter++) {
             s[iter] = nativeInstance.getResponseHeaderName(n.peer, iter);
         }
         return s;
@@ -5336,7 +6170,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.getResourcesDir()
                 };
         }
-        for(int iter = 0 ; iter < roots.length ; iter++) {
+        int rlen = roots.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             if(roots[iter].startsWith("/")) {
                 roots[iter] = "file:/" + roots[iter];
             }
@@ -5518,6 +6353,18 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public native void paintComponentBackground(Object nativeGraphics, int x, int y, int width, int height, Style s);
+    
+    @Override
+    public native void fillRect(Object nativeGraphics, int x, int y, int w, int h, byte alpha);
+    
+    @Override
+    public native void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth,
+            Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl,
+            boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText,
+            boolean endsWith3Points, int valign);
+    
+    @Override
     public void registerPush(Hashtable metaData, boolean noFallback) {
         nativeInstance.registerPush();
     }
@@ -5589,6 +6436,42 @@ public class IOSImplementation extends CodenameOneImplementation {
         pushCallback = callback;
     }
     
+    public static void setLocalNotificationCallback(LocalNotificationCallback callback) {
+        localNotificationCallback = callback;
+    }
+    
+    public static LocalNotificationCallback getLocalNotificationCallback() {
+        return localNotificationCallback;
+    }
+    
+    
+    public static void localNotificationReceived(final String notificationId) {
+        if (localNotificationCallback != null) {
+            Display.getInstance().callSerially(new Runnable() {
+
+                @Override
+                public void run() {
+                    if (getLocalNotificationCallback() != null) {
+                        getLocalNotificationCallback().localNotificationReceived(notificationId);
+                    }
+                }
+            });
+        } else { // could be a race condition against the native code... Retry in 2 seconds
+            new Thread() {
+                public void run() {
+                    try {
+                        Thread.sleep(1500);
+                    } catch (InterruptedException ex) {
+                    }
+                    // prevent infinite loop
+                    if(pushCallback != null) {
+                        localNotificationReceived(notificationId);
+                    }
+                }
+            }.start();
+        }
+    }
+    
     public static void setMainClass(Object main) {
         if(main instanceof PushCallback) {
             pushCallback = (PushCallback)main;
@@ -5598,6 +6481,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         if(main instanceof RestoreCallback) {
             restoreCallback = (RestoreCallback)main;
+        }
+        if (main instanceof LocalNotificationCallback) {
+            setLocalNotificationCallback((LocalNotificationCallback) main);
         }
     }        
     
@@ -5828,6 +6714,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationWillResignActive();
         }
+        instance.isActive = false;
     }
     
     /**
@@ -5855,6 +6742,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             });
         }        
     }
+    
     
     /**
      * Use this method to release shared resources, save user data, invalidate 
@@ -5897,6 +6785,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationWillEnterForeground();
         }
+        
+    }
+    
+    /**
+     * Calls the given runnable when the app is active.  If the app is already
+     * active, it will call it immediatly.  If not, it will be called in
+     * applicationDidBecomeActive().
+     * This is used for getting the AppArg property in a way that avoids
+     * race conditions.
+     * @param r 
+     */
+    private void callOnActive(Runnable r) {
+        synchronized(onActiveListeners) {
+            if (isActive) {
+                r.run();
+            } else {
+                onActiveListeners.add(r);
+            }
+        }
     }
     
     /**
@@ -5904,6 +6811,17 @@ public class IOSImplementation extends CodenameOneImplementation {
      * here you can undo many of the changes made on entering the background.
      */
     public static void applicationDidBecomeActive() {
+        ArrayList<Runnable> callbacks = null;
+        synchronized(instance.onActiveListeners) {
+            instance.isActive = true;
+            callbacks = new ArrayList<Runnable>(instance.onActiveListeners.size());
+        
+            callbacks.addAll(instance.onActiveListeners);
+            instance.onActiveListeners.clear();
+        }
+        for (Runnable callback : callbacks) {
+            callback.run();
+        }
         minimized = false;
         if(instance.life != null) {
             instance.life.applicationDidBecomeActive();
@@ -6232,25 +7150,34 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
         datePickerResult = -2;
-        int x = 0, y = 0, w = 20, h = 20;
+        int x = 0, y = 0, w = 20, h = 20, preferredHeight = 0, preferredWidth = 0;
+        
         if(source != null) {
             x = source.getAbsoluteX();
             y = source.getAbsoluteY();
             w = source.getWidth();
             h = source.getHeight();
         }
+        
+        if (source instanceof Picker) {
+            Picker p = (Picker)source;
+            preferredHeight = p.getPreferredPopupHeight();
+            preferredWidth = p.getPreferredPopupWidth();
+        }
+        
         if(type == Display.PICKER_TYPE_STRINGS) {
             String[] strs = (String[])data;
             int offset = -1;
             if(currentValue != null) {
-                for(int iter = 0 ; iter < strs.length ; iter++) {
+                int slen = strs.length;
+                for(int iter = 0 ; iter < slen ; iter++) {
                     if(strs[iter].equals(currentValue)) {
                         offset = iter;
                         break;
                     }
                 }
             }
-            nativeInstance.openStringPicker(strs, offset, x, y, w, h);
+            nativeInstance.openStringPicker(strs, offset, x, y, w, h, preferredWidth, preferredHeight);
         } else {
             long time;
             if(currentValue instanceof Integer) {
@@ -6261,7 +7188,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 time = ((java.util.Date)currentValue).getTime();
             }
-            nativeInstance.openDatePicker(type, time, x, y, w, h);
+            nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight);
         }
         // wait for the native code to complete
         Display.getInstance().invokeAndBlock(new Runnable() {
@@ -6371,6 +7298,27 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.splitString(source, separator, out);
     }
    
+    public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
+        
+        nativeInstance.sendLocalNotification(
+                n.getId(),
+                n.getAlertTitle(),
+                n.getAlertBody(),
+                n.getAlertSound(),
+                n.getBadgeNumber(),
+                firstTime,
+                repeat
+        );
+        
+       
+    }
+
+   
+    
+    public void cancelLocalNotification(String id) {
+         nativeInstance.cancelLocalNotification(id);
+    }
+
 }
 
 

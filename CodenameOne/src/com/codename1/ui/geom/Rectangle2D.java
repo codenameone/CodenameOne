@@ -158,7 +158,7 @@ public class Rectangle2D implements Shape {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "x = " + x + " y = " + y + " size = " + size;
@@ -423,7 +423,7 @@ public class Rectangle2D implements Shape {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(Transform m) {
         if ( path == null ){
@@ -440,14 +440,14 @@ public class Rectangle2D implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(){
         return getPathIterator(null);
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public Rectangle getBounds() {
         return new Rectangle(
@@ -459,14 +459,14 @@ public class Rectangle2D implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public float[] getBounds2D(){
         return new float[]{(float)getX(), (float)getY(), (float)getWidth(), (float)getHeight()};
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean isRectangle(){
         return true;

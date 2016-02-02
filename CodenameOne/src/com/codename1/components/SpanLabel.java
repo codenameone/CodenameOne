@@ -49,6 +49,15 @@ public class SpanLabel extends Container {
         this("");
     }
     
+    /**
+     * Constructor accepting default text and uiid for the text
+     * @param txt the text
+     * @param textUiid the new text UIID
+     */
+    public SpanLabel(String txt, String textUiid) {
+        this(txt);
+        text.setUIID(textUiid);
+    }
     
     /**
      * Constructor accepting default text
@@ -57,6 +66,7 @@ public class SpanLabel extends Container {
         setUIID("Container");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
+        text.setColumns(text.getText().length() + 1);
         text.setUIID("Label");
         text.setEditable(false);
         text.setFocusable(false);
@@ -231,7 +241,7 @@ public class SpanLabel extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -240,7 +250,7 @@ public class SpanLabel extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -253,14 +263,14 @@ public class SpanLabel extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "Image", "String", "String", "String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("text")) {
@@ -282,7 +292,7 @@ public class SpanLabel extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("text")) {

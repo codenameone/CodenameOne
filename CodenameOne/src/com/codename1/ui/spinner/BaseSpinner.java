@@ -50,7 +50,7 @@ public abstract class BaseSpinner extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         if(!isInitialized()) {
@@ -77,14 +77,14 @@ public abstract class BaseSpinner extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setUIID(String id) {
         super.setUIID(id);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -104,7 +104,7 @@ public abstract class BaseSpinner extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void paintGlass(Graphics g) {
         super.paintGlass(g);
@@ -112,6 +112,10 @@ public abstract class BaseSpinner extends Container {
     }   
     
     private void paintOverlay(Graphics g) {
+        // can happen in the new GUI builder
+        if(getParent() == null) {
+            return;
+        }
         int x = getParent().getAbsoluteX();
         int y = getParent().getAbsoluteY();
         g.translate(x, y);

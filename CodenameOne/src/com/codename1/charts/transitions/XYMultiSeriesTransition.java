@@ -116,7 +116,8 @@ public class XYMultiSeriesTransition extends SeriesTransition {
                 datasetCache.addSeries(new XYSeries(dataset.getSeriesAt(i).getTitle()));
             }
             seriesTransitions = new XYSeriesTransition[dataset.getSeries().length];
-            for (int i=0; i<seriesTransitions.length; i++){
+            int tlen = seriesTransitions.length;
+            for (int i=0; i<tlen; i++){
                 seriesTransitions[i] = new XYSeriesTransition(getChart(), dataset.getSeriesAt(i));
                 seriesTransitions[i].setBuffer(datasetCache.getSeriesAt(i));
 

@@ -71,10 +71,11 @@ public class SliderBridge extends Slider {
         int portions = 1000;
         if(sources != null) {
             v = new Vector();
-            for(int iter = 0 ; iter < sources.length ; iter++) {
+            int slen = sources.length;
+            for(int iter = 0 ; iter < slen ; iter++) {
                 v.addElement(sources[iter]);
             }
-            portions = portions / sources.length;
+            portions = portions / slen;
         }
         final Vector sourceVec = v;
         final int portionPerSource = portions;
@@ -83,7 +84,7 @@ public class SliderBridge extends Slider {
             private int soFar;
 
             /**
-             * @inheritDoc
+             * {@inheritDoc}
              */
             public void actionPerformed(ActionEvent evt) {
                 if(sources != null) {

@@ -160,7 +160,8 @@ import org.w3c.dom.NodeList;
 public class JavaSEPort extends CodenameOneImplementation {
 
     public final static boolean IS_MAC;
-
+    private static boolean isIOS;
+    public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
     static {
@@ -1341,6 +1342,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             Display.getInstance().setProperty("User-Agent", ua);
 
+            isIOS = props.getProperty("systemFontFamily", "Arial").toLowerCase().contains("helvetica");
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"));
@@ -2795,6 +2797,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         return null;
     }
 
+    @Override
+    public boolean isSimulator() {
+        // differentiate simulator from JavaSE port and detect designer
+        return designMode || portraitSkin != null;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -3894,6 +3902,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setAlpha(Object graphics, int alpha) {
+        if(alpha > 255 || alpha < 0) {
+            throw new IllegalArgumentException("Invalid value for alpha: " + alpha);
+        }
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         float a = ((float) alpha) / 255.0f;
@@ -4119,14 +4130,115 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
+    }
+
+    private String nativeFontName(String fontName) {
+        if(fontName != null && fontName.startsWith("native:")) {
+            if("native:MainThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLight";
+            }
+            if("native:MainLight".equals(fontName)) {
+                return "HelveticaNeue-Light";
+            }
+            if("native:MainRegular".equals(fontName)) {
+                return "HelveticaNeue-Medium";
+            }
+            
+            if("native:MainBold".equals(fontName)) {
+                return "HelveticaNeue-Bold";
+            }
+            
+            if("native:MainBlack".equals(fontName)) {
+                return "HelveticaNeue-CondensedBlack";
+            }
+            
+            if("native:ItalicThin".equals(fontName)) {
+                return "HelveticaNeue-UltraLightItalic";
+            }
+            
+            if("native:ItalicLight".equals(fontName)) {
+                return "HelveticaNeue-LightItalic";
+            }
+            
+            if("native:ItalicRegular".equals(fontName)) {
+                return "HelveticaNeue-MediumItalic";
+            }
+            
+            if("native:ItalicBold".equals(fontName) || "native:ItalicBlack".equals(fontName)) {
+                return "HelveticaNeue-BoldItalic";
+            }
+        }            
+        return null;
+    }
+    
+    @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
-        File fontFile;
-        if (baseResourceDir != null) {
-            fontFile = new File(baseResourceDir, fileName);
-        } else {
-            fontFile = new File("src", fileName);
-        }
+        File fontFile = null;
         try {
+            if(fontName.startsWith("native:")) {
+                if(IS_MAC && isIOS) {
+                    String nn = nativeFontName(fontName);
+                    java.awt.Font nf = new java.awt.Font(nn, java.awt.Font.PLAIN, medianFontSize);
+                    return nf;
+                }
+                String res; 
+                switch(fontName) {
+                    case "native:MainThin":
+                        res = "Thin";
+                        break;
+
+                    case "native:MainLight":
+                        res = "Light";
+                        break;
+
+                    case "native:MainRegular":
+                        res = "Medium";
+                        break;
+
+                    case "native:MainBold":
+                        res = "Bold";
+                        break;
+
+                    case "native:MainBlack":
+                        res = "Black";
+                        break;
+
+                    case "native:ItalicThin":
+                        res = "ThinItalic";
+                        break;
+
+                    case "native:ItalicLight": 
+                        res = "LightItalic";
+                        break;
+
+                    case "native:ItalicRegular":
+                        res = "Italic";
+                        break;
+
+                    case "native:ItalicBold":
+                        res = "BoldItalic";
+                        break;
+
+                    case "native:ItalicBlack":
+                        res = "BlackItalic";
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unsupported native font type: " + fontName);
+                }
+                InputStream is = getClass().getResourceAsStream("/com/codename1/impl/javase/Roboto-" + res + ".ttf");
+                if(is != null) {
+                    java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+                    is.close();
+                    return fnt;
+                }
+            }
+            if (baseResourceDir != null) {
+                fontFile = new File(baseResourceDir, fileName);
+            } else {
+                fontFile = new File("src", fileName);
+            }
             if (fontFile.exists()) {
                 FileInputStream fs = new FileInputStream(fontFile);
                 java.awt.Font fnt = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, fs);
@@ -4154,7 +4266,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             err.printStackTrace();
             throw new RuntimeException(err);
         }
-        throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
+        if(fontFile != null) {
+            throw new RuntimeException("The file wasn't found: " + fontFile.getAbsolutePath());
+        }
+        throw new RuntimeException("The file wasn't found: " + fontName);
     }
 
     @Override
@@ -4917,12 +5032,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.isBuiltinSoundAvailable(soundIdentifier);
     }
 
-//    /**
-//     * @inheritDoc
-//     */
-//    public Object createAudio(String uri, Runnable onCompletion) throws IOException {
-//        return new CodenameOneMediaPlayer(uri, frm, onCompletion);
-//    }
+    
     /**
      * Plays the sound in the given URI which is partially platform specific.
      *
@@ -5060,15 +5170,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         LinkedList<Shape> clipStack = new LinkedList<Shape>();
     }
     
+    private Object lastNativeGraphics;
+    private Transform lastNativeGraphicsTransform;
+    
     private void setNativeScreenGraphicsTransform(Object nativeGraphics, com.codename1.ui.Transform transform){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             ((NativeScreenGraphics)nativeGraphics).transform = transform;
+        } else {
+            lastNativeGraphics = nativeGraphics;
+            lastNativeGraphicsTransform = transform;
         }
     }
     
     private com.codename1.ui.Transform getNativeScreenGraphicsTransform(Object nativeGraphics){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             return ((NativeScreenGraphics)nativeGraphics).transform;
+        } else if (lastNativeGraphics == nativeGraphics) {
+            return lastNativeGraphicsTransform;
         }
         return null;
     }
@@ -5403,7 +5521,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     nr.setResponseHeaders(headers);
                     nr.setResponseBody("");
                 }
-                InputStream i = new BufferedInputStream(con.getInputStream()) {
+                InputStream is;
+                if(con.getResponseCode() >= 200 && con.getResponseCode() < 300){
+                    is = con.getInputStream();
+                }else{
+                    is = con.getErrorStream();
+                }
+                InputStream i = new BufferedInputStream(is) {
 
                     public synchronized int read(byte b[], int off, int len)
                             throws IOException {
@@ -5870,6 +5994,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         Contact contact = getContactById(id);
         c.setId(contact.getId());
         c.setDisplayName(contact.getDisplayName());
+        
+        if(includesPicture){
+            c.setPhoto(contact.getPhoto());
+        }
         
         if (includesFullName) {
             c.setFirstName(contact.getFirstName());
@@ -6694,7 +6822,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean isNativeBrowserComponentSupported() {
-        return fxExists;
+        return fxExists && !blockNativeBrowser;
         //return false;
     }
 
@@ -7205,13 +7333,20 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private Hashtable initContacts() {
         Hashtable retVal = new Hashtable();
-
+        
+        Image img = null;
+        try {
+            img = Image.createImage(getClass().getResourceAsStream("/com/codename1/impl/javase/user.jpg"));
+        } catch (IOException ex) {
+        }
+        
         Contact contact = new Contact();
         contact.setId("1");
 
         contact.setDisplayName("Chen Fishbein");
         contact.setFirstName("Chen");
         contact.setFamilyName("Fishbein");
+        contact.setPhoto(img);
 
         Hashtable phones = new Hashtable();
         phones.put("mobile", "+111111");
@@ -7236,6 +7371,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Shai Almog");
         contact.setFirstName("Shai");
         contact.setFamilyName("Almog");
+        contact.setPhoto(img);
 
         phones = new Hashtable();
         phones.put("mobile", "+111111");
@@ -7306,6 +7442,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Kenny McCormick");
         contact.setFirstName("Kenny");
         contact.setFamilyName("McCormick");
+        contact.setPhoto(img);
 
 
         phones = new Hashtable();
@@ -7407,6 +7544,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 return shrink(arr, size);
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 err.printStackTrace();
                 errorMessage = err.toString();
                 return null;
@@ -7428,6 +7566,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 os.write(param);
                 os.flush();
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 errorMessage = err.toString();
                 err.printStackTrace();
             }
@@ -7567,7 +7706,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
 
-        File u = new File(f.getParent(), "src" + File.separator + "html");
+        File u = new File(f.getParent(), "build" + File.separator + "classes"+ File.separator + "html");
+        if (!u.exists()) {
+            u = new File(f.getParent(), "src" + File.separator + "html");
+        }
         String base = u.toURI().toURL().toExternalForm(); 
         if(base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);

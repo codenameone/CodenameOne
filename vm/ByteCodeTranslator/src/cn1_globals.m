@@ -902,6 +902,7 @@ JAVA_OBJECT xmlvm_create_java_string(CODENAME_ONE_THREAD_STATE, const char *chr)
 void initConstantPool() {
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+    enteringNativeAllocations();
     JAVA_ARRAY arr = (JAVA_ARRAY)allocArray(threadStateData, CN1_CONSTANT_POOL_SIZE, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
     JAVA_OBJECT* tmpConstantPoolObjects = (JAVA_ARRAY_OBJECT*)(*arr).data;
     
@@ -929,8 +930,11 @@ void initConstantPool() {
     constantPoolObjects = tmpConstantPoolObjects;
     invokedGC = NO;
 
+    enteringNativeAllocations();
+
     // it will wait two seconds unless an explicit GC occurs
-    java_lang_System_startGCThread__(getThreadLocalData());
+    java_lang_System_startGCThread__(threadStateData);
+    finishedNativeAllocations();
 }
 
 JAVA_OBJECT utf8String = NULL;

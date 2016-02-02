@@ -185,7 +185,7 @@ public class Location {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "altitude = " + altitude

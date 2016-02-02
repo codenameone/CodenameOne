@@ -43,10 +43,12 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
     private volatile boolean created = false;
 
     private SurfaceHolder surfaceHolder;
+    private AndroidImplementation implementation;
     
     public AndroidSurfaceView(Activity activity, AndroidImplementation implementation) {
         super(activity);
         setId(2001);
+        this.implementation = implementation;
         cn1View = new CodenameOneView(activity, this, implementation, false);
         surfaceHolder = getHolder();
         surfaceHolder.addCallback(new SurfaceHolder.Callback() {
@@ -129,6 +131,9 @@ public class AndroidSurfaceView extends SurfaceView implements CodenameOneSurfac
     protected void onDraw(Canvas canvas) {
         cn1View.d(canvas);
         super.onDraw(canvas);
+        if (implementation.isAsyncEditMode() && implementation.isEditingText()) {
+            InPlaceEditView.reLayoutEdit();
+        }
     }
     
     

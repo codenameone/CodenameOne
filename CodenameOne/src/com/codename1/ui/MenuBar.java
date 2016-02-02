@@ -569,7 +569,7 @@ public class MenuBar extends Container implements ActionListener {
                         return;
                     }
                     if (softCommand[iter] != null) {
-                        ActionEvent e = new ActionEvent(softCommand[iter]);
+                        ActionEvent e = new ActionEvent(softCommand[iter],ActionEvent.Type.Command);
                         softCommand[iter].actionPerformed(e);
                         if (!e.isConsumed()) {
                             parent.actionCommandImpl(softCommand[iter]);
@@ -633,7 +633,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setUnselectedStyle(Style style) {
         style.setMargin(Component.TOP, 0, true);
@@ -716,7 +716,7 @@ public class MenuBar extends Container implements ActionListener {
             if (result == selectMenuItem) {
                 c = getComponentSelectedCommand(((Form) d).getMenuBar().commandList);
                 if (c != null) {
-                    ActionEvent e = new ActionEvent(c);
+                    ActionEvent e = new ActionEvent(c,ActionEvent.Type.Command);
                     c.actionPerformed(e);
                 }
             } else {
@@ -725,7 +725,7 @@ public class MenuBar extends Container implements ActionListener {
                 if (!isTouchMenus()) {
                     c = result;
                     if (c != null) {
-                        ActionEvent e = new ActionEvent(c);
+                        ActionEvent e = new ActionEvent(c,ActionEvent.Type.Command);
                         c.actionPerformed(e);
                     }
                 }
@@ -899,7 +899,8 @@ public class MenuBar extends Container implements ActionListener {
                     rightContainer.removeAll();
                     Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
                     if (i == null) {
-                        i = Resources.getSystemResource().getImage("of_menu.png");
+                        //i = Resources.getSystemResource().getImage("of_menu.png");
+                        i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, getUIManager().getComponentStyle("TouchCommand"));
                     }                    
                     Button menu = createTouchCommandButton(new Command("", i) {
 
@@ -1309,7 +1310,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1337,7 +1338,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1406,7 +1407,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -1709,7 +1710,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
         return DRAG_REGION_NOT_DRAGGABLE;

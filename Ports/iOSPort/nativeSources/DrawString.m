@@ -25,10 +25,14 @@
 #import "DrawStringTextureCache.h"
 #include "xmlvm.h"
 
+extern float scaleValue;
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
 extern GLKMatrix4 CN1transformMatrix;
+extern int CN1modelViewMatrixVersion;
+extern int CN1projectionMatrixVersion;
+extern int CN1transformMatrixVersion;
 extern GLuint CN1activeProgram;
 static GLuint program=0;
 static GLuint vertexShader;
@@ -46,6 +50,9 @@ static const GLshort textureCoordinates[] = {
     0, 0,
     1, 0,
 };
+static int currentCN1modelViewMatrixVersion=-1;
+static int currentCN1projectionMatrixVersion=-1;
+static int currentCN1transformMatrixVersion=-1;
 
 
 static NSString *fragmentShaderSrc =
@@ -119,12 +126,23 @@ static GLuint getOGLProgram(){
 #endif
     return self;
 }
+
 #ifdef USE_ES2
 -(void)execute {
     glUseProgram(getOGLProgram());
-    GLuint textureName = [DrawStringTextureCache checkCache:str f:font c:color a:255];
-    int w = (int)[str sizeWithFont:font].width;
-    int h = (int)[font lineHeight];
+    GLuint textureName = 0;
+    DrawStringTextureCache *cachedTex = [DrawStringTextureCache checkCache:str f:font c:color a:255];
+    int w = -1;
+    if (cachedTex != nil) {
+        textureName = [cachedTex textureName];
+        w = [cachedTex stringWidth];
+    } else {
+        w = (int)[str sizeWithFont:font].width;
+    }
+    
+    // Add one point to the height to prevent cutting off bottom in some fonts
+    // E.g. Caecilia Bold_8986
+    int h = (int)ceil([font lineHeight]+1.0*scaleValue);
     int p2w = nextPowerOf2(w);
     int p2h = nextPowerOf2(h);
     glEnableVertexAttribArray(vertexCoordAtt);
@@ -139,10 +157,12 @@ static GLuint getOGLProgram(){
     //_glEnable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
     GLErrorLog;
+    BOOL textureBound = NO;
     if(textureName == 0) {
         glGenTextures(1, &textureName);
         GLErrorLog;
         glBindTexture(GL_TEXTURE_2D, textureName);
+        textureBound = YES;
         GLErrorLog;
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
         void* imageData = malloc(p2h * p2w * 4);
@@ -166,29 +186,38 @@ static GLuint getOGLProgram(){
     }
     //_glColor4f(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
-    glBindTexture(GL_TEXTURE_2D, textureName);
-    GLErrorLog;
+    if (!textureBound) {
+        glBindTexture(GL_TEXTURE_2D, textureName);
+        GLErrorLog;
+    }
+    
+    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     GLErrorLog;
     
     GLfloat vertexes[] = {
         x, y,
-        x + p2w, y,
-        x, y + p2h,
-        x + p2w, y + p2h
+        x + w, y,
+        x, y + h,
+        x + w, y + h
     };
     
-    //static const GLshort textureCoordinates[] = {
-    //    0, 1,
-    //    1, 1,
-    //    0, 0,
-    //    1, 0,
-    //};
+    GLfloat nY = 1.0;
+    GLfloat wX = 0;
+    GLfloat sY = 1.0 - (GLfloat)h / (GLfloat)p2h;
+    GLfloat eX = (GLfloat)w/(GLfloat)p2w;
+    
+    GLfloat textureCoordinates[] = {
+        wX, nY,
+        eX, nY,
+        wX, sY,
+        eX, sY
+    };
     
     //_glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
     //GLErrorLog;
-    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
+    glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, textureCoordinates);
     GLErrorLog;
     
     //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
@@ -196,12 +225,22 @@ static GLuint getOGLProgram(){
     glVertexAttribPointer(vertexCoordAtt, 2, GL_FLOAT, GL_FALSE, 0, vertexes);
     GLErrorLog;
     
-    glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
-    GLErrorLog;
-    glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
-    GLErrorLog;
+    if (currentCN1projectionMatrixVersion != CN1projectionMatrixVersion) {
+        glUniformMatrix4fv(projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
+        currentCN1projectionMatrixVersion = CN1projectionMatrixVersion;
+        
+        GLErrorLog;
+    }
+    if (currentCN1modelViewMatrixVersion != CN1modelViewMatrixVersion) {
+        glUniformMatrix4fv(modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
+        currentCN1modelViewMatrixVersion = CN1modelViewMatrixVersion;
+        GLErrorLog;
+    }
+    if (currentCN1transformMatrixVersion != CN1transformMatrixVersion) {
+        glUniformMatrix4fv(transformMatrixUniform, 1, 0, CN1transformMatrix.m);
+        GLErrorLog;
+        currentCN1transformMatrixVersion = CN1transformMatrixVersion;
+    }
     
     glUniform1i(textureUniform, 0);
     GLErrorLog;
@@ -227,7 +266,8 @@ static GLuint getOGLProgram(){
 
 #else
 -(void)execute {
-    GLuint textureName = [DrawStringTextureCache checkCache:str f:font c:color a:255];
+    DrawStringTextureCache* cache = [DrawStringTextureCache checkCache:str f:font c:color a:255];
+    GLuint textureName = [cache textureName];
     int w = (int)[str sizeWithFont:font].width;
     int h = (int)[font lineHeight];
     int p2w = nextPowerOf2(w);

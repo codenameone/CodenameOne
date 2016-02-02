@@ -40,23 +40,16 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.RectF;
-import android.graphics.Region;
 import android.graphics.Typeface;
-import android.graphics.Paint.Style;
 import android.graphics.Path;
-import android.graphics.PorterDuff.Mode;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Vibrator;
 import android.telephony.TelephonyManager;
-import android.text.TextPaint;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -64,14 +57,12 @@ import android.view.Window;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import com.codename1.ui.BrowserComponent;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.events.ActionEvent;
@@ -86,7 +77,6 @@ import java.util.Vector;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Matrix;
-import android.graphics.PixelFormat;
 import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Camera;
 import android.media.ExifInterface;
@@ -96,6 +86,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
@@ -114,7 +105,11 @@ import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.*;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.media.Audio;
+import com.codename1.media.AudioService;
+import com.codename1.media.MediaProxy;
 import com.codename1.messaging.Message;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.push.PushCallback;
 import com.codename1.ui.*;
@@ -124,6 +119,7 @@ import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
 import java.io.File;
 import java.io.FileDescriptor;
@@ -182,7 +178,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     static final int DROID_IMPL_KEY_MUTE = -23459;
     static int[] leftSK = new int[]{DROID_IMPL_KEY_MENU};
     CodenameOneSurface myView = null;
-    private Paint defaultFont;
+    CodenameOneTextPaint defaultFont;
     private final char[] tmpchar = new char[1];
     private final Rect tmprect = new Rect();
     protected int defaultFontHeight;
@@ -204,6 +200,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
+    private Media background;
+    private boolean asyncEditMode = false;
+    private boolean compatPaintMode;
+
+    @Override
+    public void setPlatformHint(String key, String value) {
+        if(key.equals("platformHint.compatPaintMode")) {
+            compatPaintMode = value.equalsIgnoreCase("true");
+            return;
+        }
+        if(key.equals("platformHint.legacyPaint")) {
+            AndroidAsyncView.legacyPaintLogic = value.equalsIgnoreCase("true");;
+        }
+    }
+
     
     /**
      * This method in used internally for ads
@@ -455,7 +466,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
 
 
-        this.defaultFont = (Paint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
+        this.defaultFont = (CodenameOneTextPaint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
         Display.getInstance().setTransitionYield(-1);
         
         initSurface();
@@ -537,6 +548,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return Display.DENSITY_HIGH;
             case DisplayMetrics.DENSITY_XHIGH:
                 return Display.DENSITY_VERY_HIGH;
+            case 400: // DisplayMetrics.DENSITY_400
+            case 420: // DisplayMetrics.DENSITY_420
             case 480: // DisplayMetrics.DENSITY_XXHIGH
                 return Display.DENSITY_HD;
             case 560: // DisplayMetrics.DENSITY_560
@@ -702,16 +715,46 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (keyCode > 0 && getKeyboardType() == Display.KEYBOARD_TYPE_QWERTY) {
             text += (char) keyCode;
         }
-        Display display = Display.getInstance();
-        String userInput = InPlaceEditView.edit(this, cmp, constraint);
-        display.onEditingComplete(cmp, userInput);
+        InPlaceEditView.edit(this, cmp, constraint);
     }
 
     protected boolean editInProgress() {
         return InPlaceEditView.isEditing();
     }
 
-    public static void stopEditing(){
+    @Override
+    public boolean isAsyncEditMode() {
+        return asyncEditMode;
+    }
+
+    void setAsyncEditMode(boolean async) {
+        asyncEditMode = async;
+    }
+    
+    void callHideTextEditor() {
+        super.hideTextEditor();
+    }
+
+    @Override
+    public void hideTextEditor() {
+        InPlaceEditView.hideActiveTextEditor();
+    }
+
+    @Override
+    public boolean isEditingText(Component c) {
+        if (InPlaceEditView.isActiveTextEditorHidden()) {
+            return false;
+        }
+        return super.isEditingText(c);
+    }
+
+    
+    
+    public static void stopEditing() {
+        stopEditing(false);
+    }
+    
+    public static void stopEditing(final boolean forceVKBClose){
         final boolean[] flag = new boolean[]{false};
 
         // InPlaceEditView.endEdit must be called from the UI thread.
@@ -721,7 +764,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             @Override
             public void run() {
                 // Must be called from the UI thread
-                InPlaceEditView.endEdit();
+                InPlaceEditView.stopEdit(forceVKBClose);
 
                 synchronized (flag) {
                     flag[0] = true;
@@ -745,6 +788,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void saveTextEditingState() {
         stopEditing();
+    }
+    
+    @Override
+    public void stopTextEditing() {    
+        saveTextEditingState();
     }
 
     protected void setLastSizeChangedWH(int w, int h) {
@@ -907,17 +955,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             font = this.defaultFont;
         }
         if (font instanceof NativeFont) {
-            ((AndroidGraphics) graphics).setFont((Paint) ((NativeFont) font).font);
+            ((AndroidGraphics) graphics).setFont((CodenameOneTextPaint) ((NativeFont) font).font);
         } else {
-            ((AndroidGraphics) graphics).setFont((Paint) font);
+            ((AndroidGraphics) graphics).setFont((CodenameOneTextPaint) font);
         }
     }
 
     @Override
     public int getHeight(Object nativeFont) {
-        Paint font = (nativeFont == null ? this.defaultFont
-                : (Paint) ((NativeFont) nativeFont).font);
-        return font.getFontMetricsInt(font.getFontMetricsInt());
+        CodenameOneTextPaint font = (nativeFont == null ? this.defaultFont
+                : (CodenameOneTextPaint) ((NativeFont) nativeFont).font);
+        if(font.fontHeight < 0) {
+            font.fontHeight = font.getFontMetricsInt(font.getFontMetricsInt());
+        }
+        return font.fontHeight;
     }
 
     @Override
@@ -972,16 +1023,77 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public boolean isNativeFontSchemeSupported() {
+        return true;
+    }
+    
+    private Typeface fontToRoboto(String fontName) {
+            if("native:MainThin".equals(fontName)) {
+                return Typeface.create("sans-serif-thin", Typeface.NORMAL);
+            }
+            if("native:MainLight".equals(fontName)) {
+                return Typeface.create("sans-serif-light", Typeface.NORMAL);
+            }
+            if("native:MainRegular".equals(fontName)) {
+                return Typeface.create("sans-serif", Typeface.NORMAL);
+            }
+            
+            if("native:MainBold".equals(fontName)) {
+                return Typeface.create("sans-serif-condensed", Typeface.BOLD);
+            }
+            
+            if("native:MainBlack".equals(fontName)) {
+                return Typeface.create("sans-serif-black", Typeface.BOLD);
+            }
+            
+            if("native:ItalicThin".equals(fontName)) {
+                return Typeface.create("sans-serif-thin", Typeface.ITALIC);
+            }
+            
+            if("native:ItalicLight".equals(fontName)) {
+                return Typeface.create("sans-serif-thin", Typeface.ITALIC);
+            }
+            
+            if("native:ItalicRegular".equals(fontName)) {
+                return Typeface.create("sans-serif", Typeface.ITALIC);
+            }
+            
+            if("native:ItalicBold".equals(fontName)) {
+                return Typeface.create("sans-serif-condensed", Typeface.BOLD_ITALIC);
+            }
+            
+            if("native:ItalicBlack".equals(fontName)) {
+                return Typeface.create("sans-serif-black", Typeface.BOLD_ITALIC);
+            }
+            
+            throw new IllegalArgumentException("Unsupported native font type: " + fontName);
+    }
+
+    @Override
     public Object loadTrueTypeFont(String fontName, String fileName) {
+        if(fontName.startsWith("native:")) {
+            Typeface t = fontToRoboto(fontName);
+            int fontStyle = com.codename1.ui.Font.STYLE_PLAIN;
+            if(t.isBold()) {
+                fontStyle |= com.codename1.ui.Font.STYLE_BOLD;
+            }
+            if(t.isItalic()) {
+                fontStyle |= com.codename1.ui.Font.STYLE_ITALIC;
+            }
+            CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
+            newPaint.setAntiAlias(true);
+            newPaint.setSubpixelText(true);
+            return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, fontStyle,
+                    com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
+        }
         Typeface t = Typeface.createFromAsset(activity.getAssets(), fileName);
         if(t == null) {
             throw new RuntimeException("Font not found: " + fileName);
         }
-        TextPaint newPaint = new TextPaint();
+        CodenameOneTextPaint newPaint = new CodenameOneTextPaint(t);
         newPaint.setAntiAlias(true);
         newPaint.setSubpixelText(true);
-        newPaint.setTypeface(t);
-        return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, 
+        return new NativeFont(com.codename1.ui.Font.FACE_SYSTEM,
                 com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fileName, 0, 0);
     }
     
@@ -1027,29 +1139,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         NativeFont fnt = (NativeFont)font;
-        TextPaint paint = (TextPaint)fnt.font;
+        CodenameOneTextPaint paint = (CodenameOneTextPaint)fnt.font;
         paint.setAntiAlias(true);
         Typeface type = paint.getTypeface();
         int fontstyle = Typeface.NORMAL;
-        if ((weight & Font.STYLE_BOLD) != 0) {
+        if ((weight & Font.STYLE_BOLD) != 0 || type.isBold()) {
             fontstyle |= Typeface.BOLD;
         }
-        if ((weight & Font.STYLE_ITALIC) != 0) {
+        if ((weight & Font.STYLE_ITALIC) != 0 || type.isItalic()) {
             fontstyle |= Typeface.ITALIC;
         }
         type = Typeface.create(type, fontstyle);
-        TextPaint newPaint = new TextPaint();
-        newPaint.setTypeface(type);
+        CodenameOneTextPaint newPaint = new CodenameOneTextPaint(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
-        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
+        NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
         return n;
     }
 
     @Override
     public Object createFont(int face, int style, int size) {
-        Paint font = new TextPaint();
-        font.setAntiAlias(true);
         Typeface typeface = null;
         switch (face) {
             case Font.FACE_MONOSPACE:
@@ -1081,7 +1190,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 break;
         }
 
-        font.setTypeface(Typeface.create(typeface, fontstyle));
+        Paint font = new CodenameOneTextPaint(Typeface.create(typeface, fontstyle));
+        font.setAntiAlias(true);
         font.setUnderlineText((style & Font.STYLE_UNDERLINED) != 0);
         font.setTextSize(height);
         return new NativeFont(face, style, size, font);
@@ -1099,8 +1209,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object loadNativeFont(String lookup) {
         try {
             lookup = lookup.split(";")[0];
-            Paint font = new TextPaint();
-            font.setAntiAlias(true);
             int typeface = Typeface.NORMAL;
             String familyName = lookup.substring(0, lookup.indexOf("-"));
             String style = lookup.substring(lookup.indexOf("-") + 1, lookup.lastIndexOf("-"));
@@ -1113,7 +1221,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else if (style.equals("bold")) {
                 typeface = Typeface.BOLD;
             }
-            font.setTypeface(Typeface.create(familyName, typeface));
+            Paint font = new CodenameOneTextPaint(Typeface.create(familyName, typeface));
+            font.setAntiAlias(true);
             font.setTextSize(Integer.parseInt(size));
             return new NativeFont(0, 0, 0, font);
         } catch (Exception err) {
@@ -1143,8 +1252,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getDefaultFont() {
-        TextPaint paint = new TextPaint();
-        paint.set(this.defaultFont);
+        CodenameOneTextPaint paint = new CodenameOneTextPaint(this.defaultFont);
         return new NativeFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM, paint);
     }
 
@@ -1388,6 +1496,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void drawImage(Object graphics, Object img, int x, int y) {
         ((AndroidGraphics) graphics).drawImage(img, x, y);
     }
+    
+    @Override
+    public void tileImage(Object graphics, Object img, int x, int y, int w, int h) {
+        ((AndroidGraphics) graphics).tileImage(img, x, y, w, h);
+    }
 
     public boolean isScaledImageDrawingSupported() {
         return true;
@@ -1461,6 +1574,56 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidGraphics) graphics).fillRect(x, y, width, height);
     }
 
+    @Override
+    public void fillRect(Object graphics, int x, int y, int w, int h, byte alpha) {
+        ((AndroidGraphics) graphics).fillRect(x, y, w, h, alpha);
+    }
+
+    @Override
+    public void paintComponentBackground(Object graphics, int x, int y, int width, int height, Style s) {
+        if((!asyncView) || compatPaintMode ) {
+            super.paintComponentBackground(graphics, x, y, width, height, s);
+            return;
+        }
+        ((AndroidGraphics) graphics).paintComponentBackground(x, y, width, height, s);
+    }
+
+    @Override
+    public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        if(!asyncView) {
+            super.fillLinearGradient(graphics, startColor, endColor, x, y, width, height, horizontal);
+            return;
+        }
+        ((AndroidGraphics)graphics).fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
+    }
+
+    @Override
+    public void fillRectRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        if(!asyncView) {
+            super.fillRectRadialGradient(graphics, startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+            return;
+        }
+        ((AndroidGraphics)graphics).fillRectRadialGradient(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
+    }
+
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+        ((AndroidGraphics)graphics).fillRadialGradient(startColor, endColor, x, y, width, height);
+    }
+        
+
+    @Override
+    public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
+        if(AndroidAsyncView.legacyPaintLogic) {
+            super.drawLabelComponent(nativeGraphics, cmpX, cmpY, cmpHeight, cmpWidth, style, text, icon, stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth, isTickerRunning, tickerShiftText, endsWith3Points, valign);
+            return;
+        }
+        ((AndroidGraphics)nativeGraphics).drawLabelComponent(cmpX, cmpY, cmpHeight, cmpWidth, style, text, 
+                (Bitmap)icon, (Bitmap)stateIcon, preserveSpaceForState, gap, rtl, isOppositeSide, textPosition, stringWidth, 
+                isTickerRunning, tickerShiftText, endsWith3Points, valign);
+    }
+
+   
     @Override
     public void fillRoundRect(Object graphics, int x, int y, int width,
             int height, int arcWidth, int arcHeight) {
@@ -1741,62 +1904,83 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public String getAppArg() {
+        if (super.getAppArg() != null) {
+            // This just maintains backward compatibility in case people are manually
+            // setting the AppArg in their properties.  It reproduces the general
+            // behaviour the existed when AppArg was just another Display property.
+            return super.getAppArg();
+        }
+        android.content.Intent intent = activity.getIntent();
+        if (intent != null) {
+            Uri u = intent.getData();
+            if (u != null) {
+                String scheme = intent.getScheme();
+                intent.setData(null);
+                if ("content".equals(scheme)) {
+                    try {
+                        InputStream attachment = activity.getContentResolver().openInputStream(u);
+                        if (attachment != null) {
+                            String name = getContentName(activity.getContentResolver(), u);
+                            if (name != null) {
+                                String filePath = getAppHomePath()
+                                        + getFileSystemSeparator() + name;
+                                File f = new File(filePath);
+                                OutputStream tmp = createFileOuputStream(f);
+                                byte[] buffer = new byte[1024];
+                                while (attachment.read(buffer) > 0) {
+                                    tmp.write(buffer);
+                                }
+                                tmp.close();
+                                attachment.close();
+                                return filePath;
+                            }
+                        }
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                        return null;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        return null;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return null;
+                    }
+                } else {
+                    String encodedPath = u.getEncodedPath();
+                    if (encodedPath != null && encodedPath.length() > 0) {
+                        String query = u.getQuery();
+                        if(query != null && query.length() > 0){
+                            encodedPath += "?" + query;
+                        }
+                        return encodedPath;
+                    }
+                    return u.toString();
+                }
+            }
+        }
+        return null;
+    }
+    
+    
+
     /**
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
+        if(key.equalsIgnoreCase("cn1_push_prefix")) {
+            boolean has = hasAndroidMarket();
+            if(has) {
+                return "gcm";
+            }
+            return defaultValue;
+        }
         if ("OS".equals(key)) {
             return "Android";
         }
         if ("androidId".equals(key)) {
             return Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID);
-        }
-        
-        if ("AppArg".equals(key)) {
-            android.content.Intent intent = activity.getIntent();
-            if (intent != null) {
-                Uri u = intent.getData();
-                if (u != null) {
-                    String scheme = intent.getScheme();
-                    intent.setData(null);
-                    if ("content".equals(scheme)) {
-                        try {
-                            InputStream attachment = activity.getContentResolver().openInputStream(u);
-                            if (attachment != null) {
-                                String name = getContentName(activity.getContentResolver(), u);
-                                if (name != null) {
-                                    String filePath = getAppHomePath()
-                                            + getFileSystemSeparator() + name;
-                                    File f = new File(filePath);
-                                    OutputStream tmp = createFileOuputStream(f);
-                                    byte[] buffer = new byte[1024];
-                                    while (attachment.read(buffer) > 0) {
-                                        tmp.write(buffer);
-                                    }
-                                    tmp.close();
-                                    attachment.close();
-                                    return filePath;
-                                }
-                            }
-                        } catch (FileNotFoundException e) {
-                            e.printStackTrace();
-                            return defaultValue;
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            return defaultValue;
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            return defaultValue;
-                        }
-                    } else {
-                        String encodedPath = u.getEncodedPath();
-                        if (encodedPath != null && encodedPath.length() > 0) {
-                            return encodedPath;
-                        }
-                        return u.toString();
-                    }
-                }
-            }
         }
         
         if ("cellId".equals(key)) {
@@ -1849,6 +2033,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if("OSVer".equals(key)) {
             return "" + android.os.Build.VERSION.RELEASE;
+        }
+        if("DeviceName".equals(key)) {
+            return "" + android.os.Build.MODEL;
         }
         try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
@@ -2048,6 +2235,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isNativeVideoPlayerControlsIncluded() {
         return true;
     }
+    
+   
+    @Override
+    public Media createBackgroundMedia(String uri) throws IOException {
+
+        Intent serviceIntent = new Intent(activity, AudioService.class);
+        serviceIntent.putExtra("mediaLink", uri);
+        
+        final ServiceConnection mConnection = new ServiceConnection() {
+
+            public void onServiceDisconnected(ComponentName name) {
+                background = null;
+            }
+
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                AudioService.LocalBinder mLocalBinder = (AudioService.LocalBinder) service;
+                background = mLocalBinder.getService();
+            }
+        };
+
+        activity.bindService(serviceIntent, mConnection, activity.BIND_AUTO_CREATE);
+        activity.startService(serviceIntent);
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            @Override
+            public void run() {
+                while (background == null) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                    }
+                }
+            }
+        });
+
+        Media retVal = new MediaProxy(background) {
+
+            @Override
+            public void cleanup() {
+                super.cleanup();
+                activity.unbindService(mConnection);
+            }
+        };
+        return retVal;
+    }
+
     
     /**
      * @inheritDoc
@@ -4251,12 +4483,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
 //        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
 //                new Intent("SMS_DELIVERED"), 0);
-        if(i) {
-            Intent smsIntent = new Intent(Intent.ACTION_VIEW);
-            smsIntent.setType("vnd.android-dir/mms-sms");
-            smsIntent.putExtra("address", phoneNumber);
-            smsIntent.putExtra("sms_body",message);
+        if(i) {            
+            Intent smsIntent = null;
+            if(android.os.Build.VERSION.SDK_INT < 19){
+                smsIntent = new Intent(Intent.ACTION_VIEW);
+                smsIntent.setType("vnd.android-dir/mms-sms");
+                smsIntent.putExtra("address", phoneNumber);
+                smsIntent.putExtra("sms_body",message);
+            }else{
+                smsIntent = new Intent(Intent.ACTION_SENDTO);
+                smsIntent.setData(Uri.parse("smsto:" + Uri.encode(phoneNumber)));   
+                smsIntent.putExtra("sms_body", message); 
+            }
             activity.startActivity(smsIntent);            
+            
         } else {
             SmsManager sms = SmsManager.getDefault();
             ArrayList<String> parts = sms.divideMessage(message);
@@ -5222,7 +5462,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             flushGraphics();
         }
         if(InPlaceEditView.isKeyboardShowing()){
-            stopEditing();
+            stopEditing(true);
         }
         super.setCurrentForm(f);
         if (isNativeTitle() &&  !(f instanceof Dialog)) {
@@ -6146,7 +6386,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isPerspectiveTransformSupported(Object graphics){
-    	return true;
+    	return android.os.Build.VERSION.SDK_INT >= 14;
     }
 
     @Override
@@ -6333,6 +6573,76 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         return p;
+    }
+
+    public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
+        
+        Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
+        notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notif.getId());        
+        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
+        
+        Intent contentIntent = new Intent();
+        contentIntent.setComponent(activity.getComponentName());
+        contentIntent.putExtra("LocalNotificationID", notif.getId());
+        PendingIntent pendingContentIntent = PendingIntent.getActivity(activity, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
+        
+        
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        
+        AlarmManager alarmManager = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
+        if(repeat == LocalNotification.REPEAT_NONE){
+            alarmManager.set(AlarmManager.RTC_WAKEUP, firstTime, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_MINUTE){
+            
+            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, 60*1000*1000, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_HOUR){
+            
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_HALF_HOUR, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_DAY){
+            
+            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY, pendingIntent);
+            
+        }else if(repeat == LocalNotification.REPEAT_WEEK){
+            
+            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY * 7, pendingIntent);
+            
+        }
+    }
+
+    public void cancelLocalNotification(String notificationId) {
+        Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
+        notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notificationId);
+        
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);        
+        AlarmManager alarmManager = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
+        alarmManager.cancel(pendingIntent);
+    }
+
+    static Bundle createBundleFromNotification(LocalNotification notif){
+        Bundle b = new Bundle();
+        b.putString("NOTIF_ID", notif.getId());
+        b.putString("NOTIF_TITLE", notif.getAlertTitle());
+        b.putString("NOTIF_BODY", notif.getAlertBody());
+        b.putString("NOTIF_SOUND", notif.getAlertSound());
+        b.putString("NOTIF_IMAGE", notif.getAlertImage());
+        b.putInt("NOTIF_NUMBER", notif.getBadgeNumber());
+        return b;
+    }
+    
+    static LocalNotification createNotificationFromBundle(Bundle b){
+        LocalNotification n = new LocalNotification();
+        n.setId(b.getString("NOTIF_ID"));
+        n.setAlertTitle(b.getString("NOTIF_TITLE"));
+        n.setAlertBody(b.getString("NOTIF_BODY"));
+        n.setAlertSound(b.getString("NOTIF_SOUND"));
+        n.setAlertImage(b.getString("NOTIF_IMAGE"));
+        n.setBadgeNumber(b.getInt("NOTIF_NUMBER"));
+        return n;
     }
     
 }

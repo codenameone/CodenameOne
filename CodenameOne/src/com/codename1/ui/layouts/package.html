@@ -1,8 +1,3 @@
-<!-- 
-    Document   : package
-    Created on : Oct 11, 2007, 10:38:26 AM
-    Author     : Shai Almog
--->
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
   <head>
@@ -11,10 +6,70 @@
     <body>
         <p>
             Layout managers allow a {@link com.codename1.ui.Container} to 
-            arrange its components by a set of rules that would be adapted for specific
-            screen/font sizes. A layout manager is an arranging algorithm encapsulated
-            by an interface, the interface implementation places components absolutely based
-            on "hints" received.
+            arrange its components by a set of rules that adapt to specific
+            densities (ppi - pixels per inch). A layout manager is an arranging algorithm encapsulated
+            by an abstract class implementation that places components absolutely based
+            on the "hints" received.
         </p>
+        <h2>Layout Managers that ship with Codename One</h2>
+        
+        <p>
+            {@link com.codename1.ui.layouts.FlowLayout} is default layout manager, simple, flexible and with a few caveats.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/flow-layout.png" alt="Simple FlowLayout" />
+
+        <p>
+            {@link com.codename1.ui.layouts.BorderLayout} is ubiquitous thru Codename One code. 
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/border-layout.png" alt="Border Layout" />
+
+        <p>
+            {@link com.codename1.ui.layouts.BorderLayout} can also behave differently based on the center behavior flag
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/border-layout-center.png" alt="Border Layout Center" />
+
+        <p>
+            {@link com.codename1.ui.layouts.BoxLayout} Y axis is a the work-horse of component lists
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/box-layout-y.png" alt="Box Layout Y" />
+ 
+       <p>
+            {@link com.codename1.ui.layouts.BoxLayout} X axis is a simpler replacement to flow layout and has grow/no grow variants.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/box-layout-x.png" alt="Box Layout X" /><br>
+        <img src="https://www.codenameone.com/img/developer-guide/box-layout-x-no-grow.png" alt="Box Layout X No Grow" />
+        
+       <p>
+            {@link com.codename1.ui.layouts.GridLayout} arranges elements in a grid where all elements have an equal size. It can auto adapt
+            the column count.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/grid-layout-2x2.png" alt="Grid Layout 2x2" />
+        <img src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-landscape.png" alt="Grid Layout autofit landscape" />
+        
+       <p>
+            {@link com.codename1.ui.table.TableLayout} is similar in many regards to HTML tables. Notice that its
+            in the <code>com.codename1.ui.table</code> package and not in this package.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
+        <img src="https://www.codenameone.com/img/developer-guide/table-layout-constraints.png" alt="TableLayout with complex constraints" />
+        
+       <p>
+            {@link com.codename1.ui.layouts.LayeredLayout} is unique in the sense that it is meant to costruct layers
+            and not the UI positions. It only lays out on the Z axis.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/layered-layout.png" alt="The X on this button was placed there using the layered layout code below" />
+        
+       <p>
+            {@link com.codename1.ui.layouts.GridBagLayout} was added to Codename One to ease the porting of Swing/AWT
+            applications.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/gridbag-layout.png" alt="Sample gridbag layout usage" />
+
+        <p>
+            {@link com.codename1.ui.layouts.GroupLayout} is a layout that would be familiar to the users of 
+            <a href="https://netbeans.org/features/java/swing.html" target="_blank">the NetBeans GUI builder (Matisse)</a>.
+        </p>
+        <img src="https://www.codenameone.com/img/developer-guide/group-layout.png" alt="A few labels in group layout" />
+        
     </body>
 </html>

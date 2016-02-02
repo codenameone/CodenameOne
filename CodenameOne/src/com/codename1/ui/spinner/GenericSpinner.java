@@ -62,10 +62,11 @@ public class GenericSpinner extends BaseSpinner {
             } else {
                 setLayout(new BoxLayout(BoxLayout.X_AXIS));
                 spin = new Spinner[model.length];
-                for(int iter = 0 ; iter < spin.length ; iter++) {
+                int slen = spin.length;
+                for(int iter = 0 ; iter < slen ; iter++) {
                     spin[iter] = createSpinner(iter);
                     addComponent(spin[iter]);
-                    if(iter < spin.length - 1) {
+                    if(iter < slen - 1) {
                         addComponent(createSeparator());
                     }
                     if(renderingPrototype != null) {
@@ -216,34 +217,35 @@ public class GenericSpinner extends BaseSpinner {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"model", "renderer", "items", "columns"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {ListModel.class, ListCellRenderer.class, com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), Integer.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"ListModel", "ListCellRenderer", "String[]", "int"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("items")) {
             ListModel m = getModel();
             String[] s = new String[m.getSize()];
-            for(int iter = 0 ; iter < s.length ; iter++) {
+            int slen = s.length;
+            for(int iter = 0 ; iter < slen ; iter++) {
                 Object o = m.getItemAt(iter);
                 if(o != null) {
                     s[iter] = o.toString();
@@ -264,7 +266,7 @@ public class GenericSpinner extends BaseSpinner {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("items")) {
@@ -358,7 +360,8 @@ public class GenericSpinner extends BaseSpinner {
             return getValue();
         } 
         Object[] o = new Object[getColumns()];
-        for(int iter = 0 ; iter < o.length ; iter++) {
+        int olen = o.length;
+        for(int iter = 0 ; iter < olen ; iter++) {
             o[iter] = getValue(iter);
         }
         return o;
@@ -375,7 +378,8 @@ public class GenericSpinner extends BaseSpinner {
             return;
         }
         Object[] o = (Object[])state;
-        for(int iter = 0 ; iter < o.length ; iter++) {
+        int olen = o.length;
+        for(int iter = 0 ; iter < olen ; iter++) {
             setValue(iter, o[iter]);
         }
     }

@@ -83,14 +83,15 @@ public class DefaultListModel<T> implements ListModel<T> {
             items = new Object[] {};
         }
         java.util.List vec = new ArrayList(items.length);
-        for(int iter = 0 ; iter < items.length ; iter++) {
+        int ilen = items.length;
+        for(int iter = 0 ; iter < ilen ; iter++) {
             vec.add(items[iter]);
         }
         return vec;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public T getItemAt(int index) {
         if(index < getSize() && index >= 0){
@@ -100,21 +101,21 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize() {
         return items.size();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSelectedIndex() {
         return selectedIndex;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(T item){
         items.add(item);
@@ -145,7 +146,7 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index){
         if(index < getSize() && index >= 0){
@@ -167,7 +168,7 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
         int oldIndex = selectedIndex;
@@ -176,14 +177,14 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangedListener(DataChangedListener l) {
         dataListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangedListener(DataChangedListener l) {
         dataListener.removeListener(l);
@@ -199,14 +200,14 @@ public class DefaultListModel<T> implements ListModel<T> {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);

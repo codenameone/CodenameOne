@@ -368,7 +368,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         byte[] b = new byte[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readByte();
                         }
                         returnValue = b;
@@ -380,7 +380,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         char[] b = new char[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readChar();
                         }
                         returnValue = b;
@@ -392,7 +392,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         short[] b = new short[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readShort();
                         }
                         returnValue = b;
@@ -404,7 +404,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         int[] b = new int[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readInt();
                         }
                         returnValue = b;
@@ -416,7 +416,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         long[] b = new long[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readLong();
                         }
                         returnValue = b;
@@ -428,7 +428,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         double[] b = new double[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readDouble();
                         }
                         returnValue = b;
@@ -440,7 +440,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         float[] b = new float[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readFloat();
                         }
                         returnValue = b;
@@ -452,7 +452,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         boolean[] b = new boolean[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readBoolean();
                         }
                         returnValue = b;
@@ -464,7 +464,7 @@ public class WebServiceProxyCall {
                     int size = dis.readInt();
                     if(size > -1) {
                         String[] b = new String[size];
-                        for(int iter = 0 ; iter < b.length ; iter++) {
+                        for(int iter = 0 ; iter < size ; iter++) {
                             b[iter] = dis.readUTF();
                         }
                         returnValue = b;
@@ -486,7 +486,8 @@ public class WebServiceProxyCall {
         protected void buildRequestBody(OutputStream os) throws IOException {
             DataOutputStream dos = new DataOutputStream(os);
             dos.writeUTF(def.name);
-            for(int iter = 0 ; iter < arguments.length ; iter++) {
+            int alen = arguments.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 switch(def.arguments[iter]) {
                     case TYPE_BYTE:
                         dos.writeByte(((Byte)arguments[iter]).byteValue());

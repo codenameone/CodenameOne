@@ -66,15 +66,18 @@ import java.util.HashMap;
  * @author Chen Fishbein
  */
 public class Form extends Container {
-
+    private boolean globalAnimationLock;
+    static int activePeerCount;
     private Painter glassPane;
     private Container layeredPane;
-    private Container contentPane = new Container(new FlowLayout());
+    private Container contentPane;
     Container titleArea = new Container(new BorderLayout());
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
     ArrayList<Component> buttonsAwatingRelease;
+    
+    private AnimationManager animMananger = new AnimationManager(this);
     
     /**
      * Indicates whether lists and containers should scroll only via focus and thus "jump" when
@@ -150,12 +153,27 @@ public class Form extends Container {
     private Component stickyDrag;
     private boolean dragStopFlag;
     private Toolbar toolbar;
+    
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     */
+    private TextArea editOnShow;
             
     /**
      * Default constructor creates a simple form
      */
     public Form() {
+        this(new FlowLayout());
+    }
+    
+    /**
+     * Constructor that accepts a layout
+     * 
+     * @param contentPaneLayout the layout for the content pane
+     */
+    public Form(Layout contentPaneLayout) {
         super(new BorderLayout());
+        contentPane = new Container(contentPaneLayout);
         setUIID("Form");
         // forms/dialogs are not visible by default
         setVisible(false);
@@ -201,9 +219,19 @@ public class Form extends Container {
         if(bottomPaddingMode) {
             return 0;
         }
-        return Display.getInstance().getImplementation().getInvisibleAreaUnderVKB();
+        return Display.impl.getInvisibleAreaUnderVKB();
     }
         
+    /**
+     * Returns the animation manager instance responsible for this form, this can be used to track/queue
+     * animations
+     * 
+     * @return the animation manager
+     */
+    public AnimationManager getAnimationManager() {
+        return animMananger;
+    }
+    
     /**
      * Toggles the way the virtual keyboard behaves, enabling this mode shrinks the screen but makes editing
      * possible when working with text fields that aren't in a scrollable container.
@@ -289,14 +317,37 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAlwaysTensile() {
         return getContentPane().isAlwaysTensile();
     }
 
     /**
-     * @inheritDoc
+     * Allows grabbing a flag that is used by convention to indicate that you are running an exclusive animation.
+     * This is used by some code to prevent collision between optional animation
+     * 
+     * @return whether the lock was acquired or not
+     * @deprecated this is effectively invalidated by the newer animation framework
+     */
+    public boolean grabAnimationLock() {
+        if(globalAnimationLock) {
+            return false;
+        }
+        globalAnimationLock = true;
+        return true;
+    }
+    
+    /**
+     * Invoke this to release the animation lock that was grabbed in grabAnimationLock
+     * @deprecated this is effectively invalidated by the newer animation framework
+     */
+    public void releaseAnimationLock() {
+        globalAnimationLock = false;
+    }
+    
+    /**
+     * {@inheritDoc}
      */
     public void setAlwaysTensile(boolean alwaysTensile) {
         getContentPane().setAlwaysTensile(alwaysTensile);
@@ -469,11 +520,11 @@ public class Form extends Container {
         
         if(oldWidth != w && oldHeight != h){
             if (orientationListener != null) {
-                orientationListener.fireActionEvent(new ActionEvent(this));
+                orientationListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.OrientationChange));
             }
         }
         if (sizeChangedListener != null) {
-            sizeChangedListener.fireActionEvent(new ActionEvent(this, w, h));
+            sizeChangedListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.SizeChange, w, h));
         }
         
         repaint();
@@ -761,7 +812,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -794,6 +845,10 @@ public class Form extends Container {
      * Returns true if the given dest component is in the column of the source component
      */
     private boolean isInSameColumn(Component source, Component dest) {
+        // workaround for NPE
+        if(source == null || dest == null) {
+            return false;
+        }
         return Rectangle.intersects(source.getAbsoluteX(), 0,
                 source.getWidth(), Integer.MAX_VALUE, dest.getAbsoluteX(), dest.getAbsoluteY(),
                 dest.getWidth(), dest.getHeight());
@@ -888,6 +943,17 @@ public class Form extends Container {
     }
 
     /**
+     * Sets the title after invoking the constructor
+     * 
+     * @param title the form title
+     * @param contentPaneLayout the layout for the content pane
+     */
+    public Form(String title, Layout contentPaneLayout) {
+        this(contentPaneLayout);
+        setTitle(title);
+    }
+
+    /**
      * This method returns the Content pane instance
      * 
      * @return a content pane instance
@@ -899,14 +965,59 @@ public class Form extends Container {
     /**
      * This method returns the layered pane of the Form, the layered pane is laid
      * on top of the content pane and is created lazily upon calling this method the layer
-     * will be created.
+     * will be created. This is equivalent to getLayeredPane(null, false).
      * 
      * @return the LayeredPane
      */ 
     public Container getLayeredPane() {
+        return getLayeredPane(null, false);
+    }
+    
+    /**
+     * Returns the layered pane for the class and if one doesn't exist a new one is created dynamically and returned
+     * @param c the class with which this layered pane is associated, null for the global layered pane which
+     * is always on the bottom
+     * @param top if created this indicates whether the layered pane should be added on top or bottom
+     * @return the layered pane instance
+     */
+    public Container getLayeredPane(Class c, boolean top) {
+        if(c == null) {
+             for(Component cmp : getLayeredPaneImpl()) {
+                 if(cmp.getClientProperty("cn1$_cls") == null) {
+                     return (Container)cmp;
+                 }
+             } 
+        }
+        String n = c.getName();
+        for(Component cmp : getLayeredPaneImpl()) {
+            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container)cmp;
+            }
+        } 
+        Container cnt = new Container();
+        if(top) {
+            getLayeredPaneImpl().add(cnt);
+        } else {
+            getLayeredPaneImpl().addComponent(0, cnt);            
+        }
+        cnt.putClientProperty("cn1$_cls", n);
+        return cnt;
+    }
+    
+    /**
+     * This method returns the layered pane of the Form, the layered pane is laid
+     * on top of the content pane and is created lazily upon calling this method the layer
+     * will be created.
+     * 
+     * @return the LayeredPane
+     */ 
+    private Container getLayeredPaneImpl() {
         if(layeredPane == null){
             Container parent = new Container(new LayeredLayout());
-            layeredPane = new Container(new FlowLayout());
+            layeredPane = new Container(new LayeredLayout());
+            
+            // adds the global layered pane
+            layeredPane.add(new Container());
             removeComponentFromForm(contentPane);
             addComponentToForm(BorderLayout.CENTER, parent);
             parent.addComponent(contentPane);
@@ -943,7 +1054,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setLayout(Layout layout) {
         if(layout instanceof BorderLayout) {
@@ -956,7 +1067,7 @@ public class Form extends Container {
         int b = Display.getInstance().getCommandBehavior();
         if (b == Display.COMMAND_BEHAVIOR_ICS) {
             if (getTitleComponent().getIcon() == null) {
-                Image i = Display.getInstance().getImplementation().getApplicationIconImage();
+                Image i = Display.impl.getApplicationIconImage();
                 if (i != null) {
                     int h = getTitleComponent().getStyle().getFont().getHeight();
                     i = i.scaled(h, h);
@@ -972,6 +1083,11 @@ public class Form extends Container {
      * @param title the form title
      */
     public void setTitle(String title) {
+        if(toolbar != null){
+            toolbar.setTitle(title);
+            return;
+        }
+            
         this.title.setText(title);
 
         if (!Display.getInstance().isNativeTitle()) {
@@ -1020,14 +1136,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Object constraints, Component cmp) {
         contentPane.addComponent(constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Object constraints, Component cmp) {
         contentPane.addComponent(index, constraints, cmp);
@@ -1043,14 +1159,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void replace(Component current, Component next, Transition t) {
         contentPane.replace(current, next, t);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void replaceAndWait(Component current, Component next, Transition t) {
         contentPane.replaceAndWait(current, next, t);
@@ -1161,7 +1277,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if (getParent() != null) {
@@ -1180,6 +1296,9 @@ public class Form extends Container {
         }
         if (internalAnimatableComponents != null) {
             loopAnimations(internalAnimatableComponents, animatableComponents);
+        }
+        if(animMananger != null) {
+            animMananger.updateAnimations();
         }
     }
 
@@ -1219,11 +1338,12 @@ public class Form extends Container {
      */
     boolean hasAnimations() {
         return (animatableComponents != null && animatableComponents.size() > 0)
-                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0);
+                || (internalAnimatableComponents != null && internalAnimatableComponents.size() > 0) 
+                || (animMananger != null && animMananger.isAnimating());
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         // when changing the theme when a title/menu bar is not visible the refresh
@@ -1362,7 +1482,7 @@ public class Form extends Container {
      * rather than implementing many command instances
      */
     void actionCommandImpl(Command cmd) {
-        actionCommandImpl(cmd, new ActionEvent(cmd));
+        actionCommandImpl(cmd, new ActionEvent(cmd,ActionEvent.Type.Command));
     }
 
     /**
@@ -1442,7 +1562,7 @@ public class Form extends Container {
      * Displays the current form on the screen
      */
     public void show() {
-        Display.getInstance().getImplementation().onShow(this);
+        Display.impl.onShow(this);
         show(false);
     }
 
@@ -1472,22 +1592,23 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void deinitializeImpl() {
         super.deinitializeImpl();
+        animMananger.flush();
         buttonsAwatingRelease = null;
         dragged = null;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
         dragged = null;
         if (Display.getInstance().isNativeCommands()) {
-            Display.getInstance().getImplementation().setNativeCommands(menuBar.getCommands());
+            Display.impl.setNativeCommands(menuBar.getCommands());
         }
         if (getParent() != null) {
             getParent().getComponentForm().registerAnimated(this);
@@ -1495,7 +1616,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSmoothScrolling(boolean smoothScrolling) {
         // invoked by the constructor for component
@@ -1505,21 +1626,21 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isSmoothScrolling() {
         return contentPane.isSmoothScrolling();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getScrollAnimationSpeed() {
         return contentPane.getScrollAnimationSpeed();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollAnimationSpeed(int animationSpeed) {
         contentPane.setScrollAnimationSpeed(animationSpeed);
@@ -1546,7 +1667,10 @@ public class Form extends Container {
         setLightweightMode(false);
         onShowCompleted();
         if (showListener != null) {
-            showListener.fireActionEvent(new ActionEvent(this));
+            showListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Show));
+        }
+        if(editOnShow != null) {
+            editOnShow.startEditingAsync();
         }
     }
 
@@ -1685,6 +1809,17 @@ public class Form extends Container {
     void disposeImpl() {
         if (previousForm != null) {
             boolean clearPrevious = Display.getInstance().getCurrent() == this;
+            if (!clearPrevious) {
+                Form f = Display.getInstance().getCurrent();
+                while (f != null) {
+                    if (f.previousForm == this) {
+                        f.previousForm = previousForm;
+                        previousForm = null;
+                        return;
+                    }
+                    f = f.previousForm;
+                }
+            }
             previousForm.tint = false;
 
             if (previousForm instanceof Dialog) {
@@ -1708,7 +1843,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void repaint(Component cmp) {
         if (getParent() != null) {
@@ -1721,7 +1856,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public final Form getComponentForm() {
         if (getParent() != null) {
@@ -1857,7 +1992,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void longKeyPress(int keyCode) {
         if (focused != null) {
@@ -1868,7 +2003,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void longPointerPress(int x, int y) {
         if (focused != null && focused.contains(x, y)) {
@@ -1898,7 +2033,7 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -1936,7 +2071,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Layout getLayout() {
         return contentPane.getLayout();
@@ -1959,7 +2094,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
@@ -2005,7 +2140,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyRepeated(int keyCode) {
         if (focused != null) {
@@ -2033,13 +2168,13 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
         dragStopFlag = false;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            pointerPressedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         //check if the click is relevant to the menu bar.
         if (menuBar.contains(x, y)) {
@@ -2051,7 +2186,7 @@ public class Form extends Container {
             return;
         }
         Container actual = getActualPane();
-        if (y >= actual.getY()) {
+        if (y >= actual.getY() && x >= actual.getX()) {
             Component cmp = actual.getComponentAt(x, y);
             if (cmp != null) {
                 cmp.initDragAndDrop(x, y);
@@ -2090,12 +2225,33 @@ public class Form extends Container {
                 }
             }
         } else {
-            Component cmp = getTitleArea().getComponentAt(x, y);
-            if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
-                cmp.pointerPressed(x, y);
-                tactileTouchVibe(x, y, cmp);
-            }   
-
+            if(y < actual.getY()) {
+                Component cmp = getTitleArea().getComponentAt(x, y);
+                if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                    cmp.pointerPressed(x, y);
+                    tactileTouchVibe(x, y, cmp);
+                }   
+            } else {
+                Component cmp = ((BorderLayout)super.getLayout()).getWest();
+                if(cmp != null) {
+                    cmp = ((Container)cmp).getComponentAt(x, y);
+                    if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                        if(cmp.hasLead) {
+                            Container leadParent;
+                            if (cmp instanceof Container) {
+                                leadParent = ((Container) cmp).getLeadParent();
+                            } else {
+                                leadParent = cmp.getParent().getLeadParent();
+                            }
+                            setFocused(leadParent);
+                            cmp = cmp.getLeadComponent();
+                        }
+                        cmp.initDragAndDrop(x, y);
+                        cmp.pointerPressed(x, y);
+                        tactileTouchVibe(x, y, cmp);
+                    }   
+                }
+            }
         }
         initialPressX = x;
         initialPressY = y;
@@ -2145,7 +2301,7 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         // disable the drag stop flag if we are dragging again
@@ -2154,7 +2310,7 @@ public class Form extends Container {
         }
         autoRelease(x, y);
         if (pointerDraggedListeners != null) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x, y));
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
 
         if (dragged != null) {
@@ -2168,6 +2324,21 @@ public class Form extends Container {
             return;
         }
         Container actual = getActualPane();
+        if(x < actual.getX()) {
+            // special case for sidemenu
+            Component cmp = ((BorderLayout)super.getLayout()).getWest();
+            if(cmp != null) {
+                cmp = ((Container)cmp).getComponentAt(x, y);
+                if (cmp != null && cmp.isEnabled()) {
+                    cmp.pointerDragged(x, y);
+                    cmp.repaint();
+                    if(cmp.isStickyDrag()) {
+                        stickyDrag = cmp;
+                    }
+                }
+            }
+            return;
+        }
         Component cmp = actual.getComponentAt(x, y);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -2189,7 +2360,7 @@ public class Form extends Container {
         }
         autoRelease(x[0], y[0]);
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, x[0], y[0]));
+            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]));
         }
 
         if (dragged != null) {
@@ -2204,6 +2375,21 @@ public class Form extends Container {
         }
 
         Container actual = getActualPane();
+        if(x[0] < actual.getX()) {
+            // special case for sidemenu
+            Component cmp = ((BorderLayout)super.getLayout()).getWest();
+            if(cmp != null) {
+                cmp = ((Container)cmp).getComponentAt(x[0], y[0]);
+                if (cmp != null && cmp.isEnabled()) {
+                    cmp.pointerDragged(x, y);
+                    cmp.repaint();
+                    if(cmp.isStickyDrag()) {
+                        stickyDrag = cmp;
+                    }
+                }
+            }
+            return;
+        }
         Component cmp = actual.getComponentAt(x[0], y[0]);
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
@@ -2220,7 +2406,7 @@ public class Form extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
 
@@ -2242,7 +2428,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverPressed(int[] x, int[] y) {
         Container actual = getActualPane();
@@ -2257,7 +2443,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
 
@@ -2308,7 +2494,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
@@ -2335,7 +2521,7 @@ public class Form extends Container {
             }
         }
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
-            ActionEvent ev = new ActionEvent(this, x, y);
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
             if(ev.isConsumed()) {
                 return;
@@ -2363,7 +2549,7 @@ public class Form extends Container {
                 repaint();
             } else {
                 Container actual = getActualPane();
-                if (y >= actual.getY()) {
+                if (y >= actual.getY() && x >= actual.getX()) {
                     Component cmp = actual.getComponentAt(x, y);
                     if (cmp != null && cmp.isEnabled()) {
                         if (cmp.hasLead) {
@@ -2386,15 +2572,38 @@ public class Form extends Container {
                         }
                     }
                 } else {
-                    Component cmp = getTitleArea().getComponentAt(x, y);
-                    if (cmp != null && cmp.isEnabled()) {
-                        cmp.pointerReleased(x, y);
+                    if(y < actual.getY()) {
+                        Component cmp = getTitleArea().getComponentAt(x, y);
+                        if (cmp != null && cmp.isEnabled()) {
+                            cmp.pointerReleased(x, y);
+                        }
+                    } else {
+                        Component cmp = ((BorderLayout)super.getLayout()).getWest();
+                        if(cmp != null) {
+                            cmp = ((Container)cmp).getComponentAt(x, y);
+                            if (cmp != null && cmp.isEnabled()) {                                
+                                if(cmp.hasLead) {
+                                    Container leadParent;
+                                    if (cmp instanceof Container) {
+                                        leadParent = ((Container) cmp).getLeadParent();
+                                    } else {
+                                        leadParent = cmp.getParent().getLeadParent();
+                                    }
+                                    leadParent.repaint();
+                                    setFocused(leadParent);
+                                    cmp = cmp.getLeadComponent();
+                                    cmp.pointerReleased(x, y);
+                                } else {
+                                    cmp.pointerReleased(x, y);
+                                }
+                            }
+                        }
                     }
                 }
             }
         } else {
             if (dragged.isDragAndDropInitialized()) {
-                dragged.dragFinished(x, y);
+                dragged.dragFinishedImpl(x, y);
                 dragged = null;
             } else {
                 dragged.pointerReleased(x, y);
@@ -2413,21 +2622,21 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollableY(boolean scrollableY) {
         getContentPane().setScrollableY(scrollableY);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollableX(boolean scrollableX) {
         getContentPane().setScrollableX(scrollableX);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getComponentIndex(Component cmp) {
         return getContentPane().getComponentIndex(cmp);
@@ -2742,7 +2951,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     boolean moveScrollTowards(int direction, Component c) {
         //if the current focus item is in a scrollable Container
@@ -2828,7 +3037,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setRTL(boolean r) {
         super.setRTL(r);
@@ -2838,7 +3047,7 @@ public class Form extends Container {
     private boolean inInternalPaint;
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(!inInternalPaint) {
@@ -2859,21 +3068,21 @@ public class Form extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollable() {
         return getContentPane().isScrollable();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setVisible(boolean visible) {
         super.setVisible(visible);
@@ -2915,7 +3124,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         return super.paramString() + ", title = " + title
@@ -2945,12 +3154,23 @@ public class Form extends Container {
      * Sets the Form Toolbar
      * 
      * @param toolbar 
+     * @deprecated use setToolbar instead (lower case b)
      */
     public void setToolBar(Toolbar toolbar){
         this.toolbar =toolbar;
         setMenuBar(toolbar.getMenuBar());
     }
 
+    /**
+     * Sets the Form Toolbar
+     * 
+     * @param toolbar 
+     */
+    public void setToolbar(Toolbar toolbar){
+        this.toolbar =toolbar;
+        setMenuBar(toolbar.getMenuBar());
+    }
+    
     /**
      * Gets the Form Toolbar if exists or null
      * 
@@ -2982,14 +3202,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] { "titleUIID", "titleAreaUIID" };
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -2999,14 +3219,14 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("titleUIID")) {
@@ -3023,7 +3243,7 @@ public class Form extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("titleUIID")) {
@@ -3039,5 +3259,21 @@ public class Form extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     * @return the component instance
+     */
+    public TextArea getEditOnShow() {
+        return editOnShow;
+    }
+
+    /**
+     * A text component that will receive focus and start editing immediately as the form is shown
+     * @param editOnShow text component to edit when the form is shown
+     */
+    public void setEditOnShow(TextArea editOnShow) {
+        this.editOnShow = editOnShow;
     }
 }

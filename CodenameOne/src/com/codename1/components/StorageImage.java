@@ -49,7 +49,7 @@ public class StorageImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public byte[] getImageData() {
         if(data != null) {

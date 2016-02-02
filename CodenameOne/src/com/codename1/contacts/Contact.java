@@ -89,9 +89,24 @@ public class Contact {
      * @return Display Name
      */
     public String getDisplayName() {
+        if (displayName == null || "".equals(displayName)) {
+            if (familyName != null && firstName != null) {
+                displayName =  firstName + " " + familyName;
+            } else if (getPrimaryPhoneNumber() != null) {
+                displayName = getPrimaryPhoneNumber();
+            } else if (getPrimaryEmail() != null) {
+                displayName = getPrimaryEmail();
+            } else if (getFirstName() != null) {
+                displayName = getFirstName();
+            } else if (getFamilyName() != null) {
+                displayName = getFamilyName();
+            } else {
+                displayName = id;
+            }
+        }
         return displayName;
     }
-
+        
     /**
      * Gets the Contact Emails, the Hashtable contains key/value pairs where
      * the key is a String which represents the type of the Email, types can
@@ -160,7 +175,7 @@ public class Contact {
      * @return the Contact primary email or null if not declared
      */
     public String getPrimaryEmail() {
-        if(primaryEmail == null) {
+        if(primaryEmail == null && emails != null) {
             Collection c = emails.values();
             if(c.size() > 0) {
                 return (String)c.iterator().next();
@@ -175,6 +190,12 @@ public class Contact {
      * @return the Contact primary phone number or null if not declared
      */
     public String getPrimaryPhoneNumber() {
+        if(primaryPhoneNumber == null && phoneNumbers != null) {
+            Collection c = phoneNumbers.values();
+            if(c.size() > 0) {
+                return (String)c.iterator().next();
+            }
+        }
         return primaryPhoneNumber;
     }
 

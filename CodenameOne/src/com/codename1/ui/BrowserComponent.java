@@ -86,7 +86,7 @@ public class BrowserComponent extends Container {
      */
     public BrowserComponent() {
         setUIID("BrowserComponent");
-        PeerComponent c = Display.getInstance().getImplementation().createBrowserComponent(this);
+        PeerComponent c = Display.impl.createBrowserComponent(this);
         setLayout(new BorderLayout());
         addComponent(BorderLayout.CENTER, c);
         internal = c;
@@ -102,7 +102,7 @@ public class BrowserComponent extends Container {
      * @return true if native browsing is supported
      */
     public static boolean isNativeBrowserSupported() {
-        return Display.getInstance().getImplementation().isNativeBrowserComponentSupported();
+        return Display.impl.isNativeBrowserComponentSupported();
     }
 
     /**
@@ -113,7 +113,7 @@ public class BrowserComponent extends Container {
      * @param value see the documentation with the CodenameOne Implementation for further details
      */
     public void setProperty(String key, Object value) {
-        Display.getInstance().getImplementation().setBrowserProperty(internal, key, value);
+        Display.impl.setBrowserProperty(internal, key, value);
     }
 
     /**
@@ -121,7 +121,7 @@ public class BrowserComponent extends Container {
      * @return the title
      */
     public String getTitle() {
-        return Display.getInstance().getImplementation().getBrowserTitle(internal);
+        return Display.impl.getBrowserTitle(internal);
     }
 
     /**
@@ -129,7 +129,7 @@ public class BrowserComponent extends Container {
      * @return the URL
      */
     public String getURL() {
-        return Display.getInstance().getImplementation().getBrowserURL(internal);
+        return Display.impl.getBrowserURL(internal);
     }
 
     /**
@@ -137,7 +137,7 @@ public class BrowserComponent extends Container {
      * @param url  the URL
      */
     public void setURL(String url) {
-        Display.getInstance().getImplementation().setBrowserURL(internal, url);
+        Display.impl.setBrowserURL(internal, url);
     }
 
 
@@ -146,14 +146,14 @@ public class BrowserComponent extends Container {
      * @param url  the URL
      */
     public void setURLHierarchy(String url) throws IOException {
-        Display.getInstance().getImplementation().setBrowserPageInHierarchy(internal, url);
+        Display.impl.setBrowserPageInHierarchy(internal, url);
     }
 
     /**
      * Reload the current page
      */
     public void reload() {
-        Display.getInstance().getImplementation().browserReload(internal);
+        Display.impl.browserReload(internal);
     }
 
     /**
@@ -161,7 +161,7 @@ public class BrowserComponent extends Container {
      * @return true if back should work
      */
     public boolean hasBack() {
-        return Display.getInstance().getImplementation().browserHasBack(internal);
+        return Display.impl.browserHasBack(internal);
     }
 
     /**
@@ -169,28 +169,28 @@ public class BrowserComponent extends Container {
      * @return true if forward should work
      */
     public boolean hasForward() {
-        return Display.getInstance().getImplementation().browserHasForward(internal);
+        return Display.impl.browserHasForward(internal);
     }
 
     /**
      * Navigates back in the history
      */
     public void back() {
-        Display.getInstance().getImplementation().browserBack(internal);
+        Display.impl.browserBack(internal);
     }
 
     /**
      * Navigates forward in the history
      */
     public void forward() {
-        Display.getInstance().getImplementation().browserForward(internal);
+        Display.impl.browserForward(internal);
     }
 
     /**
      * Clears navigation history
      */
     public void clearHistory() {
-        Display.getInstance().getImplementation().browserClearHistory(internal);
+        Display.impl.browserClearHistory(internal);
     }
 
     /**
@@ -201,7 +201,7 @@ public class BrowserComponent extends Container {
      */
     public void setPinchToZoomEnabled(boolean e) {
         pinchToZoom = e;
-        Display.getInstance().getImplementation().setPinchToZoomEnabled(internal, e);
+        Display.impl.setPinchToZoomEnabled(internal, e);
     }
 
     /**
@@ -220,7 +220,7 @@ public class BrowserComponent extends Container {
      */
     public void setNativeScrollingEnabled(boolean b) {
         nativeScrolling = b;
-        Display.getInstance().getImplementation().setNativeBrowserScrollingEnabled(internal, b);
+        Display.impl.setNativeBrowserScrollingEnabled(internal, b);
     }
     
     /**
@@ -239,7 +239,7 @@ public class BrowserComponent extends Container {
      * @param baseUrl base URL to associate with the HTML
      */
     public void setPage(String html, String baseUrl) {
-        Display.getInstance().getImplementation().setBrowserPage(internal, html, baseUrl);
+        Display.impl.setBrowserPage(internal, html, baseUrl);
     }
 
     private EventDispatcher getEventDispatcher(String type, boolean autoCreate) {
@@ -293,14 +293,14 @@ public class BrowserComponent extends Container {
      * Cancel the loading of the current page
      */
     public void stop() {
-        Display.getInstance().getImplementation().browserStop(internal);
+        Display.impl.browserStop(internal);
     }
 
     /**
      * Release native resources of this Browser Component
      */ 
     public void destroy() {
-        Display.getInstance().getImplementation().browserDestroy(internal);        
+        Display.impl.browserDestroy(internal);        
     }
     
     /**
@@ -322,7 +322,7 @@ public class BrowserComponent extends Container {
      * @param javaScript the JavaScript string
      */
     public void execute(String javaScript) {
-        Display.getInstance().getImplementation().browserExecute(internal, javaScript);
+        Display.impl.browserExecute(internal, javaScript);
     }
 
     /**
@@ -332,7 +332,7 @@ public class BrowserComponent extends Container {
      * @return the string returned from the Javascript call
      */
     public String executeAndReturnString(String javaScript){
-        return Display.getInstance().getImplementation().browserExecuteAndReturnString(internal, javaScript);
+        return Display.impl.browserExecuteAndReturnString(internal, javaScript);
     }
 
     /**
@@ -347,7 +347,7 @@ public class BrowserComponent extends Container {
      * method instead
      */
     public void exposeInJavaScript(Object o, String name) {
-        Display.getInstance().getImplementation().browserExposeInJavaScript(internal, o, name);
+        Display.impl.browserExposeInJavaScript(internal, o, name);
     }
 
 }

@@ -352,7 +352,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -385,7 +385,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setWidth(int width) {
         if(width != getWidth()) {
@@ -395,8 +395,6 @@ public class TextArea extends Component {
             }
         }
         super.setWidth(width);
-        //getRowStrings();
-        
     }
 
     
@@ -430,6 +428,20 @@ public class TextArea extends Component {
      */
     public String getText() {
         return text;
+    }
+    
+    /**
+     * Convenience method for numeric text fields, returns the value as a number or invalid if the value in the 
+     * text field isn't a number
+     * @param invalid in case the text isn't an integer this number will be returned
+     * @return the int value of the text field
+     */
+    public int getAsInt(int invalid) {
+        try {
+            return Integer.parseInt(text);
+        } catch(NumberFormatException e) {
+            return invalid;
+        }
     }
     
     /**
@@ -469,7 +481,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         super.keyPressed(keyCode);
@@ -510,21 +522,21 @@ public class TextArea extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         onClick();
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isSelectableInteraction() {
         return editable;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);
@@ -543,7 +555,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollableY() {
         return isFocusable() && getScrollDimension().getHeight() > getHeight();
@@ -577,14 +589,14 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
         requestFocus();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
         requestFocus();
@@ -595,7 +607,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         // prevent a drag operation from going into edit mode
@@ -604,7 +616,7 @@ public class TextArea extends Component {
         } else {
             super.pointerReleased(x, y);
             if (isEditable() && isEnabled() && !isCellRenderer()) {
-                if(Display.getInstance().getImplementation().isNativeInputImmediate()) {
+                if(Display.impl.isNativeInputImmediate()) {
                     editString();
                     return;
                 }
@@ -625,7 +637,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusGainedInternal() {
         super.focusGainedInternal();
@@ -633,7 +645,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusLostInternal() {
         super.focusLostInternal();
@@ -739,7 +751,8 @@ public class TextArea extends Component {
     }
     
     private int indexOf(char[] t, char c, int offset, int length) {
-        for(int iter = offset ; iter < t.length && iter < offset+length; iter++) {
+        int tlen = t.length;
+        for(int iter = offset ; iter < tlen && iter < offset+length; iter++) {
             if(t[iter] == c) {
                 return iter;
            }
@@ -830,7 +843,8 @@ public class TextArea extends Component {
             } else {
                 // special case for the edge case of "no room".
                 // Its important since sometimes this case occurs in the GUI builder by accident
-                for(int iter = 0 ; iter < text.length ; iter++) {
+                int tlen = text.length;
+                for(int iter = 0 ; iter < tlen ; iter++) {
                     rowStrings.add("" + text[iter]);
                 }
             }
@@ -838,7 +852,6 @@ public class TextArea extends Component {
         }
         
         int minCharactersInRow = Math.max(1, textAreaWidth / charWidth);
-        int rowIndex=0;
         int from=0;
         int to=from+minCharactersInRow;
         int textLength=text.length;
@@ -981,7 +994,8 @@ public class TextArea extends Component {
                     } else {
                         // special case for the edge case of "no room".
                         // Its important since sometimes this case occurs in the GUI builder by accident
-                        for(int iter = 0 ; iter < text.length ; iter++) {
+                        int tlen = text.length;
+                        for(int iter = 0 ; iter < tlen ; iter++) {
                             rowStrings.add("" + text[iter]);
                         }
                     }
@@ -992,7 +1006,6 @@ public class TextArea extends Component {
             //adding minCharactersInRow doesn't work if what is left is less
             //then minCharactersInRow
             to=from;//+minCharactersInRow;
-            rowIndex++;
         }
         if(text[text.length -1 ] == '\n'){
             rowStrings.add("");
@@ -1018,7 +1031,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         
@@ -1039,7 +1052,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         if(shouldShowHint()) {
@@ -1054,7 +1067,7 @@ public class TextArea extends Component {
     }
         
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcScrollSize(){
         return getUIManager().getLookAndFeel().getTextAreaSize(this, false);
@@ -1094,7 +1107,7 @@ public class TextArea extends Component {
      */
     void fireActionEvent() {
         if(actionListeners != null) {
-            ActionEvent evt = new ActionEvent(this);
+            ActionEvent evt = new ActionEvent(this,ActionEvent.Type.Edit);
             actionListeners.fireActionEvent(evt);
         }
         if(bindListeners != null) {
@@ -1105,10 +1118,12 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void onEditComplete(String text) {
-        setText(text);
+        if (!Display.getInstance().getImplementation().isAsyncEditMode()) {
+            setText(text);
+        }
         if(getParent() != null) {
             getParent().revalidate();
         }
@@ -1395,7 +1410,8 @@ public class TextArea extends Component {
     public static void autoDetectWidestChar(String s) {
         Font f = UIManager.getInstance().getComponentStyle("TextArea").getFont();
         int widest = 0;
-        for(int iter = 0 ; iter < s.length() ; iter++) {
+        int slen = s.length();
+        for(int iter = 0 ; iter < slen ; iter++) {
             char c = s.charAt(iter);
             int w = f.charWidth(c);
             if(w > widest) {
@@ -1530,21 +1546,21 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"text"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {String.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -1558,7 +1574,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -1575,7 +1591,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("text")) {
@@ -1585,7 +1601,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("text")) {
@@ -1633,6 +1649,59 @@ public class TextArea extends Component {
      */
     public boolean isEndsWith3Points() {
         return endsWith3Points;
+    }
+    
+
+    /**
+     * Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
+     */
+    public void startEditing() {
+        if(!Display.getInstance().isTextEditing(this)) {
+            Display.getInstance().editString(this, maxSize, constraint, text);
+        }
+    }
+
+    /**
+     * Launches the text field editing in a callserially call
+     */
+    public void startEditingAsync() {
+        if(!Display.getInstance().isTextEditing(this)) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    Display.getInstance().editString(TextArea.this, maxSize, constraint, text);
+                }
+            });
+        }
+    }
+    
+    /**
+     * Indicates whether we are currently editing this text area
+     * @return true if Display.getInstance().isTextEditing(this)
+     */
+    public boolean isEditing() {
+        return Display.getInstance().isTextEditing(this);
+    }
+    
+    /**
+     * Stops text editing of this field if it is being edited
+     */
+    public void stopEditing() {
+        if(isEditing()) {
+            Display.getInstance().stopEditing(this);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * We override get style here to return the selected style when editing
+     * @return the selected style if editing, <code>super.getStyle()</code> otherwise
+     */
+    @Override
+    public Style getStyle() {
+        if(isEditing()) {
+            return getSelectedStyle();
+        }
+        return super.getStyle(); 
     }
     
     

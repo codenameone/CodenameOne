@@ -83,7 +83,9 @@ public class URLImage extends EncodedImage {
                 if(tmp.getWidth() > placeholderImage.getWidth()) {
                     int diff = tmp.getWidth() - placeholderImage.getWidth();
                     int x = diff / 2;
-                    tmp = tmp.subImage(x, 0, placeholderImage.getWidth(), placeholderImage.getHeight(), true);
+                    tmp = tmp.subImage(x, 0, 
+                            Math.min(placeholderImage.getWidth(), tmp.getWidth()), 
+                            Math.min(placeholderImage.getHeight(), tmp.getHeight()), true);
                 } else {
                     if(tmp.getHeight() > placeholderImage.getHeight()) {
                         int diff = tmp.getHeight() - placeholderImage.getHeight();
@@ -255,7 +257,7 @@ public class URLImage extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Image getInternal() {
         if(imageData == null) {
@@ -266,7 +268,7 @@ public class URLImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public byte[] getImageData() {
         if(imageData != null) {
@@ -276,7 +278,7 @@ public class URLImage extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(repaintImage) {
@@ -291,10 +293,24 @@ public class URLImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return repaintImage || imageData == null;
+    }
+    
+    /**
+     * Creates an image the will be downloaded on the fly as necessary with RESIZE_SCALE_TO_FILL as
+     * the default behavior
+     * 
+     * @param placeholder the image placeholder is shown as the image is loading/downloading 
+     * and serves as the guideline to the size of the downloaded image.
+     * @param storageFile the file in storage to which the image will be stored
+     * @param url the url from which the image is fetched
+     * @return a URLImage that will initialy just delegate to the placeholder
+     */
+    public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url) {
+        return createToStorage(placeholder, storageFile, url, RESIZE_SCALE_TO_FILL);
     }
 
     /**
@@ -309,7 +325,8 @@ public class URLImage extends EncodedImage {
      * @return a URLImage that will initialy just delegate to the placeholder
      */
     public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url, ImageAdapter adapter) {
-        return new URLImage(placeholder, url, adapter, storageFile, null);
+        // intern is used to trigger an NPE in case of a null URL or storage file
+        return new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null);
     }
     
     /**
@@ -324,7 +341,8 @@ public class URLImage extends EncodedImage {
      * @return a URLImage that will initialy just delegate to the placeholder
      */
     public static URLImage createToFileSystem(EncodedImage placeholder, String file, String url, ImageAdapter adapter) {
-        return new URLImage(placeholder, url, adapter, null, file);
+        // intern is used to trigger an NPE in case of a null URL or storage file
+        return new URLImage(placeholder, url.intern(), adapter, null, file.intern());
     }
 
     /**

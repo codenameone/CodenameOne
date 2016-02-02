@@ -115,12 +115,12 @@ public abstract class Transition implements Animation {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public abstract boolean animate();
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public abstract void paint(Graphics g);
 }

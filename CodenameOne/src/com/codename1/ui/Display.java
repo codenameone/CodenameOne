@@ -39,9 +39,11 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.l10n.L10NManager;
 import com.codename1.media.Media;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Purchase;
 import com.codename1.system.CrashReport;
 import com.codename1.ui.geom.Rectangle;
@@ -55,6 +57,7 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Timer;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
@@ -363,7 +366,7 @@ public final class Display {
 
     static int transitionDelay = -1;
 
-    private CodenameOneImplementation impl;
+    static CodenameOneImplementation impl;
 
     private boolean codenameOneRunning = false;
 
@@ -969,7 +972,7 @@ public final class Display {
             }
             if(!impl.handleEDTException(err)) {
                 if(errorHandler != null) {
-                    errorHandler.fireActionEvent(new ActionEvent(err));
+                    errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
                 } else {
                     Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                 }
@@ -999,7 +1002,7 @@ public final class Display {
                 }
                 if(!impl.handleEDTException(err)) {
                     if(errorHandler != null) {
-                        errorHandler.fireActionEvent(new ActionEvent(err));
+                        errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
                     } else {
                         Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                     }
@@ -1047,6 +1050,7 @@ public final class Display {
         synchronized(lock) {
             inputEventStackPointerTmp = inputEventStackPointer;
             inputEventStackPointer = 0;
+            lastDragOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
             inputEventStack = qt;
@@ -1056,6 +1060,7 @@ public final class Display {
         while(offset < inputEventStackPointerTmp) {            
             if(offset == inputEventStackPointer) {
                 inputEventStackPointer = 0;
+                lastDragOffset = -1;
             }
             offset = handleEvent(offset);
         }
@@ -1214,9 +1219,12 @@ public final class Display {
             } else {
                 r.run();
             }
+        } catch(RuntimeException re) {
+            Log.e(re);
+            throw re;
         } finally {
             this.dropEvents = false;
-        }
+        } 
     }
 
     /**
@@ -1282,6 +1290,7 @@ public final class Display {
         if(current == newForm){
             current.revalidate();
             current.repaint();
+            current.onShowCompletedImpl();
             return;
         }
         
@@ -1660,20 +1669,56 @@ public final class Display {
             lock.notify();
         }        
     }
+    
+    private int lastDragOffset;
+    private void addPointerDragEventWithTimestamp(int x, int y) {
+        synchronized(lock) {
+            if (this.dropEvents) {
+                return;
+            }
+            try {
+                if(lastDragOffset > -1) {
+                    inputEventStack[lastDragOffset] = x;
+                    inputEventStack[lastDragOffset + 1] = y;
+                    inputEventStack[lastDragOffset + 2] = (int)(System.currentTimeMillis() - displayInitTime);
+                } else {
+                    inputEventStack[inputEventStackPointer] = POINTER_DRAGGED;
+                    inputEventStackPointer++;
+                    lastDragOffset = inputEventStackPointer;
+                    inputEventStack[inputEventStackPointer] = x;
+                    inputEventStackPointer++;
+                    inputEventStack[inputEventStackPointer] = y;
+                    inputEventStackPointer++;
+                    inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+                    inputEventStackPointer++;
+                }
+            } catch(ArrayIndexOutOfBoundsException err) {
+                Log.p("EDT performance is very slow triggering this exception!");
+                Log.e(err);
+            }
+            lock.notify();
+        }        
+    }
+    
 
     private void addPointerEventWithTimestamp(int type, int x, int y) {
         synchronized(lock) {
             if (this.dropEvents) {
                 return;
             }
-            inputEventStack[inputEventStackPointer] = type;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = x;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = y;
-            inputEventStackPointer++;
-            inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
-            inputEventStackPointer++;
+            try {
+                inputEventStack[inputEventStackPointer] = type;
+                inputEventStackPointer++;
+                inputEventStack[inputEventStackPointer] = x;
+                inputEventStackPointer++;
+                inputEventStack[inputEventStackPointer] = y;
+                inputEventStackPointer++;
+                inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+                inputEventStackPointer++;
+            } catch(ArrayIndexOutOfBoundsException err) {
+                Log.p("EDT performance is very slow triggering this exception!");
+                Log.e(err);
+            }
             lock.notify();
         }        
     }
@@ -1690,7 +1735,7 @@ public final class Display {
         }
         longPointerCharged = false;
         if(x.length == 1) {
-            addPointerEventWithTimestamp(POINTER_DRAGGED, x[0], y[0]);
+            addPointerDragEventWithTimestamp(x[0], y[0]);
         } else {
             addPointerEvent(POINTER_DRAGGED_MULTI, x, y);
         }
@@ -1878,7 +1923,8 @@ public final class Display {
     private int[] readArrayStackArgument(int offset) {
         int[] a = new int[inputEventStackTmp[offset]];
         offset++;
-        for(int iter = 0 ; iter < a.length ; iter++) {
+        int alen = a.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             a[iter] = inputEventStackTmp[offset + iter];
         }
         return a;
@@ -2696,6 +2742,10 @@ public final class Display {
      * @return the value of the property
      */
     public String getProperty(String key, String defaultValue) {
+        if ("AppArg".equals(key)) {
+            String out = impl.getAppArg();
+            return out == null ? defaultValue : out;
+        }
         if(localProperties != null) {
             String v = (String)localProperties.get(key);
             if(v != null) {
@@ -2714,10 +2764,19 @@ public final class Display {
      * @param value the value of the property
      */
     public void setProperty(String key, String value) {
+        if ("AppArg".equals(key)) {
+            impl.setAppArg(value);
+            return;
+        }
         if("blockOverdraw".equals(key)) {
             Container.blockOverdraw = true;
             return;
         }
+        if(key.startsWith("platformHint.")) {
+            impl.setPlatformHint(key, value);
+            return;
+        }
+        
         if(localProperties == null) {
             localProperties = new HashMap<String, String>();
         }
@@ -2990,7 +3049,32 @@ public final class Display {
     }
 
     /**
-     * This method returns the platform Location Control
+     * This method returns the platform Location Manager used for geofencing. This allows tracking the 
+     * user location in the background. Usage:
+     * 
+     * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
+<noscript><pre>{@code public class GeofenceListenerImpl implements GeofenceListener {
+    public void onExit(String id) {
+        System.out.println("Exited "+id);
+    }
+
+    public void onEntered(String id) {
+        System.out.println("Entered "+id);
+    }
+}
+Form hi = new Form("Hi World");
+hi.addComponent(new Label("Hi World"));
+        
+Location loc = new Location();
+loc.setLatitude(51.5033630);
+loc.setLongitude(-0.1276250);
+        
+Geofence gf = new Geofence("test", loc, 100, 100000);
+        
+LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
+        
+hi.show();}</pre></noscript>
+     * 
      * @return LocationManager Object
      */
     public LocationManager getLocationManager() {
@@ -3182,6 +3266,7 @@ public final class Display {
      * @param flashLights enable/disable notification flashing
      * @param args additional arguments to the notification
      * @return a platform native object that allows modifying notification state
+     * @deprecated use scheduleLocalNotification instead
      */
     public Object notifyStatusBar(String tickerText, String contentTitle, 
         String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
@@ -3311,9 +3396,9 @@ public final class Display {
      * 
      * @param firstName the Contact firstName
      * @param familyName the Contact familyName
-     * @param workPhone the Contact work phone or null
+     * @param officePhone the Contact work phone or null
      * @param homePhone the Contact home phone or null
-     * @param mobilePhone the Contact mobile phone or null
+     * @param cellPhone the Contact mobile phone or null
      * @param email the Contact email or null
      * 
      * @return the contact id if creation succeeded or null  if failed
@@ -3385,7 +3470,7 @@ public final class Display {
      * 
      * @param text String to share.
      * @param image file path to the image or null
-     * @param mime type of the image or null if no image to share
+     * @param mimeType type of the image or null if no image to share
      * @param sourceRect The source rectangle of the button that originated the share request.  This is used on
      * some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
      * on the iPad with iOS 8 and higher.
@@ -3622,6 +3707,7 @@ public final class Display {
     /**
      * Returns the native implementation of the code scanner or null
      * @return code scanner instance
+     * @deprecated Use the cn1-codescanner cn1lib.
      */
     public CodeScanner getCodeScanner() {
         if(!hasCamera()) {
@@ -3708,5 +3794,74 @@ public final class Display {
      */
     public void setMultiKeyMode(boolean multiKeyMode) {
         this.multiKeyMode = multiKeyMode;
+    }
+    
+    /**
+     * Long pointer press is invoked after the given interval, this allows making long press events shorter/longer
+     * @param v time in milliseconds
+     */
+    public void setLongPointerPressInterval(int v) {
+        longPressInterval = v;
+    }
+
+    /**
+     * Long pointer press is invoked after the given interval, this allows making long press events shorter/longer
+     * @return time in milliseconds
+     */
+    public int getLongPointerPressInterval() {
+        return longPressInterval;
+    }
+    
+    /**
+     * Schedules a local notification to occur.
+     *
+     * @param n The notification to schedule.
+     * @param firstTime time in milliseconds when to schedule the notification
+     * @param repeat repeat one of the following: REPEAT_NONE, REPEAT_FIFTEEN_MINUTES, 
+     * REPEAT_HALF_HOUR, REPEAT_HOUR, REPEAT_DAY, REPEAT_WEEK
+     */
+    public void scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) {
+        if (n.getId() == null || n.getId().length() == 0) {
+            throw new IllegalArgumentException("Notification ID must be set");
+        }
+        if(firstTime < System.currentTimeMillis()){
+            throw new IllegalArgumentException("Cannot schedule a notification to a past time");        
+        }
+        if (n.getAlertSound() != null && n.getAlertSound().length() > 0 && !n.getAlertSound().startsWith("/notification_sound") ) {
+            throw new IllegalArgumentException("Alert sound file name must start with the 'notification_sound' prefix");
+        }
+        impl.scheduleLocalNotification(n, firstTime, repeat);
+    }
+    
+    /**
+     * Cancels a local notification by ID.
+     * @param notificationId 
+     * @see com.codename1.notifications.LocalNotification
+     */
+    public void cancelLocalNotification(String notificationId) {
+        impl.cancelLocalNotification(notificationId);
+    }
+
+    /**
+     * Allows detecting development mode so debugging code and special cases can be used to simplify flow
+     * @return true if we are running in the simulator, false otherwise
+     */
+    public boolean isSimulator() {
+        return impl.isSimulator();
+    }
+
+    /**
+     * Creates an audio media that can be played in the background.
+     * 
+     * @param uri the uri of the media can start with jar://, file://, http:// 
+     * (can also use rtsp:// if supported on the platform)
+     * 
+     * @return Media a Media Object that can be used to control the playback 
+     * of the media or null if background playing is not supported on the platform
+     * 
+     * @throws IOException if creation of media from the given URI has failed
+     */ 
+    public Media createBackgroundMedia(String uri) throws IOException{
+        return impl.createBackgroundMedia(uri);
     }
 }

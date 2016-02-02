@@ -441,6 +441,7 @@ public class Log {
      * Places a form with the log as a TextArea on the screen, this method can
      * be attached to appear at a given time or using a fixed global key. Using
      * this method might cause a problem with further log output
+     * @deprecated this method is an outdated method that's no longer supported
      */
     public static void showLog() {
         try {
@@ -522,5 +523,31 @@ public class Log {
                 }
             }
         });
+    }
+    
+    /**
+     * Binds pro based crash protection logic that will send out an email in case of an exception thrown on the EDT
+     * 
+     * @param consumeError true will hide the error from the user, false will leave the builtin logic that defaults to
+     * showing an error dialog to the user
+     */
+    public static void bindCrashProtection(final boolean consumeError) {
+        if(Display.getInstance().isSimulator()) {
+            return;
+        }
+        Display.getInstance().addEdtErrorHandler(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                if(consumeError) {
+                    evt.consume();
+                }
+                p("Exception in AppName version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
+                p("OS " + Display.getInstance().getPlatformName());
+                p("Error " + evt.getSource());
+                p("Current Form " + Display.getInstance().getCurrent().getName());
+                e((Throwable)evt.getSource());
+                sendLog();
+            }
+        });
+        
     }
 }

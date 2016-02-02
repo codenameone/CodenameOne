@@ -31,12 +31,15 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.StringUtil;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -165,7 +168,8 @@ public class ConnectionRequest implements IOProgressListener {
     private static boolean cookiesEnabledDefault = true;
     private boolean cookiesEnabled = cookiesEnabledDefault;
     private int chunkedStreamingLen = -1;
-
+    private Exception failureException;
+    private int failureErrorCode;
     private String destinationFile;
     private String destinationStorage;
     
@@ -359,7 +363,8 @@ public class ConnectionRequest implements IOProgressListener {
                 String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
                 if(cookies != null && cookies.length > 0){
                     Vector cook = new Vector();
-                    for(int iter = 0 ; iter < cookies.length ; iter++) {
+                    int clen = cookies.length;
+                    for(int iter = 0 ; iter < clen ; iter++) {
                         Cookie coo = parseCookieHeader(cookies[iter]);
                         if(coo != null) {
                             cook.addElement(coo);
@@ -367,7 +372,8 @@ public class ConnectionRequest implements IOProgressListener {
                         }
                     }
                     Cookie [] arr = new Cookie[cook.size()];
-                    for (int i = 0; i < arr.length; i++) {
+                    int arlen = arr.length;
+                    for (int i = 0; i < arlen; i++) {
                         arr[i] = (Cookie) cook.elementAt(i);
                     }
                     impl.addCookie(arr);
@@ -696,6 +702,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected void handleException(Exception err) {
         if(killed || failSilently) {
+            failureException = err;
             return;
         }
         err.printStackTrace();
@@ -722,6 +729,7 @@ public class ConnectionRequest implements IOProgressListener {
      */
     protected void handleErrorResponseCode(int code, String message) {
         if(failSilently) {
+            failureErrorCode = code;
             return;
         }
         if(responseCodeListeners != null) {
@@ -736,7 +744,9 @@ public class ConnectionRequest implements IOProgressListener {
             retry();
         } else {
             retrying = false;
-            killed = true;
+            if(!isReadResponseForErrors()){
+                killed = true;
+            }
         }
     }
 
@@ -833,7 +843,8 @@ public class ConnectionRequest implements IOProgressListener {
                     continue;
                 }
                 String[] val = (String[])requestVal;
-                for(int iter = 0 ; iter < val.length - 1; iter++) {
+                int vlen = val.length;
+                for(int iter = 0 ; iter < vlen - 1; iter++) {
                     b.append(key);
                     b.append("=");
                     b.append(val[iter]);
@@ -841,7 +852,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 b.append(key);
                 b.append("=");
-                b.append(val[val.length - 1]);
+                b.append(val[vlen - 1]);
                 if(e.hasMoreElements()) {
                     b.append("&");
                 }
@@ -875,7 +886,8 @@ public class ConnectionRequest implements IOProgressListener {
                     continue;
                 }
                 String[] valArray = (String[])requestVal;
-                for(int iter = 0 ; iter < valArray.length - 1; iter++) {
+                int vlen = valArray.length;
+                for(int iter = 0 ; iter < vlen - 1; iter++) {
                     val.append(key);
                     val.append("=");
                     val.append(valArray[iter]);
@@ -883,7 +895,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 val.append(key);
                 val.append("=");
-                val.append(valArray[valArray.length - 1]);
+                val.append(valArray[vlen - 1]);
                 if(e.hasMoreElements()) {
                     val.append("&");
                 }
@@ -1080,15 +1092,32 @@ public class ConnectionRequest implements IOProgressListener {
         // copying the array to prevent mutation
         String[] v = new String[value.length];
         if(post) {
-            for(int iter = 0 ; iter < value.length ; iter++) {
+            int vlen = value.length;
+            for(int iter = 0 ; iter < vlen ; iter++) {
                 v[iter] = Util.encodeBody(value[iter]);
             }
             addArg(Util.encodeBody(key), v);
         } else {
-            for(int iter = 0 ; iter < value.length ; iter++) {
+            int vlen = value.length;
+            for(int iter = 0 ; iter < vlen ; iter++) {
                 v[iter] = Util.encodeUrl(value[iter]);
             }
             addArg(Util.encodeUrl(key), v);
+        }
+    }
+
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArguments(String key, String... value) {
+        if(value.length == 1) {
+            addArgument(key, value[0]);
+        } else {
+            addArgument(key, (String[])value);
         }
     }
 
@@ -1277,7 +1306,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void ioStreamUpdate(Object source, int bytes) {
         if(!isKilled()) {
@@ -1403,7 +1432,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         if(url != null) {
@@ -1417,7 +1446,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         if(o != null && o.getClass() == getClass()) {
@@ -1650,5 +1679,30 @@ public class ConnectionRequest implements IOProgressListener {
         this.chunkedStreamingLen = chunklen;
     }
    
-    
+
+    /**
+     * Utility method that returns a JSON structure or throws an IOException in case of a failure.
+     * This method blocks the EDT legally and can be used synchronously. Notice that this method assumes
+     * all JSON data is UTF-8
+     * @param url the URL hosing the JSON
+     * @return map data
+     * @throws IOException in case of an error
+     */
+    public static Map<String, Object> fetchJSON(String url) throws IOException {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setFailSilently(true);
+        cr.setPost(false);
+        cr.setUrl(url);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        if(cr.getResponseData() == null) {
+            if(cr.failureException != null) {
+                throw new IOException(cr.failureException.toString());
+            } else {
+                throw new IOException("Server returned error code: " + cr.failureErrorCode);
+            }
+        }
+        JSONParser jp = new JSONParser();
+        Map<String, Object> result = jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), "UTF-8"));
+        return result;
+    }
 }

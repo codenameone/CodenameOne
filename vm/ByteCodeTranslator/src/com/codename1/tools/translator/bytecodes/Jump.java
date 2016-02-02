@@ -44,6 +44,7 @@ public class Jump extends Instruction {
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
         b.append("    ");
+        
         switch(opcode) {
             case Opcodes.IFEQ:
                 b.append("if(POP_INT() == 0) /* IFEQ */ ");
@@ -108,6 +109,7 @@ public class Jump extends Instruction {
                 b.append("if(POP_OBJ() != JAVA_NULL) /* IFNONNULL */ ");
                 break;
         }
+       
         if(TryCatch.isTryCatchInMethod()) {
             b.append("JUMP_TO(label_");
             b.append(label.toString());
@@ -120,5 +122,10 @@ public class Jump extends Instruction {
             b.append(";\n");
         }
     }
+    
+    Label getLabel() {
+        return label;
+    }
+    
 
 }

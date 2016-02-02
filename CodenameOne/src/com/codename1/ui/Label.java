@@ -33,13 +33,16 @@ import com.codename1.ui.util.EventDispatcher;
 
 /**
  * Allows displaying labels and images with different alignment options, this class
- * is a base class for several components allowing them to declare alignement/icon
+ * is a base class for several components allowing them to declare alignment/icon
  * look in a similar way.
  * 
  * @author Chen Fishbein
  */
 public class Label extends Component {
-
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     */
+    private boolean legacyRenderer;
     private String text = "";
     
     private Image icon;
@@ -72,6 +75,7 @@ public class Label extends Component {
     private boolean shouldLocalize = true;
     private boolean showEvenIfBlank = false;
     private int shiftMillimeters = 1;
+    private int stringWidthUnselected = -1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -87,14 +91,18 @@ public class Label extends Component {
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
-    Label(String text, String uiid) {
+    /** 
+     * Constructs a new label with the specified string of text and uiid
+     * 
+     * @param text the string that the label presents.
+     * @param uiid the uiid for the label
+     */
+    public Label(String text, String uiid) {
         noBind = true;
         this.text = text;
         localize();
         setFocusable(false);
 
-        // moved this to the UIManager initializations
-        //setAlignment(CENTER);
         setUIID(uiid);
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
@@ -115,12 +123,61 @@ public class Label extends Component {
     public Label(Image icon) {
         this("");
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
+
+    /** 
+     * Constructs a new label with the specified icon and UIID
+     * 
+     * @param icon the image that the label presents.
+     * @param uiid the uiid for the label
+     */
+    public Label(Image icon, String uiid) {
+        this("", uiid);
+        this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
+    
+    /** 
+     * Constructs a new label with the specified icon text and UIID
+     * 
+     * @param text the text of the label
+     * @param icon the image that the label presents.
+     * @param uiid the uiid for the label
+     */
+    public Label(String text, Image icon, String uiid) {
+        this(text, uiid);
+        this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
+    
+    /** 
+     * Constructs a new label with the specified icon and text
+     * 
+     * @param text the text of the label
+     * @param icon the image that the label presents.
+     */
+    public Label(String text, Image icon) {
+        this(text);
+        this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
+        endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
+    }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getBaselineResizeBehavior() {
         switch(valign) {
@@ -155,6 +212,7 @@ public class Label extends Component {
     public void setText(String text){
         this.text = text;
         localize();
+        stringWidthUnselected = -1;
         setShouldCalcPreferredSize(true);
         repaint();
     }
@@ -167,7 +225,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
@@ -193,7 +251,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void deinitializeImpl() {
         super.deinitializeImpl(); 
@@ -225,8 +283,14 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
-        if(icon != null && mask != null) {
-            maskedIcon = icon.applyMaskAutoScale(mask);
+        if(icon != null) {
+            if(icon.requiresDrawImage()) {
+                legacyRenderer = true;
+            }
+
+            if(mask != null) {
+                maskedIcon = icon.applyMaskAutoScale(mask);
+            }
         }
         this.icon = icon;
         setShouldCalcPreferredSize(true);
@@ -363,21 +427,44 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         return super.paramString() + ", text = " +getText() + ", gap = " + gap;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        getUIManager().getLookAndFeel().drawLabel(g, this);
+        if(legacyRenderer) {
+            getUIManager().getLookAndFeel().drawLabel(g, this);
+            return;
+        }
+        Object icn = null;
+        Image i = getIconFromState();
+        if(i != null) {
+            icn = i.getImage();
+        } else {
+            // optimize away a common usage pattern for drawing the background only
+            if(text == null || text.equals("") || text.equals(" ")) {
+                return;
+            }
+        }
+        //getUIManager().getLookAndFeel().drawLabel(g, this);
+        int cmpX = getX() + g.getTranslateX();
+        int cmpY = getY() + g.getTranslateY();
+        int cmpHeight = getHeight();
+        int cmpWidth = getWidth();
+        Style s = getStyle();
+        Font f = s.getFont();
+        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, text, 
+                icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
+                endsWith3Points, valign);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
@@ -419,7 +506,7 @@ public class Label extends Component {
     }
 
     Image getIconFromState() {
-        return getIcon();
+        return getMaskedIcon();
     }
 
     int getAvaliableSpaceForText() {
@@ -476,7 +563,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void tryDeregisterAnimated() {
     }
@@ -532,7 +619,7 @@ public class Label extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         boolean animateTicker = false;
@@ -540,8 +627,14 @@ public class Label extends Component {
             tickerStartTime = System.currentTimeMillis();
             if(rightToLeft){
                 shiftText -= Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(shiftText + getStringWidth(getStyle().getFont()) < 0) {
+                    shiftText = getStringWidth(getStyle().getFont()); 
+                }
             }else{
                 shiftText += Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(getStringWidth(getStyle().getFont()) - shiftText < 0) {
+                    shiftText = -getStringWidth(getStyle().getFont()); 
+                }
             }     
             animateTicker = true;
         }                
@@ -607,28 +700,28 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"maskName"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] { String.class };
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("maskName")) {
@@ -638,7 +731,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("maskName")) {
@@ -666,21 +759,21 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"text"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {String.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -694,7 +787,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -711,7 +804,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("text")) {
@@ -721,7 +814,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("text")) {
@@ -786,4 +879,36 @@ public class Label extends Component {
     public void setShowEvenIfBlank(boolean showEvenIfBlank) {
         this.showEvenIfBlank = showEvenIfBlank;
     }    
+    
+    /**
+     * This method is equivalent to label.getStyle().getFont().stringWidth(label.getText()) but its faster
+     * @param fnt the font is passed as an optimization to save a call to getStyle
+     * @return the string width
+     */
+    public int getStringWidth(Font fnt) {
+        if(isUnselectedStyle) {
+            // very optimized way to get the string width of a label for the common unselected case in larger lists
+            if(stringWidthUnselected < 0) {
+                stringWidthUnselected = fnt.stringWidth(text);
+            }
+            return stringWidthUnselected;
+        }
+        return fnt.stringWidth(text);
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @return the legacyRenderer
+     */
+    public boolean isLegacyRenderer() {
+        return legacyRenderer;
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @param legacyRenderer the legacyRenderer to set
+     */
+    public void setLegacyRenderer(boolean legacyRenderer) {
+        this.legacyRenderer = legacyRenderer;
+    }
 }

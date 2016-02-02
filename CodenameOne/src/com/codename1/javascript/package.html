@@ -236,13 +236,13 @@
         
         <p>Previously examples showed how to obtain a {@link ca.weblite.codename1.js.JSObject} proxy to a Javascript object.  There are 4 ways to get a {@link ca.weblite.codename1.js.JSObject}:</p>
         <ol>
-            <li>Create an anonymous object: <br/><code>JSObject obj = (JSObject)ctx.get("{}");</code></li>
-            <li>Reference an existing object directly: <br/><code>JSObject obj = (JSObject)ctx.get("window.location");</code></li>
+            <li>Create an anonymous object: <br><code>JSObject obj = (JSObject)ctx.get("{}");</code></li>
+            <li>Reference an existing object directly: <br><code>JSObject obj = (JSObject)ctx.get("window.location");</code></li>
             <li>As the result of a Javascript expression or function call:
-                <br/><code>JSObject obj = (JSObject)ctx.get("document.getElementById('mydiv')")</code>
+                <br><code>JSObject obj = (JSObject)ctx.get("document.getElementById('mydiv')")</code>
             </li>
             <li>Retrieve an Object member variable from another JSObject: 
-                <br/><code>JSObject obj = (JSObject)otherObj.get("aPropertyThatIsAnObject")</code>
+                <br><code>JSObject obj = (JSObject)otherObj.get("aPropertyThatIsAnObject")</code>
             </li>
         </ol>
         
@@ -263,14 +263,14 @@
 String name = (String)obj.get("name");
 Double age = (Double)obj.get("age");
 </pre></code>
-            <br/>
+            <br>
             Is equivalent to the following javascript:
-            <br/>
+            <br>
             <code>
                 var name = obj.name;
                 var age = obj.age;
             </code>
-            <br/>
+            <br>
             Assuming that the <code>obj</code> variable in Java is a proxy for the same obj variable
             in the javascript example.
         </p>
@@ -291,7 +291,7 @@ var obj = {
 </pre></code></p>
 
 <p>In this case you may want to obtain the <var>x</var> coordinate of the nested position object.  {@link JSObject} allows
-    you to use the dot '.' notation for referencing sub-properties like this.  E.g. <br/>
+    you to use the dot '.' notation for referencing sub-properties like this.  E.g. <br>
     <code><pre>Double x = (Double)obj.get("position.x")</pre></code>
 </p>
 <p>This feature raises the issue of how, then, to access properties that contain a '.' in its name.  E.g.</p>

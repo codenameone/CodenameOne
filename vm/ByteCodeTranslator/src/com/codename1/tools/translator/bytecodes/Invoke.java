@@ -24,8 +24,10 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
+import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
+import com.codename1.tools.translator.Util;
 import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
@@ -39,6 +41,8 @@ public class Invoke extends Instruction {
     private String name;
     private String desc;
     private boolean itf;
+    private char[] stackInputTypes;
+    private char[] stackOutputTypes;
     
     
     public Invoke(int opcode, String owner, String name, String desc, boolean itf) {
@@ -48,6 +52,23 @@ public class Invoke extends Instruction {
         this.desc = desc;
         this.itf = itf;
     }
+    
+    String getOwner() {
+        return owner;
+    }
+    
+    String getName() {
+        return name;
+    }
+    
+    String getDesc() {
+        return desc;
+    }
+    
+    boolean isItf() {
+        return itf;
+    }
+    
 
     public boolean isMethodUsed(String desc, String name) {
         return this.desc.equals(desc) && name.equals(name);
@@ -141,7 +162,6 @@ public class Invoke extends Instruction {
         bld.append("__");
         ArrayList<String> args = new ArrayList<String>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
-        
         boolean noPop = false;
         if(returnVal == null) {
             b.append(bld);
@@ -182,19 +202,28 @@ public class Invoke extends Instruction {
             b.append(bld);
         }
         b.append("(threadStateData");
+        
+        
+        
         if(opcode != Opcodes.INVOKESTATIC) {
             b.append(", stack[stackPointer - ");
             b.append(args.size() + 1);
             b.append("].data.o");
         }
         int offset = args.size();
+        //int numArgs = offset;
+        int argIndex=0;
         for(String a : args) {
+            
             b.append(", ");
+            
             b.append("stack[stackPointer - ");
             b.append(offset);
             b.append("].data.");
             b.append(a);
             offset--;
+            
+            argIndex++;
         }
         if(noPop) {
             b.append("));\n");
@@ -264,5 +293,69 @@ public class Invoke extends Instruction {
             b.append("\n");            
         }
     }
+    
+    
+    public List<ByteCodeMethodArg> getArgs() {
+        return Util.getMethodArgs(desc);
+    }
 
+    @Override
+    public char[] getStackInputTypes() {
+        if (stackInputTypes == null) {
+            List<ByteCodeMethodArg> args = getArgs();
+            int thisArg = 0;
+            if (opcode != Opcodes.INVOKESTATIC) {
+                thisArg++;
+                
+            }
+            stackInputTypes = new char[args.size() + thisArg];
+            if (opcode != Opcodes.INVOKESTATIC) {
+                stackInputTypes[0] = 'o';
+            }
+            int len = args.size();
+            for (int i=0; i<len; i++) {
+                stackInputTypes[i+thisArg] = args.get(i).getQualifier();
+            }
+        }
+        return stackInputTypes;
+    }
+
+    @Override
+    public char[] getStackOutputTypes() {
+        if (stackOutputTypes == null) {
+            String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>());
+            if (returnVal == null) {
+                stackOutputTypes = new char[0];
+            } else {
+                stackOutputTypes = new char[1];
+                if(returnVal.equals("JAVA_OBJECT")) {
+                    stackOutputTypes[0] = 'o';
+                } else {
+                    if(returnVal.equals("JAVA_INT")) {
+                        stackOutputTypes[0] = 'i';
+                    } else {
+                        if(returnVal.equals("JAVA_LONG")) {
+                            stackOutputTypes[0] = 'l';
+                        } else {
+                            if(returnVal.equals("JAVA_DOUBLE")) {
+                                stackOutputTypes[0] = 'd';
+                            } else {
+                                if(returnVal.equals("JAVA_FLOAT")) {
+                                    stackOutputTypes[0] = 'f';
+                                } else {
+                                    throw new UnsupportedOperationException("Unknown type: " + returnVal);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return stackOutputTypes;
+    }
+    
+    
+    
+    
+    
 }

@@ -53,7 +53,7 @@ public class LengthConstraint implements Constraint {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean isValid(Object value) {
@@ -61,7 +61,7 @@ public class LengthConstraint implements Constraint {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public String getDefaultFailMessage() {

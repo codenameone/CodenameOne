@@ -58,7 +58,7 @@ public class User extends FBObject {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public User(Hashtable props) {
         super(props);
