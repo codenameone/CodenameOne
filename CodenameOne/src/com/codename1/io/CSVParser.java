@@ -154,10 +154,12 @@ public class CSVParser {
             currentVector.addElement(stringBuf.toString());
         }
         String[][] actualReturnValue = new String[returnValue.size()][];
-        for(int iter = 0 ; iter < actualReturnValue.length ; iter++) {
+        int arlen = actualReturnValue.length;
+        for(int iter = 0 ; iter < arlen ; iter++) {
             Vector e = (Vector)returnValue.elementAt(iter);
             actualReturnValue[iter] = new String[e.size()];
-            for(int i = 0 ; i < actualReturnValue[iter].length ; i++) {
+            int arlen2 = actualReturnValue[iter].length;
+            for(int i = 0 ; i < arlen2 ; i++) {
                 actualReturnValue[iter][i] = (String)e.elementAt(i);
             }
         }

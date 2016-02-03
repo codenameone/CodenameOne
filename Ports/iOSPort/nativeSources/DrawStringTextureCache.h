@@ -37,12 +37,15 @@
     UIFont *font;
     int color;
     int alpha;
+    int stringWidth;
 }
 
 -(BOOL)isEqual:(id)object;
 -(id)initWithString:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a;
 +(void)cache:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a;
-+(GLuint)checkCache:(NSString*)s f:(UIFont*)f c:(int)c a:(int)a;
++(DrawStringTextureCache*)checkCache:(NSString*)s f:(UIFont*)f c:(int)c a:(int)a;
 +(void)flushDeleted;
+-(int)stringWidth;
+-(GLuint)textureName;
 
 @end

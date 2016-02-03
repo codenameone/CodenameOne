@@ -54,7 +54,7 @@ public class Photo extends FBObject {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Photo(Hashtable props) {
         super(props);

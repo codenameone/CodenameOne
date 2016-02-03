@@ -36,6 +36,7 @@ import java.io.IOException;
  * data to be limited to a specific user on the server side.
  *
  * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public class CloudPersona {
     private String persona;

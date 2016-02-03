@@ -60,13 +60,13 @@ public class ComponentGroup extends Container {
         }
     }
 
-    void insertComponentAt(int index, Component cmp) {
-        super.insertComponentAt(index, cmp);
+    void insertComponentAt(int index, Object con, Component cmp) {
+        super.insertComponentAt(index, con, cmp);
         updateUIIDs();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -196,21 +196,21 @@ public class ComponentGroup extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"elementUIID", "displayName", "horizontal", "groupFlag", "forceGroup"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {String.class, String.class, Boolean.class, String.class, Boolean.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("elementUIID")) {
@@ -236,7 +236,7 @@ public class ComponentGroup extends Container {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("elementUIID")) {

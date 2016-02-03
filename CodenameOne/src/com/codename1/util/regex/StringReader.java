@@ -45,7 +45,8 @@ public class StringReader extends Reader {
             return -1;
         }
         int read = 0;
-        for (int i = 0; i < len && pointer < str.length(); i++, read++) {
+        int slen = str.length();
+        for (int i = 0; i < len && pointer < slen; i++, read++) {
             cbuf[off + i] = str.charAt(pointer++);
         }
         return read;

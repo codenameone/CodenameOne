@@ -158,7 +158,7 @@ public class Rectangle implements Shape {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "x = " + x + " y = " + y + " size = " + size;
@@ -289,6 +289,41 @@ public class Rectangle implements Shape {
             ty2 = Integer.MIN_VALUE;
         }
         return new Rectangle(tx1, ty1, tx2, ty2);
+    }
+    
+    public void intersection(Rectangle input, Rectangle output) {
+        int tx1 = this.x;
+        int ty1 = this.y;
+        int rx1 = input.getX();
+        int ry1 = input.getY();
+        int tx2 = tx1; tx2 += this.size.getWidth();
+        int ty2 = ty1; ty2 += this.size.getHeight();
+        int rx2 = rx1; rx2 += input.getWidth();
+        int ry2 = ry1; ry2 += input.getHeight();
+        if (tx1 < rx1) {
+            tx1 = rx1;
+        }
+        if (ty1 < ry1) {
+            ty1 = ry1;
+        }
+        if (tx2 > rx2) {
+            tx2 = rx2;
+        }
+        if (ty2 > ry2) {
+            ty2 = ry2;
+        }
+        tx2 -= tx1;
+        ty2 -= ty1;
+        // tx2,ty2 will never overflow (they will never be
+        // larger than the smallest of the two source w,h)
+        // they might underflow, though...
+        if (tx2 < Integer.MIN_VALUE) {
+            tx2 = Integer.MIN_VALUE;
+        }
+        if (ty2 < Integer.MIN_VALUE) {
+            ty2 = Integer.MIN_VALUE;
+        }
+        output.setBounds(tx1, ty1, tx2, ty2);
     }
 
     /**
@@ -423,7 +458,7 @@ public class Rectangle implements Shape {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(Transform m) {
         if ( path == null ){
@@ -440,28 +475,28 @@ public class Rectangle implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(){
         return getPathIterator(null);
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public Rectangle getBounds() {
         return this;
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public float[] getBounds2D(){
         return new float[]{getX(), getY(), getWidth(), getHeight()};
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean isRectangle(){
         return true;

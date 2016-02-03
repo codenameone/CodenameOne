@@ -120,6 +120,22 @@ public class Toolbar extends Container {
         }
     }
 
+    /**
+     * Makes the title align to the center accurately by doing it at the layout level which also takes into 
+     * account right/left commands
+     * @param cent whether the title should be centered
+     */
+    public void setTitleCentered(boolean cent) {
+        ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+    } 
+    
+    /**
+     * Returns true if the title is centered via the layout
+     * @return true if the title is centered
+     */
+    public boolean isTitleCentered() {
+        return ((BorderLayout)getLayout()).getCenterBehavior() == BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
+    }
 
     /**
      * Creates a static side menu that doesn't fold instead of the standard sidemenu.
@@ -152,6 +168,15 @@ public class Toolbar extends Container {
         checkIfInitialized();
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
+    }
+    
+    /**
+     * Returns the Toolbar title Component.
+     * 
+     * @return the Toolbar title component
+     */ 
+    public Component getTitleComponent(){
+        return titleComponent;
     }
 
     /**
@@ -191,7 +216,8 @@ public class Toolbar extends Container {
             } else {
                 b.setUIID("SideCommand");
             }
-            permanentSideMenuContainer.addComponent(b);
+            addComponentToSideMenu(permanentSideMenuContainer, b);
+            
         } else {
             sideMenu.addCommand(cmd);
             sideMenu.installMenuBar();
@@ -223,7 +249,7 @@ public class Toolbar extends Container {
             Button btn = new Button(cmd);
             btn.setParent(cnt);
             cnt.setLeadComponent(btn);
-            permanentSideMenuContainer.addComponent(cnt);
+            addComponentToSideMenu(permanentSideMenuContainer, cnt);
         } else {
             cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
             cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
@@ -241,7 +267,7 @@ public class Toolbar extends Container {
         checkIfInitialized();
         if(permanentSideMenu) {
             constructPermanentSideMenu();
-            permanentSideMenuContainer.addComponent(cmp);
+            addComponentToSideMenu(permanentSideMenuContainer, cmp);
         } else {
             Command cmd = new Command("");
             cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
@@ -249,7 +275,7 @@ public class Toolbar extends Container {
             sideMenu.addCommand(cmd);
             sideMenu.installMenuBar();
         }
-        }
+    }
 
     /**
      * Find the command component instance if such an instance exists
@@ -537,11 +563,23 @@ public class Toolbar extends Container {
     
     /**
      * Creates an empty side navigation panel.
-     */ 
-    protected Container constructSideNavigationComponent(){
+     */
+    protected Container constructSideNavigationComponent() {
         return sideMenu.constructSideNavigationPanel();
     }
-    
+
+    /**
+     * This method responsible to add a Component to the side navigation panel.
+     *
+     * @param menu the Menu Container that was created in the
+     * constructSideNavigationComponent() method
+     *
+     * @param cmp the Component to add to the side menu
+     */
+    protected void addComponentToSideMenu(Container menu, Component cmp) {
+        sideMenu.addComponentToSideMenuImpl(menu, cmp);
+    }
+
 
     class ToolbarSideMenu extends SideMenuBar {
 
@@ -554,6 +592,11 @@ public class Toolbar extends Container {
         protected Container constructSideNavigationComponent(){
             return Toolbar.this.constructSideNavigationComponent();
         }
+
+        @Override
+        protected void addComponentToSideMenu(Container menu, Component cmp) {
+            Toolbar.this.addComponentToSideMenu(menu, cmp);
+        }
         
         @Override
         protected Container getTitleAreaContainer() {
@@ -562,7 +605,7 @@ public class Toolbar extends Container {
 
         @Override
         protected Component getTitleComponent() {
-            return titleComponent;
+            return Toolbar.this.getTitleComponent();
         }
 
         @Override
@@ -611,7 +654,7 @@ public class Toolbar extends Container {
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
                 if (i == null) {
-                    i = Resources.getSystemResource().getImage("of_menu.png");
+                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"));
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 

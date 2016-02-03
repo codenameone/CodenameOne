@@ -3903,7 +3903,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void layoutContainer() {
         if ((FIXED_WIDTH) && (displayWidth!=0) && (Display.getInstance().getDisplayWidth()!=displayWidth)) {
@@ -3918,7 +3918,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void actionPerformed(ActionEvent evt) {
         if (getComponentForm().getFocused() instanceof TextField) {
@@ -3944,21 +3944,21 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"url", "body","pageUIID"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {String.class, String.class,String.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("url")) {
@@ -3974,7 +3974,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("url")) {
@@ -4133,7 +4133,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
         }
 
         /**
-         * {@inheritDoc}
+         * {{@inheritDoc}}
          */
         public void pointerReleased(int x, int y) {
             triggerAction();
@@ -4358,7 +4358,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
         }
 
         /**
-         * {@inheritDoc}
+         * {{@inheritDoc}}
          */
         public void paint(Graphics g) {
             if (getIcon()!=null) {
@@ -4378,7 +4378,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
         }
 
         /**
-         * {@inheritDoc}
+         * {{@inheritDoc}}
          */
         protected Dimension calcPreferredSize() {
             if (getIcon()!=null) {
@@ -4402,7 +4402,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
     class HTMLComboBox extends ComboBox {
 
         /**
-         * {@inheritDoc}
+         * {{@inheritDoc}}
          */
         protected List createPopupList() {
             List l = new MultiComboBox(getModel(),false);

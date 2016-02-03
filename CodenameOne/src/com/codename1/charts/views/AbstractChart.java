@@ -165,7 +165,8 @@ public abstract class AbstractChart  {
       String[] lines = split(text,"\n");
       Rectangle2D rect = new Rectangle2D();
       int yOff = 0;
-      for (int i = 0; i < lines.length; ++i) {
+      int llen = lines.length;
+      for (int i = 0; i < llen; ++i) {
         canvas.drawText(lines[i], x, y + yOff, paint);
         paint.getTextBounds(lines[i], 0, lines[i].length(), rect);
         yOff = yOff + (int)rect.getHeight() + 5; // space between lines is 5
@@ -536,7 +537,8 @@ public abstract class AbstractChart  {
   private static char[] stopCharCandidates = "!@#$%^&*()?><,./+-qwertyuiop[zxcvbnm,./\\|}{".toCharArray();
     private static String[] split(String input, String sep){
         if ( sep.length() > 1 ){
-            for ( int i=0; i<stopCharCandidates.length; i++){
+            int clen = stopCharCandidates.length;
+            for ( int i=0; i<clen; i++){
                 if ( input.indexOf(stopCharCandidates[i]) == -1 ){
                     input = com.codename1.util.StringUtil.replaceAll(input, sep, String.valueOf(stopCharCandidates[i]));
                     sep = String.valueOf(stopCharCandidates[i]);

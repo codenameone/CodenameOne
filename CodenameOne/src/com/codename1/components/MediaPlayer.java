@@ -80,7 +80,7 @@ public class MediaPlayer extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         if(userSetIcons){
@@ -97,7 +97,7 @@ public class MediaPlayer extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         if(video == null && dataSource == null) {
@@ -319,21 +319,21 @@ public class MediaPlayer extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"backIcon", "forwardIcon", "pauseIcon", "playIcon", "dataSource"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {Image.class, Image.class, Image.class, Image.class, String.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("backIcon")) {
@@ -355,7 +355,7 @@ public class MediaPlayer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("backIcon")) {

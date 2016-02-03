@@ -62,35 +62,35 @@ public class DefaultTableModel implements TableModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getRowCount() {
         return data.length;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getColumnCount() {
         return columnNames.length;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getColumnName(int i) {
         return columnNames[i];
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isCellEditable(int row, int column) {
         return editable;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getValueAt(int row, int column) {
         try {
@@ -103,7 +103,7 @@ public class DefaultTableModel implements TableModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setValueAt(int row, int column, Object o) {
         data[row][column] = o;
@@ -111,14 +111,14 @@ public class DefaultTableModel implements TableModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangeListener(DataChangedListener d) {
         dispatcher.addListener(d);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangeListener(DataChangedListener d) {
         dispatcher.removeListener(d);

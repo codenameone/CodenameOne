@@ -32,6 +32,7 @@ import org.objectweb.asm.Opcodes;
 public class IInc extends Instruction {
     private int var;
     private int num;
+    private static char[] ZERO_CHAR = new char[0];
     public IInc(int var, int num) {
         super(Opcodes.IINC);
         this.var = var;
@@ -47,4 +48,17 @@ public class IInc extends Instruction {
         b.append(");\n");
     }
 
+    @Override
+    public char[] getStackInputTypes() {
+        return ZERO_CHAR;
+    }
+
+    @Override
+    public char[] getStackOutputTypes() {
+        return ZERO_CHAR;
+    }
+    
+    
+
+    
 }

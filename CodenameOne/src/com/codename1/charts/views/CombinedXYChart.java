@@ -176,7 +176,8 @@ public class CombinedXYChart extends XYChart {
   }
 
   private XYChart getXYChart(int seriesIndex) {
-    for (int i = 0; i < chartDefinitions.length; i++) {
+      int clen = chartDefinitions.length;
+    for (int i = 0; i < clen; i++) {
       if (chartDefinitions[i].containsSeries(seriesIndex)) {
         return mCharts[i];
       }
@@ -185,7 +186,8 @@ public class CombinedXYChart extends XYChart {
   }
 
   private int getChartSeriesIndex(int seriesIndex) {
-    for (int i = 0; i < chartDefinitions.length; i++) {
+      int clen = chartDefinitions.length;
+    for (int i = 0; i < clen; i++) {
       if (chartDefinitions[i].containsSeries(seriesIndex)) {
         return chartDefinitions[i].getChartSeriesIndex(seriesIndex);
       }
@@ -218,7 +220,8 @@ public class CombinedXYChart extends XYChart {
     }
 
     public int getChartSeriesIndex(int seriesIndex) {
-      for (int i = 0; i < getSeriesIndex().length; i++) {
+        int slen = getSeriesIndex().length;
+      for (int i = 0; i < slen; i++) {
         if (this.seriesIndex[i] == seriesIndex) {
           return i;
         }

@@ -225,7 +225,7 @@ public class Table extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void paintGlass(Graphics g) {
         if ((drawBorder) && (innerBorder!=INNER_BORDERS_NONE)) {
@@ -424,7 +424,7 @@ public class Table extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void initComponent() {
         // this can happen if deinitialize is invoked due to a menu command which modifies
@@ -437,7 +437,7 @@ public class Table extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void deinitialize() {
         // we unbind the listener to prevent a memory leak for the use case of keeping
@@ -709,14 +709,14 @@ public class Table extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"data", "header"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArray2DClass(), 
@@ -724,14 +724,14 @@ public class Table extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[][]", "String[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("data")) {
@@ -744,7 +744,7 @@ public class Table extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("data")) {
@@ -762,7 +762,7 @@ public class Table extends Container {
         private int editingColumn = -1;
         private int editingRow = -1;
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public final void dataChanged(int row, int column) {
             // prevents the table from rebuilding on every text field edit which makes the table 

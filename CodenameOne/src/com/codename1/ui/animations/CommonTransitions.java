@@ -344,7 +344,7 @@ public final class CommonTransitions extends Transition {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void initTransition() {
         firstFinished = false;
@@ -606,7 +606,7 @@ public final class CommonTransitions extends Transition {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(timeline != null) {
@@ -647,7 +647,7 @@ public final class CommonTransitions extends Transition {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         try {
@@ -889,7 +889,7 @@ public final class CommonTransitions extends Transition {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void cleanup() {
         if(transitionType == TYPE_SLIDE_AND_FADE) {
@@ -1200,7 +1200,7 @@ public final class CommonTransitions extends Transition {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Transition copy(boolean reverse){
         CommonTransitions retVal = null;

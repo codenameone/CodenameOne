@@ -4718,7 +4718,7 @@ public class FontImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         int oldColor = g.getColor();
@@ -4756,7 +4756,7 @@ public class FontImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         if (w == width && h == height) {
@@ -4840,28 +4840,28 @@ public class FontImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return false;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         return false;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOpaque() {
         return false;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getImageName() {
         return text;
@@ -4874,7 +4874,7 @@ public class FontImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image rotate(int degrees) {
         FontImage f = createFixed(text, fnt, color, width, height);
@@ -4911,5 +4911,13 @@ public class FontImage extends Image {
             return img;
         }
         return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean requiresDrawImage() {
+        return true;
     }
 }

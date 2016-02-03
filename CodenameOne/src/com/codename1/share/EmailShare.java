@@ -50,7 +50,7 @@ public class EmailShare extends ShareService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void share(final String toShare, final String image, final String mimeType) {
         final Form currentForm = Display.getInstance().getCurrent();
@@ -136,7 +136,7 @@ public class EmailShare extends ShareService {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void share(final String toShare) {
         share(toShare, null, null);
@@ -159,7 +159,7 @@ public class EmailShare extends ShareService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean canShareImage() {
         return true;

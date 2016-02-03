@@ -23,7 +23,9 @@
 package com.codename1.location;
 
 /**
- * The Geofence Listener
+ * Listener interface for the Geofence background tracking functionality. Usage:
+ * 
+ * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
  *
  * @author Chen
  */

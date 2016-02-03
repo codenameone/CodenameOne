@@ -102,7 +102,7 @@ public abstract class TiledProvider extends MapProvider {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public BoundingBox bboxFor(Coord position, int zoomLevel) {
         _zoomLevel = zoomLevel;
@@ -120,7 +120,7 @@ public abstract class TiledProvider extends MapProvider {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Tile tileFor(BoundingBox bbox) {
         String url = url(_zoomLevel, _tileNo.getX(), (1 << _zoomLevel) - _tileNo.getY() - 1);

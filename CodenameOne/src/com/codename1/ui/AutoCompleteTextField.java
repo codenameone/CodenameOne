@@ -87,7 +87,7 @@ public class AutoCompleteTextField extends TextField {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void initComponent() {
@@ -103,7 +103,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void deinitialize() {
@@ -123,7 +123,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void setText(String text) {
@@ -208,7 +208,7 @@ public class AutoCompleteTextField extends TextField {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int k) {
         if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -222,7 +222,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int k) {
         if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -391,28 +391,28 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"completion"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("completion")) {
@@ -435,14 +435,15 @@ public class AutoCompleteTextField extends TextField {
      */
     public String[] getCompletion() {
         String[] r = new String[filter.getUnderlying().getSize()];
-        for(int iter = 0 ; iter < r.length ; iter++) {
+        int rlen = r.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             r[iter] = (String)filter.getUnderlying().getItemAt(iter);
         }
         return r;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("completion")) {

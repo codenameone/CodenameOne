@@ -59,7 +59,7 @@ public class BoundingBox {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "SW: " + _southWest + " NE: " + _northEast;
@@ -97,7 +97,7 @@ public class BoundingBox {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object other) {
         if (!(other instanceof BoundingBox)) {
@@ -108,7 +108,7 @@ public class BoundingBox {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         int hash = 5;
@@ -133,7 +133,8 @@ public class BoundingBox {
         double west = coords[0].getLongitude();
 
         boolean projected = true;
-        for (int i = 0; i < coords.length; i++) {
+        int clen = coords.length;
+        for (int i = 0; i < clen; i++) {
             Coord c = coords[i];
             projected = c.isProjected();
             north = Math.max(north, c.getLatitude());

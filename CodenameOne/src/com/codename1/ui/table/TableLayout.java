@@ -32,8 +32,73 @@ import com.codename1.ui.plaf.Style;
 import java.util.Vector;
 
 /**
- * Layout manager similar in spirit to HTML tables allowing rows and columns 
- * of varying width/height.
+ * <p>TableLayout is a very elaborate <b>constraint based</b> layout manager that can arrange elements 
+ * in rows/columns while defining constraints to control complex behavior such as spanning, alignment/weight 
+ * etc.<br>
+ * Notice that the table layout is in the <code>com.codename1.ui.table</code> package and not in the 
+ * layouts package. <br>
+ * This is due to the fact that <code>TableLayout</code> was originally designed for the 
+ * {@link Table} class.</p>
+ *
+ * <p>Despite being constraint based the table layout isn't strict about constraints and will implicitly add a 
+ * constraint when one is missing. However, unlike grid layout table layout won't implicitly add a row if the 
+ * row/column count is incorrect<br>
+ * E.g this creates a 2x2 table but adds 5 elements. The 5th element won't show:</p>
+ * <script src="https://gist.github.com/codenameone/a25944769128d5330cd4.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/table-layout-2x2.png" alt="TableLayout 2x2 missing component" />
+ *
+ * <p>Table layout supports the ability to grow the last column which can be enabled using the 
+ * <code>setGrowHorizontally</code> method. You can also use a shortened terse syntax to construct a table 
+ * layout however since the table layout is a constraint based layout you won't be able to utilize its full power 
+ * with this syntax.</>
+ * 
+ * <p>The default usage of the encloseIn below uses the <code>setGrowHorizontally</code> flag.</p>
+ *<script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
+ *
+ * <h4>The Full Potential</h4>
+ *<p>To truly appreciate the {@code TableLayout} we need to use the constraint syntax which allows 
+ * us to span, align and set width/height for the rows &amp; columns.<br>
+ * Table layout works with a {@link Constraint} instance that can communicate our intentions into the 
+ * layout manager. Such constraints can include more than one attribute e.g. span and height.</p>
+ *
+ * <p>Notice that table layout constraints can't be reused for more than one component.<br>
+ * The constraint class supports the following attributes:</p>
+ *
+ * <table summary="" border="1">
+ *   <tr>
+ *        <td> column       </td><td> The column for the table cell. This defaults to -1 which will just place the component in the next available cell</td>
+ *   </tr>
+ *   <tr>
+ *        <td> row             </td><td> Similar to column, defaults to -1 as well</td>
+ *   </tr>
+ *   <tr>
+ *       <td> width           </td><td> The column width in percentages, -1 will use the preferred size. -2 for width will take up the rest of the available space</td>
+ *   </tr>
+ *   <tr>
+ *       <td> height          </td><td> Similar to width but doesn't support the -2 value</td>
+ *   </tr>
+ *   <tr>
+ *       <td> spanHorizontal  </td><td> The cells that should be occupied horizontally defaults to 1 and can't exceed the column count - current offset.</td>
+ *   </tr>
+ *   <tr>
+ *       <td> spanVertical    </td><td> Similar to spanHorizontal with the same limitations</td>
+ *   </tr>
+ *   <tr>
+ *       <td> horizontalAlign </td><td> The horizontal alignment of the content within the cell, defaults to the special case -1 value to take up all the cell space can be either `-1`, `Component.LEFT`, `Component.RIGHT` or `Component.CENTER`</td>
+ *   </tr>
+ *   <tr>
+ *       <td> verticalAlign   </td><td> Similar to horizontalAlign can be one of `-1`, `Component.TOP`, `Component.BOTTOM` or `Component.CENTER`</td>
+ *   </tr>
+ * </table>
+ * 
+ * <p> Notice that you only need to set `width`/`height` to one cell in a column/row.<br>
+ * The table layout constraint sample tries to demonstrate some of the unique things you can do with constraints.<br>
+ *
+ * We go into further details on this in the <a href="https://www.codenameone.com/manual/basics.html#_table_layout">developer guide</a> 
+ * so check that out.</p>
+ * <script src="https://gist.github.com/codenameone/573f73164df4af00b7b1.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/table-layout-constraints.png" alt="TableLayout with complex constraints" />
  *
  * @author Shai Almog
  */
@@ -57,7 +122,7 @@ public class TableLayout extends Layout {
         int actualColumn = -1;
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public String toString() {
             return "row: " + row + " column: " + column + " width: " + width + " height: " + height + " hspan: " + 
@@ -309,7 +374,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {
         try {
@@ -338,7 +403,8 @@ public class TableLayout extends Layout {
 
             int currentX = left;
             int availableReminder = pWidth;
-            for(int iter = 0 ; iter < columnSizes.length ; iter++) {
+            int cslen = columnSizes.length;
+            for(int iter = 0 ; iter < cslen ; iter++) {
                 columnSizes[iter] = getColumnWidthPixels(iter, pWidth, availableReminder);
                 availableReminder -= columnSizes[iter];
             }
@@ -381,7 +447,8 @@ public class TableLayout extends Layout {
             }
 
             int currentY = top;
-            for(int iter = 0 ; iter < rowSizes.length ; iter++) {
+            int rlen = rowSizes.length;
+            for(int iter = 0 ; iter < rlen ; iter++) {
                 if(parent.isScrollableY()) {
                     rowSizes[iter] = getRowHeightPixels(iter, pHeight, -1);
                 } else {
@@ -391,9 +458,9 @@ public class TableLayout extends Layout {
                 currentY += rowSizes[iter];
             }
 
-
-            for(int r = 0 ; r < rowSizes.length ; r++) {
-                for(int c = 0 ; c < columnSizes.length ; c++) {
+            int clen = columnSizes.length;
+            for(int r = 0 ; r < rlen ; r++) {
+                for(int c = 0 ; c < clen ; c++) {
                     Constraint con = tablePositions[r * columns + c];
                     int conX, conY, conW, conH;
                     if(con != null && con != H_SPAN_CONSTRAINT && con != V_SPAN_CONSTRAINT && con != VH_SPAN_CONSTRAINT) {
@@ -590,7 +657,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Dimension getPreferredSize(Container parent) {
         Style s = parent.getStyle();
@@ -664,7 +731,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addLayoutComponent(Object value, Component comp, Container c) {
         Constraint con = null;
@@ -812,7 +879,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeLayoutComponent(Component comp) {
         // reflow the table
@@ -844,7 +911,7 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getComponentConstraint(Component comp) {
         for(int r = 0 ; r < rows ; r++) {
@@ -945,21 +1012,21 @@ public class TableLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "TableLayout";
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return super.equals(o) && ((TableLayout)o).getRows() == getRows() && ((TableLayout)o).getColumns() == getColumns();
     }
         
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isConstraintTracking() {
         return true;
@@ -979,5 +1046,42 @@ public class TableLayout extends Layout {
      */
     public void setGrowHorizontally(boolean growHorizontally) {
         this.growHorizontally = growHorizontally;
+    }
+
+    /**
+     * <p>Creates a table layout container that grows the last column horizontally, the number of rows is automatically
+     * calculated based on the number of columns. See usage:</p>
+     *<script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
+     * @param columns the number of columns
+     * @param cmps components to add
+     * @return a newly created table layout container with the components in it
+     */
+    public static Container encloseIn(int columns, Component... cmps) {
+        return encloseIn(columns, true, cmps);
+    }
+
+
+    /**
+     * <p>Creates a table layout container, the number of rows is automatically calculated based on the number 
+     * of columns. See usage:</p>
+     *<script src="https://gist.github.com/codenameone/2b4d9a13f409e297fb2e.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/table-layout-enclose.png" alt="TableLayout that grows the last column" />
+     * 
+     * @param columns the number of columns
+     * @param growHorizontally true to grow the last column to fit available width
+     * @param cmps components to add
+     * @return a newly created table layout container with the components in it
+     */
+    public static Container encloseIn(int columns, boolean growHorizontally, Component... cmps) {
+        int rows = cmps.length;
+        if(rows % columns > 0) {
+            rows = rows / columns + 1;
+        } else {
+            rows = rows / columns;
+        }
+        TableLayout tl = new TableLayout(rows, columns);
+        tl.setGrowHorizontally(growHorizontally);
+        return Container.encloseIn(tl, cmps);
     }
 }

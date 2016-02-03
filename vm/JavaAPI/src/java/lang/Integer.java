@@ -308,4 +308,18 @@ public final class Integer{
     public static Integer valueOf(int i) {
         return new Integer(i);
     }
+
+    /**
+     * Returns the value of the {@code signum} function for the specified
+     * integer.
+     *
+     * @param i
+     *            the integer value to check.
+     * @return -1 if {@code i} is negative, 1 if {@code i} is positive, 0 if
+     *         {@code i} is zero.
+     * @since 1.5
+     */
+    public static int signum(int i) {
+        return (i >> 31) | (-i >>> 31); // Hacker's delight 2-7
+    }
 }

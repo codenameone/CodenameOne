@@ -80,7 +80,7 @@ public class VServAds extends FullScreenAdService {
     private String actionNotify;
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected ConnectionRequest createAdRequest() {
         ConnectionRequest con = new ConnectionRequest() {
@@ -159,7 +159,7 @@ public class VServAds extends FullScreenAdService {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void clearPendingAd() {
         imageURL = null;
@@ -168,7 +168,7 @@ public class VServAds extends FullScreenAdService {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Component getPendingAd() {
         if(imageURL == null) {
@@ -224,7 +224,7 @@ public class VServAds extends FullScreenAdService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String getAdDestination() {
         if(actionNotify != null && actionNotify.length() > 0) {
@@ -238,7 +238,7 @@ public class VServAds extends FullScreenAdService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean failed() {
         return failed;
@@ -316,7 +316,7 @@ public class VServAds extends FullScreenAdService {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAllowSkipping() {
         return true;

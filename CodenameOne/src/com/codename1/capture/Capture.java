@@ -45,6 +45,7 @@ public class Capture {
     
     /**
      * Returns true if the device has camera false otherwise.
+     * @return true if the device has a camera
      */ 
     public static boolean hasCamera(){
         return Display.getInstance().hasCamera();

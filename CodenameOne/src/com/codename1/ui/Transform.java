@@ -167,7 +167,7 @@ public class Transform {
     private static Transform _IDENTITY;
     public static Transform IDENTITY(){
         if ( _IDENTITY == null ){
-            _IDENTITY = new ImmutableTransform(Display.getInstance().getImplementation().makeTransformIdentity());
+            _IDENTITY = new ImmutableTransform(Display.impl.makeTransformIdentity());
             _IDENTITY.type = TYPE_IDENTITY;
         }
         return _IDENTITY;
@@ -186,7 +186,7 @@ public class Transform {
     
     private CodenameOneImplementation impl(){
         if ( impl == null ){
-            impl = Display.getInstance().getImplementation();
+            impl = Display.impl;
         }
         return impl;
     }
@@ -352,7 +352,7 @@ public class Transform {
      * @throws RuntimeException If {@link #isSupported()} is false.
      */
     public static Transform makeRotation(float angle, float x, float y, float z){
-        Object t = Display.getInstance().getImplementation().makeTransformRotation(angle, x, y, z);
+        Object t = Display.impl.makeTransformRotation(angle, x, y, z);
         Transform out = new Transform(t);
         return out;
     }
@@ -415,7 +415,7 @@ public class Transform {
      * @return A transform for the given perspective.
      */
     public static Transform makePerspective(float fovy, float aspect, float zNear, float zFar) {
-        Object t = Display.getInstance().getImplementation().makeTransformPerspective(fovy, aspect, zNear, zFar);
+        Object t = Display.impl.makeTransformPerspective(fovy, aspect, zNear, zFar);
         Transform out = new Transform(t);
         return out;
     }
@@ -433,7 +433,7 @@ public class Transform {
      */
     public static Transform makeOrtho(float left, float right, float bottom, float top,
                 float near, float far){
-        Object t = Display.getInstance().getImplementation().makeTransformOrtho(left, right, bottom, top, near, far);
+        Object t = Display.impl.makeTransformOrtho(left, right, bottom, top, near, far);
         Transform out = new Transform(t);
         return out;
     }
@@ -455,7 +455,7 @@ public class Transform {
     public static Transform makeCamera(float eyeX, float eyeY, float eyeZ,
                 float centerX, float centerY, float centerZ, float upX, float upY,
                 float upZ){
-        Object t = Display.getInstance().getImplementation().makeTransformCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+        Object t = Display.impl.makeTransformCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
         Transform out = new Transform(t);
         return out;
     }
@@ -471,7 +471,7 @@ public class Transform {
      */
     public void rotate(float angle, float x, float y, float z){
         initNativeTransform();
-        Display.getInstance().getImplementation().transformRotate(nativeTransform, angle, x, y, z);
+        Display.impl.transformRotate(nativeTransform, angle, x, y, z);
         type = TYPE_UNKNOWN;
     }
     
@@ -815,7 +815,7 @@ public class Transform {
      * @return True if and only if this platform supports transforms.
      */
     public static boolean isSupported(){
-        return Display.getInstance().getImplementation().isTransformSupported();
+        return Display.impl.isTransformSupported();
     }
     
     /**
@@ -824,7 +824,7 @@ public class Transform {
      * @return True if and only if this platform supports transforms.
      */
     public static boolean isPerspectiveSupported(){
-        return Display.getInstance().getImplementation().isPerspectiveTransformSupported();
+        return Display.impl.isPerspectiveTransformSupported();
     }
     
     

@@ -56,7 +56,7 @@ public class FacebookShare extends ShareService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt) {
         if (!FaceBookAccess.getInstance().isAuthenticated()) {
@@ -74,7 +74,7 @@ public class FacebookShare extends ShareService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void share(String text, final String image, final String mime) {
         final ShareForm[] f = new ShareForm[1];
@@ -159,14 +159,14 @@ public class FacebookShare extends ShareService {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void share(String toShare) {
         share(toShare, null, null);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean canShareImage() {
         return true;

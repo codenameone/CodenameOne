@@ -85,7 +85,7 @@ public class PointLayer extends Coord implements Layer{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Tile tile) {
         Point pos = tile.pointPosition(this);
@@ -109,14 +109,14 @@ public class PointLayer extends Coord implements Layer{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return super.toString() + " " + name;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public BoundingBox boundingBox() {
         return null;

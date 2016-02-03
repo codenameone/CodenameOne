@@ -439,7 +439,10 @@ public class Style {
     private EventDispatcher listeners;
 
     Object roundRectCache;
-
+    
+    // used by the Android port, do not remove!
+    Object nativeOSCache;
+    
     /**
      * Each component when it draw itself uses this Object 
      * to determine in what colors it should use.
@@ -1320,6 +1323,75 @@ public class Style {
 
         return padding[orientation];
     }
+    
+    /**
+     * Returns the left padding in pixel or right padding in an RTL situation
+     * @param rtl indicates a right to left language
+     * @return the padding in pixels
+     */
+    public int getPaddingLeft(boolean rtl) {
+        if (rtl) {
+            return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
+        }
+        return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+    }
+    
+    
+    /**
+     * Returns the right padding in pixel or left padding in an RTL situation
+     * @param rtl indicates a right to left language
+     * @return the padding in pixels
+     */
+    public int getPaddingRight(boolean rtl) {
+        if (rtl) {
+            return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+        }
+        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
+    }
+    
+    /**
+     * Returns the top padding in pixel 
+     * @return the padding in pixels
+     */
+    public int getPaddingTop() {
+        return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP);
+    }
+    
+    /**
+     * Returns the bottom padding in pixel 
+     * @return the padding in pixels
+     */
+    public int getPaddingBottom() {
+        return convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);
+    }
+    
+    /**
+     * Returns the right margin in pixel or left margin in an RTL situation
+     * @param rtl indicates a right to left language
+     * @return the margin in pixels
+     */
+    public int getMarginRight(boolean rtl) {
+        if (rtl) {
+            return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+        }
+        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
+    }
+    
+    /**
+     * Returns the top margin in pixel 
+     * @return the margin in pixels
+     */
+    public int getMarginTop() {
+        return convertUnit(marginUnit, margin[Component.TOP], Component.TOP);
+    }
+    
+    /**
+     * Returns the bottom margin in pixel 
+     * @return the margin in pixels
+     */
+    public int getMarginBottom() {
+        return convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);
+    }
 
     /**
      * Returns the Padding in using the current unit
@@ -1792,6 +1864,7 @@ public class Style {
     
     private void firePropertyChanged(String propertName) {
         roundRectCache = null;
+        nativeOSCache = null;
         if (listeners == null) {
             return;
         }

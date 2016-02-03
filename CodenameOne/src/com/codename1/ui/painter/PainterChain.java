@@ -92,10 +92,11 @@ public class PainterChain implements Painter {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Rectangle rect) {
-        for(int iter = 0 ; iter < chain.length ;  iter++) {
+        int clen = chain.length;
+        for(int iter = 0 ; iter < clen ;  iter++) {
             chain[iter].paint(g, rect);
         }
     }
@@ -152,7 +153,8 @@ public class PainterChain implements Painter {
                 f.setGlassPane(null);
             } else {
                 Vector v = new Vector();
-                for(int iter = 0 ; iter < pc.chain.length ; iter++) {
+                int plen = pc.chain.length;
+                for(int iter = 0 ; iter < plen ; iter++) {
                     if(pc.chain[iter] != p) {
                         v.addElement(pc.chain[iter]);
                     }
@@ -162,7 +164,8 @@ public class PainterChain implements Painter {
                     return;
                 }
                 Painter[] newChain = new Painter[v.size()];
-                for(int iter = 0 ; iter < newChain.length ; iter++) {
+                int clen = newChain.length;
+                for(int iter = 0 ; iter < clen ; iter++) {
                     newChain[iter] = (Painter)v.elementAt(iter);
                 }
                 pc.chain = newChain;

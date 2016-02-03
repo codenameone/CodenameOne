@@ -34,20 +34,20 @@ import com.codename1.ui.TextArea;
  */
 public abstract class AbstractTest implements UnitTest {
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void prepare() {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void cleanup() {
     }
 
     /**
-     * Defaults to two minutes.<br />
-     * @inheritDoc
+     * Defaults to two minutes.<br>
+     * {@inheritDoc}
      */
     public int getTimeoutMillis() {
         return 120000;
@@ -56,7 +56,7 @@ public abstract class AbstractTest implements UnitTest {
     /**
      * Returns false, default tests run in their own thread.
      *
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean shouldExecuteOnEDT() {
         return false;

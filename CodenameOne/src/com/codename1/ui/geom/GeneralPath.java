@@ -244,6 +244,38 @@ public final class GeneralPath implements Shape {
         types = new byte[initialCapacity];
         points = new float[initialCapacity * 2];
     }
+    
+    /**
+     * Returns the number of path commands in this path.
+     * @return The number of path commands in this path.
+     */
+    public int getTypesSize() {
+        return typeSize;
+    }
+    
+    /**
+     * Returns the number of points in this path.
+     * @return The number of points in this path.
+     */
+    public int getPointsSize() {
+        return pointSize;
+    }
+    
+    /**
+     * Returns a copy of the types (aka path commands) in this path.
+     * @param out An array to copy the path commands into.
+     */
+    public void getTypes(byte[] out) {
+        System.arraycopy(types, 0, out, 0, Math.min(types.length, out.length));
+    }
+    
+    /**
+     * Returns a copy of the points in this path.
+     * @param out An array to copy the points into.
+     */
+    public void getPoints(float[] out) {
+        System.arraycopy(points, 0, out, 0, Math.min(points.length, out.length));
+    }
 
     /**
      * Constructs a GeneralPath from an arbitrary shape object. The Shapes
@@ -919,14 +951,14 @@ public final class GeneralPath implements Shape {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator() {
         return new Iterator(this);
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(Transform m) {
         Iterator out = (Iterator) getPathIterator();
@@ -968,7 +1000,7 @@ public final class GeneralPath implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public Shape intersection(Rectangle rect){
         return ShapeUtil.intersection(rect, this);
@@ -994,7 +1026,7 @@ public final class GeneralPath implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean contains(int x, int y){
         return contains((float)x, (float)y);

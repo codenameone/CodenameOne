@@ -102,7 +102,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void released(int x, int y) {
         selected = !isSelected();
@@ -121,7 +121,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(isToggle()) {
@@ -132,14 +132,14 @@ public class CheckBox extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getCheckBoxPreferredSize(this);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         return super.paramString() + ", selected = " +selected;
@@ -157,7 +157,7 @@ public class CheckBox extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -198,21 +198,21 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"selected"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {Boolean.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -226,7 +226,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -243,7 +243,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("selected")) {
@@ -256,7 +256,7 @@ public class CheckBox extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("selected")) {

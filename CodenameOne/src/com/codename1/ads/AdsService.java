@@ -104,7 +104,7 @@ public abstract class AdsService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -118,7 +118,7 @@ public abstract class AdsService extends ConnectionRequest {
         if (size > 0) {
             String s = new String(out.toByteArray(), 0, size, "UTF-8");
             currentAd = s;
-            fireResponseListener(new ActionEvent(currentAd));
+            fireResponseListener(new ActionEvent(currentAd,ActionEvent.Type.Response));
         }
     }
 
@@ -130,7 +130,7 @@ public abstract class AdsService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleErrorResponseCode(int code, String message) {
         //do nothing, ads failure should not interfere with application flow
@@ -138,7 +138,7 @@ public abstract class AdsService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleRuntimeException(RuntimeException err) {
         //do nothing, ads failure should not interfere with application flow
@@ -146,7 +146,7 @@ public abstract class AdsService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleException(Exception err) {
         //do nothing, ads failure should not interfere with application flow

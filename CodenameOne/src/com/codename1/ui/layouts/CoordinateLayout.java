@@ -33,6 +33,7 @@ import com.codename1.ui.geom.Dimension;
  * The layout 
  *
  * @author Chen Fishbein
+ * @deprecated the usage of this layout is strongly discouraged as elements will not adapt to the right position/size
  */
 public class CoordinateLayout extends Layout{
     
@@ -70,7 +71,7 @@ public class CoordinateLayout extends Layout{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {
         if(width < 0) {
@@ -95,7 +96,7 @@ public class CoordinateLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Dimension getPreferredSize(Container parent) {
         Dimension retVal = new Dimension();
@@ -110,7 +111,7 @@ public class CoordinateLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOverlapSupported() {
         return true;

@@ -171,7 +171,7 @@ public class DateTimeSpinner extends TimeSpinner {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem",
@@ -179,7 +179,7 @@ public class DateTimeSpinner extends TimeSpinner {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class,
@@ -187,7 +187,7 @@ public class DateTimeSpinner extends TimeSpinner {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("currentDate")) {
@@ -209,7 +209,7 @@ public class DateTimeSpinner extends TimeSpinner {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("currentDate")) {

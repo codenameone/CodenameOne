@@ -58,7 +58,7 @@ public class PointsLayer extends AbstractLayer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public PointsLayer(Projection p, String name) {
         super(p, name);
@@ -73,7 +73,7 @@ public class PointsLayer extends AbstractLayer {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Tile tile) {
         int length = points.size();
@@ -124,7 +124,7 @@ public class PointsLayer extends AbstractLayer {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public BoundingBox boundingBox() {
         return BoundingBox.create(points);

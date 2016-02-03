@@ -34,6 +34,15 @@ While Codename One itself works with all major IDE's the code in this repository
 
 <img src="http://codenameone.com/img/eclipse-logo.png" width="120">
 
+## ParparVM
+Codename One's iOS VM is quite unique and is open source as well. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).
+
+ParparVM is a uniquely conservative VM that translates Java bytecode to C code. Thus providing native performance and access while still providing a safety net. This approach is unique to Codename One and is essential for future compatibility!
+
+Apple has a tendency to change things abruptly e.g. 64bit support, bitcode etc. Since ParparVM just generates a standard Xcode project there were no code changes required for any of these tectonic shifts. It's as if you handcoded the project yourself!
+
+More traditional compilers fall flat in these cases, furthermore they can't use Apple's native tools to their full extent e.g. profilers etc.
+
 ## Getting Help & FAQ
 
 <img align="right" src="http://codenameone.com/img/blog/new_icon.png" height="250">

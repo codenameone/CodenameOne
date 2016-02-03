@@ -259,21 +259,22 @@ public class Canvas  {
         Orientation o = gradient.orientation;
         Rectangle r = gradient.bounds;
         int[] colors = gradient.colors;
-        
+        int clen = colors.length;
+               
         if ( Orientation.TOP_BOTTOM.equals(o) || Orientation.BOTTOM_TOP.equals(o)){
 
            if ( Orientation.BOTTOM_TOP.equals(o) ){
-               colors = new int[colors.length];
+               colors = new int[clen];
                
-               for ( int i=0; i<colors.length; i++){
+               for ( int i=0; i<clen; i++){
                
-                   colors[i] = gradient.colors[colors.length-i-1];
+                   colors[i] = gradient.colors[clen-i-1];
                }
            }
-           g.fillLinearGradient(colors[0], colors[colors.length-1], r.getX(), r.getY(), r.getWidth(), r.getHeight(), false);
+           g.fillLinearGradient(colors[0], colors[clen-1], r.getX(), r.getY(), r.getWidth(), r.getHeight(), false);
            
         } else if ( Orientation.LEFT_RIGHT.equals(o)){
-           g.fillLinearGradient(gradient.colors[0], gradient.colors[gradient.colors.length-1], r.getX(), r.getY(), r.getWidth(), r.getHeight(), true);
+           g.fillLinearGradient(gradient.colors[0], gradient.colors[clen-1], r.getX(), r.getY(), r.getWidth(), r.getHeight(), true);
         } else {
            Log.p("Gradient with type "+o+" not implemented yet.  Just filling solid rect");
            g.setColor(gradient.colors[0]);

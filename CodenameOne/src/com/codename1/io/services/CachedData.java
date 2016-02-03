@@ -43,14 +43,14 @@ public class CachedData implements Externalizable {
     private boolean fetching;
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getVersion() {
         return 1;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void externalize(DataOutputStream out) throws IOException {
         Util.writeUTF(url, out);
@@ -61,7 +61,7 @@ public class CachedData implements Externalizable {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void internalize(int version, DataInputStream in) throws IOException {
         url = Util.readUTF(in);

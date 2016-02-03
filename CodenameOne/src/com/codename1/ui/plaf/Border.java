@@ -102,6 +102,8 @@ public class Border {
 
     private static Border empty;
     
+    private boolean emptyType;
+    
     /**
      * Prevents usage of new operator, use the factory methods in the class or subclass
      * to create new border types.
@@ -239,7 +241,17 @@ public class Border {
      * @return a border than draws nothing
      */
     public static Border createEmpty() {
-        return new Border();
+        Border b = new Border();
+        b.emptyType = true;
+        return b;
+    }
+    
+    /**
+     * Indicates whether this is an empty border
+     * @return true if this is an empty border
+     */
+    public boolean isEmptyBorder() {
+        return emptyType;
     }
     
     /**
@@ -724,7 +736,7 @@ public class Border {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean equals(Object obj) {
         if (obj != null && obj.getClass() == getClass()) {
@@ -753,7 +765,8 @@ public class Border {
                 (isSame(outerBorder, b.outerBorder))
                 );
             if(v && (type == TYPE_IMAGE || type == TYPE_IMAGE_HORIZONTAL || type == TYPE_IMAGE_VERTICAL || type == TYPE_IMAGE_SCALED)) {
-                for(int iter = 0 ; iter < images.length ; iter++) {
+                int ilen = images.length;
+                for(int iter = 0 ; iter < ilen ; iter++) {
                     if(images[iter] != b.images[iter]) {
                         return false;
                     }
@@ -1097,7 +1110,8 @@ public class Border {
                             p.paint(bgPaint.getGraphics(), new Rectangle(0, 0, width, height));
                             imageRGB = bgPaint.getRGB();
                         }
-                        for(int iter = 0 ; iter < rgb.length ; iter++) {
+                        int rlen = rgb.length;
+                        for(int iter = 0 ; iter < rlen ; iter++) {
                             if(rgb[iter] == transColor) {
                                 imageRGB[iter] = 0;
                             }
@@ -1749,7 +1763,8 @@ public class Border {
      */
     public void lock() {
         if(images != null) {
-            for(int iter = 0 ; iter < images.length ; iter++) {
+            int ilen = images.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 if(images[iter] != null) {
                     images[iter].lock();
                 }
@@ -1763,7 +1778,8 @@ public class Border {
      */
     public void unlock() {
         if(images != null) {
-            for(int iter = 0 ; iter < images.length ; iter++) {
+            int ilen = images.length;
+            for(int iter = 0 ; iter < ilen ; iter++) {
                 if(images[iter] != null) {
                     images[iter].unlock();
                 }

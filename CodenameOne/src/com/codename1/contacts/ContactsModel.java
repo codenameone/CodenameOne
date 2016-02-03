@@ -61,7 +61,7 @@ public class ContactsModel extends DefaultListModel {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getItemAt(final int index) {
         final String id = (String) super.getItemAt(index);
@@ -87,7 +87,7 @@ public class ContactsModel extends DefaultListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(Object item) {
         if (item instanceof String) {
@@ -104,7 +104,7 @@ public class ContactsModel extends DefaultListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index) {
         String id = (String) super.getItemAt(index);

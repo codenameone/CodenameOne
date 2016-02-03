@@ -157,7 +157,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
     
     private void updateIconPlaceholders(Component[] e) {
-        for(int iter = 0 ; iter < e.length ; iter++) {
+        int elen = e.length;
+        for(int iter = 0 ; iter < elen ; iter++) {
             String n = e[iter].getName();
             if(n != null) {
                 if(n.endsWith("_URLImage") && e[iter] instanceof Label) {
@@ -168,7 +169,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
 
     private void removeSelectedEntriesListener(Component[] e) {
-        for(int iter = 0 ; iter < e.length ; iter++) {
+        int elen = e.length;
+        for(int iter = 0 ; iter < elen ; iter++) {
             if(e[iter] instanceof Button) {
                 ((Button)e[iter]).removeActionListener(mon);
             }
@@ -176,7 +178,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
     
     private void addSelectedEntriesListener(Component[] e) {
-        for(int iter = 0 ; iter < e.length ; iter++) {
+        int elen = e.length;
+        for(int iter = 0 ; iter < elen ; iter++) {
             if(e[iter] instanceof Button) {
                 ((Button)e[iter]).addActionListener(mon);
             }
@@ -238,7 +241,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
 
     private Component[] vectorToComponentArray(ArrayList v) {
         Component[] result = new Component[v.size()];
-        for(int iter = 0 ; iter < result.length ; iter++) {
+        int rlen = result.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             result[iter] = (Component)v.get(iter);
         }
         return result;
@@ -271,7 +275,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
         Component cmp;
@@ -302,7 +306,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                 if(enabled != null) {
                     cmp.setEnabled(enabled.booleanValue());
                 }
-                for(int iter = 0 ; iter < entries.length ; iter++) {
+                int elen = entries.length;
+                for(int iter = 0 ; iter < elen ; iter++) {
                     String currentName = entries[iter].getName();
 
                     Object val;
@@ -327,7 +332,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     if(enabled != null) {
                         cmp.setEnabled(enabled.booleanValue());
                     }
-                    for(int iter = 0 ; iter < entries.length ; iter++) {
+                    int elen = entries.length;
+                    for(int iter = 0 ; iter < elen ; iter++) {
                         String currentName = entries[iter].getName();
 
                         Object val;
@@ -369,7 +375,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                 if(enabled != null) {
                     cmp.setEnabled(enabled.booleanValue());
                 }
-                for(int iter = 0 ; iter < entries.length ; iter++) {
+                int elen = entries.length;
+                for(int iter = 0 ; iter < elen ; iter++) {
                     String currentName = entries[iter].getName();
                     if(currentName.equals("$number")) {
                         setComponentValue(entries[iter], "" + (index + 1), list, cmp);
@@ -386,7 +393,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     if(enabled != null) {
                         cmp.setEnabled(enabled.booleanValue());
                     }
-                    for(int iter = 0 ; iter < entries.length ; iter++) {
+                    int elen = entries.length;
+                    for(int iter = 0 ; iter < elen ; iter++) {
                         String currentName = entries[iter].getName();
                         if(currentName.equals("$number")) {
                             setComponentValue(entries[iter], "" + (index + 1), list, cmp);
@@ -426,7 +434,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
         return getCellRendererComponent(list, list.getModel(), value, index, isSelected);
@@ -565,14 +573,14 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getListFocusComponent(List list) {
         return focusComponent;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Component getFocusComponent(Component list) {
         return focusComponent;
@@ -663,7 +671,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         private int selectAllOffset;
         
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public boolean animate() {
             boolean hasAnimations = false;
@@ -688,7 +696,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                 Form f = parentList.getComponentForm();
                 if(f != null) {
                     if(parentList.hasFocus() && Display.getInstance().shouldRenderSelection(parentList)) {
-                        for(int iter = 0 ; iter < selectedEntries.length ; iter++) {
+                        int slen = selectedEntries.length;
+                        for(int iter = 0 ; iter < slen ; iter++) {
                             if(selectedEntries[iter] instanceof Label) {
                                 Label l = (Label)selectedEntries[iter];
                                 if(l.isTickerRunning()) {
@@ -698,7 +707,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                             }
                         }
                     } else {
-                        for(int iter = 0 ; iter < selectedEntries.length ; iter++) {
+                        int slen = selectedEntries.length;
+                        for(int iter = 0 ; iter < slen ; iter++) {
                             if(selectedEntries[iter] instanceof Label) {
                                 Label l = (Label)selectedEntries[iter];
                                 if(l.isTickerRunning()) {
@@ -725,13 +735,13 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
         }
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void paint(Graphics g) {
         }
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void actionPerformed(ActionEvent evt) {
             if(evt.getComponent() instanceof Button) {
@@ -746,10 +756,11 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     Map h = (Map)selection;
                     Command cmd = (Command)h.get("$navigation");
                     if(cmd != null) {
-                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd));
+                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd,ActionEvent.Type.Command));
                         return;
                     }
-                    for(int iter = 0 ; iter < selectedEntries.length ; iter++) {
+                    int slen = selectedEntries.length;
+                    for(int iter = 0 ; iter < slen ; iter++) {
                         if(selectedEntries[iter] instanceof CheckBox ||
                                 selectedEntries[iter] instanceof RadioButton) {
                             boolean sel = !isSelectedValue(h.get(selectedEntries[iter].getName()));

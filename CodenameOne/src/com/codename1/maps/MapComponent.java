@@ -197,7 +197,7 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paintBackground(Graphics g) {
         super.paintBackground(g);
@@ -248,7 +248,7 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void laidOut() {
         super.laidOut();
@@ -262,28 +262,28 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean shouldBlockSideSwipe() {
         return true;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void focusGained() {
         setHandlesInput(true);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
@@ -304,7 +304,7 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
@@ -316,7 +316,7 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void pointerDragged(int[] x, int[] y) {
@@ -372,7 +372,7 @@ public class MapComponent extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
@@ -516,7 +516,7 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         int oldZoom = _zoom;
@@ -569,7 +569,7 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     private Tile screenTile() {
         Dimension componentDimension = new Dimension(getWidth(), getHeight());
@@ -1085,21 +1085,21 @@ public class MapComponent extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[]{"latitude", "longitude", "zoom"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
         return new Class[]{Double.class, Double.class, Integer.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if (name.equals("latitude")) {
@@ -1115,7 +1115,7 @@ public class MapComponent extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if (name.equals("latitude")) {

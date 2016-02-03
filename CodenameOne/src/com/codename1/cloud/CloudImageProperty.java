@@ -40,6 +40,7 @@ import java.util.Hashtable;
  * that is cached locally asynchronously. 
  *
  * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public class CloudImageProperty implements CustomProperty {
     private static CacheMap cloudImageCache;
@@ -66,7 +67,7 @@ public class CloudImageProperty implements CustomProperty {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object propertyValue(CloudObject obj, String propertyName) {
         final String key = (String)obj.getObject(idProperty);

@@ -32,17 +32,43 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Vector;
 
 /**
- * A composite pattern with {@link Component}, allows nesting and arranging multiple
+ * <p>A composite pattern with {@link Component}, allows nesting and arranging multiple
  * components using a pluggable layout manager architecture. Containers can be nested
- * one within the other to form elaborate UI's.
- *
+ * one within the other to form elaborate UI's. By default Containers use {@link com.codename1.ui.layouts.FlowLayout}
+ * which isn't ideal for most use cases.</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/component-uml.png" alt="Component/Container Relationship Diagram" />
+ * <p>
+ * Components within the Container <b>MUST</b> be arranged using a layout manager! <br>
+ * This allows the UI to adapt to different resolutions, DPI, orientation changes etc. seamlessly. Invoking any
+ * bounds setting method will produce unpredictable results. To learn about layout managers check out the 
+ * <a href="https://www.codenameone.com/manual/basics.html#_layout_managers">relevant section in the developer guide</a>.
+ * </p>
+ *<p>
+ * A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
+ * a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
+ * performance as a bonus. See this sample of {@code Container} animation:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
+ * 
+ * <p>
+ * Many components within Codename One (e.g. {@link com.codename1.ui.tree.Tree}, 
+ * {@link com.codename1.ui.table.Table}, 
+ * {@link com.codename1.components.MultiButton} etc.) derive from Container instead of Component. This allows
+ * such components to provide very rich functionality by building on top of the existing functionality.
+ * Container also provides the lead component functionality that allows treating an entire Container hierarchy
+ * as a single component. This is discussed in depth within the <a href="https://www.codenameone.com/manual/misc-features.html#_lead_component">developer guide</a>.
+ * </p>
+ * 
  * @see com.codename1.ui.layouts
  * @see Component
  * @author Chen Fishbein
@@ -123,7 +149,7 @@ public class Container extends Component implements Iterable<Component>{
     
     /**
      * 
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         if(uim == getUIManager() && isInitialized()){
@@ -143,7 +169,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public UIManager getUIManager() {
         if(uiManager != null) {
@@ -292,7 +318,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int k) {
         if(leadComponent != null) {
@@ -302,7 +328,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int k) {
         if(leadComponent != null) {
@@ -396,7 +422,7 @@ public class Container extends Component implements Iterable<Component>{
         }
     }
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         // minor optimization preventing repeated invokations to setShouldCalcPreferredSize
@@ -508,7 +534,7 @@ public class Container extends Component implements Iterable<Component>{
      */
     public void addComponent(Component cmp) {
         layout.addLayoutComponent(null, cmp, this);
-        insertComponentAt(components.size(), cmp);
+        insertComponentAt(Integer.MAX_VALUE, null, cmp);
     }
 
     /**
@@ -521,9 +547,9 @@ public class Container extends Component implements Iterable<Component>{
      *
      * @param cmp component to add
      */
-    public void addComponent(Object constraints, Component cmp) {
+    public void addComponent(final Object constraints, final Component cmp) {
         layout.addLayoutComponent(constraints, cmp, this);
-        insertComponentAt(components.size(), cmp);
+        insertComponentAt(Integer.MAX_VALUE, null, cmp);
     }
 
 
@@ -538,11 +564,45 @@ public class Container extends Component implements Iterable<Component>{
      * @param cmp component to add
      */
     public void addComponent(int index, Object constraints, Component cmp) {
-        layout.addLayoutComponent(constraints, cmp, this);
-        insertComponentAt(index, cmp);
+        insertComponentAt(index, constraints, cmp);
     }
 
-    void insertComponentAt(int index, final Component cmp) {
+    void insertComponentAt(final int index, final Object constraint, final Component cmp) {
+        AnimationManager a = getAnimationManager();
+        if(a != null && a.isAnimating()) {
+            // pretend like the component was already added
+            if(cmp.getParent() != null) {
+                throw new IllegalArgumentException("Component is already contained in Container: " + cmp.getParent());
+            }
+            cmp.setParent(this);
+            a.addAnimation(new ComponentAnimation() {
+                @Override
+                public boolean isInProgress() {
+                    return false;
+                }
+
+                @Override
+                protected void updateState() {
+                    cmp.setParent(null);
+                    if(constraint != null) {
+                        layout.addLayoutComponent(constraint, cmp, Container.this);
+                    }
+                    insertComponentAtImpl(index, cmp);
+                    revalidate();
+                }
+            });
+        } else {
+            if(constraint != null) {
+                layout.addLayoutComponent(constraint, cmp, this);
+            }
+            insertComponentAtImpl(index, cmp);
+        }
+    }
+    
+    void insertComponentAtImpl(int index, final Component cmp) {
+        if(index == Integer.MAX_VALUE) {
+            index = components.size();
+        }
         if (cmp.getParent() != null) {
             throw new IllegalArgumentException("Component is already contained in Container: " + cmp.getParent());
         }
@@ -578,8 +638,7 @@ public class Container extends Component implements Iterable<Component>{
      * the cmp is a Form Component
      */
     public void addComponent(int index, Component cmp) {
-        layout.addLayoutComponent(null, cmp, this);
-        insertComponentAt(index, cmp);
+        insertComponentAt(index, null, cmp);
     }
 
     /**
@@ -690,16 +749,24 @@ public class Container extends Component implements Iterable<Component>{
             ((Container) next).layoutContainer();
         }
 
-        final Anim anim = new Anim(this, current, next, t);
-        anim.onFinish = onFinish;
+        final TransitionAnimation anim = new TransitionAnimation(this, current, next, t);
         anim.growSpeed = growSpeed;
         anim.layoutAnimationSpeed = layoutAnimationSpeed;
 
         // register the transition animation
-        getComponentForm().registerAnimatedInternal(anim);
+        /*getComponentForm().registerAnimatedInternal(anim);
         //wait until animation has finished
         if (wait) {
             Display.getInstance().invokeAndBlock(anim, dropEvents);
+        }*/
+        if(wait) {
+            getAnimationManager().addAnimationAndBlock(anim);
+        } else {
+            if(onFinish != null) {
+                getAnimationManager().addAnimation(anim, onFinish);
+            } else {
+                getAnimationManager().addAnimation(anim);
+            }
         }
     }
 
@@ -750,7 +817,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     private void cancelRepaintsRecursively(Component c) {
-        cancelRepaintsRecursively(c, Display.getInstance().getImplementation());
+        cancelRepaintsRecursively(c, Display.impl);
     }
 
     void replace(final Component current, final Component next, boolean avoidRepaint) {
@@ -765,17 +832,17 @@ public class Container extends Component implements Iterable<Component>{
         }
         Object constraint = layout.getComponentConstraint(current);
         if (constraint != null) {
-            removeComponentImpl(current);
+            removeComponentImplNoAnimationSafety(current);
             layout.addLayoutComponent(constraint, next, Container.this);
         } else {
-            removeComponentImpl(current);
+            removeComponentImplNoAnimationSafety(current);
         }
         cancelRepaintsRecursively(current);
         next.setParent(null);
         if (index < 0) {
             index = 0;
         }
-        insertComponentAt(index, next);
+        insertComponentAtImpl(index, next);
         if (currentFocused) {
             if (next.isFocusable()) {
                 if(avoidRepaint) {
@@ -792,7 +859,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         if (!isInitialized()) {
@@ -809,7 +876,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isEnabled() {
         if(leadComponent != null) {
@@ -829,14 +896,41 @@ public class Container extends Component implements Iterable<Component>{
         removeComponentImpl(cmp);
     }
 
+    void removeComponentImpl(final Component cmp) {
+        AnimationManager a = getAnimationManager();
+        if(a != null && a.isAnimating()) {
+            // pretend like the component was already removed
+            layout.removeLayoutComponent(cmp);
+            cmp.setParent(null);
+            a.addAnimation(new ComponentAnimation() {
+                @Override
+                public boolean isInProgress() {
+                    return false;
+                }
+
+                @Override
+                protected void updateState() {
+                    removeComponentImplNoAnimationSafety(cmp);
+                    revalidate();
+                }
+            });
+        } else {
+            removeComponentImplNoAnimationSafety(cmp);
+        }
+    }
+    
     /**
      * removes a Component from the Container
      * 
      * @param cmp the removed component
      */
-    void removeComponentImpl(Component cmp) {
+    void removeComponentImplNoAnimationSafety(Component cmp) {
         Form parentForm = cmp.getComponentForm();
         layout.removeLayoutComponent(cmp);
+        
+        // the deinitizlize contract expects the component to be in a container but if this is a part of an animation 
+        // it might have been removed already to prevent conflict with remove operations
+        cmp.setParent(this);
         cmp.deinitializeImpl();
         components.remove(cmp);
         cmp.setParent(null);
@@ -853,7 +947,7 @@ public class Container extends Component implements Iterable<Component>{
             cmp.setVisible(false);
         }
         setShouldCalcPreferredSize(true);
-        Display.getInstance().getImplementation().componentRemoved(cmp);
+        Display.impl.componentRemoved(cmp);
     }
 
     
@@ -884,16 +978,17 @@ public class Container extends Component implements Iterable<Component>{
     /**
      * Flushes ongoing replace operations to prevent two concurrent replace operations from colliding.
      * If there is no ongoing replace nothing will occur
+     * @deprecated this method is no longer used in the new animation framework
      */
     public void flushReplace() {
-        if (cmpTransitions != null) {
+        /*if (cmpTransitions != null) {
             int size = cmpTransitions.size();
             for (int iter = 0; iter < size; iter++) {
                 ((Anim) cmpTransitions.elementAt(iter)).destroy();
             }
             cmpTransitions.removeAllElements();
             cmpTransitions = null;
-        }
+        }*/
     }
 
     /**
@@ -968,7 +1063,7 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void clearClientProperties(){
         super.clearClientProperties();
@@ -1051,8 +1146,134 @@ public class Container extends Component implements Iterable<Component>{
         return true;
     }
     
+    
     /**
-     * @inheritDoc
+     * Efficiently finds the first child component that is visible in the specified 
+     * bounds.  
+     * <p>This is only really helpful if the child components are sorted
+     * in some way so that we can quickly (with a binary search) find the first
+     * visible component.  E.g. In BoxLayout.Y_AXIS, the components are arranged 
+     * vertically in order of their index so we can use a binary search to find
+     * the first visible element.  For most other layout managers we can't as easily
+     * do a sort like this.</p>
+     * 
+     * <p>If the layout manager doesn't allow for a binary search, then this will
+     * just return 0 (meaning that you need to scan the children from the beginning
+     * to find visible children).</p>
+     * 
+     * <p>After you obtain this value, use the {@link #calculateLastPaintableOffset(int, int, int, int, int) } method
+     * to get the end of the visible region.</p>
+     * 
+     * <p>The motivation for this is to try to improve performance in places where the container
+     * has many (say 2500) children, and most of them aren't actually visible.</p>
+     * 
+     * @param clipX1 Left bounds of region to check.  (0,0) is the top left corner of this component.
+     * @param clipY1 Top bounds of region to check.  (0,0) is top left corner of this component.
+     * @param clipX2 Right bounds of region to check.  (0,0) is top left corner of this component.
+     * @param clipY2 Bottom bounds of region to check.  (0,0) is top left corner of this component.
+     * @return The index within the "components" array where the first child that intersects the provided
+     * clip occurs, or -1 if there is no "fast" way to find it.  If there was a fast way to do it, but no visible
+     * components were found, then this will return components.size().
+     * 
+     * @see #calculateLastPaintableOffset(int, int, int, int, int) 
+     */
+    private int calculateFirstPaintableOffset(int clipX1, int clipY1, int clipX2, int clipY2) {
+        int len = components.size();
+        Layout l = getLayout();
+        if (l.getClass() == BoxLayout.class) {
+            if (((BoxLayout)l).getAxis() == BoxLayout.Y_AXIS) {
+                // Use a binary search to find the first visible
+                int startPos = binarySearchFirstIntersectionY(clipY1, clipY2, 0, len);
+                if (startPos >= 0) {
+                    return startPos;
+                } else {
+                    return len;
+                }
+                
+            }
+        }
+        return -1;
+    }
+    
+    
+    /**
+     * Gets the index of the "last" child component that intersects the given rectangle.  This is
+     * only helpful if the components are sorted (e.g. with BoxLayout.Y_AXIS).  If they aren't
+     * sorted then this will just return components.size()-1.
+     * @param pos The starting position to search.  It is assumed that this starting
+     * position is in the visible region.
+     * @param clipX1 The left bounds of the region to search.  (0,0) is the top left corner of the container.
+     * @param clipY1 The top bounds of the region to search. (0,0) is the top left corner of the container.
+     * @param clipX2 The right bounds of the region to search. (0,0) is the top left corner of the container.
+     * @param clipY2 The bottom bounds of the region to search. (0,0) is the top left corner of the container.
+     * @return The index of the last visible component in this container - or components.size()-1 
+     */
+    private int calculateLastPaintableOffset(int pos, int clipX1, int clipY1, int clipX2, int clipY2) {
+        final int len = components.size();
+        if (pos >= len-1) {
+            // Start position is after the last index, so we didn't
+            // even find an end offset.
+            // Let's return one less than pos to indicate this
+            return len-1;
+        }
+        final Layout l = getLayout();
+        if (l.getClass() == BoxLayout.class) {
+            if (((BoxLayout)l).getAxis() == BoxLayout.Y_AXIS) {
+                // Use a binary search to find the first visible
+                //Component c = components.get(++pos);
+                Component c = null;
+                int cy1 = -1;
+                final int end = len-1;
+                pos++; // This should still be a valid index because
+                        // we previously checked to see if it was >= len-1
+                do {
+                    c = components.get(pos);
+                    cy1 = c.getBounds().getY(); 
+                } while (++pos <= end && cy1 <= clipY2);
+               return pos-1;
+            }
+        }
+        return len-1;
+    }
+    
+    /**
+     * Performs a binary search within the children of the container to find components
+     * that intersect the given range on the y-axis.  <b>This should only be used
+     * if it is known that the child components are sorted by their y coordinates
+     * in ascending order.  Otherwise you'll get undefined results.</b>
+     * @param y1 The lower y-bound of the region to search.  (0,0) is top-left corner of container.
+     * @param y2 The upper y-bound of the region to search.  (0,0) is top-left corner of container.
+     * @param start The lower "index" to search.
+     * @param end The upper "index" to search.
+     * @return The index within the components array of the first child component
+     * that intersects the given region.  Or -1 if none is found.
+     */
+    private int binarySearchFirstIntersectionY(int y1, int y2, int start, int end) {
+        if (start >= end) {
+            return -1;
+        }
+        int pos = (start + end) /2;
+        Component c = components.get(pos);
+        Rectangle bounds = c.getBounds();
+        int cy1 = bounds.getY();
+        
+        int cy2 = bounds.getY() + bounds.getHeight();
+        if ((cy1 >= y1 && cy1<= y2)||(cy2>=y1 && cy2 <=y2)||(cy1<=y1 && cy2>=y2)) {
+            // We have a hit let's roll backward until we find the first visible
+            while (pos > start && cy1 > y1) {
+                c = components.get(--pos);
+                cy1 = c.getBounds().getY();
+            }
+            return pos;
+        } else if (cy1 > y2) {
+            return binarySearchFirstIntersectionY(y1, y2, start, pos);
+        } else {
+            return binarySearchFirstIntersectionY(y1, y2, pos+1, end);
+        }
+    }
+    
+    /**
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(enableLayoutOnPaint) {
@@ -1060,9 +1281,25 @@ public class Container extends Component implements Iterable<Component>{
         }
         g.translate(getX(), getY());
         int size = components.size();
-        CodenameOneImplementation impl = Display.getInstance().getImplementation();
+        int clipX1 = g.getClipX();
+        int clipX2 = g.getClipX() + g.getClipWidth();
+        int clipY1 = g.getClipY();
+        int clipY2 = g.getClipY() + g.getClipHeight();
+        int startIter = 0;
+        if (size >= 30) {
+            startIter = calculateFirstPaintableOffset(clipX1, clipY1, clipX2, clipY2);
+            if (startIter < 0) {
+                // There was no efficient way to calculate the offset
+                startIter = 0;
+            } else if (startIter < size){
+                // There was an efficient way to calculate the offset so we
+                // will continue this approach
+                size = calculateLastPaintableOffset(startIter, clipX1, clipY1, clipX2, clipY2)+1;
+            }
+        }
+        CodenameOneImplementation impl = Display.impl;
         if(dontRecurseContainer) {
-            for(int iter = 0 ; iter < size ; iter++) {
+            for(int iter = startIter ; iter < size ; iter++) {
                 Component cmp = components.get(iter);
                 if(cmp.getClass() == Container.class) {
                     paintContainerChildrenForAnimation((Container)cmp, g);
@@ -1071,7 +1308,7 @@ public class Container extends Component implements Iterable<Component>{
                 }
             }
         } else {
-            for(int iter = 0 ; iter < size ; iter++) {
+            for(int iter = startIter ; iter < size ; iter++) {
                 Component cmp = components.get(iter);
                 cmp.paintInternal(impl.getComponentScreenGraphics(this, g), false);
             }
@@ -1160,7 +1397,9 @@ public class Container extends Component implements Iterable<Component>{
             }
         }
         laidOut();
-        onParentPositionChange();            
+        if(Form.activePeerCount > 0) {
+            onParentPositionChange();
+        }
     }
 
     /**
@@ -1209,21 +1448,15 @@ public class Container extends Component implements Iterable<Component>{
      * @return true if this Component contains in this Container
      */
     public boolean contains(Component cmp) {
-        boolean found = false;
-        int count = getComponentCount();
-        for (int i = 0; i < count; i++) {
-            Component c = getComponentAt(i);
-            if (c.equals(cmp)) {
+        if (cmp == null) {
+            return false;
+        }
+        cmp = cmp.getParent();
+        while (cmp != null) {
+            if (cmp == this) {
                 return true;
             }
-
-            if (c instanceof Container) {
-                found = ((Container) c).contains(cmp);
-                if (found) {
-                    return true;
-                }
-
-            }
+            cmp = cmp.getParent();
         }
         return false;
     }
@@ -1245,7 +1478,7 @@ public class Container extends Component implements Iterable<Component>{
                     if (f != null && f.getInvisibleAreaUnderVKB() == 0 && 
                             f.findFirstFocusable() == c) {
                         // support this use case only if the component doesn't explicitly declare visible bounds
-                        if (r == c.getBounds()) {
+                        if (r == c.getBounds() && !Display.getInstance().isTouchScreenDevice()) {
                             scrollRectToVisible(new Rectangle(0, 0,
                                     c.getX() + Math.min(c.getWidth(), getWidth()),
                                     c.getY() + Math.min(c.getHeight(), getHeight())), this);
@@ -1472,10 +1705,27 @@ public class Container extends Component implements Iterable<Component>{
      * @see Component#contains
      */
     public Component getComponentAt(int x, int y) {
+        
+        int startIter = 0;
         int count = getComponentCount();
+        if (count > 30) {
+            int relx = x - getAbsoluteX();
+            int rely = y - getAbsoluteY();
+            
+            startIter = calculateFirstPaintableOffset(relx, rely, relx, rely);
+            if (startIter < 0) {
+                // There was no efficient way to calculate the first paintable offset
+                // start counting from 0
+                startIter = 0;
+            } else if (startIter < count) {
+                // We found a start offset using an efficient method
+                // Find an appropriate end offset.
+                count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
+            }
+        }
         boolean overlaps = getLayout().isOverlapSupported();
         Component component = null;
-        for (int i = count - 1; i >= 0; i--) {
+        for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y)) {
                 component = cmp;
@@ -1522,7 +1772,7 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
         if(!isDragActivated()) {
@@ -1535,7 +1785,7 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         clearDrag();
@@ -1560,7 +1810,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         Dimension d = layout.getPreferredSize(this);
@@ -1577,7 +1827,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         String className = layout.getClass().getName();
@@ -1608,7 +1858,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -1628,14 +1878,14 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollableX() {
         return scrollableX && (getScrollDimension().getWidth() + getStyle().getPadding(RIGHT) + getStyle().getPadding(LEFT) > getWidth());
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollableY() {
         Form f = getComponentForm();
@@ -1647,7 +1897,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSideGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
@@ -1662,7 +1912,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getBottomGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
@@ -1710,7 +1960,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setCellRenderer(boolean cellRenderer) {
         if (isCellRenderer() != cellRenderer) {
@@ -1788,7 +2038,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void dragInitiated() {
         super.dragInitiated();
@@ -1798,7 +2048,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         if(leadComponent != null) {
@@ -1809,7 +2059,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isSelectableInteraction() {
         if(leadComponent != null) {
@@ -1846,7 +2096,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getGridPosY() {
         int scroll = getScrollY();
@@ -1874,7 +2124,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paintComponentBackground(Graphics g) {
         if(isFlatten()) {
@@ -1888,7 +2138,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getGridPosX() {
         int scroll = getScrollX();
@@ -1999,7 +2249,12 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+     * <p>
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation<br>
+     * See: 
+     * </p>
+     * 
+     * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
      *
      * @param duration the duration in milliseconds for the animation
      */
@@ -2008,7 +2263,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void drop(Component dragged, int x, int y) {
         int i = getComponentIndex(dragged);
@@ -2078,7 +2333,7 @@ public class Container extends Component implements Iterable<Component>{
      * a component that isn't within the container. However, unlike the replace functionality which
      * uses a transition and assumes the position of the component (and is hence quite flexible) morph
      * can move and resize the component. E.g. after entering text into a text field and pressing submit
-     * it can "morph" into a chat bubble located in a different part of the screen.<br/>
+     * it can "morph" into a chat bubble located in a different part of the screen.<br>
      * It is the responsibility of the caller to remove the source component (if desired) and revalidate the 
      * container when the animation completes.
      * 
@@ -2096,7 +2351,7 @@ public class Container extends Component implements Iterable<Component>{
      * a component that isn't within the container. However, unlike the replace functionality which
      * uses a transition and assumes the position of the component (and is hence quite flexible) morph
      * can move and resize the component. E.g. after entering text into a text field and pressing submit
-     * it can "morph" into a chat bubble located in a different part of the screen.<br/>
+     * it can "morph" into a chat bubble located in a different part of the screen.<br>
      * It is the responsibility of the caller to remove the source component (if desired) and revalidate the 
      * container when the animation completes.
      * 
@@ -2134,7 +2389,7 @@ public class Container extends Component implements Iterable<Component>{
             createAndStartAnimateMotion(source.getHeight(), destination.getHeight(), duration),
             createAndStartAnimateMotion(source.getHeight(), destination.getHeight(), duration)
         };
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         a.opacity = new Motion[] {
@@ -2144,16 +2399,18 @@ public class Container extends Component implements Iterable<Component>{
         a.animatedComponents = new Vector();
         a.animatedComponents.addElement(source);
         a.animatedComponents.addElement(destination);
-        a.onFinish = onCompletion;
         a.dontRevalidate = true;
         a.scrollTo = destination;
         
-        // animate once to prevent flickering from newly added components 
-        a.animate();
-        getComponentForm().registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
-        }        
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            if(onCompletion != null) {
+                getAnimationManager().addAnimation(a, onCompletion);
+            } else {
+                getAnimationManager().addAnimation(a);
+            }
+        }
     }
     
     /**
@@ -2199,21 +2456,23 @@ public class Container extends Component implements Iterable<Component>{
             current.setWidth(beforeW[iter]);
             current.setHeight(beforeH[iter]);
         }
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(opacity, 255, a, componentCount, duration);
         a.animatedComponents = comps;
-        getComponentForm().registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            getAnimationManager().addAnimation(a);
         }
     }
     
     /**
-     * This method is the exact reverse of animateLayout, when completed it leaves the container in 
+     * <p>This method is the exact reverse of animateLayout, when completed it leaves the container in 
      * an invalid state. It is useful to invoke this in order to remove a component, transition to a
-     * different form or provide some other interaction.
+     * different form or provide some other interaction. E.g.:</p>
+     * <script src="https://gist.github.com/codenameone/ba6fdc5f841b083e13e9.js"></script>
      * 
      * @param duration the duration of the animation
      * @param opacity the opacity to which the layout will reach, allows fading out the components
@@ -2224,9 +2483,10 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * This method is the exact reverse of animateLayoutAndWait, when completed it leaves the container in 
+     * <p>This method is the exact reverse of animateLayoutAndWait, when completed it leaves the container in 
      * an invalid state. It is useful to invoke this in order to remove a component, transition to a
-     * different form or provide some other interaction.
+     * different form or provide some other interaction. E.g.:</p>
+     * <script src="https://gist.github.com/codenameone/ba6fdc5f841b083e13e9.js"></script>
      * 
      * @param duration the duration of the animation
      * @param opacity the opacity to which the layout will reach, allows fading out the components
@@ -2271,15 +2531,19 @@ public class Container extends Component implements Iterable<Component>{
             wMotions[iter].start();
             hMotions[iter].start();
         }
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(255, opacity, a, componentCount, duration);
-        a.onFinish = callback;
         a.dontRevalidate = true;
-        getComponentForm().registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            if(callback != null) {
+                getAnimationManager().addAnimation(a, callback);
+            } else {
+                getAnimationManager().addAnimation(a);
+            }
         }
     }
     
@@ -2328,17 +2592,18 @@ public class Container extends Component implements Iterable<Component>{
             current.setWidth(beforeW[iter]);
             current.setHeight(beforeH[iter]);
         }
-        Anim a = new Anim(this, duration, new Motion[][] {
+        MorphAnimation a = new MorphAnimation(this, duration, new Motion[][] {
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(opacity, 255, a, componentCount, duration);
-        f.registerAnimated(a);
         if(wait) {
-            Display.getInstance().invokeAndBlock(a);
+            getAnimationManager().addAnimationAndBlock(a);
+        } else {
+            getAnimationManager().addAnimation(a);
         }
     }
 
-    private void setAnimOpacity(int source, int dest, Anim a, int componentCount, int duration) {
+    private void setAnimOpacity(int source, int dest, MorphAnimation a, int componentCount, int duration) {
         if(source != dest) {
             a.opacity = new Motion[componentCount];
             for(int iter = 0 ; iter < componentCount ; iter++) {
@@ -2354,136 +2619,73 @@ public class Container extends Component implements Iterable<Component>{
     public Iterator<Component> iterator() {
         return components.iterator();
     }
-    
-    static class Anim implements Animation, Runnable {
-        private int animationType;
-        private long startTime;
-        private int duration;
+
+    static class TransitionAnimation extends ComponentAnimation {
         private Transition t;
-        private Component current;
-        private Component next;
-        private boolean started = false;
         private Container thisContainer;
-        private boolean finished = false;
-        private Form parent;
-        private Motion[][] motions;
-        Runnable onFinish;
         int growSpeed;
         int layoutAnimationSpeed;
         Vector animatedComponents;
         Motion[] opacity;
         boolean dontRevalidate;
-        private Component scrollTo;
-        
-        public Anim(Container thisContainer, int duration, Motion[][] motions) {
-            startTime = System.currentTimeMillis();
-            animationType = 2;
-            this.duration = duration;
-            this.thisContainer = thisContainer;
-            this.motions = motions;
-        }
+        private boolean started = false;
+        private boolean inProgress = true;
+        private Component current;
+        private Component next;
+        private Form parent;
+        private boolean destroyed;
 
-        public Anim(Container thisContainer, Component current, Component next, Transition t) {
-            animationType = 1;
+        TransitionAnimation(Container thisContainer, Component current, Component next, Transition t) {
             this.t = t;
             this.next = next;
             this.current = current;
             this.thisContainer = thisContainer;
             this.parent = thisContainer.getComponentForm();
         }
-
-        public boolean animate() {
-            switch(animationType) {
-                case 2:
-                    int componentCount = thisContainer.getComponentCount();
-                    if(motions != null){
-                        componentCount = motions[0].length;
-                    }
-                    
-                    if(animatedComponents != null) {
-                        componentCount = animatedComponents.size();
-                        for(int iter = 0 ; iter < componentCount ; iter++) {
-                            Component currentCmp = (Component)animatedComponents.elementAt(iter);
-
-                            currentCmp.setX(motions[0][iter].getValue());
-                            currentCmp.setY(motions[1][iter].getValue());
-                            currentCmp.setWidth(motions[2][iter].getValue());
-                            currentCmp.setHeight(motions[3][iter].getValue());
-                            if(opacity != null) {
-                                currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
-                            }
-                        }
-                    } else {
-                        for(int iter = 0 ; iter < componentCount ; iter++) {
-                            Component currentCmp = thisContainer.getComponentAt(iter);
-
-                            // this might happen if a container was replaced during animation
-                            if(currentCmp == null) {
-                                continue;
-                            }
-                            currentCmp.setX(motions[0][iter].getValue());
-                            currentCmp.setY(motions[1][iter].getValue());
-                            currentCmp.setWidth(motions[2][iter].getValue());
-                            currentCmp.setHeight(motions[3][iter].getValue());
-                            if(opacity != null) {
-                                currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
-                            }
-                        }
-                    }
-                    if(scrollTo != null) {
-                        boolean s = thisContainer.isSmoothScrolling();
-                        thisContainer.setSmoothScrolling(false);
-                        thisContainer.scrollComponentToVisible(scrollTo);
-                        thisContainer.setSmoothScrolling(s);
-                    }
-                    thisContainer.repaint();
-                    if(System.currentTimeMillis() - startTime >= duration) {
-                        enableLayoutOnPaint = true;
-                        thisContainer.dontRecurseContainer = false;
-                        Form f = thisContainer.getComponentForm();
-                        if(f == null) {
-                            return false;
-                        }
-                        f.deregisterAnimated(this);
-                        if(!dontRevalidate) {
-                            f.revalidate();
-                        }
-                        synchronized(this) {
-                            finished = true;
-                            notify();
-                        }
-                    }
-                    return false;
-
-                default:
-                    if (!started) {
-                        t.init(current, next);
-                        if(current != null) {
-                            current.setLightweightMode(true);
-                        }
-                        if(next != null) {
-                            next.setLightweightMode(true);
-                        }
-                        t.initTransition();
-                        started = true;
-                        if (thisContainer.cmpTransitions == null) {
-                            thisContainer.cmpTransitions = new Vector();
-                        }
-                        thisContainer.cmpTransitions.addElement(this);
-                    }
-                    boolean notFinished = t.animate();
-                    if (!notFinished) {
-                        thisContainer.cmpTransitions.removeElement(this);
-                        destroy();
-                    }
-                    return notFinished;
-            }
+        
+        public boolean isInProgress() {
+            return inProgress;
         }
 
-        public void destroy() {
-            if(parent != null){
-                parent.deregisterAnimatedInternal(this);
+        public void updateState() {
+            if(destroyed) {
+                return;
             }
+            if (!started) {
+                t.init(current, next);
+                if(current != null) {
+                    current.setLightweightMode(true);
+                }
+                if(next != null) {
+                    next.setLightweightMode(true);
+                }
+                t.initTransition();
+                started = true;
+                if (thisContainer.cmpTransitions == null) {
+                    thisContainer.cmpTransitions = new Vector();
+                }
+                thisContainer.cmpTransitions.addElement(this);
+            }
+            inProgress = t.animate();
+            if (!inProgress) {
+                thisContainer.cmpTransitions.removeElement(this);
+                destroy();
+                thisContainer.repaint();
+            } else {
+                Display.getInstance().repaint(t);
+            }
+        }        
+
+        @Override
+        public void flush() {
+            destroy();
+        }
+        
+        public void destroy() {
+            if(destroyed) {
+                return;
+            }
+            destroyed = true;
             next.setParent(null);
             thisContainer.replace(current, next, growSpeed > 0 || layoutAnimationSpeed > 0);
             //release the events blocking
@@ -2499,34 +2701,106 @@ public class Container extends Component implements Iterable<Component>{
                     }
                 }
             }
-            synchronized(this) {
-                finished = true;
-                notify();
-            }
-            if(onFinish != null) {
-                onFinish.run();
-            }
+            inProgress = false;
+        }
+    }
+    
+    static class MorphAnimation extends ComponentAnimation {
+        private long startTime;
+        private int duration;
+        private Transition t;
+        private Container thisContainer;
+        private boolean finished = false;
+        private Motion[][] motions;
+        Runnable onFinish;
+        int growSpeed;
+        int layoutAnimationSpeed;
+        Vector animatedComponents;
+        Motion[] opacity;
+        boolean dontRevalidate;
+        private Component scrollTo;
+
+        public MorphAnimation(Container thisContainer, int duration, Motion[][] motions) {
+            startTime = System.currentTimeMillis();
+            this.duration = duration;
+            this.thisContainer = thisContainer;
+            this.motions = motions;
         }
 
-        public void paint(Graphics g) {
-            t.paint(g);
+        @Override
+        public boolean isInProgress() {
+            return !finished;
         }
 
-        public boolean isFinished() {
-            return finished;
-        }
-
-        public void run() {
-            while (!isFinished()) {
-                try {
-                    synchronized(this) {
-                        wait(50);
+        @Override
+        public void flush() {
+            for(Motion[] mm : motions) {
+                for(Motion m : mm) {
+                    if(m != null) {
+                        m.finish();
                     }
-                } catch (InterruptedException ex) {
-                    ex.printStackTrace();
+                }
+            }
+            updateState();
+        }
+        
+        @Override
+        protected void updateState() {
+            if(animatedComponents != null) {
+                int componentCount = animatedComponents.size();
+                for(int iter = 0 ; iter < componentCount ; iter++) {
+                    Component currentCmp = (Component)animatedComponents.elementAt(iter);
+
+                    currentCmp.setX(motions[0][iter].getValue());
+                    currentCmp.setY(motions[1][iter].getValue());
+                    currentCmp.setWidth(motions[2][iter].getValue());
+                    currentCmp.setHeight(motions[3][iter].getValue());
+                    if(opacity != null) {
+                        currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
+                    }
+                }
+            } else {
+                int componentCount = thisContainer.getComponentCount();
+                if(motions != null){
+                    componentCount = Math.min(motions[0].length, componentCount);
+                }
+                for(int iter = 0 ; iter < componentCount ; iter++) {
+                    Component currentCmp = thisContainer.getComponentAt(iter);
+
+                    // this might happen if a container was replaced during animation
+                    if(currentCmp == null) {
+                        continue;
+                    }
+                    currentCmp.setX(motions[0][iter].getValue());
+                    currentCmp.setY(motions[1][iter].getValue());
+                    currentCmp.setWidth(motions[2][iter].getValue());
+                    currentCmp.setHeight(motions[3][iter].getValue());
+                    if(opacity != null) {
+                        currentCmp.getStyle().setOpacity(opacity[iter].getValue(), false);
+                    }
+                }
+            }
+            if(scrollTo != null) {
+                boolean s = thisContainer.isSmoothScrolling();
+                thisContainer.setSmoothScrolling(false);
+                thisContainer.scrollComponentToVisible(scrollTo);
+                thisContainer.setSmoothScrolling(s);
+            }
+            thisContainer.repaint();
+            if(System.currentTimeMillis() - startTime >= duration) {
+                enableLayoutOnPaint = true;
+                thisContainer.dontRecurseContainer = false;
+                Form f = thisContainer.getComponentForm();
+                finished = true;
+                if(f == null) {
+                    return;
+                }
+                if(!dontRevalidate) {
+                    f.revalidate();
                 }
             }
         }
+        
     }
 }
 

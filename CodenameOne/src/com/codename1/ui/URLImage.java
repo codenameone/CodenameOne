@@ -257,7 +257,7 @@ public class URLImage extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Image getInternal() {
         if(imageData == null) {
@@ -268,7 +268,7 @@ public class URLImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public byte[] getImageData() {
         if(imageData != null) {
@@ -278,7 +278,7 @@ public class URLImage extends EncodedImage {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(repaintImage) {
@@ -293,7 +293,7 @@ public class URLImage extends EncodedImage {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return repaintImage || imageData == null;
@@ -325,7 +325,8 @@ public class URLImage extends EncodedImage {
      * @return a URLImage that will initialy just delegate to the placeholder
      */
     public static URLImage createToStorage(EncodedImage placeholder, String storageFile, String url, ImageAdapter adapter) {
-        return new URLImage(placeholder, url, adapter, storageFile, null);
+        // intern is used to trigger an NPE in case of a null URL or storage file
+        return new URLImage(placeholder, url.intern(), adapter, storageFile.intern(), null);
     }
     
     /**
@@ -340,7 +341,8 @@ public class URLImage extends EncodedImage {
      * @return a URLImage that will initialy just delegate to the placeholder
      */
     public static URLImage createToFileSystem(EncodedImage placeholder, String file, String url, ImageAdapter adapter) {
-        return new URLImage(placeholder, url, adapter, null, file);
+        // intern is used to trigger an NPE in case of a null URL or storage file
+        return new URLImage(placeholder, url.intern(), adapter, null, file.intern());
     }
 
     /**

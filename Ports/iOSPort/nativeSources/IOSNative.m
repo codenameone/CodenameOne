@@ -64,6 +64,7 @@
 #import "SocketImpl.h"
 #import "com_codename1_ui_geom_Rectangle.h"
 #import <MobileCoreServices/MobileCoreServices.h>
+#include "com_codename1_ui_plaf_Style.h"
 
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
@@ -194,6 +195,7 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalI
 
 extern signed int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
 (void* peer, const char* str, int len);
+
 
 
 extern int Java_com_codename1_impl_ios_IOSImplementation_charWidthNativeImpl
@@ -654,6 +656,80 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+
+extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
+
+static CGContextRef drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+
+    return Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    
+   
+
+}
+
+
+//native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
+void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr) {
+    POOL_BEGIN();
+    [UIColorFromRGB(color, alpha) set];
+    CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    CGContextFillPath(context);
+    POOL_END();
+    
+}
+//native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
+void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
+    POOL_BEGIN();
+    
+    CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
+    CGContextSaveGState(context);
+    [UIColorFromRGB(color, alpha) set];
+    CGContextSetLineWidth(context, lineWidth);
+    CGLineCap cap = kCGLineCapButt;
+    switch (capStyle) {
+        case CN1_CAP_BUTT: {
+            cap = kCGLineCapButt;
+            break;
+        }
+        
+        case CN1_CAP_ROUND: {
+            cap = kCGLineCapRound;
+            break;
+        }
+        
+        case CN1_CAP_SQUARE: {
+            cap = kCGLineCapSquare;
+            break;
+        }
+    }
+    CGContextSetLineCap(context, cap);
+    
+    CGLineJoin join =  kCGLineJoinMiter;
+    switch (joinStyle) {
+        case CN1_JOIN_MITER: {
+            join = kCGLineJoinMiter;
+            break;
+        }
+        case CN1_JOIN_ROUND: {
+            join = kCGLineJoinRound;
+            break;
+        }
+        case CN1_JOIN_BEVEL: {
+            join = kCGLineJoinBevel;
+            break;
+        }
+    }
+    CGContextSetLineJoin(context, join);
+    
+    CGContextSetMiterLimit(context, mitreLimit);
+    
+    CGContextStrokePath(context);
+    CGContextRestoreGState(context);
+    POOL_END();
+}
+
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawStringMutable___int_int_long_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_LONG n3, JAVA_OBJECT n4, JAVA_INT n5, JAVA_INT n6)
 {
@@ -3283,10 +3359,34 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
             } else {
                 if(last != nil) {
                     com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG last));
+                } else {
+                    ABMultiValueRef emailsTmp = (ABMultiValueRef)ABRecordCopyValue(i,kABPersonEmailProperty);
+                    int emailCountTmp = ABMultiValueGetCount(emailsTmp);
+                    if(emailCountTmp > 0) {
+                        NSString *kTmp = (BRIDGE_CAST NSString *)ABMultiValueCopyValueAtIndex(emailsTmp, 0);
+                        com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG kTmp));
+                    } else {
+                        ABMultiValueRef numbers = ABRecordCopyValue(i, kABPersonPhoneProperty);
+                        int numbersCount = ABMultiValueGetCount(numbers);
+                        if(numbersCount > 0) {
+                            NSString *k = (BRIDGE_CAST NSString *)ABMultiValueCopyValueAtIndex(numbers, 0);
+                            com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG k));
+                        } else {
+                            NSString* org = (BRIDGE_CAST NSString*)ABRecordCopyValue(i,kABPersonOrganizationProperty);
+                            if(org != nil) {
+                                com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG org));
+                            } else {
+                                com_codename1_contacts_Contact_setDisplayName___java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt, fromNSString(CN1_THREAD_STATE_PASS_ARG @"Unnamed Contact"));
+                            }
+                        }
+                    }
+
                 }
             }
         }
+        //NSLog(@"%@", toNSString(CN1_THREAD_STATE_PASS_ARG com_codename1_contacts_Contact_getDisplayName___R_java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt)));
     }
+
     
     NSString* note = (BRIDGE_CAST NSString*)ABRecordCopyValue(i, kABPersonNoteProperty);
     if(note != nil) {
@@ -4703,7 +4803,25 @@ void showPopupPickerView(CN1_THREAD_STATE_MULTI_ARG UIView *pickerView) {
     }
     repaintUI();
 }
-void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT stringArray, JAVA_INT selection, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+
+    if (preferredWidth == 0) {
+        preferredWidth = 320 * scaleValue;
+    }
+    
+    // There are only 3 valid heights for the picker in iPad
+    //http://stackoverflow.com/a/7672577/2935174
+    if (preferredHeight == 0) {
+        preferredHeight = 216 * scaleValue;
+    } else if (preferredHeight <= 162) {
+        preferredHeight = 162;
+    } else if (preferredHeight <= 180) {
+        preferredHeight = 180;
+    } else {
+        preferredHeight = 216;
+    }
+    
+    
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 #ifndef NEW_CODENAME_ONE_VM
     pickerStringArray = (org_xmlvm_runtime_XMLVMArray*)stringArray;
@@ -4725,13 +4843,13 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
             [pickerView selectRow:selection inComponent:0 animated:NO];
         }
         pickerView.delegate = [CodenameOne_GLViewController instance];
+        
         if(isIPad()) {
             datepickerPopover = YES;
             stringPickerSelection = -1;
             UIViewController *vc = [[UIViewController alloc] init];
             UIView *popoverView = [[UIView alloc] init];
             [vc setView:popoverView];
-            [vc setContentSizeForViewInPopover:CGSizeMake(320, 260)];
             
 #ifndef CN1_USE_ARC
             UIToolbar *toolbar = [[[UIToolbar alloc] init] autorelease];
@@ -4768,15 +4886,22 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 #endif
             [toolbar setItems:itemsArray];
             
-            [popoverView addSubview:toolbar];
+            
             [popoverView addSubview:pickerView];
-            pickerView.frame = CGRectMake(0, 44, pickerView.frame.size.width, pickerView.frame.size.height);
+            [popoverView addSubview:toolbar];
             
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
             
             uip.delegate = [CodenameOne_GLViewController instance];
+            uip.popoverContentSize = CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue);
+            
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
+            
+            pickerView.frame = CGRectMake(0, 22, preferredWidth/scaleValue, preferredHeight/scaleValue);
+            popoverView.frame = CGRectMake(0, 0, preferredWidth/scaleValue, preferredHeight/scaleValue);
+
+            
         } else {
             if(isIOS7()) {
                 showPopupPickerView(CN1_THREAD_GET_STATE_PASS_ARG pickerView);
@@ -4822,7 +4947,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 }
 
 
-void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
@@ -5071,6 +5196,19 @@ void com_codename1_impl_ios_IOSNative_hideTextEditing__(CN1_THREAD_STATE_MULTI_A
             [editingComponent resignFirstResponder];
             [editingComponent becomeFirstResponder];
             editingComponent.hidden = YES;
+        }
+        POOL_END();
+    });
+}
+
+void com_codename1_impl_ios_IOSNative_setNativeEditingComponentVisible___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN b) {
+    if(editingComponent == nil) {
+        return;
+    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if(editingComponent != nil) {
+            editingComponent.hidden = !b;
         }
         POOL_END();
     });
@@ -5605,6 +5743,31 @@ void com_codename1_impl_ios_IOSNative_nativeSetTransform___float_float_float_flo
                                                                                                                                                                    )
 {
     com_codename1_impl_ios_IOSImplementation_nativeSetTransformImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int
+    (
+     instanceObject, a0, a1, a2, a3,
+     b0, b1, b2, b3,
+     c0, c1, c2, c3,
+     d0, d1, d2, d3,
+     originX, originY
+     );
+}
+
+extern void com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int( JAVA_OBJECT instanceObject,
+                                                                                                                                                                                      JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                                                      JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                                                      JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                                                      JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                                                                                                                      JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                                      );
+void com_codename1_impl_ios_IOSNative_nativeSetTransformMutable___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+                                                                                                                                                                   JAVA_FLOAT a0, JAVA_FLOAT a1, JAVA_FLOAT a2, JAVA_FLOAT a3,
+                                                                                                                                                                   JAVA_FLOAT b0, JAVA_FLOAT b1, JAVA_FLOAT b2, JAVA_FLOAT b3,
+                                                                                                                                                                   JAVA_FLOAT c0, JAVA_FLOAT c1, JAVA_FLOAT c2, JAVA_FLOAT c3,
+                                                                                                                                                                   JAVA_FLOAT d0, JAVA_FLOAT d1, JAVA_FLOAT d2, JAVA_FLOAT d3,
+                                                                                                                                                                   JAVA_INT originX, JAVA_INT originY
+                                                                                                                                                                   )
+{
+    com_codename1_impl_ios_IOSImplementation_nativeSetTransformMutableImpl___float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_float_int_int
     (
      instanceObject, a0, a1, a2, a3,
      b0, b1, b2, b3,
@@ -6608,6 +6771,9 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
 }
 
 JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT notificationId) {
+    if (notificationId == JAVA_NULL) {
+        return;
+    }
     NSString *nsId = toNSString(CN1_THREAD_STATE_PASS_ARG notificationId);
     dispatch_sync(dispatch_get_main_queue(), ^{
         UIApplication *app = [UIApplication sharedApplication];
@@ -6616,11 +6782,572 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_cancelLocalNotification___java_lang_S
             UILocalNotification *n = [eventArray objectAtIndex:i];
             NSDictionary *userInfo = n.userInfo;
             NSString *uid = [NSString stringWithFormat:@"%@", [userInfo valueForKey: @"__ios_id__"]];
-            if ([uid isEqualToString:uid]) {
+            if ([nsId isEqualToString:uid]) {
                 [app cancelLocalNotification:n];
             }
         }
     });
 }
 
+// BEGIN IOSImplementation native code, this is used to optimize various "heavy" IOSImplementation methods
 
+#define DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(xpositionToDraw, ypositionToDraw)                 JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s); \
+    JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s); \
+    com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color); \
+    com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency); \
+    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, xpositionToDraw, ypositionToDraw);
+
+                  
+JAVA_VOID com_codename1_impl_ios_IOSImplementation_paintComponentBackground___java_lang_Object_int_int_int_int_com_codename1_ui_plaf_Style(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height, JAVA_OBJECT s) {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+    JAVA_OBJECT bgImageOrig = com_codename1_ui_plaf_Style_getBgImage___R_com_codename1_ui_Image(threadStateData, s);
+    if (bgImageOrig == JAVA_NULL) {
+        if (com_codename1_ui_plaf_Style_getBackgroundType___R_byte(threadStateData, s) ==get_static_com_codename1_ui_plaf_Style_BACKGROUND_GRADIENT_LINEAR_VERTICAL()) {
+            com_codename1_impl_CodenameOneImplementation_drawGradientBackground___com_codename1_ui_plaf_Style_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, s, nativeGraphics, x, y, width, height);
+            return;
+        }
+        JAVA_INT styleColor =com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+        com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, styleColor);
+        
+        JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+        com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width,height, bgTransparency);
+    } else {
+        JAVA_INT iW = virtual_com_codename1_ui_Image_getWidth___R_int(threadStateData, bgImageOrig);
+        JAVA_INT iH = virtual_com_codename1_ui_Image_getHeight___R_int(threadStateData, bgImageOrig);
+        JAVA_OBJECT bgImage = virtual_com_codename1_ui_Image_getImage___R_java_lang_Object(threadStateData, bgImageOrig);
+        JAVA_BYTE backgroundType = com_codename1_ui_plaf_Style_getBackgroundType___R_byte(threadStateData, s);
+        switch (backgroundType) {
+            case 0: {/* BACKGROUND_NONE */
+                JAVA_BYTE bb = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                if (bb != 0) {
+                    JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                    com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                    com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bb);
+                }
+                return;
+            }
+            case 1: {// Style.BACKGROUND_IMAGE_SCALED:
+                com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x, y, width, height);
+                return;
+            }
+            case 33: {//Style.BACKGROUND_IMAGE_SCALED_FILL:
+                JAVA_FLOAT r = MAX(((JAVA_FLOAT) width) / ((JAVA_FLOAT) iW), ((JAVA_FLOAT) height) / ((JAVA_FLOAT) iH));
+                JAVA_INT bwidth = (JAVA_INT) (((JAVA_FLOAT) iW) * r);
+                JAVA_INT bheight = (JAVA_INT) (((JAVA_FLOAT) iH) * r);
+                com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x + (width - bwidth) / 2, y + (height - bheight) / 2, bwidth, bheight);
+                return;
+            }
+            case 34: {//Style.BACKGROUND_IMAGE_SCALED_FIT:
+                JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                if (bgTransparency != 0) {
+                    JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                    com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                    com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency);
+                }
+                JAVA_FLOAT r2 = MIN(((JAVA_FLOAT) width) / ((JAVA_FLOAT) iW), ((JAVA_FLOAT) height) / ((JAVA_FLOAT) iH));
+                JAVA_INT awidth = (JAVA_INT) (((JAVA_FLOAT) iW) * r2);
+                JAVA_INT aheight = (JAVA_INT) (((JAVA_FLOAT) iH) * r2);
+                com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x + (width - awidth) / 2, y + (height - aheight) / 2, awidth, aheight);
+                return;
+            }
+            case 2: { //Style.BACKGROUND_IMAGE_TILE_BOTH:
+                com_codename1_impl_ios_IOSImplementation_tileImage___java_lang_Object_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x, y, width, height);
+                return;
+            }
+            case 4: {//Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP:
+                JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency);
+
+                com_codename1_impl_ios_IOSImplementation_tileImage___java_lang_Object_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x, y, width, iH);
+                return;
+            }
+            case 29: { //Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER:
+                JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency);
+                
+                com_codename1_impl_ios_IOSImplementation_tileImage___java_lang_Object_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x, y + (height / 2 - iH / 2), width, iH);
+                return;
+            }
+            case 30: {//Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM:
+                JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency);
+                
+                com_codename1_impl_ios_IOSImplementation_tileImage___java_lang_Object_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x, y + (height - iH), width, iH);
+                return;
+            }
+            case 3: {//Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT:
+                JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency);
+                for (int yPos = 0; yPos <= height; yPos += iH) {
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x, y + yPos);
+                }
+                return;
+            }
+            case 31: {//Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER:
+                JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency);
+                for (int yPos = 0; yPos <= height; yPos += iH) {
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x + (width / 2 - iW / 2), y + yPos);
+                }
+                return;
+            }
+            case 32: {//Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT:
+                JAVA_BYTE bgTransparency = com_codename1_ui_plaf_Style_getBgTransparency___R_byte(threadStateData, s);
+                JAVA_INT color = com_codename1_ui_plaf_Style_getBgColor___R_int(threadStateData, s);
+                com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, color);
+                com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(threadStateData, __cn1ThisObject, nativeGraphics, x, y, width, height, bgTransparency);
+                for (int yPos = 0; yPos <= height; yPos += iH) {
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, bgImage, x + width - iW, y + yPos);
+                }
+                return;
+            }
+            case 20: { //Style.BACKGROUND_IMAGE_ALIGNED_TOP:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
+                return;
+            }
+            case 21: { //Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
+                return;
+            }
+            case 22: {//Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x, y + (height / 2 - iH / 2));
+                return;
+            }
+            case 23: {//Style.BACKGROUND_IMAGE_ALIGNED_RIGHT:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + width - iW, y + (height / 2 - iH / 2));
+                return;
+            }
+            case 24: { //Style.BACKGROUND_IMAGE_ALIGNED_CENTER:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height / 2 - iH / 2));
+                return;
+            }
+            case 25: {//Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x, y);
+                return;
+            }
+            case 26: {//Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + width - iW, y);
+                return;
+            }
+            case 27: { //Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x, y + (height - iH));
+                return;
+            }
+            case 28: {//Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT:
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + width - iW, y + (height - iH));
+                return;
+            }
+            case 7: // Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL:
+            case 6: //Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
+            case 8: {//Style.BACKGROUND_GRADIENT_RADIAL:
+                com_codename1_impl_CodenameOneImplementation_drawGradientBackground___com_codename1_ui_plaf_Style_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, s, nativeGraphics, x, y, width, height);
+                return;
+            }
+        }
+    }
+}
+                  
+JAVA_VOID com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int_byte(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_BYTE alpha) {
+    if (alpha != 0) {
+        JAVA_INT oldAlpha = com_codename1_impl_ios_IOSImplementation_getAlpha___java_lang_Object_R_int(threadStateData, __cn1ThisObject, nativeGraphics);
+        com_codename1_impl_ios_IOSImplementation_setAlpha___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, alpha & 0xff);
+        com_codename1_impl_ios_IOSImplementation_fillRect___java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, x, y, w, h);
+        com_codename1_impl_ios_IOSImplementation_setAlpha___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, oldAlpha);
+    }
+}
+
+                  
+JAVA_INT reverseAlignForBidi(JAVA_BOOLEAN rtl, JAVA_INT align) {
+    if (rtl) {
+        switch (align) {
+            case 3: {/* Component.RIGHT: */
+                return 1 /* Component.LEFT */;
+            }
+            case 1: {/* Component.LEFT */
+                return 3 /* Component.RIGHT */;
+            }
+        }
+    }
+    return align;
+}
+
+JAVA_VOID drawString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_OBJECT nativeFont, JAVA_OBJECT str, JAVA_INT x, JAVA_INT y, JAVA_INT textDecoration, JAVA_INT fontHeight) {
+    if (java_lang_String_length___R_int(threadStateData, str) == 0) {
+        return;
+    }
+    
+    // this if has only the minor effect of providing a slighly faster execution path
+    if (textDecoration != 0) {
+        JAVA_BOOLEAN raised = (textDecoration & 8 /* Style.TEXT_DECORATION_3D */) != 0;
+        JAVA_BOOLEAN lowerd = (textDecoration & 16 /* Style.TEXT_DECORATION_3D_LOWERED */) != 0;
+        JAVA_BOOLEAN north = (textDecoration & 32 /* Style.TEXT_DECORATION_3D_SHADOW_NORTH */) != 0;
+        if (raised || lowerd || north) {
+            textDecoration = textDecoration & (~8 /* Style.TEXT_DECORATION_3D */) & (~16 /* Style.TEXT_DECORATION_3D_LOWERED */) & (~32 /* Style.TEXT_DECORATION_3D_SHADOW_NORTH */);
+            JAVA_INT c = com_codename1_impl_ios_IOSImplementation_getColor___java_lang_Object_R_int(threadStateData, __cn1ThisObject, nativeGraphics);
+            JAVA_INT a = com_codename1_impl_ios_IOSImplementation_getAlpha___java_lang_Object_R_int(threadStateData, __cn1ThisObject, nativeGraphics);
+            JAVA_INT newColor = 0;
+            JAVA_INT offset = -2;
+            if (lowerd) {
+                offset = 2;
+                newColor = 0xffffff;
+            } else if (north) {
+                offset = 2;
+            }
+            com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, newColor);
+            if (a == 0xff) {
+                com_codename1_impl_ios_IOSImplementation_setAlpha___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, 140);
+            }
+            drawString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, str, x, y + offset, textDecoration, fontHeight);
+            com_codename1_impl_ios_IOSImplementation_setAlpha___java_lang_Object_int(threadStateData, __cn1ThisObject,nativeGraphics, a);
+            com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, c);
+            drawString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, str, x, y, textDecoration, fontHeight);
+            return;
+        }
+        com_codename1_impl_ios_IOSImplementation_drawString___java_lang_Object_java_lang_String_int_int(threadStateData, __cn1ThisObject, nativeGraphics, str, x, y);
+        if ((textDecoration & 1 /* Style.TEXT_DECORATION_UNDERLINE */)  != 0) {
+            com_codename1_impl_ios_IOSImplementation_drawLine___java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, x, y + fontHeight - 1, x + com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, str), y + fontHeight - 1);
+        }
+        if ((textDecoration & 2 /* Style.TEXT_DECORATION_STRIKETHRU */) != 0) {
+            com_codename1_impl_ios_IOSImplementation_drawLine___java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, x, y + fontHeight / 2, x + com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, str), y + fontHeight / 2);
+        }
+        if ((textDecoration & 4 /* Style.TEXT_DECORATION_OVERLINE */) != 0) {
+            com_codename1_impl_ios_IOSImplementation_drawLine___java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, x, y, x + com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, str), y);
+        }
+    } else {
+        com_codename1_impl_ios_IOSImplementation_drawString___java_lang_Object_java_lang_String_int_int(threadStateData, __cn1ThisObject, nativeGraphics, str, x, y);
+    }
+}
+      
+JAVA_BOOLEAN fastCharWidthCheck(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT s, JAVA_INT length, JAVA_INT width, JAVA_INT charWidth, JAVA_OBJECT f) {
+    if (length * charWidth < width) {
+        return true;
+    }
+    length = MIN(java_lang_String_length___R_int(threadStateData, s), length);
+    JAVA_OBJECT sub = java_lang_String_substring___int_int_R_java_lang_String(threadStateData, s, 0, length);
+    return com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, f, sub) < width;
+}
+                  
+                  
+   
+JAVA_OBJECT threePoints = JAVA_NULL;
+JAVA_INT threePointsWidth;
+                  
+JAVA_INT drawLabelText(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_INT textDecoration, JAVA_BOOLEAN rtl, JAVA_BOOLEAN isTickerRunning, JAVA_BOOLEAN endsWith3Points, JAVA_OBJECT nativeFont, JAVA_INT txtW, JAVA_INT textSpaceW, JAVA_INT shiftText, JAVA_OBJECT text, JAVA_INT x, JAVA_INT y, JAVA_INT fontHeight) {
+    if ((!isTickerRunning) || rtl) {
+        //if there is no space to draw the text add ... at the end
+        if (txtW > textSpaceW && textSpaceW > 0) {
+            // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+            // the allowed space is handled differently in RTL, this is due to the reverse algorithm
+            // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
+            // trimming characters from the end of the text (as done with LTR) won't do.
+            // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+            // the downside is that a part of a letter may be shown here as well.
+            
+            if (rtl) {
+                if ((!isTickerRunning) && endsWith3Points) {
+                    if(threePoints == JAVA_NULL) {
+                        threePoints = newStringFromCString(threadStateData, "...");
+                        removeObjectFromHeapCollection(threadStateData, threePoints);
+                        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)threePoints)->java_lang_String_value);
+                        ((struct obj__java_lang_String*)threePoints)->java_lang_String_value->__codenameOneReferenceCount = 999999;
+                        threePoints->__codenameOneReferenceCount = 999999;
+                        threePointsWidth = com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, threePoints);
+                    }
+                    
+                    drawString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, threePoints, shiftText + x, y, textDecoration, fontHeight);
+                    
+                    com_codename1_impl_ios_IOSImplementation_clipRect___java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, threePointsWidth + shiftText + x, y, textSpaceW - threePointsWidth, fontHeight);
+                }
+                x = x - txtW + textSpaceW;
+            } else if (endsWith3Points) {
+                if(threePoints == JAVA_NULL) {
+                    threePoints = newStringFromCString(threadStateData, "...");
+                    removeObjectFromHeapCollection(threadStateData, threePoints);
+                    removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)threePoints)->java_lang_String_value);
+                    ((struct obj__java_lang_String*)threePoints)->java_lang_String_value->__codenameOneReferenceCount = 999999;
+                    threePoints->__codenameOneReferenceCount = 999999;
+                    threePointsWidth = com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, threePoints);
+                }
+                JAVA_INT index = 1;
+                JAVA_INT widest = com_codename1_impl_ios_IOSImplementation_charWidth___java_lang_Object_char_R_int(threadStateData, __cn1ThisObject, nativeFont, 'W');
+                while (fastCharWidthCheck(threadStateData, __cn1ThisObject, text, index, textSpaceW - threePointsWidth, widest, nativeFont) && index < java_lang_String_length___R_int(threadStateData, text)) {
+                    index++;
+                }
+                JAVA_INT textLength = java_lang_String_length___R_int(threadStateData, text);
+                text = java_lang_String_substring___int_int_R_java_lang_String(threadStateData, text, 0, MIN(textLength, MAX(1, index - 1)));
+                JAVA_OBJECT sb = __NEW_java_lang_StringBuilder(threadStateData);
+                java_lang_StringBuilder___INIT_____java_lang_String(threadStateData, sb, text);
+                java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, sb, threePoints);
+                text = java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, sb);
+                txtW = com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, text);
+            }
+        }
+    }
+    
+    drawString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, shiftText + x, y, textDecoration, fontHeight);
+    return MIN(txtW, textSpaceW);
+}
+                  
+                  
+JAVA_INT drawLabelString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_OBJECT nativeFont, JAVA_OBJECT text, JAVA_INT x, JAVA_INT y, JAVA_INT textSpaceW, JAVA_BOOLEAN isTickerRunning, JAVA_INT tickerShiftText, JAVA_INT textDecoration, JAVA_BOOLEAN rtl, JAVA_BOOLEAN endsWith3Points, JAVA_INT textWidth, JAVA_INT fontHeight) {
+    JAVA_INT cx = com_codename1_impl_ios_IOSImplementation_getClipX___java_lang_Object_R_int(threadStateData, __cn1ThisObject, nativeGraphics);
+    JAVA_INT cy = com_codename1_impl_ios_IOSImplementation_getClipY___java_lang_Object_R_int(threadStateData, __cn1ThisObject, nativeGraphics);
+    JAVA_INT cw = com_codename1_impl_ios_IOSImplementation_getClipWidth___java_lang_Object_R_int(threadStateData, __cn1ThisObject, nativeGraphics);
+    JAVA_INT ch = com_codename1_impl_ios_IOSImplementation_getClipHeight___java_lang_Object_R_int(threadStateData, __cn1ThisObject, nativeGraphics);
+    com_codename1_impl_ios_IOSImplementation_clipRect___java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, x, cy, textSpaceW, ch);
+    
+    JAVA_INT drawnW = drawLabelText(threadStateData, __cn1ThisObject, nativeGraphics, textDecoration, rtl, isTickerRunning, endsWith3Points, nativeFont,
+                               textWidth, textSpaceW, tickerShiftText, text, x, y, fontHeight);
+    
+    com_codename1_impl_ios_IOSImplementation_setClip___java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, nativeGraphics, cx, cy, cw, ch);
+    
+    return drawnW;
+}
+
+JAVA_INT drawLabelStringValign(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_OBJECT nativeFont, JAVA_OBJECT str, JAVA_INT x, JAVA_INT y, JAVA_INT textSpaceW,
+JAVA_BOOLEAN isTickerRunning, JAVA_INT tickerShiftText, JAVA_INT textDecoration, JAVA_BOOLEAN rtl, JAVA_BOOLEAN endsWith3Points, JAVA_INT textWidth, JAVA_INT iconStringHGap, JAVA_INT iconHeight, JAVA_INT fontHeight, JAVA_INT valign) {
+    switch (valign) {
+        case 0 /* Component.TOP */:
+            return drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, str, x, y, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+        case 4 /* Component.CENTER */:
+            return drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, str, x, y + iconHeight / 2 - fontHeight / 2, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+        default:
+            return drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, str, x, y + iconStringHGap, textSpaceW, isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, textWidth, fontHeight);
+    }
+}
+                  
+                  
+                  
+JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lang_Object_int_int_int_int_com_codename1_ui_plaf_Style_java_lang_String_java_lang_Object_java_lang_Object_int_int_boolean_boolean_int_int_boolean_int_boolean_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT nativeGraphics, JAVA_INT cmpX, JAVA_INT cmpY, JAVA_INT cmpHeight, JAVA_INT cmpWidth, JAVA_OBJECT style, JAVA_OBJECT text, JAVA_OBJECT icon, JAVA_OBJECT stateIcon, JAVA_INT preserveSpaceForState, JAVA_INT gap, JAVA_BOOLEAN rtl, JAVA_BOOLEAN isOppositeSide, JAVA_INT textPosition, JAVA_INT stringWidth, JAVA_BOOLEAN isTickerRunning, JAVA_INT tickerShiftText, JAVA_BOOLEAN endsWith3Points, JAVA_INT valign) {
+    JAVA_OBJECT font = com_codename1_ui_plaf_Style_getFont___R_com_codename1_ui_Font(threadStateData, style);
+    JAVA_OBJECT nativeFont = com_codename1_ui_Font_getNativeFont___R_java_lang_Object(threadStateData, font);
+    com_codename1_impl_ios_IOSImplementation_setNativeFont___java_lang_Object_java_lang_Object(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont);
+    JAVA_INT fgColor = com_codename1_ui_plaf_Style_getFgColor___R_int(threadStateData, style);
+    com_codename1_impl_ios_IOSImplementation_setColor___java_lang_Object_int(threadStateData, __cn1ThisObject, nativeGraphics, fgColor);
+    
+    JAVA_INT iconWidth = 0;
+    JAVA_INT iconHeight = 0;
+    if(icon != JAVA_NULL) {
+        iconWidth = com_codename1_impl_ios_IOSImplementation_getImageWidth___java_lang_Object_R_int(threadStateData, __cn1ThisObject, icon);
+        iconHeight = com_codename1_impl_ios_IOSImplementation_getImageHeight___java_lang_Object_R_int(threadStateData, __cn1ThisObject, icon);
+    }
+    
+    JAVA_INT textDecoration = com_codename1_ui_plaf_Style_getTextDecoration___R_int(threadStateData, style);
+    JAVA_INT stateIconSize = 0;
+    JAVA_INT stateIconYPosition = 0;
+    
+    JAVA_INT leftPadding = com_codename1_ui_plaf_Style_getPaddingLeft___boolean_R_int(threadStateData, style, rtl);
+    JAVA_INT rightPadding = com_codename1_ui_plaf_Style_getPaddingRight___boolean_R_int(threadStateData, style, rtl);
+    JAVA_INT topPadding = com_codename1_ui_plaf_Style_getPaddingTop___R_int(threadStateData, style);
+    JAVA_INT bottomPadding = com_codename1_ui_plaf_Style_getPaddingBottom___R_int(threadStateData, style);
+    
+    JAVA_INT fontHeight = 0;
+    if (text != JAVA_NULL && java_lang_String_length___R_int(threadStateData, text) > 0) {
+        fontHeight = com_codename1_ui_Font_getHeight___R_int(threadStateData, font);
+    }
+    
+    if (stateIcon != JAVA_NULL) {
+        stateIconSize = com_codename1_impl_ios_IOSImplementation_getImageWidth___java_lang_Object_R_int(threadStateData, __cn1ThisObject, stateIcon);
+        stateIconYPosition = cmpY + topPadding
+        + (cmpHeight - topPadding
+           - bottomPadding) / 2 - stateIconSize / 2;
+        JAVA_INT tX = cmpX;
+        if (isOppositeSide) {
+            if (rtl) {
+                tX += leftPadding;
+            } else {
+                tX = tX + cmpWidth - leftPadding - stateIconSize;
+            }
+            cmpWidth -= leftPadding - stateIconSize;
+        } else {
+            preserveSpaceForState = stateIconSize + gap;
+            if (rtl) {
+                tX = tX + cmpWidth - leftPadding - stateIconSize;
+            } else {
+                tX += leftPadding;
+            }
+        }
+        
+        com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, stateIcon, tX, stateIconYPosition);
+    }
+    
+    //default for bottom left alignment
+    JAVA_INT x = cmpX + leftPadding + preserveSpaceForState;
+    JAVA_INT y = cmpY + topPadding;
+    
+    JAVA_INT align = reverseAlignForBidi(rtl, com_codename1_ui_plaf_Style_getAlignment___R_int(threadStateData, style));
+    
+    JAVA_INT textPos = reverseAlignForBidi(rtl, textPosition);
+    
+    //set initial x,y position according to the alignment and textPosition
+    switch (align) {
+        case 1: /* Component.LEFT */
+            switch (textPos) {
+                case 1: /* Component.LEFT */
+                case 3: /* Component.RIGHT: */
+                    y = y + (cmpHeight - (topPadding + bottomPadding + MAX(((icon != JAVA_NULL) ? iconHeight : 0), fontHeight))) / 2;
+                    break;
+                case 2: /* Label.BOTTOM: */
+                case 0: /* Label.TOP: */
+                    y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != JAVA_NULL) ? iconHeight + gap : 0) + fontHeight)) / 2;
+                    break;
+            }
+            break;
+        case 4: /* Component.CENTER: */
+            switch (textPos) {
+                case 1: /* Component.LEFT */
+                case 3: /* Component.RIGHT: */
+                    x = x + (cmpWidth - (preserveSpaceForState
+                                         + leftPadding
+                                         + rightPadding
+                                         + ((icon != JAVA_NULL) ? iconWidth + gap : 0)
+                                         + stringWidth)) / 2;
+                    x = MAX(x, cmpX + leftPadding + preserveSpaceForState);
+                    y = y + (cmpHeight - (topPadding
+                                          + bottomPadding
+                                          + MAX(((icon != JAVA_NULL) ? iconHeight : 0),
+                                                     fontHeight))) / 2;
+                    break;
+                case 2: /* Label.BOTTOM: */
+                case 0: /* Label.TOP: */
+                    x = x + (cmpWidth - (preserveSpaceForState + leftPadding
+                                         + rightPadding
+                                         + MAX(((icon != JAVA_NULL) ? iconWidth + gap : 0),
+                                                    stringWidth))) / 2;
+                    x = MAX(x, cmpX + leftPadding + preserveSpaceForState);
+                    y = y + (cmpHeight - (topPadding
+                                          + bottomPadding
+                                          + ((icon != JAVA_NULL) ? iconHeight + gap : 0)
+                                          + fontHeight)) / 2;
+                    break;
+            }
+            break;
+        case 3: /* Component.RIGHT: */
+            switch (textPos) {
+                case 1: /* Component.LEFT */
+                case 3: /* Component.RIGHT: */
+                    x = cmpX + cmpWidth - rightPadding
+                    - (((icon != JAVA_NULL) ? (iconWidth + gap) : 0)
+                       + stringWidth);
+                    if (rtl) {
+                        x = MAX(x - preserveSpaceForState, cmpX + leftPadding);
+                    } else {
+                        x = MAX(x, cmpX + leftPadding + preserveSpaceForState);
+                    }
+                    y = y + (cmpHeight - (topPadding
+                                          + bottomPadding
+                                          + MAX(((icon != JAVA_NULL) ? iconHeight : 0),
+                                                     fontHeight))) / 2;
+                    break;
+                case 2: /* Label.BOTTOM: */
+                case 0: /* Label.TOP: */
+                    x = cmpX + cmpWidth - rightPadding
+                    - (MAX(((icon != JAVA_NULL) ? (iconWidth) : 0),
+                                stringWidth));
+                    x = MAX(x, cmpX + leftPadding + preserveSpaceForState);
+                    y = y + (cmpHeight - (topPadding
+                                          + bottomPadding
+                                          + ((icon != JAVA_NULL) ? iconHeight + gap : 0) + fontHeight)) / 2;
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+    
+    int textSpaceW = cmpWidth - rightPadding - leftPadding;
+    
+    if (icon != JAVA_NULL && (textPos == 3 /* Component.RIGHT: */ || textPos == 1 /* Component.LEFT */)) {
+        textSpaceW = textSpaceW - iconWidth;
+    }
+    
+    if (stateIcon != JAVA_NULL) {
+        textSpaceW = textSpaceW - stateIconSize;
+    } else {
+        textSpaceW = textSpaceW - preserveSpaceForState;
+    }
+    
+    if (icon == JAVA_NULL) {
+        // no icon only string
+        drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
+                        textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
+    } else {
+        int strWidth = stringWidth;
+        int iconStringWGap;
+        int iconStringHGap;
+        
+        switch (textPos) {
+            case 1: /* Component.LEFT */
+                if (iconHeight > fontHeight) {
+                    iconStringHGap = (iconHeight - fontHeight) / 2;
+                    strWidth = drawLabelStringValign(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning,
+                                                     tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, iconHeight,
+                                                     fontHeight, valign);
+                    
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x + strWidth + gap, y);
+                } else {
+                    iconStringHGap = (fontHeight - iconHeight) / 2;
+                    strWidth = drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning,
+                                               tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
+                    
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x + strWidth + gap, y + iconStringHGap);
+                }
+                break;
+            case 3: /* Component.RIGHT: */
+                if (iconHeight > fontHeight) {
+                    iconStringHGap = (iconHeight - fontHeight) / 2;
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x, y);
+                    drawLabelStringValign(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
+                                          tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight, fontHeight, valign);
+                } else {
+                    iconStringHGap = (fontHeight - iconHeight) / 2;
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x, y + iconStringHGap);
+                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
+                                    tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                }
+                break;
+            case 2: /* Label.BOTTOM: */
+                //center align the smaller
+                if (iconWidth > strWidth) {
+                    iconStringWGap = (iconWidth - strWidth) / 2;
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x, y);
+                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,
+                                    isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                } else {
+                    iconStringWGap = (MIN(strWidth, textSpaceW) - iconWidth) / 2;
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x + iconStringWGap, y);
+                    
+                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y + iconHeight + gap, textSpaceW, isTickerRunning,
+                                    tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                }
+                break;
+            case 0: /* Label.TOP: */
+                //center align the smaller
+                if (iconWidth > strWidth) {
+                    iconStringWGap = (iconWidth - strWidth) / 2;
+                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconStringWGap, y, textSpaceW, isTickerRunning,
+                                    tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x, y + fontHeight + gap);
+                } else {
+                    iconStringWGap = (MIN(strWidth, textSpaceW) - iconWidth) / 2;
+                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
+                                    textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x + iconStringWGap, y + fontHeight + gap);
+                }
+                break;
+        }
+    }
+}
+                 

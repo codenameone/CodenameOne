@@ -48,7 +48,7 @@ public class BackgroundPainter implements Painter {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Rectangle rect) {
         Style s = parent.getStyle();

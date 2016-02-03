@@ -3902,6 +3902,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setAlpha(Object graphics, int alpha) {
+        if(alpha > 255 || alpha < 0) {
+            throw new IllegalArgumentException("Invalid value for alpha: " + alpha);
+        }
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         float a = ((float) alpha) / 255.0f;
@@ -5167,15 +5170,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         LinkedList<Shape> clipStack = new LinkedList<Shape>();
     }
     
+    private Object lastNativeGraphics;
+    private Transform lastNativeGraphicsTransform;
+    
     private void setNativeScreenGraphicsTransform(Object nativeGraphics, com.codename1.ui.Transform transform){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             ((NativeScreenGraphics)nativeGraphics).transform = transform;
+        } else {
+            lastNativeGraphics = nativeGraphics;
+            lastNativeGraphicsTransform = transform;
         }
     }
     
     private com.codename1.ui.Transform getNativeScreenGraphicsTransform(Object nativeGraphics){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             return ((NativeScreenGraphics)nativeGraphics).transform;
+        } else if (lastNativeGraphics == nativeGraphics) {
+            return lastNativeGraphicsTransform;
         }
         return null;
     }
@@ -5983,6 +5994,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         Contact contact = getContactById(id);
         c.setId(contact.getId());
         c.setDisplayName(contact.getDisplayName());
+        
+        if(includesPicture){
+            c.setPhoto(contact.getPhoto());
+        }
         
         if (includesFullName) {
             c.setFirstName(contact.getFirstName());
@@ -7318,13 +7333,20 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private Hashtable initContacts() {
         Hashtable retVal = new Hashtable();
-
+        
+        Image img = null;
+        try {
+            img = Image.createImage(getClass().getResourceAsStream("/com/codename1/impl/javase/user.jpg"));
+        } catch (IOException ex) {
+        }
+        
         Contact contact = new Contact();
         contact.setId("1");
 
         contact.setDisplayName("Chen Fishbein");
         contact.setFirstName("Chen");
         contact.setFamilyName("Fishbein");
+        contact.setPhoto(img);
 
         Hashtable phones = new Hashtable();
         phones.put("mobile", "+111111");
@@ -7349,6 +7371,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Shai Almog");
         contact.setFirstName("Shai");
         contact.setFamilyName("Almog");
+        contact.setPhoto(img);
 
         phones = new Hashtable();
         phones.put("mobile", "+111111");
@@ -7419,6 +7442,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Kenny McCormick");
         contact.setFirstName("Kenny");
         contact.setFamilyName("McCormick");
+        contact.setPhoto(img);
 
 
         phones = new Hashtable();
@@ -7520,6 +7544,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 return shrink(arr, size);
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 err.printStackTrace();
                 errorMessage = err.toString();
                 return null;
@@ -7541,6 +7566,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 os.write(param);
                 os.flush();
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 errorMessage = err.toString();
                 err.printStackTrace();
             }

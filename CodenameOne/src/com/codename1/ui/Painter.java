@@ -30,7 +30,9 @@ import com.codename1.ui.geom.*;
  * The use of such painter allows reuse of a background painters for various 
  * components. 
  * Note in order to view the painter drawing, component need to have some level
- * of transparency.
+ * of transparency.  Usage:
+ * 
+ * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
  * 
  * @author Chen Fishbein
  */

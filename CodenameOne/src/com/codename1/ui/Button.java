@@ -159,14 +159,14 @@ public class Button extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void resetFocusable() {
         setFocusable(true);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusGainedInternal() {
         super.focusGainedInternal();
@@ -176,7 +176,7 @@ public class Button extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusLostInternal() {
         super.focusLostInternal();
@@ -380,7 +380,7 @@ public class Button extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void fireActionEvent(int x, int y){
         super.fireActionEvent();
@@ -394,7 +394,7 @@ public class Button extends Label {
                 }
             }
         } else {
-            dispatcher.fireActionEvent(new ActionEvent(this, x, y));
+            dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed,x, y));
         }
         Display d = Display.getInstance();
         if(d.isBuiltinSoundsEnabled()) {
@@ -430,7 +430,7 @@ public class Button extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE){
@@ -439,7 +439,7 @@ public class Button extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE){
@@ -448,13 +448,13 @@ public class Button extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyRepeated(int keyCode) {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         pressed();
@@ -462,28 +462,28 @@ public class Button extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isSelectableInteraction() {
         return true;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
         requestFocus();
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
         requestFocus();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
         clearDrag();
@@ -500,7 +500,7 @@ public class Button extends Label {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         Form f = getComponentForm();
@@ -514,14 +514,14 @@ public class Button extends Label {
         // button shouldn't fire an event when a pointer is dragged into it
         if(state == STATE_PRESSED) {
             released(x, y);
-        }
+         }
         if(restoreDragPercentage > -1) {
             Display.getInstance().setDragStartPercentage(restoreDragPercentage);
         }
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void dragInitiated() {
         if(Display.getInstance().shouldRenderSelection(this)) {
@@ -533,7 +533,7 @@ public class Button extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
         // this releases buttons on drag instead of keeping them pressed making them harder to click
@@ -545,23 +545,16 @@ public class Button extends Label {
         }*/
         super.pointerDragged(x, y);
     }
-
-    /**
-     * @inheritDoc
-     */
-    public void paint(Graphics g) {
-        getUIManager().getLookAndFeel().drawButton(g, this);
-    }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Border getBorder() {
         return getStyle().getBorder();
@@ -599,7 +592,7 @@ public class Button extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      * @deprecated use the Style alignment instead
      */
     public void setAlignment(int align){
@@ -632,7 +625,7 @@ public class Button extends Label {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         boolean a = super.animate();

@@ -176,7 +176,7 @@ class Spinner extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isStickyDrag() {
         return true;
@@ -239,7 +239,7 @@ class Spinner extends List {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {        
         getComponentForm().registerAnimated(this);
@@ -248,7 +248,7 @@ class Spinner extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         getComponentForm().deregisterAnimated(this);
@@ -256,14 +256,14 @@ class Spinner extends List {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcScrollSize() {
         return super.calcPreferredSize();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         int boxWidth = 0;
@@ -311,7 +311,7 @@ class Spinner extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int code) {
         int game = Display.getInstance().getGameAction(code);
@@ -362,7 +362,7 @@ class Spinner extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int code) {
         int game = Display.getInstance().getGameAction(code);
@@ -516,7 +516,7 @@ class Spinner extends List {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         super.paint(g);
@@ -552,7 +552,7 @@ class Spinner extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         boolean val = super.animate();
@@ -605,7 +605,7 @@ class Spinner extends List {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean shouldRenderSelection() {
         if(!isIgnoreFocusComponentWhenUnfocused()) {

@@ -186,7 +186,8 @@ public class EventDispatcher {
         DataChangedListener[] array;
         synchronized(this) {
             array = new DataChangedListener[listeners.size()];
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter] = (DataChangedListener)listeners.get(iter);
             }
         }
@@ -219,7 +220,8 @@ public class EventDispatcher {
         BindTarget[] array;
         synchronized(this) {
             array = new BindTarget[listeners.size()];
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter] = (BindTarget)listeners.get(iter);
             }
         }
@@ -246,7 +248,8 @@ public class EventDispatcher {
      * @param newValue the new value for the property
      */
     private void fireBindTargetChangeSync(BindTarget[] arr, Component source, String propertyName, Object oldValue, Object newValue) {
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             arr[iter].propertyChanged(source, propertyName, oldValue, newValue);
         }
     }
@@ -289,7 +292,8 @@ public class EventDispatcher {
      * Synchronious internal call for common code
      */
     private void fireDataChangeSync(DataChangedListener[] array, int type, int index) {
-        for(int iter = 0 ; iter < array.length ; iter++) {
+        int alen = array.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             array[iter].dataChanged(type, index);
         }
     }
@@ -298,7 +302,8 @@ public class EventDispatcher {
      * Synchronious internal call for common code
      */
     private void fireStyleChangeSync(StyleListener[] array, String property, Style source) {
-        for(int iter = 0 ; iter < array.length ; iter++) {
+        int alen = array.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             array[iter].styleChanged(property, source);
         }
     }
@@ -307,7 +312,8 @@ public class EventDispatcher {
      * Synchronious internal call for common code
      */
     private void fireSelectionSync(SelectionListener[] array, int oldSelection, int newSelection) {
-        for(int iter = 0 ; iter < array.length ; iter++) {
+        int alen = array.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             array[iter].selectionChanged(oldSelection, newSelection);
         }
     }
@@ -316,7 +322,8 @@ public class EventDispatcher {
      * Synchronious internal call for common code
      */
     private void fireScrollSync(ScrollListener[] array, int l, int t, int oldl, int oldt) {
-        for(int iter = 0 ; iter < array.length ; iter++) {
+        int alen = array.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             array[iter].scrollChanged(l, t, oldl, oldt);
         }
     }
@@ -341,7 +348,8 @@ public class EventDispatcher {
         ActionListener[] array;
         synchronized(this) {
             array = new ActionListener[listeners.size()];
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter] = (ActionListener)listeners.get(iter);
             }
         }
@@ -380,7 +388,8 @@ public class EventDispatcher {
         SelectionListener[] array;
         synchronized(this) {
             array = new SelectionListener[listeners.size()];
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter] = (SelectionListener)listeners.get(iter);
             }
         }
@@ -417,7 +426,8 @@ public class EventDispatcher {
         ScrollListener[] array;
         synchronized(this) {
             array = new ScrollListener[listeners.size()];
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter] = (ScrollListener)listeners.get(iter);
             }
         }
@@ -439,7 +449,8 @@ public class EventDispatcher {
      * Synchronous internal call for common code
      */
     private void fireActionSync(ActionListener[] array, ActionEvent ev) {
-        for(int iter = 0 ; iter < array.length ; iter++) {
+        int alen = array.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             if(ev == null || !ev.isConsumed()) {
                 array[iter].actionPerformed(ev);
             }
@@ -469,7 +480,8 @@ public class EventDispatcher {
         FocusListener[] array;
         synchronized(this) {
             array = new FocusListener[listeners.size()];
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter] = (FocusListener)listeners.get(iter);
             }
         }
@@ -492,11 +504,13 @@ public class EventDispatcher {
      */
     private void fireFocusSync(FocusListener[] array, Component c) {
         if(c.hasFocus()) {
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter].focusGained(c);
             }
         } else {
-            for(int iter = 0 ; iter < array.length ; iter++) {
+            int alen = array.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 array[iter].focusLost(c);
             }
         }

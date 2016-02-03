@@ -53,7 +53,7 @@ public class Post extends FBObject {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Post(Hashtable props) {
         super(props);
@@ -161,7 +161,7 @@ public class Post extends FBObject {
     }
 
      /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "type = " + type + " post = " + message;

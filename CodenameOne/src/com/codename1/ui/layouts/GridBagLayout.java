@@ -28,7 +28,13 @@ import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
- * Codename One port of the infamous GridBagLayout based on the Apache Harmony code
+ * <p>Codename One port of the infamous GridBagLayout based on the Apache Harmony code. For new applications
+ * we generally recommend a "native" Codename One layout such as {@link com.codename1.ui.table.TableLayout}
+ * and recommend avoiding this layout. Its here for developers who are accustomed to it and need to port existing code.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/6266580.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/gridbag-layout.png" alt="Sample gridbag layout usage" />
+ * 
  */
 public class GridBagLayout extends Layout {
     protected static final int MAXGRIDSIZE = 512;

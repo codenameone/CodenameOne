@@ -367,7 +367,8 @@ public class NetworkManager {
             if(aps == null) {
                 aps = new Vector();
                 String[] ids = getAPIds();
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                int idlen = ids.length;
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_WLAN) {
                         aps.insertElementAt(ids[iter ], 0);
@@ -379,7 +380,7 @@ public class NetworkManager {
                 }
                 
                 // add all the 2G networks at the end
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_NETWORK2G) {
                         aps.addElement(ids[iter]);
@@ -447,7 +448,8 @@ public class NetworkManager {
                             return;
                         }
                         // check for timeout violations on the currently executing threads
-                        for(int iter = 0 ; iter < networkThreads.length ; iter++) {
+                        int ntlen = networkThreads.length;
+                        for(int iter = 0 ; iter < ntlen ; iter++) {
                             ConnectionRequest c = networkThreads[iter].getCurrentRequest();
                             if(c != null) {
                                 int cTimeout = Math.min(timeout, c.getTimeout());
@@ -736,9 +738,9 @@ public class NetworkManager {
     }
 
     /**
-     * Adds a generic listener to a network error that is invoked before the exception is propogated.
+     * Adds a generic listener to a network error that is invoked before the exception is propagated.
      * Notice that this doesn't apply to server error codes!
-     * Consume the event in order to prevent it from propogating further.
+     * Consume the event in order to prevent it from propagating further.
      *
      * @param e callback will be invoked with the Exception as the source object
      */

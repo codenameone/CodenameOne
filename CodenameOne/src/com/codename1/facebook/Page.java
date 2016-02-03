@@ -48,7 +48,7 @@ public class Page extends FBObject {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Page(Hashtable props) {
         super(props);
