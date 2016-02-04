@@ -122,8 +122,7 @@ public class Font {
 
     private boolean ttf;
     
-    private double pixelSize=-1;	// for derived fonts only, the size that was requested
-    public double getPixelSize() { return(pixelSize); }
+    private float pixelSize=-1;	// for derived fonts only, the size that was requested
     
     private String fontUniqueId;
 
@@ -586,4 +585,14 @@ public class Font {
    public int getDescent() {
        return Display.impl.getFontDescent(font);
    }
+   
+   /**
+    * Returns the size with which the font object was created in case of truetype fonts/derived fonts. This
+    * is useful since a platform might change things slightly based on platform constraints but this value should
+    * be 100% consistent
+    * @return the size requested in the derive method
+    */
+    public float getPixelSize() { 
+        return pixelSize; 
+    }
 }
