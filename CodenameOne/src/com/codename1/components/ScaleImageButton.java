@@ -117,5 +117,14 @@ public class ScaleImageButton extends Button {
     @Override
     public void setText(String text) {
     }
-    
+
+    /**
+     * {@inheritDoc }
+     * Overriden to return getIcon always.
+     */
+    @Override
+    public Image getIconFromState() {
+        return getIcon();
+    }
+
 }
