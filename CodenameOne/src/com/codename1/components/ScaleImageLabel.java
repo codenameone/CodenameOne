@@ -111,4 +111,16 @@ public class ScaleImageLabel extends Label {
     public void setText(String text) {
     }
     
+    /**
+     * {@inheritDoc} 
+     * Overriden to prevent the setUIID from replacing the code
+     */
+    @Override
+    public void setUIID(String id) {
+        Image icon = getIcon();
+        super.setUIID(id); 
+        setIcon(icon);
+    }
+
+    
 }
