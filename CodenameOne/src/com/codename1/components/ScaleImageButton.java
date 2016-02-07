@@ -94,6 +94,17 @@ public class ScaleImageButton extends Button {
                 s.getPaddingTop() + s.getPaddingBottom());
     }
 
+    /**
+     * {@inheritDoc} 
+     * Overriden to prevent the setUIID from replacing the code
+     */
+    @Override
+    public void setUIID(String id) {
+        Image icon = getIcon();
+        super.setUIID(id); 
+        setIcon(icon);
+    }
+
     
     /**
      * Instead of setting the icon sets the background image
