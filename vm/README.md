@@ -4,7 +4,7 @@
 <img align="right" src="http://codenameone.com/img/parpar.png" height="250">
 ParparVM is the VM developed by Codename One to replace the defunct [XMLVM](http://xmlvm.org/) with which it was 
 originally built. We took our extensive experience both in JIT's and native OS development and built something
-that is both simple, concervative and performant. 
+that is both simple, conservative and performant. 
 
 ParparVM was designed as a client side VM and features a **concurrent GC** that doesn't block the current execution thread. In order to accomplish such concurrence a small penalty is paid during usage but this allows for smoother runtime.
 
