@@ -1109,7 +1109,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
             public boolean equals(Object o) {
                 // == is totally fine here for the text which should be interned, the font might be cloned though...
-                return text == ((DrawStringCache)o).text && fgColor == ((DrawStringCache)o).fgColor && font.equals(((DrawStringCache)o).font);
+                return font != null && text == ((DrawStringCache)o).text && fgColor == ((DrawStringCache)o).fgColor && font.equals(((DrawStringCache)o).font);
             }
 
             public int hashCode() {
@@ -1154,7 +1154,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 if (nativeFont instanceof AndroidImplementation.NativeFont) {
                     styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) ((AndroidImplementation.NativeFont) nativeFont).font);
                 } else {
-                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) font);
+                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) nativeFont);
                 }
                 
                 int c = (alpha << 24) | (style.getFgColor() & 0xffffff);
