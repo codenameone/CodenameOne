@@ -46,12 +46,13 @@ import java.util.Map;
  * <p>Modality indicates that a dialog will block the calling thread even if the
  * calling thread is the EDT. Notice that a dialog will not release the block
  * until dispose is called even if show() from another form is called! Events are still performed thanks
- * to the <code>invokeAndBlock</code> capability of the <code>Display</code> class.</p>
+ * to the {@link com.codename1.ui.Display#invokeAndBlock(java.lang.Runnable)} capability of the 
+ * <code>Display</code> class.</p>
  * <p>To determine the size of the dialog use the show method that accepts 4 integer
  * values, notice that these values accept margin from the four sides rather than x, y, width
  * and height values!</p>
- * <p>To style the dialog its important to either use the <code>getDialogStyle()</code> or 
- * <code>setDialogUIID</code> methods rather than styling the dialog object directly.</p>
+ * <p>It's important to style a <code>Dialog</code> using {@link Dialog#getDialogStyle()} or 
+ * {@link Dialog#setDialogUIID(java.lang.String)} methods rather than styling the dialog object directly.</p>
  * <p>
  * The <code>Dialog</code> class also includes support for popup dialog which is a dialog type that is positioned
  * next to a component or screen area and points an arrow at that location. 
