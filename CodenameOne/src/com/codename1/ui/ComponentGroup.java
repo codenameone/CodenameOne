@@ -299,4 +299,32 @@ public class ComponentGroup extends Container {
     public void setForceGroup(boolean forceGroup) {
         this.forceGroup = forceGroup;
     }
+    
+    /**
+     * Shorthand method for wrapping the given components in a vertical component group
+     * @param cmp the components to add into a newly created group
+     * @return the newly created group
+     */
+    public static ComponentGroup enclose(Component... cmp) {
+        ComponentGroup c = new ComponentGroup();
+        for(Component cc : cmp) {
+            c.add(cc);
+        }
+        return c;
+    }
+
+    
+    /**
+     * Shorthand method for wrapping the given components in a horizontal component group
+     * @param cmp the components to add into a newly created group
+     * @return the newly created group
+     */
+    public static ComponentGroup encloseHorizontal(Component... cmp) {
+        ComponentGroup c = new ComponentGroup();
+        c.setHorizontal(true);
+        for(Component cc : cmp) {
+            c.add(cc);
+        }
+        return c;
+    }
 }

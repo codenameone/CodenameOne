@@ -32,9 +32,13 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * RadioButton is a {@link Button} that maintains a selection state exclusively
- * within a specific {@link ButtonGroup}
+ * <p>RadioButton is a {@link Button} that maintains a selection state exclusively
+ * within a specific {@link ButtonGroup}. Check out {@link com.codename1.ui.CheckBox} for
+ * a looser selection approach. Both components support a toggle button
+ * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.</p>
  * 
+ * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
  * @author Chen Fishbein
  */
 public class RadioButton extends Button {
@@ -74,6 +78,30 @@ public class RadioButton extends Button {
         bg.add(rb);
         rb.setToggle(true);
         return rb;
+    }
+
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param text the text for the button
+     * @param bg the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(String text, ButtonGroup bg) {
+        return createToggle(text, null, bg);
+    }
+    
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param icon the icon for the button
+     * @param bg the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(Image icon, ButtonGroup bg) {
+        return createToggle(null, icon, bg);
     }
     
     /**
