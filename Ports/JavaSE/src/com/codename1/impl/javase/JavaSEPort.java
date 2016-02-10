@@ -7354,7 +7354,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setPhoneNumbers(phones);
         
         Hashtable emails = new Hashtable();
-        emails.put("work", "chen@codenameone.com");
+        emails.put("work", "----");
         contact.setEmails(emails);
 
         Hashtable addresses = new Hashtable();
@@ -7378,7 +7378,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         phones.put("home", "+222222");
         contact.setPhoneNumbers(phones);
         emails = new Hashtable();
-        emails.put("work", "shai@codenameone.com");
+        emails.put("work", "----");
         contact.setEmails(emails);
 
         addresses = new Hashtable();
