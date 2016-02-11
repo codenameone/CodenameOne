@@ -52,6 +52,9 @@ import java.util.Vector;
  * to provide other ways of rendering the content of a list model.
  *
  * @author Shai Almog
+ * @deprecated the performance of ContainerList is worse than the performance of List or Container. The API/behaviors
+ * are problematic and we don't think its the right choice for any project. It is our recommendation that you use
+ * Container, InfiniteContainer etc.
  */
 public class ContainerList extends Container {
     private CellRenderer renderer = new DefaultListCellRenderer();
