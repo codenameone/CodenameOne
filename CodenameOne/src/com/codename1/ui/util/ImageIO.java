@@ -26,6 +26,7 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
 import java.io.ByteArrayInputStream;
@@ -76,7 +77,14 @@ public abstract class ImageIO {
             EncodedImage i = (EncodedImage)img;
             save(new ByteArrayInputStream(i.getImageData()), response, format, i.getWidth(), i.getHeight(), quality);
         } else {
-            saveImage(img, response, format, quality);
+            if(img.getImage() == null) {
+                Image img2 = Image.createImage(img.getWidth(), img.getHeight(), 0);
+                Graphics g = img2.getGraphics();
+                g.drawImage(img, 0, 0);
+                saveImage(img2, response, format, quality);
+            } else {
+                saveImage(img, response, format, quality);
+            }
         }
     }
 
