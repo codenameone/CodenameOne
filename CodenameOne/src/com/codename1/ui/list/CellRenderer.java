@@ -61,6 +61,10 @@ import com.codename1.ui.List;
  * wouldn't do anything but still cost in terms of processing.
  * 
  * @author Chen Fishbein, Shai Almog
+ * @deprecated this interface was added for ContainerList which is now deprecated. Use GenericListCellRenderer 
+ * or ListCellRenderer instead
+ * @see com.codename1.ui.list.GenericListCellRenderer
+ * @see com.codename1.ui.list.ListCellRenderer
  */
 public interface CellRenderer<T> { 
     /**
