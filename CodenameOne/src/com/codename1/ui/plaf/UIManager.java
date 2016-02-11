@@ -482,7 +482,9 @@ public class UIManager {
 
         if(installedTheme == null || !installedTheme.containsKey("Scroll.derive")) {
             themeProps.put("Scroll.margin", "0,0,0,0");
-            themeProps.put("Scroll.padding", "1,1,1,1");
+            int halfMM = Display.getInstance().convertToPixels(10, true) / 20;
+            halfMM = Math.max(1, halfMM);
+            themeProps.put("Scroll.padding", halfMM + "," + halfMM + "," + halfMM + "," + halfMM);
         }
 
         if(installedTheme == null || !installedTheme.containsKey("ScrollThumb.derive")) {
