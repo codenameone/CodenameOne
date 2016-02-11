@@ -39,8 +39,18 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 
 /**
- * The table class represents a grid of data that can be used for rendering a grid
+ * <p>The {@code Table} class represents a grid of data that can be used for rendering a grid
  * of components/labels. The table reflects and updates the underlying model data.
+ * {@code Table} relies heavily on the {@link com.codename1.ui.table.TableLayout} class and 
+ * {@link com.codename1.ui.table.TableModel} interface to present its UI. Unlike a 
+ * {@link com.codename1.ui.List} a {@code Table} doesn't feature a separate renderer
+ * and instead allows developers to derive the class.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/6b106772ad1d58c50270.js"></script>
+ * 
+ * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" alt="Table with customize cells using the pinstripe effect" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png" alt="Picker table cell during edit" />
  *
  * @author Shai Almog
  */
