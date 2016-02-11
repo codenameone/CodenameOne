@@ -37,9 +37,15 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 /**
- * Main entry point for managing the connection requests, this is essentially a
+ * <p>Main entry point for managing the connection requests, this is essentially a
  * threaded queue that makes sure to route all connections via the network thread
- * while sending the callbacks through the Codename One EDT.
+ * while sending the callbacks through the Codename One EDT.</p>
+ * 
+ * <p>The sample
+ * code below fetches a page of data from the nestoria housing listing API.<br>
+ * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
+ * class.</p>
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
  */
