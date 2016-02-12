@@ -474,8 +474,9 @@ public final class CommonTransitions extends Transition {
             int dest;
             int startOffset = 0;
             boolean direction = forward;
-            if ( (source.getUIManager().getLookAndFeel().isRTL())) {
-                    direction=!direction;
+            //flip the direction only for horizontal slides
+            if ((source.getUIManager().getLookAndFeel().isRTL()) && slideType == SLIDE_HORIZONTAL) {
+                direction = !direction;
             }
             if (slideType == SLIDE_HORIZONTAL) {
                 dest = w;
@@ -928,7 +929,7 @@ public final class CommonTransitions extends Transition {
         }
 
         boolean dir = forward;
-        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
+        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL() && slideType == SLIDE_HORIZONTAL) {
             dir = !dir;
         }
         if(dir) {

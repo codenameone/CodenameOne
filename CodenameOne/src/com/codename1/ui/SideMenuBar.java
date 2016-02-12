@@ -271,7 +271,7 @@ public class SideMenuBar extends MenuBar {
                         }
                         return;
                     }
-                    if (rightSideSwipePotential && hasSideMenus[1]) {
+                    if (rightSideSwipePotential && (hasSideMenus[1] || (hasSideMenus[0] && isRTL()))) {
                         final int x = evt.getX();
                         final int y = evt.getY();
                         if (Math.abs(y - initialDragY) > initialDragX - x) {
@@ -283,7 +283,11 @@ public class SideMenuBar extends MenuBar {
                             draggedX = x;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
-                            openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX, false);
+                            if(isRTL()){
+                                openMenu(null, 0, draggedX, false);                            
+                            }else{
+                                openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX, false);
+                            }
                         }
                     }
                     if (topSwipePotential) {
@@ -329,7 +333,7 @@ public class SideMenuBar extends MenuBar {
                         }
                     }
                     int displayWidth = Display.getInstance().getDisplayWidth();
-                    if (rightSideButton != null) {
+                    if (rightSideButton != null || isRTL()) {
                         rightSideSwipePotential = !transitionRunning && evt.getX() > displayWidth - displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                     }
                     if (getTitleComponent() instanceof Button) {
@@ -998,11 +1002,18 @@ public class SideMenuBar extends MenuBar {
                 addComponentToSideMenu(menu, createTouchCommandButton(c));
             }
         }
+        boolean isRTLValue = isRTL();
+        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+            isRTLValue = !isRTLValue;
+        }
         UIManager uim = menu.getUIManager();
         boolean shadowEnabled = uim.isThemeConstant("sideMenuShadowBool", true);
         Image sh = (Image) uim.getThemeImageConstant("sideMenuShadowImage");
         if (sh == null && shadowEnabled) {
             sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
+        }
+        if (isRTLValue) {
+            sh = sh.flipHorizontally(true);
         }
         final Image shadow = sh;
 
@@ -1361,7 +1372,11 @@ public class SideMenuBar extends MenuBar {
                     v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
                     if(v < 0) {
                         if(placement == COMMAND_PLACEMENT_VALUE_RIGHT){
-                            v = rightSideButton.getWidth();
+                            if(isRTL()){
+                                v = openButton.getWidth();                            
+                            }else{
+                                v = rightSideButton.getWidth();
+                            }
                         }else{
                             v = openButton.getWidth();
                         }
@@ -1525,6 +1540,13 @@ public class SideMenuBar extends MenuBar {
             shadow = (Image) getUIManager().getThemeImageConstant("sideMenuShadowImage");
             if (shadow == null && shadowEnabled) {
                 shadow = Resources.getSystemResource().getImage("sidemenu-shadow.png");
+            }
+            boolean isRTLValue = isRTL();
+            if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+                isRTLValue = !isRTLValue;
+            }
+            if (isRTLValue) {
+                shadow = shadow.flipHorizontally(true);
             }
 
             motion.start();
