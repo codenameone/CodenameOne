@@ -86,9 +86,23 @@ public class ScaleImageButton extends Button {
     @Override
     protected Dimension calcPreferredSize() {
         Image i = getIcon();
+        if(i == null) {
+            return new Dimension();
+        }
         Style s = getStyle();
         return new Dimension(i.getWidth() + s.getPaddingLeft(false) + s.getPaddingRight(false), i.getHeight() +
                 s.getPaddingTop() + s.getPaddingBottom());
+    }
+
+    /**
+     * {@inheritDoc} 
+     * Overriden to prevent the setUIID from replacing the code
+     */
+    @Override
+    public void setUIID(String id) {
+        Image icon = getIcon();
+        super.setUIID(id); 
+        setIcon(icon);
     }
 
     
@@ -114,5 +128,14 @@ public class ScaleImageButton extends Button {
     @Override
     public void setText(String text) {
     }
-    
+
+    /**
+     * {@inheritDoc }
+     * Overriden to return getIcon always.
+     */
+    @Override
+    public Image getIconFromState() {
+        return getIcon();
+    }
+
 }

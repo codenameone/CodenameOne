@@ -29,7 +29,17 @@ import java.io.Reader;
 import java.util.Hashtable;
 
 /**
- * The parser class is used to parse an XML document into a DOM object (Element).
+ * <p>Parser class used to parse an XML document into a DOM object (Element). This code was originally
+ * developed to parse HTML and as a result isn't as strict as most XML parsers and can parse many HTML documents
+ * out of the box.  The parser is mostly stateful (although it does have an event callback API as well), its modeled closely
+ * to the Java DOM API's.
+ * </p>
+ * 
+ * <p>
+ * In this sample an XML hierarchy is displayed using a {@link com.codename1.ui.tree.Tree}:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
  * 
  * @author Ofir Leitner
  */

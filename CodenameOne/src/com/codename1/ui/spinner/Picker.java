@@ -238,7 +238,7 @@ public class Picker extends Button {
      * Sets the string entries for the string picker
      * @param strs string array
      */
-    public void setStrings(String[] strs) {
+    public void setStrings(String... strs) {
         int slen = strs.length;
         for (int i = 0; i < slen; i++) {
             String str = strs[i];

@@ -908,6 +908,7 @@ public class Component implements Animation, StyleListener {
         selectedStyle = null;
         disabledStyle = null;
         pressedStyle = null;
+        allStyles = null;
         if(!sizeRequestedByUser) {
             preferredSize = null;
         }

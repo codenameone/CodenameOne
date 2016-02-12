@@ -32,9 +32,15 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * Allows displaying labels and images with different alignment options, this class
+ * <p>Allows displaying a single line of text and icon (both optional) with different alignment options. This class
  * is a base class for several components allowing them to declare alignment/icon
- * look in a similar way.
+ * appearance universally.</p>
+ * <p>
+ * Label text can be positioned in one of 4 locations as such:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/3bfd03a497bc09700128.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-label-text-position.png" alt="Label text positioning" />
+ * 
  * 
  * @author Chen Fishbein
  */

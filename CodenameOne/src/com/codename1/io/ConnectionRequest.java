@@ -43,9 +43,16 @@ import java.util.Map;
 import java.util.Vector;
 
 /**
- * This class represents a connection object in the form of a request response
- * typically common for HTTP/HTTPS connections. Elements of this type are
- * placed in a priority queue based 
+ * <p>This class represents a connection object in the form of a request response
+ * typically common for HTTP/HTTPS connections. A connection request is added to
+ * the {@link com.codename1.io.NetworkManager} for processing in a queue on one of the
+ * network threads.</p>
+ * 
+ * <p>The sample
+ * code below fetches a page of data from the nestoria housing listing API.<br>
+ * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
+ * class.</p>
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
  */
