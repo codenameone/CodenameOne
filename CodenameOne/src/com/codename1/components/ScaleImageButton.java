@@ -49,6 +49,7 @@ public class ScaleImageButton extends Button {
         setUIID("ScaleImageButton");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
+        getAllStyles().setBgTransparency(255);
     }
     
     /**
@@ -59,6 +60,7 @@ public class ScaleImageButton extends Button {
         setUIID("ScaleImageButton");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
+        getAllStyles().setBgTransparency(255);
         setIcon(i);
     }
     
@@ -100,9 +102,12 @@ public class ScaleImageButton extends Button {
      */
     @Override
     public void setUIID(String id) {
+        byte type = getBackgroundType();
         Image icon = getIcon();
         super.setUIID(id); 
         setIcon(icon);
+        getAllStyles().setBackgroundType(type);
+        getAllStyles().setBgTransparency(255);
     }
 
     
