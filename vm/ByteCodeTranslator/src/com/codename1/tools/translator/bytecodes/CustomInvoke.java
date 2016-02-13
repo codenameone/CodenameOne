@@ -197,7 +197,7 @@ public class CustomInvoke extends Instruction {
         
         
         if(origOpcode != Opcodes.INVOKESTATIC) {
-            b.append(", stack[stackPointer - ");
+            b.append(", SP[-");
             b.append(args.size() + 1 - numLiteralArgs);
             b.append("].data.o");
         }
@@ -210,7 +210,7 @@ public class CustomInvoke extends Instruction {
             if (literalArgs != null && literalArgs[argIndex] != null) {
                 b.append(literalArgs[argIndex]);
             } else {
-                b.append("stack[stackPointer - ");
+                b.append("SP[-");
                 b.append(offset);
                 b.append("].data.");
                 b.append(a);
@@ -226,31 +226,31 @@ public class CustomInvoke extends Instruction {
             b.append(");\n");
             if(origOpcode != Opcodes.INVOKESTATIC) {
                 if(args.size() - numLiteralArgs > 0) {
-                    b.append("    stackPointer -= ");
+                    b.append("    SP -= ");
                     b.append(args.size() - numLiteralArgs);
                     b.append(";\n");
                 }
             } else {
                 if(args.size() - numLiteralArgs > 1) {
-                    b.append("    stackPointer -= ");
+                    b.append("    SP -= ");
                     b.append(args.size() - numLiteralArgs - 1);
                     b.append(";\n");
                 }
             }
             if(returnVal.equals("JAVA_OBJECT")) {
-                b.append("    stack[stackPointer - 1].data.o = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_OBJECT; }\n");
+                b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
             } else {
                 if(returnVal.equals("JAVA_INT")) {
-                    b.append("    stack[stackPointer - 1].data.i = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_INT; }\n");
+                    b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
                 } else {
                     if(returnVal.equals("JAVA_LONG")) {
-                        b.append("    stack[stackPointer - 1].data.l = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_LONG; }\n");
+                        b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
                     } else {
                         if(returnVal.equals("JAVA_DOUBLE")) {
-                            b.append("    stack[stackPointer - 1].data.d = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_DOUBLE; }\n");
+                            b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
                         } else {
                             if(returnVal.equals("JAVA_FLOAT")) {
-                                b.append("    stack[stackPointer - 1].data.f = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_FLOAT; }\n");
+                                b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
                             } else {
                                 throw new UnsupportedOperationException("Unknown type: " + returnVal);
                             }
@@ -270,10 +270,7 @@ public class CustomInvoke extends Instruction {
             val = args.size() - numLiteralArgs;
         }
         if(val > 0) {
-            /*b.append("popMany(threadStateData, ");            
-            b.append(val);
-            b.append(", stack, &stackPointer); \n"); */
-            b.append("    stackPointer -= ");
+            b.append("    SP -= ");
             b.append(val);
             b.append(";\n");
         } else {

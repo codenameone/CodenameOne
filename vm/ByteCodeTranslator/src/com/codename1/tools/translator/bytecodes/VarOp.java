@@ -118,10 +118,10 @@ public class VarOp extends Instruction implements AssignableExpression {
         b.append("    ");
         switch(opcode) {
             case Opcodes.ILOAD:
-                b.append("stack[stackPointer].type = CN1_TYPE_INT; /* ILOAD */ \n" +
-                        "    stack[stackPointer].data.i = ilocals_");
+                b.append("(*SP).type = CN1_TYPE_INT; /* ILOAD */ \n" +
+                        "    (*SP).data.i = ilocals_");
                 b.append(var);
-                b.append("_; \n    stackPointer++;\n");
+                b.append("_; \n    SP++;\n");
                 return;
             case Opcodes.LLOAD:
                 b.append("BC_LLOAD(");
