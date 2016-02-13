@@ -23,12 +23,7 @@
 
 package com.codename1.tools.translator;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.AnnotationVisitor;
@@ -401,10 +396,16 @@ public class Parser extends ClassVisitor {
             eliminateUnusedMethods();
 
             generateClassAndMethodIndexHeader(outputDirectory);
+
+            boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
+            ConcatenatingFileOutputSteeam cos = concatenate ? new ConcatenatingFileOutputSteeam(outputDirectory) : null;
+
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
-                writeFile(bc.getClsName(), bc, outputDirectory);
+                writeFile(bc, outputDirectory, cos);
             }
+            if (cos != null) cos.realClose();
+
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
@@ -577,21 +578,24 @@ public class Parser extends ClassVisitor {
         
         return false;
     }
-    
-    private static void writeFile(String clsName, ByteCodeClass cls, File outputDir) throws Exception {
-        String fileName = clsName + "." + ByteCodeTranslator.output.extension();
-        
-        FileOutputStream outMain = new FileOutputStream(new File(outputDir, fileName));
-        
-        // we also need to write the header file for iOS
+
+    private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputSteeam writeBufferInstead) throws Exception {
+        OutputStream outMain =
+                writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS ?
+                        writeBufferInstead :
+                        new FileOutputStream(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()));
+
+        if (outMain instanceof ConcatenatingFileOutputSteeam) {
+            ((ConcatenatingFileOutputSteeam)outMain).beginNextFile(cls.getClsName());
+        }
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
             outMain.write(cls.generateCCode(classes).getBytes());
             outMain.close();
-            String headerName = clsName + ".h";
 
+            // we also need to write the header file for iOS
+            String headerName = cls.getClsName() + ".h";
             FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName));
             outHeader.write(cls.generateCHeader().getBytes());
-
             outHeader.close();
         } else {
             outMain.write(cls.generateCSharpCode().getBytes());

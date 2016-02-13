@@ -245,12 +245,12 @@ typedef struct clazz*       JAVA_CLASS;
 #define BC_SWAP() swapStack(SP)
 
 
-#define POP_INT() pop(&SP)->data.i
-#define POP_OBJ() pop(&SP)->data.o
-#define POP_OBJ_NO_RELEASE() pop(&SP)->data.o
-#define POP_LONG() pop(&SP)->data.l
-#define POP_DOUBLE() pop(&SP)->data.d
-#define POP_FLOAT() pop(&SP)->data.f
+#define POP_INT() (*pop(&SP)).data.i
+#define POP_OBJ() (*pop(&SP)).data.o
+#define POP_OBJ_NO_RELEASE() (*pop(&SP)).data.o
+#define POP_LONG() (*pop(&SP)).data.l
+#define POP_DOUBLE() (*pop(&SP)).data.d
+#define POP_FLOAT() (*pop(&SP)).data.f
 
 #define PEEK_INT(offset) SP[-offset].data.i
 #define PEEK_OBJ(offset) SP[-offset].data.o
@@ -425,12 +425,12 @@ typedef struct clazz*       JAVA_CLASS;
     SP[-offset].data.i = pInt; \
     popMany(threadStateData, MAX(1, offset) - 1, &SP); }
 
-#define POP_MANY_AND_PUSH_LONG(value, offset) { \
+#define POP_MANY_AND_PUSH_LONG(value, offset) {  \
     JAVA_LONG pLong = value; SP[-offset].type = CN1_TYPE_LONG; \
     SP[-offset].data.l = pLong; \
     popMany(threadStateData, MAX(1, offset) - 1, &SP); }
 
-#define POP_MANY_AND_PUSH_DOUBLE(value, offset) {\
+#define POP_MANY_AND_PUSH_DOUBLE(value, offset) {  \
     JAVA_DOUBLE pDob = value; SP[-offset].type = CN1_TYPE_DOUBLE; \
     SP[-offset].data.d = pDob; \
     popMany(threadStateData, MAX(1, offset) - 1, &SP); }
@@ -511,7 +511,7 @@ if(SP[-1].type == CN1_TYPE_LONG || SP[-1].type == CN1_TYPE_DOUBLE) {\
         SP[1].data.l = plong2; \
         SP+=2; \
     } \
-    SP[-1].type = SP[-1].type; \
+    SP[-1].type = SP[-3].type; \
     SP[-2].type = SP[-4].type; \
 }
 
@@ -536,12 +536,12 @@ if(SP[-1].type == CN1_TYPE_LONG || SP[-1].type == CN1_TYPE_DOUBLE) {\
     } else {\
         (*SP).data.l = SP[-1].data.l; \
         SP[-1].data.l = SP[-2].data.l; \
-        SP[-2].data.l = SP[-1].data.l; \
-        SP[-1].data.l = (*SP).data.l; \
+        SP[-2].data.l = SP[-3].data.l; \
+        SP[-3].data.l = (*SP).data.l; \
         (*SP).type = SP[-1].type; \
         SP[-1].type = SP[-2].type; \
-        SP[-2].type = SP[-1].type; \
-        SP[-1].type = (*SP).type; \
+        SP[-2].type = SP[-3].type; \
+        SP[-3].type = (*SP).type; \
     }\
     SP++; \
 }
@@ -641,28 +641,28 @@ extern int instanceofFunction(int sourceClass, int destId);
 
 
 #define BC_BASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_CASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_SASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_IASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
+    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
 #define BC_LASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, SP[-2].data.i) = SP[-1].data.l; SP-=3
+    LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.l; SP-=3
 
 #define BC_FASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, SP[-2].data.i) = SP[-1].data.f; SP-=3
+    FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.f; SP-=3
 
 #define BC_DASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
-    DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, SP[-2].data.i) = SP[-1].data.d; SP-=3
+    DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.d; SP-=3
 
 #define BC_AASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
-    JAVA_OBJECT aastoreTmp = SP[-1].data.o; \
+    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
 }
@@ -917,7 +917,6 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
     initMethodStack(threadStateData, __cn1ThisObject, stackSize,localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
-//#define stackPointer (SP-&stack[0])
 
 #ifdef __OBJC__
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
@@ -983,8 +982,8 @@ static inline struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, str
 }
 */
 
-extern struct elementStruct* pop(struct elementStruct** sp);
-extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** SP);
+extern struct elementStruct* pop(struct elementStruct**sp);
+extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp);
 
 
 #define swapStack(sp) { \
