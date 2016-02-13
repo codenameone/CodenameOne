@@ -23,12 +23,7 @@
 
 package com.codename1.tools.translator;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.AnnotationVisitor;
@@ -42,6 +37,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
+import org.objectweb.asm.tree.LabelNode;
 
 /**
  *
@@ -56,10 +52,20 @@ public class Parser extends ClassVisitor {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
         }
-        ClassReader r = new ClassReader(new FileInputStream(sourceFile));
-        /*if(ByteCodeTranslator.verbose) {
-            System.out.println("Class: " + r.getClassName() + " derives from: " + r.getSuperName() + " interfaces: " + Arrays.asList(r.getInterfaces()));
-        }*/
+        ClassReader r = new ClassReader(new FileInputStream(sourceFile)) {
+            String clsName;
+            @Override
+            protected Label readLabel(int offset, Label[] labels) {
+                if (clsName == null) {
+                    clsName = getClassName().replace('/', '_').replace('$', '_');
+                }
+                if (labels[offset] == null) {
+                    final String labelName = "L" + clsName + "___" + offset;
+                    labels[offset] = new MyLabel(labelName);
+                }
+                return labels[offset];
+            }
+        };
         Parser p = new Parser();
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
         if(p.clsName.startsWith("java_lang_annotation") || p.clsName.startsWith("java_lang_Deprecated")
@@ -322,10 +328,10 @@ public class Parser extends ClassVisitor {
         
         bld.append("\n\n#endif // __CN1_CLASS_METHOD_INDEX_H__\n");        
         
-        FileOutputStream fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.h"));
+        OutputStream fos = new PreservingFileOutputStream(new File(outputDirectory, "cn1_class_method_index.h"));
         fos.write(bld.toString().getBytes("UTF-8"));
         fos.close();
-        fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.m"));
+        fos = new PreservingFileOutputStream(new File(outputDirectory, "cn1_class_method_index.m"));
         fos.write(bldM.toString().getBytes("UTF-8"));
         fos.close();
     }
@@ -374,6 +380,7 @@ public class Parser extends ClassVisitor {
         System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
         String file = "Unknown File";
         try {
+            System.out.println("Iterate first..");
             for(ByteCodeClass bc : classes) {
                 // special case for object
                 if(bc.getClsName().equals("java_lang_Object")) {
@@ -387,24 +394,33 @@ public class Parser extends ClassVisitor {
                 }
                 bc.setBaseInterfacesObject(lst);
             }
+            if(ByteCodeTranslator.verbose) System.out.println("Iterate second..");
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
-            }   
+            }
+            if(ByteCodeTranslator.verbose) System.out.println("Mark deps..");
             ByteCodeClass.markDependencies(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
 
             // load the native sources (including user native code) 
+            if(ByteCodeTranslator.verbose) System.out.println("Load natives..");
             readNativeFiles(outputDirectory);
 
             // loop over methods and start eliminating the body of unused methods
-            eliminateUnusedMethods();
+            if(ByteCodeTranslator.verbose) System.out.println("Eliminate unused..");
+            if (!ByteCodeTranslator.draft)
+                eliminateUnusedMethods();
 
+            if(ByteCodeTranslator.verbose) System.out.println("Generate common header..");
             generateClassAndMethodIndexHeader(outputDirectory);
+            if(ByteCodeTranslator.verbose) System.out.println("Generate all classes..");
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 writeFile(bc.getClsName(), bc, outputDirectory);
             }
+            int created = PreservingFileOutputStream.total - PreservingFileOutputStream.preserved;
+            if(ByteCodeTranslator.verbose) System.out.println("Updated/created: "+created+" files");
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
@@ -577,11 +593,11 @@ public class Parser extends ClassVisitor {
         
         return false;
     }
-    
+
     private static void writeFile(String clsName, ByteCodeClass cls, File outputDir) throws Exception {
         String fileName = clsName + "." + ByteCodeTranslator.output.extension();
-        
-        FileOutputStream outMain = new FileOutputStream(new File(outputDir, fileName));
+
+        PreservingFileOutputStream outMain = new PreservingFileOutputStream(new File(outputDir, fileName));
         
         // we also need to write the header file for iOS
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
@@ -589,7 +605,7 @@ public class Parser extends ClassVisitor {
             outMain.close();
             String headerName = clsName + ".h";
 
-            FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName));
+            PreservingFileOutputStream outHeader = new PreservingFileOutputStream(new File(outputDir, headerName));
             outHeader.write(cls.generateCHeader().getBytes());
 
             outHeader.close();
@@ -612,7 +628,20 @@ public class Parser extends ClassVisitor {
     public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
         BytecodeMethod mtd = new BytecodeMethod(clsName, access, name, desc, signature, exceptions);
         cls.addMethod(mtd);
-        JSRInlinerAdapter a = new JSRInlinerAdapter(new MethodVisitorWrapper(super.visitMethod(access, name, desc, signature, exceptions), mtd), access, name, desc, signature, exceptions);
+        final int labelN = cls.getMethods().size();
+        JSRInlinerAdapter a = new JSRInlinerAdapter(Opcodes.ASM5,
+                new MethodVisitorWrapper(
+                        super.visitMethod(access, name, desc, signature, exceptions),
+                        mtd),
+                access, name, desc, signature, exceptions) {
+            @Override
+            protected LabelNode getLabelNode(Label l) {
+                if (!(l.info instanceof LabelNode)) {
+                    l.info = new LabelNode(new MyLabel("JSRL_"+labelN+"_"+l.toString()));
+                }
+                return (LabelNode) l.info;
+            }
+        };
         return a; 
     }
 
@@ -671,8 +700,28 @@ public class Parser extends ClassVisitor {
             cls.setFinalClass(true);
         }
         super.visit(version, access, name, signature, superName, interfaces); 
-    }    
-    
+    }
+
+    public static class MyLabel extends Label {
+        private final String labelName;
+
+        public MyLabel(String labelName) {
+            this.labelName = labelName;
+        }
+
+        int count = 0;
+
+        @Override
+        public String toString() {
+            // persistence of label names causes non-regeneration of resulting sources.
+            return labelName;
+        }
+    }
+
+
+
+
+
     class MethodVisitorWrapper extends MethodVisitor {
         private BytecodeMethod mtd;
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {

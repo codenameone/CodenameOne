@@ -61,8 +61,9 @@ public class ByteCodeTranslator {
         public abstract String extension();
     };
     public static OutputType output = OutputType.OUTPUT_TYPE_IOS;
-    public static boolean verbose = true;
-    
+    public static boolean verbose = Boolean.parseBoolean(System.getProperty("ByteCodeTranslator.verbose","true"));
+    public static boolean draft = Boolean.parseBoolean(System.getProperty("ByteCodeTranslator.draft","false"));
+
     ByteCodeTranslator() {
     }
     
@@ -95,7 +96,9 @@ public class ByteCodeTranslator {
                 } else {
                     if(!f.isDirectory()) {
                         // copy the file to the dest dir
-                        copy(new FileInputStream(f), new FileOutputStream(new File(outputDir, f.getName())));
+                        if (f.getName().equals("package.html"))
+                            continue;
+                        copy(new FileInputStream(f), new PreservingFileOutputStream(new File(outputDir, f.getName())));
                     }
                 }
             }
@@ -111,17 +114,23 @@ public class ByteCodeTranslator {
         }
     }
     
-    private void copyDir(File source, File destDir) throws IOException {
+    private boolean copyDir(File source, File destDir) throws IOException {
         File destFile = new File(destDir, source.getName());
         destFile.mkdirs();
         File[] files = source.listFiles();
+        boolean retval = false;
         for(File f : files) {
             if(f.isDirectory()) {
-                copyDir(f, destFile);
+                long savedModified = destFile.lastModified();
+                boolean modified = copyDir(f, destFile);
+                if (!modified) {
+                    destFile.setLastModified(savedModified);
+                }
             } else {
-                copy(new FileInputStream(f), new FileOutputStream(new File(destFile, f.getName())));
+                retval |= copy(new FileInputStream(f), new PreservingFileOutputStream(new File(destFile, f.getName())));
             }
         }
+        return retval;
     }
     
     /**
@@ -145,6 +154,7 @@ public class ByteCodeTranslator {
         final String appVersion = args[6];
         final String appType = args[7];
         final String addFrameworks = args[8];
+        StringBuilder appFonts = new StringBuilder("\n");
         // we accept 3 arguments output type, input directory & output directory
         if(args[0].equalsIgnoreCase("csharp")) {
             output = OutputType.OUTPUT_TYPE_CSHARP;
@@ -179,11 +189,11 @@ public class ByteCodeTranslator {
             imagesXcassets.mkdirs();
             File  launchImageLaunchimage = new File(imagesXcassets, "LaunchImage.launchimage");
             launchImageLaunchimage.mkdirs();
-            copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new FileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new PreservingFileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
 
             File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
             appIconAppiconset.mkdirs();
-            copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new FileOutputStream(new File(appIconAppiconset, "Contents.json")));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new PreservingFileOutputStream(new File(appIconAppiconset, "Contents.json")));
             
             
             File xcproj = new File(root, appName + ".xcodeproj");
@@ -196,35 +206,38 @@ public class ByteCodeTranslator {
             b.execute(sources, srcRoot);
 
             File cn1Globals = new File(srcRoot, "cn1_globals.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new PreservingFileOutputStream(cn1Globals));
             File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new PreservingFileOutputStream(cn1GlobalsM));
             File nativeMethods = new File(srcRoot, "nativeMethods.m");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new PreservingFileOutputStream(nativeMethods));
 
             Parser.writeOutput(srcRoot);
             
-            File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
+            File templateInfoPlist = new File(srcRoot, appName + "-Info.plist" + PreservingFileOutputStream.NEW_SUFFIX);
+            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), new PreservingFileOutputStream(templateInfoPlist));
             
             File templatePch = new File(srcRoot, appName + "-Prefix.pch");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Prefix.pch"), new FileOutputStream(templatePch));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Prefix.pch"), new PreservingFileOutputStream(templatePch));
 
             File xmlvm = new File(srcRoot, "xmlvm.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
+            copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new PreservingFileOutputStream(xmlvm));
             
-            File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new FileOutputStream(projectWorkspaceData));
+            File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata"+ PreservingFileOutputStream.NEW_SUFFIX);
+            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new PreservingFileOutputStream(projectWorkspaceData));
             replaceInFile(projectWorkspaceData, "KitchenSink", appName);
             
             
-            File projectPbx = new File(xcproj, "project.pbxproj");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));            
+            File projectPbx = new File(xcproj, "project.pbxproj"+ PreservingFileOutputStream.NEW_SUFFIX);
+            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.pbxproj"), new PreservingFileOutputStream(projectPbx));
             
             String[] sourceFiles = srcRoot.list(new FilenameFilter() {
                 @Override
-                public boolean accept(File pathname, String string) {
-                    return string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
+                public boolean accept(File pathname, String filename) {
+                    if (filename.endsWith(".ttf")) {
+                        appFonts.append("<string>"+filename+"</string>\n");
+                    }
+                    return filename.endsWith(".bundle") || filename.endsWith(".xcdatamodeld") || !pathname.isHidden() && !filename.startsWith(".") && !"Images.xcassets".equals(filename);
                 }
             });
             
@@ -278,6 +291,11 @@ public class ByteCodeTranslator {
             arr.addAll(Arrays.asList(sourceFiles));
             
             for(String file : arr) {
+                if (file.endsWith(PreservingFileOutputStream.NEW_SUFFIX)) {
+                    file = file.substring(0, file.length()-PreservingFileOutputStream.NEW_SUFFIX.length());
+                } else {
+                    if (arr.contains(file + PreservingFileOutputStream.NEW_SUFFIX)) continue;   // remove duplicates
+                }
                 fileListEntry.append("		0");
                 currentValue++;
                 String fileOneValue = Integer.toHexString(currentValue).toUpperCase();
@@ -417,7 +435,15 @@ public class ByteCodeTranslator {
             }
 
             String bundleVersion = System.getProperty("bundleVersionNumber", appVersion);
-            replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
+            replaceInFile(templateInfoPlist,
+                    "com.codename1pkg", appPackageName,
+                    "${PRODUCT_NAME}", appDisplayName,
+                    "VERSION_VALUE", appVersion,
+                    "VERSION_BUNDLE_VALUE", bundleVersion,
+                    "${APP_FONTS}", appFonts.toString());
+            PreservingFileOutputStream.finishWithNewFile(projectPbx);
+            PreservingFileOutputStream.finishWithNewFile(templateInfoPlist);
+            PreservingFileOutputStream.finishWithNewFile(projectWorkspaceData);
         } else {
             b.execute(sources, dest);
             Parser.writeOutput(dest);
@@ -495,8 +521,8 @@ public class ByteCodeTranslator {
      * @param i source
      * @param o destination
      */
-    public static void copy(InputStream i, OutputStream o) throws IOException {
-        copy(i, o, 8192);
+    public static boolean copy(InputStream i, OutputStream o) throws IOException {
+        return copy(i, o, 8192);
     }
 
     /**
@@ -507,7 +533,8 @@ public class ByteCodeTranslator {
      * @param o destination
      * @param bufferSize the size of the buffer, which should be a power of 2 large enoguh
      */
-    public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
+    public static boolean copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
+        boolean modified = true;
         try {
             byte[] buffer = new byte[bufferSize];
             int size = i.read(buffer);
@@ -516,9 +543,10 @@ public class ByteCodeTranslator {
                 size = i.read(buffer);
             }
         } finally {
-            cleanup(o);
             cleanup(i);
+            modified = cleanup(o);
         }
+        return modified;
     }
 
     /**
@@ -526,19 +554,24 @@ public class ByteCodeTranslator {
      * object is null
      *
      * @param o Connection, Stream or other closeable object
+     * @return true if modified
      */
-    public static void cleanup(Object o) {
+    public static boolean cleanup(Object o) {
         try {
             if(o instanceof OutputStream) {
                 ((OutputStream)o).close();
-                return;
+                if (o instanceof PreservingFileOutputStream) {
+                    return !((PreservingFileOutputStream)o).equal;
+                }
+                return true;
             }
             if(o instanceof InputStream) {
                 ((InputStream)o).close();
-                return;
+                return false;
             }
         } catch(IOException err) {
             err.printStackTrace();
         }
+        return true;
     }
 }
