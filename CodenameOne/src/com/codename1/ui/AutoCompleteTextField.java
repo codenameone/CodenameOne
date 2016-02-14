@@ -48,6 +48,11 @@ public class AutoCompleteTextField extends TextField {
     private int minimumLength;
     
     /**
+     * The number of elements shown for the auto complete popup
+     */
+    private int minimumElementsShownInPopup = -1;
+    
+    /**
      * Constructor with completion suggestions
      * @param completion a String array of suggestion for completion
      */ 
@@ -271,6 +276,9 @@ public class AutoCompleteTextField extends TextField {
         popup.setEnabled(false);
         filter(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        if(getMinimumElementsShownInPopup() > 0) {
+            l.setMinElementHeight(getMinimumElementsShownInPopup());
+        }
         l.setScrollToSelected(false);
         l.setItemGap(0);
         for(ActionListener al : listeners) {
@@ -361,6 +369,22 @@ public class AutoCompleteTextField extends TextField {
      */
     public void setMinimumLength(int minimumLength) {
         this.minimumLength = minimumLength;
+    }
+
+    /**
+     * The number of elements shown for the auto complete popup
+     * @return the minimumElementsShownInPopup
+     */
+    public int getMinimumElementsShownInPopup() {
+        return minimumElementsShownInPopup;
+    }
+
+    /**
+     * The number of elements shown for the auto complete popup
+     * @param minimumElementsShownInPopup the minimumElementsShownInPopup to set
+     */
+    public void setMinimumElementsShownInPopup(int minimumElementsShownInPopup) {
+        this.minimumElementsShownInPopup = minimumElementsShownInPopup;
     }
 
     class FormPointerListener implements ActionListener {
