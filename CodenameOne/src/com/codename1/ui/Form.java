@@ -206,6 +206,14 @@ public class Form extends Container {
         
         // hardcoded, anything else is just pointless...
         formStyle.setBgTransparency(0xFF);
+
+        initGlobalToolbar();
+    }
+    
+    void initGlobalToolbar() {
+        if(Toolbar.isGlobalToolbar()) {
+            setToolbar(new Toolbar());
+        }
     }
 
     static int getInvisibleAreaUnderVKB(Form f) {

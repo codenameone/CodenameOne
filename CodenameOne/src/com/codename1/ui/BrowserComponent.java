@@ -43,6 +43,9 @@ import java.util.Hashtable;
  * focusable components to prevent confusion between focus authority and allow the component to scroll
  * itself rather than CodenameOne making that decision for it.
  *
+ *  <p>On Android this component might show a native progress indicator dialog. You can disable that functionality
+ * using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.</p>
+ * 
  * @author Shai Almog
  */
 public class BrowserComponent extends Container {

@@ -1432,9 +1432,12 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Paints this component as a root by going to all the parent components and
+     * <p>Paints this component as a root by going to all the parent components and
      * setting the absolute translation based on coordinates and scroll status.
-     * Restores translation when the painting is finished.
+     * Restores translation when the painting is finished.<br>
+     * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
+     * that creates an image for sharing on social media</p>
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
      * 
      * @param g the graphics to paint this Component on
      */
@@ -1444,9 +1447,13 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Paints this component as a root by going to all the parent components and
+     * <p>Paints this component as a root by going to all the parent components and
      * setting the absolute translation based on coordinates and scroll status.
-     * Restores translation when the painting is finished.
+     * Restores translation when the painting is finished.<br>
+     * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
+     * that creates an image for sharing on social media</p>
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     * 
      * 
      * @param g the graphics to paint this Component on
      * @param background if true paints all parents background

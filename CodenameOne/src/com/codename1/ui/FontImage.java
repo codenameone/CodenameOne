@@ -4785,7 +4785,11 @@ public class FontImage extends Image {
             g.resetAffine();
             g.translate(tX, tY);
         } else {
+            int tX = g.getTranslateX();
+            int tY = g.getTranslateY();
+            g.translate(-tX, -tY);
             g.drawString(text, x + w / 2 - ww / 2, y);
+            g.translate(tX, tY);
         }
         g.setFont(oldFont);
         g.setColor(oldColor);

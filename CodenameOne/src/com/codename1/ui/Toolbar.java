@@ -40,9 +40,9 @@ import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
 /**
- * Toolbar can replace the default TitleArea component. Toolbar allows
- * customizing the Form title with different commands on the title area, within
- * the side menu or the overflow menu.
+ * Toolbar replaces the default title area with a powerful abstraction that allows functionality ranging
+ * from side menus (hamburger) to title animations and any arbitrary component type. Toolbar allows
+ * customizing the Form title with different commands on the title area, within the side menu or the overflow menu.
  *
  * @author Chen
  */
@@ -80,6 +80,8 @@ public class Toolbar extends Container {
     
     private Container permanentSideMenuContainer;
 
+    private static boolean globalToolbar;
+    
     /**
      * Empty Constructor
      */
@@ -89,6 +91,25 @@ public class Toolbar extends Container {
         sideMenu = new ToolbarSideMenu();
     }
 
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant globalToobarBool.
+     * @param gt true to enable the toolbar globally
+     */
+    public static void setGlobalToolbar(boolean gt) {
+        globalToolbar = gt;
+    }
+    
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant globalToobarBool.
+     * 
+     * @return  true if the toolbar API is turned on by default
+     */
+    public static boolean isGlobalToolbar() {
+        return globalToolbar;
+    }
+    
     /**
      * This constructor places the Toolbar on a different layer on top of the 
      * Content Pane.
@@ -182,6 +203,20 @@ public class Toolbar extends Container {
     /**
      * Adds a Command to the overflow menu
      *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToOverflowMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToOverflowMenu(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the overflow menu
+     *
      * @param cmd a Command
      */
     public void addCommandToOverflowMenu(Command cmd) {
@@ -193,6 +228,20 @@ public class Toolbar extends Container {
         sideMenu.installRightCommands();
     }
 
+    /**
+     * Adds a Command to the side navigation menu
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToSideMenu(cmd);
+        return cmd;
+    }
+    
     /**
      * Adds a Command to the side navigation menu
      *
@@ -314,12 +363,40 @@ public class Toolbar extends Container {
     /**
      * Adds a Command to the TitleArea on the right side.
      *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToRightBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToRightBar(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the right side.
+     *
      * @param cmd a Command
      */
     public void addCommandToRightBar(Command cmd) {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);        
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the left side.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToLeftBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToLeftBar(cmd);
+        return cmd;
     }
 
     /**

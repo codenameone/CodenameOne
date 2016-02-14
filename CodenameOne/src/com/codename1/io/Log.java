@@ -543,7 +543,11 @@ public class Log {
                 p("Exception in AppName version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
                 p("OS " + Display.getInstance().getPlatformName());
                 p("Error " + evt.getSource());
-                p("Current Form " + Display.getInstance().getCurrent().getName());
+                if(Display.getInstance().getCurrent() != null) {
+                    p("Current Form " + Display.getInstance().getCurrent().getName());
+                } else {
+                    p("Before the first form!");
+                }
                 e((Throwable)evt.getSource());
                 sendLog();
             }

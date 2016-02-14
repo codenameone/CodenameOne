@@ -39,8 +39,8 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * A component that lets the user switch between a group of components by
- * clicking on a tab with a given title and/or icon.
+ * <p>A component that lets the user switch between a group of components by
+ * clicking on a tab with a given title and/or icon.</p>
  *
  * <p>
  * Tabs/components are added to a <code>Tabs</code> object by using the
@@ -48,13 +48,24 @@ import com.codename1.ui.util.EventDispatcher;
  * A tab is represented by an index corresponding
  * to the position it was added in, where the first tab has an index equal to 0
  * and the last tab has an index equal to the tab count minus 1.
+ * </p>
  * <p>
  * The <code>Tabs</code> uses a <code>SingleSelectionModel</code>
  * to represent the set of tab indices and the currently selected index.
  * If the tab count is greater than 0, then there will always be a selected
  * index, which by default will be initialized to the first tab.
  * If the tab count is 0, then the selected index will be -1.
- * <p>
+ * </p>
+ * <p>A simple {@code Tabs} sample looks a bit like this:</p>
+ * <script src="https://gist.github.com/codenameone/ba27124a0a25e685b123.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs.png" alt="Simple usage of Tabs" />
+ * 
+ * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the 
+ * form and swiping is used to move between pages:</p>
+ * <script src="https://gist.github.com/codenameone/e981c3f91f98f1515987.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe1.png" alt="Tabs carousel page 1" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe2.png" alt="Tabs carousel page 2" />
+ * 
  *
  * @author Chen Fishbein
  *

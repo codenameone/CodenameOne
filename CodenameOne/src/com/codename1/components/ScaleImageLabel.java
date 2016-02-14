@@ -29,9 +29,14 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
 /**
- * Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
+ * <p>Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
  * on a label but more convenient for some special circumstances. One major difference is that preferred size
- * equals the image in this case.
+ * equals the image in this case.<br>
+ * The default UIID for this component is "{@code Label}".
+ * </p>
+ * <script src="https://gist.github.com/codenameone/7289bbe5dad9e279eabb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-scaleimage.png" alt="ScaleImageButton and ScaleImageLabel samples" />
+
  *
  * @author Shai Almog
  */
@@ -41,8 +46,10 @@ public class ScaleImageLabel extends Label {
      * Default constructor
      */
     public ScaleImageLabel() {
+        setUIID("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
+        getAllStyles().setBgTransparency(255);
     }
     
     /**
@@ -50,8 +57,10 @@ public class ScaleImageLabel extends Label {
      * @param i image
      */
     public ScaleImageLabel(Image i) {
+        setUIID("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
+        getAllStyles().setBgTransparency(255);
         setIcon(i);
     }
     
@@ -117,9 +126,12 @@ public class ScaleImageLabel extends Label {
      */
     @Override
     public void setUIID(String id) {
+        byte type = getBackgroundType();
         Image icon = getIcon();
         super.setUIID(id); 
         setIcon(icon);
+        getAllStyles().setBackgroundType(type);
+        getAllStyles().setBgTransparency(255);
     }
 
     

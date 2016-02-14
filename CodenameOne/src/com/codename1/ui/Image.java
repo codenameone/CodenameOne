@@ -33,8 +33,8 @@ import java.io.InputStream;
 import java.util.HashMap;
 
 /**
- * Abstracts the underlying platform images allowing us to treat them as a uniform
- * object.
+ * <p>Abstracts the underlying platform images allowing us to treat them as a uniform
+ * object. </p>
  * 
  * @author Chen Fishbein
  */
@@ -578,7 +578,10 @@ public class Image {
     }
 
     /**
-     * Creates a mutable image that may be manipulated using getGraphics
+     * <p>Creates a white opaque mutable image that may be manipulated using {@link #getGraphics()}.<br>
+     * The sample below shows this method being used to create a screenshot for sharing the image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
      * 
      * @param width the image width
      * @param height the image height
@@ -598,7 +601,10 @@ public class Image {
     }
     
     /**
-     * Creates a mutable image that may be manipulated using getGraphics
+     * <p>Creates a mutable image that may be manipulated using {@link #getGraphics()}.<br>
+     * The sample below shows this method being used to create a screenshot for sharing the image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
      * 
      * @param width the image width
      * @param height the image height

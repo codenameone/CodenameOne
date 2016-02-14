@@ -31,8 +31,12 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * Unlike networking, the file system storage mostly tries to emulate java.io.File with
- * some simplifications for mobile devices
+ * <p>Unlike networking, the file system storage mostly tries to emulate java.io.File with
+ * some simplifications for mobile devices.<br>
+ * A lot of API's rely on {@code FileSystemStorage} as its the API native code usually uses consistently.
+ * E.g. in this sample below the {@code FileSystemStorage} is used to save a screenshot image for sharing
+ * on social media:</p>
+ * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
  *
  * @author Shai Almog
  */

@@ -1166,7 +1166,12 @@ public class Util {
     }
 
     /**
-     * Non-blocking method that will download the given URL to storage in the background and return immediately
+     * <p>Non-blocking method that will download the given URL to storage in the background and return 
+     * immediately. This method can be used to fetch data dynamically and asynchronously e.g. in this code it is used
+     * to fetch book covers for the {@link com.codename1.components.ImageViewer}:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/305c3f5426b0e2e80833.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" alt="Image viewer with dynamic URL fetching model" />
      * @param url the URL
      * @param fileName the storage file name
      */

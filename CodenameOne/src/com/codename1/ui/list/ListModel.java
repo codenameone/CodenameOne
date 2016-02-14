@@ -38,7 +38,14 @@ import com.codename1.ui.events.SelectionListener;
  * <script src="https://gist.github.com/codenameone/5161090bcb3684a542ac.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-millionbooks.png" alt="Million books list model" />
  * 
- * @author Chen Fishbein
+  * <p>
+ * A {@code ListModel} can be used in conjunction with an {@link com.codename1.components.ImageViewer}
+ * to fetch images dynamically into the view:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/305c3f5426b0e2e80833.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" alt="Image viewer with dynamic URL fetching model" />
+ * 
+* @author Chen Fishbein
  */
 public interface ListModel<T> {
     
