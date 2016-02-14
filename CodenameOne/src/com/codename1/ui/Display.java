@@ -3148,15 +3148,19 @@ hi.show();}</pre></noscript>
     }
     
     /**
-     * Opens the device gallery
-     * The method returns immediately and the response will be sent asynchronously
-     * to the given ActionListener Object
+     * <p>Opens the device gallery to pick an image or a video.<br>
+     * The method returns immediately and the response is sent asynchronously
+     * to the given ActionListener Object as the source value of the event (as a String)</p>
      * 
-     * use this in the actionPerformed to retrieve the file path
-     * String path = (String) evt.getSource();
+     * <p>E.g. within the callback action performed call you can use this code: {@code String path = (String) evt.getSource();}.<br>
+     * A more detailed sample of picking a video file can be seen here:
+     * </p>
+     * 
+     * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
      * 
      * @param response a callback Object to retrieve the file path
-     * @param type one of the following GALLERY_IMAGE, GALLERY_VIDEO, GALLERY_ALL
+     * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
     public void openGallery(ActionListener response, int type){

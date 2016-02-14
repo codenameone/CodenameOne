@@ -37,6 +37,8 @@ import com.codename1.ui.plaf.Style;
  * The UIID of this class is {@code ScaleImageButton}, the original {@code Button} UIID isn't preserved since it
  * might cause an issue with the border.
  * </p>
+ * <script src="https://gist.github.com/codenameone/7289bbe5dad9e279eabb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-scaleimage.png" alt="ScaleImageButton and ScaleImageLabel samples" />
  *
  * @author Shai Almog
  */
