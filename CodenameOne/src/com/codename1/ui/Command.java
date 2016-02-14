@@ -310,4 +310,24 @@ public class Command implements ActionListener{
             clientProperties.put(key, value);
         }
     }
+    
+    /**
+     * Creates a new command instance that encapsulates the action listener and details, the main
+     * value of this approach is in our ability to write commands using the shorthand lambda syntax
+     * of Java 8.
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public static Command create(String name, Image icon, final ActionListener ev) {
+        Command cmd = new Command(name) {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                ev.actionPerformed(evt);
+            }
+        };
+        cmd.setIcon(icon);
+        return cmd;
+    }
 }

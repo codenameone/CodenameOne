@@ -37,9 +37,23 @@ import java.util.Vector;
 
 
 /**
- * Button is the base class for several UI widgets allowing clickability.
- * It has 3 states: rollover, pressed and the default state it 
- * can also have ActionListeners that react when the Button is clicked.
+ * <p>Button is the base class for several UI widgets allowing clickability.
+ * It has 3 states: rollover, pressed and the default state. {@code Button}
+ * can also have an {@link com.codename1.ui.events.ActionListener} that react when the 
+ * {@code Button} is clicked or handle actions via a 
+ * {@link com.codename1.ui.Command}.<br>
+ * Button has the "Button" UIID by default.</p>
+ * <p>
+ * Here is trivial usage of the {@code Button} API:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/99cdefe0c73096ebdbfb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-button.png" alt="Simple Button" />
+ * 
+ * <p>
+ * This code shows a common use case of making a button look like a hyperlink
+ * </p>
+ * <script src="https://gist.github.com/codenameone/2627b4edc5d3d340ce90.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-link-button.png" alt="Hyperlink Button" />
  * 
  * @author Chen Fishbein
  */

@@ -247,6 +247,10 @@ public class Dialog extends Form {
         deregisterAnimated(this);
     }
 
+    @Override
+    void initGlobalToolbar() {
+    }
+
     public Container getContentPane() {
         return dialogContentPane;
     }
