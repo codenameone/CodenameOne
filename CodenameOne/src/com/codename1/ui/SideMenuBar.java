@@ -103,7 +103,7 @@ public class SideMenuBar extends MenuBar {
      * putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
      */
     public static final String COMMAND_ACTIONABLE = "Actionable";
-    
+        
     /**
      * Empty Constructor
      */
@@ -268,6 +268,8 @@ public class SideMenuBar extends MenuBar {
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
                             openMenu(null, 0, draggedX, false);
+                            initialDragX = 0;
+                            initialDragY = 0;
                         }
                         return;
                     }
@@ -288,6 +290,8 @@ public class SideMenuBar extends MenuBar {
                             }else{
                                 openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX, false);
                             }
+                            initialDragX = 0;
+                            initialDragY = 0;
                         }
                     }
                     if (topSwipePotential) {
@@ -303,6 +307,8 @@ public class SideMenuBar extends MenuBar {
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
                             openMenu(COMMAND_PLACEMENT_VALUE_TOP, 0, draggedX, false);
+                            initialDragX = 0;
+                            initialDragY = 0;
                         }
                     }
                 }
@@ -1681,12 +1687,31 @@ public class SideMenuBar extends MenuBar {
             
             public void run() {
                 if(Display.getInstance().isEdt()) {
-                    ActionEvent e = new ActionEvent(cmd,ActionEvent.Type.Command);
+                    ActionEvent e = new ActionEvent(cmd, ActionEvent.Type.Command);
+                    if (cmd instanceof NavigationCommand) {
+                        parent.getContentPane().setVisible(true);
+                        final Form nextForm = ((NavigationCommand) cmd).getNextForm();
+                        if (nextForm != null) {
+                            final Transition out = parent.getTransitionOutAnimator();
+                            final Transition in = nextForm.getTransitionInAnimator();
+                            parent.setTransitionOutAnimator(CommonTransitions.createEmpty());
+                            nextForm.setTransitionInAnimator(CommonTransitions.createEmpty());
+                            nextForm.addShowListener(new ActionListener() {
+
+                                public void actionPerformed(ActionEvent evt) {
+                                    parent.setTransitionOutAnimator(out);
+                                    nextForm.setTransitionInAnimator(in);
+                                    nextForm.removeShowListener(this);
+                                }
+                            });
+                        }
+                    }
                     parent.dispatchCommand(cmd, e);
+
                     return;
                 }
 
-                synchronized(LOCK) {
+                synchronized (LOCK) {
                     while (Display.getInstance().getCurrent() != parent) {
                         try {
                             LOCK.wait(40);
@@ -1709,6 +1734,15 @@ public class SideMenuBar extends MenuBar {
             if (transitionRunning) {
                 return;
             }
+            //if this is a navigation command clear the current Form to make the 
+            //transition more pleasent
+            if(cmd instanceof NavigationCommand){
+                rightPanel.getStyle().setBgImage(null);
+                parent.getContentPane().setVisible(false);
+                Image img = updateRightPanelBgImage(((MenuTransition)parent.getTransitionInAnimator()).placement, parent);
+                rightPanel.getStyle().setBgImage(img);
+            }
+            
             closeMenu();
             clean();
             parent.addShowListener(pointerDragged);

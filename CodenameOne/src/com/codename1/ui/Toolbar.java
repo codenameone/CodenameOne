@@ -382,6 +382,10 @@ public class Toolbar extends Container {
         }
         menu.setTransitionOutAnimator(transitionIn);
         menu.setTransitionInAnimator(transitionOut);
+        if(isRTL()){
+            marginRight = marginLeft;
+            marginLeft = 0;
+        }
         return menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
     }
 
