@@ -35,6 +35,10 @@ public class StringUtil {
 
     
     private static CodenameOneImplementation impl;
+    
+    /**
+     * @deprecated exposed as part of an internal optimization, this method isn't meant for general access
+     */
     public static void setImplementation(CodenameOneImplementation i) {
         impl = i;
     }
