@@ -63,6 +63,7 @@ import java.util.Map;
  * 
  * <p>See this sample for showing a dialog at the bottom of the screen:</p>
  * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-dialog-modal-south.png" alt="Dialog South" />
  *
  * @author Shai Almog
  * @see Display#invokeAndBlock(java.lang.Runnable) 

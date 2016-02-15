@@ -52,6 +52,7 @@ import com.codename1.ui.util.WeakHashMap;
  * the background while the infinite progress rotates:
  * </p>
  *<script src="https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/infinite-progress.png" alt="InfiniteProgress">
  * 
  * @author Shai Almog
  */

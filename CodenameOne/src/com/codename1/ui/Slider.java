@@ -33,9 +33,10 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * The slider component serves both as a slider widget to allow users to select
+ * <p>The slider component serves both as a slider widget to allow users to select
  * a value on a scale via touch/arrows and also to indicate progress. The slider
- * defaults to percentage display but can represent any positive set of values.
+ * defaults to percentage display but can represent any positive set of values.</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/slider.png" alt="Sample Slider" />
  *
  * @author Shai Almog
  */

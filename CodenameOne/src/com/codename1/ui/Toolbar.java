@@ -40,10 +40,16 @@ import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
 /**
- * Toolbar replaces the default title area with a powerful abstraction that allows functionality ranging
+ * <p>Toolbar replaces the default title area with a powerful abstraction that allows functionality ranging
  * from side menus (hamburger) to title animations and any arbitrary component type. Toolbar allows
- * customizing the Form title with different commands on the title area, within the side menu or the overflow menu.
- *
+ * customizing the Form title with different commands on the title area, within the side menu or the overflow menu.</p>
+ * 
+ * <p>
+ * The Toolbar allows placing components in one of 4 positions as illustrated by the sample below:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/e72cfa6aedd7fcd1af72.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar.png" alt="Simple usage of Toolbar" />
+  *
  * @author Chen
  */
 public class Toolbar extends Container {

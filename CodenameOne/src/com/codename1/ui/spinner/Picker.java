@@ -39,9 +39,17 @@ import java.util.Calendar;
 import java.util.Date;
 
 /**
- * The picker is a component and API that allows either poping up a spinner or
+ * <p>{@code Picker} is a component and API that allows either popping up a spinner or
  * using the native picker API when applicable. This is quite important for some
- * platforms where the native spinner behavior is very hard to replicate.
+ * platforms where the native spinner behavior is very hard to replicate.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/5e437d82812dfcbdf092.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker.png" alt="Picker UI" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-date-time-on-simulator.png" alt="Date And Time Picker On the simulator" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-date-android.png" alt="Android native date picker" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-strings-android.png" alt="Android native String picker" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-time-android.png" alt="Android native time picker" />
+ * 
  *
  * @author Shai Almog
  */

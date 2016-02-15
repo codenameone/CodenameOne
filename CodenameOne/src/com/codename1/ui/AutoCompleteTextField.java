@@ -31,8 +31,16 @@ import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 
 /**
- * This class is an editable TextField with predefined completion suggestion 
- * that shows up in a drop down menu while the user types in text
+ * <p>An editable {@link com.codename1.ui.TextField} with completion suggestions 
+ * that show up in a drop down menu while the user types in text. <br>
+ * This class uses the "{@code TextField}" UIID by default as well as "{@code AutoCompletePopup}" &amp;
+ * "{@code AutoCompleteList}" for the popup list details.<br>
+ * The sample below shows the more trivial use case for this widget:
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/7e4dc757971e460e5823.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-autocomplete.png" alt="Simple usage of auto complete" />
+ * 
  *
  * @author Chen
  */

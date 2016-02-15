@@ -39,11 +39,14 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
 /**
- * Unlike a regular dialog the interaction dialog only looks like a dialog,
+ * <p>Unlike a regular dialog the interaction dialog only looks like a dialog,
  * it resides in the layered pane and can be used to implement features where 
  * interaction with the background form is still required.<br>
  * Since this code is designed for interaction all "dialogs" created thru here are
- * modless and never block.
+ * modless and never block.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/d1db2033981c835fb925.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-interaction-dialog.png" alt="InteractionDialog Sample" />
  *
  * @author Shai Almog
  */
