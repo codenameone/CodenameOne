@@ -1,9 +1,6 @@
 package com.codename1.tools.translator;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 
 /**
  * Created by san on 2/13/16.
@@ -49,7 +46,7 @@ public class ConcatenatingFileOutputSteeam extends java.io.OutputStream {
             if (dest == null || dest[i].size() ==0) {
                 destFile.delete();
             } else {
-                PreservingFileOutputStream pfos = new PreservingFileOutputStream(destFile);
+                FileOutputStream pfos = new FileOutputStream(destFile);
                 pfos.write(byteArrayOutputStream.toByteArray());
                 pfos.close();
             }
