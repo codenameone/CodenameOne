@@ -398,7 +398,7 @@ public class Parser extends ClassVisitor {
             generateClassAndMethodIndexHeader(outputDirectory);
 
             boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
-            ConcatenatingFileOutputSteeam cos = concatenate ? new ConcatenatingFileOutputSteeam(outputDirectory) : null;
+            ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
 
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
@@ -579,14 +579,14 @@ public class Parser extends ClassVisitor {
         return false;
     }
 
-    private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputSteeam writeBufferInstead) throws Exception {
+    private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputStream writeBufferInstead) throws Exception {
         OutputStream outMain =
                 writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS ?
                         writeBufferInstead :
                         new FileOutputStream(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()));
 
-        if (outMain instanceof ConcatenatingFileOutputSteeam) {
-            ((ConcatenatingFileOutputSteeam)outMain).beginNextFile(cls.getClsName());
+        if (outMain instanceof ConcatenatingFileOutputStream) {
+            ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
         }
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
             outMain.write(cls.generateCCode(classes).getBytes());
