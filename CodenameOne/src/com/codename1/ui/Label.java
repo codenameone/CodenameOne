@@ -464,7 +464,11 @@ public class Label extends Component {
         int cmpWidth = getWidth();
         Style s = getStyle();
         Font f = s.getFont();
-        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, text, 
+        String t = text;
+        if(text == null) { 
+            t = "";
+        }
+        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, t, 
                 icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
                 endsWith3Points, valign);
     }
