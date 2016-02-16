@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import static com.codename1.ui.Container.enableLayoutOnPaint;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -268,6 +269,7 @@ public class Tabs extends Container {
                     component.paintLockRelease();
                 }
                 slideToDestMotion = null;
+                enableLayoutOnPaint = true;
                 deregisterAnimatedInternal();
                 setSelectedIndex(active);
             }
@@ -1291,6 +1293,7 @@ public class Tabs extends Container {
                                 component.setX(component.getX() + diffX);
                                 component.paintLock(false);
                             }
+                            enableLayoutOnPaint = false;
                             repaint();
                         }
                     }
