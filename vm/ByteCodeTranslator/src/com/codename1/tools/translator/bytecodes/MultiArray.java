@@ -93,13 +93,13 @@ public class MultiArray extends Instruction {
         }*/
         switch(actualDim) {
             case 2:
-                b.append("    PUSH_OBJ(alloc2DArray(threadStateData, (*pop(stack, &stackPointer)).data.i, ");
+                b.append("    PUSH_OBJ(alloc2DArray(threadStateData, (*(--SP)).data.i, ");
                 switch(dims) {
                     case 1:
                         b.append("-1");
                         break;
                     case 2:
-                        b.append("(*pop(stack, &stackPointer)).data.i");
+                        b.append("(*(--SP)).data.i");
                         break;
                 }
                 b.append(", &class_array2__");
