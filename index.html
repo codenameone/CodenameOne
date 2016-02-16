@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Codename One by codenameone</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Codename One</h1>
+        <h2>Write once run anywhere native mobile apps using a subset of Java 8</h2>
+        <a href="https://github.com/codenameone/CodenameOne" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h1>
+<a id="codename-one" class="anchor" href="#codename-one" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Codename One</h1>
+
+<h2>
+<a id="write-once-run-anywhere-native-mobile-apps-using-java" class="anchor" href="#write-once-run-anywhere-native-mobile-apps-using-java" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Write Once Run Anywhere Native Mobile Apps Using Java</h2>
+
+<p><img align="right" src="http://codenameone.com/img/phones.png" height="250"></p>
+
+<p>Codename One allows Java developers to write their app once and have it work on all mobile devices (iOS, Android etc.). 
+It features a simulator, designer (visual theme/builder) and ports to multiple OS's.</p>
+
+<p>Codename One is a mature open source project and its roots go back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. </p>
+
+<p>This open source project includes the libraries, native OS ports, resource editor &amp; native VM code for Codename One. It also includes themes and there are separate related projects containing <a href="https://github.com/codenameone/codenameone-demos/">demos</a>, <a href="https://github.com/codenameone/codenameone-skins">skins</a> etc.</p>
+
+<p>Codename One can be extended easily using 3rd party libraries that can include native OS code there is an extensive list of these libraries (cn1libs) <a href="https://www.codenameone.com/cn1libs.html">here</a>.</p>
+
+<p>You can learn more about Codename One and its capabilities at the <a href="http://www.codenameone.com">main site</a> and you can read 
+additional documentation <a href="https://www.codenameone.com/getting-started.html">here</a>.</p>
+
+<p>You can also check out this introduction to Codename One video:</p>
+
+<p><a href="http://www.youtube.com/watch?v=r6VO3zaBJGY" title="Introducing Codename One"><img src="http://img.youtube.com/vi/r6VO3zaBJGY/0.jpg" alt="Introducing Codename One"></a></p>
+
+<h2>
+<a id="setup--getting-started-with-the-code" class="anchor" href="#setup--getting-started-with-the-code" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Setup &amp; Getting Started With The Code</h2>
+
+<p>Setup is covered in depth in <a href="https://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html">this article and video</a>. Notice that this covers debugging the simulator and working with the code for that which requires the Codename One plugin for NetBeans. You can install that by installing NetBeans and typing "Codename One" in the plugin search section see <a href="https://www.codenameone.com/getting-started.html">the getting started tutorial</a>.</p>
+
+<p><a href="http://www.youtube.com/watch?v=2nD75pODPWk" title="Using The Codename One Source Code"><img src="http://img.youtube.com/vi/2nD75pODPWk/0.jpg" alt="Using The Codename One Source Code"></a></p>
+
+<p>While Codename One itself works with all major IDE's the code in this repository was designed to work with NetBeans (ex-Sun guys). </p>
+
+<p><img src="http://codenameone.com/img/NetBeans-logo.png" width="120"></p>
+
+<p><img src="http://codenameone.com/img/intellij_idea-logo.png" width="120"></p>
+
+<p><img src="http://codenameone.com/img/eclipse-logo.png" width="120"></p>
+
+<h2>
+<a id="parparvm" class="anchor" href="#parparvm" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>ParparVM</h2>
+
+<p>Codename One's iOS VM is quite unique and is open source as well. You can read more about it <a href="https://github.com/codenameone/CodenameOne/tree/master/vm">in its dedicated folder in this repository</a>.</p>
+
+<p>ParparVM is a uniquely conservative VM that translates Java bytecode to C code. Thus providing native performance and access while still providing a safety net. This approach is unique to Codename One and is essential for future compatibility!</p>
+
+<p>Apple has a tendency to change things abruptly e.g. 64bit support, bitcode etc. Since ParparVM just generates a standard Xcode project there were no code changes required for any of these tectonic shifts. It's as if you handcoded the project yourself!</p>
+
+<p>More traditional compilers fall flat in these cases, furthermore they can't use Apple's native tools to their full extent e.g. profilers etc.</p>
+
+<h2>
+<a id="getting-help--faq" class="anchor" href="#getting-help--faq" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Getting Help &amp; FAQ</h2>
+
+<p><img align="right" src="http://codenameone.com/img/blog/new_icon.png" height="250">
+We provide support over at <a href="http://stackoverflow.com/tags/codenameone">StackOverflow when you tag using codenameone</a>, you can ask anything there and we try to be pretty responsive. <a href="http://stackoverflow.com/tags/codenameone">The StackOverflow link</a> also serves as an excellent community driven FAQ since it literally maps user questions to answers.</p>
+
+<p>Codename One has a <a href="https://www.codenameone.com/discussion-forum.html">discussion group</a> where you can post questions. However, due to the nature of that group we try to limit discussions over the source. The discussion forum is intended for simpler usage and more complex source code hacks/native compilation might create noise there.</p>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/codenameone/CodenameOne/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/codenameone/CodenameOne/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/codenameone/CodenameOne"></a> is maintained by <a href="https://github.com/codenameone">codenameone</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
