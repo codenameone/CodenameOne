@@ -227,7 +227,7 @@ public class ByteCodeTranslator {
                     return string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
                 }
             });
-            
+
             StringBuilder fileOneEntry = new StringBuilder();
             StringBuilder fileTwoEntry = new StringBuilder();
             StringBuilder fileListEntry = new StringBuilder();
