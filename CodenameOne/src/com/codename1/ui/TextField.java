@@ -54,6 +54,13 @@ import java.util.Vector;
  * <script src="https://gist.github.com/codenameone/fb63dd5d6efdb95932be.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-text-component.png" alt="Text field input sample" />
  * 
+ * <p>
+ * The following code demonstrates a more advanced search widget where the data is narrowed as we type
+ * directly into the title area search. Notice that the {@code TextField} and its hint are styled to look like the title.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/dce6598a226aaf9a3157.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-search.png" alt="Dynamic TextField search using the Toolbar" />
+ * 
  * @author Shai Almog
  */
 public class TextField extends TextArea {
