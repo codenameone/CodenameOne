@@ -3965,8 +3965,9 @@ public class Component implements Animation, StyleListener {
         
         
         Painter bgp = getStyle().getBgPainter();
-        animateBackground = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
-
+        boolean animateBackgroundB = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
+        animateBackground = animateBackgroundB || animateBackground;
+                
         if(getUIManager().getLookAndFeel().isFadeScrollBar()) {
             if(tensileHighlightIntensity > 0) {
                 tensileHighlightIntensity = Math.max(0, tensileHighlightIntensity - (scrollOpacityChangeSpeed * 2));
