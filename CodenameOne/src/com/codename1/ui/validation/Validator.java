@@ -335,6 +335,10 @@ public class Validator {
             constraintList.put(cmp, new GroupConstraint(c));
         }
         bindDataListener(cmp);
+        boolean isV = isValid();
+        for(Component btn : submitButtons) {
+            btn.setEnabled(isV);
+        }
         return this;
     }
     
@@ -454,7 +458,7 @@ public class Validator {
         if(cmp instanceof CheckBox || cmp instanceof RadioButton) {
             ((Button)cmp).addActionListener(new ComponentListener(cmp));
             return;
-        }
+        } 
     }
 
     /**
@@ -500,11 +504,16 @@ public class Validator {
     void setValid(Component cmp, boolean v) {
         Boolean b = (Boolean)cmp.getClientProperty(VALID_MARKER);
         if(b != null && b.booleanValue() == v) {
-            for(Component c : submitButtons) {
-                c.setEnabled(b.booleanValue());
+            /*
+            if (!v) {
+                for(Component c : submitButtons) {
+                    c.setEnabled(false);
+                }
             }
+            */
             return;
         }
+        cmp.putClientProperty(VALID_MARKER, v);
         if(!v) {
             // if one component is invalid... just disable the submit buttons
             for(Component c : submitButtons) {
@@ -519,7 +528,7 @@ public class Validator {
                 message.dispose();
             }
         }
-        cmp.putClientProperty(VALID_MARKER, v);
+        
         if(validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
             if(!(cmp.getComponentForm().getGlassPane() instanceof ComponentListener)) {
                 cmp.getComponentForm().setGlassPane(new ComponentListener(null));
