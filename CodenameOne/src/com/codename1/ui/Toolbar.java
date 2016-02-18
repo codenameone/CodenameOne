@@ -49,7 +49,23 @@ import java.util.Vector;
  * </p>
  * <script src="https://gist.github.com/codenameone/e72cfa6aedd7fcd1af72.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar.png" alt="Simple usage of Toolbar" />
-  *
+ *  
+ * <p>
+ * The following code demonstrates a more advanced search widget where the data is narrowed as we type
+ * directly into the title area search. Notice that the {@code TextField} and its hint are styled to look like the title.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/dce6598a226aaf9a3157.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-search.png" alt="Dynamic TextField search using the Toolbar" />
+ * 
+ * <p>
+ * This sample code show off title animations that allow a title to change (and potentially shrink) as the user scrolls
+ * down the UI.  The 3 frames below show a step by step process in the change.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/085e3a8fa1c36829d812.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-1.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-2.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-3.png" alt="Toolbar animation stages" />
+ * 
  * @author Chen
  */
 public class Toolbar extends Container {

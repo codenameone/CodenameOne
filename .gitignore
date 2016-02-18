@@ -1,4 +1,5 @@
 /CodenameOne/nbproject/private/
+/CodenameOne/javadoc/
 /CodenameOneDesigner/nbproject/private/
 /Ports/Android/nbproject/private/
 /Ports/BlackBerryOS_4_2/nbproject/private/
@@ -40,3 +41,6 @@ Ports/iOSPort/nbproject/private/private.properties
 CodenameOne/build.xml
 CodenameOne/build.xml
 Ports/iOSPort/nbproject/private/private.properties
+/Ports/JavaSEWithSVGSupport/nbproject/private/
+/Ports/JavaSEWithSVGSupport/build/
+/Ports/JavaSEWithSVGSupport/dist/
