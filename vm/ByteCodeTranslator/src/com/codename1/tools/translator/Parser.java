@@ -367,6 +367,10 @@ public class Parser extends ClassVisitor {
     
     public static void writeOutput(File outputDirectory) throws Exception {
         System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
+        if(ByteCodeClass.getMainClass()==null){
+			System.out.println("Error main class is not defined. The main class name is expected to have a public static void main(String[]) method and it is assumed to reside in the com.package.name directory");
+			System.exit(1);
+		}
         String file = "Unknown File";
         try {
             for(ByteCodeClass bc : classes) {
@@ -378,7 +382,12 @@ public class Parser extends ClassVisitor {
                 bc.setBaseClassObject(getClassByName(bc.getBaseClass()));
                 List<ByteCodeClass> lst = new ArrayList<ByteCodeClass>();
                 for(String s : bc.getBaseInterfaces()) {
-                    lst.add(getClassByName(s));
+					ByteCodeClass bcode=getClassByName(s);
+					if(bcode==null){
+					  System.out.println("Error while working with the class: " + s+" file:"+file+" no class definition");
+					} else {
+						lst.add(getClassByName(s));
+					}
                 }
                 bc.setBaseInterfacesObject(lst);
             }

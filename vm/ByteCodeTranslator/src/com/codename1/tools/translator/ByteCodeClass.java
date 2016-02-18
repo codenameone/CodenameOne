@@ -67,7 +67,9 @@ public class ByteCodeClass {
     public ByteCodeClass(String clsName) {
         this.clsName = clsName;
     }
-
+    static ByteCodeClass getMainClass() {
+		return mainClass;
+    }
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
             if (mainClass == null) {
