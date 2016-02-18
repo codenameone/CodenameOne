@@ -753,7 +753,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         Dimension d = getListPreferredSizeImpl(l);
         Style style = l.getStyle();
         if(style.getBorder() != null) {
-            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
+            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth() + l.getSideGap()));
             d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
         }
         return d;
