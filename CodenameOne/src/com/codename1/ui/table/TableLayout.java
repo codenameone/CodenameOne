@@ -369,8 +369,12 @@ public class TableLayout extends Layout {
      * @return the component instance
      */
     public Component getComponentAt(int row, int column) {
-        Constraint  c =tablePositions[row * columns + column];
-        return c != null ? c.parent : null;
+        int pos = row * columns + column;
+        if(pos > -1 && pos < tablePositions.length) {
+            Constraint  c =tablePositions[pos];
+            return c != null ? c.parent : null;
+        } 
+        return null;
     }
 
     /**
@@ -725,7 +729,8 @@ public class TableLayout extends Layout {
     }
 
     private void addRow() {
-        Constraint[] newArr = new Constraint[(rows + 1) * columns];
+        rows++;
+        Constraint[] newArr = new Constraint[rows * columns];
         System.arraycopy(tablePositions, 0, newArr, 0, tablePositions.length);
         tablePositions = newArr;
     }

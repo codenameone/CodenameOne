@@ -102,6 +102,7 @@ public abstract class LookAndFeel {
      */
     private int defaultSmoothScrollingSpeed = 150;
 
+    private boolean scrollVisible;
     private boolean fadeScrollEdge;
     private boolean fadeScrollBar;
     private int fadeScrollBarSpeed = 5;
@@ -911,6 +912,7 @@ public abstract class LookAndFeel {
         Toolbar.setGlobalToolbar(manager.isThemeConstant("globalToobarBool", Toolbar.isGlobalToolbar()));
         
         boolean isTouch = Display.getInstance().isTouchScreenDevice();
+        scrollVisible = manager.isThemeConstant("scrollVisibleBool", true);
         fadeScrollEdge = manager.isThemeConstant("fadeScrollEdgeBool", false);
         fadeScrollEdgeLength = manager.getThemeConstant("fadeScrollEdgeInt", fadeScrollEdgeLength);
         fadeScrollBar = manager.isThemeConstant("fadeScrollBarBool", false);
@@ -1373,6 +1375,13 @@ public abstract class LookAndFeel {
         return fadeScrollBarSpeed;
     }
 
+    /**
+     * @return scrollVisible
+     */ 
+    public boolean isScrollVisible() {
+        return scrollVisible;
+    }
+    
     /**
      * @param fadeScrollBarSpeed the fadeScrollBarSpeed to set
      */

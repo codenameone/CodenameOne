@@ -1637,16 +1637,20 @@ public class List<T> extends Component {
     }
 
     /**
-     * The rendering prototype is optionally used in calculating the size of the
+     * <p>The rendering prototype is optionally used in calculating the size of the
      * List and is recommended for performance reasons. You should invoke it with an object
      * representing a theoretical value in the list which will be used to calculate
-     * the size required for each element in the list.
+     * the size required for each element in the list.</p>
      * <p>This allows list size calculations to work across look and feels and allows
-     * developers to predetermin size for list elements.
+     * developers to predetermine size for list elements.</p>
      * <p>e.g. For a list of Strings which you would like to always be 5 characters wide
      * you can use a prototype "XXXXX" which would use the preferred size of the XXXXX
      * String to determine the size of the list element. E.g. for a list of dates you can use
-     * new Date(30, 12, 00) etc..
+     * new Date(30, 12, 00) etc..</p>
+     * <p>The example below was designed for {@link com.codename1.ui.list.MultiList} but
+     * should work for any list. Its goal is to render 2 lines of text with 20 characters and a 
+     * 5mm square icon:</p>
+     * <script src="https://gist.github.com/codenameone/dc9c7f13f6b312d1edc8.js"></script>
      *
      * @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
      * size of a list component.
