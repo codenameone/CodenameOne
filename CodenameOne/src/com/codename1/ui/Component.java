@@ -429,6 +429,8 @@ public class Component implements Animation, StyleListener {
         alwaysTensile = laf.isDefaultAlwaysTensile();
         tensileHighlightEnabled = laf.isDefaultTensileHighlight();
         scrollOpacityChangeSpeed = laf.getFadeScrollBarSpeed();
+        isScrollVisible = laf.isScrollVisible();
+        
         if(tensileHighlightEnabled) {
             tensileLength = 3;
         } else {
