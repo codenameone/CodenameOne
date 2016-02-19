@@ -1087,7 +1087,37 @@ public final class Graphics {
      * @param h coordinate to tile the image along 
      */
     public void tileImage(Image img, int x, int y, int w, int h) {
-        impl.tileImage(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h);
+        if(img.requiresDrawImage()) {
+            int iW = img.getWidth();
+            int iH = img.getHeight();
+            int clipX = getClipX();
+            int clipW = getClipWidth();
+            int clipY = getClipY();
+            int clipH = getClipHeight();
+            clipRect(x, y, w, h);
+            for (int xPos = 0; xPos <= w; xPos += iW) {
+                for (int yPos = 0; yPos < h; yPos += iH) {
+                    int actualX = xPos + x;
+                    int actualY = yPos + y;
+                    if(actualX > clipX + clipW) {
+                        continue;
+                    }
+                    if(actualX + iW < clipX) {
+                        continue;
+                    }
+                    if(actualY > clipY + clipH) {
+                        continue;
+                    }
+                    if(actualY + iH < clipY) {
+                        continue;
+                    }
+                    drawImage(img, actualX, actualY);
+                }
+            }
+            setClip(clipX, clipY, clipW, clipH);
+        } else {
+            impl.tileImage(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h);
+        }
     }
     
     /**
