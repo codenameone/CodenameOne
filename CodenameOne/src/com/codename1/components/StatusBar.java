@@ -62,7 +62,8 @@ import java.util.TimerTask;
  * <h3>Status With Multi-Line Message</h3>
  * <p><img src="https://cloud.githubusercontent.com/assets/2677562/13191729/9108cf22-d71a-11e5-86d6-d5c752826596.png"/></p>
  * 
- * 
+ * <h2>Video Demos</h2>
+ * <p><a href="https://youtu.be/SMhqQ1xvfz0">30 Second Screencast Demo of Status Bar Component</a></p>
  * 
  * @author shannah
  */
