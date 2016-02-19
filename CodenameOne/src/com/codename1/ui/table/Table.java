@@ -762,7 +762,7 @@ public class Table extends Container {
             return null;
         }
         if(name.equals("header")) {
-            setModel(new DefaultTableModel((String[])value, ((DefaultTableModel)model).data));
+            setModel(new DefaultTableModel((String[])value, ((DefaultTableModel)model).data, ((DefaultTableModel)model).editable));
             return null;
         }
         return super.setPropertyValue(name, value);
@@ -800,11 +800,14 @@ public class Table extends Container {
             }
 
             Component c = t.getComponentAt(row, column);
-            removeComponent(c);
+            if(c != null) {
+                removeComponent(c);
+                
+                // a repaint sent right before this might result in an artifact for some use cases so
+                // removing visibility essentially cancels repaints
+                c.setVisible(false);
+            }
 
-            // a repaint sent right before this might result in an artifact for some use cases so
-            // removing visibility essentially cancels repaints
-            c.setVisible(false);
             addComponent(con, cell);
             layoutContainer();
             cell.requestFocus();
