@@ -373,7 +373,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
                 
             case Opcodes.LSHL:
-                b.append("    SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.l)); /* LSHL */\n");
+                b.append("    SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.i)); /* LSHL */\n");
                 break;
                 
             case Opcodes.ISHR:
