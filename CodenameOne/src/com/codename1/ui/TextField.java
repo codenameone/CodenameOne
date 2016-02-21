@@ -44,6 +44,7 @@ import java.util.Vector;
  *    <li>Blinking cursor is rendered on {@code TextField} only</li>
  *    <li>{@link com.codename1.ui.events.DataChangeListener} is only available in {@code TextField}. 
  *              This is crucial for character by character input event tracking</li>
+ *    <li>{@link com.codename1.ui.TextField#setDoneListener(com.codename1.ui.events.ActionListener) } is only available in {@code TextField}</li>
  *    <li>Different UIID's ("{@code TextField}" vs. "{@code TextArea}") </li>
  * </ul>
  * 
