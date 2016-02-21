@@ -43,13 +43,13 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * An API to present status messages to the user in an unubtrusive manner.  This is useful if
+ * An API to present status messages to the user in an unobtrusive manner.  This is useful if
  * there are background tasks that need to display information to the user.  E.g. If a network request fails,
  * of let the user know that "Jobs are being synchronized".
  * 
  * <h2>Example Usage</h2>
  * 
- * <script src="https://gist.github.com/shannah/76ac6e3e136fb19124f2.js"></script>
+ * <script src="https://gist.github.com/codenameone/4584f342783169899b34.js"></script>
  * 
  * <h3>Advanced Usage</h3>
  * <p>See the <a href="https://github.com/codenameone/codenameone-demos/blob/master/StatusBarDemo/src/com/codename1/demos/status/StatusBarDemo.java">StatusBarDemo</p>
@@ -57,48 +57,52 @@ import java.util.TimerTask;
  * <h2>Screenshots</h2>
  * 
  * <h3>Status With Progress Bar</h3>
- * <p><img src="https://cloud.githubusercontent.com/assets/2677562/13191694/5db26e12-d71a-11e5-8b21-3058e240910d.png"/></p>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-statusbar.png" alt="Status With Progress Bar" />
  * 
  * <h3>Status With Multi-Line Message</h3>
- * <p><img src="https://cloud.githubusercontent.com/assets/2677562/13191729/9108cf22-d71a-11e5-86d6-d5c752826596.png"/></p>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-statusbar-multiline.png" alt="Status With Multi-Line Message" />
  * 
- * <h2>Video Demos</h2>
- * <p><a href="https://youtu.be/SMhqQ1xvfz0">30 Second Screencast Demo of Status Bar Component</a></p>
+ * <h2>Video Demo</h2>
+ * <iframe width="640" height="480" src="https://www.youtube.com/embed/SMhqQ1xvfz0?rel=0" frameborder="0" allowfullscreen></iframe>
+ * <p>
+ * Note: the video above refers to the {@code ToastBar} based on its development name of StatusBar. This 
+ * was changed to avoid confusion with the iOS StatusBar.
+ * </p>
  * 
  * @author shannah
  */
-public class StatusBar {
+public class ToastBar {
    
     /**
-     * The default UIID that to be used for the status bar component.  This is the 
+     * The default UIID that to be used for the {@code ToastBar} component.  This is the 
      * style of the box that appears at the bottom of the screen.
      */
-    private String defaultUIID="StatusBarComponent";
+    private String defaultUIID="ToastBar";
     
     /**
-     * The default UIID that is to be used for the text in the status bar.
+     * The default UIID that is to be used for the text in the {@code ToastBar}.
      */
-    private String defaultMessageUIID="StatusBarMessage";
+    private String defaultMessageUIID="ToastBarMessage";
     
     
     
-    //FIXME SH Need to style the status bar so that it looks nicer
+    //FIXME SH Need to style the {@code ToastBar} so that it looks nicer
     
-    private static StatusBar instance;
+    private static ToastBar instance;
     
     /**
      * Gets reference to the singleton StatusBar instance
      * @return 
      */
-    public static StatusBar getInstance() {
+    public static ToastBar getInstance() {
         if (instance == null) {
-            instance = new StatusBar();
+            instance = new ToastBar();
             
         }
         return instance;
     }
     
-    private StatusBar(){
+    private ToastBar(){
         
     }
     
@@ -110,8 +114,8 @@ public class StatusBar {
     private final ArrayList<Status> statuses = new ArrayList<Status>();
 
     /**
-     * Gets the default UIID to be used for the style of the Status Bar component.
-     * By default this is "StatusBarComponent".
+     * Gets the default UIID to be used for the style of the {@code ToastBar} component.
+     * By default this is "ToastBarComponent".
      * @return the defaultUIID
      */
     public String getDefaultUIID() {
@@ -119,8 +123,8 @@ public class StatusBar {
     }
 
     /**
-     * Sets the defaults UIID to be used for the style of the Status Bar component.  By default
-     * this is "StatusBarComponent"
+     * Sets the defaults UIID to be used for the style of the {@code ToastBar} component.  By default
+     * this is "ToastBarComponent"
      * @param defaultUIID the defaultUIID to set
      */
     public void setDefaultUIID(String defaultUIID) {
@@ -128,8 +132,8 @@ public class StatusBar {
     }
 
     /**
-     * Gets the default UIID to be used for the style of the Status Bar text.  By default
-     * this is "StatusBarMessage"
+     * Gets the default UIID to be used for the style of the {@code ToastBar} text.  By default
+     * this is "ToastBarMessage"
      * @return the defaultMessageUIID
      */
     public String getDefaultMessageUIID() {
@@ -137,8 +141,8 @@ public class StatusBar {
     }
 
     /**
-     * Sets the default UIID to be used for the style of the Status Bar text.  By default this is
-     * "StatusBarMessage"
+     * Sets the default UIID to be used for the style of the {@code ToastBar} text.  By default this is
+     * "ToastBarMessage"
      * @param defaultMessageUIID the defaultMessageUIID to set
      */
     public void setDefaultMessageUIID(String defaultMessageUIID) {
@@ -153,13 +157,13 @@ public class StatusBar {
     public class Status {
         
         /**
-         * This UIID that should be used to style the StatusBar text while this
+         * This UIID that should be used to style the ToastBar text while this
          * message is being displayed.
          */
         private String messageUIID=defaultMessageUIID;
         
         /**
-         * The UIID that should be used to style the StatusBar component while 
+         * The UIID that should be used to style the ToastBar component while 
          * this message is being displayed.
          */
         private String uiid=defaultUIID;
@@ -185,7 +189,7 @@ public class StatusBar {
         private Timer showTimer;
         
         /**
-         * The message to be displayed in the status bar.
+         * The message to be displayed in the {@code ToastBar}.
          */
         private String message;
         
@@ -195,7 +199,7 @@ public class StatusBar {
         private int progress=-1;
         
         /**
-         * Optional icon to show in the status bar.  (Not tested or implemented yet).
+         * Optional icon to show in the {@code ToastBar}.  (Not tested or implemented yet).
          */
         private Image icon;
         
@@ -240,7 +244,7 @@ public class StatusBar {
         }
         
         /**
-         * Sets the message that should be displayed in the status bar.
+         * Sets the message that should be displayed in the {@code ToastBar}.
          * @param message 
          */
         public void setMessage(String message) {
@@ -271,7 +275,7 @@ public class StatusBar {
                 showTimer.cancel();
                 showTimer = null;
             }
-            StatusBarComponent c = getStatusBarComponent();
+            ToastBarComponent c = getToastBarComponent();
             if (c != null) {
                 c.currentlyShowing = this;
                 updateStatus();
@@ -422,10 +426,10 @@ public class StatusBar {
     
     
     /**
-     * Updates the StatusBar UI component with the settings of the current status.
+     * Updates the ToastBar UI component with the settings of the current status.
      */
     private void updateStatus() {
-        StatusBarComponent c = getStatusBarComponent();
+        ToastBarComponent c = getToastBarComponent();
         if (c != null) {
             if (updatingStatus) {
                 pendingUpdateStatus = true;
@@ -568,10 +572,10 @@ public class StatusBar {
     }
     
     /**
-     * The actual component for the status bar.  This is added to the layered pane of
+     * The actual component for the {@code ToastBar}.  This is added to the layered pane of
      * the top-level form.
      */
-    private class StatusBarComponent extends Container {
+    private class ToastBarComponent extends Container {
         private TextArea label;
         private InfiniteProgress progressLabel;
         private Slider progressBar;
@@ -580,7 +584,7 @@ public class StatusBar {
         boolean hidden = true;
         Button leadButton = new Button();
         
-        public StatusBarComponent() {
+        public ToastBarComponent() {
             this.getAllStyles().setBgColor(0x0);
             this.getAllStyles().setBackgroundType(Style.BACKGROUND_NONE);
             this.getAllStyles().setBgTransparency(128);
@@ -604,7 +608,7 @@ public class StatusBar {
                     if (currentlyShowing != null && !currentlyShowing.showProgressIndicator ) {
                         currentlyShowing.clear();
                     }
-                    StatusBar.this.setVisible(false);
+                    ToastBar.this.setVisible(false);
                 }
             });
             leadButton.setVisible(false);
@@ -655,14 +659,14 @@ public class StatusBar {
         updateStatus();
     }
     
-    private StatusBarComponent getStatusBarComponent() {
+    private ToastBarComponent getToastBarComponent() {
         Form f = Display.getInstance().getCurrent();
         if (f != null && !(f instanceof Dialog)) {
-            StatusBarComponent c = (StatusBarComponent)f.getClientProperty("StatusBarComponent");
+            ToastBarComponent c = (ToastBarComponent)f.getClientProperty("ToastBarComponent");
             if (c == null) {
-                c = new StatusBarComponent();
+                c = new ToastBarComponent();
                 c.hidden = true;
-                f.putClientProperty("StatusBarComponent", c);
+                f.putClientProperty("ToastBarComponent", c);
                 Container layered = f.getLayeredPane(this.getClass(), true);
                 layered.setLayout(new BorderLayout());
                 layered.addComponent(BorderLayout.SOUTH, c);
@@ -674,11 +678,11 @@ public class StatusBar {
     }
     
     /**
-     * Shows or hides the status bar.
+     * Shows or hides the {@code ToastBar}.
      * @param visible 
      */
     public void setVisible(boolean visible) {
-        StatusBarComponent c = getStatusBarComponent();
+        ToastBarComponent c = getToastBarComponent();
         if (c == null || c.isVisible() == visible) {
             return;
         }

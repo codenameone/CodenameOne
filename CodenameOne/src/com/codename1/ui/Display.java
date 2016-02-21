@@ -61,8 +61,7 @@ import java.util.Timer;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
- * level components ({@link Form}) on the "display". Before any Form is shown the Developer must
- * invoke Display.init(Object m) in order to register the current MIDlet.
+ * level components ({@link Form}) on the "display". 
  * <p>This class handles the main thread for the toolkit referenced here on as the EDT
  * (Event Dispatch Thread) similar to the Swing EDT. This thread encapsulates the platform
  * specific event delivery and painting semantics and enables threading features such as
@@ -547,7 +546,7 @@ public final class Display {
      * This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
      * This method must be called before any Form is shown
      *
-     * @param m the main running MIDlet
+     * @param m platform specific object used by the implementation
      * @deprecated this method is invoked internally do not invoke it!
      */
     public static void init(Object m) {

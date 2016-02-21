@@ -322,27 +322,27 @@ public class UIManager {
         themeProps.put("dis#fgColor", disabledColor);
 
         // component specific settings
-        if (installedTheme == null || !installedTheme.containsKey("StatusBarComponent.derive")) {
-            themeProps.put("StatusBarComponent.margin", "0,0,0,0");
-            themeProps.put("StatusBarComponent.bgColor", "0");
-            themeProps.put("StatusBarComponent.transparency", "200");
-            themeProps.put("StatusBarComponent.bgType", new Byte(Style.BACKGROUND_NONE));
-            themeProps.put("StatusBarComponent.border", Border.createEmpty());
-            themeProps.put("StatusBarComponent.sel#derive", "StatusBarComponent");
-            themeProps.put("StatusBarComponent.press#derive", "StatusBarComponent");
-            themeProps.put("StatusBarComponent.dis#derive", "StatusBarComponent");
+        if (installedTheme == null || !installedTheme.containsKey("ToastBarComponent.derive")) {
+            themeProps.put("ToastBarComponent.margin", "0,0,0,0");
+            themeProps.put("ToastBarComponent.bgColor", "0");
+            themeProps.put("ToastBarComponent.transparency", "200");
+            themeProps.put("ToastBarComponent.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("ToastBarComponent.border", Border.createEmpty());
+            themeProps.put("ToastBarComponent.sel#derive", "ToastBarComponent");
+            themeProps.put("ToastBarComponent.press#derive", "ToastBarComponent");
+            themeProps.put("ToastBarComponent.dis#derive", "ToastBarComponent");
         }
         
-        if (installedTheme == null || !installedTheme.containsKey("StatusBarMessage.derive")) {
+        if (installedTheme == null || !installedTheme.containsKey("ToastBarMessage.derive")) {
             
-            themeProps.put("StatusBarMessage.font", Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL));
-            themeProps.put("StatusBarMessage.transparency", "0");
-            themeProps.put("StatusBarMessage.fgColor", "FFFFFF");
-            themeProps.put("StatusBarMessage.bgType", new Byte(Style.BACKGROUND_NONE));
-            themeProps.put("StatusBarMessage.border", Border.createEmpty());
-            themeProps.put("StatusBarMessage.sel#derive", "StatusBarMessage");
-            themeProps.put("StatusBarMessage.press#derive", "StatusBarMessage");
-            themeProps.put("StatusBarMessage.dis#derive", "StatusBarMessage");
+            themeProps.put("ToastBarMessage.font", Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL));
+            themeProps.put("ToastBarMessage.transparency", "0");
+            themeProps.put("ToastBarMessage.fgColor", "FFFFFF");
+            themeProps.put("ToastBarMessage.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("ToastBarMessage.border", Border.createEmpty());
+            themeProps.put("ToastBarMessage.sel#derive", "ToastBarMessage");
+            themeProps.put("ToastBarMessage.press#derive", "ToastBarMessage");
+            themeProps.put("ToastBarMessage.dis#derive", "ToastBarMessage");
         }
         
         
