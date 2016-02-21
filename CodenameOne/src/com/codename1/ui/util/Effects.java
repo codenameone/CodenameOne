@@ -184,10 +184,22 @@ public class Effects {
     }
     
     
+    /**
+     * Create a blur image from the given image.
+     * The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
+     * 
+     * @param image the image to blur
+     * @param radius the radius to be used in the algorithm
+     */ 
     public static Image gaussianBlurImage(Image image, float radius){
         return Display.getInstance().gaussianBlurImage(image, radius);
     }
     
+    /**
+     * Returns true if gaussian blur is supported on this platform
+     * 
+     * @return true if gaussian blur is supported.
+     */ 
     public static boolean isGaussianBlurSupported(){
         return Display.getInstance().isGaussianBlurSupported();        
     }
