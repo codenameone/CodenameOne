@@ -251,7 +251,38 @@ public class Slider extends Label {
         }
         return("");
     }
-    
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderFullUnselectedStyle() {
+        return sliderFull;
+    }
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full and selected
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderFullSelectedStyle() {
+        return sliderFull;
+    }
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderEmptyUnselectedStyle() {
+        return super.getUnselectedStyle();
+    }
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full and selected
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderEmptySelectedStyle() {
+        return super.getSelectedStyle();
+    }
 
     /**
      * {@inheritDoc}

@@ -414,8 +414,7 @@ public final class CommonTransitions extends Transition {
             if (buffer == null) {
                 buffer = createMutableImage(w, h);
             } else {
-                // this might happen when screen orientation changes or a MIDlet moves
-                // to an external screen
+                // this might happen when screen orientation changes 
                 if(buffer.getWidth() != w || buffer.getHeight() != h) {
                     buffer = createMutableImage(w, h);
                     rgbBuffer = null;

@@ -4435,8 +4435,8 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Used to reduce coupling between the TextArea component and display/implementation
-     * classes thus reduce the size of the hello world MIDlet
+     * Used to reduce coupling between the {@link TextArea} component and display/implementation
+     * classes thus reduce the size of the hello world 
      * 
      * @param text text after editing is completed
      */
