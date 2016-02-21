@@ -154,6 +154,7 @@
         <copy file="../../../codenameone-skins/xoom.skin" todir="src" />
         <copydir src="${project.CodenameOne}/build/classes" dest="build/classes" />
         <unjar src="../../../cn1-binaries/javase/sqlite-jdbc-3.7.15-M1.jar" dest="build/classes" /> 
+        <unjar src="../../../cn1-binaries/javase/Filters.jar" dest="build/classes" /> 
     </target>    
 
     <target name="desktop" depends="jar">

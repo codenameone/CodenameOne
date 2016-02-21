@@ -90,6 +90,10 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -6638,5 +6642,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         n.setBadgeNumber(b.getInt("NOTIF_NUMBER"));
         return n;
     }
+
+    public Image gaussianBlurImage(Image image, float radius) {
+
+        Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
+
+        RenderScript rs = RenderScript.create(activity);
+        ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+        Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
+        Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+        theIntrinsic.setRadius(radius);
+        theIntrinsic.setInput(tmpIn);
+        theIntrinsic.forEach(tmpOut);
+        tmpOut.copyTo(outputBitmap);
+        
+        return new NativeImage(outputBitmap);
+    }
+
+    public boolean isGaussianBlurSupported() {
+        return android.os.Build.VERSION.SDK_INT >= 11;
+    }
+    
     
 }

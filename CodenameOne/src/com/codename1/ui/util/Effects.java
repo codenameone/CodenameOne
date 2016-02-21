@@ -24,6 +24,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import com.codename1.ui.RGBImage;
 
@@ -180,5 +181,14 @@ public class Effects {
         }
         
         return Image.createImage(destinationArray, destinationWidth, destinationHeight);
+    }
+    
+    
+    public static Image gaussianBlurImage(Image image, float radius){
+        return Display.getInstance().gaussianBlurImage(image, radius);
+    }
+    
+    public static boolean isGaussianBlurSupported(){
+        return Display.getInstance().isGaussianBlurSupported();        
     }
 }

@@ -3868,4 +3868,12 @@ hi.show();}</pre></noscript>
     public Media createBackgroundMedia(String uri) throws IOException{
         return impl.createBackgroundMedia(uri);
     }
+
+    public Image gaussianBlurImage(Image image, float radius) {
+        return impl.gaussianBlurImage(image, radius);
+    }
+
+    public boolean isGaussianBlurSupported() {
+        return impl.isGaussianBlurSupported();
+    }
 }
