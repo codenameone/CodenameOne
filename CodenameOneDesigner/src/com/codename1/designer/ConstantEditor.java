@@ -61,6 +61,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("defaultCommandImage", "Image to give a command with no icon");
         helpMap.put("dialogButtonCommandsBool", "Place commands in the dialogs as buttons");
         helpMap.put("dialogPosition", "Place the dialog in an arbitrary border layout position (e.g. North, South, Center etc.)");
+        helpMap.put("dialogBlurRadiusInt", "Sets the default Gaussian blur radius for the background of the dialogs. The default value is -1 indicating no blur");
         helpMap.put("centeredPopupBool", "Popup of the combo box will appear in the center of the screen");
         helpMap.put("changeTabOnFocusBool","Usefull for feature phones, allows changing the tab when the focus changes immediately without pressing a key");
         helpMap.put("checkBoxCheckDisImage","CheckBox image to use instead of Codename One drawing it on its own");

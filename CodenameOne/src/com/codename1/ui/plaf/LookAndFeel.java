@@ -931,6 +931,7 @@ public abstract class LookAndFeel {
         disableColor = Integer.parseInt(manager.getThemeConstant("disabledColor", Integer.toHexString(disableColor)), 16);
         Dialog.setDefaultDialogPosition(manager.getThemeConstant("dialogPosition", Dialog.getDefaultDialogPosition()));
         Dialog.setCommandsAsButtons(manager.isThemeConstant("dialogButtonCommandsBool", Dialog.isCommandsAsButtons()));
+        Dialog.setDefaultBlurBackgroundRadius(manager.getThemeConstant("dialogBlurRadiusInt", (int)Dialog.getDefaultBlurBackgroundRadius()));
 
         List.setDefaultIgnoreFocusComponentWhenUnfocused(manager.isThemeConstant("ignorListFocusBool", List.isDefaultIgnoreFocusComponentWhenUnfocused()));
 

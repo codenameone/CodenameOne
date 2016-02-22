@@ -1893,7 +1893,7 @@ public class Dialog extends Form {
     /**
      * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
      * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
-     * only should be used
+     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
      * @param blurBackgroundRadius the blurBackgroundRadius to set
      */
     public void setBlurBackgroundRadius(float blurBackgroundRadius) {
@@ -1913,7 +1913,7 @@ public class Dialog extends Form {
     /**
      * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
      * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
-     * only should be used
+     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
      * @param aDefaultBlurBackgroundRadius the defaultBlurBackgroundRadius to set
      */
     public static void setDefaultBlurBackgroundRadius(float aDefaultBlurBackgroundRadius) {
