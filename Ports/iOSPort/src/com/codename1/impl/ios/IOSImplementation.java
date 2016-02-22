@@ -1049,6 +1049,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
+    @Override
+    public boolean isGaussianBlurSupported() {
+        return true;
+    }
+
+    @Override
+    public Image gaussianBlurImage(Image image, float radius) {
+        NativeImage im = (NativeImage)image.getImage();
+        NativeImage n = new NativeImage("blurred:" + im.debugText );
+        n.width = im.width;
+        n.height = im.height;
+        n.peer = nativeInstance.gausianBlurImage(im.peer, radius);
+        return Image.createImage(n);
+    }
+
+    
     public Object createImage(byte[] bytes, int offset, int len) {
         int[] wh = widthHeight;
         if(offset != 0 || len != bytes.length) {

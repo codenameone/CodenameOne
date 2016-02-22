@@ -69,7 +69,6 @@ import java.util.Map;
  * @see Display#invokeAndBlock(java.lang.Runnable) 
  */
 public class Dialog extends Form {
-
     /**
      * Indicates whether the dialog has been disposed
      */
@@ -196,6 +195,20 @@ public class Dialog extends Form {
      * its set to a value it biases the system towards a fixed direction for the popup dialog.
      */
     private Boolean popupDirectionBiasPortrait;
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian 
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     */
+    private static float defaultBlurBackgroundRadius = -1;
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian 
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     */
+    private float blurBackgroundRadius = defaultBlurBackgroundRadius;
     
     /**
      * Constructs a Dialog with a title
@@ -1865,5 +1878,62 @@ public class Dialog extends Form {
      */
     public boolean wasDisposedDueToRotation() {
         return disposedDueToRotation;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     * @return the blurBackgroundRadius
+     */
+    public float getBlurBackgroundRadius() {
+        return blurBackgroundRadius;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
+     * @param blurBackgroundRadius the blurBackgroundRadius to set
+     */
+    public void setBlurBackgroundRadius(float blurBackgroundRadius) {
+        this.blurBackgroundRadius = blurBackgroundRadius;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     * @return the defaultBlurBackgroundRadius
+     */
+    public static float getDefaultBlurBackgroundRadius() {
+        return defaultBlurBackgroundRadius;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
+     * @param aDefaultBlurBackgroundRadius the defaultBlurBackgroundRadius to set
+     */
+    public static void setDefaultBlurBackgroundRadius(float aDefaultBlurBackgroundRadius) {
+        defaultBlurBackgroundRadius = aDefaultBlurBackgroundRadius;
+    }
+
+    /**
+     * In case of a blur effect we need to do something different...
+     * {@inheritDoc}
+     */
+    void initDialogBgPainter(Painter p, Form previousForm) {
+        if(getBlurBackgroundRadius() > 0 && Display.impl.isGaussianBlurSupported()) {
+            Image img = Image.createImage(previousForm.getWidth(), previousForm.getHeight());
+            Graphics g = img.getGraphics();
+            previousForm.paintComponent(g, true);
+            img = Display.getInstance().gaussianBlurImage(img, blurBackgroundRadius);
+            getUnselectedStyle().setBgImage(img);
+            getUnselectedStyle().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
+        } else {
+            super.initDialogBgPainter(p, previousForm);
+        }
     }
 }

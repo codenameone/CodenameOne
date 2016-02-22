@@ -37,6 +37,14 @@ import com.codename1.ui.util.EventDispatcher;
  * a value on a scale via touch/arrows and also to indicate progress. The slider
  * defaults to percentage display but can represent any positive set of values.</p>
  * <img src="https://www.codenameone.com/img/developer-guide/slider.png" alt="Sample Slider" />
+ * 
+ * <p>
+ * {@code Slider} is very versatile and can be used to represent things as diverse as the 5 star ranking UI
+ * demonstrated below. Notice that for the UI to work correctly you need to enclose it in a layout that preserves
+ * its preferred size like flow layout.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/fbdde74e699174a16b31.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-slider.png" alt="Star Ranking Slider" />
  *
  * @author Shai Almog
  */
@@ -265,7 +273,7 @@ public class Slider extends Label {
      * @return the Style object that shows a completely full style.
      */
     public Style getSliderFullSelectedStyle() {
-        return sliderFull;
+        return sliderFullSelected;
     }
 
     /**
