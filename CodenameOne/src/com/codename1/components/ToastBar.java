@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -73,6 +74,9 @@ import java.util.TimerTask;
  */
 public class ToastBar {
    
+   
+    private int position = Component.BOTTOM;
+    
     /**
      * The default UIID that to be used for the {@code ToastBar} component.  This is the 
      * style of the box that appears at the bottom of the screen.
@@ -147,6 +151,22 @@ public class ToastBar {
      */
     public void setDefaultMessageUIID(String defaultMessageUIID) {
         this.defaultMessageUIID = defaultMessageUIID;
+    }
+
+    /**
+     * Gets the position of the toast bar on the screen.  Either {@link Component#TOP} or {@link Component#BOTTOM}.
+     * @return the position
+     */
+    public int getPosition() {
+        return position;
+    }
+
+    /**
+     * Sets the position of the toast bar on the screen.  
+     * @param position the position to set Should be one of {@link Component#TOP} and {@link Component#BOTTOM}
+     */
+    public void setPosition(int position) {
+        this.position = position;
     }
 
     
@@ -669,7 +689,7 @@ public class ToastBar {
                 f.putClientProperty("ToastBarComponent", c);
                 Container layered = f.getLayeredPane(this.getClass(), true);
                 layered.setLayout(new BorderLayout());
-                layered.addComponent(BorderLayout.SOUTH, c);
+                layered.addComponent(position==Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();
             }
             return c;
