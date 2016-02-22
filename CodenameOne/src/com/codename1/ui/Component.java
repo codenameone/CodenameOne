@@ -915,6 +915,15 @@ public class Component implements Animation, StyleListener {
             preferredSize = null;
         }
     }
+    
+    /**
+     * This method will remove the Component from its parent.
+     */
+    public void remove(){
+        if(parent != null){
+            parent.removeComponent(this);
+        }
+    }
 
     /**
      * Returns the container in which this component is contained
