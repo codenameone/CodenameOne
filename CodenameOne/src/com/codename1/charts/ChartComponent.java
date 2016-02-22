@@ -46,8 +46,8 @@ import java.util.Queue;
         The <code>charts</code> package enables Codename One developers to add charts
  * and visualizations to their apps without having to include external libraries
  * or embedding web views. We also wanted to harness the new features in the
- * graphics pipeline to maximize performance.</p>  *
-        <h4>Device Support</h4>
+ * graphics pipeline to maximize performance.</p>  
+ *       <h4>Device Support</h4>
  * <p>
  * Since the charts package makes use of 2D transformations and shapes, it
  * requires some of the graphics features that are not yet available on all
@@ -57,8 +57,8 @@ import java.util.Queue;
  * <li>Simulator</li>
  * <li>Android</li>
  * <li>iOS</li>
- * </ol>  *
-        <h4>Features</h4>
+ * </ol>  
+ *       <h4>Features</h4>
  * <ol>
  * <li><strong>Built-in support for many common types of charts</strong>
  * including bar charts, line charts, stacked charts, scatter charts, pie charts
@@ -89,8 +89,8 @@ import java.util.Queue;
  * <img src="https://www.codenameone.com/img/developer-guide/dial_chart.png" alt="Dial Charts">
  * <img src="https://www.codenameone.com/img/developer-guide/combined.png" alt="Combined Charts">
  * <img src="https://www.codenameone.com/img/developer-guide/bubble_chart.png" alt="Bubble Charts">
- * <img src="https://www.codenameone.com/img/developer-guide/time_chart.png" alt="Time Charts">  *
-        <table>
+ * <img src="https://www.codenameone.com/img/developer-guide/time_chart.png" alt="Time Charts">  
+ *       <table>
  * <tbody><tr> <td class="icon"> <i class="fa icon-note" title="Note"></i> </td>
  * <td class="content">
  * The above screenshots were taken from the
@@ -98,8 +98,8 @@ import java.util.Queue;
  * app</a>. Y ou can start playing with this app by checking it out from our git
  * repository. </td> </tr>
  * </tbody>
- * </table>  *
-        <h4>How to Create A Chart</h4>
+ * </table>  
+ *       <h4>How to Create A Chart</h4>
  * <p>
  * Adding a chart to your app involves four steps:</p>
  * <ol>

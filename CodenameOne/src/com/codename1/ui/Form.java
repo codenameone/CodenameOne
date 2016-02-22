@@ -1752,13 +1752,7 @@ public class Form extends Container {
             }
             titleStyle.setMarginUnit(null);
             contentStyle.setMarginUnit(null);
-            if (p instanceof BGPainter && ((BGPainter) p).getPreviousForm() != null) {
-                ((BGPainter) p).setPreviousForm(previousForm);
-            } else {
-                BGPainter b = new BGPainter(this, p);
-                getStyle().setBgPainter(b);
-                b.setPreviousForm(previousForm);
-            }
+            initDialogBgPainter(p, previousForm);
             revalidate();
         }
 
@@ -1776,6 +1770,20 @@ public class Form extends Container {
             Display.getInstance().invokeAndBlock(new RunnableWrapper(this, p, reverse));
             // if the virtual keyboard was opend by the dialog close it
             Display.getInstance().setShowVirtualKeyboard(false);
+        }
+    }
+
+    /**
+     * Allows Dialog to override background painting for blur
+     * @param p the painter
+     */
+    void initDialogBgPainter(Painter p, Form previousForm) {
+        if (p instanceof BGPainter && ((BGPainter) p).getPreviousForm() != null) {
+            ((BGPainter) p).setPreviousForm(previousForm);
+        } else {
+            BGPainter b = new BGPainter(this, p);
+            getStyle().setBgPainter(b);
+            b.setPreviousForm(previousForm);
         }
     }
 
