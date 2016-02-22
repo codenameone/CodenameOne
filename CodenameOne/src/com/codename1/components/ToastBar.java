@@ -53,7 +53,7 @@ import java.util.TimerTask;
  * <script src="https://gist.github.com/codenameone/4584f342783169899b34.js"></script>
  * 
  * <h3>Advanced Usage</h3>
- * <p>See the <a href="https://github.com/codenameone/codenameone-demos/blob/master/StatusBarDemo/src/com/codename1/demos/status/StatusBarDemo.java">StatusBarDemo</p>
+ * <p>See the <a href="https://github.com/codenameone/codenameone-demos/blob/master/ToastBarDemo/src/com/codename1/demos/status/ToastBarDemo.java">StatusBarDemo</a></p>
  * 
  * <h2>Screenshots</h2>
  * 
