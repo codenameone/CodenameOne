@@ -568,7 +568,7 @@ public class EncodedImage extends Image {
         } else {
             if(height < 0) {
                 float ratio = ((float)width) / ((float)getWidth());
-                height = Math.max(1, (int)(getWidth() * ratio));
+                height = Math.max(1, (int)(getHeight() * ratio));
             }
         }
         
