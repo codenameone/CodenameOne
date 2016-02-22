@@ -1964,7 +1964,7 @@ BOOL prefersStatusBarHidden = NO;
         CGRect viewFrame = self.view.frame;
         
         if (keyboardFrame.origin.y > 0) {
-            keyboardSlideOffset = keyboardFrame.origin.y - (editCompoentY + editCompoentH);
+            keyboardSlideOffset = keyboardFrame.origin.y - (editCompoentY + editCompoentH + 10);
         } else {
             keyboardSlideOffset = 0;
         }

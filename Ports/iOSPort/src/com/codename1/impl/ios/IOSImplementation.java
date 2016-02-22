@@ -449,7 +449,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(nativeInstance.isAsyncEditMode()) {
             // revalidate the parent since the size of form is now larger due to the vkb
             final Form current = Display.getInstance().getCurrent();
-            final Component currentEditingFinal = instance.currentEditing;
+            //final Component currentEditingFinal = instance.currentEditing;
             if(current.isFormBottomPaddingEditingMode()) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
@@ -607,8 +607,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             // editing - and should instead revert to legacy editing mode.
             if(asyncEdit && !parentForm.isFormBottomPaddingEditingMode()) {
                 Container p = cmp.getParent();
+                
+                // A crude estimate of how far the component needs to be able to scroll to make 
+                // async editing viable.  We start with half-way down the screen.
+                int keyboardClippingThresholdY = Display.getInstance().getDisplayWidth() / 2;
                 while(p != null) {
-                    if(p.isScrollableY()) {
+                    if(p.isScrollableY()  && p.getAbsoluteY() < keyboardClippingThresholdY) {
                         break;
                     }
                     p = p.getParent();
@@ -671,23 +675,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             final boolean forceSlideUp = forceSlideUpTmp;
             
-            /*
-            if(isAsyncEditMode()) {
-                // revalidate the parent since the size of form is now larger due to the vkb
-                if(current.isFormBottomPaddingEditingMode()) {
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, getInvisibleAreaUnderVKB());
-                            current.forceRevalidate();
-                        }
-                    });
-                } else {
-                    current.revalidate();
-                }
-            } else {
-                cmp.repaint();
-            }*/
             cmp.repaint();
             // give the repaint one cycle to "do its magic...
             final Style stl = currentEditing.getStyle();
