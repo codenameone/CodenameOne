@@ -292,6 +292,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     // just scroll the text field into view and don't want this to happen.
     private int doNotHideTextEditorSemaphore=0;
     
+    /**
+     * A way to get the *actual* root content pane of a form without exposing Form.getActualPane().
+     * @param f The form whose root pane we want.
+     * @return The root pane of the form.  If there is no layered pane, then this should just
+     * return the content pane.  Otherwise it may return the parent of the layered pane and content pane.
+     */
+    private static Container getRootPane(Form f) {
+        Container root = f.getContentPane();
+        Container parent = null;
+        while ((parent = root.getParent()) != null && parent != f) {
+            root = parent;
+        }
+        return root;
+    }
+    
     @Override
     public void hideTextEditor() {
         if (doNotHideTextEditorSemaphore > 0) {
@@ -301,8 +316,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         Form current = getCurrentForm();
-        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && current.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
-            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && getRootPane(current).getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
             current.forceRevalidate();
         } 
         nativeInstance.hideTextEditing();
@@ -347,8 +362,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(f == cmp.getComponentForm()) {
                             cmp.requestFocus();
                         }
-                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && f.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
-                            f.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && getRootPane(f).getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+                            getRootPane(f).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                             f.forceRevalidate();
                             return;
                         } 
@@ -454,8 +469,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (current != null) {
-                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
                             current.revalidate();
                             Display.getInstance().callSerially(new Runnable() {
                                 public void run() {
@@ -797,7 +812,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                         Form current = Display.getInstance().getCurrent();
                         if (current != null && current.isFormBottomPaddingEditingMode()) {
-                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+                            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                         }
                     } else {
                         instance.currentEditing.setText(s);
