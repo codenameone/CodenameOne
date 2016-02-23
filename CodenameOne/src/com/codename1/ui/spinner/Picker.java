@@ -243,7 +243,10 @@ public class Picker extends Button {
     }
     
     /**
-     * Sets the string entries for the string picker
+     * <p>Sets the string entries for the string picker. <br>
+     * sample usage for this method below:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/47602e679f61712693bd.js"></script>
      * @param strs string array
      */
     public void setStrings(String... strs) {
