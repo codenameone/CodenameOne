@@ -1739,7 +1739,7 @@ public class SideMenuBar extends MenuBar {
             if(cmd instanceof NavigationCommand){
                 rightPanel.getStyle().setBgImage(null);
                 parent.getContentPane().setVisible(false);
-                Image img = updateRightPanelBgImage(((MenuTransition)parent.getTransitionInAnimator()).placement, parent);
+                Image img = updateRightPanelBgImage(null, parent);
                 rightPanel.getStyle().setBgImage(img);
             }
             
