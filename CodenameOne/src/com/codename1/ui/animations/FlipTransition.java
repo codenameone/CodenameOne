@@ -33,7 +33,12 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.util.MathUtil;
 
 /**
- * A Transitions that flips between 2 views
+ * <p>A Transitions that flips between 2 components/forms using perspective transform where available.<br>
+ * Notice that this looks rather different on devices as perspective transform is available there but isn't
+ * on the simulator. 
+ * </p>
+ * <script src="https://gist.github.com/codenameone/47602e679f61712693bd.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-flip.jpg" alt="Flip" />
  * 
  * @author Chen, Steve
  */
@@ -125,12 +130,6 @@ public class FlipTransition extends Transition {
             setBgColor(0);
         }
         
-        
-        
-        //flipState = 0f;
-        //motion = Motion.createLinearMotion(0, 180, 500);
-        //motion.start();
-        
         motion = Motion.createLinearMotion(0, 100, duration);
         motion.start();
 
@@ -144,7 +143,7 @@ public class FlipTransition extends Transition {
                 zState = ((float)val)/100f;
                 if ( motion.isFinished() || !perspectiveSupported){
                     transitionState = STATE_FLIP;
-                    motion = Motion.createLinearMotion(0, 180, 500);
+                    motion = Motion.createLinearMotion(0, 180, duration);
                     motion.start();
                 }
                 return true;
@@ -367,6 +366,16 @@ public class FlipTransition extends Transition {
      */
     public void setBgColor(int bgColor) {
         this.bgColor = bgColor;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @param reverse {@inheritDoc}
+     * @return {@inheritDoc}
+     */
+    @Override
+    public Transition copy(boolean reverse) {
+        return new FlipTransition(bgColor, duration);
     }
 
 }
