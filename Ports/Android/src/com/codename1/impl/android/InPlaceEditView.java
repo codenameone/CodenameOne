@@ -699,7 +699,7 @@ public class InPlaceEditView extends FrameLayout {
         addView(mEditText, mEditLayoutParams);
 
         Component nextDown = textArea.nextDown;
-        
+        boolean imeOptionTaken = true;
         if (textArea.isSingleLineTextArea()) {
             if(textArea.getClientProperty("searchField") != null) {
                 mEditText.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
@@ -716,6 +716,7 @@ public class InPlaceEditView extends FrameLayout {
                             mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
                         } else {
                             mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+                            imeOptionTaken = false;
                         }
                     }
                 }
@@ -752,6 +753,10 @@ public class InPlaceEditView extends FrameLayout {
         
         if (textArea.isSingleLineTextArea()) {
             mEditText.setInputType(getAndroidInputType(codenameOneInputType));
+            //if not ime was explicity requested and this is a single line textfield of type ANY add the emoji keyboard.
+            if(!imeOptionTaken && codenameOneInputType == TextArea.ANY){
+                mEditText.setInputType(getAndroidInputType(codenameOneInputType) | InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE);                
+            }
             if(Display.getInstance().getProperty("andAddComma", "false").equals("true") && 
                     (codenameOneInputType & TextArea.DECIMAL) == TextArea.DECIMAL) {
                 mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
