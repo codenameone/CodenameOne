@@ -23,16 +23,18 @@
 
 package com.codename1.ui;
 
-import com.codename1.components.FileEncodedImage;
-import com.codename1.components.StorageImage;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.Callback;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 
 /**
  * <p>{@code URLImage} allows us to create an image from a URL. If the image was downloaded 
@@ -130,7 +132,12 @@ public class URLImage extends EncodedImage {
      * Scales the image to match to fill the area while preserving aspect ratio
      */
     public static final ImageAdapter RESIZE_SCALE_TO_FILL = new ScaleToFill();
-
+    
+    /**
+     * Thread pool used in {@link #createToStorageAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) } and {@link #createToFileSystemAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) }
+     * to download and process images in the background.
+     */
+    private static DownloadThreadPool downloadThreadPool;
     private final EncodedImage placeholder;
     private final String url;
     private final ImageAdapter adapter;
@@ -150,7 +157,7 @@ public class URLImage extends EncodedImage {
         this.storageFile = storageFile;
         this.fileSystemFile = fileSystemFile;
     }
-
+    
     /**
      * Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the 
      * exception that a mask will be applied later on. This adapter requires that the resulting image be in the size
@@ -347,6 +354,268 @@ public class URLImage extends EncodedImage {
     }
     
     /**
+     * Creates an EncodedImage in storage asynchronously.  When the image is ready, it will call the callback's 
+     * onSuccess() or onError() method.  This avoids the use of expensive invokeAndBlock() for the network request.  Note that 
+     * this method doesn't require you to provide a placeholder image, since the image isn't returned (via the callback)
+     * until the image has been received.
+     * 
+     * <h3>Example Usage</h3>
+     * 
+     * <script src="https://gist.github.com/shannah/22565f5128d1f4a6b272.js"></script>
+     * 
+     * @param storageFile The storage file where the image should be saved.
+     * @param url The URL where the image should be downloaded.
+     * @param callback The callback to handle the response.
+     * 
+     * @see #createToStorageAsync(com.codename1.io.ConnectionRequest, java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * @see #createToFileSystemAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * @since 3.4
+     */
+    public static void createToStorageAsync(String storageFile, String url, Callback<Image> callback) {
+        ConnectionRequest req = new ConnectionRequest();
+        req.setPost(false);
+        req.setFailSilently(true);
+        req.setUrl(url);
+        req.setDuplicateSupported(true);
+        createToStorageAsync(req, storageFile, url, callback);
+    }
+    
+    /**
+     * Creates an EncodedImage in storage asynchronously.  When the image is ready, it will call the callback's 
+     * onSuccess() or onError() method.  This avoids the use of expensive invokeAndBlock() for the network request.  Note that 
+     * this method doesn't require you to provide a placeholder image, since the image isn't returned (via the callback)
+     * until the image has been received.
+     * @param req An optional connection request to use for downloading the image from the URL.  
+     * @param storageFile The storage file where the image should be saved.
+     * @param url The URL where the image should be downloaded.
+     * @param callback The callback to handle the response.
+     * 
+     * @see #createToStorageAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * @see #createToFileSystemAsync(com.codename1.io.ConnectionRequest, java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * @since 3.4
+     */
+    public static void createToStorageAsync(final ConnectionRequest req, final String storageFile, final String url, final Callback<Image> callback) {
+        final Storage s = Storage.getInstance();
+        if (s.exists(storageFile)) {
+            addImageDownloadTask(new Runnable() {
+                public void run() {
+                    try {
+                        final Image img = EncodedImage.create(s.createInputStream(storageFile));
+                        Display.getInstance().callSerially(new AsyncCallbackHandler(img, null, callback, 0));
+                    } catch (final Exception ex) {
+                        Display.getInstance().callSerially(new AsyncCallbackHandler(null, ex, callback, 0));
+                    }
+                }
+            });
+        } else if (req != null) {
+            addImageDownloadTask(new Runnable() {
+                public void run() {
+                    req.setUrl(url);
+                    req.setDestinationStorage(storageFile);
+                    
+                    NetworkManager.getInstance().addToQueueAndWait(req);
+                    if (req.getResponseCode() != 200) {
+                        Display.getInstance().callSerially(new AsyncCallbackHandler(null, new IOException("Failed to download image"), callback, req.getResponseCode()));
+                    } else {
+                        if (!s.exists(storageFile)) {
+                            Display.getInstance().callSerially(new AsyncCallbackHandler(null, new IOException("Failed to copy file to storage"), callback, req.getResponseCode()));
+                        } else {
+                            try {
+                                final Image img = EncodedImage.create(s.createInputStream(storageFile));
+                                Display.getInstance().callSerially(new AsyncCallbackHandler(img, null, callback, 0));
+                            } catch (Exception ex) {
+                                Display.getInstance().callSerially(new AsyncCallbackHandler(null, ex, callback, 0));
+                            }
+                        }
+                    }
+                    
+                }
+            });
+        } else {
+            Display.getInstance().callSerially(new AsyncCallbackHandler(null, new IOException("No image found at that storage location"), callback, 0));
+        }
+    }
+    
+    /**
+     * Creates an EncodedImage in the file system asynchronously.  When the image is ready, it will call the callback's 
+     * onSuccess() or onError() method.  This avoids the use of expensive invokeAndBlock() for the network request.  Note that 
+     * this method doesn't require you to provide a placeholder image, since the image isn't returned (via the callback)
+     * until the image has been received. 
+     * 
+     * <h3>Example Usage</h3>
+     * 
+     * <script src="https://gist.github.com/shannah/c866bc87faecfa184080.js"></script>
+     * 
+     * @param file The file where the image should be saved.
+     * @param url The URL where the image should be downloaded.
+     * @param callback The callback to handle the response.
+     * 
+     * @see #createToFileSystemAsync(com.codename1.io.ConnectionRequest, java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * @see #createToStorageAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * 
+     * @since 3.4
+     */
+    public static void createToFileSystemAsync(final String file, final String url, final Callback<Image> callback) {
+        ConnectionRequest req = new ConnectionRequest();
+        req.setPost(false);
+        req.setFailSilently(true);
+        req.setUrl(url);
+        req.setDuplicateSupported(true);
+        createToFileSystemAsync(req, file, url, callback);
+    }
+    
+    /**
+     * Creates an EncodedImage in the file system asynchronously.  When the image is ready, it will call the callback's 
+     * onSuccess() or onError() method.  This avoids the use of expensive invokeAndBlock() for the network request.  Note that 
+     * this method doesn't require you to provide a placeholder image, since the image isn't returned (via the callback)
+     * until the image has been received.
+     * @param req An optional connection request to use for downloading the image from the URL.  
+     * @param file The file where the image should be saved.
+     * @param url The URL where the image should be downloaded.
+     * @param callback The callback to handle the response.
+     * 
+     * @see #createToFileSystemAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * @see #createToStorageAsync(com.codename1.io.ConnectionRequest, java.lang.String, java.lang.String, com.codename1.util.Callback) 
+     * @since 3.4
+     */
+    public static void createToFileSystemAsync(final ConnectionRequest req, final String file, final String url, final Callback<Image> callback) {
+        final FileSystemStorage s = FileSystemStorage.getInstance();
+        if (s.exists(file)) {
+            addImageDownloadTask(new Runnable() {
+                public void run() {
+                    try {
+                        final Image img = EncodedImage.create(s.openInputStream(file));
+                        Display.getInstance().callSerially(new AsyncCallbackHandler(img, null, callback, 0));
+                    } catch (final Exception ex) {
+                        Display.getInstance().callSerially(new AsyncCallbackHandler(null, ex, callback, 0));
+                    }
+                }
+            });
+        } else if (req != null) {
+            addImageDownloadTask(new Runnable() {
+                public void run() {
+                    req.setUrl(url);
+                    req.setDestinationFile(file);
+                    
+                    NetworkManager.getInstance().addToQueueAndWait(req);
+                    if (req.getResponseCode() != 200) {
+                        Display.getInstance().callSerially(new AsyncCallbackHandler(null, new IOException("Failed to download image"), callback, req.getResponseCode()));
+                    } else {
+                        if (!s.exists(file)) {
+                            Display.getInstance().callSerially(new AsyncCallbackHandler(null, new IOException("Failed to copy file to file"), callback, req.getResponseCode()));
+                        } else {
+                            try {
+                                final Image img = EncodedImage.create(s.openInputStream(file));
+                                Display.getInstance().callSerially(new AsyncCallbackHandler(img, null, callback, 0));
+                            } catch (Exception ex) {
+                                Display.getInstance().callSerially(new AsyncCallbackHandler(null, ex, callback, 0));
+                            }
+                        }
+                    }
+                    
+                }
+            });
+        } else {
+            Display.getInstance().callSerially(new AsyncCallbackHandler(null, new IOException("No image found at that storage location"), callback, 0));
+        }
+
+    }
+    
+    /**
+     * Class used for running callbacks on the EDT.  This class can be reused to reduce the number
+     * of classes, rather than just using a separate anonymous inner Runnable each time.
+     */
+    private static class AsyncCallbackHandler implements Runnable {
+        final Exception error;
+        final Callback<Image> callback;
+        final int responseCode;
+        final Image image;
+        
+        private AsyncCallbackHandler(Image img, Exception error, Callback<Image> callback, int responseCode) {
+            this.image = img;
+            this.error = error;
+            this.callback = callback;
+            this.responseCode = responseCode;
+        }
+        
+        public void run() {
+            if (error != null) {
+                callback.onError(this, error, responseCode, error.getMessage());
+            } else {
+                callback.onSucess(image);
+            }
+        }
+        
+    }
+    
+    /**
+     * A threadpool used for async image download requests.  This allows us to 
+     * efficiently start up (possibly) multiple background requests for async
+     * image downloads without worrying about spawning too many threads.
+     */
+    private static class DownloadThreadPool implements Runnable {
+        ArrayList<Thread> threads = new ArrayList<Thread>();
+        ArrayList<Runnable> queue = new ArrayList();
+        int maxSize = 4;
+        final Object lock = new Object();
+        
+        void addTask(Runnable r) {
+            synchronized(lock) {
+                if (threads.size() < maxSize) {
+                    startThread(r);
+                } else {
+                    queue.add(r);
+                }
+            }
+        }
+        
+        void startThread(Runnable r) {
+            Thread t = null;
+            synchronized(lock) {
+                t = Display.getInstance().startThread(this, "DownloadImageThreadPool");
+                threads.add(t);
+                queue.add(r);
+            }
+            t.start();
+        }
+        
+        
+
+        public void run() {
+            while (!queue.isEmpty()) {
+                Runnable r = null;
+                synchronized(lock) {
+                    if (queue.isEmpty()) {
+                        break;
+                    }
+                    r = queue.remove(0);
+                }
+                if (r != null) {
+                    r.run();
+                }
+            }
+            synchronized(lock) {
+                threads.remove(Thread.currentThread());
+            }
+        }
+        
+    }
+    
+    
+    /**
+     * Adds a runnable task to the image download threadpool.  This is used by {@link #createToStorageAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) }
+     * and {@link #createToFileSystemAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) } to allow for background
+     * downloading of images without relying on invokeAndBlock, nor about spawning too many new threads.
+     * @param r The task to run in the thread pool.
+     */
+    private static void addImageDownloadTask(Runnable r) {
+        if (downloadThreadPool == null) {
+            downloadThreadPool = new DownloadThreadPool();
+        }
+        downloadThreadPool.addTask(r);
+    }
+    
+    /**
      * Creates an image the will be downloaded on the fly as necessary
      * 
      * @param placeholder the image placeholder is shown as the image is loading/downloading 
@@ -387,4 +656,5 @@ public class URLImage extends EncodedImage {
          */
         public boolean isAsyncAdapter();
     }
+    
 }

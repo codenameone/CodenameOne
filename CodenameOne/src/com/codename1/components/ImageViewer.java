@@ -509,6 +509,9 @@ public class ImageViewer extends Component {
         boolean result = false;
         if(image != null && image.isAnimation()) {
             result = image.animate();
+            if (result) {
+                updatePositions();
+            }
         }
         return super.animate() || result; 
     }
