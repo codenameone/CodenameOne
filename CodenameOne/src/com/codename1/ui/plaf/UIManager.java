@@ -322,15 +322,15 @@ public class UIManager {
         themeProps.put("dis#fgColor", disabledColor);
 
         // component specific settings
-        if (installedTheme == null || !installedTheme.containsKey("ToastBarComponent.derive")) {
-            themeProps.put("ToastBarComponent.margin", "0,0,0,0");
-            themeProps.put("ToastBarComponent.bgColor", "0");
-            themeProps.put("ToastBarComponent.transparency", "200");
-            themeProps.put("ToastBarComponent.bgType", new Byte(Style.BACKGROUND_NONE));
-            themeProps.put("ToastBarComponent.border", Border.createEmpty());
-            themeProps.put("ToastBarComponent.sel#derive", "ToastBarComponent");
-            themeProps.put("ToastBarComponent.press#derive", "ToastBarComponent");
-            themeProps.put("ToastBarComponent.dis#derive", "ToastBarComponent");
+        if (installedTheme == null || !installedTheme.containsKey("ToastBar.derive")) {
+            themeProps.put("ToastBar.margin", "0,0,0,0");
+            themeProps.put("ToastBar.bgColor", "0");
+            themeProps.put("ToastBar.transparency", "200");
+            themeProps.put("ToastBar.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("ToastBar.border", Border.createEmpty());
+            themeProps.put("ToastBar.sel#derive", "ToastBar");
+            themeProps.put("ToastBar.press#derive", "ToastBar");
+            themeProps.put("ToastBar.dis#derive", "ToastBar");
         }
         
         if (installedTheme == null || !installedTheme.containsKey("ToastBarMessage.derive")) {

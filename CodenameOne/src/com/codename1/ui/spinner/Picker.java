@@ -247,6 +247,7 @@ public class Picker extends Button {
      * @param strs string array
      */
     public void setStrings(String... strs) {
+        this.type = Display.PICKER_TYPE_STRINGS;
         int slen = strs.length;
         for (int i = 0; i < slen; i++) {
             String str = strs[i];

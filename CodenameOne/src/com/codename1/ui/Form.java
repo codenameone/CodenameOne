@@ -928,6 +928,21 @@ public class Form extends Container {
     }
 
     /**
+     * Shorthand for {@link #setBackCommand(com.codename1.ui.Command)} that
+     * dynamically creates the command using {@link com.codename1.ui.Command#create(java.lang.String, com.codename1.ui.Image, com.codename1.ui.events.ActionListener)}.
+     * 
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command setBackCommand(String name, Image icon, ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        menuBar.setBackCommand(cmd);
+        return cmd;
+    }
+
+    /**
      * Indicates the command that is defined as the back command out of this form.
      * A back command can be used both to map to a hardware button (e.g. on the Sony Ericsson devices)
      * and by elements such as transitions etc. to change the behavior based on 
