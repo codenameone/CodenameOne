@@ -2337,6 +2337,9 @@ public final class Display {
      * the vitual keyboard
      *
      * @param show toggles the virtual keyboards visibility
+     * @deprecated this method was only relevant for feature phones. 
+     * You should use {@link com.codename1.ui.TextArea#startEditingAsync()} or {@link com.codename1.ui.TextArea#stopEditing()}
+     * to control text field editing/VKB visibility
      */
     public void setShowVirtualKeyboard(boolean show) {
         if(isTouchScreenDevice()){
@@ -2351,6 +2354,8 @@ public final class Display {
      * Indicates if the virtual keyboard is currently showing or not
      *
      * @return true if the virtual keyboard is showing
+     * @deprecated this method was only relevant for feature phones. 
+     * You should use {@link com.codename1.ui.TextArea#isEditing()} instead.
      */
     public boolean isVirtualKeyboardShowing() {
         if(!isTouchScreenDevice()){
@@ -2362,6 +2367,7 @@ public final class Display {
     /**
      * Returns all platform supported virtual keyboards names
      * @return all platform supported virtual keyboards names
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public String [] getSupportedVirtualKeyboard(){
         String [] retVal = new String[virtualKeyboards.size()];
@@ -2376,6 +2382,7 @@ public final class Display {
     /**
      * Register a virtual keyboard
      * @param vkb
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public void registerVirtualKeyboard(VirtualKeyboardInterface vkb){
         virtualKeyboards.put(vkb.getVirtualKeyboardName(), vkb);
@@ -2386,6 +2393,7 @@ public final class Display {
      *
      * @param vkb a VirtualKeyboard to be used or null to disable the
      * VirtualKeyboard
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public void setDefaultVirtualKeyboard(VirtualKeyboardInterface vkb){
         if(vkb != null){
@@ -2401,6 +2409,7 @@ public final class Display {
     /**
      * Get the default virtual keyboard or null if the VirtualKeyboard is disabled
      * @return the default vkb
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public VirtualKeyboardInterface getDefaultVirtualKeyboard(){
         if(selectedVirtualKeyboard == null){

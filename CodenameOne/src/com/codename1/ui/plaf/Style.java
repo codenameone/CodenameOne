@@ -2169,6 +2169,9 @@ public class Style {
      */
     public void setPaddingUnit(byte... paddingUnit) {
         if(proxyTo != null) {
+            if(paddingUnit != null && paddingUnit.length < 4) {
+                paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};
+            }
             for(Style s : proxyTo) {
                 s.setPaddingUnit(paddingUnit);
             }
@@ -2197,6 +2200,9 @@ public class Style {
      */
     public void setMarginUnit(byte... marginUnit) {
         if(proxyTo != null) {
+            if(marginUnit != null && marginUnit.length < 4) {
+                marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};
+            }
             for(Style s : proxyTo) {
                 s.setMarginUnit(marginUnit);
             }
