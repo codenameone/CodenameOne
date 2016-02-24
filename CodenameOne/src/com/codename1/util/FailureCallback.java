@@ -25,9 +25,18 @@ package com.codename1.util;
 
 /**
  * <p>Simple interface that allows asynchronous code to perform a parameterized callback 
- * or failure in a similar way to GWT's callback interface.</p>
+ * in a similar way to GWT's callback interface. This is the base interface for {@link com.codename1.util.Callback}
+ *where the logic is broken down to single method interfaces so Java 8 lambdas can be used.</p>
  *
  * @author Shai Almog
  */
-public interface Callback<T> extends SuccessCallback<T>, FailureCallback<T> {
+public interface FailureCallback<T> {
+    /**
+     * Invoked when the async method throws an exception
+     * @param sender the source of the error e.g. connection request that triggered the error, could be null
+     * @param err in case of an error triggered by an exception
+     * @param errorCode if applicable e.g. with http error codes, -1 for unknown
+     * @param errorMessage if applicable a user displayable message (can be null)
+     */
+    public void onError(Object sender, Throwable err, int errorCode, String errorMessage);
 }

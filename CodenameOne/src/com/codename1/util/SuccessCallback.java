@@ -25,9 +25,15 @@ package com.codename1.util;
 
 /**
  * <p>Simple interface that allows asynchronous code to perform a parameterized callback 
- * or failure in a similar way to GWT's callback interface.</p>
- *
+ * in a similar way to GWT's callback interface. This is the base interface for {@link com.codename1.util.Callback}
+ *where the logic is broken down to single method interfaces so Java 8 lambdas can be used.</p>
+ * 
  * @author Shai Almog
  */
-public interface Callback<T> extends SuccessCallback<T>, FailureCallback<T> {
+public interface SuccessCallback<T> {
+    /**
+     * Invoked when the async method returns with a successful value
+     * @param value the value
+     */
+    public void onSucess(T value);
 }
