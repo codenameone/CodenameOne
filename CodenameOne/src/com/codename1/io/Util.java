@@ -30,7 +30,11 @@ import com.codename1.io.Externalizable;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -1199,19 +1203,6 @@ public class Util {
     }
     
     /**
-     * Non-blocking method that will download the given URL to storage in the background and return immediately
-     * @param cr A pre-configured ConnectionRequest used to perform the download.
-     * @param url the URL
-     * @param fileName the storage file name
-     * @param onCompletion invoked when download completes
-     * @since 3.4
-     * @see #downloadUrlToStorageInBackground(java.lang.String, java.lang.String, com.codename1.ui.events.ActionListener) 
-     */
-    public static void downloadUrlToStorageInBackground(ConnectionRequest cr, String url, String fileName, ActionListener onCompletion) {
-        downloadUrlTo(cr, url, fileName, false, true, true, onCompletion);
-    }
-
-    /**
      * Non-blocking method that will download the given URL to file system storage in the background and return immediately
      * @param url the URL
      * @param fileName the file name
@@ -1222,27 +1213,78 @@ public class Util {
     }
     
     /**
-     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
-     * @param cr A pre-configured ConnectionRequest for performing the request.
-     * @param url the URL
-     * @param fileName the file name
-     * @param onCompletion invoked when download completes
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from 
+     * the file system.
+     * @param url The URL to download the image from.
+     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the 
+     * network request altogether.
+     * @param onSuccess Callback called on success.
+     * @param onFail Callback called if we fail to load the image.
      * @since 3.4
-     * @see #downloadUrlToFileSystemInBackground(java.lang.String, java.lang.String, com.codename1.ui.events.ActionListener) 
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
-    public static void downloadUrlToFileSystemInBackground(ConnectionRequest cr, String url, String fileName, ActionListener onCompletion) {
-        downloadUrlTo(cr, url, fileName, false, true, false, onCompletion);
+    public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setDuplicateSupported(true);
+        cr.setUrl(url);
+        cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
     }
-
+    
+    /**
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from 
+     * the file system.
+     * @param url The URL to download the image from.
+     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the 
+     * network request altogether.
+     * @param onSuccess Callback called on success.
+     * @since 3.4
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback) 
+     */
+    public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess) {
+        downloadImageToFileSystem(url, fileName, onSuccess, new CallbackAdapter<Image>());
+    }
+    
+    /**
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from 
+     * storage.
+     * @param url The URL to download the image from.
+     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the 
+     * network request altogether.
+     * @param onSuccess Callback called on success.
+     * @param onFail Callback called if we fail to load the image.
+     * @since 3.4
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
+     */
+    public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setDuplicateSupported(true);
+        cr.setUrl(url);
+        cr.downloadImageToStorage(fileName, onSuccess, onFail);
+    }
+    
+    /**
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from 
+     * storage.
+     * @param url The URL to download the image from.
+     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the 
+     * network request altogether.
+     * @param onSuccess Callback called on success.
+     * @since 3.4
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback) 
+     */
+    public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess) {
+        downloadImageToStorage(url, fileName, onSuccess, new CallbackAdapter<Image>());
+    }
+    
     private static boolean downloadUrlTo(String url, String fileName, boolean showProgress, boolean background, boolean storage, ActionListener callback) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
         cr.setDuplicateSupported(true);
-        return downloadUrlTo(cr, url, fileName, showProgress, background, storage, callback);
-    }
-    
-    private static boolean downloadUrlTo(ConnectionRequest cr, String url, String fileName, boolean showProgress, boolean background, boolean storage, ActionListener callback) {
         cr.setUrl(url);
         if(callback != null) {
             cr.addResponseListener(callback);
