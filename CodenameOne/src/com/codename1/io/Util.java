@@ -1197,6 +1197,19 @@ public class Util {
     public static void downloadUrlToStorageInBackground(String url, String fileName, ActionListener onCompletion) {
         downloadUrlTo(url, fileName, false, true, true, onCompletion);
     }
+    
+    /**
+     * Non-blocking method that will download the given URL to storage in the background and return immediately
+     * @param cr A pre-configured ConnectionRequest used to perform the download.
+     * @param url the URL
+     * @param fileName the storage file name
+     * @param onCompletion invoked when download completes
+     * @since 3.4
+     * @see #downloadUrlToStorageInBackground(java.lang.String, java.lang.String, com.codename1.ui.events.ActionListener) 
+     */
+    public static void downloadUrlToStorageInBackground(ConnectionRequest cr, String url, String fileName, ActionListener onCompletion) {
+        downloadUrlTo(cr, url, fileName, false, true, true, onCompletion);
+    }
 
     /**
      * Non-blocking method that will download the given URL to file system storage in the background and return immediately
@@ -1207,13 +1220,30 @@ public class Util {
     public static void downloadUrlToFileSystemInBackground(String url, String fileName, ActionListener onCompletion) {
         downloadUrlTo(url, fileName, false, true, false, onCompletion);
     }
+    
+    /**
+     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
+     * @param cr A pre-configured ConnectionRequest for performing the request.
+     * @param url the URL
+     * @param fileName the file name
+     * @param onCompletion invoked when download completes
+     * @since 3.4
+     * @see #downloadUrlToFileSystemInBackground(java.lang.String, java.lang.String, com.codename1.ui.events.ActionListener) 
+     */
+    public static void downloadUrlToFileSystemInBackground(ConnectionRequest cr, String url, String fileName, ActionListener onCompletion) {
+        downloadUrlTo(cr, url, fileName, false, true, false, onCompletion);
+    }
 
     private static boolean downloadUrlTo(String url, String fileName, boolean showProgress, boolean background, boolean storage, ActionListener callback) {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
-        cr.setUrl(url);
         cr.setDuplicateSupported(true);
+        return downloadUrlTo(cr, url, fileName, showProgress, background, storage, callback);
+    }
+    
+    private static boolean downloadUrlTo(ConnectionRequest cr, String url, String fileName, boolean showProgress, boolean background, boolean storage, ActionListener callback) {
+        cr.setUrl(url);
         if(callback != null) {
             cr.addResponseListener(callback);
         }

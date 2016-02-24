@@ -39,7 +39,27 @@ import java.io.OutputStream;
 public class Storage {
     private final CacheMap cache = new CacheMap();
     private static Storage INSTANCE;
+    private static FSStorage FSINSTANCE;
     private boolean normalizeNames = true;
+    
+    /**
+     * Type value for Storage object that accesses regular storage.
+     * @see #getType() 
+     * @since 3.4
+     */
+    public static final int TYPE_STORAGE=1;
+    
+    /**
+     * Type value for Storage object that wraps {@link FileSystemStorage}
+     * @since 3.4
+     */
+    public static final int TYPE_FILESYSTEM=2;
+    
+    /**
+     * @since 3.4
+     * @see #getType() 
+     */
+    protected int type=TYPE_STORAGE;
 
     /**
      * Indicates the caching size, storage can be pretty slow
@@ -79,6 +99,16 @@ public class Storage {
         Util.getImplementation().setStorageData(data);
         INSTANCE = new Storage();
     }
+    
+    /**
+     * Gets the type of storage that this storage object represents.  Will be one of {@link #TYPE_STORAGE} or
+     * {@link #TYPE_FILESYSTEM}.
+     * @return 
+     * @since 3.4
+     */
+    public int getType() {
+        return type;
+    }
 
     /**
      * Returns true if the storage is initialized
@@ -100,6 +130,25 @@ public class Storage {
             init("cn1");
         }
         return INSTANCE;
+    }
+    
+    /**
+     * Obtains the Storage object for the specified type of storage.  
+     * @param type Should be one of {@link #TYPE_FILESYSTEM} or {@link #TYPE_STORAGE}.
+     * @return A Storage object for writing to storage.  If type is {@link #TYPE_FILESYSTEM},
+     * then this will return a wrapper around {@link FileSystemStorage} that conforms to the {@link Storage} API.
+     */
+    public static Storage getInstance(int type) {
+        switch (type) {
+            case TYPE_FILESYSTEM: {
+                if (FSINSTANCE == null) {
+                    FSINSTANCE = new FSStorage();
+                }
+                return FSINSTANCE;
+            }
+            default :
+                return getInstance();
+        }
     }
 
     /**
@@ -260,5 +309,102 @@ public class Storage {
      */
     public void setNormalizeNames(boolean normalizeNames) {
         this.normalizeNames = normalizeNames;
+    }
+    
+    /**
+     * Wrapper class around FileSystemStorage.  Use {@link #getInstance(int) }
+     * to access instance of this object.
+     */
+    private static class FSStorage extends Storage {
+        FileSystemStorage fs;
+        private FSStorage() {
+            fs = FileSystemStorage.getInstance();
+            type = TYPE_FILESYSTEM;
+        }
+
+        @Override
+        public InputStream createInputStream(String name) throws IOException {
+            return fs.openInputStream(name);
+        }
+
+        @Override
+        public OutputStream createOutputStream(String name) throws IOException {
+            return fs.openOutputStream(name);
+        }
+
+        @Override
+        public void deleteStorageFile(String name) {
+            fs.delete(name);
+        }
+
+        @Override
+        public boolean exists(String name) {
+            return fs.exists(name);
+        }
+
+        @Override
+        public int entrySize(String name) {
+            return (int)fs.getLength(name);
+        }
+
+        @Override
+        public String[] listEntries() {
+            throw new RuntimeException("listEntries() not supported in FileSystemStorage");
+        }
+
+        @Override
+        public void setHardCacheSize(int size) {
+            throw new RuntimeException("setHardCacheSize() not supported in FileSystemStorage");
+        }
+
+        @Override
+        public void clearCache() {
+            throw new RuntimeException("clearCache() not supported in FileSystemStorage");
+        }
+
+        @Override
+        public Object readObject(String name) {
+            if (!fs.exists(name)) {
+                return null;
+            }
+            InputStream is=null;
+            DataInputStream dis=null;
+            try {
+                is = fs.openInputStream(name);
+                dis = new DataInputStream(is);
+                Object out = Util.readObject(dis);
+                return out;
+            } catch (Exception ex) {
+                return null;
+            } finally {
+                Util.cleanup(dis);
+                Util.cleanup(is);
+            }
+        }
+
+        @Override
+        public boolean writeObject(String name, Object o) {
+            DataOutputStream daos=null;
+            try {
+                daos = new DataOutputStream(fs.openOutputStream(name));
+                Util.writeObject(o, daos);
+                return true;
+            } catch (Exception ex) {
+                Log.e(ex);
+                throw new RuntimeException("Problem occurred writing object to '"+name+"' in file system.  Please ensure that the parent directory exists: " + ex.getMessage());
+            } finally {
+                Util.cleanup(daos);
+            }
+        }
+        
+        @Override
+        public void flushStorageCache() {
+            throw new RuntimeException("flushStorageCache() not supported in FileSystemStorage");
+        }
+
+        @Override
+        public void clearStorage() {
+            throw new RuntimeException("clearStorage() not supported in FileSystemStorage");
+        }
     }
 }
