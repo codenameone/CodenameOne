@@ -2174,7 +2174,11 @@ public class Style {
             }
             return;
         }
-        this.paddingUnit = paddingUnit;
+        if(paddingUnit != null && paddingUnit.length < 4) {
+            this.paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};
+        } else {
+            this.paddingUnit = paddingUnit;
+        }
     }
 
     /**
@@ -2198,6 +2202,10 @@ public class Style {
             }
             return;
         }
-        this.marginUnit = marginUnit;
+        if(marginUnit != null && marginUnit.length < 4) {
+            this.marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};
+        } else {
+            this.marginUnit = marginUnit;
+        }
     }
 }
