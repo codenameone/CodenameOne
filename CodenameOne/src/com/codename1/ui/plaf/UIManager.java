@@ -322,6 +322,13 @@ public class UIManager {
         themeProps.put("dis#fgColor", disabledColor);
 
         // component specific settings
+        if (installedTheme == null || !installedTheme.containsKey("SignatureButton.derive")) {
+            themeProps.put("SignatureButton.align", centerAlign);
+            themeProps.put("SignatureButton.sel#derive", "SignatureButton");
+            themeProps.put("SignatureButton.press#derive", "SignatureButton");
+            themeProps.put("SignatureButton.dis#derive", "SignatureButton");
+        }
+        
         if (installedTheme == null || !installedTheme.containsKey("ToastBar.derive")) {
             themeProps.put("ToastBar.margin", "0,0,0,0");
             themeProps.put("ToastBar.bgColor", "0");
