@@ -34,6 +34,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
+import com.codename1.util.CallbackDispatcher;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
@@ -1841,9 +1842,9 @@ public class ConnectionRequest implements IOProgressListener {
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }
-                                Display.getInstance().callSerially(new AsyncCallbackHandler(img, null, onSuccess, onFail, 0));
+                                CallbackDispatcher.dispatchSuccess(onSuccess, img);
                             } catch (Exception ex) {
-                                Display.getInstance().callSerially(new AsyncCallbackHandler(null, ex, onSuccess, onFail, 0));
+                                CallbackDispatcher.dispatchError(onFail, ex);
                             }
                         } else {
                             downloadImage(onSuccess, onFail, false);
@@ -1857,9 +1858,9 @@ public class ConnectionRequest implements IOProgressListener {
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }
-                                Display.getInstance().callSerially(new AsyncCallbackHandler(img, null, onSuccess, onFail, 0));
+                                CallbackDispatcher.dispatchSuccess(onSuccess, img);
                             } catch (Exception ex) {
-                                Display.getInstance().callSerially(new AsyncCallbackHandler(null, ex, onSuccess, onFail, 0));
+                                CallbackDispatcher.dispatchError(onFail, ex);
                             }
                         } else {
                             downloadImage(onSuccess, onFail, false);
@@ -1879,7 +1880,7 @@ public class ConnectionRequest implements IOProgressListener {
                         if (nevt.getError() == null) {
                             nevt.setError(new IOException("Failed to get image:  Code was "+nevt.getResponseCode()));
                         }
-                        Display.getInstance().callSerially(new AsyncCallbackHandler(null, nevt.getError(), onSuccess, onFail, 0));
+                        CallbackDispatcher.dispatchError(onFail, nevt.getError());
                     }
                     removeResponseListener(this);
                 }
@@ -1888,35 +1889,6 @@ public class ConnectionRequest implements IOProgressListener {
             };
             addResponseListener(onDownload);
             NetworkManager.getInstance().addToQueue(this);
-        }
-        
-    }
-    
-    /**
-     * Class used for running callbacks on the EDT.  This class can be reused to reduce the number
-     * of classes, rather than just using a separate anonymous inner Runnable each time.
-     */
-    private static class AsyncCallbackHandler implements Runnable {
-        final Exception error;
-        final SuccessCallback<Image> onSuccess;
-        final FailureCallback<Image> onFail;
-        final int responseCode;
-        final Image image;
-        
-        private AsyncCallbackHandler(Image img, Exception error, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, int responseCode) {
-            this.image = img;
-            this.error = error;
-            this.onSuccess = onSuccess;
-            this.onFail = onFail;
-            this.responseCode = responseCode;
-        }
-        
-        public void run() {
-            if (error != null) {
-                onFail.onError(this, error, responseCode, error.getMessage());
-            } else {
-                onSuccess.onSucess(image);
-            }
         }
         
     }
