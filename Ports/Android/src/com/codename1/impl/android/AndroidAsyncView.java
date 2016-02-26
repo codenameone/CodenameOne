@@ -1891,10 +1891,15 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         Paint getPaint() {
             return super.getPaint();
         }
-
+        
         @Override
         void setColor(final int clr) {
             this.color = clr;
+            
+            // workaround for potential OOM
+            if(pendingRenderingOperations.size() > 20000 && impl.isMinimized()) {
+                pendingRenderingOperations.clear();
+            }
         }
 
         private CodenameOneTextPaint font;
