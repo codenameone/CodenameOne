@@ -1595,7 +1595,7 @@ public class TextField extends TextArea {
         boolean ani = super.animate();
         
         // while native editing we don't need the cursor animations
-        if(Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {
+        if(Display.getInstance().isNativeEditorVisible(this)) {
             return ani;
         }
         if(hasFocus() && isVisible()) {
