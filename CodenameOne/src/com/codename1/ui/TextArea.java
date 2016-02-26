@@ -1044,8 +1044,7 @@ public class TextArea extends Component {
      */
     public void paint(Graphics g) {
         
-        if(Display.getInstance().isNativeInputSupported() &&
-                Display.getInstance().isTextEditing(this)) {
+        if(Display.getInstance().isNativeEditorVisible(this)) {
             return;
         }
         

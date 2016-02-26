@@ -1529,6 +1529,10 @@ public final class Display {
     boolean isTextEditing(Component c) {
         return impl.isEditingText(c);
     }
+    
+    boolean isNativeEditorVisible(Component c) {
+        return impl.isNativeEditorVisible(c);
+    }
 
     /**
      * Minimizes the current application if minimization is supported by the platform (may fail).

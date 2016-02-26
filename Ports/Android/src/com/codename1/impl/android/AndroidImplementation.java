@@ -745,14 +745,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public boolean isEditingText(Component c) {
-        if (InPlaceEditView.isActiveTextEditorHidden()) {
-            return false;
-        }
-        return super.isEditingText(c);
+    public boolean isNativeEditorVisible(Component c) {
+        return super.isNativeEditorVisible(c) && !InPlaceEditView.isActiveTextEditorHidden();
     }
-
-    
     
     public static void stopEditing() {
         stopEditing(false);
@@ -791,7 +786,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void saveTextEditingState() {
-        stopEditing();
+        stopEditing(true);
     }
     
     @Override

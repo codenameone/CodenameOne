@@ -339,6 +339,16 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Checks whether the native text editor is currently visible over top of the 
+     * given component (usually a {@code TextArea}
+     * @param c The textarea/component we are checking
+     * @return True if the native editor is visible.
+     */
+    public boolean isNativeEditorVisible(Component c) {
+        return this.isNativeInputSupported() && this.isEditingText(c);
+    }
+    
+    /**
      * In case of scrolling we can hide the text editor unless the user starts typing again,
      * this is only relevant for the async mode...
      */
