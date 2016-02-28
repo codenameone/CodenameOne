@@ -557,6 +557,8 @@ public final class IOSNative {
 
     native void cancelLocalNotification(String id);
 
+    native long gausianBlurImage(long peer, float radius);
+    
     /**
      * Removes an observer from NSNotificationCenter
      * @param nsObserverPeer The opaque Objective-C class that is being used as the observer.

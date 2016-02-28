@@ -38,10 +38,45 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
 /**
- * A combo box is a list that allows only one selection at a time, when a user clicks
- * the combo box a popup button with the full list of elements allows the selection of
- * a single element. The combo box is driven by the list model and allows all the renderer
- * features of the List as well. 
+ * <p>A {@code ComboBox} is a list that allows only one selection at a time, when a user clicks
+ * the {@code ComboBox} a popup button with the full list of elements allows the selection of
+ * a single element. The {@code ComboBox} is driven by the list model and allows all the renderer
+ * features of the List as well. <br>
+ * The {@code ComboBox} is notoriously hard to style properly as it relies on a complex dynamic of
+ * popup renderer and instantly visible renderer. The UIID for the {@code ComboBox}  is "{@code ComboBox}"
+ * however if you set it to something else all the other UIID's will also change their prefix. E.g. the "{@code ComboBoxPopup}" 
+ * UIID will become "{@code MyNewUIIDPopup}". <br>
+ * The combo box defines the following UIID's by default: 
+ * </p>
+ * <ul>
+ *  <li>{@code ComboBox}</li>
+ *  <li>{@code ComboBoxItem}</li>
+ *  <li>{@code ComboBoxFocus}</li>
+ *  <li>{@code PopupContentPane}</li>
+ *  <li>{@code PopupItem}</li>
+ *  <li>{@code PopupFocus}</li>
+ * </ul>
+ * <p>
+ * This class also defines theme constants that allow some native themes to manipulate its behavior e.g.:
+ * </p>
+ * <ul>
+ *    <li>popupTitleBool - shows the "label for" value as the title of the popup dialog</li>
+ *    <li>popupCancelBodyBool - Adds a cancel button into the popup dialog</li>
+ *    <li>centeredPopupBool - shows the popup dialog in the center of the screen instead of under the popup</li>
+ *    <li>otherPopupRendererBool - Uses a different list cell render for the popup than the one used for the {@code ComboBox} 
+ * itself. When this is false {@code PopupItem} &amp; {@code PopupFocus}  become irrelevant. Notice that the
+ * Android native theme defines this to true.</li>
+ * </ul>
+ * <p>
+ * <strong>iOS doesn't use combo boxes as part of its UI paradigm</strong>. Its available there mostly in web applications and feels
+ * unnatural in iOS which is why we recommend using the {@link com.codename1.ui.spinner.Picker} class.
+ * </p>
+ * <p>
+ * The sample code below uses the {@link com.codename1.ui.list.GenericListCellRenderer} to create a richer
+ * {@code ComboBox} UI.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/7aa88182d6a7f63cbd4e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-combobox.png" alt="Rich ComboBox" />
  * 
  * @see List
  * @author Chen Fishbein

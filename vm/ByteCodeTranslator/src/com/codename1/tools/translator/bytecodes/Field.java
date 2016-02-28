@@ -203,7 +203,7 @@ public class Field extends Instruction implements AssignableExpression {
                 switch(desc.charAt(0)) {
                     case 'L':
                     case '[':
-                        b.append("PEEK_OBJ(1));\n    stackPointer--;\n");
+                        b.append("PEEK_OBJ(1));\n    SP--;\n");
                         return;
                     case 'D':
                         b.append("POP_DOUBLE");
@@ -261,7 +261,7 @@ public class Field extends Instruction implements AssignableExpression {
                     case '[':
                         b.append("PEEK_OBJ");
                         if(useThis) {
-                            b.append("(1), __cn1ThisObject);\n    stackPointer--;\n");
+                            b.append("(1), __cn1ThisObject);\n    SP--;\n");
                         } else {
                             b.append("(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
                         }

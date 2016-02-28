@@ -206,6 +206,14 @@ public class Form extends Container {
         
         // hardcoded, anything else is just pointless...
         formStyle.setBgTransparency(0xFF);
+
+        initGlobalToolbar();
+    }
+    
+    void initGlobalToolbar() {
+        if(Toolbar.isGlobalToolbar()) {
+            setToolbar(new Toolbar());
+        }
     }
 
     static int getInvisibleAreaUnderVKB(Form f) {
@@ -917,6 +925,21 @@ public class Form extends Container {
      */
     public void setBackCommand(Command backCommand) {
         menuBar.setBackCommand(backCommand);
+    }
+
+    /**
+     * Shorthand for {@link #setBackCommand(com.codename1.ui.Command)} that
+     * dynamically creates the command using {@link com.codename1.ui.Command#create(java.lang.String, com.codename1.ui.Image, com.codename1.ui.events.ActionListener)}.
+     * 
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command setBackCommand(String name, Image icon, ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        menuBar.setBackCommand(cmd);
+        return cmd;
     }
 
     /**
@@ -1744,13 +1767,7 @@ public class Form extends Container {
             }
             titleStyle.setMarginUnit(null);
             contentStyle.setMarginUnit(null);
-            if (p instanceof BGPainter && ((BGPainter) p).getPreviousForm() != null) {
-                ((BGPainter) p).setPreviousForm(previousForm);
-            } else {
-                BGPainter b = new BGPainter(this, p);
-                getStyle().setBgPainter(b);
-                b.setPreviousForm(previousForm);
-            }
+            initDialogBgPainter(p, previousForm);
             revalidate();
         }
 
@@ -1768,6 +1785,20 @@ public class Form extends Container {
             Display.getInstance().invokeAndBlock(new RunnableWrapper(this, p, reverse));
             // if the virtual keyboard was opend by the dialog close it
             Display.getInstance().setShowVirtualKeyboard(false);
+        }
+    }
+
+    /**
+     * Allows Dialog to override background painting for blur
+     * @param p the painter
+     */
+    void initDialogBgPainter(Painter p, Form previousForm) {
+        if (p instanceof BGPainter && ((BGPainter) p).getPreviousForm() != null) {
+            ((BGPainter) p).setPreviousForm(previousForm);
+        } else {
+            BGPainter b = new BGPainter(this, p);
+            getStyle().setBgPainter(b);
+            b.setPreviousForm(previousForm);
         }
     }
 

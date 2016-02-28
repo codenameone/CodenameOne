@@ -37,7 +37,28 @@ import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Style;
 
 /**
- * An image viewer component that allows zooming into an image and potentially flicking between multiple images
+ * <p>ImageViewer allows zooming/panning an image and potentially flicking between multiple images
+ * within a list of images. <br>
+ * E.g. the trivial usage works like this:</p>
+ * <script src="https://gist.github.com/codenameone/350a58254aa8b6f9f661.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer.png" alt="Simple image viewer zoomed out" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-zoomed-in.png" alt="Simple image viewer zoomed in" />
+ * <p>
+ * You can simulate pinch to zoom on the simulator by dragging the right button away from the top left corner to 
+ * zoom in and towards the top left corner to zoom out. On Mac touchpads you can drag two fingers to achieve that.
+ * </p>
+ * <p>
+ * A more elaborate usage includes flicking between multiple images e.g.:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/2001562d621473fd42c5.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-multi.png" alt="Image viewer with multiple elements" />
+ * 
+ * <p>
+ * You can even download image URL's dynamically into the {@code ImageViewer} thanks to the usage of the 
+ * {@link com.codename1.ui.list.ListModel}. E.g. in this model book cover images are downloaded dynamically:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/305c3f5426b0e2e80833.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" alt="Image viewer with dynamic URL fetching model" />
  *
  * @author Shai Almog
  */
@@ -488,6 +509,9 @@ public class ImageViewer extends Component {
         boolean result = false;
         if(image != null && image.isAnimation()) {
             result = image.animate();
+            if (result) {
+                updatePositions();
+            }
         }
         return super.animate() || result; 
     }

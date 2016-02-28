@@ -90,6 +90,10 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -741,14 +745,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public boolean isEditingText(Component c) {
-        if (InPlaceEditView.isActiveTextEditorHidden()) {
-            return false;
-        }
-        return super.isEditingText(c);
+    public boolean isNativeEditorVisible(Component c) {
+        return super.isNativeEditorVisible(c) && !InPlaceEditView.isActiveTextEditorHidden();
     }
-
-    
     
     public static void stopEditing() {
         stopEditing(false);
@@ -787,7 +786,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void saveTextEditingState() {
-        stopEditing();
+        stopEditing(true);
     }
     
     @Override
@@ -3944,6 +3943,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public int getResponseCode(Object connection) throws IOException {
+        // workaround for Android bug discussed here: http://stackoverflow.com/questions/17638398/androids-httpurlconnection-throws-eofexception-on-head-requests
+        HttpURLConnection con = (HttpURLConnection) connection;
+        if("head".equalsIgnoreCase(con.getRequestMethod())) {
+            con.setRequestProperty( "Accept-Encoding", "" );
+        }
         return ((HttpURLConnection) connection).getResponseCode();
     }
 
@@ -5312,12 +5316,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         f = Bitmap.CompressFormat.JPEG;
                     }
                     Image img = Image.createImage(image).scaled(width, height);
-                    if (width < 0) {
-                        width = img.getWidth();
-                    }
-                    if (height < 0) {
-                        width = img.getHeight();
-                    }
                     Bitmap b = (Bitmap) img.getImage();
                     b.compress(f, (int) (quality * 100), response);
                 }
@@ -6644,5 +6642,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         n.setBadgeNumber(b.getInt("NOTIF_NUMBER"));
         return n;
     }
+
+    public Image gaussianBlurImage(Image image, float radius) {
+
+        Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
+
+        RenderScript rs = RenderScript.create(activity);
+        ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+        Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
+        Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+        theIntrinsic.setRadius(radius);
+        theIntrinsic.setInput(tmpIn);
+        theIntrinsic.forEach(tmpOut);
+        tmpOut.copyTo(outputBitmap);
+        
+        return new NativeImage(outputBitmap);
+    }
+
+    public boolean isGaussianBlurSupported() {
+        return android.os.Build.VERSION.SDK_INT >= 11;
+    }
+    
     
 }

@@ -27,10 +27,17 @@ package com.codename1.io;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.Callback;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.CallbackDispatcher;
+import com.codename1.util.FailureCallback;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,9 +50,16 @@ import java.util.Map;
 import java.util.Vector;
 
 /**
- * This class represents a connection object in the form of a request response
- * typically common for HTTP/HTTPS connections. Elements of this type are
- * placed in a priority queue based 
+ * <p>This class represents a connection object in the form of a request response
+ * typically common for HTTP/HTTPS connections. A connection request is added to
+ * the {@link com.codename1.io.NetworkManager} for processing in a queue on one of the
+ * network threads.</p>
+ * 
+ * <p>The sample
+ * code below fetches a page of data from the nestoria housing listing API.<br>
+ * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
+ * class.</p>
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
  */
@@ -1704,5 +1718,178 @@ public class ConnectionRequest implements IOProgressListener {
         JSONParser jp = new JSONParser();
         Map<String, Object> result = jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), "UTF-8"));
         return result;
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param onFail Callback called if we fail to load the image.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, boolean useCache) {
+        setDestinationStorage(storageFile);
+        downloadImage(onSuccess, onFail, useCache);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * 
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess, boolean useCache) {
+        downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter<Image>(), useCache);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess) {
+        downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter<Image>(), true);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        downloadImageToStorage(storageFile, onSuccess, onFail, true);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param onFail Callback called if we fail to load the image.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, boolean useCache) {
+        setDestinationFile(file);
+        downloadImage(onSuccess, onFail, useCache);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess, boolean useCache) {
+        downloadImageToFileSystem(file, onSuccess, new CallbackAdapter<Image>(), useCache);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess) {
+        downloadImageToFileSystem(file, onSuccess, new CallbackAdapter<Image>(), true);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param onFail Callback called if the image fails to load.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        downloadImageToFileSystem(file, onSuccess, onFail, true);
+    }
+    
+
+    private void downloadImage(final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        downloadImage(onSuccess, onFail,  true);
+    }
+    
+    private void downloadImage(final SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail, boolean useCache) {
+        if (useCache) {
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                public void run() {
+                    if (getDestinationFile() != null) {
+                        String file = getDestinationFile();
+                        FileSystemStorage fs = FileSystemStorage.getInstance();
+                        if (fs.exists(file)) {
+                            try {
+                                EncodedImage img = EncodedImage.create(fs.openInputStream(file));
+                                if (img == null) {
+                                    throw new IOException("Failed to load image at "+file);
+                                }
+                                CallbackDispatcher.dispatchSuccess(onSuccess, img);
+                            } catch (Exception ex) {
+                                CallbackDispatcher.dispatchError(onFail, ex);
+                            }
+                        } else {
+                            downloadImage(onSuccess, onFail, false);
+                        }
+                    } else if (getDestinationStorage() != null) {
+                        String file = getDestinationStorage();
+                        Storage fs = Storage.getInstance();
+                        if (fs.exists(file)) {
+                            try {
+                                EncodedImage img = EncodedImage.create(fs.createInputStream(file));
+                                if (img == null) {
+                                    throw new IOException("Failed to load image at "+file);
+                                }
+                                CallbackDispatcher.dispatchSuccess(onSuccess, img);
+                            } catch (Exception ex) {
+                                CallbackDispatcher.dispatchError(onFail, ex);
+                            }
+                        } else {
+                            downloadImage(onSuccess, onFail, false);
+                        } 
+                    }
+                }
+            });
+                
+        } else {
+            final ActionListener onDownload = new ActionListener() {
+
+                public void actionPerformed(ActionEvent evt) {
+                    NetworkEvent nevt = (NetworkEvent)evt;
+                    if (nevt.getResponseCode() == 200) {
+                        downloadImage(onSuccess, onFail, true);
+                    } else {
+                        if (nevt.getError() == null) {
+                            nevt.setError(new IOException("Failed to get image:  Code was "+nevt.getResponseCode()));
+                        }
+                        CallbackDispatcher.dispatchError(onFail, nevt.getError());
+                    }
+                    removeResponseListener(this);
+                }
+
+               
+            };
+            addResponseListener(onDownload);
+            NetworkManager.getInstance().addToQueue(this);
+        }
+        
     }
 }

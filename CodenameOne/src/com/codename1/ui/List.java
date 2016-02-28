@@ -43,17 +43,46 @@ import java.util.Collection;
 import java.util.Vector;
 
 /**
- * A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
- * and are extracted via the {@link com.codename1.ui.list.ListModel}.
- * <p>A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
+ * <p>A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
+ * and are extracted via the {@link com.codename1.ui.list.ListModel}.<br>
+ * A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
  * is made possible thanks to extensive use of Swing's style of MVC. Specifically a list
  * component is relatively simple, it invokes the model in order to extract the displayed/selected
- * information and shows it to the user by invoking the cell renderer.
+ * information and shows it to the user by invoking the cell renderer.</p>
  * <p>The list class itself is completely decoupled from everything, thus it allows us to extract its
  * content from any source (e.g. network, storage etc.) and display the information in any form
- * (e.g. checkboxed elemenents, icons etc.).
+ * (e.g. checkboxed elemenents, icons etc.).</p>
+ * <h3>Important</h3>
+ * <p>
+ * {@code List} is a pretty complex class to use so we generally recommend developers use 
+ * {@link com.codename1.ui.Container}, 
+ * {@link com.codename1.components.InfiniteScrollAdapter} or {@link com.codename1.ui.InfiniteContainer}
+ * coupled with widgets such as {@link com.codename1.components.MultiButton}. Arranging those in a 
+ * {@link com.codename1.ui.layouts.BoxLayout} on the {@link com.codename1.ui.layouts.BoxLayout#Y_AXIS}
+ * can produce the functionality of the {@code List} with better performance and far simpler code!
+ * </p>
+ * <p>
+ * Another simpler alternative although not as attractive is the {@link com.codename1.ui.list.MultiList} class
+ * that removes a lot of the {@link com.codename1.ui.list.ListCellRenderer} related complexities inherent
+ * in building a list.
+ * </p>
+ * 
+ * <h4>Sample Usage</h4>
+ * <p>
+ * The sample below uses the {@link com.codename1.ui.list.GenericListCellRenderer} class instead of the 
+ * {@link com.codename1.ui.list.DefaultListCellRenderer}. We generally recommend using the builtin classes
+ * as the renderer is probably the greatest source of pitfalls in {@code Lists}.
+ * </p>
  *
+ * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png" alt="Sample of using the generic list cell renderer" />
+ * 
+ * @see com.codename1.ui.Container
+ * @see com.codename1.ui.InfiniteContainer
+ * @see com.codename1.components.InfiniteScrollAdapter
+ * @see com.codename1.components.MultiButton
  * @see com.codename1.ui.list
+ * @see com.codename1.ui.list.MultiList
  * @author Chen Fishbein
  */
 public class List<T> extends Component {
@@ -1608,16 +1637,20 @@ public class List<T> extends Component {
     }
 
     /**
-     * The rendering prototype is optionally used in calculating the size of the
+     * <p>The rendering prototype is optionally used in calculating the size of the
      * List and is recommended for performance reasons. You should invoke it with an object
      * representing a theoretical value in the list which will be used to calculate
-     * the size required for each element in the list.
+     * the size required for each element in the list.</p>
      * <p>This allows list size calculations to work across look and feels and allows
-     * developers to predetermin size for list elements.
+     * developers to predetermine size for list elements.</p>
      * <p>e.g. For a list of Strings which you would like to always be 5 characters wide
      * you can use a prototype "XXXXX" which would use the preferred size of the XXXXX
      * String to determine the size of the list element. E.g. for a list of dates you can use
-     * new Date(30, 12, 00) etc..
+     * new Date(30, 12, 00) etc..</p>
+     * <p>The example below was designed for {@link com.codename1.ui.list.MultiList} but
+     * should work for any list. Its goal is to render 2 lines of text with 20 characters and a 
+     * 5mm square icon:</p>
+     * <script src="https://gist.github.com/codenameone/dc9c7f13f6b312d1edc8.js"></script>
      *
      * @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
      * size of a list component.

@@ -23,23 +23,42 @@
 
 package com.codename1.ui;
 
-import com.codename1.components.FileEncodedImage;
-import com.codename1.components.StorageImage;
+import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.Callback;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 
 /**
- * The URLImage allows us to create an image from a URL. If the image was downloaded 
+ * <p>{@code URLImage} allows us to create an image from a URL. If the image was downloaded 
  * already it is fetched from cache; if not it is downloaded optionally scaled/adapted
- * and placed in cache.
+ * and placed in cache.</p>
  * <p>By default an image is fetched lazily as it is asked for by the GUI unless 
- * the fetch() method is invoked in which case the IO code is executed immediately.
+ * the fetch() method is invoked in which case the IO code is executed immediately.</p>
+ * 
+ *  <p>
+ * This sample code show a {@code URLImage} that is fetched to the title area background and scaled/cropped
+ * to fit device specific dimensions.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/085e3a8fa1c36829d812.js"></script>
+
+ * <p>
+ * This sample code shows the usage of the nestoria API to fill out an infinitely scrolling list in it 
+ * we use {@code URLImage} to fetch the icon.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/af27af111ba766627363.js"></script>
+ * 
+ * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" /><br><br>
+ * 
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
+
  *
  * @author Shai Almog
  */
@@ -113,7 +132,11 @@ public class URLImage extends EncodedImage {
      * Scales the image to match to fill the area while preserving aspect ratio
      */
     public static final ImageAdapter RESIZE_SCALE_TO_FILL = new ScaleToFill();
-
+    
+    /**
+     * Thread pool used in {@link #createToStorageAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) } and {@link #createToFileSystemAsync(java.lang.String, java.lang.String, com.codename1.util.Callback) }
+     * to download and process images in the background.
+     */
     private final EncodedImage placeholder;
     private final String url;
     private final ImageAdapter adapter;
@@ -133,7 +156,7 @@ public class URLImage extends EncodedImage {
         this.storageFile = storageFile;
         this.fileSystemFile = fileSystemFile;
     }
-
+    
     /**
      * Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the 
      * exception that a mask will be applied later on. This adapter requires that the resulting image be in the size
@@ -370,4 +393,5 @@ public class URLImage extends EncodedImage {
          */
         public boolean isAsyncAdapter();
     }
+    
 }

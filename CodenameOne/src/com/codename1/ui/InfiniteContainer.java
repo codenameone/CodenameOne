@@ -22,23 +22,33 @@
  */
 package com.codename1.ui;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InfiniteScrollAdapter;
 import com.codename1.ui.layouts.BoxLayout;
 
 /**
- * This abstract Container can scroll indefinitely (or at least until
+ * <p>This abstract Container can scroll indefinitely (or at least until
  * we run out of data).
- * This class uses the InfiniteScrollAdapter to bring more data and the pull to 
- * refresh feature to refresh current displayed data.
+ * This class uses the {@link com.codename1.components.InfiniteScrollAdapter} to bring more data and the pull to 
+ * refresh feature to refresh current displayed data.</p>
+ * <p>
+ * The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/9e2f7984beb22d9e372c.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" />
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  * 
  * @author Chen
  */
 public abstract class InfiniteContainer extends Container {
 
     private int amount = 10;
+    private boolean amountSet;
 
     private boolean requestingResults;
 
+    private InfiniteScrollAdapter adapter;
+    
     /**
      * Creates the InfiniteContainer.
      * The InfiniteContainer is created with BoxLayout Y layout.
@@ -60,12 +70,20 @@ public abstract class InfiniteContainer extends Container {
         if(amount <= 0){
             throw new IllegalArgumentException("amount must be greater then zero");
         }
+        amountSet = true;
     }
 
     @Override
     void resetScroll() {
     }
 
+    boolean shouldContinue(Component[] cmps) {
+        if(amountSet) {
+            return cmps.length == amount;
+        } else {
+            return cmps != null && cmps.length > 0;
+        }
+    }
     
     @Override
     protected void initComponent() {
@@ -88,7 +106,7 @@ public abstract class InfiniteContainer extends Container {
 
                             public void run() {
                                 removeAll();
-                                InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, cmps.length == amount);
+                                InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
                                 requestingResults = false;
                             }
                         });
@@ -100,7 +118,7 @@ public abstract class InfiniteContainer extends Container {
     }
 
     private void createInfiniteScroll() {
-        InfiniteScrollAdapter.createInfiniteScroll(this, new Runnable() {
+        adapter = InfiniteScrollAdapter.createInfiniteScroll(this, new Runnable() {
 
             public void run() {
                 Display.getInstance().scheduleBackgroundTask(new Runnable() {
@@ -118,7 +136,7 @@ public abstract class InfiniteContainer extends Container {
                         Display.getInstance().callSerially(new Runnable() {
 
                             public void run() {
-                                InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, cmps.length == amount);
+                                InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
                                 requestingResults = false;
                             }
                         });
@@ -148,4 +166,13 @@ public abstract class InfiniteContainer extends Container {
      * size of the amount or smaller, if no data to fetch method can return null.
      */ 
     public abstract Component[] fetchComponents(int index, int amount);
+
+
+    /**
+     * Lets us manipulate the infinite progress object e.g. set the animation image etc.
+     * @return the infinite progress component underlying this container
+     */
+    public InfiniteProgress getInfiniteProgress() {
+        return adapter.getInfiniteProgress();
+    }
 }

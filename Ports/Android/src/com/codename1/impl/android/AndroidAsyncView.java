@@ -1085,6 +1085,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 this.text = text;
                 this.fgColor = color;
                 this.font = font;
+                if(font == null) {
+                    this.font = impl.defaultFont;
+                } 
             }
 
             public DrawStringCache(String text, Style s) {
@@ -1097,13 +1100,16 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                     if(nativeFont instanceof AndroidImplementation.NativeFont) {
                         nativeFont = ((AndroidImplementation.NativeFont)nativeFont).font;
                     }
+                    if(nativeFont == null) {
+                        nativeFont = impl.defaultFont;
+                    } 
                 }
                 this.font = (CodenameOneTextPaint)nativeFont;
             }
 
             public boolean equals(Object o) {
                 // == is totally fine here for the text which should be interned, the font might be cloned though...
-                return text == ((DrawStringCache)o).text && fgColor == ((DrawStringCache)o).fgColor && font.equals(((DrawStringCache)o).font);
+                return font != null && o != null && text == ((DrawStringCache)o).text && fgColor == ((DrawStringCache)o).fgColor && font.equals(((DrawStringCache)o).font);
             }
 
             public int hashCode() {
@@ -1148,7 +1154,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 if (nativeFont instanceof AndroidImplementation.NativeFont) {
                     styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) ((AndroidImplementation.NativeFont) nativeFont).font);
                 } else {
-                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) font);
+                    styleCache.textPaint = new CodenameOneTextPaint((CodenameOneTextPaint) nativeFont);
                 }
                 
                 int c = (alpha << 24) | (style.getFgColor() & 0xffffff);
@@ -1885,10 +1891,15 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         Paint getPaint() {
             return super.getPaint();
         }
-
+        
         @Override
         void setColor(final int clr) {
             this.color = clr;
+            
+            // workaround for potential OOM
+            if(pendingRenderingOperations.size() > 20000 && impl.isMinimized()) {
+                pendingRenderingOperations.clear();
+            }
         }
 
         private CodenameOneTextPaint font;

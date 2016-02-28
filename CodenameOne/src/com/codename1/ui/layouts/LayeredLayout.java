@@ -29,13 +29,51 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
 /**
- * Allows placing components one on top of the other like a stack, this layout
- * effectively allows us to build a UI of overlapping components. The components
- * may be containers with their own layout managers to allow elaborate arbitrary
- * looks. Since the Z-ordering creates a great deal of complexity and
- * inefficiency it is recommended that you first try to achieve the desired UI
- * without resorting to this layout or coordinate layout.
+ * <p>The {@code LayeredLayout} places the components in order one on top of the other and sizes 
+ * them all to the size of the largest component. This is useful when trying to create an overlay on top of an 
+ * existing component. E.g. an "x" button to allow removing the component as shown here</p>
  *
+ * <img src="https://www.codenameone.com/img/developer-guide/layered-layout.png" alt="The X on this button was placed there using the layered layout code below" />
+ *
+ * <p>The code to generate this UI is slightly complex and contains very little relevant pieces. The only truly relevant 
+ * piece the last line of code:</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/d0491ce08ce6b889bbd5.js"></script>* 
+ *
+ *
+ * <p>We are doing three distinct things here:</p>
+ * <ul>
+ *.<li> We are adding a layered layout to the form.</li>
+ * <li> We are creating a layered layout and placing two components within. This would be the equivalent of just 
+ *     creating a {@code LayeredLaout} {@link com.codename1.ui.Container} and invoking `add` twice.</li>
+.* <li> We use https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[FlowLayout] to position the `X` close button in the right position.</li>
+ * </ul>
+ * 
+ * <p>
+ * A common use case for {@code LayeredLayout} is the iOS carousel effect which we can achieve by combing
+ * the {@code LayeredLayout}  with {@link com.codename1.ui.Tabs}.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/e981c3f91f98f1515987.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe1.png" alt="Tabs carousel page 1" />
+ * 
+ * <p>Notice that the layered layout sizes all components to the exact same size one on top of the other. It usually 
+ * requires that we use another container within; in order to position the components correctly.<br />
+ *
+ * Forms have a built in layered layout that you can access via `getLayeredPane()`, this allows you to overlay 
+ * elements on top of the content pane.<br />
+ *
+ * The layered pane is used internally by components such as {@link com.codename1.components.InteractionDialog}, 
+ * {@link com.codename1.u./AutoCompleteTextField} etc.
+ *</p>
+ * <p>
+ *   Warning: Placing native widgets within a layered layout is problematic due to the behavior of peer 
+ *   components. Sample of peer components include the {@link com.codename1.ui.BrowserComponent}, 
+ *   video playback etc. 
+ * </p>
+ *
+ * @see com.codename1.ui.Form#getLayeredPane() 
+ * @see com.codename1.ui.Form#getLayeredPane(java.lang.Class, boolean) 
+ * @see com.codename1.ui.Form#setGlassPane(com.codename1.ui.Painter) 
  * @author Shai Almog
  */
 public class LayeredLayout extends Layout {

@@ -829,7 +829,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
         Style lStyle = l.getStyle();
         int verticalPadding = lStyle.getPadding(false, Component.TOP) + lStyle.getPadding(false, Component.BOTTOM);
-        int horizontalPadding = lStyle.getPadding(false, Component.RIGHT) + lStyle.getPadding(false, Component.LEFT);
+        int horizontalPadding = lStyle.getPadding(false, Component.RIGHT) + lStyle.getPadding(false, Component.LEFT) + l.getSideGap();
 
         if (numOfcomponents == 0) {
             return new Dimension(horizontalPadding, verticalPadding);

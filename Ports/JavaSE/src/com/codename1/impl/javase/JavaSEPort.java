@@ -107,6 +107,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
+import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseWheelEvent;
@@ -116,6 +117,9 @@ import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
+import java.awt.image.BufferedImageOp;
+import java.awt.image.ConvolveOp;
+import java.awt.image.Kernel;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
@@ -7354,7 +7358,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setPhoneNumbers(phones);
         
         Hashtable emails = new Hashtable();
-        emails.put("work", "chen@codenameone.com");
+        emails.put("work", "----");
         contact.setEmails(emails);
 
         Hashtable addresses = new Hashtable();
@@ -7378,7 +7382,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         phones.put("home", "+222222");
         contact.setPhoneNumbers(phones);
         emails = new Hashtable();
-        emails.put("work", "shai@codenameone.com");
+        emails.put("work", "----");
         contact.setEmails(emails);
 
         addresses = new Hashtable();
@@ -7741,4 +7745,23 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+ 
+    public Image gaussianBlurImage(Image image, float radius) {
+        GaussianFilter gf = new GaussianFilter(radius);
+        Image bim = Image.createImage(image.getWidth(), image.getHeight());        
+        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());        
+        return new NativeImage(blurredImage);
+    }
+
+    public boolean isGaussianBlurSupported() {
+        return true;
+    }
+ 
+    class NativeImage extends Image {
+
+        public NativeImage(BufferedImage nativeImage) {
+            super(nativeImage);
+        }
+    }
+    
 }

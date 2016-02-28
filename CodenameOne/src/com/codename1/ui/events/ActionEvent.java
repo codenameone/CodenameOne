@@ -25,6 +25,7 @@ package com.codename1.ui.events;
 
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 
 /**
  * Event object delivered when an {@link ActionListener} callback is invoked
@@ -33,13 +34,6 @@ import com.codename1.ui.Component;
  */
 public class ActionEvent {
 	
-    // [ddyer 1/2016] adds subtype annotations to actionevents.  The general philosophy
-    // is that existing consumers of actionevents who do not know about these type indicators
-    // will not see any differences, so this change will be innocuous to the existing code
-    //
-    // there's evidence of a lot of ad-hoc use of the available state of actionevents
-    // in the absence of these subtypes, 
-
     /**
      * The event type, as declared when the event is created.
      * 
@@ -276,7 +270,36 @@ public class ActionEvent {
     }
 
     /**
-     * Returns the source component object
+     * Identical to {@link ActionEvent#getComponent()} except for the fact that a lead component will be returned 
+     * if such a lead component is available. This is important for components such as {@link com.codename1.components.MultiButton}
+     * which will return the underlying button instead.
+     * @return the component that sent the event 
+     */
+    public Component getActualComponent() {
+        Component c = getComponent();
+        if(c != null) {
+            Container lead;
+            if(c instanceof Container) {
+                lead = ((Container)c).getLeadParent();
+            } else {
+                lead = c.getParent().getLeadParent();
+            }
+            if(lead != null) {
+                return lead;
+            }
+        }
+        return c;
+    }
+    
+    /**
+     * <p>Returns the component that generated the event. <b>important</b> this might not be the actual component.
+     * In case of a lead component such as {@link com.codename1.components.MultiButton} the underlying 
+     * {@link com.codename1.ui.Button} will be returned and not the {@link com.codename1.components.MultiButton} 
+     * itself. To get the component that you would logically think of as the source component use the {@code getActualComponent}
+     * method.</p>
+     * <p>If you are in doubt use the {@code getActualComponent} method.</p>
+     * 
+     * @see ActionEvent#getActualComponent() - you should probably use {@code getActualComponent} instead of this method
      * @return a component
      */
     public Component getComponent() {

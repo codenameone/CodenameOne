@@ -80,8 +80,10 @@ public class Message {
     }
 
     /**
-     * Returns the attachment map which can be used to add multiple attachments
-     * @return a map of file name to mime type that can be used to add attachments
+     * Returns the attachment map which can be used to add multiple attachments.
+     * The path needs to point at a full absolute file URI within {@link com.codename1.io.FileSystemStorage},
+     * it will not work with {@link com.codename1.io.Storage} files!
+     * @return a map of full file paths to mime type that can be used to add attachments
      */
     public Map<String, String> getAttachments() {
         if(attachments == null) {

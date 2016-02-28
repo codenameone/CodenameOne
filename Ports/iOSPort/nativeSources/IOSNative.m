@@ -495,6 +495,35 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE
     //XMLVM_END_WRAPPER
 }
 
+JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_FLOAT radius) {
+    POOL_BEGIN();
+
+    GLUIImage* glu = (BRIDGE_CAST GLUIImage*)n1;
+    if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == glu) {
+        Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
+    }
+
+    UIImage* original = [glu getImage];
+    
+    // taken from: http://stackoverflow.com/a/19433086/756809
+    CIFilter *gaussianBlurFilter = [CIFilter filterWithName:@"CIGaussianBlur"];
+    [gaussianBlurFilter setDefaults];
+    CIImage *inputImage = [CIImage imageWithCGImage:[original CGImage]];
+    [gaussianBlurFilter setValue:inputImage forKey:kCIInputImageKey];
+    NSNumber *radiusNumber = [NSNumber numberWithFloat:radius];
+    [gaussianBlurFilter setValue:radiusNumber forKey:kCIInputRadiusKey];
+    
+    CIImage *outputImage = [gaussianBlurFilter outputImage];
+    CIContext *context   = [CIContext contextWithOptions:nil];
+    CGImageRef cgimg     = [context createCGImage:outputImage fromRect:[inputImage extent]];
+    UIImage *image       = [UIImage imageWithCGImage:cgimg];
+    CGImageRelease(cgimg);
+    GLUIImage* gl = [[GLUIImage alloc] initWithImage:image];
+    
+    POOL_END();
+    return (BRIDGE_CAST void*)gl;
+}
+
 void com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_BOOLEAN n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int_boolean]
@@ -5927,6 +5956,10 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY_R
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3) {
     return com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE_PASS_ARG instanceObject, n1, n2, n3);
+}
+
+JAVA_LONG com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_FLOAT radius) {
+    return com_codename1_impl_ios_IOSNative_gausianBlurImage___long_float(CN1_THREAD_STATE_PASS_ARG instanceObject, n1, radius);
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_stringWidthNative___long_java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_OBJECT n2) {

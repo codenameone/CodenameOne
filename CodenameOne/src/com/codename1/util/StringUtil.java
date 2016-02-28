@@ -35,6 +35,10 @@ public class StringUtil {
 
     
     private static CodenameOneImplementation impl;
+    
+    /**
+     * @deprecated exposed as part of an internal optimization, this method isn't meant for general access
+     */
     public static void setImplementation(CodenameOneImplementation i) {
         impl = i;
     }
@@ -149,32 +153,34 @@ public class StringUtil {
      */
     public static List<String> tokenize(String source, char separator) {
         ArrayList<String> tokenized = new ArrayList<String>();
-//        int len = source.length();
-//        boolean lastSeparator = false;
-//        StringBuilder buf = new StringBuilder();
-//        for(int iter = 0 ; iter < len ; iter++) {
-//            char current = source.charAt(iter);
-//            if(current == separator) {
-//                if(lastSeparator) {
-//                    buf.append(separator);
-//                    lastSeparator = false;
-//                    continue;
-//                }
-//                lastSeparator = true;
-//                if(buf.length() > 0) {
-//                    tokenized.add(buf.toString());
-//                    buf = new StringBuilder();
-//                }
-//            } else {
-//                lastSeparator = false;
-//                buf.append(current);
-//            }
-//        }
-//        if(buf.length() > 0) {
-//            tokenized.add(buf.toString());
-//        }
-        
-        impl.splitString(source, separator, tokenized);
+        if (impl == null) {
+            int len = source.length();
+            boolean lastSeparator = false;
+            StringBuilder buf = new StringBuilder();
+            for(int iter = 0 ; iter < len ; iter++) {
+                char current = source.charAt(iter);
+                if(current == separator) {
+                    if(lastSeparator) {
+                        buf.append(separator);
+                        lastSeparator = false;
+                        continue;
+                    }
+                    lastSeparator = true;
+                    if(buf.length() > 0) {
+                        tokenized.add(buf.toString());
+                        buf = new StringBuilder();
+                    }
+                } else {
+                    lastSeparator = false;
+                    buf.append(current);
+                }
+            }
+            if(buf.length() > 0) {
+                tokenized.add(buf.toString());
+            }
+        } else {
+            impl.splitString(source, separator, tokenized);
+        }
         return tokenized;
     }
     

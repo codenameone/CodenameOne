@@ -552,15 +552,26 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * Performs scaling using ImageIO to gnerate an encoded Image
-     * @param width the width of the image
-     * @param height the height of the image
+     * Performs scaling using ImageIO to generate an encoded Image
+     * @param width the width of the image, -1 to scale based on height and preserve aspect ratio
+     * @param height the height of the image, -1 to scale based on width and preserve aspect ratio
      * @return new encoded image
      */
     public EncodedImage scaledEncoded(int width, int height) {
         if(width == getWidth() && height == getHeight()) {
             return this;
         }
+        
+        if(width < 0) {
+            float ratio = ((float)height) / ((float)getHeight());
+            width = Math.max(1, (int)(getWidth() * ratio));
+        } else {
+            if(height < 0) {
+                float ratio = ((float)width) / ((float)getWidth());
+                height = Math.max(1, (int)(getHeight() * ratio));
+            }
+        }
+        
         try {
             ImageIO io = ImageIO.getImageIO();
             if(io != null) {

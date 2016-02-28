@@ -38,13 +38,33 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.LazyValue;
 
 /**
- * Contains common transition animations including the following:
+ * <p>Contains common transition animations that can be applied to forms &amp; components 
+ * including the following types:
  * <ol>
- * <li>Slide - the exiting form slides out of the screen while the new form slides in. 
- * <li>Fade - components fade into/out of the screen
- * <li>Timeline - uses an animation image as an alpha mask between the source/destination
+ * <li>Slide - the exiting form slides out of the screen while the new form slides in (can be vertical or horizontal). </li>
+ * <li>Slide Fade - slides the content pane while fading the title. This is the default iOS transition. </li>
+ * <li>Cover/Uncover - like slide only one of the forms remains in place while the other moves. </li>
+ * <li>Fade - components fade into/out of the screen<li>
+ * <li>Timeline - uses an animation image as an alpha mask between the source/destination</li>
  * </ol>
- * <p>Instances of this class are created using factory methods.
+ * 
+ * <p>
+ * The code below demonstrates the common transitions
+ * </p>
+ * <script src="https://gist.github.com/codenameone/47602e679f61712693bd.js"></script>
+ * <h4>Slide</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-slide.jpg" alt="Slide" />
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-vertical.jpg" alt="Slide" />
+ * 
+ * <h4>Slide Fade</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-fade.jpg" alt="Slide Fade" />
+ * 
+ * <h4>Cover/Uncover</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-cover.jpg" alt="Cover" />
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-uncover.jpg" alt="Uncover" />
+ * 
+ * <h4>Fade</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-fade.jpg" alt="Fade" />
  * 
  * @author Shai Almog, Chen Fishbein
  */
@@ -414,8 +434,7 @@ public final class CommonTransitions extends Transition {
             if (buffer == null) {
                 buffer = createMutableImage(w, h);
             } else {
-                // this might happen when screen orientation changes or a MIDlet moves
-                // to an external screen
+                // this might happen when screen orientation changes 
                 if(buffer.getWidth() != w || buffer.getHeight() != h) {
                     buffer = createMutableImage(w, h);
                     rgbBuffer = null;
@@ -474,8 +493,9 @@ public final class CommonTransitions extends Transition {
             int dest;
             int startOffset = 0;
             boolean direction = forward;
-            if ( (source.getUIManager().getLookAndFeel().isRTL())) {
-                    direction=!direction;
+            //flip the direction only for horizontal slides
+            if ((source.getUIManager().getLookAndFeel().isRTL()) && slideType == SLIDE_HORIZONTAL) {
+                direction = !direction;
             }
             if (slideType == SLIDE_HORIZONTAL) {
                 dest = w;
@@ -928,7 +948,7 @@ public final class CommonTransitions extends Transition {
         }
 
         boolean dir = forward;
-        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
+        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL() && slideType == SLIDE_HORIZONTAL) {
             dir = !dir;
         }
         if(dir) {

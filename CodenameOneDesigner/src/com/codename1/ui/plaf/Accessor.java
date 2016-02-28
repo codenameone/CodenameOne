@@ -153,6 +153,6 @@ public class Accessor {
     }
 
     public static HashMap<String, Object> getThemeProps() {
-        return UIManager.instance.getThemeProps();
+        return UIManager.getInstance().getThemeProps();
     }
 }

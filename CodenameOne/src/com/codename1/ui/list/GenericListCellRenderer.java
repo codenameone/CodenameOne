@@ -49,16 +49,23 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * The generic list cell renderer can display containers or arbitrary Codename One components
- * as items in a list. It generally relies on the source data being either a Map a CloudObject or
- * a list of Strings. It extracts values from the Map using the component name as
- * an indication to the Map key lookup.
- * This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.
- * Please notice that you must use at least two distinguished instances of the component
- * to render, reusing the same instance WILL NOT WORK.
- * Also the renderer instance cannot be reused for multiple lists, each list will need
- * a new instance of this renderer!
+ * <p>The generic list cell renderer can display containers or arbitrary Codename One components
+ * as items in a list. It relies on the source data being a {@code Map} object. It extracts values from 
+ * the {@code Map} using the component name as an indication to the Map key lookup.<br>
+ * This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.</p>
+ * <p>
+ * Please notice that you must use at least two distinct instances of the component
+ * when passing them to the constructor, reusing the same instance <b>WILL NOT WORK!</b><br>
+ * Furthermore, the renderer instance cannot be reused for multiple lists, each list will need
+ * a new instance of this renderer!</p>
+ * <p>
+ * Sample usage for this renderer follows:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png" alt="Sample of using the generic list cell renderer" />
  *
+ * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
+ * 
  * @author Shai Almog
  */
 public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRenderer<T> {

@@ -429,6 +429,8 @@ public class Component implements Animation, StyleListener {
         alwaysTensile = laf.isDefaultAlwaysTensile();
         tensileHighlightEnabled = laf.isDefaultTensileHighlight();
         scrollOpacityChangeSpeed = laf.getFadeScrollBarSpeed();
+        isScrollVisible = laf.isScrollVisible();
+        
         if(tensileHighlightEnabled) {
             tensileLength = 3;
         } else {
@@ -908,8 +910,18 @@ public class Component implements Animation, StyleListener {
         selectedStyle = null;
         disabledStyle = null;
         pressedStyle = null;
+        allStyles = null;
         if(!sizeRequestedByUser) {
             preferredSize = null;
+        }
+    }
+    
+    /**
+     * This method will remove the Component from its parent.
+     */
+    public void remove(){
+        if(parent != null){
+            parent.removeComponent(this);
         }
     }
 
@@ -1431,9 +1443,12 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Paints this component as a root by going to all the parent components and
+     * <p>Paints this component as a root by going to all the parent components and
      * setting the absolute translation based on coordinates and scroll status.
-     * Restores translation when the painting is finished.
+     * Restores translation when the painting is finished.<br>
+     * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
+     * that creates an image for sharing on social media</p>
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
      * 
      * @param g the graphics to paint this Component on
      */
@@ -1443,9 +1458,13 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Paints this component as a root by going to all the parent components and
+     * <p>Paints this component as a root by going to all the parent components and
      * setting the absolute translation based on coordinates and scroll status.
-     * Restores translation when the painting is finished.
+     * Restores translation when the painting is finished.<br>
+     * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
+     * that creates an image for sharing on social media</p>
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     * 
      * 
      * @param g the graphics to paint this Component on
      * @param background if true paints all parents background
@@ -3957,8 +3976,9 @@ public class Component implements Animation, StyleListener {
         
         
         Painter bgp = getStyle().getBgPainter();
-        animateBackground = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
-
+        boolean animateBackgroundB = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
+        animateBackground = animateBackgroundB || animateBackground;
+                
         if(getUIManager().getLookAndFeel().isFadeScrollBar()) {
             if(tensileHighlightIntensity > 0) {
                 tensileHighlightIntensity = Math.max(0, tensileHighlightIntensity - (scrollOpacityChangeSpeed * 2));
@@ -4424,8 +4444,8 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Used to reduce coupling between the TextArea component and display/implementation
-     * classes thus reduce the size of the hello world MIDlet
+     * Used to reduce coupling between the {@link TextArea} component and display/implementation
+     * classes thus reduce the size of the hello world 
      * 
      * @param text text after editing is completed
      */

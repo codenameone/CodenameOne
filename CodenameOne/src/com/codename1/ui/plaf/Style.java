@@ -1356,7 +1356,184 @@ public class Style {
     public int getPaddingTop() {
         return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP);
     }
+
+    /**
+     * Sets the Style Padding on the top, this is equivalent to calling {@code setPadding(Component.TOP, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setPaddingTop(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingTop(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("padding cannot be negative");
+        }
+        if (padding[Component.TOP] != gap) {
+            padding[Component.TOP] = gap;
+            modifiedFlag |= PADDING_MODIFIED;
+            firePropertyChanged(PADDING);
+        }
+    }
     
+    /**
+     * Sets the Style Padding on the bottom, this is equivalent to calling {@code setPadding(Component.BOTTOM, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setPaddingBottom(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingBottom(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("padding cannot be negative");
+        }
+        if (padding[Component.BOTTOM] != gap) {
+            padding[Component.BOTTOM] = gap;
+            modifiedFlag |= PADDING_MODIFIED;
+            firePropertyChanged(PADDING);
+        }
+    }
+    
+    /**
+     * Sets the Style Padding on the left, this is equivalent to calling {@code setPadding(Component.LEFT, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setPaddingLeft(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingLeft(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("padding cannot be negative");
+        }
+        if (padding[Component.LEFT] != gap) {
+            padding[Component.LEFT] = gap;
+            modifiedFlag |= PADDING_MODIFIED;
+            firePropertyChanged(PADDING);
+        }
+    }
+    
+    /**
+     * Sets the Style Padding on the right, this is equivalent to calling {@code setPadding(Component.RIGHT, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setPaddingRight(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setPaddingRight(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("padding cannot be negative");
+        }
+        if (padding[Component.RIGHT] != gap) {
+            padding[Component.RIGHT] = gap;
+            modifiedFlag |= PADDING_MODIFIED;
+            firePropertyChanged(PADDING);
+        }
+    }
+
+
+    /**
+     * Sets the Style margin on the top, this is equivalent to calling {@code setMargin(Component.TOP, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setMarginTop(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginTop(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("Margin cannot be negative");
+        }
+        if (margin[Component.TOP] != gap) {
+            margin[Component.TOP] = gap;
+            modifiedFlag |= MARGIN_MODIFIED;
+            firePropertyChanged(MARGIN);
+        }
+    }
+    
+    /**
+     * Sets the Style Margin on the bottom, this is equivalent to calling {@code setMargin(Component.BOTTOM, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setMarginBottom(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginBottom(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("Margin cannot be negative");
+        }
+        if (margin[Component.BOTTOM] != gap) {
+            margin[Component.BOTTOM] = gap;
+            modifiedFlag |= MARGIN_MODIFIED;
+            firePropertyChanged(MARGIN);
+        }
+    }
+    
+    /**
+     * Sets the Style Margin on the left, this is equivalent to calling {@code setMargin(Component.LEFT, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setMarginLeft(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginLeft(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("Margin cannot be negative");
+        }
+        if (margin[Component.LEFT] != gap) {
+            margin[Component.LEFT] = gap;
+            modifiedFlag |= MARGIN_MODIFIED;
+            firePropertyChanged(MARGIN);
+        }
+    }
+    
+    /**
+     * Sets the Style Margin on the right, this is equivalent to calling {@code setMargin(Component.RIGHT, gap, false);}
+     * 
+     * @param gap number of pixels to pad
+     */
+    public void setMarginRight(int gap) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.setMarginRight(gap);
+            }
+            return;
+        }
+        if (gap < 0) {
+            throw new IllegalArgumentException("Margin cannot be negative");
+        }
+        if (margin[Component.RIGHT] != gap) {
+            margin[Component.RIGHT] = gap;
+            modifiedFlag |= MARGIN_MODIFIED;
+            firePropertyChanged(MARGIN);
+        }
+    }
+
     /**
      * Returns the bottom padding in pixel 
      * @return the padding in pixels
@@ -1992,12 +2169,19 @@ public class Style {
      */
     public void setPaddingUnit(byte... paddingUnit) {
         if(proxyTo != null) {
+            if(paddingUnit != null && paddingUnit.length < 4) {
+                paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};
+            }
             for(Style s : proxyTo) {
                 s.setPaddingUnit(paddingUnit);
             }
             return;
         }
-        this.paddingUnit = paddingUnit;
+        if(paddingUnit != null && paddingUnit.length < 4) {
+            this.paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};
+        } else {
+            this.paddingUnit = paddingUnit;
+        }
     }
 
     /**
@@ -2016,11 +2200,18 @@ public class Style {
      */
     public void setMarginUnit(byte... marginUnit) {
         if(proxyTo != null) {
+            if(marginUnit != null && marginUnit.length < 4) {
+                marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};
+            }
             for(Style s : proxyTo) {
                 s.setMarginUnit(marginUnit);
             }
             return;
         }
-        this.marginUnit = marginUnit;
+        if(marginUnit != null && marginUnit.length < 4) {
+            this.marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};
+        } else {
+            this.marginUnit = marginUnit;
+        }
     }
 }

@@ -27,15 +27,25 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.SelectionListener;
 
 /**
- * Represents the data structure of the list, thus allowing a list to
+ * <p>Represents the data structure of the list, thus allowing a list to
  * represent any potential data source by referencing different implementations of this
  * interface. E.g. a list model can be implemented in such a way that it retrieves data
- * directly from storage (although caching would be recommended).
+ * directly from storage (although caching would be recommended).</p>
  * <p>It is the responsibility of the list to notify observers (specifically the view 
  * {@link com.codename1.ui.List} of any changes to its state (items removed/added/changed etc.)
- * thus the data would get updated on the view.
+ * thus the data would get updated on the view.</p>
  * 
- * @author Chen Fishbein
+ * <script src="https://gist.github.com/codenameone/5161090bcb3684a542ac.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-millionbooks.png" alt="Million books list model" />
+ * 
+  * <p>
+ * A {@code ListModel} can be used in conjunction with an {@link com.codename1.components.ImageViewer}
+ * to fetch images dynamically into the view:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/305c3f5426b0e2e80833.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png" alt="Image viewer with dynamic URL fetching model" />
+ * 
+* @author Chen Fishbein
  */
 public interface ListModel<T> {
     

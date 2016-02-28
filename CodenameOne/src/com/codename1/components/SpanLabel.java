@@ -33,8 +33,10 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
 /**
- * A multi line label component that can be easily localized, this is simply based
- * on a text area combined with a label.
+ * <p>A multi line label component that can be easily localized, this is simply based
+ * on a text area combined with a label.</p>
+ * <script src="https://gist.github.com/codenameone/55b73c621fea0263638a.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-spanlabel.png" alt="SpanLabel Sample" />
  *
  * @author Shai Almog
  */

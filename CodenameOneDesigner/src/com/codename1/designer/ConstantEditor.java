@@ -61,6 +61,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("defaultCommandImage", "Image to give a command with no icon");
         helpMap.put("dialogButtonCommandsBool", "Place commands in the dialogs as buttons");
         helpMap.put("dialogPosition", "Place the dialog in an arbitrary border layout position (e.g. North, South, Center etc.)");
+        helpMap.put("dialogBlurRadiusInt", "Sets the default Gaussian blur radius for the background of the dialogs. The default value is -1 indicating no blur");
         helpMap.put("centeredPopupBool", "Popup of the combo box will appear in the center of the screen");
         helpMap.put("changeTabOnFocusBool","Usefull for feature phones, allows changing the tab when the focus changes immediately without pressing a key");
         helpMap.put("checkBoxCheckDisImage","CheckBox image to use instead of Codename One drawing it on its own");
@@ -98,6 +99,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("formTransitionInImage", "Default transition Image for form, causes a Timeline transition effect");
         helpMap.put("formTransitionOut", "Default transition for form");
         helpMap.put("formTransitionOutImage", "Default transition Image for form, causes a Timeline transition effect");
+        helpMap.put("globalToobarBool", "Turns the toolbar API on/off globally");
         helpMap.put("hideBackCommandBool","Hides the back command from the side menu when possible");
         helpMap.put("hideEmptyTitleBool", "Indicates that a title with no content should be hidden even if the border for the title occupies space");
         helpMap.put("hideLeftSideMenuBool","Hides the side menu icon that appears on the left side of the UI");

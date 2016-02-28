@@ -56,8 +56,10 @@ import java.util.Vector;
  *<p>
  * A container doesn't implicitly reflow its elements and in that regard follows the direction of AWT/Swing. As
  * a result the layout can be animated to create a flowing effect for UI changes. This also provides improved
- * performance as a bonus.
+ * performance as a bonus. See this sample of {@code Container} animation:
  * </p>
+ * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
+ * 
  * <p>
  * Many components within Codename One (e.g. {@link com.codename1.ui.tree.Tree}, 
  * {@link com.codename1.ui.table.Table}, 
@@ -72,7 +74,7 @@ import java.util.Vector;
  * @author Chen Fishbein
  */
 public class Container extends Component implements Iterable<Component>{
-    private static boolean enableLayoutOnPaint = true;
+    static boolean enableLayoutOnPaint = true;
     private Component leadComponent;
     private Layout layout;
     private java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();
@@ -2247,7 +2249,12 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+     * <p>
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation<br>
+     * See: 
+     * </p>
+     * 
+     * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
      *
      * @param duration the duration in milliseconds for the animation
      */
@@ -2462,9 +2469,10 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * This method is the exact reverse of animateLayout, when completed it leaves the container in 
+     * <p>This method is the exact reverse of animateLayout, when completed it leaves the container in 
      * an invalid state. It is useful to invoke this in order to remove a component, transition to a
-     * different form or provide some other interaction.
+     * different form or provide some other interaction. E.g.:</p>
+     * <script src="https://gist.github.com/codenameone/ba6fdc5f841b083e13e9.js"></script>
      * 
      * @param duration the duration of the animation
      * @param opacity the opacity to which the layout will reach, allows fading out the components
@@ -2475,9 +2483,10 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * This method is the exact reverse of animateLayoutAndWait, when completed it leaves the container in 
+     * <p>This method is the exact reverse of animateLayoutAndWait, when completed it leaves the container in 
      * an invalid state. It is useful to invoke this in order to remove a component, transition to a
-     * different form or provide some other interaction.
+     * different form or provide some other interaction. E.g.:</p>
+     * <script src="https://gist.github.com/codenameone/ba6fdc5f841b083e13e9.js"></script>
      * 
      * @param duration the duration of the animation
      * @param opacity the opacity to which the layout will reach, allows fading out the components

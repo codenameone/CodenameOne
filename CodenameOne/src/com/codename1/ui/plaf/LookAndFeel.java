@@ -102,6 +102,7 @@ public abstract class LookAndFeel {
      */
     private int defaultSmoothScrollingSpeed = 150;
 
+    private boolean scrollVisible;
     private boolean fadeScrollEdge;
     private boolean fadeScrollBar;
     private int fadeScrollBarSpeed = 5;
@@ -908,7 +909,10 @@ public abstract class LookAndFeel {
             }
         }
 
+        Toolbar.setGlobalToolbar(manager.isThemeConstant("globalToobarBool", Toolbar.isGlobalToolbar()));
+        
         boolean isTouch = Display.getInstance().isTouchScreenDevice();
+        scrollVisible = manager.isThemeConstant("scrollVisibleBool", true);
         fadeScrollEdge = manager.isThemeConstant("fadeScrollEdgeBool", false);
         fadeScrollEdgeLength = manager.getThemeConstant("fadeScrollEdgeInt", fadeScrollEdgeLength);
         fadeScrollBar = manager.isThemeConstant("fadeScrollBarBool", false);
@@ -927,6 +931,7 @@ public abstract class LookAndFeel {
         disableColor = Integer.parseInt(manager.getThemeConstant("disabledColor", Integer.toHexString(disableColor)), 16);
         Dialog.setDefaultDialogPosition(manager.getThemeConstant("dialogPosition", Dialog.getDefaultDialogPosition()));
         Dialog.setCommandsAsButtons(manager.isThemeConstant("dialogButtonCommandsBool", Dialog.isCommandsAsButtons()));
+        Dialog.setDefaultBlurBackgroundRadius(manager.getThemeConstant("dialogBlurRadiusInt", (int)Dialog.getDefaultBlurBackgroundRadius()));
 
         List.setDefaultIgnoreFocusComponentWhenUnfocused(manager.isThemeConstant("ignorListFocusBool", List.isDefaultIgnoreFocusComponentWhenUnfocused()));
 
@@ -1371,6 +1376,13 @@ public abstract class LookAndFeel {
         return fadeScrollBarSpeed;
     }
 
+    /**
+     * @return scrollVisible
+     */ 
+    public boolean isScrollVisible() {
+        return scrollVisible;
+    }
+    
     /**
      * @param fadeScrollBarSpeed the fadeScrollBarSpeed to set
      */

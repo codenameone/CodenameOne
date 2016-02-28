@@ -101,7 +101,7 @@ public class Storage {
         }
         return INSTANCE;
     }
-
+    
     /**
      * Storage is cached for faster access, however this might cause a problem with refreshing
      * objects since they are not cloned. Clearing the cache allows to actually reload from the

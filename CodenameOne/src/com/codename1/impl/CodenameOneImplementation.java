@@ -339,6 +339,16 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Checks whether the native text editor is currently visible over top of the 
+     * given component (usually a {@code TextArea}
+     * @param c The textarea/component we are checking
+     * @return True if the native editor is visible.
+     */
+    public boolean isNativeEditorVisible(Component c) {
+        return this.isNativeInputSupported() && this.isEditingText(c);
+    }
+    
+    /**
      * In case of scrolling we can hide the text editor unless the user starts typing again,
      * this is only relevant for the async mode...
      */
@@ -5317,8 +5327,7 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
-    // END TRANSFORMATION METHODS--------------------------------------------------------------------
-    
+    // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {
         public void run() {
@@ -6737,5 +6746,16 @@ public abstract class CodenameOneImplementation {
     public void cancelLocalNotification(String notificationId) {
     }
     //ENDS METHODS FOR DEALING Local Notifications
+
+    
+    //METHODS FOR Imgae blur
+    public Image gaussianBlurImage(Image image, float radius) {
+        return image;
+    }
+
+    public boolean isGaussianBlurSupported() {
+        return false;
+    }
+    //ENDS METHODS FOR Imgae blur
     
 }

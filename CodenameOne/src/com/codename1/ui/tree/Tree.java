@@ -43,10 +43,19 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
 /**
- * The tree component allows constructing simple tree component hierechies that can be expaneded seamingly
- * with no limit. The tree is bound to a model that can provide data with free form depth such as file system
- * or similarly structured data.
- * To customize the look of the tree the component can be derived and component creation can be replaced.
+ * <p>The {@code Tree} component allows constructing simple tree component hierarchies that can be expanded 
+ * seamlessly with no limit. The tree is bound to a model that can provide data with free form depth such as file system
+ * or similarly structured data.<br>
+ * To customize the look of the tree the component can be derived and component creation can be replaced.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/870d4412694bca3092c4.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/tree.png" alt="Tree sample code" />
+ * 
+ * <p>
+ * And heres a more "real world" example showing an XML hierarchy in a {@code Tree}:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
  *
  * @author Shai Almog
  */

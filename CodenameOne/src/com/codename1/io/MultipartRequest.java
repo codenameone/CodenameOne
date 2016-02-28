@@ -34,8 +34,13 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 /**
- * A multipart post request allows a developer to submit large binary data 
- * files to the server in a post request
+ * <p>A multipart post request allows a developer to submit large binary data 
+ * files to the server in a multipart mime post request. This is a standard method
+ * for large binary file uploads to webservers and data services. The demo code
+ * below demonstrates uploading to the 
+ * <a href="https://www.filestack.com/features-upload" target="_blank">filestack.com</a> API.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/7f6e07dadbdd169648ed.js"></script>
  *
  * @author Shai Almog
  */

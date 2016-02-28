@@ -133,103 +133,103 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
 
             case Opcodes.BALOAD:
-                b.append("    { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* BALOAD */ \n" +
-                    "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \n" +
-                    "    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \n" +
+                b.append("    { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* BALOAD */ \n" +
+                    "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
+                    "    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
                     "    }\n");
                 break;
 
             case Opcodes.CALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* CALOAD */\n" +
-                    "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \n" +
-                    "    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i];\n");
+                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* CALOAD */\n" +
+                    "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
+                    "    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
                 break;
                 
             case Opcodes.IALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* IALOAD */\n" +
-                        "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \n" +
-                        "    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i];\n");
+                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* IALOAD */\n" +
+                        "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
+                        "    SP[-1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];\n");
                 break;
 
             case Opcodes.SALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \n" +
-                        "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \n" +
-                        "    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; /* SALOAD */\n");
+                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \n" +
+                        "    SP--; SP[-1].type = CN1_TYPE_INT; \n" +
+                        "    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; /* SALOAD */\n");
                 break;
 
             case Opcodes.LALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* LALOAD */\n" +
-                        "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_LONG; \n" +
-                        "    stack[stackPointer - 1].data.l = LONG_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 1].data.o, stack[stackPointer].data.i);\n");
+                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* LALOAD */\n" +
+                        "    SP--; SP[-1].type = CN1_TYPE_LONG; \n" +
+                        "    SP[-1].data.l = LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i);\n");
                 break;
 
             case Opcodes.FALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* FALOAD */\n" +
-                        "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_FLOAT; \n" +
-                        "    stack[stackPointer - 1].data.f = FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 1].data.o, stack[stackPointer].data.i);\n");
+                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* FALOAD */\n" +
+                        "    SP--; SP[-1].type = CN1_TYPE_FLOAT; \n" +
+                        "    SP[-1].data.f = FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i);\n");
                 break;
 
             case Opcodes.DALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* DALOAD */\n" +
-                        "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_DOUBLE; \n" +
-                        "    stack[stackPointer - 1].data.d = DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 1].data.o, stack[stackPointer].data.i);\n");
+                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* DALOAD */\n" +
+                        "    SP--; SP[-1].type = CN1_TYPE_DOUBLE; \n" +
+                        "    SP[-1].data.d = DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i);\n");
                 break;
 
             case Opcodes.AALOAD:
-                b.append("    CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); /* AALOAD */\n" +
-                        "    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INVALID; \n" +
-                        "    stack[stackPointer - 1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \n" +
-                        "    stack[stackPointer - 1].type = CN1_TYPE_OBJECT; \n");
+                b.append("    CHECK_ARRAY_ACCESS(2, SP[-1].data.i); /* AALOAD */\n" +
+                        "    SP--; SP[-1].type = CN1_TYPE_INVALID; \n" +
+                        "    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \n" +
+                        "    SP[-1].type = CN1_TYPE_OBJECT; \n");
                 break;
 
             case Opcodes.BASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); /* BASTORE */\n" +
-                        "    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3;\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* BASTORE */\n" +
+                        "    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.CASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); /* CASTORE */\n" +
-                        "    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3;\n\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* CASTORE */\n" +
+                        "    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n\n");
                 break;
 
             case Opcodes.SASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); /* SASTORE */\n" +
-                        "    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3;\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* SASTORE */\n" +
+                        "    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.IASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); /* IASTORE */\n" +
-                        "    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3;\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* IASTORE */\n" +
+                        "    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP -= 3;\n");
                 break;
 
             case Opcodes.LASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); /* LASTORE */\n" +
-                        "    LONG_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 3].data.o, stack[stackPointer - 2].data.i) = stack[stackPointer - 1].data.l; stackPointer -= 3;\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* LASTORE */\n" +
+                        "    LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.l; SP -= 3;\n");
                 break;
 
             case Opcodes.FASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); /* FASTORE */\n" +
-                        "    FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 3].data.o, stack[stackPointer - 2].data.i) = stack[stackPointer - 1].data.f; stackPointer -= 3;\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* FASTORE */\n" +
+                        "    FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.f; SP -= 3;\n");
                 break;
 
             case Opcodes.DASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); /* DASTORE */\n" +
-                        "    DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 3].data.o, stack[stackPointer - 2].data.i) = stack[stackPointer - 1].data.d; stackPointer -= 3;\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); /* DASTORE */\n" +
+                        "    DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.d; SP -= 3;\n");
                 break;
 
             case Opcodes.AASTORE:
-                b.append("    CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); { /* BC_AASTORE */\n" +
-                        "    JAVA_OBJECT aastoreTmp = stack[stackPointer - 3].data.o; \n" +
-                        "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.o; \n" +
-                        "    stackPointer -= 3; }\n");
+                b.append("    CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { /* BC_AASTORE */\n" +
+                        "    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \n" +
+                        "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \n" +
+                        "    SP -= 3; }\n");
                 break;
 
             case Opcodes.POP:
-                b.append("    stackPointer--; /* POP */\n");
+                b.append("    SP--; /* POP */\n");
                 break;
 
             case Opcodes.POP2:
-                b.append("    popMany(threadStateData, 2, stack, &stackPointer); /* POP2 */\n");
+                b.append("    popMany(threadStateData, 2, &SP); /* POP2 */\n");
                 break;
 
             /*case Opcodes.DUP:
@@ -269,211 +269,211 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
                 
             case Opcodes.SWAP:
-                b.append("    swapStack(stack, stackPointer); /* SWAP */\n");
+                b.append("    swapStack(SP); /* SWAP */\n");
                 break;
                 
             case Opcodes.IADD:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i + stack[stackPointer].data.i; /* IADD */\n");
+                b.append("    SP--; SP[-1].data.i = SP[-1].data.i + (*SP).data.i; /* IADD */\n");
                 break;
                 
             case Opcodes.LADD:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l + stack[stackPointer].data.l; /* LADD */\n");
+                b.append("    SP--; SP[-1].data.l = SP[-1].data.l + (*SP).data.l; /* LADD */\n");
                 break;
                 
             case Opcodes.FADD:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.f = stack[stackPointer - 1].data.f + stack[stackPointer].data.f; /* FADD */\n");
+                b.append("    SP--; SP[-1].data.f = SP[-1].data.f + (*SP).data.f; /* FADD */\n");
                 break;
                 
             case Opcodes.DADD:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.d + stack[stackPointer].data.d; /* DADD */\n");
+                b.append("    SP--; SP[-1].data.d = SP[-1].data.d + (*SP).data.d; /* DADD */\n");
                 break;
                 
             case Opcodes.ISUB:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i - stack[stackPointer].data.i); /* ISUB */\n");
+                b.append("    SP--; SP[-1].data.i = (SP[-1].data.i - (*SP).data.i); /* ISUB */\n");
                 break;
                 
             case Opcodes.LSUB:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = (stack[stackPointer - 1].data.l - stack[stackPointer].data.l); /* LSUB */\n");
+                b.append("    SP--; SP[-1].data.l = (SP[-1].data.l - (*SP).data.l); /* LSUB */\n");
                 break;
                 
             case Opcodes.FSUB:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.f = (stack[stackPointer - 1].data.f - stack[stackPointer].data.f); /* FSUB */\n");
+                b.append("    SP--; SP[-1].data.f = (SP[-1].data.f - (*SP).data.f); /* FSUB */\n");
                 break;
                 
             case Opcodes.DSUB:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.d = (stack[stackPointer - 1].data.d - stack[stackPointer].data.d); /* DSUB */\n");
+                b.append("    SP--; SP[-1].data.d = (SP[-1].data.d - (*SP).data.d); /* DSUB */\n");
                 break;
                 
             case Opcodes.IMUL:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i * stack[stackPointer].data.i; /* IMUL */\n");
+                b.append("    SP--; SP[-1].data.i = SP[-1].data.i * (*SP).data.i; /* IMUL */\n");
                 break;
                 
             case Opcodes.LMUL:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l * stack[stackPointer].data.l; /* LMUL */\n");
+                b.append("    SP--; SP[-1].data.l = SP[-1].data.l * (*SP).data.l; /* LMUL */\n");
                 break;
                 
             case Opcodes.FMUL:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.f = stack[stackPointer - 1].data.f * stack[stackPointer].data.f; /* FMUL */\n");
+                b.append("    SP--; SP[-1].data.f = SP[-1].data.f * (*SP).data.f; /* FMUL */\n");
                 break;
                 
             case Opcodes.DMUL:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.d * stack[stackPointer].data.d; /* DMUL */\n");
+                b.append("    SP--; SP[-1].data.d = SP[-1].data.d * (*SP).data.d; /* DMUL */\n");
                 break;
                 
             case Opcodes.IDIV:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i / stack[stackPointer].data.i; /* IDIV */\n");
+                b.append("    SP--; SP[-1].data.i = SP[-1].data.i / (*SP).data.i; /* IDIV */\n");
                 break;
                 
             case Opcodes.LDIV:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l / stack[stackPointer].data.l; /* LDIV */\n");
+                b.append("    SP--; SP[-1].data.l = SP[-1].data.l / (*SP).data.l; /* LDIV */\n");
                 break;
                 
             case Opcodes.FDIV:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.f = stack[stackPointer - 1].data.f / stack[stackPointer].data.f; /* FDIV */\n");
+                b.append("    SP--; SP[-1].data.f = SP[-1].data.f / (*SP).data.f; /* FDIV */\n");
                 break;
                 
             case Opcodes.DDIV:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.d / stack[stackPointer].data.d; /* DDIV */\n");
+                b.append("    SP--; SP[-1].data.d = SP[-1].data.d / (*SP).data.d; /* DDIV */\n");
                 break;
                 
             case Opcodes.IREM:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i % stack[stackPointer].data.i; /* IREM */\n");
+                b.append("    SP--; SP[-1].data.i = SP[-1].data.i % (*SP).data.i; /* IREM */\n");
                 break;
                 
             case Opcodes.LREM:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l % stack[stackPointer].data.l; /* LREM */\n");
+                b.append("    SP--; SP[-1].data.l = SP[-1].data.l % (*SP).data.l; /* LREM */\n");
                 break;
                 
             case Opcodes.FREM:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.f = fmod(stack[stackPointer - 1].data.f, stack[stackPointer].data.f); /* FREM */\n");
+                b.append("    SP--; SP[-1].data.f = fmod(SP[-1].data.f, (*SP).data.f); /* FREM */\n");
                 break;
                 
             case Opcodes.DREM:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.d = fmod(stack[stackPointer - 1].data.d, stack[stackPointer].data.d); /* DREM */\n");
+                b.append("    SP--; SP[-1].data.d = fmod(SP[-1].data.d, (*SP).data.d); /* DREM */\n");
                 break;
                 
             case Opcodes.INEG:
-                b.append("    stack[stackPointer - 1].data.i *= -1; /* INEG */\n");
+                b.append("    SP[-1].data.i *= -1; /* INEG */\n");
                 break;
                 
             case Opcodes.LNEG:
-                b.append("    stack[stackPointer - 1].data.l *= -1; /* LNEG */\n");
+                b.append("    SP[-1].data.l *= -1; /* LNEG */\n");
                 break;
                 
             case Opcodes.FNEG:
-                b.append("    stack[stackPointer - 1].data.f *= -1; /* FNEG */\n");
+                b.append("    SP[-1].data.f *= -1; /* FNEG */\n");
                 break;
                 
             case Opcodes.DNEG:
-                b.append("    stack[stackPointer - 1].data.d *= -1; /* DNEG */\n");
+                b.append("    SP[-1].data.d *= -1; /* DNEG */\n");
                 break;
                 
             case Opcodes.ISHL:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i << (0x1f & stack[stackPointer].data.i)); /* ISHL */\n");
+                b.append("    SP--; SP[-1].data.i = (SP[-1].data.i << (0x1f & (*SP).data.i)); /* ISHL */\n");
                 break;
                 
             case Opcodes.LSHL:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = (stack[stackPointer - 1].data.l << (0x3f & stack[stackPointer].data.l)); /* LSHL */\n");
+                b.append("    SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.i)); /* LSHL */\n");
                 break;
                 
             case Opcodes.ISHR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i >> (0x1f & stack[stackPointer].data.i)); /* ISHR */\n");
+                b.append("    SP--; SP[-1].data.i = (SP[-1].data.i >> (0x1f & (*SP).data.i)); /* ISHR */\n");
                 break;
                 
             case Opcodes.LSHR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = (stack[stackPointer - 1].data.l >> (0x3f & stack[stackPointer].data.l)); /* LSHR */\n");
+                b.append("    SP--; SP[-1].data.l = (SP[-1].data.l >> (0x3f & (*SP).data.l)); /* LSHR */\n");
                 break;
                 
             case Opcodes.IUSHR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = (((unsigned int)stack[stackPointer - 1].data.i) >> (0x1f & ((unsigned int)stack[stackPointer].data.i))); /* IUSHR */\n");
+                b.append("    SP--; SP[-1].data.i = (((unsigned int)SP[-1].data.i) >> (0x1f & ((unsigned int)(*SP).data.i))); /* IUSHR */\n");
                 break;
                 
             case Opcodes.LUSHR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = (((unsigned long long)stack[stackPointer - 1].data.l) >> (0x3f & ((unsigned long long)stack[stackPointer].data.i))); /* LUSHR */\n");
+                b.append("    SP--; SP[-1].data.l = (((unsigned long long)SP[-1].data.l) >> (0x3f & ((unsigned long long)(*SP).data.i))); /* LUSHR */\n");
                 break;
                 
             case Opcodes.IAND:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i & stack[stackPointer].data.i; /* IAND */\n") ;
+                b.append("    SP--; SP[-1].data.i = SP[-1].data.i & (*SP).data.i; /* IAND */\n") ;
                 break;
                 
             case Opcodes.LAND:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l & stack[stackPointer].data.l; /* LAND */\n") ;
+                b.append("    SP--; SP[-1].data.l = SP[-1].data.l & (*SP).data.l; /* LAND */\n") ;
                 break;
                 
             case Opcodes.IOR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i | stack[stackPointer].data.i; /* IOR */\n") ;
+                b.append("    SP--; SP[-1].data.i = SP[-1].data.i | (*SP).data.i; /* IOR */\n") ;
                 break;
                 
             case Opcodes.LOR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l | stack[stackPointer].data.l; /* LOR */\n") ;
+                b.append("    SP--; SP[-1].data.l = SP[-1].data.l | (*SP).data.l; /* LOR */\n") ;
                 break;
                 
             case Opcodes.IXOR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i ^ stack[stackPointer].data.i; /* IXOR */\n") ;
+                b.append("    SP--; SP[-1].data.i = SP[-1].data.i ^ (*SP).data.i; /* IXOR */\n") ;
                 break;
                 
             case Opcodes.LXOR:
-                b.append("    stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l ^ stack[stackPointer].data.l; /* LXOR */\n") ;
+                b.append("    SP--; SP[-1].data.l = SP[-1].data.l ^ (*SP).data.l; /* LXOR */\n") ;
                 break;
                 
             case Opcodes.I2L:
-                b.append("    stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.i; /* I2L */\n");
+                b.append("    SP[-1].data.l = SP[-1].data.i; /* I2L */\n");
                 break;
                 
             case Opcodes.I2F:
-                b.append("    stack[stackPointer - 1].data.f = (JAVA_FLOAT)stack[stackPointer - 1].data.i; /* I2F */\n");
+                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.i; /* I2F */\n");
                 break;
                 
             case Opcodes.I2D:
-                b.append("    stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.i; /* I2D */;\n");
+                b.append("    SP[-1].data.d = SP[-1].data.i; /* I2D */;\n");
                 break;
                 
             case Opcodes.L2I:
-                b.append("    stack[stackPointer - 1].data.i = (JAVA_INT)stack[stackPointer - 1].data.l; /* L2I */\n");
+                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.l; /* L2I */\n");
                 break;
                 
             case Opcodes.L2F:
-                b.append("    stack[stackPointer - 1].data.f = (JAVA_FLOAT)stack[stackPointer - 1].data.l; /* L2F */\n");
+                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.l; /* L2F */\n");
                 break;
                 
             case Opcodes.L2D:
-                b.append("    stack[stackPointer - 1].data.d = (JAVA_DOUBLE)stack[stackPointer - 1].data.l; /* L2D */\n");
+                b.append("    SP[-1].data.d = (JAVA_DOUBLE)SP[-1].data.l; /* L2D */\n");
                 break;
                 
             case Opcodes.F2I:
-                b.append("    stack[stackPointer - 1].data.i = (JAVA_INT)stack[stackPointer - 1].data.f; /* F2I */\n");
+                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.f; /* F2I */\n");
                 break;
                 
             case Opcodes.F2L:
-                b.append("    stack[stackPointer - 1].data.l = (JAVA_LONG)stack[stackPointer - 1].data.f; /* F2L */\n");
+                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.f; /* F2L */\n");
                 break;
                 
             case Opcodes.F2D:
-                b.append("    stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.f; /* F2D */\n");
+                b.append("    SP[-1].data.d = SP[-1].data.f; /* F2D */\n");
                 break;
                 
             case Opcodes.D2I:
-                b.append("    stack[stackPointer - 1].data.i = (JAVA_INT)stack[stackPointer - 1].data.d; /* D2I */\n");
+                b.append("    SP[-1].data.i = (JAVA_INT)SP[-1].data.d; /* D2I */\n");
                 break;
                 
             case Opcodes.D2L:
-                b.append("    stack[stackPointer - 1].data.l = (JAVA_LONG)stack[stackPointer - 1].data.d; /* D2L */\n");
+                b.append("    SP[-1].data.l = (JAVA_LONG)SP[-1].data.d; /* D2L */\n");
                 break;
                 
             case Opcodes.D2F:
-                b.append("    stack[stackPointer - 1].data.f = (JAVA_FLOAT)stack[stackPointer - 1].data.d; /* D2F */\n");
+                b.append("    SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.d; /* D2F */\n");
                 break;
                 
             case Opcodes.I2B:
-                b.append("    stack[stackPointer - 1].data.i = ((stack[stackPointer - 1].data.i << 24) >> 24); /* I2B */\n");
+                b.append("    SP[-1].data.i = ((SP[-1].data.i << 24) >> 24); /* I2B */\n");
                 break;
                 
             case Opcodes.I2C:
-                b.append("    stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i & 0xffff); /* I2C */\n");
+                b.append("    SP[-1].data.i = (SP[-1].data.i & 0xffff); /* I2C */\n");
                 break;
                 
             case Opcodes.I2S:
-                b.append("    stack[stackPointer - 1].data.i = ((stack[stackPointer - 1].data.i << 16) >> 16); /* I2S */\n");
+                b.append("    SP[-1].data.i = ((SP[-1].data.i << 16) >> 16); /* I2S */\n");
                 break;
                 
             case Opcodes.LCMP:
@@ -494,13 +494,13 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
                 
                 if(TryCatch.isTryCatchInMethod()) {
-                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals, methodBlockOffset); \n    return stack[stackPointer - 1].data.i;\n");
+                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return SP[-1].data.i;\n");
+//                    b.append(maxLocals);
+//                    b.append(", stack, locals, methodBlockOffset); \n    return SP[-1].data.i;\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals); \n    return stack[stackPointer - 1].data.i;\n");
+                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return SP[-1].data.i;\n");
+//                    b.append(maxLocals);
+//                    b.append(", stack, locals); \n    return SP[-1].data.i;\n");
                 }
                 break;                
                 
@@ -508,13 +508,9 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
                                 
                 if(TryCatch.isTryCatchInMethod()) {
-                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals, methodBlockOffset); \n    return POP_LONG();\n");
+                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_LONG();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals); \n    return POP_LONG();\n");
+                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_LONG();\n");
                 }
                 break;                
                 
@@ -522,13 +518,9 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
                 
                 if(TryCatch.isTryCatchInMethod()) {
-                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals, methodBlockOffset); \n    return POP_FLOAT();\n");
+                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_FLOAT();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals); \n    return POP_FLOAT();\n");
+                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_FLOAT();\n");
                 }
                 break;                
                 
@@ -536,13 +528,9 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
                 
                 if(TryCatch.isTryCatchInMethod()) {
-                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals, methodBlockOffset); \n    return POP_DOUBLE();\n");
+                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_DOUBLE();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals); \n    return POP_DOUBLE();\n");
+                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_DOUBLE();\n");
                 }
                 break;
                 
@@ -550,13 +538,9 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 appendSynchronized(b);
                 
                 if(TryCatch.isTryCatchInMethod()) {
-                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals, methodBlockOffset); \n    return POP_OBJ();\n");
+                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_OBJ();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals); \n    return POP_OBJ();\n");
+                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_OBJ();\n");
                 }
                 break;
                 
@@ -568,23 +552,19 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     break;
                 }
                 if(TryCatch.isTryCatchInMethod()) {
-                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals, methodBlockOffset); \n    return;\n");
+                    b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return;\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, ");
-                    b.append(maxLocals);
-                    b.append(", stack, locals); \n    return;\n");
+                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return;\n");
                 }
                 break;
                 
             case Opcodes.ARRAYLENGTH:
                 b.append("    { /* ARRAYLENGTH */\n" +
-                    "        if(stack[stackPointer - 1].data.o == JAVA_NULL) { \n" +
+                    "        if(SP[-1].data.o == JAVA_NULL) { \n" +
                     "            throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); \n" +
                     "        }; \n" +
-                    "        stack[stackPointer - 1].type = CN1_TYPE_INT; \n" +
-                    "        stack[stackPointer - 1].data.i = (*((JAVA_ARRAY)stack[stackPointer - 1].data.o)).length; \n" +
+                    "        SP[-1].type = CN1_TYPE_INT; \n" +
+                    "        SP[-1].data.i = (*((JAVA_ARRAY)SP[-1].data.o)).length; \n" +
                     "    }\n");
                 break;                
                 
@@ -612,28 +592,28 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
             case Opcodes.NEWARRAY:
                 switch(value) {
                     case 4: // boolean
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_BOOLEAN, sizeof(JAVA_ARRAY_BOOLEAN), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_BOOLEAN, sizeof(JAVA_ARRAY_BOOLEAN), 1));\n");
                         break;
                     case 5: // char
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1));\n");
                         break;
                     case 6: // float
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_FLOAT, sizeof(JAVA_ARRAY_FLOAT), 1));\n");
                         break;
                     case 7: // double
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_DOUBLE, sizeof(JAVA_ARRAY_DOUBLE), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_DOUBLE, sizeof(JAVA_ARRAY_DOUBLE), 1));\n");
                         break;
                     case 8: // byte
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1));\n");
                         break;
                     case 9: // short
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_SHORT, sizeof(JAVA_ARRAY_SHORT), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_SHORT, sizeof(JAVA_ARRAY_SHORT), 1));\n");
                         break;
                     case 10: // int
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_INT, sizeof(JAVA_ARRAY_INT), 1));\n");
                         break;
                     case 11: // long 
-                        b.append("    stackPointer--; PUSH_OBJ(allocArray(threadStateData, stack[stackPointer].data.i, &class_array1__JAVA_LONG, sizeof(JAVA_ARRAY_LONG), 1));\n");
+                        b.append("    SP--; PUSH_OBJ(allocArray(threadStateData, (*SP).data.i, &class_array1__JAVA_LONG, sizeof(JAVA_ARRAY_LONG), 1));\n");
                         break;
                 }
                 break;
