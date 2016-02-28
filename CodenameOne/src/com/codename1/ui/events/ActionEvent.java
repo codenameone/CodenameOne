@@ -41,16 +41,119 @@ public class ActionEvent {
      *
      */
     public enum Type {
-
-            Other,					// unspecified, someone called one of the old undifferentiated constructors.
-            Command,				// some type of command 
-            Pointer, PointerPressed, PointerReleased, PointerDrag, Swipe,	// pointer activity
-            KeyPress, KeyRelease,	// key activity
-            Exception, Response,Progress,Data, 	// network activity
-            Calendar,			// calendar
-            Edit,Done,			// text area
-            File,JavaScript,Log,	// file system
-            Theme, Show, SizeChange, OrientationChange	// window status changes
+            /**
+             * Unspecified command type, this occurs when one of the old undifferentiated constructors was invoked
+             */
+            Other,
+            
+            /**
+             * Triggered by a command
+             */
+            Command,				
+            
+            /**
+             * Pointer event that doesn't necessarily fall into one of the other pointer event values
+             */
+            Pointer, 
+            
+            /**
+             * Pointer event
+             */
+            PointerPressed, 
+            
+            /**
+             * Pointer event
+             */
+            PointerReleased, 
+            
+            
+            /**
+             * Pointer event
+             */
+            PointerDrag, 
+            
+            
+            /**
+             * Pointer swipe event currently fired by {@link com.codename1.ui.SwipeableContainer#addSwipeOpenListener(com.codename1.ui.events.ActionListener)}
+             */
+            Swipe,	
+            
+            /**
+             * Fired by key events
+             */
+            KeyPress, 
+            
+            
+            /**
+             * Fired by key events
+             */
+            KeyRelease,	
+            
+            /**
+             * Network event fired in case of a network error
+             */
+            Exception, 
+            
+            /**
+             * Network event fired in case of a network response code event
+             */
+            Response,
+            
+            /**
+             * Network event fired in case of progress update
+             */
+            Progress,
+            
+            /**
+             * Network event fired in case of a network response containing data
+             */
+            Data, 	
+            
+            /**
+             * Event from {@link com.codename1.ui.Calendar}
+             */
+            Calendar,			
+            
+            /**
+             * Fired on a {@link com.codename1.ui.TextArea} action event
+             */
+            Edit,
+            
+            /**
+             * Fired on a {@link com.codename1.ui.TextField#setDoneListener(com.codename1.ui.events.ActionListener)} action event
+             */
+            Done,			
+            
+            /**
+             * Fired by the {@link com.codename1.javascript.JavascriptContext} 
+             */
+            JavaScript,
+            
+            /**
+             * Logging event to used for log/filesystem decoupling
+             */
+            Log,
+            
+            /**
+             * Fired when the theme changes
+             */
+            Theme, 
+            
+            /**
+             * Fired when a {@link com.codename1.ui.Form} is shown
+             */
+            Show, 
+            
+            
+            /**
+             * Fired when a {@link com.codename1.ui.Form#sizeChanged(int, int)} occurs 
+             */
+            SizeChange, 
+            
+            /**
+             * Fired when a {@link com.codename1.ui.Form} is rotated 
+             */
+            OrientationChange	
             } ;
     private Type trigger;
     
@@ -295,7 +398,7 @@ public class ActionEvent {
      * <p>Returns the component that generated the event. <b>important</b> this might not be the actual component.
      * In case of a lead component such as {@link com.codename1.components.MultiButton} the underlying 
      * {@link com.codename1.ui.Button} will be returned and not the {@link com.codename1.components.MultiButton} 
-     * itself. To get the component that you would logically think of as the source component use the {@code getActualComponent}
+     * itself. To get the component that you would logically think of as the source component use the {@link #getActualComponent}
      * method.</p>
      * <p>If you are in doubt use the {@code getActualComponent} method.</p>
      * 
