@@ -197,10 +197,14 @@ public class Image {
     }
 
     /**
-     * Creates a mask from the given image, a mask can be used to apply an arbitrary
+     * <p>Creates a mask from the given image, a mask can be used to apply an arbitrary
      * alpha channel to any image. A mask is derived from the blue channel (LSB) of
-     * the given image.
-     * The generated mask can be used with the apply mask method.
+     * the given image, other channels are ignored.<br>
+     * The generated mask can be used with the apply mask method.<br>
+     * The sample below demonstrates the masking of an image based on a circle drawn on a mutable image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
      * 
      * @return mask object that can be used with applyMask
      */
@@ -215,9 +219,13 @@ public class Image {
     }
 
     /**
-     * Applies the given alpha mask onto this image and returns the resulting image
+     * <p>Applies the given alpha mask onto this image and returns the resulting image
      * see the createMask method for indication on how to convert an image into an alpha
-     * mask.
+     * mask.</p>
+     * The sample below demonstrates the masking of an image based on a circle drawn on a mutable image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
      * 
      * @param mask mask object created by the createMask() method.
      * @param x starting x where to apply the mask
@@ -582,6 +590,12 @@ public class Image {
      * The sample below shows this method being used to create a screenshot for sharing the image:</p>
      * 
      * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     * 
+     * <p>
+     * The sample below demonstrates the drawing of a mask image to create a round image effect
+     * </p>
+     * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
      * 
      * @param width the image width
      * @param height the image height

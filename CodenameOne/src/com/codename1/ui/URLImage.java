@@ -58,8 +58,12 @@ import java.util.ArrayList;
  * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" /><br><br>
  * 
  * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
-
  *
+ * <p>
+ * You can use adapters with masks using syntax similar to this to create a round image mask for a {@code URLImage}:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/2515be7528ef3e402ec0.js"></script>
+ * 
  * @author Shai Almog
  */
 public class URLImage extends EncodedImage {    
@@ -158,9 +162,12 @@ public class URLImage extends EncodedImage {
     }
     
     /**
-     * Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the 
+     * <p>Creates an adapter that uses an image as a Mask, this is roughly the same as SCALE_TO_FILL with the 
      * exception that a mask will be applied later on. This adapter requires that the resulting image be in the size
-     * of the imageMask!
+     * of the imageMask!<br>
+     * See the sample usage code below that implements a circular image masked downloader:</p>
+     * <script src="https://gist.github.com/codenameone/2515be7528ef3e402ec0.js"></script>
+     * 
      * @param imageMask the mask image see the createMask() method of image for details of what a mask is, it
      * will be used as the reference size for the image and resulting images must be of the same size!
      * @return the adapter

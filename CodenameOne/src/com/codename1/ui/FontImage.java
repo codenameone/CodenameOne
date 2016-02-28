@@ -28,7 +28,46 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
 
 /**
- * An image based on icon fonts that adapts its environment
+ * <p>{@code FontImage} allows using an icon font as if it was an image. You can specify the character, color and 
+ * size and then treat the `FontImage` as if its a regular image. The huge benefits are that the font image can 
+ * adapt to platform conventions in terms of color and easily scale to adapt to DPI.</p>
+ *
+ * <p>You can generate icon fonts using free tools on the Internet such as 
+ * <a href="http://fontello.com/">this</a>. Icon fonts are a remarkably simple and powerful technique to 
+ * create a small, modern applications.</p>
+ * 
+ * <p>Icon fonts can be created in 2 basic ways the first is explicitly by defining all of the elements within the font:</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/9c881350e1d142081aba.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/graphics-fontimage-fixed.png" alt="Icon font from material design icons created with the fixed size of display width" />
+ * 
+ * <p>The second approach uses a {@link com.codename1.ui.plaf.Style} object thru either {@link #create(java.lang.String, com.codename1.ui.plaf.Style)}
+ * or {@link #create(java.lang.String, com.codename1.ui.plaf.Style, com.codename1.ui.Font)}:</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/da3912b9ccef03f58058.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/graphics-fontimage-style.png" alt="An image created from the Style object" />
+ * 
+ * <h3>Material Design Icon Fonts</h3>
+ * <p>
+ * There are many icon fonts in the web, the field is rather volatile and constantly changing. However, we wanted 
+ * to have builtin icons that would allow us to create better looking demos and builtin components.
+ * </p>
+ * <p>
+ * That's why we picked the material design icon font for inclusion in the Codename One distribution. It features 
+ * a relatively stable core set of icons, that aren't IP encumbered.
+ * </p>
+ * <p>
+ * You can use the builtin font directly as demonstrated above but there are far better ways to create a material 
+ * design icon. To find the icon you want you can check out the 
+ * <a href="https://design.google.com/icons/" target="_blank">material design icon gallery</a>. 
+ * E.g. we used the save icon in the samples above.<br>
+ * To recreate the save icon from above we can do something like:
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/34fd9e519ec3d305a015.js"></script>
+ * 
+ * <p>This can also be expressed using the shorthand syntax:</p>
+ * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
  *
  * @author Shai Almog
  */
@@ -4509,8 +4548,10 @@ public class FontImage extends Image {
     }
 
     /**
-     * Applies a material design icon (one of the MATERIAL_* icons above) to the given label using the 
-     * styling of the label
+     * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * 
      * @param l a label or subclass (e.g. Button etc.)
      * @param icon one of the MATERIAL_* icons
      */
@@ -4523,8 +4564,9 @@ public class FontImage extends Image {
     }
 
     /**
-     * Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
-     * styling of the label
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * @param l a multibutton
      * @param icon one of the MATERIAL_* icons
      */
@@ -4537,8 +4579,9 @@ public class FontImage extends Image {
     }
     
     /**
-     * Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
-     * styling of the label
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * @param l a SpanButton
      * @param icon one of the MATERIAL_* icons
      */
@@ -4616,8 +4659,11 @@ public class FontImage extends Image {
     }
 
     /**
-     * Creates a font image
+     * <p>Creates a font image with a fixed size/appearance</p>
      *
+     * <script src="https://gist.github.com/codenameone/9c881350e1d142081aba.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-fontimage-fixed.png" alt="Icon font from material design icons created with the fixed size of display width" />
+     * 
      * @param text the text of the font image
      * @param fnt the font
      * @param color the color for the image foreground
@@ -4636,7 +4682,10 @@ public class FontImage extends Image {
     }
 
     /**
-     * Creates the font image
+     * <p>Creates the font image based on the given style, the font in the style is assumed to be an icon font</p>
+     *  
+     * <script src="https://gist.github.com/codenameone/da3912b9ccef03f58058.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-fontimage-style.png" alt="An image created from the Style object" />
      *
      * @param text the text for the font image
      * @param s the style
@@ -4647,7 +4696,11 @@ public class FontImage extends Image {
     }
 
     /**
-     * Creates the font image
+     * <p>Creates the font image with the given style settings but uses the given font, notice that the
+     * size of the given font determines the size of the icon!</p>
+     *  
+     * <script src="https://gist.github.com/codenameone/da3912b9ccef03f58058.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-fontimage-style.png" alt="An image created from the Style object" />
      *
      * @param text the text for the font image
      * @param s the style
@@ -4669,7 +4722,9 @@ public class FontImage extends Image {
     }
     
     /**
-     * Creates a material design icon font for the given style
+     * <p>Creates a material design icon font for the given style</p>
+     * <script src="https://gist.github.com/codenameone/34fd9e519ec3d305a015.js"></script>
+     * 
      * @param icon the icon, one of the MATERIAL_* constants
      * @param s the style to use, notice the font in the style only matters in terms of size and nothing else
      * @return a new icon

@@ -35,10 +35,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * This is the main class for capturing media files from the device.
- * Use this class to invoke the native camera to capture images, audio or video
+ * <p>{@code Capture} can "capture" media files from the device e.g. record audio, video and snap photos.
  * Notice that files returned by this class are potentially temporary files and might be
- * deleted by the OS in the future.
+ * deleted by the OS in the future.<br>
+ * The code below demonstrates the capturing of a photo thru this API:</p>
+ * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
+ * 
  * @author Chen
  */
 public class Capture {
@@ -101,7 +104,10 @@ public class Capture {
     }
 
     /**
-     * Invokes the camera and takes a photo synchronously while blocking the EDT
+     * <p>Invokes the camera and takes a photo synchronously while blocking the EDT, the sample below
+     * demonstrates a simple usage and applying a mask to the result</p>
+     * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
      * 
      * @param width the target width for the image if possible, some platforms don't support scaling. To maintain aspect ratio set to -1
      * @param height the target height for the image if possible, some platforms don't support scaling. To maintain aspect ratio set to -1

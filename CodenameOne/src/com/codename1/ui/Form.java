@@ -539,11 +539,17 @@ public class Form extends Container {
     }
 
     /**
-     * Allows a developer that doesn't derive from the form to draw on top of the 
+     * <p>Allows a developer that doesn't derive from the form to draw on top of the 
      * form regardless of underlying changes or animations. This is useful for
      * watermarks or special effects (such as tinting) it is also useful for generic
      * drawing of validation errors etc... A glass pane is generally 
-     * transparent or translucent and allows the the UI bellow to be seen.
+     * transparent or translucent and allows the the UI below to be seen.</p>
+     * <p>
+     * The example shows a glasspane running on top of a field to show a validation hint,
+     * notice that for real world usage you should probably look into {@link com.codename1.ui.validation.Validator}
+     * </p>
+     * <script src="https://gist.github.com/codenameone/f5b83373088600b19610.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-glasspane.png" alt="Sample of glasspane" />
      * 
      * @param glassPane a new glass pane to install. It is generally recommended to
      * use a painter chain if more than one painter is required.
@@ -630,11 +636,17 @@ public class Form extends Container {
     }
 
     /**
-     * Allows a developer that doesn't derive from the form to draw on top of the 
+     * <p>Allows a developer that doesn't derive from the form to draw on top of the 
      * form regardless of underlying changes or animations. This is useful for
      * watermarks or special effects (such as tinting) it is also useful for generic
      * drawing of validation errors etc... A glass pane is generally 
-     * transparent or translucent and allows the the UI bellow to be seen.
+     * transparent or translucent and allows the the UI below to be seen.</p>
+     * <p>
+     * The example shows a glasspane running on top of a field to show a validation hint,
+     * notice that for real world usage you should probably look into {@link com.codename1.ui.validation.Validator}
+     * </p>
+     * <script src="https://gist.github.com/codenameone/f5b83373088600b19610.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-glasspane.png" alt="Sample of glasspane" />
      * 
      * @return the instance of the glass pane for this form
      * @see com.codename1.ui.painter.PainterChain#installGlassPane(Form, com.codename1.ui.Painter) 

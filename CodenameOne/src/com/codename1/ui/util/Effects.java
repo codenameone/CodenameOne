@@ -38,7 +38,7 @@ public class Effects {
     private Effects() {}
 
     /**
-     * Takes the given image and appends an effect of reflection bellow it that
+     * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
      * 
@@ -50,7 +50,7 @@ public class Effects {
     }
     
     /**
-     * Takes the given image and appends an effect of reflection bellow it that
+     * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
      * 
@@ -67,7 +67,7 @@ public class Effects {
     }
 
     /**
-     * Takes the given image and appends an effect of reflection bellow it that
+     * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
      *

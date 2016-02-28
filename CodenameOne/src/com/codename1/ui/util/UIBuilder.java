@@ -2671,7 +2671,7 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * Returns either the parent form or the component bellow the embedded container
+     * Returns either the parent form or the component below the embedded container
      * above c.
      * 
      * @param c the component whose root ancestor we should find

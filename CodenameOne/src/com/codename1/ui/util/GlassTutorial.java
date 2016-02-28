@@ -61,7 +61,7 @@ public class GlassTutorial implements Painter {
      * is indicated with border layout attributes. Notice you can place multiple components on a single 
      * element and they will be rendered in order e.g. a component with a border can be used to "circle"
      * the destination by placing it in the CENTER position and another arrow with text can be places in 
-     * the south position bellow.
+     * the south position below.
      * 
      * @param hintComponent The component that would be renderered in the given position
      * @param destinationComponent the "hinted" component over which the hint will show
