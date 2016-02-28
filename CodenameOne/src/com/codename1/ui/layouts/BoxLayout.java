@@ -96,6 +96,23 @@ public class BoxLayout extends Layout{
     }
     
     /**
+     * Shorthand for {@code new BoxLayout(BoxLayout.Y_AXIS)}
+     * @return a new Y axis {@code BoxLayout}
+     */
+    public static BoxLayout y() {
+        return new BoxLayout(BoxLayout.Y_AXIS);
+    }
+    
+    
+    /**
+     * Shorthand for {@code new BoxLayout(BoxLayout.X_AXIS)}
+     * @return a new X axis {@code BoxLayout}
+     */
+    public static BoxLayout x() {
+        return new BoxLayout(BoxLayout.X_AXIS);
+    }
+
+    /**
      * {@inheritDoc}
      */
     public void layoutContainer(Container parent) {        
