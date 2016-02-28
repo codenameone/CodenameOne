@@ -850,11 +850,18 @@ public class TextField extends TextArea {
     }
 
     /**
-     * Cleares the text from the TextField
+     * Clears the text from the TextField
      */
     public void clear(){
-        setText("");
-        commitChange();
+        if(isEditing()) {
+            stopEditing();
+            setText("");
+            commitChange();
+            startEditingAsync();
+        } else {
+            setText("");
+            commitChange();
+        }
     }   
     
     /**
