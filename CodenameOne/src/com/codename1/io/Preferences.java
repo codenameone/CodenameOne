@@ -25,8 +25,20 @@ package com.codename1.io;
 import java.util.Hashtable;
 
 /**
- * Simple map like class to store application and Codename One preference 
- * settings. 
+ * <p>Simple map like class to store application and Codename One preference 
+ * settings in the {@link com.codename1.io.Storage}. <br>
+ * Simple usage of the class for storing a {@code String} token:</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/fc7693ef69108e90057c.js"></script>
+ * 
+ * <p>
+ * Notice that this class might get somewhat confusing with primitive numbers e.g. if you use 
+ * {@code Preferences.set("primitiveLongValue", myLongNumber)} then invoke 
+ * {@code Preferences.get("primitiveLongValue", 0)} you might get an exception!<br>
+ * This would happen because the value is physically a {@code Long} object but you are trying to get an 
+ * {@code Integer}. <br>
+ * The workaround is to remain consistent and use code like this {@code Preferences.get("primitiveLongValue", (long)0)}.
+ * </p>
  *
  * @author Shai Almog
  */

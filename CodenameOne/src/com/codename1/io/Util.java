@@ -173,7 +173,12 @@ public class Util {
     }
 
     /**
-     * Registers this externalizable so readObject will be able to load such objects
+     * <p>Registers this externalizable so readObject will be able to load such objects.</p>
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
+     *
      *
      * @param e the externalizable instance
      */
@@ -182,7 +187,12 @@ public class Util {
     }
 
     /**
-     * Registers this externalizable so readObject will be able to load such objects
+     * <p>Registers this externalizable so readObject will be able to load such objects.</p>
+     *
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param id id of the externalizable
      * @param c the class for the externalizable
@@ -192,7 +202,13 @@ public class Util {
     }
 
     /**
-     * Writes an object to the given output stream
+     * <p>Writes an object to the given output stream, notice that it should be externalizable or one of
+     * the supported types.</p>
+     * 
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param o the object to write which can be null
      * @param out the destination output stream
@@ -489,7 +505,13 @@ public class Util {
     }
 
     /**
-     * Reads an object from the stream
+     * <p>Reads an object from the stream, notice that this is the inverse of the 
+     * {@link #writeObject(java.lang.Object, java.io.DataOutputStream)}.</p>
+     *
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param input the source input stream
      * @throws IOException thrown by the stream
