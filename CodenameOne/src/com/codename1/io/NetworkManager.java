@@ -560,7 +560,7 @@ public class NetworkManager {
      * @param request the request object to add
      */
     public void addToQueueAndWait(final ConnectionRequest request) {
-        class WaitingClass implements Runnable, ActionListener {
+        class WaitingClass implements Runnable, ActionListener<NetworkEvent> {
             private boolean finishedWaiting;
             public void run() {
                 while(!finishedWaiting) {
@@ -572,8 +572,7 @@ public class NetworkManager {
                 }
             }
 
-            public void actionPerformed(ActionEvent evt) {
-                NetworkEvent e = (NetworkEvent)evt;
+            public void actionPerformed(NetworkEvent e) {
                 if(e.getError() != null) {
                     finishedWaiting = true;
                     removeProgressListener(this);
@@ -750,7 +749,7 @@ public class NetworkManager {
      *
      * @param e callback will be invoked with the Exception as the source object
      */
-    public void addErrorListener(ActionListener e) {
+    public void addErrorListener(ActionListener<NetworkEvent> e) {
         if(errorListeners == null) {
             errorListeners = new EventDispatcher();
             errorListeners.setBlocking(true);
@@ -763,7 +762,7 @@ public class NetworkManager {
      *
      * @param e callback to remove
      */
-    public void removeErrorListener(ActionListener e) {
+    public void removeErrorListener(ActionListener<NetworkEvent> e) {
         if(errorListeners == null) {
             return;
         }
@@ -776,7 +775,7 @@ public class NetworkManager {
      *
      * @param al action listener
      */
-    public void addProgressListener(ActionListener al) {
+    public void addProgressListener(ActionListener<NetworkEvent> al) {
         if(progressListeners == null) {
             progressListeners = new EventDispatcher();
             progressListeners.setBlocking(false);
@@ -789,7 +788,7 @@ public class NetworkManager {
      *
      * @param al action listener
      */
-    public void removeProgressListener(ActionListener al) {
+    public void removeProgressListener(ActionListener<NetworkEvent> al) {
         if(progressListeners == null) {
             return;
         }

@@ -1353,7 +1353,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void addResponseListener(ActionListener a) {
+    public void addResponseListener(ActionListener<NetworkEvent> a) {
         if(actionListeners == null) {
             actionListeners = new EventDispatcher();
             actionListeners.setBlocking(false);
@@ -1366,7 +1366,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void removeResponseListener(ActionListener a) {
+    public void removeResponseListener(ActionListener<NetworkEvent> a) {
         if(actionListeners == null) {
             return;
         }
@@ -1382,7 +1382,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void addResponseCodeListener(ActionListener a) {
+    public void addResponseCodeListener(ActionListener<NetworkEvent> a) {
         if(responseCodeListeners == null) {
             responseCodeListeners = new EventDispatcher();
             responseCodeListeners.setBlocking(false);
@@ -1395,7 +1395,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void removeResponseCodeListener(ActionListener a) {
+    public void removeResponseCodeListener(ActionListener<NetworkEvent> a) {
         if(responseCodeListeners == null) {
             return;
         }
@@ -1870,10 +1870,9 @@ public class ConnectionRequest implements IOProgressListener {
             });
                 
         } else {
-            final ActionListener onDownload = new ActionListener() {
+            final ActionListener onDownload = new ActionListener<NetworkEvent>() {
 
-                public void actionPerformed(ActionEvent evt) {
-                    NetworkEvent nevt = (NetworkEvent)evt;
+                public void actionPerformed(NetworkEvent nevt) {
                     if (nevt.getResponseCode() == 200) {
                         downloadImage(onSuccess, onFail, true);
                     } else {
