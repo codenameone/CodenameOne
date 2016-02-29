@@ -32,9 +32,13 @@ import java.util.Collection;
 import java.util.Vector;
 
 /**
- * Handles event dispatching while guaranteeing that all events would
+ * <p>Handles event dispatching while guaranteeing that all events would
  * be fired properly on the EDT regardless of their source. This class handles listener
- * registration/removal in a safe and uniform way. 
+ * registration/removal in a safe and uniform way. </p>
+ * <p>
+ * To integrate this into your code you can use something like:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/8abb07271bae62d0f81a.js"></script>
  * 
  * @author Shai Almog
  */
