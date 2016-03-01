@@ -1664,7 +1664,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         System.err.println("This simulation requires jdk 7");
                         return;
                     }
-                    locSimulation = new LocationSimulation();
+										if(locSimulation==null)
+											locSimulation = new LocationSimulation();
+										else
+											locSimulation.setVisible(true);
 
                 }
             });
