@@ -1,19 +1,572 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
-  <head>
-    <title></title>
-  </head>
+    <head>
+        <title></title>
+    </head>
     <body>
+        <h1>Networking, Storage, Filesystem &amp; related API's</h1>
         <p>
-            Codename One IO is intended as a componentized solution for IO operations
-            that allows us to centralize IO logic while maintaining a more portable
-            approach for threads. It also exposes several device specific behaviors
-            such as APN selection, network type selection in a more seamless way.
+            The IO package includes all of the main features related to storage and networking with the exception
+            of {@link com.codename1.db SQL} &amp; XML parsing.
+        </p>
+
+        <h3>Storage</h3>
+        <p>
+            {@link com.codename1.io.Storage} is accessed via the <code>Storage</code>
+            class. It is a flat filesystem like interface and contains the ability to list/delete and 
+            write to named storage entries.
+        </p>
+
+        <p>
+            The {@link com.codename1.io.Storage} API also provides convenient methods to write objects to 
+            {@link com.codename1.io.Storage} and read them from {@link com.codename1.io.Storage} specifically 
+            <code>readObject</code> &amp; <code>writeObject</code>.<br>
+            Notice that objects in {@link com.codename1.io.Storage} are deleted when an app is uninstalled but are 
+            retained between application updates.
+        </p>
+
+        <p>
+            The sample code below demonstrates listing the content of the storage, adding/viewing and 
+            deleting entries within the storage:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/7f6e07dadbdd169648ed.js"></script>
+
+        <img src="https://www.codenameone.com/img/developer-guide/storage-list.png" alt="List of files within the storage" />
+        <img src="https://www.codenameone.com/img/developer-guide/storage-content.png" alt="Content of a file added to the storage" />
+
+        <h4>The Preferences API</h4>
+
+        <p>
+            {@link com.codename1.io.Storage} also offers a very simple API in the form of the 
+            {@link com.codename1.io.Preferences} 
+            class. The {@link com.codename1.io.Preferences} class allows developers to store simple variables, strings, 
+            numbers, booleans etc. in storage without writing any storage code. This is a common use case 
+            within applications e.g. you have a server token that you need to store you can store &amp; read it like this:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/fc7693ef69108e90057c.js"></script>
+
+        <p>
+            This gets somewhat confusing with primitive numbers e.g. if you use 
+            <code>Preferences.set("primitiveLongValue", myLongNumber)</code> then invoke 
+            <code>Preferences.get("primitiveLongValue", 0)</code> you might get an exception!<br>
+            This would happen because the value is physically a <code>Long</code> object but you are 
+            trying to get an <code>Integer</code>. The workaround is to remain consistent and use code 
+            like this <code>Preferences.get("primitiveLongValue", (long)0)</code>.
+        </p>
+
+        <h3>File System</h3>
+        <p>
+            {@link com.codename1.io.FileSystemStorage} provides file system access. It maps to the underlying 
+            OS’s file system API providing most of the common operations expected from a file API somewhat in 
+            the vain of <code>java.io.File</code> &amp; <code>java.io.FileInputStream</code> e.g. opening, 
+            renaming, deleting etc.
         </p>
         <p>
-            Codename One's standard UI is used mostly for the EDT and event convention although
-            the package displays error messages using Codename One dialogs and provides several
-            IO related widgets to ease working with the platform.
+            Notice that the file system API is somewhat platform specific in its behavior. All paths used the API 
+            should be absolute otherwise they are not guaranteed to work.
         </p>
+
+        <p>
+            The main reason <code>java.io.File</code> &amp; <code>java.io.FileInputStream</code> 
+            weren’t supported directly has a lot to do with the richness of those two API’s. They effectively 
+            allow saving a file anywhere, however mobile devices are far more restrictive and don’t allow 
+            apps to see/modify files that are owned by other apps.
+        </p>
+
+        <h4>File Paths &amp; App Home</h4>
+        <p>
+            All paths in {@link com.codename1.io.FileSystemStorage} are absolute, this simplifies the issue of portability 
+            significantly since the concept of relativity and current working directory aren’t very portable.
+        </p>
+
+        <p>
+            All URL’s use the <code>/</code> as their path separator we try to enforce this behavior even in 
+            Windows.
+        </p>
+
+        <p>
+            Directories end with the <code>/</code> character and thus can be easily distinguished by their name.
+        </p>
+
+        <p>
+            The {@link com.codename1.io.FileSystemStorage} API provides a <code>getRoots()</code> call to list the root 
+            directories of the file system (you can then "dig in" via the <code>listFiles</code> API). However, 
+            this is confusing and unintuitive for developers.
+        </p>
+
+        <p>
+            To simplify the process of creating/reading files we added the <code>getAppHomePath()</code> method. 
+            This method allows us to obtain the path to a directory where files can be stored/read.
+        </p>
+
+        <p>
+            We can use this directory to place an image to share as we did in the 
+            <a href="https://www.codenameone.com/manual/components.html#sharebutton-section">share sample</a>.
+        </p>
+
+        <p>
+            <strong>Warning:</strong> A common Android hack is to write files to the SDCard storage to share 
+            them among apps. Android 4.x disabled the ability to write to arbitrary directories on the SDCard 
+            even when the appropriate permission was requested.
+        </p>
+
+        <p>
+            A more advanced usage of the {@link com.codename1.io.FileSystemStorage} API can be a 
+            {@link com.codename1.io.FileSystemStorage} <code>Tree</code>:
+        </p>
+        <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>            
+        <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
+
+        <h4>Storage vs. File System</h4>
+        <p>
+            The question of storage vs. file system is often confusing for novice mobile developers. This embeds 
+            two separate questions:</p>
+        <ul>
+            <li>
+                <p>Why are there 2 API’s where one would have worked?</p>
+            </li>
+            <li>
+                <p>Which one should I pick?</p>
+            </li>
+        </ul>
+
+        <p>
+            The main reasons for the 2 API’s are technical. Many OS’s provide 2 ways of accessing data 
+            specific to the app and this is reflected within the API. E.g. on Android the 
+            {@link com.codename1.io.FileSystemStorage} maps to API’s such as <code>java.io.FileInputStream</code> 
+            whereas the {@link com.codename1.io.Storage} maps to <code>Context.openFileInput()</code>.
+        </p>
+
+        <p>
+            The secondary reason for the two API’s is conceptual. {@link com.codename1.io.FileSystemStorage} is 
+            more powerful and in a sense provides more ways to fail, this is compounded by the complex 
+            on-device behavior of the API. {@link com.codename1.io.Storage} is designed to be friendlier to the 
+            uninitiated and more portable.
+        </p>
+
+        <p>
+            You should pick {@link com.codename1.io.Storage} unless you have a specific requirement that prevents it. 
+            Some API’s such as <code>Capture</code> expect a {@link com.codename1.io.FileSystemStorage} URI 
+            so in those cases this would also be a requirement.
+        </p>
+
+        <p>
+            Another case where {@link com.codename1.io.FileSystemStorage} is beneficial is the case of hierarchy or 
+            native API usage. If you need a a directory structure or need to communicate with a native 
+            API the {@link com.codename1.io.FileSystemStorage} approach is usually easier.<br>
+            <strong>Warning: </strong>In some OS’s the {@link com.codename1.io.FileSystemStorage} API can find the 
+            content of the {@link com.codename1.io.Storage} API. As one is implemented on top of the other. This is 
+            undocumented behavior that can change at any moment!
+        </p>
+
+        <h3>Network Manager &amp; Connection Request</h3>
+        <p>
+            One of the more common problems in Network programming is spawning a new thread to handle 
+            the network operations. In Codename One this is done seamlessly and becomes unessential 
+            thanks to the {@link com.codename1.io.NetworkManager}.
+        </p>
+        <p>
+            {@link com.codename1.io.NetworkManager} effectively alleviates the need for managing network threads by 
+            managing the complexity of network threading.  The connection request class can be used to 
+            facilitate web service requests when coupled with the JSON/XML parsing capabilities.
+        </p>
+        <p>
+            To open a connection one needs to use a {@link com.codename1.io.ConnectionRequest}
+            object, which has some similarities to the networking mechanism in JavaScript but is obviously somewhat more elaborate.</p>
+        <p>You can send a get request to a URL using something like:</p>
+
+        <script src="https://gist.github.com/codenameone/08f8de7590674e47683b.js"></script>
+
+        <p>
+            Notice that you can also implement the same thing and much more by avoiding the response 
+            listener code and instead overriding the methods of the {@link com.codename1.io.ConnectionRequest} class 
+            which offers multiple points to override e.g.
+        </p>
+        <script src="https://gist.github.com/codenameone/f7e2f95e5beb11901e1c.js"></script>
+
+
+        <p>
+            Notice that overriding <code>buildRequestBody(OutputStream)</code> will only work for 
+            <code>POST</code> requests and will replace writing the arguments.
+        </p>
+        <p>
+            <strong>Important:</strong> You don’t need to close the output/input streams passed to the 
+            request methods. They are implicitly cleaned up.
+        </p>
+
+        <p>
+            {@link com.codename1.io.NetworkManager} also supports synchronous requests which work in a similar 
+            way to <code>Dialog</code> via the <code>invokeAndBlock</code> call and thus don’t block 
+            the EDT illegally. E.g. you can do something like this:
+        </p>
+        <script src="https://gist.github.com/codenameone/bf1d90a391a6ffda8695.js"></script>
+
+
+        <p>
+            Notice that in this case the <code>addToQueueAndWait</code> method returned after the 
+            connection completed. Also notice that this was totally legal to do on the EDT!
+        </p>
+
+        <h4>Threading</h4>
+        <p>
+            By default the {@link com.codename1.io.NetworkManager} launches with a single network thread. This is 
+            sufficient for very simple applications that don’t do too much networking but if you need to 
+            fetch many images concurrently and perform web services in parallel this might be an issue.
+        </p>
+
+        <p>
+            <strong>Warning:</strong> Once you increase the thread count there is no guarantee of order for your requests. Requests 
+            might not execute in the order with which you added them to the queue!
+        </p>
+        <p>To update the number of threads use:</p>
+
+        <script src="https://gist.github.com/codenameone/6b83eaa251b3d0003016.js"></script>
+
+        <p>
+            All the callbacks in the {@code ConnectionRequest} occur on the network thread and 
+            <strong>not on the EDT</strong>!
+        </p>
+
+        <p>
+            There is one exception to this rule which is the <code>postResponse()</code> method designed 
+            to update the UI after the networking code completes.
+        </p>
+
+        <p>
+            <strong>Important:</strong> Never change the UI from a {@link com.codename1.io.ConnectionRequest} 
+            callback. You can either use a listener on the {@link com.codename1.io.ConnectionRequest}, use 
+            <code>postResponse()</code> (which is the only exception to this rule) or wrap your UI code with 
+            {@link com.codename1.ui.Display#callSerially(java.lang.Runnable)}.
+        </p>
+
+        <h4>Arguments, Headers &amp; Methods</h4>
+        <p>
+            HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename 
+            One tries to simplify and abstract most of these complexities behind common sense API’s while 
+            still providing the full low level access you would expect from such an API.
+        </p>
+
+        <h5>Arguments</h5>
+        <p>
+            HTTP supports several "request methods", most commonly <code>GET</code> &amp; 
+            <code>POST</code> but also a few others such as <code>HEAD</code>, <code>PUT</code>, 
+            <code>DELETE</code> etc.
+        </p>
+
+        <p>Arguments in HTTP are passed differently between <code>GET</code> and <code>POST</code> 
+            methods. That is what the <code>setPost</code> method in Codename One determines, whether 
+            arguments added to the request should be placed using the <code>GET</code> semantics or the 
+            <code>POST</code> semantics.</p>
+
+        <p>So if we continue our example from above we can do something like this:</p>
+        <script src="https://gist.github.com/codenameone/7970bcb0f09f9ad24ef9.js"></script>
+
+        <p>
+            This will implicitly add a get argument with the content of <code>value</code>. Notice that we 
+            don’t really care what value is. It’s implicitly HTTP encoded based on the get/post semantics. 
+            In this case it will use the get encoding since we passed <code>false</code> to the constructor.
+        </p>
+
+        <p>A simpler implementation could do something like this:</p>
+
+        <script src="https://gist.github.com/codenameone/78f498161c730dd365c3.js"></script>
+
+        <p>
+            This would be almost identical but doesn’t provide the convenience for switching back and 
+            forth between <code>GET</code>/<code>POST</code> and it isn’t as fluent.
+        </p>
+
+        <p>We can skip the encoding in complex cases where server code expects illegal HTTP 
+            characters (this happens) using the <code>addArgumentNoEncoding</code> method. We can 
+            also add multiple arguments with the same key using <code>addArgumentArray</code>.
+        </p>
+
+        <h5>Methods</h5>
+        <p>
+            As we explained above, the <code>setPost()</code> method allows us to manipulate the 
+            get/post semantics of a request. This implicitly changes the <code>POST</code> 
+            or <code>GET</code> method submitted to the server.
+        </p>
+
+        <p>
+            However, if you wish to have finer grained control over the submission process e.g. for making a 
+            <code>HEAD</code> request you can do this with code like:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/2aa6b21aa6d57d00bd05.js"></script>
+
+        <h5>Headers</h5>
+        <p>
+            When communicating with HTTP servers we often pass data within headers mostly for 
+            authentication/authorization but also to convey various properties.
+        </p>
+
+        <p>
+            Some headers are builtin as direct API’s e.g. content type is directly exposed within the API 
+            since it’s a pretty common use case. We can set the content type of a post request using:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/fc66ddfde85ec9d96185.js"></script>
+
+        <p>
+            We can also add any arbitrary header type we want, e.g. a very common use case is basic 
+            authorization where the authorization header includes the Base64 encoded user/password 
+            combination as such:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/08babc9b08460ff05400.js"></script>
+
+
+        <p>This can be quite tedious to do if you want all requests from your app to use this header. 
+            For this use case you can just use:</p>
+
+        <script src="https://gist.github.com/codenameone/083c1c1ccf45db55a55a.js"></script>
+
+        <h5>Server Headers</h5>
+        <p>
+            Server returned headers are a bit trickier to read. We need to subclass the connection request 
+            and override the <code>readHeaders</code> method e.g.:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/3c9ffaef41f523426552.js"></script>
+
+        <p>
+            Here we can extract the headers one by one to handle complex headers such as cookies, 
+            authentication etc.
+        </p>
+
+        <h5>Error Handling</h5>
+        <p>
+            As you noticed above practically all of the methods in the <code>ConectionRequest</code> 
+            throw <code>IOException</code>. This allows you to avoid the <code>try</code>/<code>catch</code> 
+            semantics and just let the error propagate up the chain so it can be handled uniformly by 
+            the application.
+        </p>
+
+        <p>There are two distinct placed where you can handle a networking error:</p>
+        <ul>
+            <li>
+                <p>The {@link com.codename1.io.ConnectionRequest} - by overriding callback methods</p>
+            </li>
+            <li>
+                <p>The {@link com.codename1.io.NetworkManager} error handler</p>
+            </li>
+        </ul>
+
+        <p>
+            Notice that the {@link com.codename1.io.NetworkManager} error handler takes precedence thus allowing 
+            you to define a global policy for network error handling by consuming errors.
+        </p>
+        <p>
+            E.g. if I would like to block all network errors from showing anything to the user I could do 
+            something like this:</p>
+
+        <script src="https://gist.github.com/codenameone/114c4a7253db84c7654d.js"></script>
+
+        <p>
+            The error listener is invoked first with the {@link com.codename1.io.NetworkEvent} matching the 
+            error. Consuming the event prevents it from propagating further down the chain into the 
+            {@link com.codename1.io.ConnectionRequest} callbacks.
+        </p>
+        <p>
+            We can also override the error callbacks of the various types in the request e.g. in the case of a 
+            server error code we can do:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/a3bc133ad3d3ed11c150.js"></script>
+
+
+        <p>
+            <strong>Important:</strong> The error callback callback is triggered in the network thread!<br>
+            As a result it can’t access the UI to show a <code>Dialog</code> or anything like that.
+        </p>
+
+        <p>
+            Another approach is to use the <code>setFailSilently(true)</code> method on the 
+            {@link com.codename1.io.ConnectionRequest}. This will prevent the 
+            {@link com.codename1.io.ConnectionRequest} from displaying any errors to the user. It’s a very 
+            powerful strategy if you use the synchronous version of the API’s e.g.:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/9ec6fe3b79d95f15661d.js"></script>
+
+        <p>
+            This code will only work with the synchronous "AndWait" version of the method since the response 
+            code will take a while to return for the non-wait version.
+        </p>
+
+        <h5>Error Stream</h5>
+        <p>
+            When we get an error code that isn’t 200/300 we ignore the result. This is problematic as the 
+            result might contain information we need. E.g. many webservices provide further XML/JSON 
+            based details describing the reason for the error code.
+        </p>
+        <p>
+            Calling <code>setReadResponseForErrors(true)</code> will trigger a mode where even errors 
+            will receive the <code>readResponse</code> callback with the error stream. This also means 
+            that API’s like <code>getData</code> and the listener API’s will also work correctly in 
+            case of error.
+        </p>
+
+
+        <h4>GZIP</h4>
+        <p>
+            Gzip is a very common compression format based on the lz algorithm, it’s used by web servers 
+            around the world to compress data.
+        </p>
+
+        <p>
+            Codename One supports {@link com.codename1.io.gzip.GZIPInputStream} and 
+            {@link com.codename1.io.gzip.GZIPOutputStream}, which allow you to compress data 
+            seamlessly into a stream and extract compressed data from a stream. This is very useful and 
+            can be applied to every arbitrary stream.
+        </p>
+
+        <p>
+            Codename One also features a {@link com.codename1.io.gzip.GZConnectionRequest}, which 
+            will automatically unzip an HTTP response if it is indeed gzipped. Notice that some devices (iOS) 
+            always request gzip’ed data and always decompress it for us, however in the case of iOS it 
+            doesn’t remove the gziped header. The <code>GZConnectionRequest</code> is aware of such 
+            behaviors so its better to use that when connecting to the network (if applicable).
+        </p>
+
+        <p>
+            By default <code>GZConnectionRequest</code> doesn’t request gzipped data (only unzips it 
+            when its received) but its pretty easy to do so just add the HTTP header 
+            <code>Accept-Encoding: gzip</code> e.g.:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/9a4c6f49d836ca173235.js"></script>
+
+        <p>Do the rest as usual and you should have smaller responses from the servers.</p>
+
+        <h4>File Upload</h4>
+        <p>
+            {@link com.codename1.io.MultipartRequest} tries to simplify the process of uploading a file from 
+            the local device to a remote server.
+        </p>
+
+        <p>
+            You can always submit data in the <code>buildRequestBody</code> but this is flaky and has 
+            some limitations in terms of devices/size allowed. HTTP standardized file upload capabilities 
+            thru the multipart request protocol, this is implemented by countless servers and is well 
+            documented. Codename One supports this out of the box.
+        </p>
+        <p>
+            Since we assume most developers reading this will be familiar with Java here is the way to 
+            implement the multipart upload in the servlet API.
+        </p>
+
+        <script src="https://gist.github.com/codenameone/9cad1248365512416101.js"></script>
+
+        <p>
+            {@link com.codename1.io.MultipartRequest} is a {@link com.codename1.io.ConnectionRequest} 
+            most stuff you expect from there should work. Even addArgument etc.
+        </p>
+
+        <h3>Externalizable Objects</h3>
+
+        <p>
+            Codename One provides the {@link com.codename1.io.Externalizable}  interface, which is similar 
+            to the Java SE {@link com.codename1.io.Externalizable} interface.
+            This interface allows an object to declare itself as {@link com.codename1.io.Externalizable} for 
+            serialization (so an object can be stored in a file/storage or sent over the network). However, due to the 
+            lack of reflection and use of obfuscation these objects must be registered with the 
+            {@link com.codename1.io.Util} class.
+        </p>
+
+        <p>
+            Codename One doesn’t support the Java SE Serialization API due to the size issues and 
+            complexities related to obfuscation.
+        </p>
+
+        <p>
+            The major objects that are supported by default in the Codename One 
+            {@link com.codename1.io.Externalizable} are:
+            <code>String</code>, <code>Collection</code>, <code>Map</code>, <code>ArrayList</code>, 
+            <code>HashMap</code>, <code>Vector</code>, <code>Hashtable</code>, 
+            <code>Integer</code>, <code>Double</code>, <code>Float</code>, <code>Byte</code>, 
+            <code>Short</code>, <code>Long</code>, <code>Character</code>, <code>Boolean</code>, 
+            <code>Object[]</code>, <code>byte[]</code>, <code>int[]</code>, <code>float[]</code>, 
+            <code>long[]</code>, <code>double[]</code>.
+        </p>
+
+        <p>Externalizing an object such as h below should work just fine:</p>
+        <script src="https://gist.github.com/codenameone/585a38057956861a8641.js"></script>
+
+
+        <p>
+            However, notice that some things aren’t polymorphic e.g. if we will externalize a 
+            <code>String[]</code> we will get back an <code>Object[]</code> since <code>String</code> 
+            arrays aren’t detected by the implementation.
+        </p>
+
+
+        <p>
+            <strong>Important:</strong> The externalization process caches objects so the app will seem to 
+            work and only fail on restart!
+        </p>
+
+        <p>
+            Implementing the {@link com.codename1.io.Externalizable} interface is only important when we 
+            want to store a proprietary object. In this case we must register the object with the 
+            <code>com.codename1.io.Util</code> class so the externalization algorithm will be able to 
+            recognize it by name by invoking:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/98939f91d5bae79afe9e.js"></script>                
+
+        <p>
+            You should do this early on in the app e.g. in the <code>init(Object)</code> but you shouldn’t do 
+            it in a static initializer within the object as that might never be invoked!
+        </p>
+
+        <p>
+            An {@link com.codename1.io.Externalizable} object <strong>must</strong> have a 
+            <strong>default public constructor</strong> and must implement the following 4 methods:
+        </p>
+        <script src="https://gist.github.com/codenameone/dbaf28959c2f1012e018.js"></script>
+
+        <p>
+            The <code>getVersion()</code> method returns the current version of the object allowing the 
+            stored data to change its structure in the future (the version is then passed when internalizing 
+            the object). The object id is a <code>String</code> uniquely representing the object;
+            it usually corresponds to the class name (in the example above the Unique Name should be 
+            <code>MyClass</code>).
+        </p>
+
+        <p>
+            <strong>Warning:</strong> It’s a common mistake to use <code>getClass().getName()</code> 
+            to implement <code>getObjectId()</code> and it would <strong>seem to work</strong> in the 
+            simulator. This isn’t the case though!<br>
+            Since devices obfuscate the class names this becomes a problem as data is stored in a random 
+            name that changes with every release.
+        </p>
+
+        <p>
+            Developers need to write the data of the object in the externalize method using the methods in the 
+            data output stream and read the data of the object in the internalize method e.g.:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/b94d418ed771c63ffd6f.js"></script>
+
+        <p>
+            Since strings might be null sometimes we also included convenience methods to implement such 
+            externalization. This effectively writes a boolean before writing the UTF to indicate whether the string 
+            is null:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/843b48b703431236c875.js"></script>
+
+        <p>
+            Assuming we added a new date field to the object we can do the following. Notice that a 
+            <code>Date</code> is really a <code>long</code> value in Java that can be null. 
+            For completeness the full class is presented below:</p>
+
+        <script src="https://gist.github.com/codenameone/ebfffaffd405ed3b7723.js"></script>
+        <p>Notice that we only need to check for compatibility during the reading process as the writing 
+            process always writes the latest version of the data.</p>
     </body>
 </html>

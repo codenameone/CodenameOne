@@ -33,11 +33,18 @@ import java.util.TimerTask;
 /**
  * <p>Unlike networking, the file system storage mostly tries to emulate java.io.File with
  * some simplifications for mobile devices.<br>
+ * Check out a more thorough discussion of this API {@link com.codename1.io here}.<br>
  * A lot of API's rely on {@code FileSystemStorage} as its the API native code usually uses consistently.
  * E.g. in this sample below the {@code FileSystemStorage} is used to save a screenshot image for sharing
  * on social media:</p>
  * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
  *
+ * <p>
+ * The sample below shows the {@code FileSystemStorage} as a tree:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>            
+ * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
+ * 
  * @author Shai Almog
  */
 public class FileSystemStorage {
@@ -289,9 +296,12 @@ public class FileSystemStorage {
     }
 
     /**
-     * This will return the application home directory.
-     * On some platforms such as Android this path may be visible only to the 
-     * application itself, other apps won't have permission to access this path
+     * <p>The application home directory is a "safe place" to store files for this application in a portable way.
+     * On some platforms such as Android  &amp; iOS this path may be visible only to the 
+     * application itself, other apps won't have permission to access this path.<br>
+     * The sample below uses the app home directory to save a file so we can share it using the {@link com.codename1.components.ShareButton}:</p>
+     * 
+     *  <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
      * 
      * @return a writable directory that represent the application home directory
      */
