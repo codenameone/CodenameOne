@@ -29,8 +29,8 @@ import java.io.InputStream;
 
 /**
  * <p>A connection request that can detect a GZipped response, parse it automatically and unzip it. 
- * Notice that some devices (iOS) always request gzip’ed data and always decompress it for us, however in 
- * the case of iOS it doesn’t remove the gziped header. The {@code GZConnectionRequest} is aware of such 
+ * Notice that some devices (iOS) always request gzip'ed data and always decompress it for us, however in 
+ * the case of iOS it doesn't remove the gziped header. The {@code GZConnectionRequest} is aware of such 
  * behaviors so it's better to use that when connecting to the network (if applicable).</p>
  * <p>
  * By default `GZConnectionRequest` doesn't request gzipped data (only unzips it when its received) but it's 
