@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import static com.codename1.impl.javase.JavaSEPort.locSimulation;
 import com.codename1.location.Location;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
@@ -52,6 +53,14 @@ class StubLocationManager extends LocationManager {
         double lon = p.getDouble("lastGoodLon", -74.005973);
         loc.setLongitude(lon);
         loc.setLatitude(lat);
+				loc.setAccuracy(55);
+				loc.setAltitude(1000);
+				loc.setDirection(0);
+				loc.setVelocity(50);
+				loc.setStatus(AVAILABLE);
+        if(locSimulation==null)
+					locSimulation = new LocationSimulation();
+				JavaSEPort.locSimulation.setLocation(loc);
     }
 
     public static LocationManager getLocationManager() {
@@ -63,6 +72,11 @@ class StubLocationManager extends LocationManager {
         if (JavaSEPort.locSimulation != null) {
             loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
             loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
+						loc.setAccuracy(JavaSEPort.locSimulation.getAccuracy());
+						loc.setAltitude(JavaSEPort.locSimulation.getAltitude());
+						loc.setDirection(JavaSEPort.locSimulation.getDirection());
+						loc.setVelocity(JavaSEPort.locSimulation.getVelocity());
+						loc.setStatus(JavaSEPort.locSimulation.getState());
         }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
@@ -73,6 +87,11 @@ class StubLocationManager extends LocationManager {
         if (JavaSEPort.locSimulation != null) {
             loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
             loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
+						loc.setAccuracy(JavaSEPort.locSimulation.getAccuracy());
+						loc.setAltitude(JavaSEPort.locSimulation.getAltitude());
+						loc.setDirection(JavaSEPort.locSimulation.getDirection());
+						loc.setVelocity(JavaSEPort.locSimulation.getVelocity());
+						loc.setStatus(JavaSEPort.locSimulation.getState());
         }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
