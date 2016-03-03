@@ -59,7 +59,7 @@
         <h3>File System</h3>
         <p>
             {@link com.codename1.io.FileSystemStorage} provides file system access. It maps to the underlying 
-            OS’s file system API providing most of the common operations expected from a file API somewhat in 
+            OS's file system API providing most of the common operations expected from a file API somewhat in 
             the vain of <code>java.io.File</code> &amp; <code>java.io.FileInputStream</code> e.g. opening, 
             renaming, deleting etc.
         </p>
@@ -70,19 +70,19 @@
 
         <p>
             The main reason <code>java.io.File</code> &amp; <code>java.io.FileInputStream</code> 
-            weren’t supported directly has a lot to do with the richness of those two API’s. They effectively 
-            allow saving a file anywhere, however mobile devices are far more restrictive and don’t allow 
+            weren't supported directly has a lot to do with the richness of those two API's. They effectively 
+            allow saving a file anywhere, however mobile devices are far more restrictive and don't allow 
             apps to see/modify files that are owned by other apps.
         </p>
 
         <h4>File Paths &amp; App Home</h4>
         <p>
             All paths in {@link com.codename1.io.FileSystemStorage} are absolute, this simplifies the issue of portability 
-            significantly since the concept of relativity and current working directory aren’t very portable.
+            significantly since the concept of relativity and current working directory aren't very portable.
         </p>
 
         <p>
-            All URL’s use the <code>/</code> as their path separator we try to enforce this behavior even in 
+            All URL's use the <code>/</code> as their path separator we try to enforce this behavior even in 
             Windows.
         </p>
 
@@ -125,7 +125,7 @@
             two separate questions:</p>
         <ul>
             <li>
-                <p>Why are there 2 API’s where one would have worked?</p>
+                <p>Why are there 2 API's where one would have worked?</p>
             </li>
             <li>
                 <p>Which one should I pick?</p>
@@ -133,14 +133,14 @@
         </ul>
 
         <p>
-            The main reasons for the 2 API’s are technical. Many OS’s provide 2 ways of accessing data 
+            The main reasons for the 2 API's are technical. Many OS's provide 2 ways of accessing data 
             specific to the app and this is reflected within the API. E.g. on Android the 
-            {@link com.codename1.io.FileSystemStorage} maps to API’s such as <code>java.io.FileInputStream</code> 
+            {@link com.codename1.io.FileSystemStorage} maps to API's such as <code>java.io.FileInputStream</code> 
             whereas the {@link com.codename1.io.Storage} maps to <code>Context.openFileInput()</code>.
         </p>
 
         <p>
-            The secondary reason for the two API’s is conceptual. {@link com.codename1.io.FileSystemStorage} is 
+            The secondary reason for the two API's is conceptual. {@link com.codename1.io.FileSystemStorage} is 
             more powerful and in a sense provides more ways to fail, this is compounded by the complex 
             on-device behavior of the API. {@link com.codename1.io.Storage} is designed to be friendlier to the 
             uninitiated and more portable.
@@ -148,7 +148,7 @@
 
         <p>
             You should pick {@link com.codename1.io.Storage} unless you have a specific requirement that prevents it. 
-            Some API’s such as <code>Capture</code> expect a {@link com.codename1.io.FileSystemStorage} URI 
+            Some API's such as <code>Capture</code> expect a {@link com.codename1.io.FileSystemStorage} URI 
             so in those cases this would also be a requirement.
         </p>
 
@@ -156,7 +156,7 @@
             Another case where {@link com.codename1.io.FileSystemStorage} is beneficial is the case of hierarchy or 
             native API usage. If you need a a directory structure or need to communicate with a native 
             API the {@link com.codename1.io.FileSystemStorage} approach is usually easier.<br>
-            <strong>Warning: </strong>In some OS’s the {@link com.codename1.io.FileSystemStorage} API can find the 
+            <strong>Warning: </strong>In some OS's the {@link com.codename1.io.FileSystemStorage} API can find the 
             content of the {@link com.codename1.io.Storage} API. As one is implemented on top of the other. This is 
             undocumented behavior that can change at any moment!
         </p>
@@ -192,13 +192,13 @@
             <code>POST</code> requests and will replace writing the arguments.
         </p>
         <p>
-            <strong>Important:</strong> You don’t need to close the output/input streams passed to the 
+            <strong>Important:</strong> You don't need to close the output/input streams passed to the 
             request methods. They are implicitly cleaned up.
         </p>
 
         <p>
             {@link com.codename1.io.NetworkManager} also supports synchronous requests which work in a similar 
-            way to <code>Dialog</code> via the <code>invokeAndBlock</code> call and thus don’t block 
+            way to <code>Dialog</code> via the <code>invokeAndBlock</code> call and thus don't block 
             the EDT illegally. E.g. you can do something like this:
         </p>
         <script src="https://gist.github.com/codenameone/bf1d90a391a6ffda8695.js"></script>
@@ -212,7 +212,7 @@
         <h4>Threading</h4>
         <p>
             By default the {@link com.codename1.io.NetworkManager} launches with a single network thread. This is 
-            sufficient for very simple applications that don’t do too much networking but if you need to 
+            sufficient for very simple applications that don't do too much networking but if you need to 
             fetch many images concurrently and perform web services in parallel this might be an issue.
         </p>
 
@@ -244,7 +244,7 @@
         <h4>Arguments, Headers &amp; Methods</h4>
         <p>
             HTTP/S is a complex protocol that expects complex encoded data for its requests. Codename 
-            One tries to simplify and abstract most of these complexities behind common sense API’s while 
+            One tries to simplify and abstract most of these complexities behind common sense API's while 
             still providing the full low level access you would expect from such an API.
         </p>
 
@@ -265,7 +265,7 @@
 
         <p>
             This will implicitly add a get argument with the content of <code>value</code>. Notice that we 
-            don’t really care what value is. It’s implicitly HTTP encoded based on the get/post semantics. 
+            don't really care what value is. It's implicitly HTTP encoded based on the get/post semantics. 
             In this case it will use the get encoding since we passed <code>false</code> to the constructor.
         </p>
 
@@ -274,8 +274,8 @@
         <script src="https://gist.github.com/codenameone/78f498161c730dd365c3.js"></script>
 
         <p>
-            This would be almost identical but doesn’t provide the convenience for switching back and 
-            forth between <code>GET</code>/<code>POST</code> and it isn’t as fluent.
+            This would be almost identical but doesn't provide the convenience for switching back and 
+            forth between <code>GET</code>/<code>POST</code> and it isn't as fluent.
         </p>
 
         <p>We can skip the encoding in complex cases where server code expects illegal HTTP 
@@ -304,8 +304,8 @@
         </p>
 
         <p>
-            Some headers are builtin as direct API’s e.g. content type is directly exposed within the API 
-            since it’s a pretty common use case. We can set the content type of a post request using:
+            Some headers are builtin as direct API's e.g. content type is directly exposed within the API 
+            since it's a pretty common use case. We can set the content type of a post request using:
         </p>
 
         <script src="https://gist.github.com/codenameone/fc66ddfde85ec9d96185.js"></script>
@@ -380,14 +380,14 @@
 
         <p>
             <strong>Important:</strong> The error callback callback is triggered in the network thread!<br>
-            As a result it can’t access the UI to show a <code>Dialog</code> or anything like that.
+            As a result it can't access the UI to show a <code>Dialog</code> or anything like that.
         </p>
 
         <p>
             Another approach is to use the <code>setFailSilently(true)</code> method on the 
             {@link com.codename1.io.ConnectionRequest}. This will prevent the 
-            {@link com.codename1.io.ConnectionRequest} from displaying any errors to the user. It’s a very 
-            powerful strategy if you use the synchronous version of the API’s e.g.:
+            {@link com.codename1.io.ConnectionRequest} from displaying any errors to the user. It's a very 
+            powerful strategy if you use the synchronous version of the API's e.g.:
         </p>
 
         <script src="https://gist.github.com/codenameone/9ec6fe3b79d95f15661d.js"></script>
@@ -399,21 +399,21 @@
 
         <h5>Error Stream</h5>
         <p>
-            When we get an error code that isn’t 200/300 we ignore the result. This is problematic as the 
+            When we get an error code that isn't 200/300 we ignore the result. This is problematic as the 
             result might contain information we need. E.g. many webservices provide further XML/JSON 
             based details describing the reason for the error code.
         </p>
         <p>
             Calling <code>setReadResponseForErrors(true)</code> will trigger a mode where even errors 
             will receive the <code>readResponse</code> callback with the error stream. This also means 
-            that API’s like <code>getData</code> and the listener API’s will also work correctly in 
+            that API's like <code>getData</code> and the listener API's will also work correctly in 
             case of error.
         </p>
 
 
         <h4>GZIP</h4>
         <p>
-            Gzip is a very common compression format based on the lz algorithm, it’s used by web servers 
+            Gzip is a very common compression format based on the lz algorithm, it's used by web servers 
             around the world to compress data.
         </p>
 
@@ -427,13 +427,13 @@
         <p>
             Codename One also features a {@link com.codename1.io.gzip.GZConnectionRequest}, which 
             will automatically unzip an HTTP response if it is indeed gzipped. Notice that some devices (iOS) 
-            always request gzip’ed data and always decompress it for us, however in the case of iOS it 
-            doesn’t remove the gziped header. The <code>GZConnectionRequest</code> is aware of such 
+            always request gzip'ed data and always decompress it for us, however in the case of iOS it 
+            doesn't remove the gziped header. The <code>GZConnectionRequest</code> is aware of such 
             behaviors so its better to use that when connecting to the network (if applicable).
         </p>
 
         <p>
-            By default <code>GZConnectionRequest</code> doesn’t request gzipped data (only unzips it 
+            By default <code>GZConnectionRequest</code> doesn't request gzipped data (only unzips it 
             when its received) but its pretty easy to do so just add the HTTP header 
             <code>Accept-Encoding: gzip</code> e.g.:
         </p>
@@ -616,7 +616,7 @@
         </p>
 
         <p>
-            Codename One doesn’t support the Java SE Serialization API due to the size issues and 
+            Codename One doesn't support the Java SE Serialization API due to the size issues and 
             complexities related to obfuscation.
         </p>
 
@@ -636,9 +636,9 @@
 
 
         <p>
-            However, notice that some things aren’t polymorphic e.g. if we will externalize a 
+            However, notice that some things aren't polymorphic e.g. if we will externalize a 
             <code>String[]</code> we will get back an <code>Object[]</code> since <code>String</code> 
-            arrays aren’t detected by the implementation.
+            arrays aren't detected by the implementation.
         </p>
 
 
@@ -657,7 +657,7 @@
         <script src="https://gist.github.com/codenameone/98939f91d5bae79afe9e.js"></script>                
 
         <p>
-            You should do this early on in the app e.g. in the <code>init(Object)</code> but you shouldn’t do 
+            You should do this early on in the app e.g. in the <code>init(Object)</code> but you shouldn't do 
             it in a static initializer within the object as that might never be invoked!
         </p>
 
@@ -676,9 +676,9 @@
         </p>
 
         <p>
-            <strong>Warning:</strong> It’s a common mistake to use <code>getClass().getName()</code> 
+            <strong>Warning:</strong> It's a common mistake to use <code>getClass().getName()</code> 
             to implement <code>getObjectId()</code> and it would <strong>seem to work</strong> in the 
-            simulator. This isn’t the case though!<br>
+            simulator. This isn't the case though!<br>
             Since devices obfuscate the class names this becomes a problem as data is stored in a random 
             name that changes with every release.
         </p>

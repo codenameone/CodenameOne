@@ -9,14 +9,14 @@
         <p>
             Most new devices contain one version of sqlite or another; sqlite is a very lightweight SQL database 
             designed for embedding into devices. For portability we recommend avoiding SQL altogether since 
-            it is both fragmented between devices (different sqlite versions) and isn’t supported on all devices.
+            it is both fragmented between devices (different sqlite versions) and isn't supported on all devices.
         </p>
 
         <p>In general SQL seems overly complex for most embedded device programming tasks.</p>
 
         <h3>Portability Of SQLite</h3>
         <p>SQLite is supported on iOS, Android, RIM, Desktop &amp; JavaScript builds. However, the JavaScript 
-            version of SQL has been deprecated and isn’t supported on all platforms.</p>
+            version of SQL has been deprecated and isn't supported on all platforms.</p>
         <p>You will notice that at this time support is still missing from the Windows builds.</p>
         <p>The biggest issue with SQLite portability is in iOS. The SQLite version for most platforms is 
             threadsafe and as a result very stable. However, the iOS version is not!</p>
