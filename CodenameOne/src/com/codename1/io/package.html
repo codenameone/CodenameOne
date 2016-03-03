@@ -466,6 +466,144 @@
             most stuff you expect from there should work. Even addArgument etc.
         </p>
 
+        
+        
+        <h4>Parsing</h4>
+
+        <p>Codename One has several built in parsers for JSON, XML, CSV &amp; Properties formats. You can 
+            use those parsers to read data from the Internet or data that is shipping with your product. E.g. use the 
+            CSV data to setup default values for your application.</p>
+
+        <p>
+            All our parsers are designed with simplicity and small distribution size; they don't validate and will fail 
+            in odd ways when faced with broken data. The main logic behind this is that validation takes up CPU 
+            time on the device where CPU is a precious resource.
+        </p>
+
+        <h5>Parsing CSV</h5>
+
+        <p>
+            CSV is probably the easiest to use, the "Comma Separated Values" format is just a list of values 
+            separated by commas (or some other character) with new lines to indicate another row in the table. 
+            These usually map well to an Excel spreadsheet or database table and are supported by default in all 
+            spreadsheets.
+        </p>
+
+        <p>
+            To parse a CSV just use the 
+            <a href="https://www.codenameone.com/javadoc/com/codename1/io/CSVParser.html">CSVParser</a> class as such:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/e60d45dcd79c91be9d31.js"></script>
+        <img src="https://www.codenameone.com/img/developer-guide/csv-parsing.png" alt="CSV parsing results, notice the properly escaped parentheses and comma" />
+
+
+        <p>
+            The data contains a two dimensional array of the CSV content. You can change the delimiter character 
+            by using the {@code CSVParser} constructor that accepts a character.
+        </p>
+
+        <p>
+            <strong>IMPORTANT:</strong> Notice that we used {@link com.codename1.io.CharArrayReader} for 
+            this sample. Normally you would want to use {@link java.util.InputStreamReader} for real world data.
+        </p>
+
+        <h5>JSON</h5>
+        
+        <p>
+            The JSON ("Java Script Object Notation") format is popular on the web for passing values to/from 
+            webservices since it works so well with JavaScript. Parsing JSON is just as easy but has two 
+            different variations. You can use the 
+            {@link com.codename1.io.JSONParser} class to build a tree of the JSON data as such:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/dd0537936bb79608692c.js"></script>
+        
+        <p>
+            The response is a {@code Map} containing a nested hierarchy of {@code Collection} ({@code java.util.List}), 
+            Strings and numbers to represent the content of the submitted JSON. To extract the data from a specific 
+            path just iterate the {@code Map} keys and recurs into it.
+        </p>
+
+        <p>
+            The sample below uses results from <a href="https://anapioficeandfire.com/">an API of ice and fire</a> 
+            that queries structured data about the "Song Of Ice &amp; Fire" book series. Here is a sample result 
+            returned from the API for the query 
+            <a href="http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3">http://www.anapioficeandfire.com/api/characters?page=5&pageSize=3</a>:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/c00e2e09aa03cc24e1d3.js"></script>
+        
+        <p>
+            We will place that into a file named "anapioficeandfire.json" in the src directory to make the next 
+            sample simpler:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/808f436c34444c8143b3.js"></script>
+        
+        <ol>
+            <li>The {@code JSONParser} returns a {@code Map} which is great if the root object is a {@code Map} 
+                but in some cases its a list of elements (as is the case above). In this case a special case {@code "root"} 
+                element is created to contain the actual list of elements.</li>
+            <li>We rely that the entries are all maps, this might not be the case for every API type.</li>
+            <li>Notice that the "titles" and "aliases" entries are both lists of elements. We use {@code java.util.List} 
+                to avoid a clash with {@code com.codename1.ui.List}.</li>
+        </ol>
+
+
+        <img src="https://www.codenameone.com/img/developer-guide/json-parsing.png" alt="Parsed JSON result, clicking the elements opens the URL from the JSON" />
+
+        <p>
+            <b>Tip:</b> The structure of the returned map is sometimes unintuitive when looking at the raw JSON. The easiest 
+            thing to do is set a breakpoint on the method and use the inspect variables capability of your IDE to 
+            inspect the returned element hierarchy while writing the code to extract that data
+        </p>
+
+
+        <p>
+            An alternative approach is to use the static data parse() method of the {@code JSONParser} class and 
+            implement a callback parser e.g.: {@code JSONParser.parse(reader, callback);}
+        </p>
+
+        <p>
+            Notice that a static version of the method is used! The callback object is an instance of the 
+            {@code JSONParseCallback} interface, which includes multiple methods. These methods are invoked 
+            by the parser to indicate internal parser states, this is similar to the way traditional XML SAX event 
+            parsers work.
+        </p>
+
+        <h5>XML Parsing</h5>
+
+        <p>
+            The {@link com.codename1.xml.XMLParser} started its life as an HTML parser built for displaying 
+            mobile HTML. That usage has since been deprecated but the parser can still parse many HTML 
+            pages and is very "loose" in terms of verification. This is both good and bad as the parser will work 
+            with invalid data without complaining.
+        </p>
+
+        <p>
+            The simplest usage of {@link com.codename1.xml.XMLParser} looks a bit like this:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/b240756906f41ca72539.js"></script>
+
+        <p>
+            The {@link com.codename1.xml.Element} contains children and attributes. It represents a tag within the 
+            XML document and even the root document itself. You can iterate over the XML tree to extract the 
+            data from within the XML file.
+        </p>
+
+        <p>
+            We have a great sample of working with {@code XMLParser} in the
+            {@link com.codename1.ui.tree.Tree} class.
+        </p>
+
+        <h5>XPath Processing</h5>
+        <p>
+            Codename One ships with support to a subset of XPath processing, you can read more about it in
+            the {@link com.codename1.processing processing package docs}.
+        </p>
+        
         <h3>Externalizable Objects</h3>
 
         <p>

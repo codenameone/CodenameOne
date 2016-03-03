@@ -46,6 +46,13 @@ import com.codename1.ui.util.EventDispatcher;
  * <script src="https://gist.github.com/codenameone/fbdde74e699174a16b31.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-slider.png" alt="Star Ranking Slider" />
  *
+ * <p>
+ * Slider can be used as a progress indicator for network operations when combined with the 
+ * {@link com.codename1.components.SliderBridge} component:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/051bfa054fd3024c8292.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/network-sliderbridge.png" alt="SliderBridge progress for downloading the image in the slow network mode" />
+ * 
  * @author Shai Almog
  */
 public class Slider extends Label {
