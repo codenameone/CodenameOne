@@ -42,7 +42,7 @@ public class BigDecimal {
     /**
      * Constructor for <code>BigDecimal</code>. The value of the
      * constructed <code>BigDecimal</code> equals <code>bigInt / 
-     * 2<sup>scale</sup></code>.
+     * 10<sup>scale</sup></code>.
      * @param bigInt The <code>bigInt</code> value parameter.
      * @param scale The scale of the constructed <code>BigDecimal</code>.
      */
