@@ -1402,8 +1402,7 @@ public class InPlaceEditView extends FrameLayout {
         @Override
         public boolean onKeyPreIme(int keyCode, KeyEvent event) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
-
-                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false);
+                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true);
                 return true;
             }
             return super.onKeyPreIme(keyCode, event);
@@ -1417,7 +1416,7 @@ public class InPlaceEditView extends FrameLayout {
             // again
             if (keyCode == KeyEvent.KEYCODE_BACK
                     || keyCode == KeyEvent.KEYCODE_MENU) {
-                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false);
+                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true);
             }
 
             return super.onKeyDown(keyCode, event);
