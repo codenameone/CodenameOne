@@ -960,6 +960,30 @@ public class Image {
     }
 
     /**
+     * Resizes/crops the image so that its center fills the given dimensions. This is similar to {@link com.codename1.ui.plaf.Style#BACKGROUND_IMAGE_SCALED_FILL}
+     * 
+     * @param width the width to fill
+     * @param height the height to fill
+     * @return a new image (or the same image if dimensions happen to match) filling the width/height 
+     */
+    public Image fill(int width, int height) {
+        if(getWidth() == width && getHeight() == height) {
+            return this;
+        }
+        Image nimage = scaledLargerRatio(width, height);
+        if(nimage.getWidth() > width) {
+            int diff = nimage.getWidth() - width;
+            nimage = nimage.subImage(diff / 2, 0, width, height, true);
+        } else {
+            if(nimage.getHeight() > height) {
+                int diff = nimage.getHeight() - height;
+                nimage = nimage.subImage(0, diff / 2, width, height, true);
+            }
+        }
+        return nimage;
+    }
+    
+    /**
      * Returns the platform specific image implementation, <strong>warning</strong> the
      * implementation class can change between revisions of Codename One and platforms.
      *
