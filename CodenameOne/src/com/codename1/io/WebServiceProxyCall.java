@@ -24,6 +24,8 @@
 package com.codename1.io;
 
 import com.codename1.util.Callback;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.SuccessCallback;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -198,6 +200,20 @@ public class WebServiceProxyCall {
      * Invokes a web asynchronously and calls the callback on completion
      * 
      * @param def definition of the webservice request
+     * @param scall the return value callback 
+     * @param fcall the error callback 
+     * @param arguments the arguments to the webservice
+     */
+    public static void invokeWebserviceASync(WSDefinition def, SuccessCallback scall, 
+            FailureCallback fcall, Object... arguments) {
+        WSConnection cr = new WSConnection(def, scall, fcall, arguments);
+        NetworkManager.getInstance().addToQueue(cr);
+    }
+
+    /**
+     * Invokes a web asynchronously and calls the callback on completion
+     * 
+     * @param def definition of the webservice request
      * @param call the return value containing an error callback or value 
      * @param arguments the arguments to the webservice
      */
@@ -238,34 +254,40 @@ public class WebServiceProxyCall {
         private WSDefinition def;
         private Object[] arguments;
         Object returnValue;
-        private Callback call;
+        private SuccessCallback scall;
+        private FailureCallback fcall;
         
         public WSConnection(WSDefinition def, Callback call, Object... arguments) {
+            this(def, call, call, arguments);
+        }
+        
+        public WSConnection(WSDefinition def, SuccessCallback scall, FailureCallback fcall, Object... arguments) {
             this.def = def;
             setUrl(def.url);
             this.arguments = arguments;
-            this.call = call;
+            this.scall = scall;
+            this.fcall = fcall;
             setPost(true);
         }
         
         @Override
         protected void postResponse() {
-            if(call != null) {
-                call.onSucess(returnValue);
+            if(scall != null) {
+                scall.onSucess(returnValue);
             }
         }
         
         @Override
         protected void handleErrorResponseCode(int code, String message) {
-            if(call != null) {
-                call.onError(this, null, code, message);
+            if(fcall != null) {
+                fcall.onError(this, null, code, message);
             }
         }
 
         @Override
         protected void handleException(Exception err) {
-            if(call != null) {
-                call.onError(this, err, -1, null);
+            if(fcall != null) {
+                fcall.onError(this, err, -1, null);
             }
         }
         

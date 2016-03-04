@@ -44,7 +44,7 @@ import java.util.Vector;
  * <p>The sample
  * code below fetches a page of data from the nestoria housing listing API.<br>
  * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
- * class.</p>
+ * class. You can read more about networking in Codename One {@link com.codename1.io here}</p>
  * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
@@ -144,6 +144,9 @@ public class NetworkManager {
      * the thread count might fail.
      *
      * @param threadCount the threadCount to set
+     * @deprecated since the network is always running in Codename One this method is quite confusing
+     * unfortunately fixing it will probably break working code. You should migrate the code to use 
+     * {@link #updateThreadCount(int)}
      */
     public void setThreadCount(int threadCount) {
         // in auto detect mode multiple threads can break the detections
@@ -151,11 +154,21 @@ public class NetworkManager {
             this.threadCount = threadCount;
         }
     }
+    
+    /**
+     * Sets the number of network threads and restarts the network threads
+     * @param threadCount the new number of threads
+     */
+    public void updateThreadCount(int threadCount) {
+        this.threadCount = threadCount;
+        shutdown();
+        start();
+    }
 
     class NetworkThread implements Runnable {
         private ConnectionRequest currentRequest;
         private Thread threadInstance;
-        private boolean stopped = false;
+        boolean stopped = false;
 
         public NetworkThread() {
         }
@@ -497,6 +510,11 @@ public class NetworkManager {
      */
     public void shutdown() {
         running = false;
+        if(networkThreads != null) {
+            for(NetworkThread n : networkThreads) {
+                n.stopped = true;
+            }
+        }
         networkThreads = null;
         synchronized(LOCK) {
             LOCK.notifyAll();

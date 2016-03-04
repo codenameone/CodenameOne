@@ -27,7 +27,9 @@ import com.codename1.codescan.CodeScanner;
 import com.codename1.components.FileTree;
 import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
+import com.codename1.db.Cursor;
 import com.codename1.db.Database;
+import com.codename1.db.Row;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
@@ -4072,6 +4074,12 @@ public abstract class CodenameOneImplementation {
                 }
                 if(o instanceof Writer) {
                     ((Writer) o).close();
+                }
+                if(o instanceof Database) {
+                    ((Database)o).close();
+                }
+                if(o instanceof Cursor) {
+                    ((Cursor)o).close();
                 }
             }
         } catch (Throwable ex) {

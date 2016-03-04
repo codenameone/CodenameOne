@@ -34,8 +34,9 @@ import java.io.OutputStream;
 /**
  * <p>Abstracts the underlying application specific storage system, unlike the {@link com.codename1.io.FileSystemStorage}
  * this class is a higher level abstraction. The {@code Storage} class is designed to be very portable and as
- * such it has no support for staple file system capabilities such as hierarchies. 
- * 
+ * such it has no support for staple file system capabilities such as hierarchies. <br>
+ * Check out a more thorough discussion of this API {@link com.codename1.io here}.
+ * </p>
  * <p>
  * The sample code below shows a simple storage browser tool in action:
  * </p>

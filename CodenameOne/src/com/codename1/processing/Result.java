@@ -57,9 +57,9 @@ import java.util.Vector;
 /**
  * An evaluator for a very small expression language to extract primitive types
  * from structured information. This implementation is layered over the
- * com.codename1.io.JSONParser and com.codename1.xml.XMLParser classes. This
+ * {@link com.codename1.io.JSONParser} and {@link com.codename1.xml.XMLParser} classes. This
  * expression language allows applications to extract information from
- * structured data returned by web services with minimal effort.
+ * structured data returned by web services with minimal effort. You can read more about it {@link com.codename1.processing here}.
  *
  * The expression language works a lot like a very small subset of XPath - the
  * expression syntax uses the / character for sub-elements and square brackets
@@ -67,7 +67,7 @@ import java.util.Vector;
  *
  * Some sample expressions:
  *
- * <pre>
+ * <pre>{@code 
  *  Simple expression, get the title of the first photo element.
  *
  *  /photos/photo[1]/title
@@ -88,7 +88,7 @@ import java.util.Vector;
  *
  *  //order/lineitem[price > 5]/../@ponum
  * etc
- * </pre>
+ * }</pre>
  *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  *

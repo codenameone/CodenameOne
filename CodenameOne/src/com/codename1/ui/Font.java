@@ -286,6 +286,10 @@ public class Font {
      * @return newly created font or null if creation failed
      */
     public static Font create(String lookup) {
+        // for general convenience
+        if(lookup.startsWith("native:")) {
+            return createTrueTypeFont(lookup, lookup);
+        }
         Object n = Display.impl.loadNativeFont(lookup);
         if(n == null) {
             return null;

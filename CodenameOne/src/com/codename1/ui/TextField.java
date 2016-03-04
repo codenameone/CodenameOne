@@ -1520,8 +1520,7 @@ public class TextField extends TextArea {
     public void paint(Graphics g) {
         
         //the native input will show the string.
-        if(useNativeTextInput && Display.getInstance().isNativeInputSupported() &&
-                Display.getInstance().isTextEditing(this)) {
+        if(useNativeTextInput && Display.getInstance().isNativeEditorVisible(this)) {
             return;
         }
 

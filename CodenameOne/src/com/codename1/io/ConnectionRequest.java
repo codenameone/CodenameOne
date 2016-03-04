@@ -53,12 +53,12 @@ import java.util.Vector;
  * <p>This class represents a connection object in the form of a request response
  * typically common for HTTP/HTTPS connections. A connection request is added to
  * the {@link com.codename1.io.NetworkManager} for processing in a queue on one of the
- * network threads.</p>
+ * network threads. You can read more about networking in Codename One {@link com.codename1.io here}</p>
  * 
  * <p>The sample
  * code below fetches a page of data from the nestoria housing listing API.<br>
  * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
- * class.</p>
+ * class. You can read more about networking in Codename One {@link com.codename1.io here}.</p>
  * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
@@ -193,10 +193,35 @@ public class ConnectionRequest implements IOProgressListener {
      */
     private static String cookieHeader = "cookie";
     
+    /**
+     * Default constructor
+     */
     public ConnectionRequest() {
         if(NetworkManager.getInstance().isAPSupported()) {
             silentRetryCount = 1;
         }
+    }
+
+    /**
+     * Construct a connection request to a url
+     * 
+     * @param url the url
+     */
+    public ConnectionRequest(String url) {
+        this();
+        setUrl(url);
+    }
+    
+
+    /**
+     * Construct a connection request to a url
+     * 
+     * @param url the url
+     * @param post whether the request is a post url or a get URL
+     */
+    public ConnectionRequest(String url, boolean post) {
+        this(url);
+        setPost(post);
     }
     
     /**
@@ -1095,6 +1120,17 @@ public class ConnectionRequest implements IOProgressListener {
         }
     }
 
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgumentArray(String key, String... value) {
+        addArgument(key, value);
+    }
+    
     /**
      * Add an argument to the request response as an array of elements, this will
      * trigger multiple request entries with the same key

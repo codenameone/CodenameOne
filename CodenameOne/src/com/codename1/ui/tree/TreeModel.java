@@ -38,6 +38,12 @@ import java.util.Vector;
  * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
  *
+ * <p>
+ * Another real world example showing the {@link com.codename1.io.FileSystemStorage} as a tree:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>            
+ * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
+ * 
  * @author Shai Almog
  */
 public interface TreeModel {
