@@ -3343,10 +3343,14 @@ hi.show();}</pre></noscript>
     }
 
     /**
-     * Notice: this method might be very slow and should be invoked on a separate thread!
+     * <p>Notice: this method might be very slow and should be invoked on a separate thread!
      * It might have platform specific optimizations over getAllContacts followed by looping
      * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
-     * information.
+     * information.<br>
+     * The sample below demonstrates listing all the contacts within the device with their photos</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
      * 
      * @param withNumbers if true returns only contacts that has a number
      * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
@@ -3379,8 +3383,12 @@ hi.show();}</pre></noscript>
     }
 
     /**
-     * This method returns a Contact by the contact id and fills it's data
-     * according to the given flags
+     * <p>This method returns a Contact by the contact id and fills it's data
+     * according to the given flags.<br>
+     * The sample below demonstrates listing all the contacts within the device with their photos</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
      * 
      * @param id of the Contact
      * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
@@ -3399,7 +3407,9 @@ hi.show();}</pre></noscript>
     }
     
     /**
-     * Some platforms allow the user to block contacts access on a per application basis (specifically iOS).
+     * Some platforms allow the user to block contacts access on a per application basis this method
+     * returns true if the user denied permission to access contacts. This can allow you to customize the error
+     * message presented to the user.
      * 
      * @return true if contacts access is allowed or globally available, false otherwise
      */
@@ -3498,7 +3508,13 @@ hi.show();}</pre></noscript>
     
     
      /**
-     * Returns the localization manager instance for this platform
+     * <p>The localization manager allows adapting values for display in different locales thru parsing and formatting
+     * capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
+     * related API's similar to Locale/currency API's from JavaSE.<br>
+     * The sample code below just lists the various capabilities of the API:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/l10n-manager.png" alt="Localization formatting/parsing and information" />
      * 
      * @return an instance of the localization manager
      */

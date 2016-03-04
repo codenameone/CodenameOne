@@ -29,7 +29,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Represents a message to be sent using underlying platform e-mail client.
+ * <p>Represents a message to be sent using underlying platform e-mail client or the cloud (for pro subscribers).
+ * 
+ * <p>
+ * The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
+ * specific feature:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js"></script>
  * 
  * @author Chen
  */
@@ -151,8 +157,10 @@ public class Message {
     
 
     /**
-     * Send an email message using the Codename One cloud to send the message, notice that this API
-     * will only work for pro accounts
+     * <p>Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts.</p>
+     * <script src="https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js"></script>
+     * 
      * @param sender the name of the sender, notice all email will arrive from Codename One to avoid spam issues
      * @param recipient the email for the recipient
      * @param recipientName the display name for the recipient
@@ -165,8 +173,10 @@ public class Message {
     }
 
     /**
-     * Send an email message using the Codename One cloud to send the message, notice that this API
-     * will only work for pro accounts
+     * <p>Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts.</p>
+     * <script src="https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js"></script>
+     * 
      * @param sender the name of the sender, notice all email will arrive from Codename One to avoid spam issues
      * @param recipient the email for the recipient
      * @param recipientName the display name for the recipient
