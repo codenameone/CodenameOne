@@ -225,10 +225,20 @@
         
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
-        <copy file="dist/CodenameOne.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
-        <zip basedir="src" destfile="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" compress="false">
+        
+        <delete dir="build/tempsource" />
+        <!-- this will get overriden the main value is keeping the package.html files -->
+        <copydir src="src" dest="build/tempsource" />
+        <java fork="true" jar="../../cn1-binraries/JavaDocSourceEmbed.jar">
+            <arg file="src" />
+            <arg file="build/tempsource" />
+        </java>        
+        <zip basedir="build/tempsource" destfile="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" compress="false">
             <exclude name="**/svn/"/>
         </zip>
+        <delete dir="build/tempsource" />
+        
+        <copy file="dist/CodenameOne.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../demos" />
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="../demos" />
         <copy file="dist/CodenameOne.jar" todir="../demos" />
