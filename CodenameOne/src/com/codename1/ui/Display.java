@@ -3198,7 +3198,11 @@ hi.show();}</pre></noscript>
     }
 
     /**
-     * Send an email using the platform mail client
+     * <p>Send an email using the platform mail client.<br>
+     * The code below demonstrates sending a simple message with attachments using the devices
+     * native email client:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js"></script>
      * @param recipients array of e-mail addresses
      * @param subject e-mail subject
      * @param msg the Message to send
@@ -3216,8 +3220,14 @@ hi.show();}</pre></noscript>
     }    
     
     /**
-     * Indicates the level of SMS support in the platform as one of: SMS_NOT_SUPPORTED (for desktop, tablet etc.), 
-     * SMS_SEAMLESS (no UI interaction), SMS_INTERACTIVE (with compose UI), SMS_BOTH.
+     * <p>Indicates the level of SMS support in the platform as one of: 
+     * {@link #SMS_NOT_SUPPORTED} (for desktop, tablet etc.), 
+     * {@link #SMS_SEAMLESS} (no UI interaction), {@link #SMS_INTERACTIVE} (with compose UI), 
+     * {@link #SMS_BOTH}.<br>
+     * The sample below demonstrates the use case for this property:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
+     * 
      * @return one of the SMS_* values
      */
     public int getSMSSupport() {
@@ -3235,7 +3245,11 @@ hi.show();}</pre></noscript>
     }
     
     /**
-     * Sends a SMS message to the given phone number
+     * <p>Sends a SMS message to the given phone number, the code below demonstrates the logic
+     * of detecting platform behavior for sending SMS.</p>
+     * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
+     * 
+     * @see #getSMSSupport() 
      * @param phoneNumber to send the sms
      * @param message the content of the sms
      * @param interactive indicates the SMS should show a UI or should not show a UI if applicable see getSMSSupport

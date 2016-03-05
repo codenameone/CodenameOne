@@ -29,7 +29,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * <p>Represents a message to be sent using underlying platform e-mail client or the cloud (for pro subscribers).
+ * <p>Represents a message to be sent using underlying platform e-mail client or the cloud.<br>
+ * The code below demonstrates sending a simple message with attachments using the devices
+ * native email client:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js"></script>
  * 
  * <p>
  * The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
