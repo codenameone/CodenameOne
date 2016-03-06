@@ -476,8 +476,8 @@ public class Toolbar extends Container {
             transitionIn = lf.getDefaultMenuTransitionIn();
             transitionOut = lf.getDefaultMenuTransitionOut();
         } else {
-            transitionIn = CommonTransitions.createFade(300);
-            transitionOut = CommonTransitions.createFade(300);
+            transitionIn = CommonTransitions.createEmpty();
+            transitionOut = CommonTransitions.createEmpty();
         }
         menu.setTransitionOutAnimator(transitionIn);
         menu.setTransitionInAnimator(transitionOut);
@@ -485,7 +485,11 @@ public class Toolbar extends Container {
             marginRight = marginLeft;
             marginLeft = 0;
         }
-        return menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
+        int tint = parent.getTintColor();
+        parent.setTintColor(0);
+        Command r = menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
+        parent.setTintColor(tint);
+        return r;
     }
 
     /**
@@ -756,8 +760,8 @@ public class Toolbar extends Container {
             super.installRightCommands();
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
-                if (i == null) {
-                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"));
+                if (i == null) { 
+                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), 4.5f);
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 
