@@ -31,11 +31,14 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * The analytics service allows an application to report its usage, it is seamlessly
- * invoked by GUI builder applications if analytics is enabled for your application!
- * To enable analytics just use the init() method of the analytics service. If you are 
+ * <p>The analytics service allows an application to report its usage, it is seamlessly
+ * invoked by GUI builder applications if analytics is enabled for your application but can
+ * work just as well for handcoded apps!</p>
+ * <p>To enable analytics just use the {@link #init(java.lang.String, java.lang.String)} 
+ * method of the analytics service. For most typical usage you should also invoke the
+ * {@link #setAppsMode(boolean)} method with {@code true}. If you are 
  * not using the GUI builder invoke the visit method whenever you would like to log a 
- * page view event.
+ * page view event.</p>
  * 
  *
  * @author Shai Almog
@@ -70,7 +73,8 @@ public class AnalyticsService {
     }
 
     /**
-     * Apps mode allows improved analytics using the newer google analytics API designed for apps
+     * Apps mode allows improved analytics using the newer google analytics API designed for apps.
+     * Most developers should invoke this method with {@code true}.
      * @param aAppsMode the appsMode to set
      */
     public static void setAppsMode(boolean aAppsMode) {

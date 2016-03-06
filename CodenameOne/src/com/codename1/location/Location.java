@@ -23,7 +23,23 @@
 package com.codename1.location;
 
 /**
- * This class represents a Location Object
+ * <p>
+ * Represents a position and possible velocity returned from positioning API's. This class is used both by
+ * foreground and background location for the purposes of both conveying the users location and conveying a
+ * desired location e.g. in the case of geofencing where we can define a location that would trigger the callback.
+ * </p>
+ * <p>
+ * Trivial one time usage of location data can look like this sample:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5c2f411e1687793409d5.js"></script>
+ * 
+ * <p>
+ * You can also track location in the foreground using API calls like this:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/9dc822cf80cc8bf3a6cc.js"></script>
+ * 
+ * <p>The sample below demonstrates the usage of the background geofencing API:</p>
+ * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
  */
 public class Location {
     

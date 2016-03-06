@@ -41,6 +41,11 @@ import java.io.OutputStream;
  * The code below demonstrates the capturing of a photo thru this API:</p>
  * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
+ *<p>
+ * The code below demonstrates capturing and playing back audio files using this API:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  * 
  * @author Chen
  */

@@ -26,13 +26,23 @@ import com.codename1.ui.Display;
 import java.io.IOException;
 
 /**
- * <p>The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener, important: in 
- * order to use location on iOS you will need to define the build argument ios.locationUsageDescription.
+ * <p>The LocationManager is the main entry to retrieveLocation or to bind  a LocationListener, 
+ * <strong>important:</strong> in order to use location on iOS you will need to define the build 
+ * argument {@code ios.locationUsageDescription}.
  * This build argument should be used to describe to Apple &amp; the users why you need to use the location 
  * functionality.</p>
+ * <p>
+ * Trivial one time usage of location data can look like this sample:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5c2f411e1687793409d5.js"></script>
  * 
- * <p>Usage:</p>
- * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
+ * <p>
+ * You can also track location in the foreground using API calls like this:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/9dc822cf80cc8bf3a6cc.js"></script>
+ * 
+ * <p>The sample below demonstrates the usage of the background geofencing API:</p>
+ * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
  * 
  */
 public abstract class LocationManager {

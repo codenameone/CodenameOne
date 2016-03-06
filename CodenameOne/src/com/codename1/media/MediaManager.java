@@ -40,6 +40,12 @@ import java.io.InputStream;
  * 
  * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
+ * 
+ * <p>
+ *     The code below demonstrates capturing and playing back audio files using this API:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  */
 public class MediaManager {
 
