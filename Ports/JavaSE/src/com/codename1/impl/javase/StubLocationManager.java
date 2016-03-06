@@ -53,13 +53,14 @@ class StubLocationManager extends LocationManager {
         double lon = p.getDouble("lastGoodLon", -74.005973);
         loc.setLongitude(lon);
         loc.setLatitude(lat);
-				loc.setAccuracy(55);
-				loc.setAltitude(1000);
-				loc.setDirection(0);
-				loc.setVelocity(50);
-				loc.setStatus(AVAILABLE);
+				loc.setAccuracy(p.getFloat("accuracy", 55));
+				loc.setAltitude(p.getDouble("Altitude",1000));
+				loc.setDirection(p.getFloat("direction", 0));
+				loc.setVelocity(p.getFloat("velocity",50));
+				loc.setStatus(p.getInt("state", AVAILABLE));
         if(locSimulation==null)
 					locSimulation = new LocationSimulation();
+				JavaSEPort.locSimulation.setMeasUnit(p.getInt("unit", LocationSimulation.E_MeasUnit_Metric));
 				JavaSEPort.locSimulation.setLocation(loc);
     }
 
