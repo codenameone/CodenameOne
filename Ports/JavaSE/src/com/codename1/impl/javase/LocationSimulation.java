@@ -502,31 +502,36 @@ public class LocationSimulation extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-	private void updateSave(java.awt.event.ActionEvent evt) {
-		try {
-			String lat = latitude.getText();
-			String lon = longitude.getText();
+    private void updateSave(java.awt.event.ActionEvent evt) {
+        try {
+            String lat = latitude.getText();
+            String lon = longitude.getText();
 
-			final Double la = new Double(lat);
-			final Double lo = new Double(lon);
+            if (lat.length() == 0 || lon.length() == 0) {
+                return;
+            }
 
-			Platform.runLater(new Runnable() {
+            final Double la = new Double(lat);
+            final Double lo = new Double(lon);
 
-				public void run() {
-					Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
-					p.putFloat("accuracy", getAccuracy());
-					p.putFloat("velocity", getVelocity());
-					p.putDouble("Altitude", getAltitude());
-					p.putFloat("direction", getDirection());
-					webView.getEngine().executeScript("moveToLocation(" + la.toString() + "," + lo.toString() + ");");
-				}
-			});
+            Platform.runLater(new Runnable() {
 
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+                public void run() {
+                    Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+                    p.putFloat("accuracy", getAccuracy());
+                    p.putFloat("velocity", getVelocity());
+                    p.putDouble("Altitude", getAltitude());
+                    p.putFloat("direction", getDirection());
+                    webView.getEngine().executeScript("moveToLocation(" + la.toString() + "," + lo.toString() + ");");
+                }
+            });
 
-	}
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+    
   private void latitudeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_latitudeActionPerformed
 		updateSave(evt);
   }//GEN-LAST:event_latitudeActionPerformed
