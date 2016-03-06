@@ -4731,8 +4731,8 @@ public class FontImage extends Image {
      * @param size the size in millimeters
      * @return a new icon
      */
-    public static FontImage createMaterial(char icon, Style s, int size) {
-        Font f = getMaterialDesignFont().derive(Display.getInstance().convertToPixels(size, true), Font.STYLE_PLAIN);
+    public static FontImage createMaterial(char icon, Style s, float size) {
+        Font f = getMaterialDesignFont().derive(Display.getInstance().convertToPixels(size), Font.STYLE_PLAIN);
         return create("" + icon, s, f);
     }
     
