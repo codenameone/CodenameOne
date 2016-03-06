@@ -2290,6 +2290,18 @@ public final class Display {
         return impl.convertToPixels(dipCount, horizontal);
     }
 
+
+    /**
+     * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
+     * to be relied upon. This version of the method assumes square pixels which is pretty much the norm.
+     * 
+     * @param dipCount the dips that we will convert to pixels
+     * @return value in pixels
+     */
+    public int convertToPixels(int dipCount) {
+        return impl.convertToPixels(dipCount, true);
+    }
+
     /**
      * Returns the game action code matching the given key combination
      *
@@ -3859,8 +3871,11 @@ hi.show();}</pre></noscript>
     }
     
     /**
-     * Schedules a local notification to occur.
-     *
+     * <p>Schedules a local notification that will occur after the given time elapsed.<br>
+     * The sample below combines this with the geofence API to show a local notification
+     * when entering a radius with the app in the background:</p>
+     * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+     * 
      * @param n The notification to schedule.
      * @param firstTime time in milliseconds when to schedule the notification
      * @param repeat repeat one of the following: REPEAT_NONE, REPEAT_FIFTEEN_MINUTES, 
