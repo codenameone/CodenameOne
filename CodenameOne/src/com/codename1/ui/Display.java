@@ -2298,8 +2298,8 @@ public final class Display {
      * @param dipCount the dips that we will convert to pixels
      * @return value in pixels
      */
-    public int convertToPixels(int dipCount) {
-        return impl.convertToPixels(dipCount, true);
+    public int convertToPixels(float dipCount) {
+        return Math.round(impl.convertToPixels((int)(dipCount * 1000), true) / 1000.0f);
     }
 
     /**
