@@ -4722,6 +4722,21 @@ public class FontImage extends Image {
     }
     
     /**
+     * <p>Creates a material design icon font for the given style but size it in millimeters based
+     * on the size argument and not the font</p>
+     * <script src="https://gist.github.com/codenameone/34fd9e519ec3d305a015.js"></script>
+     * 
+     * @param icon the icon, one of the MATERIAL_* constants
+     * @param s the style to use, notice the font in the style only matters in terms of size and nothing else
+     * @param size the size in millimeters
+     * @return a new icon
+     */
+    public static FontImage createMaterial(char icon, Style s, int size) {
+        Font f = getMaterialDesignFont().derive(Display.getInstance().convertToPixels(size, true), Font.STYLE_PLAIN);
+        return create("" + icon, s, f);
+    }
+    
+    /**
      * <p>Creates a material design icon font for the given style</p>
      * <script src="https://gist.github.com/codenameone/34fd9e519ec3d305a015.js"></script>
      * 
