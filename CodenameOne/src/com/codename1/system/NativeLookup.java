@@ -68,17 +68,17 @@ public class NativeLookup {
      * @return an instance of that interface that can be invoked or null if the native interface isn't
      * present on the underlying platform (e.g. simulator platform).
      */
-    public static NativeInterface create(Class c) {
+    public static <T extends NativeInterface> T create(Class<T> c) {
         try {
             if(interfaceToClassLookup != null) {
                 Class cls = interfaceToClassLookup.get(c);
                 if(cls == null) {
                     return null;
                 }
-                return (NativeInterface)cls.newInstance();
+                return (T)cls.newInstance();
             }
             // special case for JavaSE native interfaces
-            return (NativeInterface)Class.forName(c.getName() + "Impl").newInstance();
+            return (T)Class.forName(c.getName() + "Impl").newInstance();
         } catch (Throwable ex) {
             if(verbose) {
                 ex.printStackTrace();
