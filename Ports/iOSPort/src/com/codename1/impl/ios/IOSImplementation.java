@@ -1397,6 +1397,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
         ng.clipApplied = false;
         if ( ng.isTransformSupported() ){
             if ( ng.clip == null ){
@@ -3781,10 +3782,15 @@ public class IOSImplementation extends CodenameOneImplementation {
                 //Log.p("In applyClip");
                 if ( this.clip == null ){
                     //Log.p("Clip is null");
-                    int w = Display.getInstance().getDisplayWidth();
-                    int h = Display.getInstance().getDisplayHeight();
+                    int w = associatedImage == null ? Display.getInstance().getDisplayWidth() : associatedImage.width;
+                    int h = associatedImage == null ? Display.getInstance().getDisplayHeight() : associatedImage.height;
+                    clipX = 0;
+                    clipY = 0;
+                    clipW = w;
+                    clipH = h;
+                    this.clip = new Rectangle(0,0,w,h);
                     setNativeClipping(0,0,w,h,clipApplied);
-                    
+                    clipApplied = true;
                     return;
                 }
                 if ( this.clip.isRectangle() ){
