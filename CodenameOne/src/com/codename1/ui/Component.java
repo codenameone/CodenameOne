@@ -2862,8 +2862,11 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * This method adds a refresh task to the Component, the task will be 
-     * executed if the user has pulled the scroll beyond a certain height.
+     * <p>This method adds a refresh task to the Component, the task will be 
+     * executed if the user has pulled the scroll beyond a certain height.</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/da87714157f97c739b2a.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/pull-to-refresh.png" alt="Simple pull to refresh demo" />
      * 
      * @param task the refresh task to execute.
      */ 

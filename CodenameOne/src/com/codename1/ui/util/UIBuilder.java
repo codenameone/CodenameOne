@@ -1427,7 +1427,7 @@ public class UIBuilder { //implements Externalizable {
                         items[iter] = in.readUTF();
                     }
                     if(!setListModel(((List)cmp))) {
-                        ((List)cmp).setModel(new DefaultListModel(items));
+                        ((List)cmp).setModel(new DefaultListModel((Object[])items));
                     }
                     break;
 

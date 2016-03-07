@@ -90,7 +90,7 @@ public class Picker extends Button {
                                 gs.setRenderingPrototype((String)renderingPrototype);
                             }
                             String[] strArr = (String[])metaData;
-                            gs.setModel(new DefaultListModel(strArr));
+                            gs.setModel(new DefaultListModel((Object[])strArr));
                             if(value != null) {
                                 int slen = strArr.length;
                                 for(int iter = 0 ; iter < slen ; iter++) {

@@ -1476,8 +1476,9 @@ public final class Display {
     }
 
     /**
-     * Encapsulates the editing code which is specific to the platform, some platforms
-     * would allow "in place editing" MIDP does not.
+     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead 
+     * use an API like {@link com.codename1.ui.TextArea#startEditingAsync()}, {@link com.codename1.ui.TextArea#startEditing()}
+     * or {@link com.codename1.ui.Form#setEditOnShow(com.codename1.ui.TextArea)}.
      *
      * @param cmp the {@link TextArea} component
      * @param maxSize the maximum size from the text area
@@ -1489,8 +1490,9 @@ public final class Display {
     }
 
     /**
-     * Encapsulates the editing code which is specific to the platform, some platforms
-     * would allow "in place editing" MIDP does not.
+     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead 
+     * use an API like {@link com.codename1.ui.TextArea#startEditingAsync()}, {@link com.codename1.ui.TextArea#startEditing()}
+     * or {@link com.codename1.ui.Form#setEditOnShow(com.codename1.ui.TextArea)}.
      *
      * @param cmp the {@link TextArea} component
      * @param maxSize the maximum size from the text area
@@ -2757,7 +2759,7 @@ public final class Display {
      * <li>User-Agent
      * <li>AppVersion
      * <li>Platform - Similar to microedition.platform
-     * <li>OS - returns what is the underlying platform e.g. - J2ME, RIM, SE...
+     * <li>OS - returns what is the underlying platform e.g. - iOS, Android, RIM, SE...
      * <li>OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
      *
      * </ol>
@@ -2812,8 +2814,10 @@ public final class Display {
     }
     
     /**
-     * Returns true if executing this URL should work, returns false if it will not
-     * and null if this is unknown.
+     * <p>Returns true if executing this URL should work, returns false if it will not
+     * and null if this is unknown.</p>
+     * <script src="https://gist.github.com/codenameone/7aefb64909e75e10c396.js"></script>
+     * 
      * @param url the url that would be executed
      * @return true if executing this URL should work, returns false if it will not
      * and null if this is unknown
@@ -2823,7 +2827,8 @@ public final class Display {
     }
 
     /**
-     * Executes the given URL on the native platform
+     * <p>Executes the given URL on the native platform</p>
+     * <script src="https://gist.github.com/codenameone/7aefb64909e75e10c396.js"></script>
      *
      * @param url the url to execute
      */
