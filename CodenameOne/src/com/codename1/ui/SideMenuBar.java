@@ -1018,7 +1018,7 @@ public class SideMenuBar extends MenuBar {
         if (sh == null && shadowEnabled) {
             sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
         }
-        if (isRTLValue) {
+        if (isRTLValue && sh != null) {
             sh = sh.flipHorizontally(true);
         }
         final Image shadow = sh;
