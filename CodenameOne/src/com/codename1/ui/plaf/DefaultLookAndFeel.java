@@ -1757,8 +1757,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             }
             UIManager uim = UIManager.getInstance();
             Style unsel = uim.createStyle("CheckBox", "", false);
-            Style sel = uim.getComponentSelectedStyle("CheckBox");
-            Style dis = uim.getComponentCustomStyle("CheckBox", "dis");
+            Style sel = uim.createStyle("CheckBox", "sel#", true);
+            Style dis = uim.createStyle("CheckBox", "dis#", false);
             FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, dis);
             FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);
             if(focus) {
