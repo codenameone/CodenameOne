@@ -486,8 +486,14 @@ public class Toolbar extends Container {
             marginLeft = 0;
         }
         int tint = parent.getTintColor();
-        parent.setTintColor(0);
-        Command r = menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
+        parent.setTintColor(0x00FFFFFF);
+        parent.tint = false;
+        boolean showBelowTitle = manager.isThemeConstant("showMenuBelowTitleBool", true);
+        int topPadding = 0;
+        if(showBelowTitle){
+            topPadding = th;
+        }
+        Command r = menu.show(topPadding, Math.max(topPadding, height), marginLeft, marginRight, true);
         parent.setTintColor(tint);
         return r;
     }

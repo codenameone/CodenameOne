@@ -1798,8 +1798,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             }
             UIManager uim = UIManager.getInstance();
             Style unsel = uim.createStyle("RadioButton", "", false);
-            Style sel = uim.getComponentSelectedStyle("RadioButton");
-            Style dis = uim.getComponentCustomStyle("RadioButton", "dis");
+            Style sel = uim.createStyle("RadioButton", "sel#", true);
+            Style dis = uim.createStyle("RadioButton", "dis#", false);
             FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, dis);
             FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);
             if(focus) {

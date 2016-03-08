@@ -719,7 +719,11 @@ public class ToastBar {
             Form f = c.getComponentForm();
             Container layered = c.getParent();
             c.hidden = true;
-            layered.animateHierarchyAndWait(1000);
+            if(Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()){
+                layered.animateHierarchyAndWait(1000);
+            }else{
+                layered.revalidate();
+            }
             c.setVisible(false); 
         }
     }
