@@ -96,7 +96,7 @@ public class AutoCompleteTextField extends TextField {
      * getSuggestionModel value as well as for the GUI builder
      */
     public AutoCompleteTextField() {
-        this(new DefaultListModel(new String[]{""}));
+        this(new DefaultListModel(new Object[]{""}));
     }
     
     /**

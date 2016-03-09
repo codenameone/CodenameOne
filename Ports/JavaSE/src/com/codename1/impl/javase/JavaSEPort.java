@@ -95,6 +95,7 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
+import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.payment.Product;
@@ -1664,11 +1665,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         System.err.println("This simulation requires jdk 7");
                         return;
                     }
-										if(locSimulation==null)
-											locSimulation = new LocationSimulation();
-										else
-											locSimulation.setVisible(true);
-
+                    if(locSimulation==null) {
+                            locSimulation = new LocationSimulation();
+                    } else {
+                            locSimulation.setVisible(true);
+                    }
                 }
             });
             simulatorMenu.add(locactionSim);
@@ -5935,7 +5936,29 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public LocationManager getLocationManager() {
-        return StubLocationManager.getLocationManager();
+        // the location simulation should ONLY apply to the simulator and not to JavaSE port, designer etc.
+        if(portraitSkin != null) {
+            return StubLocationManager.getLocationManager();
+        }
+        return new LocationManager() {
+            @Override
+            public Location getCurrentLocation() throws IOException {
+                return new Location();
+            }
+
+            @Override
+            public Location getLastKnownLocation() {
+                return new Location();
+            }
+
+            @Override
+            protected void bindListener() {
+            }
+
+            @Override
+            protected void clearListener() {
+            }
+        };
     }
 
     @Override

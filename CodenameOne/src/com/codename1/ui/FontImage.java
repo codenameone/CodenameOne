@@ -4564,6 +4564,24 @@ public class FontImage extends Image {
     }
 
     /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * 
+     * @param l a label or subclass (e.g. Button etc.)
+     * @param icon one of the MATERIAL_* icons
+     * @param size in millimeters for the icon
+     */
+    public static void setMaterialIcon(Label l, char icon, float size) {
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            int sizePixels = Display.getInstance().convertToPixels(size);
+            s.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
+    }
+
+    /**
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>

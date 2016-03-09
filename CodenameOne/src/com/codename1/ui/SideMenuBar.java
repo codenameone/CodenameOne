@@ -220,7 +220,7 @@ public class SideMenuBar extends MenuBar {
         if (i != null) {
             ob.setIcon(i);
         } else {
-            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU);
+            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU, 4.5f);
         }
         Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
         if (p != null) {

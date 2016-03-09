@@ -6508,12 +6508,12 @@ public abstract class CodenameOneImplementation {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         drawImage(nativeGraphics, icon, x, y);
                         drawLabelStringValign(nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight, fontHeight, valign);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, iconStringHGap, iconHeight, fontHeight, valign);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
                         drawImage(nativeGraphics, icon, x, y + iconStringHGap);
                         drawLabelString(nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                     }
                     break;
                 case Label.BOTTOM:
@@ -6522,13 +6522,13 @@ public abstract class CodenameOneImplementation {
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         drawImage(nativeGraphics, icon, x, y);
                         drawLabelString(nativeGraphics, nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,
-                                isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
                         drawImage(nativeGraphics, icon, x + iconStringWGap, y);
 
                         drawLabelString(nativeGraphics, nativeFont, text, x, y + iconHeight + gap, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                     }
                     break;
                 case Label.TOP:
@@ -6536,12 +6536,12 @@ public abstract class CodenameOneImplementation {
                     if (iconWidth > strWidth) { 
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         drawLabelString(nativeGraphics, nativeFont, text, x + iconStringWGap, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                         drawImage(nativeGraphics, icon, x, y + fontHeight + gap);
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
                         drawLabelString(nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
-                                textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                         drawImage(nativeGraphics, icon, x + iconStringWGap, y + fontHeight + gap);
                     }
                     break;
