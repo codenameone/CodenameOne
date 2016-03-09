@@ -23,6 +23,7 @@
 #import "FillRect.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
+#include "TargetConditionals.h"
 
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -115,10 +116,18 @@ static GLuint getOGLProgram(){
     
     GLKVector4 colorV = GLKVector4Make(((float)((color >> 16) & 0xff))/255.0 * alph,
                                        ((float)((color >> 8) & 0xff))/255.0 * alph, ((float)(color & 0xff))/255.0 * alph, alph);
+    GLfloat xOffset = 0;
+    GLfloat yOffset = 0;
+    
+#if (TARGET_OS_SIMULATOR)
+    xOffset = 0;
+    yOffset = 0;
+#endif
+    
     GLfloat vertexes[] = {
-        x+0.5, y+0.5,
-        x + width, y+0.5,
-        x+0.5, y + height,
+        x+xOffset, y+yOffset,
+        x + width, y+yOffset,
+        x+xOffset, y + height,
         x + width, y + height
     };
     glEnableVertexAttribArray(vertexCoordAtt);
