@@ -1374,13 +1374,13 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
                                     underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
                                     drawLabelStringValign(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, iconStringHGap, finalIconHeight, finalFontHeight,
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, finalIconHeight, finalFontHeight,
                                             valign, textCache);
                                 } else {
                                     iconStringHGap = (finalFontHeight - finalIconHeight) / 2;
                                     underlying.canvas.drawBitmap(icon, finalX, finalY + iconStringHGap, underlying.paint);
                                     drawLabelString(underlying, nativeFont, finalText, finalX + finalIconWidth + gap, finalY, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
                                 }
                                 break;
                             case Label.BOTTOM:
@@ -1389,13 +1389,13 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                     iconStringWGap = (finalIconWidth - strWidth) / 2;
                                     underlying.canvas.drawBitmap(icon, finalX, finalY, underlying.paint);
                                     drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY + finalIconHeight + gap, finalTextSpaceW,
-                                            isTickerRunning, tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
+                                            isTickerRunning, tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
                                 } else {
                                     iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;
                                     underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY, underlying.paint);
 
                                     drawLabelString(underlying, nativeFont, finalText, finalX, finalY + finalIconHeight + gap, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
                                 }
                                 break;
                             case Label.TOP:
@@ -1403,12 +1403,12 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                                 if (finalIconWidth > strWidth) {
                                     iconStringWGap = (finalIconWidth - strWidth) / 2;
                                     drawLabelString(underlying, nativeFont, finalText, finalX + iconStringWGap, finalY, finalTextSpaceW, isTickerRunning,
-                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
+                                            tickerShiftText, finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
                                     underlying.canvas.drawBitmap(icon, finalX, finalY + finalFontHeight + gap, underlying.paint);
                                 } else {
                                     iconStringWGap = (Math.min(strWidth, finalTextSpaceW) - finalIconWidth) / 2;
                                     drawLabelString(underlying, nativeFont, finalText, finalX, finalY, finalTextSpaceW, isTickerRunning, tickerShiftText,
-                                            finalTextDecoration, rtl, endsWith3Points, finalIconWidth, finalFontHeight, textCache);
+                                            finalTextDecoration, rtl, endsWith3Points, strWidth, finalFontHeight, textCache);
                                     underlying.canvas.drawBitmap(icon, finalX + iconStringWGap, finalY + finalFontHeight + gap, underlying.paint);
                                 }
                                 break;

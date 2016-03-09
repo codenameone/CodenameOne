@@ -7343,7 +7343,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                     iconStringHGap = (iconHeight - fontHeight) / 2;
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x, y);
                     drawLabelStringValign(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
-                                          tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight, fontHeight, valign);
+                                          tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, iconStringHGap, iconHeight, fontHeight, valign);
                 } else {
                     iconStringHGap = (fontHeight - iconHeight) / 2;
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x, y + iconStringHGap);
@@ -7357,13 +7357,13 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                     iconStringWGap = (iconWidth - strWidth) / 2;
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x, y);
                     drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,
-                                    isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                    isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
                 } else {
                     iconStringWGap = (MIN(strWidth, textSpaceW) - iconWidth) / 2;
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x + iconStringWGap, y);
                     
                     drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y + iconHeight + gap, textSpaceW, isTickerRunning,
-                                    tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                    tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
                 }
                 break;
             case 0: /* Label.TOP: */
@@ -7371,12 +7371,12 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 if (iconWidth > strWidth) {
                     iconStringWGap = (iconWidth - strWidth) / 2;
                     drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconStringWGap, y, textSpaceW, isTickerRunning,
-                                    tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                    tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x, y + fontHeight + gap);
                 } else {
                     iconStringWGap = (MIN(strWidth, textSpaceW) - iconWidth) / 2;
                     drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
-                                    textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                    textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject,nativeGraphics, icon, x + iconStringWGap, y + fontHeight + gap);
                 }
                 break;
