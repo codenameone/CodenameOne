@@ -493,7 +493,7 @@ public class Toolbar extends Container {
         if(showBelowTitle){
             topPadding = th;
         }
-        Command r = menu.show(topPadding, Math.max(topPadding, height), marginLeft, marginRight, true);
+        Command r = menu.show(topPadding, Math.max(topPadding, height - topPadding), marginLeft, marginRight, true);
         parent.setTintColor(tint);
         return r;
     }
