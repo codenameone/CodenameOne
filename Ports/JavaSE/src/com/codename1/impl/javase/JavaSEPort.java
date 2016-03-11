@@ -7736,10 +7736,34 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
 
+        String sep = File.separator;
+        File[] searchPaths = new File[]{
+            new File(f.getParent(), "build" + sep + "classes"+ sep + "html"),
+            new File(f.getParent(), "src" + sep + "html"),
+            new File(f.getParent(), "lib" + sep + "impl" + sep + "cls" + sep + "html")
+        };
+        
+        File u = null;
+        boolean found = false;
+        for (File htmldir : searchPaths) {
+            u = new File(htmldir, url);
+            if (u.exists()) {
+                u = htmldir;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            throw new RuntimeException("Could not display browser page "+url+" because it doesn't exist in bundle html hierarchy.");
+        }
+        /*
         File u = new File(f.getParent(), "build" + File.separator + "classes"+ File.separator + "html");
         if (!u.exists()) {
             u = new File(f.getParent(), "src" + File.separator + "html");
         }
+        if (!u.exists()) {
+            u = new File(f.getParent(), "lib" + File.separator + "impl" + File.separator + "cls" + File.separator )
+        }*/
         String base = u.toURI().toURL().toExternalForm(); 
         if(base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
