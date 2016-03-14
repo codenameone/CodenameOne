@@ -1553,6 +1553,18 @@ public class Style {
         }
         return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
     }
+
+    /**
+     * Returns the left margin in pixel or right margin in an RTL situation
+     * @param rtl indicates a right to left language
+     * @return the margin in pixels
+     */
+    public int getMarginLeft(boolean rtl) {
+        if (rtl) {
+            return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
+        }
+        return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+    }
     
     /**
      * Returns the top margin in pixel 
