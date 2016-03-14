@@ -2075,7 +2075,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void setTransform(Object graphics, Transform transform) {
         NativeGraphics ng = (NativeGraphics)graphics;
-        ng.transform = transform;
+        if (ng.transform != null) {
+            if (transform == null) {
+                ng.transform.setIdentity();
+            } else {
+                ng.transform.setTransform(transform);
+            }
+        } else {
+            ng.transform = transform == null ? null : transform.copy();
+        }
         ng.transformApplied = false;
         ng.checkControl();
         ng.applyTransform();
