@@ -1241,11 +1241,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         return ((NativeGraphics)graphics).clipH;
     }
 
+    @Override
+    public boolean isShapeClipSupported(Object graphics) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        return ng.isShapeClipSupported();
+    }
+
+    @Override
+    public void setClip(Object graphics, Shape shape) {
+        setClipShape(graphics, shape);
+    }
+    
     public void setClipShape(Object graphics, Shape shape){
         NativeGraphics ng = (NativeGraphics)graphics;
         //Log.p("Setting clip shape "+shape);
         ng.clip = shape;
         ng.clipDirty = true;
+        ng.clipApplied = false;
         
     }
     
@@ -1344,18 +1356,38 @@ public class IOSImplementation extends CodenameOneImplementation {
     private  void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip) {
         nativeInstance.setNativeClippingMutable(x, y, width, height, firstClip);
     }
+    
+    
     private  void setNativeClippingGlobal(int x, int y, int width, int height, boolean firstClip) {
         nativeInstance.setNativeClippingGlobal(x, y, width, height, firstClip);
+    }
+    
+    private boolean isPolygon(Shape s) {
+        if (s.isRectangle()) {
+            return true;
+        }
+        PathIterator it = s.getPathIterator();
+        float[] curr = new float[6];
+        while (!it.isDone()) {
+            it.next();
+            switch (it.currentSegment(curr)) {
+                case PathIterator.SEG_CUBICTO:
+                case PathIterator.SEG_QUADTO:
+                return false;
+            }
+        }
+        return true;
     }
     
     private  void setNativeClippingGlobal(Shape shape){
         Rectangle bounds = shape.getBounds();
         if ( shape.isRectangle() || bounds.getWidth() <= 0 || bounds.getHeight() <= 0){
             setNativeClippingGlobal(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), true);
-        } else {
+        } else if (isPolygon(shape)) {
             float[] points = shapeToPolygon(shape);
             nativeInstance.setNativeClippingPolygonGlobal(points);
-            /*
+        } else {
+            
             TextureAlphaMask mask = (TextureAlphaMask)textureCache.get(shape, null);
             if ( mask == null ){
                 mask = (TextureAlphaMask)this.createAlphaMask(shape, null);
@@ -1363,12 +1395,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             
            if ( mask != null ){
-               Log.p("Setting native clipping mask global with bounds "+mask.getBounds()+" : "+shape);
+               //Log.p("Setting native clipping mask global with bounds "+mask.getBounds()+" : "+shape);
                 nativeInstance.setNativeClippingMaskGlobal(mask.getTextureName(), mask.getBounds().getX(), mask.getBounds().getY(), mask.getBounds().getWidth(), mask.getBounds().getHeight());
             } else {
                Log.p("Failed to create texture mask for clipping region");
             }
-            */
+            
         }
     }
 
@@ -3838,7 +3870,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         void setNativeClipping(Shape shape){
-            
+            if (shape.getClass() == GeneralPath.class) {
+                // GeneralPath gives us some easy access to the points
+                GeneralPath p = (GeneralPath)shape;
+                int commandsLen = p.getTypesSize();
+                int pointsLen = p.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                p.getTypes(commandsArr);
+                p.getPoints(pointsArr);
+                nativeInstance.setNativeClippingMutable(commandsLen, commandsArr, pointsLen, pointsArr);
+                //nativeInstance.nativeDrawShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
+            } else {
+                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            }
         }
 
         void nativeDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
@@ -4057,6 +4102,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         void drawConvexPolygon(float[] points, int color, int alpha, float lineWidth, int joinStyle, int capStyle, float miterLimit) {
             
+        }
+
+        boolean isShapeClipSupported() {
+            return true;
         }
     }
 

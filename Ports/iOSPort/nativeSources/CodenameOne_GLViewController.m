@@ -1155,6 +1155,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl finished");
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
+(int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
+{
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    //NSLog(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
+    //if(clipApplied) {
+    CGContextRestoreGState(context);
+    //}
+    CGContextSaveGState(context);
+    CGContextClip(Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_GET_STATE_PASS_ARG numCommands, commands, numPoints, points));
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 (int x, int y, int width, int height, int clipApplied) {
     //    NSLog(@"Native global clipping applied: %i x: %i y: %i width: %i height: %i", clipApplied, x, y, width, height);

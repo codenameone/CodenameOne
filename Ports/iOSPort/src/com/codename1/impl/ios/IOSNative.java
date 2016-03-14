@@ -574,6 +574,8 @@ public final class IOSNative {
      */
     native void setNativeEditingComponentVisible(boolean b) ;
 
+    native void setNativeClippingMutable(int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
+
    
 
 }

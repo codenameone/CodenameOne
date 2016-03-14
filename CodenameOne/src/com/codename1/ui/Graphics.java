@@ -39,6 +39,7 @@ import com.codename1.ui.geom.Shape;
 public final class Graphics {
     private int xTranslate;
     private int yTranslate;
+    private Transform translation;
     private int color;
     private Font current = Font.getDefaultFont();
 
@@ -56,6 +57,15 @@ public final class Graphics {
     Graphics(Object nativeGraphics) {
         setGraphics(nativeGraphics);
         impl = Display.impl;
+    }
+    
+    private Transform translation() {
+        if (translation == null) {
+            translation = Transform.makeTranslation(xTranslate, yTranslate);
+        } else {
+            translation.setTranslation(xTranslate, yTranslate);
+        }
+        return translation;
     }
 
     /**
@@ -238,6 +248,8 @@ public final class Graphics {
         impl.setClip(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
 
+    
+    
     /**
      * Clips the Graphics context to the Shape.
      * <p>This is not supported on all platforms and contexts currently.  
@@ -248,6 +260,15 @@ public final class Graphics {
      * @see #isShapeClipSupported
      */
     public void setClip(Shape shape) {
+        if (xTranslate != 0 || yTranslate != 0) {
+            if (shape instanceof GeneralPath) {
+                shape = ((GeneralPath)shape).createTransformedShape(translation());
+            } else {
+                GeneralPath p = new GeneralPath();
+                p.append(shape.getPathIterator(translation()), false);
+                shape = p;
+            }
+        }
         impl.setClip(nativeGraphics, shape);
     }
     

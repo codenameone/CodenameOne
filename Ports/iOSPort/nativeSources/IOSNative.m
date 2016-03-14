@@ -112,6 +112,9 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied);
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
+(int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points);
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 (int x, int y, int width, int height, int clipApplied);
 
@@ -531,6 +534,13 @@ void com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_int_int_int
     Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl(n1, n2, n3, n4, n5);
     POOL_END();
     //XMLVM_END_WRAPPER
+}
+
+void com_codename1_impl_ios_IOSNative_setNativeClippingMutable___int_byte_1ARRAY_int_float_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT numCommands, JAVA_OBJECT commands, JAVA_INT numPoints, JAVA_OBJECT points)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl(numCommands, commands, numPoints, points);
+    POOL_END();
 }
 
 void com_codename1_impl_ios_IOSNative_setNativeClippingGlobal___int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_BOOLEAN n5)
