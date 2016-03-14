@@ -122,6 +122,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
@@ -1688,6 +1689,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void setClip(Object graphics, int x, int y, int width, int height) {
         ((AndroidGraphics) graphics).setClip(x, y, width, height);
     }
+    
+    @Override
+    public boolean isShapeClipSupported(Object graphics){
+        return true;
+    }
+    
+    @Override
+    public void setClip(Object graphics, Shape shape) {
+        Path p = cn1ShapeToAndroidPath(shape);
+        ((AndroidGraphics) graphics).setClip(p);
+    }
+    
 
     @Override
     public void clipRect(Object graphics, int x, int y, int width, int height) {

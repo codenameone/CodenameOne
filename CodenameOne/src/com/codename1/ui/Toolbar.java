@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
@@ -474,13 +475,17 @@ public class Toolbar extends Container {
         LookAndFeel lf = manager.getLookAndFeel();
         if (lf.getDefaultMenuTransitionIn() != null || lf.getDefaultMenuTransitionOut() != null) {
             transitionIn = lf.getDefaultMenuTransitionIn();
+            if(transitionIn instanceof BubbleTransition){
+                ((BubbleTransition)transitionIn).setComponentName("OverflowButton");
+            }
             transitionOut = lf.getDefaultMenuTransitionOut();
         } else {
             transitionIn = CommonTransitions.createEmpty();
             transitionOut = CommonTransitions.createEmpty();
         }
-        menu.setTransitionOutAnimator(transitionIn);
-        menu.setTransitionInAnimator(transitionOut);
+        menu.setTransitionInAnimator(transitionIn);
+        menu.setTransitionOutAnimator(transitionOut);
+        
         if(isRTL()){
             marginRight = marginLeft;
             marginLeft = 0;
@@ -493,6 +498,7 @@ public class Toolbar extends Container {
         if(showBelowTitle){
             topPadding = th;
         }
+        
         Command r = menu.show(topPadding, Math.max(topPadding, height - topPadding), marginLeft, marginRight, true);
         parent.setTintColor(tint);
         return r;
@@ -777,6 +783,7 @@ public class Toolbar extends Container {
                 });
                 menuButton.putClientProperty("overflow", Boolean.TRUE);
                 menuButton.setUIID("TitleCommand");
+                menuButton.setName("OverflowButton");
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     BorderLayout bl = (BorderLayout) l;

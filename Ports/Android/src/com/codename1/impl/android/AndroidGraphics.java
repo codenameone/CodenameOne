@@ -1252,6 +1252,11 @@ class AndroidGraphics {
         canvas.clipRect(x, y, x + width, y + height, Region.Op.REPLACE);
     }
 
+    public void setClip(Path path) {
+        clipFresh = false;
+        canvas.clipPath(path, Region.Op.REPLACE);
+    }
+    
     public void clipRect(int x, int y, int width, int height) {
         clipFresh = false;
         canvas.clipRect(x, y, x + width, y + height);

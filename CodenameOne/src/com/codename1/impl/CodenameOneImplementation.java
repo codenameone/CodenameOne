@@ -1245,6 +1245,16 @@ public abstract class CodenameOneImplementation {
     public abstract void setClip(Object graphics, int x, int y, int width, int height);
 
     /**
+     * Clips the Graphics context to the Shape.
+     * 
+     * @param graphics the graphics context
+     * @param shape The shape to clip.
+     */
+    public void setClip(Object graphics, Shape shape){
+        System.out.println("Shape clip is not supported");
+    }
+
+    /**
      * Changes the current clipping rectangle to subset the current clipping with
      * the given clipping.
      * 
@@ -1547,6 +1557,16 @@ public abstract class CodenameOneImplementation {
     public boolean isShapeSupported(Object graphics){
         return false;
     }
+    
+    /**
+     * Checks if clipping shapes is supported by the provided graphics context.
+     * @param graphics
+     * @return 
+     */
+    public boolean isShapeClipSupported(Object graphics){
+        return false;
+    }
+    
     
 
     // END METHODS FOR DEALING WITH 2-D Paths

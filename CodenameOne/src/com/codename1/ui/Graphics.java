@@ -237,6 +237,19 @@ public final class Graphics {
     public void setClip(int x, int y, int width, int height) {
         impl.setClip(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
+
+    /**
+     * Clips the Graphics context to the Shape.
+     * <p>This is not supported on all platforms and contexts currently.  
+     * Use {@link #isShapeClipSupported} to check if the current 
+     * context supports clipping shapes.</p>
+     * @param shape The shape to clip.
+     * 
+     * @see #isShapeClipSupported
+     */
+    public void setClip(Shape shape) {
+        impl.setClip(nativeGraphics, shape);
+    }
     
     /**
      * Pushes the current clip onto the clip stack.  It can later be restored 
@@ -643,6 +656,14 @@ public final class Graphics {
         return impl.isShapeSupported(nativeGraphics);
     }
     
+    /**
+     * Checks to see if this graphics context supports clip Shape.
+     * If this returns {@literal false}, calling setClip(Shape) will have no effect on the Graphics clipping area
+     * @return {@literal true} If setClip(Shape) is supported.  
+     */
+    public boolean isShapeClipSupported(){
+        return impl.isShapeClipSupported(nativeGraphics);
+    }
     
     
     /**

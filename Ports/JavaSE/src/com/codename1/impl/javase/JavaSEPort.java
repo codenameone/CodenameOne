@@ -3753,6 +3753,23 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    public boolean isShapeClipSupported(Object graphics){
+        return true;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void setClip(Object graphics, com.codename1.ui.geom.Shape shape){
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        Shape s = cn1ShapeToAwtShape(shape);
+        nativeGraphics.setClip(s);
+    }
+    
+    /**
+     * @inheritDoc
+     */
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);

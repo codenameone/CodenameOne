@@ -25,6 +25,7 @@ package com.codename1.ui.plaf;
 
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.*;
+import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.list.*;
@@ -1071,6 +1072,11 @@ public abstract class LookAndFeel {
         }
         if(val.equalsIgnoreCase("pulse")) {
             return CommonTransitions.createDialogPulsate();
+        }
+        if(val.equalsIgnoreCase("bubble")) {
+            BubbleTransition transition = new BubbleTransition(speed);
+            transition.setRoundBubble(false);
+            return transition;
         }
         return t;
     }
