@@ -495,6 +495,10 @@ public class Toolbar extends Container {
         parent.tint = false;
         boolean showBelowTitle = manager.isThemeConstant("showMenuBelowTitleBool", true);
         int topPadding = 0;
+        Component statusBar = ((BorderLayout) getLayout()).getNorth();
+        if (statusBar != null) {
+            topPadding = statusBar.getAbsoluteY() + statusBar.getHeight();
+        }
         if(showBelowTitle){
             topPadding = th;
         }
