@@ -857,15 +857,23 @@ public final class CommonTransitions extends Transition {
             }
         }
         // for slow mutable images
-        if(buffer == null) {
-            paint(graphics, src, 0, 0);
+        if (buffer == null) {
             Component dest = getDestination();
-            dest.setX(src.getX());
-            dest.setY(src.getY());
-            dest.setWidth(src.getWidth());
-            dest.setHeight(src.getHeight());
-            graphics.setAlpha(position);
-            paint(graphics, dest, 0, 0);
+            Component srcCmp = src;
+            Component destCmp = dest;
+            int alpha = position;
+            if (src instanceof Dialog && dest instanceof Form) {
+                srcCmp = dest;
+                destCmp = src;
+                alpha = 255 - position;
+            }
+            paint(graphics, srcCmp, 0, 0);
+            destCmp.setX(srcCmp.getX());
+            destCmp.setY(srcCmp.getY());
+            destCmp.setWidth(srcCmp.getWidth());
+            destCmp.setHeight(srcCmp.getHeight());
+            graphics.setAlpha(alpha);
+            paint(graphics, destCmp, 0, 0);
             graphics.setAlpha(255);
             return;
         }
@@ -1151,31 +1159,32 @@ public final class CommonTransitions extends Transition {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
-        if(cmp instanceof Dialog) {
-            if(transitionType != TYPE_FADE) {
-                if(!(getSource() instanceof Dialog && getDestination() instanceof Dialog && 
-                        cmp == getDestination())) {
-                    Painter p = cmp.getStyle().getBgPainter();
-                    cmp.getStyle().setBgPainter(null);
-                    g.translate(x, y);
-                    Dialog dlg = (Dialog)cmp;
-                    g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
-                    getDialogParent(dlg).paintComponent(g, false);
-                    g.translate(-x, -y);
-                    if(drawDialogMenu && dlg.getCommandCount() > 0) {
-                        Component menuBar = dlg.getSoftButton(0).getParent();
-                        if(menuBar != null) {
-                            g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
-                            menuBar.paintComponent(g, false);
-                        }
+        if (cmp instanceof Dialog) {
+            if (transitionType == TYPE_FADE && Display.getInstance().areMutableImagesFast()) {
+                cmp.paintComponent(g, background);
+                return;
+            }
+            if (!(getSource() instanceof Dialog && getDestination() instanceof Dialog
+                    && cmp == getDestination())) {
+                Painter p = cmp.getStyle().getBgPainter();
+                cmp.getStyle().setBgPainter(null);
+                g.translate(x, y);
+                Dialog dlg = (Dialog) cmp;
+                g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
+                getDialogParent(dlg).paintComponent(g, false);
+                g.translate(-x, -y);
+                if (drawDialogMenu && dlg.getCommandCount() > 0) {
+                    Component menuBar = dlg.getSoftButton(0).getParent();
+                    if (menuBar != null) {
+                        g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
+                        menuBar.paintComponent(g, false);
                     }
-
-                    g.setClip(cx, cy, cw, ch);
-                    cmp.getStyle().setBgPainter(p);
-                    return;
                 }
-            } 
-            cmp.paintComponent(g, background);
+                g.setClip(cx, cy, cw, ch);
+                cmp.getStyle().setBgPainter(p);
+            }else{
+                cmp.paintComponent(g, background);            
+            }
             return;
         }
         //g.clipRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());
