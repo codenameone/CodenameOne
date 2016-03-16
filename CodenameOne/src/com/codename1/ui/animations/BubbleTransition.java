@@ -132,14 +132,16 @@ public class BubbleTransition extends Transition {
         x = dest.getAbsoluteX();
         y = dest.getAbsoluteY();
 
-        clipMotion = Motion.createLinearMotion(0, Math.max(dest.getWidth(), dest.getHeight())*3/2, duration);
-        clipMotion.start();
         if(origin != null){
             locMotionX = Motion.createLinearMotion(origin.getAbsoluteX() + origin.getWidth()/2 - dest.getWidth()/2, dest.getAbsoluteX(), duration);
             locMotionX.start();
             locMotionY = Motion.createLinearMotion(origin.getAbsoluteY() + origin.getHeight()/2 - dest.getHeight()/2, dest.getAbsoluteY(), duration);
             locMotionY.start();
+            clipMotion = Motion.createLinearMotion(Math.min(origin.getWidth(), origin.getHeight()), Math.max(dest.getWidth(), dest.getHeight())*3/2, duration);
+        }else{
+            clipMotion = Motion.createLinearMotion(0, Math.max(dest.getWidth(), dest.getHeight())*3/2, duration);
         }
+        clipMotion.start();
         
     }
 
