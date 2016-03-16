@@ -427,6 +427,11 @@ public class AutoCompleteTextField extends TextField {
             }
             
             if (contains(evt.getX(), evt.getY())) {
+                //something went wrong re-init the popup
+                if(popup.getAbsoluteX() != getAbsoluteX()){
+                    removePopup();
+                    addPopup();
+                }
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(true);
                 popup.setEnabled(true);
