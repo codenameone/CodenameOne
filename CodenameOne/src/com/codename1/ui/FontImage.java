@@ -4813,7 +4813,7 @@ public class FontImage extends Image {
         int oldAlpha = g.getAlpha();
         Font oldFont = g.getFont();
 
-        if (opacity > 0 ) {
+        if (opacity > 0 && opacity < 255) {
             g.setAlpha(opacity);
         }
         
