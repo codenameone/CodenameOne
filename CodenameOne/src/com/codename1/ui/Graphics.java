@@ -26,7 +26,6 @@ package com.codename1.ui;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.geom.Shape;
-import com.codename1.ui.plaf.Style;
 
 /**
  * Abstracts the underlying platform graphics context thus allowing us to achieve
@@ -560,6 +559,7 @@ public final class Graphics {
      * all platforms and contexts currently.  Use {@link #isShapeSupported} to check if the current 
      * context supports drawing shapes.</p>
      * @param shape The shape to be drawn.
+     * @param stroke the stroke to use
      * 
      * @see #setStroke
      * @see #isShapeSupported

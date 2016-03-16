@@ -36,14 +36,30 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 /**
- * Allows in place editing using a lightweight API without necessarily moving to
- * the external native text box. The main drawback in this approach is that editing
- * can't support features such as T9 and might not have the same keymapping or
- * behavior of the native text input.
- * <p>Notice that due to limitations of text area and text field input modes in
- * text area aren't properly supported since they won't work properly across devices.
- * To limit input modes please use the setInputModeOrder method. All constants 
- * declared in TextArea are ignored with the exception of PASSWORD.
+ * <p>
+ * A specialized version of {@link com.codename1.ui.TextArea} with some minor deviations from the original 
+ * specifically:
+ * </p>
+ * <ul>
+ *    <li>Blinking cursor is rendered on {@code TextField} only</li>
+ *    <li>{@link com.codename1.ui.events.DataChangeListener} is only available in {@code TextField}. 
+ *              This is crucial for character by character input event tracking</li>
+ *    <li>Different UIID's ("{@code TextField}" vs. "{@code TextArea}") </li>
+ * </ul>
+ * 
+ * <p>
+ * The demo code below shows simple input using text fields:
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/fb63dd5d6efdb95932be.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-text-component.png" alt="Text field input sample" />
+ * 
+ * <p>
+ * The following code demonstrates a more advanced search widget where the data is narrowed as we type
+ * directly into the title area search. Notice that the {@code TextField} and its hint are styled to look like the title.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/dce6598a226aaf9a3157.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-search.png" alt="Dynamic TextField search using the Toolbar" />
  * 
  * @author Shai Almog
  */

@@ -40,10 +40,32 @@ import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
 /**
- * Toolbar can replace the default TitleArea component. Toolbar allows
- * customizing the Form title with different commands on the title area, within
- * the side menu or the overflow menu.
- *
+ * <p>Toolbar replaces the default title area with a powerful abstraction that allows functionality ranging
+ * from side menus (hamburger) to title animations and any arbitrary component type. Toolbar allows
+ * customizing the Form title with different commands on the title area, within the side menu or the overflow menu.</p>
+ * 
+ * <p>
+ * The Toolbar allows placing components in one of 4 positions as illustrated by the sample below:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/e72cfa6aedd7fcd1af72.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar.png" alt="Simple usage of Toolbar" />
+ *  
+ * <p>
+ * The following code demonstrates a more advanced search widget where the data is narrowed as we type
+ * directly into the title area search. Notice that the {@code TextField} and its hint are styled to look like the title.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/dce6598a226aaf9a3157.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-search.png" alt="Dynamic TextField search using the Toolbar" />
+ * 
+ * <p>
+ * This sample code show off title animations that allow a title to change (and potentially shrink) as the user scrolls
+ * down the UI.  The 3 frames below show a step by step process in the change.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/085e3a8fa1c36829d812.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-1.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-2.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-3.png" alt="Toolbar animation stages" />
+ * 
  * @author Chen
  */
 public class Toolbar extends Container {
@@ -80,6 +102,8 @@ public class Toolbar extends Container {
     
     private Container permanentSideMenuContainer;
 
+    private static boolean globalToolbar;
+    
     /**
      * Empty Constructor
      */
@@ -89,6 +113,25 @@ public class Toolbar extends Container {
         sideMenu = new ToolbarSideMenu();
     }
 
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant globalToobarBool.
+     * @param gt true to enable the toolbar globally
+     */
+    public static void setGlobalToolbar(boolean gt) {
+        globalToolbar = gt;
+    }
+    
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant globalToobarBool.
+     * 
+     * @return  true if the toolbar API is turned on by default
+     */
+    public static boolean isGlobalToolbar() {
+        return globalToolbar;
+    }
+    
     /**
      * This constructor places the Toolbar on a different layer on top of the 
      * Content Pane.
@@ -182,6 +225,20 @@ public class Toolbar extends Container {
     /**
      * Adds a Command to the overflow menu
      *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToOverflowMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToOverflowMenu(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the overflow menu
+     *
      * @param cmd a Command
      */
     public void addCommandToOverflowMenu(Command cmd) {
@@ -193,6 +250,20 @@ public class Toolbar extends Container {
         sideMenu.installRightCommands();
     }
 
+    /**
+     * Adds a Command to the side navigation menu
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToSideMenu(cmd);
+        return cmd;
+    }
+    
     /**
      * Adds a Command to the side navigation menu
      *
@@ -314,12 +385,40 @@ public class Toolbar extends Container {
     /**
      * Adds a Command to the TitleArea on the right side.
      *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToRightBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToRightBar(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the right side.
+     *
      * @param cmd a Command
      */
     public void addCommandToRightBar(Command cmd) {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);        
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the left side.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToLeftBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToLeftBar(cmd);
+        return cmd;
     }
 
     /**
@@ -382,6 +481,10 @@ public class Toolbar extends Container {
         }
         menu.setTransitionOutAnimator(transitionIn);
         menu.setTransitionInAnimator(transitionOut);
+        if(isRTL()){
+            marginRight = marginLeft;
+            marginLeft = 0;
+        }
         return menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
     }
 

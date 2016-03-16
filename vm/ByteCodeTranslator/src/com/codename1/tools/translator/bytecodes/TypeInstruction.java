@@ -111,22 +111,22 @@ public class TypeInstruction extends Instruction {
                         dim++;
                     }
                     
-                    b.append(" stackPointer--;\n    PUSH_POINTER(allocArray(threadStateData, stack[stackPointer].data.i, &class_array");
+                    b.append(" SP--;\n    PUSH_POINTER(allocArray(threadStateData, (*SP).data.i, &class_array");
                     b.append(dim);
                     b.append("__");
                     b.append(actualType);
                     b.append(", sizeof(JAVA_OBJECT), ");
                     b.append(dim);
-                    b.append("));\n    stack[stackPointer - 1].data.o->__codenameOneParentClsReference = &class_array");
+                    b.append("));\n    SP[-1].data.o->__codenameOneParentClsReference = &class_array");
                     b.append(dim);
                     b.append("__");
                     b.append(actualType);
                     b.append("; /* ANEWARRAY multi */\n");
                     break;
                 }
-                b.append("stackPointer--;\n    PUSH_POINTER(__NEW_ARRAY_");
+                b.append("SP--;\n    PUSH_POINTER(__NEW_ARRAY_");
                 b.append(actualType);
-                b.append("(threadStateData, stack[stackPointer].data.i));\n");
+                b.append("(threadStateData, SP[0].data.i));\n");
                 break;
             case Opcodes.CHECKCAST:
                 b.append("BC_CHECKCAST(");

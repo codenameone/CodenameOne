@@ -28,7 +28,12 @@ import com.codename1.ui.List;
 import java.util.Hashtable;
 
 /**
- * A list with a multi-button renderer by default
+ * <p>A list with a {@link com.codename1.components.MultiButton} renderer. This simplifies the process of
+ * working with the list and its model as the renderer comes pre-configured for common use cases.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/b2ab6645db842d7b2750.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/graphics-urlimage-multilist.png" alt="MultiList and model in action" />
  *
  * @author Shai Almog
  */
@@ -36,6 +41,16 @@ public class MultiList extends List {
     private MultiButton sel;
     private MultiButton unsel;
     private Image placeholder;
+    
+    /**
+     * Constructor that accepts a model for the list
+     * @param model the model object to assign to the list
+     */
+    public MultiList(ListModel model) {
+        super(model);
+        sel = new MultiButton();
+        unsel = new MultiButton();
+    }
     
     /**
      * Constructor for the GUI builder

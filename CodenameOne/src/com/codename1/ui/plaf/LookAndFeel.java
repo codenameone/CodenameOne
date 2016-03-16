@@ -908,6 +908,8 @@ public abstract class LookAndFeel {
             }
         }
 
+        Toolbar.setGlobalToolbar(manager.isThemeConstant("globalToobarBool", Toolbar.isGlobalToolbar()));
+        
         boolean isTouch = Display.getInstance().isTouchScreenDevice();
         fadeScrollEdge = manager.isThemeConstant("fadeScrollEdgeBool", false);
         fadeScrollEdgeLength = manager.getThemeConstant("fadeScrollEdgeInt", fadeScrollEdgeLength);

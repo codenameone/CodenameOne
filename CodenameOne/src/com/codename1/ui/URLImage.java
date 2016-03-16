@@ -35,11 +35,28 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * The URLImage allows us to create an image from a URL. If the image was downloaded 
+ * <p>{@code URLImage} allows us to create an image from a URL. If the image was downloaded 
  * already it is fetched from cache; if not it is downloaded optionally scaled/adapted
- * and placed in cache.
+ * and placed in cache.</p>
  * <p>By default an image is fetched lazily as it is asked for by the GUI unless 
- * the fetch() method is invoked in which case the IO code is executed immediately.
+ * the fetch() method is invoked in which case the IO code is executed immediately.</p>
+ * 
+ *  <p>
+ * This sample code show a {@code URLImage} that is fetched to the title area background and scaled/cropped
+ * to fit device specific dimensions.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/085e3a8fa1c36829d812.js"></script>
+
+ * <p>
+ * This sample code shows the usage of the nestoria API to fill out an infinitely scrolling list in it 
+ * we use {@code URLImage} to fetch the icon.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/af27af111ba766627363.js"></script>
+ * 
+ * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" /><br><br>
+ * 
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
+
  *
  * @author Shai Almog
  */

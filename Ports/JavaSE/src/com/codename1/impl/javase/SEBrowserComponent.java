@@ -29,6 +29,7 @@ import java.awt.BorderLayout;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
@@ -38,6 +39,7 @@ import javafx.concurrent.Worker.State;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.event.EventHandler;
 import javafx.scene.image.WritableImage;
+import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JPanel;
@@ -65,7 +67,14 @@ public class SEBrowserComponent extends PeerComponent {
         this.frm = f;
         this.panel = fx;
 
-        web.getEngine().setUserDataDirectory(new File(JavaSEPort.getAppHomeDir()));
+        WebEngine we = web.getEngine();
+        try {
+            Method mtd = we.getClass().getMethod("setUserDataDirectory",java.io.File.class); 
+            mtd.invoke(we, new File(JavaSEPort.getAppHomeDir()));
+        } catch(Throwable t) {
+            System.out.println("It looks like you are running on a version of Java older than Java 8. We recommend upgrading");
+            t.printStackTrace();
+        }
         
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {

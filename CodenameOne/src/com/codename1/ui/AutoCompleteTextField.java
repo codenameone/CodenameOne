@@ -31,8 +31,16 @@ import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 
 /**
- * This class is an editable TextField with predefined completion suggestion 
- * that shows up in a drop down menu while the user types in text
+ * <p>An editable {@link com.codename1.ui.TextField} with completion suggestions 
+ * that show up in a drop down menu while the user types in text. <br>
+ * This class uses the "{@code TextField}" UIID by default as well as "{@code AutoCompletePopup}" &amp;
+ * "{@code AutoCompleteList}" for the popup list details.<br>
+ * The sample below shows the more trivial use case for this widget:
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/7e4dc757971e460e5823.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-autocomplete.png" alt="Simple usage of auto complete" />
+ * 
  *
  * @author Chen
  */
@@ -46,6 +54,11 @@ public class AutoCompleteTextField extends TextField {
     private ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
     private String pickedText;
     private int minimumLength;
+    
+    /**
+     * The number of elements shown for the auto complete popup
+     */
+    private int minimumElementsShownInPopup = -1;
     
     /**
      * Constructor with completion suggestions
@@ -271,6 +284,9 @@ public class AutoCompleteTextField extends TextField {
         popup.setEnabled(false);
         filter(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        if(getMinimumElementsShownInPopup() > 0) {
+            l.setMinElementHeight(getMinimumElementsShownInPopup());
+        }
         l.setScrollToSelected(false);
         l.setItemGap(0);
         for(ActionListener al : listeners) {
@@ -361,6 +377,22 @@ public class AutoCompleteTextField extends TextField {
      */
     public void setMinimumLength(int minimumLength) {
         this.minimumLength = minimumLength;
+    }
+
+    /**
+     * The number of elements shown for the auto complete popup
+     * @return the minimumElementsShownInPopup
+     */
+    public int getMinimumElementsShownInPopup() {
+        return minimumElementsShownInPopup;
+    }
+
+    /**
+     * The number of elements shown for the auto complete popup
+     * @param minimumElementsShownInPopup the minimumElementsShownInPopup to set
+     */
+    public void setMinimumElementsShownInPopup(int minimumElementsShownInPopup) {
+        this.minimumElementsShownInPopup = minimumElementsShownInPopup;
     }
 
     class FormPointerListener implements ActionListener {

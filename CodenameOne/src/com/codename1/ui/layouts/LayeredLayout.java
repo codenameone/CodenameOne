@@ -49,6 +49,13 @@ import com.codename1.ui.plaf.Style;
 .* <li> We use https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[FlowLayout] to position the `X` close button in the right position.</li>
  * </ul>
  * 
+ * <p>
+ * A common use case for {@code LayeredLayout} is the iOS carousel effect which we can achieve by combing
+ * the {@code LayeredLayout}  with {@link com.codename1.ui.Tabs}.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/e981c3f91f98f1515987.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe1.png" alt="Tabs carousel page 1" />
+ * 
  * <p>Notice that the layered layout sizes all components to the exact same size one on top of the other. It usually 
  * requires that we use another container within; in order to position the components correctly.<br />
  *

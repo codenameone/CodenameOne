@@ -30,12 +30,17 @@ import com.codename1.ui.layouts.BoxLayout;
  * and gives the same UIID with "First"/"Last" prepended to the first and last components. E.g.
  * by default the  GroupElement UIID is applied so the first and last elements would have the
  * GroupElementFirst/GroupElementLast UIID's applied to them. If a group has only one element
- * the word "Only" is appended to the element UIID as in GroupElementOnly.
+ * the word "Only" is appended to the element UIID as in GroupElementOnly.</p>
  * <p><b>Important!!!</b> A component group does nothing by default unless explicitly activated by
  * the theme by enabling the ComponentGroupBool constant (by default, this can be customized via the groupFlag property).
- * This allows logical grouping without changing the UI for themes that don't need grouping.
+ * This allows logical grouping without changing the UI for themes that don't need grouping.</p>
  * <p>This container uses box X/Y layout (defaults to Y), other layout managers shouldn't be used
- * since this container relies on the specific behavior of the box layout.
+ * since this container relies on the specific behavior of the box layout.</p>
+ * <p>
+ * Check out this sample code:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5daba198d0009e503a1a.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-componentgroup.png" alt="Sample ComponentGroup Grouping" />
  *
  * @author Shai Almog
  */
@@ -298,5 +303,33 @@ public class ComponentGroup extends Container {
      */
     public void setForceGroup(boolean forceGroup) {
         this.forceGroup = forceGroup;
+    }
+    
+    /**
+     * Shorthand method for wrapping the given components in a vertical component group
+     * @param cmp the components to add into a newly created group
+     * @return the newly created group
+     */
+    public static ComponentGroup enclose(Component... cmp) {
+        ComponentGroup c = new ComponentGroup();
+        for(Component cc : cmp) {
+            c.add(cc);
+        }
+        return c;
+    }
+
+    
+    /**
+     * Shorthand method for wrapping the given components in a horizontal component group
+     * @param cmp the components to add into a newly created group
+     * @return the newly created group
+     */
+    public static ComponentGroup encloseHorizontal(Component... cmp) {
+        ComponentGroup c = new ComponentGroup();
+        c.setHorizontal(true);
+        for(Component cc : cmp) {
+            c.add(cc);
+        }
+        return c;
     }
 }

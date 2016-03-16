@@ -33,9 +33,13 @@ import java.util.Map;
 import java.util.Vector;
 
 /**
- * Fast and dirty parser for JSON content on the web, it essentially returns
- * a Hashtable object mapping the object fields to their values. If the value is
- * a nester object a nested hashtable is returned.
+ * <p>Fast and dirty parser for JSON content on the web, it essentially returns
+ * a {@link java.util.Map} object containing the object fields mapped to their values. If the value is
+ * a nested object a nested {@link java.util.Map}/{@link java.util.List} is returned. The sample
+ * code below fetches a page of data from the nestoria housing listing API as a list of Map elements.
+ * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
+ * class.</p>
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
  */

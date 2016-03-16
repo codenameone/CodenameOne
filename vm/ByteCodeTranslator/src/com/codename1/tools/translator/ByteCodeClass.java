@@ -70,7 +70,11 @@ public class ByteCodeClass {
 
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
-            mainClass = this;
+            if (mainClass == null) {
+                mainClass = this;
+            } else {
+                throw new RuntimeException("Multiple main classes: "+mainClass.clsName+" and "+this.clsName);
+            }
         }
         m.setSourceFile(sourceFile);
         m.setForceVirtual(isInterface);

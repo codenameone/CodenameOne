@@ -186,395 +186,395 @@ typedef struct clazz*       JAVA_CLASS;
 
 
 #define BC_ILOAD(local) { \
-    stack[stackPointer].type = CN1_TYPE_INT; \
-    stack[stackPointer].data.i = ilocals_##local##_; \
-    stackPointer++; \
+    (*SP).type = CN1_TYPE_INT; \
+    (*SP).data.i = ilocals_##local##_; \
+    SP++; \
 }
 
 #define BC_LLOAD(local) { \
-    stack[stackPointer].type = CN1_TYPE_LONG; \
-    stack[stackPointer].data.l = llocals_##local##_; \
-    stackPointer++; \
+    (*SP).type = CN1_TYPE_LONG; \
+    (*SP).data.l = llocals_##local##_; \
+    SP++; \
 }
 
 #define BC_FLOAD(local) { \
-    stack[stackPointer].type = CN1_TYPE_FLOAT; \
-    stack[stackPointer].data.f = flocals_##local##_; \
-    stackPointer++; \
+    (*SP).type = CN1_TYPE_FLOAT; \
+    (*SP).data.f = flocals_##local##_; \
+    SP++; \
 }
 
 #define BC_DLOAD(local) { \
-    stack[stackPointer].type = CN1_TYPE_DOUBLE; \
-    stack[stackPointer].data.d = dlocals_##local##_; \
-    stackPointer++; \
+    (*SP).type = CN1_TYPE_DOUBLE; \
+    (*SP).data.d = dlocals_##local##_; \
+    SP++; \
 }
 
 #define BC_ALOAD(local) { \
-    stack[stackPointer].type = CN1_TYPE_INVALID; \
-    stack[stackPointer].data.o = locals[local].data.o; \
-    stack[stackPointer].type = CN1_TYPE_OBJECT; \
-    stackPointer++; \
+    (*SP).type = CN1_TYPE_INVALID; \
+    (*SP).data.o = locals[local].data.o; \
+    (*SP).type = CN1_TYPE_OBJECT; \
+    SP++; \
 }
 
 
-#define BC_ISTORE(local) { stackPointer--; \
-    ilocals_##local##_ = stack[stackPointer].data.i; \
+#define BC_ISTORE(local) { SP--; \
+    ilocals_##local##_ = (*SP).data.i; \
     }
 
-#define BC_LSTORE(local) { stackPointer--; \
-    llocals_##local##_ = stack[stackPointer].data.l; \
+#define BC_LSTORE(local) { SP--; \
+    llocals_##local##_ = (*SP).data.l; \
     }
 
-#define BC_FSTORE(local) { stackPointer--; \
-    flocals_##local##_ = stack[stackPointer].data.f; \
+#define BC_FSTORE(local) { SP--; \
+    flocals_##local##_ = (*SP).data.f; \
     }
 
-#define BC_DSTORE(local) { stackPointer--; \
-    dlocals_##local##_ = stack[stackPointer].data.d; \
+#define BC_DSTORE(local) { SP--; \
+    dlocals_##local##_ = (*SP).data.d; \
     }
 
-#define BC_ASTORE(local) { stackPointer--; \
+#define BC_ASTORE(local) { SP--; \
     locals[local].type = CN1_TYPE_INVALID; \
-    locals[local].data.o = stack[stackPointer].data.o; \
+    locals[local].data.o = (*SP).data.o; \
     locals[local].type = CN1_TYPE_OBJECT; \
     }
 
 // todo map instanceof and throw typecast exception
 #define BC_CHECKCAST(type)
 
-#define BC_SWAP() swapStack(stack, stackPointer)
+#define BC_SWAP() swapStack(SP)
 
 
-#define POP_INT() (*pop(stack, &stackPointer)).data.i
-#define POP_OBJ() (*pop(stack, &stackPointer)).data.o
-#define POP_OBJ_NO_RELEASE() (*pop(stack, &stackPointer)).data.o
-#define POP_LONG() (*pop(stack, &stackPointer)).data.l
-#define POP_DOUBLE() (*pop(stack, &stackPointer)).data.d
-#define POP_FLOAT() (*pop(stack, &stackPointer)).data.f
+#define POP_INT() (*pop(&SP)).data.i
+#define POP_OBJ() (*pop(&SP)).data.o
+#define POP_OBJ_NO_RELEASE() (*pop(&SP)).data.o
+#define POP_LONG() (*pop(&SP)).data.l
+#define POP_DOUBLE() (*pop(&SP)).data.d
+#define POP_FLOAT() (*pop(&SP)).data.f
 
-#define PEEK_INT(offset) stack[stackPointer - offset].data.i
-#define PEEK_OBJ(offset) stack[stackPointer - offset].data.o
-#define PEEK_LONG(offset) stack[stackPointer - offset].data.l
-#define PEEK_DOUBLE(offset) stack[stackPointer - offset].data.d
-#define PEEK_FLOAT(offset) stack[stackPointer - offset].data.f
+#define PEEK_INT(offset) SP[-offset].data.i
+#define PEEK_OBJ(offset) SP[-offset].data.o
+#define PEEK_LONG(offset) SP[-offset].data.l
+#define PEEK_DOUBLE(offset) SP[-offset].data.d
+#define PEEK_FLOAT(offset) SP[-offset].data.f
 
-#define POP_MANY(offset) popMany(threadStateData, offset, stack, &stackPointer)
+#define POP_MANY(offset) popMany(threadStateData, offset, &SP)
 
 #define BC_IADD() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i + stack[stackPointer].data.i; \
+    SP--; \
+    SP[-1].data.i = SP[-1].data.i + (*SP).data.i; \
 }
 
 #define BC_LADD() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l + stack[stackPointer].data.l; \
+    SP--; \
+    SP[-1].data.l = SP[-1].data.l + (*SP).data.l; \
 }
 
 #define BC_FADD() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.f = stack[stackPointer - 1].data.f + stack[stackPointer].data.f; \
+    SP--; \
+    SP[-1].data.f = SP[-1].data.f + (*SP).data.f; \
 }
 
 #define BC_DADD() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.d + stack[stackPointer].data.d; \
+    SP--; \
+    SP[-1].data.d = SP[-1].data.d + (*SP).data.d; \
 }
 
 #define BC_IMUL() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i * stack[stackPointer].data.i; \
+    SP--; \
+    SP[-1].data.i = SP[-1].data.i * (*SP).data.i; \
 }
 
 #define BC_LMUL() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l * stack[stackPointer].data.l; \
+    SP--; \
+    SP[-1].data.l = SP[-1].data.l * (*SP).data.l; \
 }
 
 #define BC_FMUL() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.f = stack[stackPointer - 1].data.f * stack[stackPointer].data.f; \
+    SP--; \
+    SP[-1].data.f = SP[-1].data.f * (*SP).data.f; \
 }
 
 #define BC_DMUL() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.d * stack[stackPointer].data.d; \
+    SP--; \
+    SP[-1].data.d = SP[-1].data.d * (*SP).data.d; \
 }
 
-#define BC_INEG() stack[stackPointer - 1].data.i *= -1
+#define BC_INEG() SP[-1].data.i *= -1
 
-#define BC_LNEG() stack[stackPointer - 1].data.l *= -1
+#define BC_LNEG() SP[-1].data.l *= -1
 
-#define BC_FNEG() stack[stackPointer - 1].data.f *= -1
+#define BC_FNEG() SP[-1].data.f *= -1
 
-#define BC_DNEG() stack[stackPointer - 1].data.d *= -1
+#define BC_DNEG() SP[-1].data.d *= -1
 
 #define BC_IAND() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i & stack[stackPointer].data.i; \
+    SP--; \
+    SP[-1].data.i = SP[-1].data.i & (*SP).data.i; \
 }
 
 #define BC_LAND() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l & stack[stackPointer].data.l; \
+    SP--; \
+    SP[-1].data.l = SP[-1].data.l & (*SP).data.l; \
 }
 
 #define BC_IOR() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i | stack[stackPointer].data.i; \
+    SP--; \
+    SP[-1].data.i = SP[-1].data.i | (*SP).data.i; \
 }
 
 #define BC_LOR() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l | stack[stackPointer].data.l; \
+    SP--; \
+    SP[-1].data.l = SP[-1].data.l | (*SP).data.l; \
 }
 
 #define BC_IXOR() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i ^ stack[stackPointer].data.i; \
+    SP--; \
+    SP[-1].data.i = SP[-1].data.i ^ (*SP).data.i; \
 }
 
 #define BC_LXOR() { \
-    stackPointer--; \
-    stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l ^ stack[stackPointer].data.l; \
+    SP--; \
+    SP[-1].data.l = SP[-1].data.l ^ (*SP).data.l; \
 }
 
-#define BC_I2L() stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.i
+#define BC_I2L() SP[-1].data.l = SP[-1].data.i
 
-#define BC_L2I() stack[stackPointer - 1].data.i = (JAVA_INT)stack[stackPointer - 1].data.l
+#define BC_L2I() SP[-1].data.i = (JAVA_INT)SP[-1].data.l
 
-#define BC_L2F() stack[stackPointer - 1].data.f = (JAVA_FLOAT)stack[stackPointer - 1].data.l
+#define BC_L2F() SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.l
 
-#define BC_L2D() stack[stackPointer - 1].data.d = (JAVA_DOUBLE)stack[stackPointer - 1].data.l
+#define BC_L2D() SP[-1].data.d = (JAVA_DOUBLE)SP[-1].data.l
 
-#define BC_I2F() stack[stackPointer - 1].data.f = (JAVA_FLOAT)stack[stackPointer - 1].data.i 
+#define BC_I2F() SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.i 
 
-#define BC_F2I() stack[stackPointer - 1].data.i = (JAVA_INT)stack[stackPointer - 1].data.f
+#define BC_F2I() SP[-1].data.i = (JAVA_INT)SP[-1].data.f
 
-#define BC_F2L() stack[stackPointer - 1].data.l = (JAVA_LONG)stack[stackPointer - 1].data.f
+#define BC_F2L() SP[-1].data.l = (JAVA_LONG)SP[-1].data.f
 
-#define BC_F2D() stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.f
+#define BC_F2D() SP[-1].data.d = SP[-1].data.f
 
-#define BC_D2I() stack[stackPointer - 1].data.i = (JAVA_INT)stack[stackPointer - 1].data.d
+#define BC_D2I() SP[-1].data.i = (JAVA_INT)SP[-1].data.d
 
-#define BC_D2L() stack[stackPointer - 1].data.l = (JAVA_LONG)stack[stackPointer - 1].data.d
+#define BC_D2L() SP[-1].data.l = (JAVA_LONG)SP[-1].data.d
 
-#define BC_I2D() stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.i
+#define BC_I2D() SP[-1].data.d = SP[-1].data.i
 
-#define BC_D2F() stack[stackPointer - 1].data.f = (JAVA_FLOAT)stack[stackPointer - 1].data.d
+#define BC_D2F() SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.d
 
 #define BC_ARRAYLENGTH() { \
-    if(stack[stackPointer - 1].data.o == JAVA_NULL) { \
+    if(SP[-1].data.o == JAVA_NULL) { \
         throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); \
     }; \
-    stack[stackPointer - 1].type = CN1_TYPE_INT; \
-    stack[stackPointer - 1].data.i = (*((JAVA_ARRAY)stack[stackPointer - 1].data.o)).length; \
+    SP[-1].type = CN1_TYPE_INT; \
+    SP[-1].data.i = (*((JAVA_ARRAY)SP[-1].data.o)).length; \
 }
 
-#define BC_IF_ICMPEQ() stackPointer -= 2; if(stack[stackPointer].data.i == stack[stackPointer + 1].data.i)
+#define BC_IF_ICMPEQ() SP-=2; if((*SP).data.i == SP[1].data.i)
 
-#define BC_IF_ICMPNE() stackPointer -= 2; if(stack[stackPointer].data.i != stack[stackPointer + 1].data.i)
+#define BC_IF_ICMPNE() SP-=2; if((*SP).data.i != SP[1].data.i)
 
-#define BC_IF_ICMPLT() stackPointer -= 2; if(stack[stackPointer].data.i < stack[stackPointer + 1].data.i)
+#define BC_IF_ICMPLT() SP-=2; if((*SP).data.i < SP[1].data.i)
 
-#define BC_IF_ICMPGE() stackPointer -= 2; if(stack[stackPointer].data.i >= stack[stackPointer + 1].data.i)
+#define BC_IF_ICMPGE() SP-=2; if((*SP).data.i >= SP[1].data.i)
 
-#define BC_IF_ICMPGT() stackPointer -= 2; if(stack[stackPointer].data.i > stack[stackPointer + 1].data.i)
+#define BC_IF_ICMPGT() SP-=2; if((*SP).data.i > SP[1].data.i)
 
-#define BC_IF_ICMPLE() stackPointer -= 2; if(stack[stackPointer].data.i <= stack[stackPointer + 1].data.i)
+#define BC_IF_ICMPLE() SP-=2; if((*SP).data.i <= SP[1].data.i)
 
-#define BC_IF_ACMPEQ() stackPointer -= 2; if(stack[stackPointer].data.o == stack[stackPointer + 1].data.o)
+#define BC_IF_ACMPEQ() SP-=2; if((*SP).data.o == SP[1].data.o)
 
-#define BC_IF_ACMPNE() stackPointer -= 2; if(stack[stackPointer].data.o != stack[stackPointer + 1].data.o)
+#define BC_IF_ACMPNE() SP-=2; if((*SP).data.o != SP[1].data.o)
 
 //#define POP_TYPE(type) (*((type*)POP_OBJ()))
 
 // we assign the value to trigger the expression in the macro
 // then set the type to invalid first so we don't get a race condition where the value is
 // incomplete and the GC goes crazy
-#define PUSH_POINTER(value) { JAVA_OBJECT ppX = value; stack[stackPointer].type = CN1_TYPE_INVALID; \
-    stack[stackPointer].data.o = ppX; stack[stackPointer].type = CN1_TYPE_OBJECT; \
-    stackPointer++; }
+#define PUSH_POINTER(value) { JAVA_OBJECT ppX = value; (*SP).type = CN1_TYPE_INVALID; \
+    (*SP).data.o = ppX; (*SP).type = CN1_TYPE_OBJECT; \
+    SP++; }
 
-#define PUSH_OBJ(value)  { JAVA_OBJECT ppX = value; stack[stackPointer].type = CN1_TYPE_INVALID; \
-    stack[stackPointer].data.o = ppX; stack[stackPointer].type = CN1_TYPE_OBJECT; \
-    stackPointer++; }
+#define PUSH_OBJ(value)  { JAVA_OBJECT ppX = value; (*SP).type = CN1_TYPE_INVALID; \
+    (*SP).data.o = ppX; (*SP).type = CN1_TYPE_OBJECT; \
+    SP++; }
 
-#define PUSH_INT(value) { JAVA_INT pInt = value; stack[stackPointer].type = CN1_TYPE_INT; \
-    stack[stackPointer].data.i = pInt; \
-    stackPointer++; }
+#define PUSH_INT(value) { JAVA_INT pInt = value; (*SP).type = CN1_TYPE_INT; \
+    (*SP).data.i = pInt; \
+    SP++; }
 
-#define PUSH_LONG(value) { JAVA_LONG plong = value; stack[stackPointer].type = CN1_TYPE_LONG; \
-    stack[stackPointer].data.l = plong; \
-    stackPointer++; }
+#define PUSH_LONG(value) { JAVA_LONG plong = value; (*SP).type = CN1_TYPE_LONG; \
+    (*SP).data.l = plong; \
+    SP++; }
 
-#define PUSH_DOUBLE(value) { JAVA_DOUBLE pdob = value; stack[stackPointer].type = CN1_TYPE_DOUBLE; \
-    stack[stackPointer].data.d = pdob; \
-    stackPointer++; }
+#define PUSH_DOUBLE(value) { JAVA_DOUBLE pdob = value; (*SP).type = CN1_TYPE_DOUBLE; \
+    (*SP).data.d = pdob; \
+    SP++; }
 
-#define PUSH_FLOAT(value) { JAVA_FLOAT pFlo = value; stack[stackPointer].type = CN1_TYPE_FLOAT; \
-    stack[stackPointer].data.f = pFlo; \
-    stackPointer++; }
+#define PUSH_FLOAT(value) { JAVA_FLOAT pFlo = value; (*SP).type = CN1_TYPE_FLOAT; \
+    (*SP).data.f = pFlo; \
+    SP++; }
 
-#define POP_MANY_AND_PUSH_OBJ(value, offset) { int acOff = stackPointer - offset; \
-    JAVA_OBJECT pObj = value; stack[stackPointer - offset].type = CN1_TYPE_INVALID; \
-    stack[stackPointer - offset].data.o = pObj; stack[stackPointer - offset].type = CN1_TYPE_OBJECT; \
-    popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
+#define POP_MANY_AND_PUSH_OBJ(value, offset) {  \
+    JAVA_OBJECT pObj = value; SP[-offset].type = CN1_TYPE_INVALID; \
+    SP[-offset].data.o = pObj; SP[-offset].type = CN1_TYPE_OBJECT; \
+    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
 
-#define POP_MANY_AND_PUSH_INT(value, offset) { int acOff = stackPointer - offset; \
-    JAVA_INT pInt = value; stack[stackPointer - offset].type = CN1_TYPE_INT; \
-    stack[stackPointer - offset].data.i = pInt; \
-    popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
+#define POP_MANY_AND_PUSH_INT(value, offset) {  \
+    JAVA_INT pInt = value; SP[-offset].type = CN1_TYPE_INT; \
+    SP[-offset].data.i = pInt; \
+    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
 
-#define POP_MANY_AND_PUSH_LONG(value, offset) { int acOff = stackPointer - offset; \
-    JAVA_LONG pLong = value; stack[stackPointer - offset].type = CN1_TYPE_LONG; \
-    stack[stackPointer - offset].data.l = pLong; \
-    popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
+#define POP_MANY_AND_PUSH_LONG(value, offset) {  \
+    JAVA_LONG pLong = value; SP[-offset].type = CN1_TYPE_LONG; \
+    SP[-offset].data.l = pLong; \
+    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
 
-#define POP_MANY_AND_PUSH_DOUBLE(value, offset) { int acOff = stackPointer - offset; \
-    JAVA_DOUBLE pDob = value; stack[stackPointer - offset].type = CN1_TYPE_DOUBLE; \
-    stack[stackPointer - offset].data.d = pDob; \
-    popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
+#define POP_MANY_AND_PUSH_DOUBLE(value, offset) {  \
+    JAVA_DOUBLE pDob = value; SP[-offset].type = CN1_TYPE_DOUBLE; \
+    SP[-offset].data.d = pDob; \
+    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
 
-#define POP_MANY_AND_PUSH_FLOAT(value, offset) { int acOff = stackPointer - offset; \
-    JAVA_FLOAT pFlo = value; stack[stackPointer - offset].type = CN1_TYPE_FLOAT; \
-    stack[stackPointer - offset].data.f = pFlo; \
-    popMany(threadStateData, MAX(1, offset) - 1, stack, &stackPointer); }
+#define POP_MANY_AND_PUSH_FLOAT(value, offset) {  \
+    JAVA_FLOAT pFlo = value; SP[-offset].type = CN1_TYPE_FLOAT; \
+    SP[-offset].data.f = pFlo; \
+    popMany(threadStateData, MAX(1, offset) - 1, &SP); }
 
 
-#define BC_IDIV() stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i / stack[stackPointer].data.i
+#define BC_IDIV() SP--; SP[-1].data.i = SP[-1].data.i / (*SP).data.i
 
-#define BC_LDIV() stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l / stack[stackPointer].data.l
+#define BC_LDIV() SP--; SP[-1].data.l = SP[-1].data.l / (*SP).data.l
 
-#define BC_FDIV() stackPointer--; stack[stackPointer - 1].data.f = stack[stackPointer - 1].data.f / stack[stackPointer].data.f
+#define BC_FDIV() SP--; SP[-1].data.f = SP[-1].data.f / (*SP).data.f
 
-#define BC_DDIV() stackPointer--; stack[stackPointer - 1].data.d = stack[stackPointer - 1].data.d / stack[stackPointer].data.d
+#define BC_DDIV() SP--; SP[-1].data.d = SP[-1].data.d / (*SP).data.d
 
-#define BC_IREM() stackPointer--; stack[stackPointer - 1].data.i = stack[stackPointer - 1].data.i % stack[stackPointer].data.i
+#define BC_IREM() SP--; SP[-1].data.i = SP[-1].data.i % (*SP).data.i
 
-#define BC_LREM() stackPointer--; stack[stackPointer - 1].data.l = stack[stackPointer - 1].data.l % stack[stackPointer].data.l
+#define BC_LREM() SP--; SP[-1].data.l = SP[-1].data.l % (*SP).data.l
 
-#define BC_FREM() stackPointer--; stack[stackPointer - 1].data.f = fmod(stack[stackPointer - 1].data.f, stack[stackPointer].data.f)
+#define BC_FREM() SP--; SP[-1].data.f = fmod(SP[-1].data.f, (*SP).data.f)
 
-#define BC_DREM() stackPointer--; stack[stackPointer - 1].data.d = fmod(stack[stackPointer - 1].data.d, stack[stackPointer].data.d)
+#define BC_DREM() SP--; SP[-1].data.d = fmod(SP[-1].data.d, (*SP).data.d)
 
-#define BC_LCMP() stackPointer--; if(stack[stackPointer - 1].data.l == stack[stackPointer].data.l) { \
-        stack[stackPointer - 1].data.i = 0; \
+#define BC_LCMP() SP--; if(SP[-1].data.l == (*SP).data.l) { \
+        SP[-1].data.i = 0; \
     } else { \
-        if(stack[stackPointer - 1].data.l > stack[stackPointer].data.l) { \
-            stack[stackPointer - 1].data.i = 1; \
+        if(SP[-1].data.l > (*SP).data.l) { \
+            SP[-1].data.i = 1; \
         } else { \
-            stack[stackPointer - 1].data.i = -1; \
+            SP[-1].data.i = -1; \
         } \
     } \
-    stack[stackPointer - 1].type = CN1_TYPE_INT;
+    SP[-1].type = CN1_TYPE_INT;
 
-#define BC_FCMPL() stackPointer--; if(stack[stackPointer - 1].data.f == stack[stackPointer].data.f) { \
-        stack[stackPointer - 1].data.i = 0; \
+#define BC_FCMPL() SP--; if(SP[-1].data.f == (*SP).data.f) { \
+        SP[-1].data.i = 0; \
     } else { \
-        if(stack[stackPointer - 1].data.f > stack[stackPointer].data.f) { \
-            stack[stackPointer - 1].data.i = 1; \
+        if(SP[-1].data.f > (*SP).data.f) { \
+            SP[-1].data.i = 1; \
         } else { \
-            stack[stackPointer - 1].data.i = -1; \
+            SP[-1].data.i = -1; \
         } \
     } \
-    stack[stackPointer - 1].type = CN1_TYPE_INT;
+    SP[-1].type = CN1_TYPE_INT;
 
-#define BC_DCMPL() stackPointer--; if(stack[stackPointer - 1].data.d == stack[stackPointer].data.d) { \
-        stack[stackPointer - 1].data.i = 0; \
+#define BC_DCMPL() SP--; if(SP[-1].data.d == (*SP).data.d) { \
+        SP[-1].data.i = 0; \
     } else { \
-        if(stack[stackPointer - 1].data.d > stack[stackPointer].data.d) { \
-            stack[stackPointer - 1].data.i = 1; \
+        if(SP[-1].data.d > (*SP).data.d) { \
+            SP[-1].data.i = 1; \
         } else { \
-            stack[stackPointer - 1].data.i = -1; \
+            SP[-1].data.i = -1; \
         } \
     } \
-    stack[stackPointer - 1].type = CN1_TYPE_INT;
+    SP[-1].type = CN1_TYPE_INT;
 
 #define BC_DUP()  { \
-        JAVA_LONG plong = stack[stackPointer - 1].data.l; \
-        stack[stackPointer].type = CN1_TYPE_INVALID; \
-        stack[stackPointer].data.l = plong; stack[stackPointer].type = CN1_TYPE_LONG; \
-        stackPointer++; \
+        JAVA_LONG plong = SP[-1].data.l; \
+        (*SP).type = CN1_TYPE_INVALID; \
+        (*SP).data.l = plong; (*SP).type = CN1_TYPE_LONG; \
+        SP++; \
     } \
-    stack[stackPointer - 1].type = stack[stackPointer - 2].type; 
+    SP[-1].type = SP[-2].type; 
 
 #define BC_DUP2()  \
-if(stack[stackPointer - 1].type == CN1_TYPE_LONG || stack[stackPointer - 1].type == CN1_TYPE_DOUBLE) {\
+if(SP[-1].type == CN1_TYPE_LONG || SP[-1].type == CN1_TYPE_DOUBLE) {\
     BC_DUP(); \
 } else {\
     { \
-        JAVA_LONG plong = stack[stackPointer - 2].data.l; \
-        JAVA_LONG plong2 = stack[stackPointer - 1].data.l; \
-        stack[stackPointer].type = CN1_TYPE_INVALID; \
-        stack[stackPointer + 1].type = CN1_TYPE_INVALID; \
-        stack[stackPointer].data.l = plong; \
-        stack[stackPointer + 1].data.l = plong2; \
-        stackPointer+=2; \
+        JAVA_LONG plong = SP[-2].data.l; \
+        JAVA_LONG plong2 = SP[-1].data.l; \
+        (*SP).type = CN1_TYPE_INVALID; \
+        SP[1].type = CN1_TYPE_INVALID; \
+        (*SP).data.l = plong; \
+        SP[1].data.l = plong2; \
+        SP+=2; \
     } \
-    stack[stackPointer - 1].type = stack[stackPointer - 3].type; \
-    stack[stackPointer - 2].type = stack[stackPointer - 4].type; \
+    SP[-1].type = SP[-3].type; \
+    SP[-2].type = SP[-4].type; \
 }
 
 #define BC_DUP2_X1() {\
-    stack[stackPointer].data.l = stack[stackPointer - 1].data.l; \
-    stack[stackPointer - 1].data.l = stack[stackPointer - 2].data.l; \
-    stack[stackPointer - 2].data.l = stack[stackPointer].data.l; \
-    stack[stackPointer].type = stack[stackPointer - 1].type; \
-    stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
-    stack[stackPointer - 2].type = stack[stackPointer].type; \
-    stackPointer++; \
+    (*SP).data.l = SP[-1].data.l; \
+    SP[-1].data.l = SP[-2].data.l; \
+    SP[-2].data.l = (*SP).data.l; \
+    (*SP).type = SP[-1].type; \
+    SP[-1].type = SP[-2].type; \
+    SP[-2].type = (*SP).type; \
+    SP++; \
 }
 
 #define BC_DUP2_X2() { \
-    if (stack[stackPointer-2].type == CN1_TYPE_LONG || stack[stackPointer-2].type == CN1_TYPE_DOUBLE) {\
-        stack[stackPointer].data.l = stack[stackPointer - 1].data.l; \
-        stack[stackPointer - 1].data.l = stack[stackPointer - 2].data.l; \
-        stack[stackPointer - 2].data.l = stack[stackPointer].data.l; \
-        stack[stackPointer].type = stack[stackPointer - 1].type; \
-        stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
-        stack[stackPointer - 2].type = stack[stackPointer].type; \
+    if (SP[-2].type == CN1_TYPE_LONG || SP[-2].type == CN1_TYPE_DOUBLE) {\
+        (*SP).data.l = SP[-1].data.l; \
+        SP[-1].data.l = SP[-2].data.l; \
+        SP[-2].data.l = (*SP).data.l; \
+        (*SP).type = SP[-1].type; \
+        SP[-1].type = SP[-2].type; \
+        SP[-2].type = (*SP).type; \
     } else {\
-        stack[stackPointer].data.l = stack[stackPointer - 1].data.l; \
-        stack[stackPointer - 1].data.l = stack[stackPointer - 2].data.l; \
-        stack[stackPointer - 2].data.l = stack[stackPointer - 3].data.l; \
-        stack[stackPointer - 3].data.l = stack[stackPointer].data.l; \
-        stack[stackPointer].type = stack[stackPointer - 1].type; \
-        stack[stackPointer - 1].type = stack[stackPointer - 2].type; \
-        stack[stackPointer - 2].type = stack[stackPointer - 3].type; \
-        stack[stackPointer - 3].type = stack[stackPointer].type; \
+        (*SP).data.l = SP[-1].data.l; \
+        SP[-1].data.l = SP[-2].data.l; \
+        SP[-2].data.l = SP[-3].data.l; \
+        SP[-3].data.l = (*SP).data.l; \
+        (*SP).type = SP[-1].type; \
+        SP[-1].type = SP[-2].type; \
+        SP[-2].type = SP[-3].type; \
+        SP[-3].type = (*SP).type; \
     }\
-    stackPointer++; \
+    SP++; \
 }
 
-#define BC_I2B() stack[stackPointer - 1].data.i = ((stack[stackPointer - 1].data.i << 24) >> 24)
+#define BC_I2B() SP[-1].data.i = ((SP[-1].data.i << 24) >> 24)
 
-#define BC_I2S() stack[stackPointer - 1].data.i = ((stack[stackPointer - 1].data.i << 16) >> 16)
+#define BC_I2S() SP[-1].data.i = ((SP[-1].data.i << 16) >> 16)
 
-#define BC_I2C() stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i & 0xffff)
+#define BC_I2C() SP[-1].data.i = (SP[-1].data.i & 0xffff)
 
-#define BC_ISHL() stackPointer--; stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i << (0x1f & stack[stackPointer].data.i))
+#define BC_ISHL() SP--; SP[-1].data.i = (SP[-1].data.i << (0x1f & (*SP).data.i))
 
-#define BC_LSHL() stackPointer--; stack[stackPointer - 1].data.l = (stack[stackPointer - 1].data.l << (0x3f & stack[stackPointer].data.l))
+#define BC_LSHL() SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.l))
 
-#define BC_ISHR() stackPointer--; stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i >> (0x1f & stack[stackPointer].data.i))
+#define BC_ISHR() SP--; SP[-1].data.i = (SP[-1].data.i >> (0x1f & (*SP).data.i))
 
-#define BC_LSHR() stackPointer--; stack[stackPointer - 1].data.l = (stack[stackPointer - 1].data.l >> (0x3f & stack[stackPointer].data.l))
+#define BC_LSHR() SP--; SP[-1].data.l = (SP[-1].data.l >> (0x3f & (*SP).data.l))
 
-#define BC_IUSHL() stackPointer--; stack[stackPointer - 1].data.i = (((unsigned int)stack[stackPointer - 1]).data.i << (0x1f & ((unsigned int)stack[stackPointer].data.i)))
+#define BC_IUSHL() SP--; SP[-1].data.i = (((unsigned int)SP[-1]).data.i << (0x1f & ((unsigned int)(*SP).data.i)))
 
-#define BC_LUSHL() stackPointer--; stack[stackPointer - 1].data.l = (((unsigned long long)stack[stackPointer - 1].data.l) << (0x3f & ((unsigned long long)stack[stackPointer].data.l)))
+#define BC_LUSHL() SP--; SP[-1].data.l = (((unsigned long long)SP[-1].data.l) << (0x3f & ((unsigned long long)(*SP).data.l)))
 
-#define BC_IUSHR() stackPointer--; stack[stackPointer - 1].data.i = (((unsigned int)stack[stackPointer - 1].data.i) >> (0x1f & ((unsigned int)stack[stackPointer].data.i)))
+#define BC_IUSHR() SP--; SP[-1].data.i = (((unsigned int)SP[-1].data.i) >> (0x1f & ((unsigned int)(*SP).data.i)))
 
-#define BC_LUSHR() stackPointer--; stack[stackPointer - 1].data.l = (((unsigned long long)stack[stackPointer - 1].data.l) >> (0x3f & ((unsigned long long)stack[stackPointer].data.l)))
+#define BC_LUSHR() SP--; SP[-1].data.l = (((unsigned long long)SP[-1].data.l) >> (0x3f & ((unsigned long long)(*SP).data.l)))
 
-#define BC_ISUB() stackPointer--; stack[stackPointer - 1].data.i = (stack[stackPointer - 1].data.i - stack[stackPointer].data.i)
+#define BC_ISUB() SP--; SP[-1].data.i = (SP[-1].data.i - (*SP).data.i)
 
-#define BC_LSUB() stackPointer--; stack[stackPointer - 1].data.l = (stack[stackPointer - 1].data.l - stack[stackPointer].data.l)
+#define BC_LSUB() SP--; SP[-1].data.l = (SP[-1].data.l - (*SP).data.l)
 
-#define BC_FSUB() stackPointer--; stack[stackPointer - 1].data.f = (stack[stackPointer - 1].data.f - stack[stackPointer].data.f)
+#define BC_FSUB() SP--; SP[-1].data.f = (SP[-1].data.f - (*SP).data.f)
 
-#define BC_DSUB() stackPointer--; stack[stackPointer - 1].data.d = (stack[stackPointer - 1].data.d - stack[stackPointer].data.d)
+#define BC_DSUB() SP--; SP[-1].data.d = (SP[-1].data.d - (*SP).data.d)
 
 extern JAVA_OBJECT* constantPoolObjects;
 
@@ -591,80 +591,80 @@ extern int instanceofFunction(int sourceClass, int destId);
 #define GET_CLASS_ID(JavaObj) (*(*JavaObj).__codenameOneParentClsReference).classId
 
 #define BC_INSTANCEOF(typeOfInstanceOf) { \
-    if(stack[stackPointer - 1].data.o != JAVA_NULL) { \
-        int tmpInstanceOfId = GET_CLASS_ID(stack[stackPointer - 1].data.o); \
-        stack[stackPointer - 1].type = CN1_TYPE_INVALID; \
-        stack[stackPointer - 1].data.i = instanceofFunction( typeOfInstanceOf, tmpInstanceOfId ); \
+    if(SP[-1].data.o != JAVA_NULL) { \
+        int tmpInstanceOfId = GET_CLASS_ID(SP[-1].data.o); \
+        SP[-1].type = CN1_TYPE_INVALID; \
+        SP[-1].data.i = instanceofFunction( typeOfInstanceOf, tmpInstanceOfId ); \
     } \
-    stack[stackPointer - 1].type = CN1_TYPE_INT; \
+    SP[-1].type = CN1_TYPE_INT; \
 }
 
-#define BC_IALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \
-    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \
+#define BC_IALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_INT; \
+    SP[-1].data.i = ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
     }
 
-#define BC_LALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_LONG; \
-    stack[stackPointer - 1].data.l = LONG_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 1].data.o, stack[stackPointer].data.i); \
+#define BC_LALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_LONG; \
+    SP[-1].data.l = LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i); \
     }
 
-#define BC_FALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_FLOAT; \
-    stack[stackPointer - 1].data.f = FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 1].data.o, stack[stackPointer].data.i); \
+#define BC_FALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_FLOAT; \
+    SP[-1].data.f = FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i); \
     }
 
-#define BC_DALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_DOUBLE; \
-    stack[stackPointer - 1].data.d = DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 1].data.o, stack[stackPointer].data.i); \
+#define BC_DALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_DOUBLE; \
+    SP[-1].data.d = DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-1].data.o, (*SP).data.i); \
     }
 
-#define BC_AALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INVALID; \
-    stack[stackPointer - 1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \
-    stack[stackPointer - 1].type = CN1_TYPE_OBJECT;  }
+#define BC_AALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_INVALID; \
+    SP[-1].data.o = ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
+    SP[-1].type = CN1_TYPE_OBJECT;  }
 
-#define BC_BALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \
-    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \
+#define BC_BALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_INT; \
+    SP[-1].data.i = ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
     }
 
-#define BC_CALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \
-    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \
+#define BC_CALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_INT; \
+    SP[-1].data.i = ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
     }
 
-#define BC_SALOAD() { CHECK_ARRAY_ACCESS(2, stack[stackPointer - 1].data.i); \
-    stackPointer--; stack[stackPointer - 1].type = CN1_TYPE_INT; \
-    stack[stackPointer - 1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)stack[stackPointer - 1].data.o).data)[stack[stackPointer].data.i]; \
+#define BC_SALOAD() { CHECK_ARRAY_ACCESS(2, SP[-1].data.i); \
+    SP--; SP[-1].type = CN1_TYPE_INT; \
+    SP[-1].data.i = ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i]; \
     }
 
 
-#define BC_BASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); \
-    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3
+#define BC_BASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
+    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
-#define BC_CASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); \
-    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3
+#define BC_CASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
+    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
-#define BC_SASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); \
-    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3
+#define BC_SASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
+    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
-#define BC_IASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); \
-    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)stack[stackPointer - 3].data.o).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.i; stackPointer -= 3
+#define BC_IASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
+    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-3].data.o).data)[SP[-2].data.i] = SP[-1].data.i; SP-=3
 
-#define BC_LASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); \
-    LONG_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 3].data.o, stack[stackPointer - 2].data.i) = stack[stackPointer - 1].data.l; stackPointer -= 3
+#define BC_LASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
+    LONG_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.l; SP-=3
 
-#define BC_FASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); \
-    FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 3].data.o, stack[stackPointer - 2].data.i) = stack[stackPointer - 1].data.f; stackPointer -= 3
+#define BC_FASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
+    FLOAT_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.f; SP-=3
 
-#define BC_DASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); \
-    DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)stack[stackPointer - 3].data.o, stack[stackPointer - 2].data.i) = stack[stackPointer - 1].data.d; stackPointer -= 3
+#define BC_DASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); \
+    DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.d; SP-=3
 
-#define BC_AASTORE() CHECK_ARRAY_ACCESS(3, stack[stackPointer - 2].data.i); { \
-    JAVA_OBJECT aastoreTmp = stack[stackPointer - 3].data.o; \
-    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[stack[stackPointer - 2].data.i] = stack[stackPointer - 1].data.o; \
-    stackPointer -= 3; \
+#define BC_AASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
+    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
+    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
+    SP-=3; \
 }
 
 
@@ -770,25 +770,25 @@ extern struct ThreadLocalData* getThreadLocalData();
         goto labelToJumpTo; \
     }
 
-extern void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int stackPointer, int cn1SizeOfLocals, struct elementStruct* stack, struct elementStruct* locals);
+extern void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread);
 
 
 #define RETURN_AND_RELEASE_FROM_METHOD(returnVal, cn1SizeOfLocals) { \
-        releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, cn1SizeOfLocals, stack, locals); \
+        releaseForReturn(threadStateData, cn1LocalsBeginInThread); \
         return returnVal; \
     }
 
 #define RETURN_AND_RELEASE_FROM_VOID(cn1SizeOfLocals) { \
-        releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer, cn1SizeOfLocals, stack, locals); \
+        releaseForReturn(threadStateData, cn1LocalsBeginInThread); \
         return; \
     }
 
-extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int stackPointer, int cn1SizeOfLocals, struct elementStruct* stack, struct elementStruct* locals, int methodBlockOffset);
+extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset);
 
-#define RETURN_FROM_METHOD(returnVal, cn1SizeOfLocals) releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, cn1SizeOfLocals, stack, locals, methodBlockOffset); \
+#define RETURN_FROM_METHOD(returnVal, cn1SizeOfLocals) releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \
         return returnVal; \
 
-#define RETURN_FROM_VOID(cn1SizeOfLocals) releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, stackPointer, cn1SizeOfLocals, stack, locals, methodBlockOffset); \
+#define RETURN_FROM_VOID(cn1SizeOfLocals) releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \
         return; \
 
 #define END_TRY() threadStateData->tryBlockOffset--
@@ -799,7 +799,7 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
     if(setjmp(destinationJump)) { \
         threadStateData->callStackOffset = currentCodenameOneCallStackOffset; \
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
-        stackPointer = 1; \
+        SP = &stack[1]; \
         stack[0].data.o = threadStateData->exception; \
         stack[0].type = CN1_TYPE_OBJECT; \
         goto labelName; \
@@ -821,14 +821,14 @@ extern void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int i
 #define THROW_ARRAY_INDEX_EXCEPTION(index)    throwArrayIndexOutOfBoundsException(threadStateData, index)
 
 #ifdef CN1_INCLUDE_NPE_CHECKS
-    #define CHECK_NPE_TOP_OF_STACK() if(stack[stackPointer - 1].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }
-    #define CHECK_NPE_AT_STACK(pos) if(stack[stackPointer - pos].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }
+    #define CHECK_NPE_TOP_OF_STACK() if(SP[-1].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }
+    #define CHECK_NPE_AT_STACK(pos) if(SP[-pos].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }
 
     #ifdef CN1_INCLUDE_ARRAY_BOUND_CHECKS
-        #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(stack[stackPointer - array_pos].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); } \
-            if(bounds < 0 || bounds >= ((JAVA_ARRAY)stack[stackPointer - array_pos].data.o)->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
+        #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[- array_pos].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); } \
+            if(bounds < 0 || bounds >= ((JAVA_ARRAY)SP[- array_pos].data.o)->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
     #else 
-        #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(stack[stackPointer - array_pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); } 
+        #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[-array_pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
     #endif
 #else
     #define CHECK_NPE_TOP_OF_STACK()
@@ -905,7 +905,7 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    int stackPointer = spPosition; \
+    struct elementStruct* SP = &stack[spPosition]; \
     initMethodStack(threadStateData, (JAVA_OBJECT)1, stackSize,localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
@@ -913,7 +913,7 @@ extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObje
     const int cn1LocalsBeginInThread = threadStateData->threadObjectStackOffset; \
     struct elementStruct* locals = &threadStateData->threadObjectStack[cn1LocalsBeginInThread]; \
     struct elementStruct* stack = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset + localsStackSize]; \
-    int stackPointer = spPosition; \
+    struct elementStruct* SP = &stack[spPosition]; \
     initMethodStack(threadStateData, __cn1ThisObject, stackSize,localsStackSize, classNameId, methodNameId); \
     const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
@@ -982,14 +982,14 @@ static inline struct elementStruct* popAndRelease(CODENAME_ONE_THREAD_STATE, str
 }
 */
 
-extern struct elementStruct* pop(struct elementStruct* array, int* sp);
-extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* array, int* sp);
+extern struct elementStruct* pop(struct elementStruct**sp);
+extern void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp);
 
 
-#define swapStack(array, sp) { \
-    struct elementStruct t = array[sp-1]; \
-    array[sp-1] = array[sp - 2]; \
-    array[sp - 2] = t; \
+#define swapStack(sp) { \
+    struct elementStruct t = sp[-1]; \
+    sp[-1] = sp[-2]; \
+    sp[-2] = t; \
 }
 
 extern struct clazz class__java_lang_Class;

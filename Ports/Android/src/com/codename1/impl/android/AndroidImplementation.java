@@ -5312,12 +5312,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         f = Bitmap.CompressFormat.JPEG;
                     }
                     Image img = Image.createImage(image).scaled(width, height);
-                    if (width < 0) {
-                        width = img.getWidth();
-                    }
-                    if (height < 0) {
-                        width = img.getHeight();
-                    }
                     Bitmap b = (Bitmap) img.getImage();
                     b.compress(f, (int) (quality * 100), response);
                 }

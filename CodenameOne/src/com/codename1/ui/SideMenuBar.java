@@ -103,7 +103,7 @@ public class SideMenuBar extends MenuBar {
      * putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
      */
     public static final String COMMAND_ACTIONABLE = "Actionable";
-    
+        
     /**
      * Empty Constructor
      */
@@ -268,10 +268,12 @@ public class SideMenuBar extends MenuBar {
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
                             openMenu(null, 0, draggedX, false);
+                            initialDragX = 0;
+                            initialDragY = 0;
                         }
                         return;
                     }
-                    if (rightSideSwipePotential && hasSideMenus[1]) {
+                    if (rightSideSwipePotential && (hasSideMenus[1] || (hasSideMenus[0] && isRTL()))) {
                         final int x = evt.getX();
                         final int y = evt.getY();
                         if (Math.abs(y - initialDragY) > initialDragX - x) {
@@ -283,7 +285,13 @@ public class SideMenuBar extends MenuBar {
                             draggedX = x;
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
-                            openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX, false);
+                            if(isRTL()){
+                                openMenu(null, 0, draggedX, false);                            
+                            }else{
+                                openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX, false);
+                            }
+                            initialDragX = 0;
+                            initialDragY = 0;
                         }
                     }
                     if (topSwipePotential) {
@@ -299,6 +307,8 @@ public class SideMenuBar extends MenuBar {
                             dragActivated = true;
                             parent.pointerReleased(-1, -1);
                             openMenu(COMMAND_PLACEMENT_VALUE_TOP, 0, draggedX, false);
+                            initialDragX = 0;
+                            initialDragY = 0;
                         }
                     }
                 }
@@ -329,7 +339,7 @@ public class SideMenuBar extends MenuBar {
                         }
                     }
                     int displayWidth = Display.getInstance().getDisplayWidth();
-                    if (rightSideButton != null) {
+                    if (rightSideButton != null || isRTL()) {
                         rightSideSwipePotential = !transitionRunning && evt.getX() > displayWidth - displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
                     }
                     if (getTitleComponent() instanceof Button) {
@@ -998,11 +1008,18 @@ public class SideMenuBar extends MenuBar {
                 addComponentToSideMenu(menu, createTouchCommandButton(c));
             }
         }
+        boolean isRTLValue = isRTL();
+        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+            isRTLValue = !isRTLValue;
+        }
         UIManager uim = menu.getUIManager();
         boolean shadowEnabled = uim.isThemeConstant("sideMenuShadowBool", true);
         Image sh = (Image) uim.getThemeImageConstant("sideMenuShadowImage");
         if (sh == null && shadowEnabled) {
             sh = Resources.getSystemResource().getImage("sidemenu-shadow.png");
+        }
+        if (isRTLValue) {
+            sh = sh.flipHorizontally(true);
         }
         final Image shadow = sh;
 
@@ -1361,7 +1378,11 @@ public class SideMenuBar extends MenuBar {
                     v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
                     if(v < 0) {
                         if(placement == COMMAND_PLACEMENT_VALUE_RIGHT){
-                            v = rightSideButton.getWidth();
+                            if(isRTL()){
+                                v = openButton.getWidth();                            
+                            }else{
+                                v = rightSideButton.getWidth();
+                            }
                         }else{
                             v = openButton.getWidth();
                         }
@@ -1526,6 +1547,13 @@ public class SideMenuBar extends MenuBar {
             if (shadow == null && shadowEnabled) {
                 shadow = Resources.getSystemResource().getImage("sidemenu-shadow.png");
             }
+            boolean isRTLValue = isRTL();
+            if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+                isRTLValue = !isRTLValue;
+            }
+            if (isRTLValue) {
+                shadow = shadow.flipHorizontally(true);
+            }
 
             motion.start();
         }
@@ -1659,12 +1687,31 @@ public class SideMenuBar extends MenuBar {
             
             public void run() {
                 if(Display.getInstance().isEdt()) {
-                    ActionEvent e = new ActionEvent(cmd,ActionEvent.Type.Command);
+                    ActionEvent e = new ActionEvent(cmd, ActionEvent.Type.Command);
+                    if (cmd instanceof NavigationCommand) {
+                        parent.getContentPane().setVisible(true);
+                        final Form nextForm = ((NavigationCommand) cmd).getNextForm();
+                        if (nextForm != null) {
+                            final Transition out = parent.getTransitionOutAnimator();
+                            final Transition in = nextForm.getTransitionInAnimator();
+                            parent.setTransitionOutAnimator(CommonTransitions.createEmpty());
+                            nextForm.setTransitionInAnimator(CommonTransitions.createEmpty());
+                            nextForm.addShowListener(new ActionListener() {
+
+                                public void actionPerformed(ActionEvent evt) {
+                                    parent.setTransitionOutAnimator(out);
+                                    nextForm.setTransitionInAnimator(in);
+                                    nextForm.removeShowListener(this);
+                                }
+                            });
+                        }
+                    }
                     parent.dispatchCommand(cmd, e);
+
                     return;
                 }
 
-                synchronized(LOCK) {
+                synchronized (LOCK) {
                     while (Display.getInstance().getCurrent() != parent) {
                         try {
                             LOCK.wait(40);
@@ -1687,6 +1734,15 @@ public class SideMenuBar extends MenuBar {
             if (transitionRunning) {
                 return;
             }
+            //if this is a navigation command clear the current Form to make the 
+            //transition more pleasent
+            if(cmd instanceof NavigationCommand){
+                rightPanel.getStyle().setBgImage(null);
+                parent.getContentPane().setVisible(false);
+                Image img = updateRightPanelBgImage(((MenuTransition)parent.getTransitionInAnimator()).placement, parent);
+                rightPanel.getStyle().setBgImage(img);
+            }
+            
             closeMenu();
             clean();
             parent.addShowListener(pointerDragged);

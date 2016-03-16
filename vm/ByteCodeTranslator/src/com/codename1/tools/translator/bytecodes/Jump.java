@@ -65,28 +65,28 @@ public class Jump extends Instruction {
                 b.append("if(POP_INT() <= 0) /* IFLE */ ");
                 break;
             case Opcodes.IF_ICMPEQ:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i == stack[stackPointer + 1].data.i) /* IF_ICMPEQ */ ");
+                b.append("SP-=2; if((*SP).data.i == SP[1].data.i) /* IF_ICMPEQ */ ");
                 break;
             case Opcodes.IF_ICMPNE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i != stack[stackPointer + 1].data.i) /* IF_ICMPNE */ ");
+                b.append("SP-=2; if((*SP).data.i != SP[1].data.i) /* IF_ICMPNE */ ");
                 break;
             case Opcodes.IF_ICMPLT:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i < stack[stackPointer + 1].data.i) /* IF_ICMPLT */ ");
+                b.append("SP-=2; if((*SP).data.i < SP[1].data.i) /* IF_ICMPLT */ ");
                 break;
             case Opcodes.IF_ICMPGE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i >= stack[stackPointer + 1].data.i) /* IF_ICMPGE */ ");
+                b.append("SP-=2; if((*SP).data.i >= SP[1].data.i) /* IF_ICMPGE */ ");
                 break;
             case Opcodes.IF_ICMPGT:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i > stack[stackPointer + 1].data.i) /* IF_ICMPGT */ ");
+                b.append("SP-=2; if((*SP).data.i > SP[1].data.i) /* IF_ICMPGT */ ");
                 break;
             case Opcodes.IF_ICMPLE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.i <= stack[stackPointer + 1].data.i) /* IF_ICMPLE */ ");
+                b.append("SP-=2; if((*SP).data.i <= SP[1].data.i) /* IF_ICMPLE */ ");
                 break;
             case Opcodes.IF_ACMPEQ:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.o == stack[stackPointer + 1].data.o) /* IF_ACMPEQ */ ");
+                b.append("SP-=2; if((*SP).data.o == SP[1].data.o) /* IF_ACMPEQ */ ");
                 break;
             case Opcodes.IF_ACMPNE:
-                b.append("stackPointer -= 2; if(stack[stackPointer].data.o != stack[stackPointer + 1].data.o) /* IF_ACMPNE */ ");
+                b.append("SP-=2; if((*SP).data.o != SP[1].data.o) /* IF_ACMPNE */ ");
                 break;
             case Opcodes.GOTO:
                 // this space intentionally left blank

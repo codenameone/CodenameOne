@@ -1449,7 +1449,7 @@ public class BytecodeMethod {
                             if (storeLiteral != null) {
                                 sb.append("    "+storeLiteral);
                             } else {
-                                sb.append("    stack[stackPointer].type = CN1_TYPE_INT; stack[stackPointer++].data.i = ");
+                                sb.append("    (*SP).type = CN1_TYPE_INT; (*(SP++)).data.i = ");
                             }
                             sb.append(leftLiteral).append(operator).append(rightLiteral)
                                     .append("; /* ").append(opName).append(" Optimized */\n");

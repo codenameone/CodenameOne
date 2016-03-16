@@ -50,7 +50,7 @@ public class UIManager {
     private HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
     private HashMap<String, Object> themeProps;
     private HashMap<String, Object> themeConstants = new HashMap<String, Object>();
-    static UIManager instance = new UIManager();
+    static UIManager instance;
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
     /**
@@ -86,6 +86,14 @@ public class UIManager {
     private EventDispatcher themelisteners;
 
     UIManager() {
+        // Lazy initialization of instance for js port compatibility.  We will
+        // do a double-lazy initialization to try to best prevent regressions
+        // from other projects that may be out of sync.  E.g. the Designer project
+        // uses the "instance" property directly.  This should guarantee that
+        // instance will be set
+        if (instance == null) {
+            instance = this;
+        }
         current = new DefaultLookAndFeel(this);    
         resetThemeProps(null);
     }
@@ -104,6 +112,9 @@ public class UIManager {
      * @return Instance of the ui manager
      */
     public static UIManager getInstance() {
+        if (instance == null) {
+            instance = new UIManager();
+        }
         return instance;
     }
 
@@ -482,7 +493,9 @@ public class UIManager {
 
         if(installedTheme == null || !installedTheme.containsKey("Scroll.derive")) {
             themeProps.put("Scroll.margin", "0,0,0,0");
-            themeProps.put("Scroll.padding", "1,1,1,1");
+            int halfMM = Display.getInstance().convertToPixels(10, true) / 20;
+            halfMM = Math.max(1, halfMM);
+            themeProps.put("Scroll.padding", halfMM + "," + halfMM + "," + halfMM + "," + halfMM);
         }
 
         if(installedTheme == null || !installedTheme.containsKey("ScrollThumb.derive")) {

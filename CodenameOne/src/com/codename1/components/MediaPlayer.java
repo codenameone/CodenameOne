@@ -39,8 +39,14 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * This is a Media Player Component with control buttons back, play/pause and 
- * forward buttons
+ * <p>Video playback component with control buttons for back, play/pause and 
+ * forward buttons. In the simulator those controls are implemented locally but on the
+ * device the native playback controls are used.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
+ * 
  */
 public class MediaPlayer extends Container {
     private Image playIcon;

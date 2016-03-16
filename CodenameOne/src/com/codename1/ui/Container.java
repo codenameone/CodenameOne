@@ -74,7 +74,7 @@ import java.util.Vector;
  * @author Chen Fishbein
  */
 public class Container extends Component implements Iterable<Component>{
-    private static boolean enableLayoutOnPaint = true;
+    static boolean enableLayoutOnPaint = true;
     private Component leadComponent;
     private Layout layout;
     private java.util.ArrayList<Component> components = new java.util.ArrayList<Component>();

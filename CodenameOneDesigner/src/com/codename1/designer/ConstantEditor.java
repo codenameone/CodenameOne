@@ -98,6 +98,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("formTransitionInImage", "Default transition Image for form, causes a Timeline transition effect");
         helpMap.put("formTransitionOut", "Default transition for form");
         helpMap.put("formTransitionOutImage", "Default transition Image for form, causes a Timeline transition effect");
+        helpMap.put("globalToobarBool", "Turns the toolbar API on/off globally");
         helpMap.put("hideBackCommandBool","Hides the back command from the side menu when possible");
         helpMap.put("hideEmptyTitleBool", "Indicates that a title with no content should be hidden even if the border for the title occupies space");
         helpMap.put("hideLeftSideMenuBool","Hides the side menu icon that appears on the left side of the UI");

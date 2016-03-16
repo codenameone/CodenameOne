@@ -41,11 +41,20 @@ import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
 /**
- * This is a share button.
- * The share button is responsible to share the required info with the available 
- * sharing services
+ * <p>The share button allows sharing a String or an image either thru the defined 
+ * sharing services or thru the native OS sharing support. On Android &amp; iOS the native 
+ * sharing API is invoked for this class.<br>
+ * The code below demonstrates image sharing, notice that an image must be stored using
+ * the {@link com.codename1.io.FileSystemStorage} API and shouldn't use a different API
+ * like {@link com.codename1.io.Storage}!</p>
  * 
- * @author Chen
+ * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-sharebutton.png" alt="Share on the simulator" />
+ * 
+ * <h4>Notice that share looks different on a device</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-sharebutton-android.png" alt="Share on the device" />
+ * 
+ * @author Chen Fishbein
  */
 public class ShareButton extends Button implements ActionListener{
     

@@ -32,9 +32,15 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * Allows displaying labels and images with different alignment options, this class
+ * <p>Allows displaying a single line of text and icon (both optional) with different alignment options. This class
  * is a base class for several components allowing them to declare alignment/icon
- * look in a similar way.
+ * appearance universally.</p>
+ * <p>
+ * Label text can be positioned in one of 4 locations as such:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/3bfd03a497bc09700128.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-label-text-position.png" alt="Label text positioning" />
+ * 
  * 
  * @author Chen Fishbein
  */
@@ -458,7 +464,11 @@ public class Label extends Component {
         int cmpWidth = getWidth();
         Style s = getStyle();
         Font f = s.getFont();
-        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, text, 
+        String t = text;
+        if(text == null) { 
+            t = "";
+        }
+        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, t, 
                 icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
                 endsWith3Points, valign);
     }
