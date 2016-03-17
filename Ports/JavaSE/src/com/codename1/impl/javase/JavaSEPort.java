@@ -3744,10 +3744,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setClip(Object graphics, int x, int y, int width, int height) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
-        nativeGraphics.setClip(x, y, width, height);
+        AffineTransform saveT = nativeGraphics.getTransform();
+        resetAffine(graphics);
+        nativeGraphics.setClip(x, y, width, height);        
         if (perfMonitor != null) {
             perfMonitor.setClip(x, y, width, height);
         }
+        nativeGraphics.setTransform(saveT);
     }
 
     /**
@@ -3763,8 +3766,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setClip(Object graphics, com.codename1.ui.geom.Shape shape){
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
+        AffineTransform saveT = nativeGraphics.getTransform();
+        resetAffine(graphics);
         Shape s = cn1ShapeToAwtShape(shape);
         nativeGraphics.setClip(s);
+        nativeGraphics.setTransform(saveT);
     }
     
     /**
