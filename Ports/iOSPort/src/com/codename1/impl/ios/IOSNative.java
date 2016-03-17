@@ -576,6 +576,8 @@ public final class IOSNative {
 
     native void setNativeClippingMutable(int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
 
+    native void refreshContacts();
+
    
 
 }

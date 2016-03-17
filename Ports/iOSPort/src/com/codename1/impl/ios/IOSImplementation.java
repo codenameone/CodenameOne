@@ -5209,6 +5209,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void refreshContacts() {
+        nativeInstance.refreshContacts();
+    }
+    
+    
+    
+    
+
+    @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         int recId = Integer.parseInt(id);
         Contact c = new Contact();

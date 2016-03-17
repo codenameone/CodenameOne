@@ -5355,6 +5355,11 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    public void refreshContacts() {
+        
+    }
+
+
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {

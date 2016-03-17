@@ -3009,6 +3009,10 @@ ABAddressBookRef getAddressBook() {
     return globalAddressBook;
 }
 
+JAVA_VOID com_codename1_impl_ios_IOSNative_refreshContacts__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    globalAddressBook = nil;
+}
+
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isContactsPermissionGranted__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     POOL_BEGIN();
     getAddressBook();

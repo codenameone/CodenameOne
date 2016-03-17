@@ -164,4 +164,15 @@ public class ContactsManager {
     public static boolean isAllContactsFast() {
         return Display.getInstance().isGetAllContactsFast();
     }
+    
+    /**
+     * Clears the contacts cache to that they will be loaded from the system the next time {@link #getContacts(boolean, boolean, boolean, boolean, boolean, boolean) }
+     * is called.  
+     * 
+     * <p>This is only necessary on platforms that use a transactional address book, if you want to reload contact changes
+     * that have occurred outside the app.  At time of writing, the only platform that does this is iOS.  This method will have no effect on other platforms.</p>
+     */
+    public static void refresh() {
+        Display.getInstance().refreshContacts();
+    }
 }
