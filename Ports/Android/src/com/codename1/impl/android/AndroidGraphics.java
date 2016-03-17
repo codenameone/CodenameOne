@@ -1254,7 +1254,9 @@ class AndroidGraphics {
 
     public void setClip(Path path) {
         clipFresh = false;
-        canvas.clipPath(path, Region.Op.REPLACE);
+        this.tmppath.rewind();
+        path.transform(getTransformMatrix(), this.tmppath);        
+        canvas.clipPath(this.tmppath, Region.Op.REPLACE);
     }
     
     public void clipRect(int x, int y, int width, int height) {
