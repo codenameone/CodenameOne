@@ -1369,12 +1369,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         PathIterator it = s.getPathIterator();
         float[] curr = new float[6];
         while (!it.isDone()) {
-            it.next();
             switch (it.currentSegment(curr)) {
                 case PathIterator.SEG_CUBICTO:
                 case PathIterator.SEG_QUADTO:
                 return false;
             }
+            it.next();
         }
         return true;
     }
@@ -1480,7 +1480,18 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } else {
                     newClip = s.intersection(ng.reusableRect);
                 }
-                if ( newClip.isRectangle() ){
+                if (newClip == null) {
+                    if (ng.clip != null && ng.clip.getClass() == Rectangle.class) {
+                        ((Rectangle)ng.clip).setBounds(0, 0, 0, 0);
+                    } else {
+                        ng.clip = new Rectangle(0,0,0,0);
+                    }
+                    
+                    ng.setNativeClipping(0,0,0,0, ng.clipApplied);
+                    ng.clipApplied = true;
+                    ng.clipDirty = true;
+                    return;
+                } else if ( newClip.isRectangle() ){
                     Rectangle r = newClip.getBounds();
                     ng.clip = r;
                     ng.setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), ng.clipApplied);
@@ -3873,6 +3884,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (shape.getClass() == GeneralPath.class) {
                 // GeneralPath gives us some easy access to the points
                 GeneralPath p = (GeneralPath)shape;
+                if (transform != null && !transform.isIdentity()) {
+                    p = (GeneralPath)p.createTransformedShape(transform);
+                }
                 int commandsLen = p.getTypesSize();
                 int pointsLen = p.getPointsSize();
                 byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
@@ -4176,7 +4190,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         void setNativeClipping(Shape clip){
-            setNativeClippingGlobal(clip);
+            if (transform != null && !transform.isIdentity()) {
+                GeneralPath p = null;
+                if (clip.getClass() == GeneralPath.class) {
+                    p = (GeneralPath)((GeneralPath)clip).createTransformedShape(transform);
+                } else {
+                    p = new GeneralPath();
+                    p.append(clip.getPathIterator(transform), false);
+                }
+                setNativeClippingGlobal(p);
+            } else {
+                setNativeClippingGlobal(clip);
+            }
         }
 
         void nativeDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
