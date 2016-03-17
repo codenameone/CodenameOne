@@ -279,4 +279,13 @@ public class BubbleTransition extends Transition {
         return null;
     }
 
+    /**
+     * {@inheritDoc}
+     * @param reverse {@inheritDoc}
+     * @return {@inheritDoc}
+     */
+    @Override
+    public Transition copy(boolean reverse) {
+        return new BubbleTransition(duration, componentName);
+    }
 }
