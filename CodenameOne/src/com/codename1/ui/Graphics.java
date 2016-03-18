@@ -592,6 +592,11 @@ public final class Graphics {
      * <p>This is not supported on
      * all platforms and contexts currently.  Use {@link #isShapeSupported} to check if the current 
      * context supports drawing shapes.</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
+     * 
+     * 
      * @param shape The shape to be drawn.
      * @param stroke the stroke to use
      * 
@@ -616,6 +621,11 @@ public final class Graphics {
      *  <p>This is not supported on
      * all platforms and contexts currently.  Use {@link #isShapeSupported} to check if the current 
      * context supports drawing shapes.</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
+     * 
+     * 
      * @param shape The shape to be filled.
      * 
      * @see #isShapeSupported
@@ -666,9 +676,9 @@ public final class Graphics {
     }
     
     /**
-     * Checks to see if this graphics context supports drawing shapes (i.e. {@link #drawShape}
+     * <p>Checks to see if this graphics context supports drawing shapes (i.e. {@link #drawShape}
      * and {@link #fillShape} methods. If this returns {@literal false}, and you call {@link #drawShape} or {@link #fillShape}, then
-     * nothing will be drawn.
+     * nothing will be drawn.</p>
      * @return {@literal true} If {@link #drawShape} and {@link #fillShape} are supported.  
      * @see #drawShape
      * @see #fillShape

@@ -50,6 +50,16 @@ import java.util.Hashtable;
  * </p>
  * 
  * <p>
+ * The sample code below demonstrates a catalog of available fonts, the scr
+ * </p>
+ * <script src="https://gist.github.com/codenameone/1081b77246b8485856be.js"></script>
+ * <h4>The demo code on the iPad simulator on a Mac</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/theme-font-catalog.png" alt="The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC" />
+ * 
+ * <h4>The demo code on an Android 5.1 OPO device (OnePlus One)</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/theme-font-catalog-opo.png" alt="The same demo running on a OnePlus One device with Android 5.1" />
+ * 
+ * <p>
  *    The Font class also supports bitmap fonts but this support is strictly aimed at legacy applications. We no longer
  * maintain that functionality.
  * </p>
