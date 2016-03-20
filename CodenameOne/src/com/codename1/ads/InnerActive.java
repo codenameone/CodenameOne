@@ -162,6 +162,7 @@ public class InnerActive extends AdsService{
         if(testAds){
             addParam(this, "test", "1");
         }
+        setDuplicateSupported(true);
     }
 
     /**
