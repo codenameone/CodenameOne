@@ -39,6 +39,9 @@ import com.codename1.ui.plaf.Style;
  * The Bubble window can be round on supported platforms
  * </p>
  * 
+ * <script src="https://gist.github.com/codenameone/5c44d837d3582b11deed.js"></script>
+ * <img src="https://www.codenameone.com/img/blog/bubble-transition.gif" alt="Bubble transition converting a circular button to a Dialog" />
+ * 
  * @author Chen
  */
 public class BubbleTransition extends Transition {
