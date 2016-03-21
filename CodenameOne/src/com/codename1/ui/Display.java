@@ -3950,4 +3950,8 @@ hi.show();}</pre></noscript>
     public boolean isGaussianBlurSupported() {
         return impl.isGaussianBlurSupported();
     }
+
+    public void refreshContacts() {
+        impl.refreshContacts();
+    }
 }

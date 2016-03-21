@@ -463,10 +463,12 @@ public class Rectangle implements Shape {
     public PathIterator getPathIterator(Transform m) {
         if ( path == null ){
             path = new GeneralPath();
+            int w = size.getWidth();
+            int h = size.getHeight();
             path.moveTo(x, y);
-            path.lineTo(x+size.getWidth(), y);
-            path.lineTo(x+size.getWidth(), y+size.getHeight());
-            path.lineTo(x, y+size.getHeight());
+            path.lineTo(x+w, y);
+            path.lineTo(x+w, y+h);
+            path.lineTo(x, y+h);
             path.closePath();
             
         }
