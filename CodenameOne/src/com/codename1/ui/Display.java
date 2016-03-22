@@ -3950,4 +3950,11 @@ hi.show();}</pre></noscript>
     public boolean isGaussianBlurSupported() {
         return impl.isGaussianBlurSupported();
     }
+
+    /**
+     * Refreshes the native list of contacts on devices that require this see {@link com.codename1.contacts.ContactsManager#refresh()}
+     */
+    public void refreshContacts() {
+        impl.refreshContacts();
+    }
 }

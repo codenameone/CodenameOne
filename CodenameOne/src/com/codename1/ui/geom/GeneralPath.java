@@ -23,16 +23,15 @@
 package com.codename1.ui.geom;
 
 
-import com.codename1.io.Log;
 import com.codename1.ui.Transform;
 import com.codename1.util.MathUtil;
 import java.util.Arrays;
 
 /**
- * A general geometric path, consisting of any number of subpaths constructed
+ * <p>A general geometric path, consisting of any number of subpaths constructed
  * out of straight lines and cubic or quadratic Bezier curves. The inside of the
  * curve is defined for drawing purposes by a winding rule. Either the
- * {@link #WIND_EVEN_ODD} or {@link #WIND_NON_ZERO} winding rule can be chosen.
+ * {@link #WIND_EVEN_ODD} or {@link #WIND_NON_ZERO} winding rule can be chosen.</p>
  *
  * <h4>A drawing of a GeneralPath</h4>
  *
@@ -54,10 +53,13 @@ import java.util.Arrays;
  * intersection 'down') Point C in the image is inside (two intersections in the
  * 'down' direction)</p>
  *
- * <!--(Note: This description and image were copied from <a
+ * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
+ * 
+ * <p>Note: This description and image were copied from <a
  * href="http://developer.classpath.org/doc/java/awt/geom/GeneralPath.html">the
  * GNU classpath</a>
- * docs). License here http://www.gnu.org/licenses/licenses.html#FDL -->
+ * docs). License here http://www.gnu.org/licenses/licenses.html#FDL</p>
  *
  * @author shannah
  *

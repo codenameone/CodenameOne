@@ -831,13 +831,28 @@ public class UIManager {
     
         if (installedTheme == null || !installedTheme.containsKey("AutoCompletePopup.derive")) {
             themeProps.put("AutoCompletePopup.transparency", "255");
+            themeProps.put("AutoCompletePopup.padding", "0,0,0,0");
             themeProps.put("AutoCompletePopup.border", Border.createLineBorder(1));       
         }
         if (installedTheme == null || !installedTheme.containsKey("AutoCompletePopup.sel#derive")) {
             themeProps.put("AutoCompletePopup.sel#transparency", "255");
+            themeProps.put("AutoCompletePopup.sel#padding", "0,0,0,0");
             themeProps.put("AutoCompletePopup.sel#border", Border.createLineBorder(1));
         }
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompleteList.derive")) {
+            themeProps.put("AutoCompleteList.margin", "1,1,1,1");
+            themeProps.put("AutoCompleteList.padding", "0,0,0,0");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompleteList.sel#derive")) {
+            themeProps.put("AutoCompleteList.sel#margin", "1,1,1,1");
+            themeProps.put("AutoCompleteList.sel#padding", "0,0,0,0");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompleteList.press#derive")) {
+            themeProps.put("AutoCompleteList.press#margin", "1,1,1,1");
+            themeProps.put("AutoCompleteList.press#padding", "0,0,0,0");
+        }
 
+        
         if (installedTheme == null || !installedTheme.containsKey("CommandList.derive")) {
             themeProps.put("CommandList.transparency", "255");
             themeProps.put("CommandList.border", Border.createLineBorder(1));       

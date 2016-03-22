@@ -3744,7 +3744,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setClip(Object graphics, int x, int y, int width, int height) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
-        nativeGraphics.setClip(x, y, width, height);
+        nativeGraphics.setClip(x, y, width, height);        
         if (perfMonitor != null) {
             perfMonitor.setClip(x, y, width, height);
         }

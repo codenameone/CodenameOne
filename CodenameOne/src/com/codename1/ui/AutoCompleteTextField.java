@@ -26,6 +26,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.list.*;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
@@ -251,8 +252,10 @@ public class AutoCompleteTextField extends TextField {
     private void removePopup() {
         Form f = getComponentForm();
         if (f != null) {
-            f.getLayeredPane().removeComponent(popup);
-            popup.setParent(null);
+            Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
+            Container parent = popup.getParent();
+            lay.removeComponent(parent);
+            popup.remove();
             f.revalidate();
         }
     }
@@ -318,15 +321,18 @@ public class AutoCompleteTextField extends TextField {
         if(units != null){
             units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;
             units[Component.TOP] = Style.UNIT_TYPE_PIXELS;
-            popup.getStyle().setMarginUnit(units);
+            popup.getAllStyles().setMarginUnit(units);
         }
-        popup.getUnselectedStyle().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
-        popup.getSelectedStyle().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
+        popup.getAllStyles().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
         
         int y = getAbsoluteY();
         int topMargin;
         int popupHeight;
-        int listHeight = l.getModel().getSize() * l.getElementSize(false, true).getHeight();
+        int items = l.getModel().getSize();
+        if(l.getModel() instanceof FilterProxyListModel){
+            items = ((FilterProxyListModel)l.getModel()).getUnderlying().getSize();
+        }
+        int listHeight = items * l.getElementSize(false, true).getHeight();
         if(y < f.getContentPane().getHeight()/2){
             topMargin =  y - f.getTitleArea().getHeight() + getHeight();
             popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
@@ -335,13 +341,7 @@ public class AutoCompleteTextField extends TextField {
             popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
             topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
         }
-        if(f.getToolbar() != null) {
-            // we need to add the status bar which is now missing from the titlebar entry
-            Style s = getUIManager().getComponentStyle("StatusBar");
-            topMargin += s.getPadding(TOP) + s.getPadding(BOTTOM);
-        }
-        popup.getUnselectedStyle().setMargin(TOP, Math.max(0, topMargin));
-        popup.getSelectedStyle().setMargin(TOP, Math.max(0, topMargin));                    
+        popup.getAllStyles().setMargin(TOP, Math.max(0, topMargin));                    
         popup.setPreferredH(popupHeight);
         popup.setPreferredW(getWidth());
         popup.setHeight(popupHeight);
@@ -353,7 +353,11 @@ public class AutoCompleteTextField extends TextField {
         
         if (f != null) {
             if (popup.getParent() == null) {
-                f.getLayeredPane().addComponent(popup);
+                Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
+                lay.setLayout(new LayeredLayout());
+                Container wrapper = new Container();
+                wrapper.add(popup);
+                lay.addComponent(wrapper);
             }
             f.revalidate();
         }
@@ -397,28 +401,50 @@ public class AutoCompleteTextField extends TextField {
 
     class FormPointerListener implements ActionListener {
 
-        public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
-            if (f.getLayeredPane().getComponentCount() > 0 && popup.getComponentCount() > 0) {
-                if (!popup.getComponentAt(0).
-                        contains(evt.getX(), evt.getY())) {
-                    //removePopup();
-                    popup.setVisible(false);
-                    popup.setEnabled(false);
-                    f.repaint();
-                    
+        public void actionPerformed(final ActionEvent evt) {
+            final Form f = getComponentForm();
+            Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
+            
+            boolean canOpenPopup = true;
+            
+            for (int i = 0; i < layered.getComponentCount(); i++) {
+                Container wrap = (Container) layered.getComponentAt(i);
+                Component pop = wrap.getComponentAt(0);
+                if(pop.isVisible()){
+                    if(!pop.contains(evt.getX(), evt.getY())){
+                        pop.setVisible(false);
+                        pop.setEnabled(false);      
+                        f.repaint();
+                        evt.consume();
+                    }else{
+                        canOpenPopup = false;
+                    }
                 }
-            } else {
-                if (contains(evt.getX(), evt.getY())) {
-                    popup.getComponentAt(0).setScrollY(0);
-                    popup.setVisible(true);
-                    popup.setEnabled(true);
-                    evt.consume();
-                    pointerReleased(evt.getX(), evt.getY());
-                }
-
             }
+            
+            if(!canOpenPopup){
+                return;
+            }
+            
+            if (contains(evt.getX(), evt.getY())) {
+                //something went wrong re-init the popup
+                if(popup.getAbsoluteX() != getAbsoluteX()){
+                    removePopup();
+                    addPopup();
+                }
+                popup.getComponentAt(0).setScrollY(0);
+                popup.setVisible(true);
+                popup.setEnabled(true);
+                popup.repaint();
+                evt.consume();                
+                f.revalidate();
+                Display.getInstance().callSerially(new Runnable() {
 
+                    public void run() {
+                        pointerReleased(evt.getX(), evt.getY());
+                    }
+                });
+            }
         }
     }
 

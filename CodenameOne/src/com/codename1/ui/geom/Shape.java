@@ -25,8 +25,18 @@ package com.codename1.ui.geom;
 import com.codename1.ui.Transform;
 
 /**
- * An interface that can be implemented by any class that wants to be drawable
- * as a shape. 
+ * <p>An interface that can be implemented by any class that wants to be drawable
+ * as a shape. </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
+ * 
+ * <p>
+ * Shape can also be used to clip an area e.g.:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/65f531adae2e8c22afc8.js"></script>
+ * <img src="https://www.codenameone.com/img/blog/shaped-clipping.png" alt="Shaped clipping in action" />
+ * 
  * @author Steve Hannah
  * @see GeneralPath for a concrete implementation of Shape.
  * @see com.codename1.ui.Graphics#drawShape
