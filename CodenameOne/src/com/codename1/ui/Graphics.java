@@ -255,8 +255,11 @@ public final class Graphics {
      * <p>This is not supported on all platforms and contexts currently.  
      * Use {@link #isShapeClipSupported} to check if the current 
      * context supports clipping shapes.</p>
-     * @param shape The shape to clip.
      * 
+     * <script src="https://gist.github.com/codenameone/65f531adae2e8c22afc8.js"></script>
+     * <img src="https://www.codenameone.com/img/blog/shaped-clipping.png" alt="Shaped clipping in action" />
+     * 
+     * @param shape The shape to clip.
      * @see #isShapeClipSupported
      */
     public void setClip(Shape shape) {
