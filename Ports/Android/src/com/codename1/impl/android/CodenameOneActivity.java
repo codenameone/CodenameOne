@@ -279,6 +279,12 @@ public class CodenameOneActivity extends Activity {
     }
 
     @Override
+    public void onBackPressed() {
+        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
+        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
+    }
+    
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         AndroidImplementation.activity = this;
