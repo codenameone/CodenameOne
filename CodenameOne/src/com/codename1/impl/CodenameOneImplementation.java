@@ -1510,6 +1510,7 @@ public abstract class CodenameOneImplementation {
      * @param graphics
      * @see isTransformSupported()
      * @see isPerspectiveTransformSupported()
+     * @deprecated Use {@link #getTransform(java.lang.Object, com.codename1.ui.Transform) } instead.
      */
     public Transform getTransform(Object graphics){
         return Transform.makeIdentity();
@@ -5154,6 +5155,11 @@ public abstract class CodenameOneImplementation {
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         throw new RuntimeException("Transforms not supported");
     }
+    
+    public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        setTransformIdentity(nativeTransform);
+        transformTranslate(nativeTransform, translateX, translateY, translateZ);
+    }
 
     /**
      * Makes a new native scale transform.  Each implementation can decide the format
@@ -5168,6 +5174,11 @@ public abstract class CodenameOneImplementation {
      */
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
         throw new RuntimeException("Transforms not supported");
+    }
+    
+    public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
+        setTransformIdentity(nativeTransform);
+        transformScale(nativeTransform, scaleX, scaleY, scaleZ);
     }
 
     /**
@@ -5184,6 +5195,11 @@ public abstract class CodenameOneImplementation {
      */
     public Object makeTransformRotation(float angle, float x, float y, float z) {
         throw new RuntimeException("Transforms not supported");
+    }
+    
+    public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
+        setTransformIdentity(nativeTransform);
+        transformRotate(nativeTransform, angle, x, y, z);
     }
 
     /**
@@ -5202,6 +5218,10 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    public void setTransformPerspective(Object nativeTransform, float fovy, float aspect, float zNear, float zFar) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
     /**
      * Makes a new orthographic projection transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5220,6 +5240,10 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
     /**
      * Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5241,6 +5265,10 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        throw new RuntimeException("Transforms not supported");
+    }
+    
     /**
      * Rotates the provided  transform.
      * @param nativeTransform The transform to rotate. Each implementation can decide the format
@@ -5304,6 +5332,10 @@ public abstract class CodenameOneImplementation {
        throw new RuntimeException("Transforms not supported");
     }
     
+    public void setTransformInverse(Object nativeTransform) throws Transform.NotInvertibleException {
+       throw new RuntimeException("Transforms not supported");
+    }
+    
     /**
      * Makes a new identity native transform. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5316,6 +5348,14 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    /**
+     * Sets the given native transform to the identiy transform
+     * @param transform 
+     */
+    public void setTransformIdentity(Object transform) {
+        copyTransform(makeTransformIdentity(), transform);
+    }
+    
     /**
      * Copies the setting of one transform into another.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5354,9 +5394,93 @@ public abstract class CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         throw new RuntimeException("Transforms not supported");
     }
+    
+    /**
+     * Transforms a set of points using the provided transform.
+     * @param nativeTransform The transform to use for transforming the points
+     * @param pointSize The size of the points (either 2 or 3)
+     * @param in Input array of points.
+     * @param srcPos The start position of the input array
+     * @param out The output array of points
+     * @param destPos The start position of the output array.
+     * @param numPoints The number of points to transform.
+     */
+    public void transformPoints(Object nativeTransform, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        float[] bufIn = new float[pointSize];
+        float[] bufOut = new float[pointSize];
+        int len = numPoints * pointSize;
+        for (int i=0; i<len; i+= pointSize) {
+            System.arraycopy(in, srcPos + i, bufIn, 0, pointSize);
+            transformPoint(nativeTransform, bufIn, bufOut);
+            System.arraycopy(bufOut, 0, out, destPos + i, pointSize);
+        }
+    }
+    
+    /**
+     * Translates a set of points.
+     * @param pointSize The size of each point (2 or 3)
+     * @param tX Size of translation along x-axis
+     * @param tY Size of translation along y-axis
+     * @param tZ Size of translation along z-axis (only used if pointSize == 3)
+     * @param in Input array of points.
+     * @param srcPos Start position in input array
+     * @param out Output array of points
+     * @param destPos Start position in output array
+     * @param numPoints Number of points to translate.
+     */
+    public void translatePoints(int pointSize, float tX, float tY, float tZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        int len = numPoints * pointSize;
+        for (int i=0; i<len; i+=pointSize) {
+            int d0 = destPos + i;
+            int s0 = srcPos + i;
+            out[d0++] = in[s0++] + tX;
+            out[d0++] = in[s0++] + tY;
+            if (pointSize > 2) {
+                out[d0] = in[s0] + tZ;
+            }
+        }
+    }
+    
+    /**
+     * Scales a set of points.
+     * @param pointSize The size of each point (2 or 3)
+     * @param sX Scale factor along x-axis
+     * @param sY Scale factor along y-axis
+     * @param sZ Scale factor along z-axis (only used if pointSize == 3)
+     * @param in Input array of points.
+     * @param srcPos Start position in input array
+     * @param out Output array of points
+     * @param destPos Start position in output array
+     * @param numPoints Number of points to translate.
+     */
+    public void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        int len = numPoints * pointSize;
+        for (int i=0; i<len; i+=pointSize) {
+            int d0 = destPos + i;
+            int s0 = srcPos + i;
+            out[d0++] = in[s0++] * sX;
+            out[d0++] = in[s0++] * sY;
+            if (pointSize > 2) {
+                out[d0] = in[s0] * sZ;
+            }
+        }
+    }
+    
 
+    /**
+     * Clears the addressbook cache.  This is only necessary on iOS since its AddressBookRef is transactional.
+     */
     public void refreshContacts() {
         
+    }
+
+    /**
+     * Sets the given transform to the current transform in the given graphics object.
+     * @param nativeGraphics
+     * @param t 
+     */
+    public void getTransform(Object nativeGraphics, Transform t) {
+        t.setIdentity();
     }
 
 

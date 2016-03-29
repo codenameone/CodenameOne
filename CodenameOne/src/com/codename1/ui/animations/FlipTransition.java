@@ -74,6 +74,10 @@ public class FlipTransition extends Transition {
 
     private int duration = 200;
     
+    private Transform tmpTransform;
+    private Transform perspectiveT;
+    private Transform currTransform;
+    
     /**
      * Creates  a Flip Transition
      */ 
@@ -179,7 +183,7 @@ public class FlipTransition extends Transition {
         
     }
     
-    private Transform makePerspectiveTransform(){
+    private void makePerspectiveTransform(Transform t){
         int x = getSource().getAbsoluteX();
         int y = getSource().getAbsoluteY();
         int w = getSource().getWidth();
@@ -189,7 +193,8 @@ public class FlipTransition extends Transition {
         //double midX = (float)x+(float)w/2.0;
         //double midY = (float)y+(float)h/2.0;
         double fovy = 0.25;
-        return Transform.makePerspective((float)fovy, (float)displayW/(float)displayH, zNear, zFar);
+        
+        t.setPerspective((float)fovy, (float)displayW/(float)displayH, zNear, zFar);
     }
     
     
@@ -227,29 +232,35 @@ public class FlipTransition extends Transition {
             double midX = (float)x+(float)w/2.0;
             //double midY = (float)y+(float)h/2.0;
             
-            
-            Transform perspectiveT = makePerspectiveTransform();
+            if (perspectiveT == null) {
+                perspectiveT = Transform.makeIdentity();
+            }
+            makePerspectiveTransform(perspectiveT);
             float[] bottomRight = perspectiveT.transformPoint(new float[]{displayW, displayH, zNear});
             
-            Transform t = Transform.makeTranslation(0,0, 0);
+            if (currTransform == null) {
+                currTransform = Transform.makeTranslation(0,0, 0);
+            } else {
+                currTransform.setIdentity();
+            }
             
             
             float xfactor = -displayW/bottomRight[0];
             float yfactor = -displayH/bottomRight[1];
             
             
-            t.scale(xfactor,yfactor,0f);
-            t.translate((x+w/2)/xfactor, (y+h/2)/yfactor, 0);
+            currTransform.scale(xfactor,yfactor,0f);
+            currTransform.translate((x+w/2)/xfactor, (y+h/2)/yfactor, 0);
             
-            t.concatenate(perspectiveT);
+            currTransform.concatenate(perspectiveT);
             
             float cameraZ = -zNear-w/2*zState;
             float cameraX = -x-w/2;
             float cameraY = -y-h/2;
-            t.translate(cameraX, cameraY, cameraZ);
+            currTransform.translate(cameraX, cameraY, cameraZ);
             
             if ( transitionState == STATE_FLIP){
-                t.translate((float)midX, y, 0);
+                currTransform.translate((float)midX, y, 0);
             }
             
             Image img = null;
@@ -263,7 +274,7 @@ public class FlipTransition extends Transition {
                     double sin = flipState * 2.0;
                     double angle = MathUtil.asin(sin);
 
-                    t.rotate((float)angle, 0, 1, 0);// rotate about y axis
+                    currTransform.rotate((float)angle, 0, 1, 0);// rotate about y axis
                 }
             } else {
                 img = destBuffer;
@@ -275,24 +286,26 @@ public class FlipTransition extends Transition {
                     // 1.0 -> 0 degrees
                     double sin = (1.0-flipState)*2.0;
                     double angle = Math.PI-MathUtil.asin(sin);
-                    t.rotate((float)angle, 0, 1, 0);// rotate about y axis
+                    currTransform.rotate((float)angle, 0, 1, 0);// rotate about y axis
                 }
             }
             if ( transitionState == STATE_FLIP ){
-                t.translate(-(float)midX, -y, 0);
+                currTransform.translate(-(float)midX, -y, 0);
                 if ( flipState >= 0.5f ){
                     // The rotation will leave the destination image flipped
                     // backwards, so we need to transform it to be the 
                     // mirror image
-                    t.scale(-1, 1, 1);
-                    t.translate(-2*x-w, 0, 0);
+                    currTransform.scale(-1, 1, 1);
+                    currTransform.translate(-2*x-w, 0, 0);
                 }
             }
-            
-            Transform oldTransform = g.getTransform();
-            g.setTransform(t);
+            if (tmpTransform == null) {
+                tmpTransform = Transform.makeIdentity();
+            }
+            g.getTransform(tmpTransform);
+            g.setTransform(currTransform);
             g.drawImage(img, x, y, w, h);
-            g.setTransform(oldTransform);
+            g.setTransform(tmpTransform);
         } else {
             perspectiveSupported = false;
             if (flipState < 0.5) {

@@ -159,6 +159,12 @@ public final class Matrix {
         return Factory.getDefault().makeTranslation(x, y, z);
     }
 
+    public void setTranslation(float x, float y, float z) {
+        reset();
+        MatrixUtil.translateM(data, 0, x, y, z);
+        type = TYPE_TRANSLATION;
+    }
+    
     public static Matrix makeRotation(float angle, float x, float y, float z) {
         return Factory.getDefault().makeRotation(angle, x, y, z);
     }
@@ -211,17 +217,20 @@ public final class Matrix {
 
     public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
         MatrixUtil.perspectiveM(data, 0, (float) (fovy * 180f / Math.PI), aspect, zNear, zFar);
+        type = TYPE_UNKNOWN;
     }
 
     public void setOrtho(float left, float right, float bottom, float top,
             float near, float far) {
         MatrixUtil.orthoM(data, 0, left, right, bottom, top, near, far);
+        type = TYPE_UNKNOWN;
     }
 
     public void setCamera(float eyeX, float eyeY, float eyeZ,
             float centerX, float centerY, float centerZ, float upX, float upY,
             float upZ) {
         MatrixUtil.setLookAtM(data, 0, eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+        type = TYPE_UNKNOWN;
     }
 
     public void setIdentity() {
@@ -321,6 +330,11 @@ public final class Matrix {
         }
     }
 
+    public void transformPoints(int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        MatrixUtil.transformPoints(data, pointSize, in, srcPos, out, destPos, numPoints);
+    }
+    
+    
     public void concatenate(Matrix m){
         //MatrixUtil.setRotateM(factory.sTemp, 0, (float) (a * 180f / Math.PI), x, y, z);
         MatrixUtil.multiplyMM(factory.sTemp, 16, data, 0, m.data, 0);
@@ -335,6 +349,7 @@ public final class Matrix {
             data[i] = 0;
         }
         data[0] = data[5] = data[10] = data[15] = 1;
+        type = TYPE_IDENTITY;
 
     }
 
@@ -506,6 +521,8 @@ public final class Matrix {
         System.arraycopy(this.data, 0, data, 0, 16);
         return Matrix.make(data);
     }
+    
+    
 
     /*
      * Copyright (C) 2007 The Android Open Source Project
@@ -550,6 +567,8 @@ public final class Matrix {
             }
             return val;
         }
+        
+        public static native void transformPoints(float[] data, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints);
         
         /**
          * Temporary memory for operations that need temporary matrix data.

@@ -23,9 +23,9 @@
 package com.codename1.ui.geom;
 
 
-import com.codename1.io.Log;
 import com.codename1.ui.Transform;
 import com.codename1.util.MathUtil;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -66,6 +66,130 @@ import java.util.Arrays;
  */
 public final class GeneralPath implements Shape {
 
+    private static int MAX_POOL_SIZE=20;
+    
+    private static ArrayList<GeneralPath> pathPool;
+    private static ArrayList<Rectangle> rectPool;
+    private static ArrayList<float[]> floatPool;
+    private static ArrayList<boolean[]> boolPool;
+    private static ArrayList<Iterator> iteratorPool;
+    
+    
+    private static ArrayList<GeneralPath> pathPool() {
+        if (pathPool == null) {
+            pathPool = new ArrayList<GeneralPath>();
+        }
+        return pathPool;
+    }
+    
+    private static ArrayList<Rectangle> rectPool() {
+        if (rectPool == null) {
+            rectPool = new ArrayList<Rectangle>();
+        }
+        return rectPool;
+    }
+    
+    private static ArrayList<float[]> floatPool() {
+        if (floatPool == null) {
+            floatPool = new ArrayList<float[]>();
+        }
+        return floatPool;
+    }
+    
+    private static ArrayList<boolean[]> boolPool() {
+        if (boolPool == null) {
+            boolPool = new ArrayList<boolean[]>();
+        }
+        return boolPool;
+    }
+    
+    private static ArrayList<Iterator> iteratorPool() {
+        if (iteratorPool == null) {
+            iteratorPool = new ArrayList<Iterator>();
+        }
+        return iteratorPool;
+    }
+    
+    private static synchronized GeneralPath createPathFromPool() {
+        if (!pathPool().isEmpty()) {
+            return pathPool.remove(pathPool.size()-1);
+        }
+        return new GeneralPath();
+    }
+    
+    private static synchronized Rectangle createRectFromPool() {
+        if (!rectPool().isEmpty()) {
+            return rectPool.remove(rectPool.size()-1);
+        }
+        return new Rectangle();
+    }
+    
+    private static synchronized float[] createFloatArrayFromPool(int size) {
+        int len = floatPool().size();
+        for (int i=0; i<len; i++) {
+            float[] arr = floatPool.get(i);
+            if (arr.length == size) {
+                return floatPool.remove(i);
+            }
+        }
+        return new float[size];
+    }
+    
+    
+    private static synchronized boolean[] createBoolArrayFromPool(int size) {
+        int len = boolPool().size();
+        for (int i=0; i<len; i++) {
+            boolean[] arr = boolPool.get(i);
+            if (arr.length == size) {
+                return boolPool.remove(i);
+            }
+        }
+        return new boolean[size];
+    }
+    
+    private static synchronized Iterator createIteratorFromPool(GeneralPath p, Transform t) {
+        if (!iteratorPool().isEmpty()) {
+            Iterator it = iteratorPool.remove(iteratorPool.size()-1);
+            it.p = p;
+            it.transform = t;
+            it.reset();
+            return it;
+        }
+        return (Iterator)p.getPathIterator(t);
+        
+    }
+    
+    private static synchronized void recycle(GeneralPath p) {
+        if (pathPool().size() >= MAX_POOL_SIZE || p == null) return;
+        pathPool.add(p);
+    }
+    
+    private static synchronized void recycle(Rectangle r) {
+        if (rectPool.size() >= MAX_POOL_SIZE || r == null) return;
+        rectPool.add(r);
+    }
+    
+    private static synchronized void recycle(float[] a) {
+        if (floatPool().size() >= MAX_POOL_SIZE || a == null) return;
+        floatPool.add(a);
+    }
+    
+    
+    private static synchronized void recycle(boolean[] b) {
+        if (boolPool().size() >= MAX_POOL_SIZE || b == null) {
+            return;
+        }
+        boolPool.add(b);
+    }
+    
+    private static synchronized void recycle(Iterator it) {
+        if (iteratorPool().size() >= MAX_POOL_SIZE || it == null) {
+            return;
+        }
+        iteratorPool.add(it);
+    }
+    
+    
     private boolean dirty = false;
 
     // END Alpha Mask Caching Functionality
@@ -113,6 +237,8 @@ public final class GeneralPath implements Shape {
      * The path rule
      */
     private int rule;
+    
+    
 
     /**
      * The space amount in points buffer for different segmenet's types
@@ -155,6 +281,11 @@ public final class GeneralPath implements Shape {
             this.p = path;
 
         }
+        
+        private void reset() {
+            typeIndex = 0;
+            pointIndex = 0;
+        }
 
         public int getWindingRule() {
             return p.getWindingRule();
@@ -168,6 +299,26 @@ public final class GeneralPath implements Shape {
             typeIndex++;
         }
 
+        private void transformSegmentInPlace() {
+            if (isDone()) {
+                // awt.4B=Iterator out of bounds
+                throw new IndexOutOfBoundsException("Path done"); //$NON-NLS-1$
+            }
+            if (transform == null) {
+                return;
+            }
+            int type = p.types[typeIndex];
+            int count = GeneralPath.pointShift[type];
+            for (int i=0; i < count; i+=2) {
+                buf[0] = p.points[pointIndex + i];
+                buf[1] = p.points[pointIndex + i + 1];
+                transform.transformPoint(buf, buf);
+                p.points[pointIndex+i] = buf[0];
+                p.points[pointIndex+i+1] = buf[1];
+            }
+        }
+        
+        
         public int currentSegment(double[] coords) {
             if (isDone()) {
                 // awt.4B=Iterator out of bounds
@@ -175,10 +326,17 @@ public final class GeneralPath implements Shape {
             }
             int type = p.types[typeIndex];
             int count = GeneralPath.pointShift[type];
-            for (int i = 0; i < count; i++) {
-                coords[i] = p.points[pointIndex + i];
-            }
+            System.arraycopy(p.points, pointIndex, coords, 0, count);
+            if (transform != null) {
 
+                for (int i = 0; i < count; i += 2) {
+                    buf[0] = (float)coords[i];
+                    buf[1] = (float)coords[i + 1];
+                    transform.transformPoint(buf, buf);
+                    coords[i] = buf[0];
+                    coords[i + 1] = buf[1];
+                }
+            }
             pointIndex += count;
             return type;
         }
@@ -246,6 +404,49 @@ public final class GeneralPath implements Shape {
     }
     
     /**
+     * Checks to see if this path forms a polygon.
+     * @return True if the path is a polygon.
+     */
+    public boolean isPolygon() {
+        
+        if (isRectangle()) {
+            return true;
+        }
+        Iterator it = createIteratorFromPool(this, null);
+        float[] curr = createFloatArrayFromPool(6);
+        float[] firstPoint = createFloatArrayFromPool(2);
+        try {
+            boolean firstMove = false;
+            int cmd = -1;
+            while (!it.isDone()) {
+                switch (cmd = it.currentSegment(curr)) {
+                    case PathIterator.SEG_MOVETO: {
+                        if (firstMove) {
+                            return false;
+                        }
+                        firstMove = true;
+                        firstPoint[0] = curr[0];
+                        firstPoint[1] = curr[1];
+                        break;
+                    }
+                    case PathIterator.SEG_CUBICTO:
+                    case PathIterator.SEG_QUADTO:
+                    return false;
+                }
+                it.next();
+            }
+            
+            return cmd == PathIterator.SEG_CLOSE || (curr[0] == firstPoint[0] && curr[1] == firstPoint[1]);
+            
+        } finally {
+            recycle(it);
+            recycle(curr);
+            recycle(firstPoint);
+        }
+        
+    }
+    
+    /**
      * Returns the number of path commands in this path.
      * @return The number of path commands in this path.
      */
@@ -285,36 +486,45 @@ public final class GeneralPath implements Shape {
      */
     public GeneralPath(Shape shape) {
         this(WIND_NON_ZERO, BUFFER_SIZE);
-        PathIterator p = shape.getPathIterator();
-        setWindingRule(p.getWindingRule());
-        append(p, false);
+        if (shape.getClass() == GeneralPath.class) {
+            setPath((GeneralPath)shape, null);
+        } else {
+            PathIterator p = shape.getPathIterator();
+            setWindingRule(p.getWindingRule());
+            append(p, false);
+        }
     }
     
     public String toString(){
         StringBuilder sb = new StringBuilder();
         sb.append("[General Path: ");
-        PathIterator it = getPathIterator();
-        float[] buf = new float[6];
-        while (!it.isDone() ){
-            int type = it.currentSegment(buf);
-            switch ( type ){
-                case PathIterator.SEG_MOVETO:
-                    sb.append("Move ("+buf[0]+","+buf[1]+"), ");
-                    break;
-                case PathIterator.SEG_LINETO:
-                    sb.append("Line ("+buf[0]+","+buf[1]+"), ");
-                    break;
-                case PathIterator.SEG_CUBICTO:
-                    sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+".."+buf[4]+","+buf[5]+")");
-                    break;
-                case PathIterator.SEG_QUADTO:
-                    sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+")");
-                    break;
-                case PathIterator.SEG_CLOSE:
-                    sb.append(" CLOSE]");
-                    break;
+        Iterator it = createIteratorFromPool(this, null);
+        float[] buf = createFloatArrayFromPool(6);//new float[6];
+        try {
+            while (!it.isDone() ){
+                int type = it.currentSegment(buf);
+                switch ( type ){
+                    case PathIterator.SEG_MOVETO:
+                        sb.append("Move ("+buf[0]+","+buf[1]+"), ");
+                        break;
+                    case PathIterator.SEG_LINETO:
+                        sb.append("Line ("+buf[0]+","+buf[1]+"), ");
+                        break;
+                    case PathIterator.SEG_CUBICTO:
+                        sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+".."+buf[4]+","+buf[5]+")");
+                        break;
+                    case PathIterator.SEG_QUADTO:
+                        sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+")");
+                        break;
+                    case PathIterator.SEG_CLOSE:
+                        sb.append(" CLOSE]");
+                        break;
+                }
+                it.next();
             }
-            it.next();
+        } finally {
+            recycle(buf);
+            recycle(it);
         }
         return sb.toString();
     }
@@ -367,6 +577,7 @@ public final class GeneralPath implements Shape {
             points = tmp;
         }
     }
+    
 
     public void moveTo(double x, double y){
         moveTo((float)x, (float)y);
@@ -483,7 +694,7 @@ public final class GeneralPath implements Shape {
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle, boolean joinPath) {
         float cx = x+w/2;
         float cy = y+h/2;
-        createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 4, false, this, joinPath);
+        createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 8, false, this, joinPath);
     }
     
     /**
@@ -511,7 +722,7 @@ public final class GeneralPath implements Shape {
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle, boolean joinPath) {
         double cx = x+w/2;
         double cy = y+h/2;
-        createBezierArcRadians((float)cx, (float)cy, (float)w/2, (float)h/2, -startAngle, -sweepAngle, 4, false, this, joinPath);
+        createBezierArcRadians((float)cx, (float)cy, (float)w/2, (float)h/2, -startAngle, -sweepAngle, 8, false, this, joinPath);
     }
     
     
@@ -754,8 +965,18 @@ public final class GeneralPath implements Shape {
      * @param connect whether to connect the new shape to the existing path.
      */
     public void append(Shape shape, boolean connect) {
-        PathIterator p = shape.getPathIterator();
-        append(p, connect);
+        if (shape.getClass() == GeneralPath.class) {
+            Iterator it = createIteratorFromPool((GeneralPath)shape, null);
+            try {
+                append(it, connect);
+            } finally {
+                recycle(it);
+            }
+        } else {
+            PathIterator p = shape.getPathIterator();
+            append(p, connect);
+        }
+        
         dirty = true;
     }
 
@@ -774,7 +995,13 @@ public final class GeneralPath implements Shape {
      * {@link PathIterator#SEG_MOVETO} unchanged.
      */
     public void append(PathIterator path, boolean connect) {
-        float coords[] = new float[6];
+        float coords[] = createFloatArrayFromPool(6);//new float[6];
+        append(path, connect, coords);
+        recycle(coords);
+    }
+    
+    private void append(PathIterator path, boolean connect, float[] tmpCoordsBuf) {
+        float coords[] = tmpCoordsBuf;
         while (!path.isDone()) {
             
             switch (path.currentSegment(coords)) {
@@ -818,6 +1045,20 @@ public final class GeneralPath implements Shape {
         if (typeSize == 0) {
             return null;
         }
+        float[] out = new float[2];
+        getCurrentPoint(out);
+        return out;
+    }
+    
+    /**
+     * Sets the coordinates of the given point to the current point in the path.
+     *
+     * @param point Out parameter.  Will be filled with the coords of the current point.
+     */
+    public void getCurrentPoint(float[] point) {
+        if (typeSize == 0) {
+            throw new RuntimeException("Cannot get point because the size of this command is 0");
+        }
         int j = pointSize - 2;
         if (types[typeSize - 1] == PathIterator.SEG_CLOSE) {
 
@@ -829,7 +1070,9 @@ public final class GeneralPath implements Shape {
                 j -= pointShift[type];
             }
         }
-        return new float[]{points[j], points[j + 1]};
+        point[0] = points[j];
+        point[1] = points[j+1];
+        //return new float[]{points[j], points[j + 1]};
     }
 
     /**
@@ -847,6 +1090,16 @@ public final class GeneralPath implements Shape {
      * @return 4-element array of the form {@code [x, y, width, height]}.
      */
     public float[] getBounds2D() {
+        float[] out = new float[4];
+        getBounds2D(out);
+        return out;
+    }
+    
+    /**
+     * Sets the 4-element array to the bounding box coordinates of the path.  x, y, width, height.
+     * @param out 4-element float[] array.
+     */
+    public void getBounds2D(float[] out) {
         float rx1, ry1, rx2, ry2;
         if (pointSize == 0) {
             rx1 = ry1 = rx2 = ry2 = 0.0f;
@@ -869,7 +1122,10 @@ public final class GeneralPath implements Shape {
                 }
             }
         }
-        return new float[]{rx1, ry1, rx2 - rx1, ry2 - ry1};
+        out[0] = rx1;
+        out[1] = ry1;
+        out[2] = rx2-rx1;
+        out[3] = ry2-ry1;
     }
 
     /**
@@ -891,65 +1147,124 @@ public final class GeneralPath implements Shape {
 
     }
     
-    public boolean isRectangle(){
-        Rectangle bounds = getBounds();
-        PathIterator it = getPathIterator();
-        float[] buf = new float[6];
-        boolean[] corners = new boolean[4];
-        int prevX = 0; 
-        int prevY = 0;
-        while ( !it.isDone() ){
-            int type = it.currentSegment(buf);
-            
-            // Rectangulars only support moves, lines, and closes
-            if ( type != PathIterator.SEG_CLOSE && type != PathIterator.SEG_LINETO && type != PathIterator.SEG_MOVETO ){
-                return false;
-            }
-            
-            
-            // Get the current point
-            int x = (int)buf[0];
-            int y = (int)buf[1];
-            
-            // Make sure there are no diagonal lines
-            if ( type == PathIterator.SEG_LINETO && !(x == prevX || y == prevY )){
-                return false;
-            }
-            
-            // Make sure point is on the perimeter.
-            if ( x != bounds.getX() && y != bounds.getY() && x != bounds.getX()+bounds.getWidth() && y != bounds.getY()+bounds.getHeight() ){
-                return false;
-            }
-            
-            // Make sure that all corners are accounted for.
-            for ( int i=0; i<4; i++){
-                if ( corners[i] ){
-                    continue;
+    /**
+     * Sets the coordinates of the provided rectangle to the bounding box of this path.
+     * @param out 
+     */
+    public void getBounds(Rectangle out) {
+        float rx1, ry1, rx2, ry2;
+        if (pointSize == 0) {
+            rx1 = ry1 = rx2 = ry2 = 0.0f;
+        } else {
+            int i = pointSize - 1;
+            ry1 = ry2 = points[i--];
+            rx1 = rx2 = points[i--];
+            while (i > 0) {
+                float y = points[i--];
+                float x = points[i--];
+                if (x < rx1) {
+                    rx1 = x;
+                } else if (x > rx2) {
+                    rx2 = x;
                 }
-                switch (i){
-                    case 0:
-                        corners[i] = (x == bounds.getX() && y == bounds.getY());
-                        break;
-                    case 1:
-                        corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY());
-                        break;
-                    case 2:
-                        corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY() + bounds.getHeight());
-                        break;
-                    case 3:
-                        corners[i] = (x== bounds.getX() && y == bounds.getY()+bounds.getHeight());
-                        break;
+                if (y < ry1) {
+                    ry1 = y;
+                } else if (y > ry2) {
+                    ry2 = y;
                 }
             }
-            
-            prevX = x;
-            prevY = y;
-            it.next();
         }
+        int x1 = (int)Math.floor(rx1);
+        int y1 = (int)Math.floor(ry1);
+        int x2 = (int)Math.ceil(rx2);
+        int y2 = (int)Math.ceil(ry2);
+        out.setX(x1);
+        out.setY(y1);
+        out.setWidth(x2-x1);
+        out.setHeight(y2-y1);
         
-        return corners[0] && corners[1] && corners[2] && corners[3];
     }
+    
+    /**
+     * Checks to see if this path is a rectangle.
+     * @return True if this path forms a rectangle.  False otherwise.
+     */
+    public boolean isRectangle() {
+        float[] tmpPointsBuf = createFloatArrayFromPool(6);
+        boolean[] tmpCornersBuf = createBoolArrayFromPool(4);
+        Iterator it = createIteratorFromPool(this, null);
+        Rectangle bounds = createRectFromPool();
+        try {
+            getBounds(bounds);
+            if (tmpPointsBuf.length != 6) {
+                throw new RuntimeException("points buffer must be length 6");
+            }
+            float[] buf = tmpPointsBuf;
+            if (tmpCornersBuf.length != 4) {
+                throw new RuntimeException("corners buffer must be length 4");
+            }
+            boolean[] corners = tmpCornersBuf;
+            int prevX = 0; 
+            int prevY = 0;
+            while ( !it.isDone() ){
+                int type = it.currentSegment(buf);
 
+                // Rectangulars only support moves, lines, and closes
+                if ( type != PathIterator.SEG_CLOSE && type != PathIterator.SEG_LINETO && type != PathIterator.SEG_MOVETO ){
+                    return false;
+                }
+
+
+                // Get the current point
+                int x = (int)buf[0];
+                int y = (int)buf[1];
+
+                // Make sure there are no diagonal lines
+                if ( type == PathIterator.SEG_LINETO && !(x == prevX || y == prevY )){
+                    return false;
+                }
+
+                // Make sure point is on the perimeter.
+                if ( x != bounds.getX() && y != bounds.getY() && x != bounds.getX()+bounds.getWidth() && y != bounds.getY()+bounds.getHeight() ){
+                    return false;
+                }
+
+                // Make sure that all corners are accounted for.
+                for ( int i=0; i<4; i++){
+                    if ( corners[i] ){
+                        continue;
+                    }
+                    switch (i){
+                        case 0:
+                            corners[i] = (x == bounds.getX() && y == bounds.getY());
+                            break;
+                        case 1:
+                            corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY());
+                            break;
+                        case 2:
+                            corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY() + bounds.getHeight());
+                            break;
+                        case 3:
+                            corners[i] = (x== bounds.getX() && y == bounds.getY()+bounds.getHeight());
+                            break;
+                    }
+                }
+
+                prevX = x;
+                prevY = y;
+                it.next();
+            }
+
+            return corners[0] && corners[1] && corners[2] && corners[3];
+        } finally {
+            recycle(tmpPointsBuf);
+            recycle(tmpCornersBuf);
+            recycle(it);
+            recycle(bounds);
+        }
+    }
+    
+    
     /**
      * {{@inheritDoc}}
      */
@@ -976,10 +1291,148 @@ public final class GeneralPath implements Shape {
     public Shape createTransformedShape(Transform m){
         
         GeneralPath out = new GeneralPath();
-        out.append(getPathIterator(m), false);
+        out.setPath(this, m);
         return out;
     }
+    
+    /**
+     * Sets this path to be identical to the provided path {@code p} with the given
+     * Transform {@code t} applied to it.
+     * @param p The path to copy.
+     * @param t The transform to apply to all points in the path.
+     */
+    public void setPath(GeneralPath p, Transform t) {
+        dirty = true;
+        typeSize = p.typeSize;
+        pointSize = p.pointSize;
+        rule = p.rule;
+        if (points == null || points.length < pointSize) {
+            points = new float[pointSize];
+        }
+        if (types == null || types.length < typeSize) {
+            types = new byte[typeSize];
+        }
+        System.arraycopy(p.types, 0, types, 0, typeSize);
+        if (t == null || t.isIdentity()) {
+            System.arraycopy(p.points, 0, points, 0, pointSize);
+            
+        } else {
+            t.transformPoints(2, p.points, 0, points, 0, pointSize / 2);
+            
+        }
+        
+    }
+    
+    /**
+     * Sets this path to be a rectangle with the provided bounds, but with 
+     * the given transform applied to it.
+     * @param r Rectangle to copy.
+     * @param t The transform to apply to the points in in {@code r}.
+     */
+    public void setRect(Rectangle r, Transform t) {
+        reset();
+        int x = r.getX();
+        int y = r.getY();
+        Dimension size = r.getSize();
+        int w = size.getWidth();
+        int h = size.getHeight();
 
+        if (t == null) {
+            moveTo(x, y);
+            lineTo(x + w, y);
+            lineTo(x + w, y + h);
+            lineTo(x, y+ h);
+            closePath();
+        } else {
+            float[] pointBuffer = createFloatArrayFromPool(6);
+            try {
+                pointBuffer[0] = x;
+                pointBuffer[1] = y;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                moveTo(pointBuffer[0], pointBuffer[1]);
+                pointBuffer[0] = x+w;
+                pointBuffer[1] = y;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                lineTo(pointBuffer[0], pointBuffer[1]);
+                pointBuffer[0] = x+w;
+                pointBuffer[1] = y+h;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                lineTo(pointBuffer[0], pointBuffer[1]);
+                pointBuffer[0] = x;
+                pointBuffer[1] = y+h;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                lineTo(pointBuffer[0], pointBuffer[1]);
+                closePath();
+            } finally {
+                recycle(pointBuffer);
+            }
+        }
+    }
+    
+    /**
+     * Sets this path to be a copy of the provided shape, but with the provided
+     * transform applied to it.
+     * @param s The shape to copy.
+     * @param t The transform to apply to all points in the shape.
+     */
+    public void setShape(Shape s, Transform t) {
+        if (s.getClass() == GeneralPath.class) {
+            setPath((GeneralPath)s, t);
+        } else if (s.getClass() == Rectangle.class) {
+            setRect((Rectangle)s, t);
+        } else {
+            reset();
+            append(s.getPathIterator(t), false);
+        }
+    }
+    
+    /**
+     * Sets the current path to the intersection of itself and the provided rectangle.
+     * @param rect The rectangle to intersect with this path.
+     * @return True if {@code rect} intersects the current path.  False otherwise.  If there is no intersection, the
+     * path will be reset to be empty.
+     */
+    public boolean intersect(Rectangle rect) {
+        GeneralPath intersectionScratchPath = createPathFromPool();
+        try {
+            
+            Shape result = ShapeUtil.intersection(rect, this, intersectionScratchPath);
+            if (result != null) {
+                this.setPath(intersectionScratchPath, null);
+                return true;
+            }
+            reset();
+            return false;
+
+        } finally {
+            recycle(intersectionScratchPath);
+        }
+    }
+    
+    public boolean intersect(int x, int y, int w, int h) {
+        Rectangle r = createRectFromPool();
+        try {
+            r.setBounds(x, y, w, h);
+            return intersect(r);
+        } finally {
+            recycle(r);
+        }
+    }
+    
+    /**
+     * Transforms the current path in place using the given transform.
+     * @param m The transform to apply to the path.
+     */
+    public void transform(Transform m) {
+        if (m != null && !m.isIdentity()) {
+            m.transformPoints(2, points, 0, points, 0, pointSize / 2 );
+        }
+    }
+    
     /**
      * Resets this path to be the intersection of itself with the given shape.  Note that only 
      * {@link com.codename1.ui.geom.Rectangle}s are current supported.  If you pass any other
@@ -992,20 +1445,20 @@ public final class GeneralPath implements Shape {
         if ( !(shape instanceof Rectangle) ){
             throw new RuntimeException("GeneralPath.intersect() only supports Rectangles");
         }
-        Rectangle r = (Rectangle)shape;
-        GeneralPath tmp = (GeneralPath)ShapeUtil.intersection(r, this);
-        this.reset();
-        this.append(tmp, false);
-        //Log.p("End intersect");
+        intersect((Rectangle)shape);
     }
     
     /**
      * {{@inheritDoc}}
      */
     public Shape intersection(Rectangle rect){
-        return ShapeUtil.intersection(rect, this);
+        Shape out = ShapeUtil.intersection(rect, this);
+        if (out == null) {
+            return new Rectangle(rect.getX(), rect.getY(), 0, 0);
+        }
+        return out;
     }
-
+    
     /**
      * Checks cross count according to path rule to define is it point inside shape or not. 
      * @param cross - the point cross count
@@ -1020,6 +1473,9 @@ public final class GeneralPath implements Shape {
 
     /**
      * Checks if the given point is contained in the current shape.
+     * @param x The x coordinate to check
+     * @param y The y coordinate to check
+     * @return True if the point is inside the shape.
      */
     public boolean contains(float x, float y) {
        return isInside(ShapeUtil.crossShape(this, x, y));
@@ -1039,8 +1495,8 @@ public final class GeneralPath implements Shape {
     private static class ShapeUtil {
     
     
+        
 
-   
     /**
      * Generates the intersection of a given shape and a given rectangle.  Only supported convex polygons.
      *
@@ -1050,93 +1506,100 @@ public final class GeneralPath implements Shape {
      * rectangle.
      */
     static Shape intersection(Rectangle r, Shape s) {
+        return intersection(r, s, new GeneralPath());
+    }
+        
+    
+    private static Shape intersection(Rectangle r, Shape s, GeneralPath out) {
+        
         Shape segmentedShape = segmentShape(r, s);
-        PathIterator it = segmentedShape.getPathIterator(null);
-        GeneralPath out = new GeneralPath();
-        float[] buf = new float[6];
-        boolean started = false;
-        int count = 0;
+        Iterator it = createIteratorFromPool((GeneralPath)segmentedShape, null);
+        //GeneralPath out = new GeneralPath();
+        float[] buf = createFloatArrayFromPool(6);//new float[6];
+        try {
+            boolean started = false;
+            float x1 = r.getX();
+            float x2 = r.getX() + r.getWidth();
+            float y1 = r.getY();
+            float y2 = r.getY() + r.getHeight();
 
-        float x1 = r.getX();
-        float x2 = r.getX() + r.getWidth();
-        float y1 = r.getY();
-        float y2 = r.getY() + r.getHeight();
+            float minX = -1;
+            float minY = -1;
+            float maxX = -1;
+            float maxY = -1;
 
-        //System.out.println("x1` is "+x1);
-        
-        float minX = -1;
-        float minY = -1;
-        float maxX = -1;
-        float maxY = -1;
+            float prevX=0; 
+            float prevY=0;
 
-        float prevX=0; 
-        float prevY=0;
-        
-        while (!it.isDone()) {
-            int type = it.currentSegment(buf);
+            while (!it.isDone()) {
+                int type = it.currentSegment(buf);
 
-            switch (type) {
+                switch (type) {
 
-                case PathIterator.SEG_CLOSE:
-                    //System.out.println("Closing path");
-                    out.closePath();
-                    break;
+                    case PathIterator.SEG_CLOSE:
+                        //System.out.println("Closing path");
+                        out.closePath();
+                        break;
 
-                case PathIterator.SEG_MOVETO:
-                case PathIterator.SEG_LINETO:
-                    if (buf[0] < x1) {
-                        buf[0] = x1;
-                    } else if (buf[0] > x2) {
-                        buf[0] = x2;
-                    }
-                    if (buf[1] < y1) {
-                        buf[1] = y1;
-                    } else if (buf[1] > y2) {
-                        buf[1] = y2;
-                    }
-
-                    if (!started || (buf[0] < minX)) {
-                        minX = buf[0];
-                    }
-                    if (!started || (buf[0] > maxX)) {
-                        maxX = buf[0];
-                    }
-
-                    if (!started || (buf[1] < minY)) {
-                        minY = buf[1];
-                    }
-                    if (!started || (buf[1] > maxY)) {
-                        maxY = buf[1];
-                    }
-
-                    if (type == PathIterator.SEG_MOVETO) {
-                        
-                        //System.out.println("Moving to "+buf[0]+","+buf[1]);
-                        out.moveTo(buf[0], buf[1]);
-                    } else { // type == PathITerator.SEG_LINETO
-                        
-                        if ( prevX != buf[0] || prevY != buf[1]){
-                            //System.out.println("Line to "+buf[0]+","+buf[1]);
-                            out.lineTo(buf[0], buf[1]);
+                    case PathIterator.SEG_MOVETO:
+                    case PathIterator.SEG_LINETO:
+                        if (buf[0] < x1) {
+                            buf[0] = x1;
+                        } else if (buf[0] > x2) {
+                            buf[0] = x2;
                         }
-                    }
-                    prevX = buf[0];
-                    prevY = buf[1];
-                    started = true;
-                    count++;
-                    break;
-                default:
-                    throw new RuntimeException("Intersection only supports polygons currently");
+                        if (buf[1] < y1) {
+                            buf[1] = y1;
+                        } else if (buf[1] > y2) {
+                            buf[1] = y2;
+                        }
+
+                        if (!started || (buf[0] < minX)) {
+                            minX = buf[0];
+                        }
+                        if (!started || (buf[0] > maxX)) {
+                            maxX = buf[0];
+                        }
+
+                        if (!started || (buf[1] < minY)) {
+                            minY = buf[1];
+                        }
+                        if (!started || (buf[1] > maxY)) {
+                            maxY = buf[1];
+                        }
+
+                        if (type == PathIterator.SEG_MOVETO) {
+
+                            //System.out.println("Moving to "+buf[0]+","+buf[1]);
+                            out.moveTo(buf[0], buf[1]);
+                        } else { // type == PathITerator.SEG_LINETO
+
+                            if ( prevX != buf[0] || prevY != buf[1]){
+                                //System.out.println("Line to "+buf[0]+","+buf[1]);
+                                out.lineTo(buf[0], buf[1]);
+                            }
+                        }
+                        prevX = buf[0];
+                        prevY = buf[1];
+                        started = true;
+                        //count++;
+                        break;
+                    default:
+                        throw new RuntimeException("Intersection only supports polygons currently");
+                }
+                it.next();
+
             }
-            it.next();
-            
-        }
 
-        if (maxX - minX <= 1f || maxY - minY <= 1f) {
-            return null;
-        }
+            if (maxX - minX <= 1f || maxY - minY <= 1f) {
+                return null;
+            }
 
-        return out;
+            return out;
+        } finally {
+            recycle(it);
+            recycle(buf);
+        }
 
     }
 
@@ -1154,222 +1617,239 @@ public final class GeneralPath implements Shape {
      * start/end points of a segment.
      */
     static Shape segmentShape(Rectangle r, Shape s) {
-        PathIterator it = s.getPathIterator(null);
-        GeneralPath out = new GeneralPath();
-        float[] buf = new float[6];     // buffer to hold segment coordinates from PathIterator.currentSegment
-        float[] curr = new float[2];    // Placeholder for current point
-        float[] prev = new float[2];    // Placeholder for previous point
-        float[] mark = new float[2];    // Placeholder for the moveTo point
-        float[] buf4 = new float[4];    // Reusable buffer to hold two points.
-
-        float prevX = -1;               // Placeholder for previous X coord.
-        float prevY = -1;               // Placeholder for previous Y coord.
-        float currX = 0;                // Placeholder for current X coord.
-        float currY = 0;                // Placeholder for current Y coord.
-        float[] intersects = null;      // Placeholder for intersection points
-        while (!it.isDone()) {
-            
-            int type = it.currentSegment(buf);
-            switch (type) {
-                
-                case PathIterator.SEG_MOVETO:
-                    // Move to segment is transferred straight through
-                    prevX = prev[0] = mark[0] = buf[0];
-                    prevY = prev[1] = mark[1] = buf[1];
-                    out.moveTo(prevX, prevY);
-                    
-                    //System.out.println("Moving to "+prevX+","+prevY);
-                    break;
-
-                case PathIterator.SEG_LINETO:
-                    // Line Segment may need to be partitioned if it crosses
-                    // an edge of the rectangle.
-                    currX = curr[0] = buf[0];
-                    currY = curr[1] = buf[1];
-
-                    // Check if line intersects rectangle
-                    intersects = intersectLineWithRectAsHash(prevX, prevY, currX, currY, r);
-                    //System.out.println("Looking for intersections between "+prevX+","+prevY+" and "+currX+","+currY);
-                    //System.out.println("Intersects: "+intersects[0]+", "+intersects[1]+"  "+intersects[2]+","+intersects[3]);
-                    if (intersects[8] >= 1) {
-                        int num = (int)intersects[8];
-                        int len = num*2;
-                        for ( int i=0; i<len; i+=2){
-                            out.lineTo(intersects[i], intersects[i+1]);
-                            
-                        }
-                       
-                    } 
-                    //System.out.println("Line to "+currX+","+currY);
-                    out.lineTo(currX, currY);
-
-                    // Set current position to prev for next iteration.
-                    prevX = currX;
-                    prevY = currY;
-                    float[] tmp = curr;
-                    curr = prev;
-                    prev = tmp;
-
-                    break;
-                case PathIterator.SEG_CLOSE:
-
-                    // Closing the path.  Need to check if there is an intersection
-                    // on this last closing path.
-                    currX = curr[0] = mark[0];
-                    currY = curr[1] = mark[1];
-                    intersects = intersectLineWithRectAsHash(prevX, prevY, currX, currY, r);
-                    if (intersects[8] >= 1) {
-                        int num = (int)intersects[8];
-                        int len = num*2;
-                        for ( int i=0; i<len; i+=2){
-                            out.lineTo(intersects[i], intersects[i+1]);
-                            
-                        }
-                       
-                    } 
-                    out.closePath();
-                    
-                    break;
-                default:
-                    throw new RuntimeException("Shape segmentation only supported for polygons");
-            }
-            it.next();
-        }
-        return out;
+        return segmentShape(r, s, new GeneralPath());
     }
-
-    
-    static float[] intersectLineWithRectAsHash(float x1, float y1, float x2, float y2, Rectangle rect){
-        float[] out = new float[9]; // max 4 points here
-        float[] x = new float[4];
-        //float[] y = new float[4];
-        float rx1 = rect.getX();
-        float ry1 = rect.getY();
-        float rx2 = rect.getX()+rect.getWidth();
-        float ry2 = rect.getY()+rect.getHeight();
-        
-        float dx = x2-x1;
-        float dy = y2-y1;
-        int num=0;
-        
-        float minY = Math.min(y1,y2);
-        float maxY = Math.max(y1,y2);
-        float minX = Math.min(x1, x2);
-        float maxX = Math.max(x1, x2);
-        int i = 0;
-        if ( dx == 0 ){
-            if ( ry1 > minY && ry1 < maxY ){
-                num++;
-                x[i++] = ry1;
-                //out[i++] = ry1;
-            }
-            if ( ry2 > minY && ry2 < maxY ){
-                num++;
-                x[i++] = ry2;
-                //out[i++] = ry2;
-            }
-            
-            Arrays.sort(x, 0, num);
-            if ( y1 <= y2 ){
-                for ( i=0; i<num; i++){
-                    int j = 2*i;
-                    out[j] = x1;
-                    out[j+1] = x[i];
-                }
-            } else {
-                for ( i=0; i<num; i++){
-                    int j = 2*(num-i-1);
-                    out[j] = x1;
-                    out[j+1] = x[i];
-                }
-            }
-            
-            
-            out[8] = num;
-            
-            
-        } else if ( dy == 0 ){
-            if ( rx1 > minX && rx1 < maxX ){
-                num++;
-                x[i++] = rx1;
-                //out[i++] = y1;
-            }
-            if ( rx2 > minX && rx2 < maxX ){
-                num++;
-                x[i++] = rx2;
-                //out[i++] = y1;
-            }
-            Arrays.sort(x, 0, num);
-            if ( x1 <= x2 ){
-                for ( i=0; i<num; i++){
-                    int j = 2*i;
-                    out[j] = x[i];
-                    out[j+1] = y1;
-                }
-            } else {
-                for ( i=0; i<num; i++){
-                    int j = 2*(num-i-1);
-                    out[j] = x[i];
-                    out[j+1] = y1;
-                }
-            }
-            out[8] = num;
-        } else {
-            float m = dy/dx;
-            
-            if ( rx1 > minX && rx1 < maxX ){
-                num++;
-                x[i] = rx1;
-                //y[i] = y1+(rx1-x1)*m;
-                i++;
-            }
-            if ( rx2 > minX && rx2 < maxX ){
-                num++;
-                x[i] = rx2;
-                //y[i++] = y1+(rx2-x1)*m;
-                i++;
-            }
-            if ( ry1 > minY && ry1 < maxY ){
-                num++;
-                x[i] = x1+(ry1-y1)/m;
-                //out[i++] = ry1;
-                i++;
-            }
-            if ( ry2 > minY && ry2 < maxY ){
-                num++;
-                x[i] = x1+(ry2-y1)/m;
-                //out[i++] = ry2;
-                i++;
-            }
-            
-            Arrays.sort(x, 0, num);
-            if ( x1 < x2 ){
-                for ( i=0; i<num; i++){
-                    int j = 2*i;
-                    out[j] = x[i];
-                    out[j+1] = y1 + (x[i]-x1)*m;
-                }
-            } else {
-                for ( i=0; i<num; i++){
-                    int j = 2*(num-i-1);
-                    out[j] = x[i];
-                    out[j+1] = y1 + (x[i]-x1)*m;
-                }
-            }
-            out[8] = num;
+    private static GeneralPath segmentShape(Rectangle r, Shape s, GeneralPath out) {
+        GeneralPath tmpGeneralPath = null;
+        if (s.getClass() != GeneralPath.class) {
+            tmpGeneralPath = createPathFromPool();
+            tmpGeneralPath.setShape(s, null);
+            s = tmpGeneralPath;
         }
         
-        
-        
-        
-        return out;
+        Iterator it = createIteratorFromPool((GeneralPath)s, null);
+        //GeneralPath out = new GeneralPath();
+        float[] buf = createFloatArrayFromPool(6); // buffer to hold segment coordinates from PathIterator.currentSegment
+        float[] curr = createFloatArrayFromPool(2);    // Placeholder for current point
+        float[] prev = createFloatArrayFromPool(2);   // Placeholder for previous point
+        float[] mark = createFloatArrayFromPool(2);   // Placeholder for the moveTo point
+        //float[] buf4 = new float[4];    // Reusable buffer to hold two points.
+        float[] intersects = createFloatArrayFromPool(9);
+        try {
+            float prevX = -1;               // Placeholder for previous X coord.
+            float prevY = -1;               // Placeholder for previous Y coord.
+            float currX = 0;                // Placeholder for current X coord.
+            float currY = 0;                // Placeholder for current Y coord.
+            //float[] intersects = null;      // Placeholder for intersection points
+            while (!it.isDone()) {
+
+                int type = it.currentSegment(buf);
+                switch (type) {
+
+                    case PathIterator.SEG_MOVETO:
+                        // Move to segment is transferred straight through
+                        prevX = prev[0] = mark[0] = buf[0];
+                        prevY = prev[1] = mark[1] = buf[1];
+                        out.moveTo(prevX, prevY);
+
+                        //System.out.println("Moving to "+prevX+","+prevY);
+                        break;
+
+                    case PathIterator.SEG_LINETO:
+                        // Line Segment may need to be partitioned if it crosses
+                        // an edge of the rectangle.
+                        currX = curr[0] = buf[0];
+                        currY = curr[1] = buf[1];
+
+                        // Check if line intersects rectangle
+                        intersectLineWithRectAsHash(prevX, prevY, currX, currY, r, intersects);
+                        //System.out.println("Looking for intersections between "+prevX+","+prevY+" and "+currX+","+currY);
+                        //System.out.println("Intersects: "+intersects[0]+", "+intersects[1]+"  "+intersects[2]+","+intersects[3]);
+                        if (intersects[8] >= 1) {
+                            int num = (int)intersects[8];
+                            int len = num*2;
+                            for ( int i=0; i<len; i+=2){
+                                out.lineTo(intersects[i], intersects[i+1]);
+
+                            }
+
+                        } 
+                        //System.out.println("Line to "+currX+","+currY);
+                        out.lineTo(currX, currY);
+
+                        // Set current position to prev for next iteration.
+                        prevX = currX;
+                        prevY = currY;
+                        float[] tmp = curr;
+                        curr = prev;
+                        prev = tmp;
+
+                        break;
+                    case PathIterator.SEG_CLOSE:
+
+                        // Closing the path.  Need to check if there is an intersection
+                        // on this last closing path.
+                        currX = curr[0] = mark[0];
+                        currY = curr[1] = mark[1];
+                        intersectLineWithRectAsHash(prevX, prevY, currX, currY, r, intersects);
+                        if (intersects[8] >= 1) {
+                            int num = (int)intersects[8];
+                            int len = num*2;
+                            for ( int i=0; i<len; i+=2){
+                                out.lineTo(intersects[i], intersects[i+1]);
+
+                            }
+
+                        } 
+                        out.closePath();
+
+                        break;
+                    default:
+                        throw new RuntimeException("Shape segmentation only supported for polygons");
+                }
+                it.next();
+            }
+            return out;
+        } finally {
+            recycle(it);
+            recycle(buf);
+            recycle(curr);
+            recycle(prev);
+            recycle(mark);
+            recycle(intersects);
+            recycle(tmpGeneralPath);
+        }
+    }
+
+    private static float[] intersectLineWithRectAsHash(float x1, float y1, float x2, float y2, Rectangle rect,
+            float[] out
+            ){
+        //float[] out = new float[9]; // max 4 points here
+        float[] x = createFloatArrayFromPool(4);
+        try {
+            //float[] y = new float[4];
+            float rx1 = rect.getX();
+            float ry1 = rect.getY();
+            float rx2 = rect.getX()+rect.getWidth();
+            float ry2 = rect.getY()+rect.getHeight();
+
+            float dx = x2-x1;
+            float dy = y2-y1;
+            int num=0;
+
+            float minY = Math.min(y1,y2);
+            float maxY = Math.max(y1,y2);
+            float minX = Math.min(x1, x2);
+            float maxX = Math.max(x1, x2);
+            int i = 0;
+            if ( dx == 0 ){
+                if ( ry1 > minY && ry1 < maxY ){
+                    num++;
+                    x[i++] = ry1;
+                    //out[i++] = ry1;
+                }
+                if ( ry2 > minY && ry2 < maxY ){
+                    num++;
+                    x[i++] = ry2;
+                    //out[i++] = ry2;
+                }
+
+                Arrays.sort(x, 0, num);
+                if ( y1 <= y2 ){
+                    for ( i=0; i<num; i++){
+                        int j = 2*i;
+                        out[j] = x1;
+                        out[j+1] = x[i];
+                    }
+                } else {
+                    for ( i=0; i<num; i++){
+                        int j = 2*(num-i-1);
+                        out[j] = x1;
+                        out[j+1] = x[i];
+                    }
+                }
+
+
+                out[8] = num;
+
+
+            } else if ( dy == 0 ){
+                if ( rx1 > minX && rx1 < maxX ){
+                    num++;
+                    x[i++] = rx1;
+                    //out[i++] = y1;
+                }
+                if ( rx2 > minX && rx2 < maxX ){
+                    num++;
+                    x[i++] = rx2;
+                    //out[i++] = y1;
+                }
+                Arrays.sort(x, 0, num);
+                if ( x1 <= x2 ){
+                    for ( i=0; i<num; i++){
+                        int j = 2*i;
+                        out[j] = x[i];
+                        out[j+1] = y1;
+                    }
+                } else {
+                    for ( i=0; i<num; i++){
+                        int j = 2*(num-i-1);
+                        out[j] = x[i];
+                        out[j+1] = y1;
+                    }
+                }
+                out[8] = num;
+            } else {
+                float m = dy/dx;
+
+                if ( rx1 > minX && rx1 < maxX ){
+                    num++;
+                    x[i] = rx1;
+                    //y[i] = y1+(rx1-x1)*m;
+                    i++;
+                }
+                if ( rx2 > minX && rx2 < maxX ){
+                    num++;
+                    x[i] = rx2;
+                    //y[i++] = y1+(rx2-x1)*m;
+                    i++;
+                }
+                if ( ry1 > minY && ry1 < maxY ){
+                    num++;
+                    x[i] = x1+(ry1-y1)/m;
+                    //out[i++] = ry1;
+                    i++;
+                }
+                if ( ry2 > minY && ry2 < maxY ){
+                    num++;
+                    x[i] = x1+(ry2-y1)/m;
+                    //out[i++] = ry2;
+                    i++;
+                }
+
+                Arrays.sort(x, 0, num);
+                if ( x1 < x2 ){
+                    for ( i=0; i<num; i++){
+                        int j = 2*i;
+                        out[j] = x[i];
+                        out[j+1] = y1 + (x[i]-x1)*m;
+                    }
+                } else {
+                    for ( i=0; i<num; i++){
+                        int j = 2*(num-i-1);
+                        out[j] = x[i];
+                        out[j+1] = y1 + (x[i]-x1)*m;
+                    }
+                }
+                out[8] = num;
+            }
+            return out;
+        } finally {
+            recycle(x);
+        }
         
     }
     
-    
-        
-        //public class Crossing {
-
     /**
      * Allowable tolerance for bounds comparison
      */
@@ -1862,6 +2342,7 @@ public final class GeneralPath implements Shape {
         if (!s.getBounds().contains((int)x, (int)y)) {
             return 0;
         }
+        
         return crossPath(s.getPathIterator(null), x, y);
     }
 

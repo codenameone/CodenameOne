@@ -786,34 +786,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
     }
 }
 
-void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl(color, alpha, 0, 0, width, height, startAngle, angle);
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    
-    GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height);
-#ifndef CN1_USE_ARC
-    [glu release];
-#endif
-}
-
-void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl(color, alpha, 0, 0, width, height, startAngle, angle);
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    
-    GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height);
-#ifndef CN1_USE_ARC
-    [glu release];
-#endif
-}
-
 // START ES2 ADDITION: Drawing Shapes ------------------------------------------------------------------------------
 
 void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OBJECT points, int color, int alpha)
@@ -1505,7 +1477,13 @@ static CodenameOne_GLViewController *sharedSingleton;
     return sharedSingleton->drawTextureSupported;
 }
 
++(BOOL)isCurrentMutableTransformSet {
+    return currentMutableTransformSet;
+}
 
++(CGAffineTransform) currentMutableTransform {
+    return currentMutableTransform;
+}
 
 #ifdef INCLUDE_MOPUB
 @synthesize adView;

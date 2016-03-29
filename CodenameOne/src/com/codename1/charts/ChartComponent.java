@@ -179,6 +179,8 @@ public class ChartComponent extends Component {
      */
     private Transform dragTransformStart = null;
     
+    private Transform tmpTransform = null;
+    
     /**
      * The starting position of a pan operation.
      */
@@ -251,11 +253,20 @@ public class ChartComponent extends Component {
         super.paint(g);
         boolean oldAntialias = g.isAntiAliased();
         g.setAntiAliased(true);
-        Transform oldTransform = null;
+        
+        boolean transformed = false;
         if ( getTransform() != null ){
-            oldTransform = g.getTransform();
+            transformed = true;
+            if (tmpTransform == null) {
+                tmpTransform = Transform.makeIdentity();
+            }
+            g.getTransform(tmpTransform);
             
-            currentTransform = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());
+            if (currentTransform == null) {
+                currentTransform = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());
+            } else {
+                currentTransform.setTranslation(getAbsoluteX(), getAbsoluteY());
+            }
             currentTransform.concatenate(transform);
             currentTransform.translate(-getAbsoluteX(), -getAbsoluteY());
             
@@ -267,8 +278,8 @@ public class ChartComponent extends Component {
         
         util.paintChart(g, chart, getBounds(), getAbsoluteX(), getAbsoluteY());
         
-        if ( oldTransform != null ){
-            g.setTransform(oldTransform);
+        if ( transformed){
+            g.setTransform(tmpTransform);
         }
         
         g.setAntiAliased(oldAntialias);

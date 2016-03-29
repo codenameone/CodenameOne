@@ -54,6 +54,7 @@ public class BubbleTransition extends Transition {
     private int y;
     private String componentName;
     private boolean roundBubble = true;
+    private GeneralPath bubbleShape;
     
     
     /**
@@ -155,6 +156,13 @@ public class BubbleTransition extends Transition {
         return !clipMotion.isFinished();
     }
 
+    private GeneralPath getBubbleShape() {
+        if (bubbleShape == null) {
+            bubbleShape = new GeneralPath();
+        }
+        return bubbleShape;
+    }
+    
     @Override
     public void paint(Graphics g) {
         Component source = getSource();
@@ -167,7 +175,8 @@ public class BubbleTransition extends Transition {
             dest = getDialogParent(dest);
         }
         if(roundBubble && g.isShapeClipSupported()){
-            GeneralPath p = new GeneralPath();
+            GeneralPath p = getBubbleShape();
+            p.reset();
             p.arc(x + dest.getWidth()/2 - clipSize/2, y + dest.getHeight()/2 - clipSize/2, clipSize, clipSize, 0, Math.toRadians(360));
             g.setClip(p);
         }else{

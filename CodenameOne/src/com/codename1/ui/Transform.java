@@ -35,6 +35,11 @@ import com.codename1.impl.CodenameOneImplementation;
  * @author shannah
  */
 public class Transform {
+    
+    public static class NotInvertibleException extends Exception {
+        
+    }
+    
     /**
      * Reference to the native transform.  This should only be used by the implementation.
      */
@@ -45,6 +50,8 @@ public class Transform {
      * when using a special matrix like a translation, scale, or identity matrix.
      */
     private int type = TYPE_UNKNOWN;
+    private Transform inverse;
+    private boolean inverseDirty=true;
     
     private float translateX=0, translateY=0, translateZ=0;
     private float scaleX=1f, scaleY=1f, scaleZ=1f;
@@ -201,29 +208,25 @@ public class Transform {
      */
     private void initNativeTransform(){
         if ( nativeTransform == null ){
+            nativeTransform = impl.makeTransformIdentity();
             if ( type == TYPE_TRANSLATION ){
-                nativeTransform = impl.makeTransformTranslation(translateX, translateY, translateZ);
+                impl.setTransformTranslation(nativeTransform, translateX, translateY, translateZ);
             } else if ( type == TYPE_SCALE ){
-                nativeTransform = impl.makeTransformScale(scaleX, scaleY, scaleZ);
-            } else {
-                nativeTransform = impl.makeTransformIdentity();
-            } 
+                impl.setTransformScale(nativeTransform, scaleX, scaleY, scaleZ);
+            }  
         } else  {
-            Object nativeT = null;
             switch (type){
                 case TYPE_TRANSLATION:
-                    nativeT = impl.makeTransformTranslation(translateX, translateY, translateZ);
+                    impl.setTransformTranslation(nativeTransform, translateX, translateY, translateZ);
                     break;
                 case TYPE_SCALE:
-                    nativeT = impl.makeTransformScale(scaleX, scaleY, scaleZ);
+                    impl.setTransformScale(nativeTransform, scaleX, scaleY, scaleZ);
                     break;
                 case TYPE_IDENTITY:
-                    nativeT = impl.makeTransformIdentity();
+                    impl.setTransformIdentity(nativeTransform);
                     break;     
             }
-            if ( nativeT != null){
-                impl().copyTransform(nativeT, nativeTransform);
-            }
+
         }
         dirty = false;
     }
@@ -393,6 +396,9 @@ public class Transform {
      * @return A transform that scales values according to the provided scale factors.
      */
     public static Transform makeScale(float x, float y, float z){
+        if (x==1 && y == 1 && z == 1) {
+            return makeIdentity();
+        }
         Transform out = new Transform(null);
         out.scaleX = x;
         out.scaleY = y;
@@ -401,8 +407,41 @@ public class Transform {
         return out;
     }
     
+    /**
+     * Creates a new scale transform.
+     * @param x Factor to scale in x axis.
+     * @param y Factor to scale by in y axis.
+     * @return A new transform with the specified scale.
+     */
     public static Transform makeScale(float x, float y){
         return makeScale(x, y, 1);
+    }
+    
+    /**
+     * Resets the transformation to a scale transformation.
+     * @param x x-axis scaling
+     * @param y y-axis scaling
+     * @param z z-axis scaling
+     */
+    public void setScale(float x, float y, float z) {
+        if (x==1 && y == 1 && z == 1) {
+            setIdentity();
+            return;
+        }
+        Transform out = this;
+        out.scaleX = x;
+        out.scaleY = y;
+        out.scaleZ = z;
+        out.type = TYPE_SCALE;
+    }
+    
+    /**
+     * Resets the transformation to scale transform.
+     * @param x x-axis scaling.
+     * @param y y-axis scaling.
+     */
+    public void setScale(float x, float y) {
+        setScale(x, y, 1);
     }
     
     /**
@@ -620,9 +659,14 @@ public class Transform {
      * Gets the inverse transformation for this transform.
      * <p>Note: If {@link #isSupported()} is false, then this will throw a Runtime Exception.</p>
      * @return The inverse transform.
+     * @deprecated Use {@link #getInverse(com.codename1.ui.Transform) } instead.
      */
     public Transform getInverse(){
-        
+        return makeInverse();
+    }
+    
+    
+    private Transform makeInverse() {
         if ( type == TYPE_IDENTITY ){
             return makeIdentity();
         } else if ( type == TYPE_TRANSLATION ){
@@ -635,8 +679,31 @@ public class Transform {
             Transform out = new Transform(t);
             return out;
         }
-        
-        
+    }
+    
+    public void getInverse(Transform inverseOut) throws NotInvertibleException {
+        if (inverse == null) {
+            inverse = makeInverse();
+            inverseDirty = false;
+        } else if (inverseDirty) {
+            inverse.setTransform(this);
+            inverse.invert();
+            inverseDirty = false;
+        }
+        inverseOut.setTransform(inverse);
+    }
+    
+    public void invert() throws NotInvertibleException {
+        if ( type == TYPE_IDENTITY ){
+            // Do nothing
+        } else if ( type == TYPE_TRANSLATION ){
+            setTranslation(-translateX, -translateY, -translateZ);
+        } else if ( type == TYPE_SCALE ){
+            setScale(1f/scaleX, 1f/scaleY, 1f/scaleZ);
+        } else {
+            initNativeTransform();
+            impl.setTransformInverse(nativeTransform);
+        }
     }
     
     /**
@@ -690,7 +757,8 @@ public class Transform {
      * @see #makePerspective()
      */
     public void setPerspective(float fovy, float aspect, float zNear, float zFar){
-        setTransform(makePerspective(fovy, aspect, zNear, zFar));
+        type = TYPE_UNKNOWN;
+        impl.setTransformPerspective(getNativeTransform(), fovy, aspect, zNear, zFar);
     }
     
     /**
@@ -705,7 +773,8 @@ public class Transform {
      */
     public void setOrtho(float left, float right, float bottom, float top,
                 float near, float far){
-        setTransform(makeOrtho(left, right, bottom, top, near, far));
+        type = TYPE_UNKNOWN;
+        impl.setTransformOrtho(getNativeTransform(), left, right, bottom, top, near, far);
     }
     
     
@@ -726,6 +795,32 @@ public class Transform {
                 float centerX, float centerY, float centerZ, float upX, float upY,
                 float upZ){
         setTransform(makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ));
+    }
+    
+    /**
+     * Transforms a set of points using the current transform.
+     * @param pointSize The size of the points to transform (2 or 3)
+     * @param in Input array of points.
+     * @param srcPos Start position in input array
+     * @param out Output array of points
+     * @param destPos Start position in output array
+     * @param numPoints Number of points to transform.
+     */
+    public void transformPoints(int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        switch (type) {
+            case TYPE_TRANSLATION:
+                impl.translatePoints(pointSize, translateX, translateY, translateZ, in, srcPos, out, destPos, numPoints);
+                break;
+            case TYPE_SCALE:
+                impl.scalePoints(pointSize, scaleX, scaleY, scaleZ, in, srcPos, out, destPos, numPoints);
+                break;
+            case TYPE_IDENTITY:
+                System.arraycopy(in, srcPos, out, destPos, numPoints * pointSize);
+                break;
+            default :
+                impl.transformPoints(getNativeTransform(), pointSize, in, srcPos, out, destPos, numPoints);
+                break;
+        }
     }
     
     /**

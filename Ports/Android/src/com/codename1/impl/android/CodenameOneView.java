@@ -75,7 +75,7 @@ public class CodenameOneView {
         if(!drawing) {
             androidView.setWillNotCacheDrawing(false);
             androidView.setWillNotDraw(true);
-            this.buffy = new AndroidGraphics(implementation, null);
+            this.buffy = new AndroidGraphics(implementation, null, false);
         }
 
         this.keyCharacterMap = KeyCharacterMap.load(KeyCharacterMap.BUILT_IN_KEYBOARD);

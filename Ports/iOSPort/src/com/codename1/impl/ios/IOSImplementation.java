@@ -1169,76 +1169,25 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     
-    void loadClipBounds(Object graphics){
-        NativeGraphics ng = (NativeGraphics)graphics;
-        if ( ng.clipDirty){
-            ng.clipDirty = false;
-            if ( ng.isTransformSupported()){
-
-                if ( ng.transform == null ){
-                    ng.transform = Transform.makeIdentity();
-                }
-                if ( ng.clip == null ){
-                    return;
-                }
-                if ( ng.transform.isIdentity() ){
-                    Rectangle r = ng.clip.getBounds();
-                    ng.clipX = r.getX();
-                    ng.clipY = r.getY();
-                    ng.clipW = r.getWidth();
-                    ng.clipH = r.getHeight();
-                } else {
-                    Transform inverted = ng.transform.getInverse();
-                    GeneralPath gp = new GeneralPath();
-                    gp.append(ng.clip.getPathIterator(inverted), false);
-                    //gp.append(ng.clip.getPathIterator(inverted), false);
-                    Rectangle r = gp.getBounds();
-                    ng.clipX = r.getX();
-                    ng.clipY = r.getY();
-                    ng.clipW = r.getWidth();
-                    ng.clipH = r.getHeight();
-                } 
-            } 
-        }
-    }
+    
     
     public int getClipX(Object graphics) {
-        if ( isTransformSupported(graphics) ){
-            
-             loadClipBounds(graphics);
-            
-        }
-        return ((NativeGraphics)graphics).clipX;
+        
+        return ((NativeGraphics)graphics).getClipX();
     }
 
     public int getClipY(Object graphics) {
-         if ( isTransformSupported(graphics) ){
-            loadClipBounds(graphics);
-            
-        }
-        return ((NativeGraphics)graphics).clipY;
+         
+        return ((NativeGraphics)graphics).getClipY();
     }
 
     public int getClipWidth(Object graphics) {
-         if ( isTransformSupported(graphics) ){
-            loadClipBounds(graphics);
-            
-        }
-        if(((NativeGraphics)graphics).clipW < 0 && ((NativeGraphics)graphics).associatedImage != null) {
-            return ((NativeGraphics)graphics).associatedImage.width;
-        }
-        return ((NativeGraphics)graphics).clipW;
+        return ((NativeGraphics)graphics).getClipW();
     }
 
     public int getClipHeight(Object graphics) {
-         if ( isTransformSupported(graphics) ){
-            loadClipBounds(graphics);
-           
-        }
-        if(((NativeGraphics)graphics).clipH < 0 && ((NativeGraphics)graphics).associatedImage != null) {
-            return ((NativeGraphics)graphics).associatedImage.height;
-        }
-        return ((NativeGraphics)graphics).clipH;
+        
+        return ((NativeGraphics)graphics).getClipH();
     }
 
     @Override
@@ -1249,28 +1198,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void setClip(Object graphics, Shape shape) {
-        setClipShape(graphics, shape);
+        ((NativeGraphics)graphics).setClip(shape);
     }
-    
-    public void setClipShape(Object graphics, Shape shape){
-        NativeGraphics ng = (NativeGraphics)graphics;
-        //Log.p("Setting clip shape "+shape);
-        ng.clip = shape;
-        ng.clipDirty = true;
-        ng.clipApplied = false;
-        
-    }
-    
-    public Shape getClipShape(Object graphics){
-        NativeGraphics ng = (NativeGraphics)graphics;
-        if ( ng.clip != null ){
-            //Log.p("Clip shape is not null");
-            return ng.clip;
-        } else {
-            //Log.p("Clip shape is null");
-            return this.getClipRect(graphics);
-        }
-    }
+   
     
     public void pushClip(Object graphics){
         ((NativeGraphics)graphics).pushClip();
@@ -1282,75 +1212,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void setClip(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = ((NativeGraphics)graphics);
-        
         ng.checkControl();
-        ng.clipApplied = false;
-        boolean isTransformSupported = ng.isTransformSupported();
-        
-        if ( isTransformSupported ){
-            if ( ng.transform == null ){
-                ng.transform = Transform.makeIdentity();
-            }
-            if ( ng.transform.isIdentity()){
-                //Log.p("Identity transform");
-                if ( ng.clip != null ){
-                    if ( ng.clip.isRectangle() ){
-                        Rectangle r = ng.clip.getBounds();
-                        if ( r.getX() == x && r.getY() == y && r.getWidth() == width && r.getHeight() == height ){
-                            return;
-                        }
-                    }
-                }
-                if (ng.clip == null || !(ng.clip instanceof Rectangle)) {
-                    ng.clip = new Rectangle(x, y, width, height);
-                } else {
-                    ((Rectangle)ng.clip).setBounds(x, y, width, height);
-                }
-                if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-                    ng.setNativeClipping(x, y, width, height, ng.clipApplied);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                }
-            } else {
-                if (ng.clip == null || !(ng.clip instanceof Rectangle)) {
-                    ng.clip = new Rectangle(x,y,width,height);
-                } else {
-                    ((Rectangle)ng.clip).setBounds(x, y, width, height);
-                }
-                GeneralPath gp = new GeneralPath();
-                gp.append(ng.clip.getPathIterator(ng.transform), false);
-                //gp.append(ng.clip.getPathIterator(ng.transform), false);
-                if ( gp.isRectangle() ){
-                    Rectangle r = (Rectangle)gp.getBounds();
-                    ng.clip = r;
-                    if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-                        ng.setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), ng.clipApplied);
-                        ng.clipApplied = true;
-                        ng.clipDirty = true;
-                    }
-                } else {
-                    ng.clip = gp;
-                    if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-                        ng.setNativeClipping(ng.clip);
-                        ng.clipApplied = true;
-                        ng.clipDirty = true;
-                    }
-                }
-            }
-            return;
-        }
-        if ( ng.clipX == x && ng.clipY == y && ng.clipW == width && ng.clipH == height){
-            return;
-        }
-        ng.clipApplied = (ng.clipX == x) && (ng.clipY == y) && (ng.clipW == width) && (ng.clipH == height);
-        ng.clipX = x;
-        ng.clipY = y;
-        ng.clipW = width;
-        ng.clipH = height;
-        if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-            ng.setNativeClipping(x, y, width, height, ng.clipApplied);
-            ng.clipApplied = true;
-        } 
+        ng.setClip(x, y, width, height);
     }
 
     private  void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip) {
@@ -1362,30 +1225,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setNativeClippingGlobal(x, y, width, height, firstClip);
     }
     
-    private boolean isPolygon(Shape s) {
-        if (s.isRectangle()) {
-            return true;
-        }
-        PathIterator it = s.getPathIterator();
-        float[] curr = new float[6];
-        while (!it.isDone()) {
-            switch (it.currentSegment(curr)) {
-                case PathIterator.SEG_CUBICTO:
-                case PathIterator.SEG_QUADTO:
-                return false;
-            }
-            it.next();
-        }
-        return true;
-    }
+    float[] polygonPointsBuffer;
     
-    private  void setNativeClippingGlobal(Shape shape){
+    private  void setNativeClippingGlobal(ClipShape shape){
         Rectangle bounds = shape.getBounds();
         if ( shape.isRectangle() || bounds.getWidth() <= 0 || bounds.getHeight() <= 0){
             setNativeClippingGlobal(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), true);
-        } else if (isPolygon(shape)) {
-            float[] points = shapeToPolygon(shape);
-            nativeInstance.setNativeClippingPolygonGlobal(points);
+        } else if (shape.isPolygon()) {
+            int pointsSize = shape.getPointsSize();
+            if (polygonPointsBuffer == null || polygonPointsBuffer.length < pointsSize) {
+                polygonPointsBuffer = new float[pointsSize];
+            }
+            shapeToPolygon(shape, polygonPointsBuffer);
+            nativeInstance.setNativeClippingPolygonGlobal(polygonPointsBuffer);
         } else {
             
             TextureAlphaMask mask = (TextureAlphaMask)textureCache.get(shape, null);
@@ -1404,169 +1256,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /*public void clipRect(Object graphics, int x, int y, int width, int height) {
-        NativeGraphics ng = (NativeGraphics)graphics;
-        if(ng.clipH == 0 || ng.clipW == 0) {
-            return;
-        }
-        if(ng.clipW == -1 || ng.clipH == -1) {
-            ng.clipW = ng.associatedImage.width;
-            ng.clipH = ng.associatedImage.height;
-        }
-        Rectangle r = new Rectangle(ng.clipX, ng.clipY, ng.clipW, ng.clipH).intersection(x, y, width, height);
-        Dimension d = r.getSize();
-        if(d.getWidth() <= 0 || d.getHeight() <= 0) {
-            ng.clipW = 0;
-            ng.clipH = 0;
-        } else {
-            ng.clipX = r.getX();
-            ng.clipY = r.getY();
-            ng.clipW = d.getWidth();
-            ng.clipH = d.getHeight();
-            setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
-        }
-    }*/
     
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
-        ng.clipApplied = false;
-        if ( ng.isTransformSupported() ){
-            if ( ng.clip == null ){
-                setClip(graphics, x, y, width, height);
-                return;
-            } 
-            Rectangle clipBounds = ng.clip.getBounds();
-            if ( clipBounds.getWidth() == 0 || clipBounds.getHeight() == 0 ){
-                return;
-            }
-            
-            if ( ng.transform == null ){
-                ng.transform = Transform.makeIdentity();
-            }
-            
-            if ( ng.transform.isIdentity() ){
-                // Case 1:  There is no transform
-                
-                Shape s = ng.clip;
-                
-                
-                if ( s.isRectangle() ){
-                    
-                    if ( clipBounds.getX() == x && clipBounds.getY() == y && clipBounds.getWidth() == width && clipBounds.getHeight() == height ){
-                        
-                        return;
-                    }
-                }
-                if ( s.contains(x,y) && s.contains(x+width, y) && s.contains(x+width, y+height) && s.contains(x, y+height)){
-                    ng.setNativeClipping(x, y, width, height, ng.clipApplied);
-                    ng.clip = clipBounds;
-                    clipBounds.setBounds(x, y, width, height);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                }
-                
-                ng.reusableRect.setBounds(x,y,width,height);
-                if ( ng.reusableRect.contains(clipBounds)){
-                    // We are clipping a greater region than the current clip... we don't need to clip at all here
-                    return;
-                }
-                
-                Shape newClip = null;
-                if (s.getClass() == Rectangle.class && ng.clip.getClass() == Rectangle.class) {
-                    ((Rectangle)s).intersection(ng.reusableRect, (Rectangle)ng.clip);
-                    newClip = ng.clip;
-                } else {
-                    newClip = s.intersection(ng.reusableRect);
-                }
-                if (newClip == null) {
-                    if (ng.clip != null && ng.clip.getClass() == Rectangle.class) {
-                        ((Rectangle)ng.clip).setBounds(0, 0, 0, 0);
-                    } else {
-                        ng.clip = new Rectangle(0,0,0,0);
-                    }
-                    
-                    ng.setNativeClipping(0,0,0,0, ng.clipApplied);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                } else if ( newClip.isRectangle() ){
-                    Rectangle r = newClip.getBounds();
-                    ng.clip = r;
-                    ng.setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), ng.clipApplied);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                } else {
-                    ng.clip = newClip;
-                    ng.setNativeClipping(ng.clip);
-                    ng.clipDirty = true;
-                    ng.clipApplied = true;
-                    return;
-                }
-                
-                
-            } else {
-                Transform inverseTransform = ng.transform.getInverse();
-                if ( inverseTransform == null ){
-                    throw new RuntimeException("Failed to invert transform");
-                }
-                GeneralPath clipProjection = new GeneralPath();
-                clipProjection.append(ng.clip.getPathIterator(inverseTransform), false);
-                //clipProjection.append(ng.clip.getPathIterator(inverseTransform), false);
-                ng.reusableRect.setBounds(x, y, width, height);
-                Shape clipIntersection = clipProjection.intersection(ng.reusableRect);
-                if ( clipIntersection == null ){
-                    ng.clip = new Rectangle(0,0,0,0);
-                    ng.setNativeClipping(0,0,0,0, ng.clipApplied);
-                    ng.clipDirty = true;
-                    ng.clipApplied = true;
-                    return;
-                }
-                ng.clip = new GeneralPath();
-                ((GeneralPath)ng.clip).append(clipIntersection.getPathIterator(ng.transform), false);
-                //((GeneralPath)ng.clip).append(clipIntersection.getPathIterator(ng.transform), false);
-                
-                if ( ng.clip.isRectangle() ){
-                    
-                    Rectangle r = ng.clip.getBounds();
-                    
-                    ng.clip = r;
-                    ng.setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), ng.clipApplied);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                } else {
-                    ng.setNativeClipping(ng.clip);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                }
-                
-            }
-        } else {
-            if(ng.clipH == 0 || ng.clipW == 0) {
-                return;
-            }
-            if(ng.clipW == -1 || ng.clipH == -1) {
-                ng.clipW = ng.associatedImage.width;
-                ng.clipH = ng.associatedImage.height;
-            }
-
-            Rectangle.intersection(x, y, width, height, ng.clipX, ng.clipY, ng.clipW, ng.clipH, ng.reusableRect);
-            Dimension d = ng.reusableRect.getSize();
-            if(d.getWidth() <= 0 || d.getHeight() <= 0) {
-                ng.clipW = 0;
-                ng.clipH = 0;
-            } else {
-                ng.clipX = ng.reusableRect.getX();
-                ng.clipY = ng.reusableRect.getY();
-                ng.clipW = d.getWidth();
-                ng.clipH = d.getHeight();
-                setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
-            }
-        }
+        ng.clipRect(x, y, width, height);
     }
 
     @Override
@@ -1583,31 +1277,68 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         return Matrix.makeTranslation(translateX, translateY, translateZ);
     }
+
+    @Override
+    public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        Matrix m = (Matrix)nativeTransform;
+        m.setTranslation(translateX, translateY, translateZ);
+    }
+    
     @Override
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
         Matrix out = Matrix.makeIdentity();
         out.scale(scaleX, scaleY, scaleZ);
         return out;
     }
+    
+    @Override
+    public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
+        Matrix out = (Matrix)nativeTransform;
+        out.reset();
+        out.scale(scaleX, scaleY, scaleZ);
+    }
 
     @Override
     public Object makeTransformRotation(float angle, float x, float y, float z) {
         return Matrix.makeRotation(angle, x, y, z);
+    }
+    
+    @Override
+    public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
+        Matrix m = (Matrix)nativeTransform;
+        m.reset();
+        m.rotate(angle, x, y, z);
     }
 
     @Override
     public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
         return Matrix.makePerspective(fovy, aspect, zNear, zFar);
     }
+    
+    public void setTransformPerspective(Object nativeGraphics, float fovy, float aspect, float zNear, float zFar) {
+        Matrix m = (Matrix)nativeGraphics;
+        m.setPerspective(fovy, aspect, zNear, zFar);
+    }
 
     @Override
     public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
         return Matrix.makeOrtho(left, right, bottom, top, near, far);
     }
+    
+    public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
+        Matrix m = (Matrix)nativeGraphics;
+        m.setOrtho(left, right, bottom, top, near, far);
+    }
 
     @Override
     public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
         return Matrix.makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+    }
+    
+    @Override
+    public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        Matrix m = (Matrix)nativeGraphics;
+        m.setCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
     }
 
     @Override
@@ -1637,8 +1368,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     @Override
+    public void setTransformInverse(Object nativeTransform) throws com.codename1.ui.Transform.NotInvertibleException {
+        Matrix m = (Matrix)nativeTransform;
+        if (!m.invert()) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+    }
+    
+    @Override
     public Object makeTransformIdentity(){
         return Matrix.makeIdentity();
+    }
+    
+    @Override
+    public void setTransformIdentity(Object nativeTransform){
+        ((Matrix)nativeTransform).setIdentity();
     }
 
     @Override
@@ -1658,10 +1402,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         ((Matrix)nativeTransform).transformCoord(in, out);
     }
-    
+
+    @Override
+    public void transformPoints(Object nativeTransform, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        Matrix m = (Matrix)nativeTransform;
+        m.transformPoints(pointSize, in, srcPos, out, destPos, numPoints);
+    }
+
+    @Override
+    public void translatePoints(int pointSize, float tX, float tY, float tZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        nativeInstance.translatePoints(pointSize, tX, tY, tX, in, srcPos, out, destPos, numPoints);
+    }
+
+    @Override
+    public void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        nativeInstance.scalePoints(pointSize, sX, sY, sZ, in, srcPos, out, destPos, numPoints);
+    }
    
-    
-    
     // END TRANSFORMATION METHODS--------------------------------------------------------------------
     
     
@@ -1759,13 +1516,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
         nativeInstance.nativeDrawArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
     }
-    private static void nativeFillArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        nativeInstance.nativeFillArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
-    }
-    private static void nativeDrawArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        nativeInstance.nativeDrawArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
-    }
-
     public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
@@ -1931,38 +1681,15 @@ public class IOSImplementation extends CodenameOneImplementation {
  
     }
     
-    private float[] shapeToPolygon(Shape shape){
-        PathIterator it = shape.getPathIterator();
-        float[] buf = new float[6];
-        int size = 0;
-        while ( !it.isDone()){
-            int type = it.currentSegment(buf);
-            switch ( type ){
-                case PathIterator.SEG_MOVETO:
-                case PathIterator.SEG_LINETO:
-                    size++;
-                    break;
-
-            }
-            it.next();
+    private void shapeToPolygon(ClipShape shape, float[] pointsOut){
+        int size = shape.getPointsSize();
+        if (size > pointsOut.length) {
+            throw new RuntimeException("shapeToPolygon requires out array at least the size of the points in the polygon.  Requires "+size+" but found "+pointsOut.length);
         }
-        it = shape.getPathIterator();
-        float[] points = new float[size*2];
-        int i=0;
-        while ( !it.isDone()){
-            int type = it.currentSegment(buf);
-            switch ( type ){
-                case PathIterator.SEG_MOVETO:
-                case PathIterator.SEG_LINETO:
-                    points[i++] = buf[0];
-                    points[i++] = buf[1];
-                    break;
-            }
-            it.next();
-        }
-        return points;
+        shape.getPoints(pointsOut);
+        
     }
-    
+    /*
     public void drawConvexPolygon(Object graphics, Shape shape, Stroke stroke, int color, int alpha){
         NativeGraphics ng = (NativeGraphics)graphics;
         if ( ng.isShapeSupported()){
@@ -1979,12 +1706,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
     }
-
-    
-
-
-    
-    
+    */
 
     /**
      * Deletes an alpha mask that was created with {@link #createAlphaMask}.
@@ -2033,10 +1755,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         return ((NativeGraphics)graphics).isAlphaMaskSupported();
     }
     
-    
-    
-    
-    
     void nativeDeleteTexture(long textureID){
         nativeInstance.nativeDeleteTexture(textureID);
     }
@@ -2044,9 +1762,6 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Draws the outline of a shape in the given graphics context.
      * @param graphics the graphics context
      * @param shape The shape to be drawn.
-     * @param lineWidth The width of the line.
-     * @param capStyle The cap style to use for the line.
-     * @param path the path to draw.
      */
     @Override
     public void drawShape(Object graphics, Shape shape, Stroke stroke){// float lineWidth, int capStyle, int miterStyle, float miterLimit){
@@ -2110,7 +1825,17 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Transform getTransform(Object graphics) {
-        return ((NativeGraphics)graphics).transform;
+        return ((NativeGraphics)graphics).transform.copy();
+    }
+
+    @Override
+    public void getTransform(Object nativeGraphics, Transform t) {
+        NativeGraphics ng = (NativeGraphics)nativeGraphics;
+        if (ng.transform != null) {
+            t.setTransform(ng.transform);
+        } else {
+            t.setIdentity();
+        }
     }
 
     
@@ -3783,19 +3508,193 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeFont font;
         int clipX, clipY, clipW = -1, clipH = -1;
         boolean clipApplied;
-        Shape clip;
-        Transform transform = Transform.makeIdentity();
-        boolean transformApplied = false;
-        Shape[] clipStack = new Shape[20];
-        private int clipStackPtr = 0; 
-        
-        
+        ClipShape clip;
         /**
          * Used with the ES2 pipeline (or any engine where transforms are supported)
          * to record if the clipX, clipY, clipW, and clipH parameters need to be updated.
          */
         boolean clipDirty = true;
 
+        GeneralPath inverseClip;
+        boolean inverseClipDirty=true;
+        Rectangle inverseClipBounds;
+        
+        
+        Transform transform = Transform.makeIdentity();
+        Transform inverseTransform;
+        boolean inverseTransformDirty=true;
+        
+        
+        boolean transformApplied = false;
+        ClipShape[] clipStack = new ClipShape[20];
+        private int clipStackPtr = 0; 
+        
+        
+        void setClip(Shape newClip) {
+            clip.setShape(newClip, transform);
+            clipDirty = true;
+            clipApplied = false;
+            inverseClipDirty = true;
+            applyClip();
+        }
+        
+        
+        void setClip(int x, int y, int w, int h) {
+            if (clip == null) {
+                clip = new ClipShape();
+            }
+            if (transform == null || transform.isIdentity()) {
+                if (!clip.equals(x, y, w, h)) {
+                    clip.setBounds(x, y, w, h);
+                    clipDirty = true;
+                    clipApplied = false;
+                    inverseClipDirty = true;
+                    
+                }
+            } else {
+                reusableRect.setBounds(x, y, w, h);
+                clip.setShape(reusableRect, transform);
+                clipDirty = true;
+                clipApplied = false;
+                inverseClipDirty = true;
+            }
+            applyClip();
+        }
+        
+        void clipRect(int x, int y, int w, int h) {
+            if (clip == null) {
+                setClip(x, y, w, h);
+                return;
+            }
+            
+            if (transform == null || transform.isIdentity()) {
+                clip.intersect(x, y, w, h);
+                clipDirty = true;
+                clipApplied = false;
+                inverseClipDirty = true;
+            } else {
+                GeneralPath inverseClip = inverseClip();
+                inverseClip.intersect(x, y, w, h);
+                clip.setShape(inverseClip, transform);
+                clipDirty = true;
+                clipApplied = false;
+                inverseClipDirty = true;
+            }
+            applyClip();
+        }
+        
+        void loadClipBounds(){
+            NativeGraphics ng = this;
+            if ( ng.clipDirty){
+                ng.clipDirty = false;
+                if ( ng.transform == null ){
+                    ng.transform = Transform.makeIdentity();
+                }
+                if ( ng.clip == null ){
+                    ng.clip = ClipShape.create();
+                    if (associatedImage == null) {
+                        ng.clip.setBounds(0,0,Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+                    } else {
+                        ng.clip.setBounds(0, 0, associatedImage.width, associatedImage.height);
+                    }
+                }
+                if ( ng.transform.isIdentity() ){
+                    Rectangle r = reusableRect;
+                
+                    ng.clip.getBounds(r);
+                    ng.clipX = r.getX();
+                    ng.clipY = r.getY();
+                    ng.clipW = r.getWidth();
+                    ng.clipH = r.getHeight();
+                } else {
+                    
+                    GeneralPath inverseClip = ng.inverseClip();
+                    Rectangle r = reusableRect;
+                    inverseClip.getBounds(r);
+                    ng.clipX = r.getX();
+                    ng.clipY = r.getY();
+                    ng.clipW = r.getWidth();
+                    ng.clipH = r.getHeight();
+                } 
+
+            }
+        }
+        
+        int getClipX() {
+            loadClipBounds();
+            return clipX;
+        }
+        
+        int getClipY() {
+            loadClipBounds();
+            return clipY;
+        }
+        
+        int getClipW() {
+            loadClipBounds();
+            if(clipW < 0 && associatedImage != null) {
+                return associatedImage.width;
+            }
+            return clipW;
+        }
+        
+        int getClipH() {
+            loadClipBounds();
+            if(clipH < 0 && associatedImage != null) {
+                return associatedImage.height;
+            }
+            return clipH;
+        }
+        
+        void setTransform(Transform t) {
+            if (transform == null) {
+                transform = Transform.makeIdentity();
+            }
+            transform.setTransform(t);
+            inverseTransformDirty = true;
+            clipDirty = true;
+            transformApplied = false;
+            applyTransform();
+        }
+        
+        Transform inverseTransform() {
+            
+            if (inverseTransformDirty) {
+                if (inverseTransform == null) {
+                    inverseTransform = Transform.makeIdentity();
+                }
+                if (transform == null) {
+                    inverseTransform.setIdentity();
+                } else {
+                    try {
+                        transform.getInverse(inverseTransform);
+                    } catch (Transform.NotInvertibleException ex) {
+                        throw new RuntimeException("The transform "+transform+" cannot be inverted");
+                    }
+                }
+                inverseTransformDirty = false;
+            }
+            return inverseTransform;
+            
+        }
+        
+        
+        GeneralPath inverseClip() {
+            if (inverseClipDirty) {
+
+                if (clip == null) {
+                    return null;
+                }
+                if (inverseClip == null) {
+                    inverseClip = new GeneralPath();
+                }
+                inverseClip.setShape(clip, inverseTransform());
+                inverseClipDirty = false;
+            }
+            return inverseClip;
+        }
+        
+        
 
         public NativeFont getFont() {
             if(font != null) {
@@ -3812,57 +3711,56 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         public void pushClip(){
-            clipStack[clipStackPtr++] = getClipShape(this);
-            //Log.p("Pushing clip "+clipStack[clipStackPtr-1]);
+            
+            ClipShape newClip = ClipShape.create();
+            newClip.setShape(clip, null);
+            clipStack[clipStackPtr++] = newClip;
             
         }
         
         public Shape popClip(){
-            Shape s = clipStack[--clipStackPtr];
+            ClipShape s = clipStack[--clipStackPtr];
             //Log.p("Popping clip "+s);
             clipApplied = false;
-            setClipShape(this, s);
+            clip.setShape(s, null);
+            ClipShape.recycle(s);
+            applyClip();
             return s;
         }
         
         public void applyClip() {
-            if ( isTransformSupported()){
-                if ( clipApplied ){
-                    return;
-                }
-                //Log.p("In applyClip");
-                if ( this.clip == null ){
-                    //Log.p("Clip is null");
-                    int w = associatedImage == null ? Display.getInstance().getDisplayWidth() : associatedImage.width;
-                    int h = associatedImage == null ? Display.getInstance().getDisplayHeight() : associatedImage.height;
-                    clipX = 0;
-                    clipY = 0;
-                    clipW = w;
-                    clipH = h;
-                    this.clip = new Rectangle(0,0,w,h);
-                    setNativeClipping(0,0,w,h,clipApplied);
-                    clipApplied = true;
-                    return;
-                }
-                if ( this.clip.isRectangle() ){
-                    //Log.p("Clip is a rectangle");
-                    //Log.p(""+this.clip);
-                    Rectangle r = this.clip.getBounds();
-                    setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), clipApplied);
-                    clipApplied = true;
-                } else {
-                    //Log.p("Clip is not a rectangle");
-                    //Log.p(""+this.clip);
-                    setNativeClipping(this.clip);
-                    clipApplied = true;
-                }
-            } else {
-                //Log.p("In applyClip but transform is not supported");
-                if(clipH > -1 && clipW > -1) {
-                    setNativeClipping(clipX, clipY, clipW, clipH, clipApplied);
-                    clipApplied = true;
-                }
+            if ( clipApplied ){
+                return;
             }
+            //Log.p("In applyClip");
+            if ( this.clip == null ){
+                //Log.p("Clip is null");
+                int w = associatedImage == null ? Display.getInstance().getDisplayWidth() : associatedImage.width;
+                int h = associatedImage == null ? Display.getInstance().getDisplayHeight() : associatedImage.height;
+                clipX = 0;
+                clipY = 0;
+                clipW = w;
+                clipH = h;
+                this.clip = new ClipShape();
+                this.clip.setBounds(0,0,w,h);
+                setNativeClipping(0,0,w,h,clipApplied);
+                clipApplied = true;
+                return;
+            }
+            if ( this.clip.isRect() ){
+                //Log.p("Clip is a rectangle");
+                //Log.p(""+this.clip);
+                Rectangle r = this.reusableRect;
+                this.clip.getBounds(r);
+                setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), clipApplied);
+                clipApplied = true;
+            } else {
+                //Log.p("Clip is not a rectangle");
+                //Log.p(""+this.clip);
+                setNativeClipping(this.clip);
+                clipApplied = true;
+            }
+            
         }
 
         public void checkControl() {
@@ -3880,23 +3778,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             setNativeClippingMutable(x, y, width, height, firstClip);
         }
         
-        void setNativeClipping(Shape shape){
-            if (shape.getClass() == GeneralPath.class) {
-                // GeneralPath gives us some easy access to the points
-                GeneralPath p = (GeneralPath)shape;
-                if (transform != null && !transform.isIdentity()) {
-                    p = (GeneralPath)p.createTransformedShape(transform);
-                }
-                int commandsLen = p.getTypesSize();
-                int pointsLen = p.getPointsSize();
+        void setNativeClipping(ClipShape shape){
+            
+            if (shape.isRect()) {
+                shape.getBounds(reusableRect);
+                setNativeClippingMutable(reusableRect.getX(), reusableRect.getY(), reusableRect.getWidth(), reusableRect.getHeight(), clipApplied);
+                
+            } else {
+                int commandsLen = shape.getTypesSize();
+                int pointsLen = shape.getPointsSize();
                 byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
                 float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
-                p.getTypes(commandsArr);
-                p.getPoints(pointsArr);
+                shape.getTypes(commandsArr);
+                shape.getPoints(pointsArr);
                 nativeInstance.setNativeClippingMutable(commandsLen, commandsArr, pointsLen, pointsArr);
-                //nativeInstance.nativeDrawShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
-            } else {
-                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
             }
         }
 
@@ -3941,16 +3836,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         //----------------------------------------------------------------------
         // BEGIN DRAW SHAPE METHODS
         
-        
-        
-        
-        
         void nativeDrawAlphaMask(TextureAlphaMask mask){
             
         }
         
         
-        private float[] tmpNativeDrawShape_buf = new float[6];
         private float[] tmpNativeDrawShape_coords;
         
         private float[] getTmpNativeDrawShape_coords(int size) {
@@ -3986,15 +3876,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             return tmpNativeDrawShape_commands;
         }
         
-        private byte[] growTmpNativeDrawShape_commands(int size, int factor) {
-            if (tmpNativeDrawShape_commands.length < size) {
-                byte[] newArray = new byte[size * factor];
-                System.arraycopy(tmpNativeDrawShape_commands, 0, newArray, 0, tmpNativeDrawShape_commands.length);
-                tmpNativeDrawShape_commands = newArray;
-            }
-            return tmpNativeDrawShape_commands;
-        }
-        
         private byte[] tmpNativeDrawShape_commands;
         
         /**
@@ -4021,7 +3902,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             
         }
         
-        
         /**
          * Fills a shape in the graphics context.
          * @param shape
@@ -4042,9 +3922,6 @@ public class IOSImplementation extends CodenameOneImplementation {
                 Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
             }
         }
-        
-       
-        
         
         boolean isTransformSupported(){
             return true;
@@ -4068,23 +3945,36 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void resetAffine() {
             this.transform.setIdentity();
             transformApplied = false;
+            clipDirty = true;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
             this.applyTransform();
         }
 
         public void scale(float x, float y) {
             this.transform.scale(x, y, 1);
+            clipDirty = true;
             transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
             this.applyTransform();
         }
 
         public void rotate(float angle) {
             this.transform.rotate(angle, 0, 0);
+            clipDirty = true;
             transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            applyTransform();
         }
 
         public void rotate(float angle, int x, int y) {
             this.transform.rotate(angle, x, y);
             transformApplied = false;
+            clipDirty = true;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
             this.applyTransform();
         }
         
@@ -4134,71 +4024,63 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void applyTransform(){
-            if ( !transformApplied && isTransformSupported() ){
+            if ( !transformApplied){
                 setNativeTransformGlobal(this.transform);
                 transformApplied = true;
             }
         }
         
         public void resetAffine() {
-            if ( isTransformSupported() ){
-                this.transform.setIdentity();
-                transformApplied = false;
-                this.applyTransform();
-            } else {
-                nativeInstance.resetAffineGlobal();
-            }
+            this.transform.setIdentity();
+            transformApplied = false;
+            inverseClipDirty = true;
+            clipDirty = true;
+            inverseTransformDirty = true;
+            this.applyTransform();
         }
 
         public void scale(float x, float y) {
-            if ( isTransformSupported() ){
-                this.transform.scale(x, y, 1);
-                transformApplied = false;
-                this.applyTransform();
-            } else {
-                nativeInstance.scaleGlobal(x, y);
-            }
+            this.transform.scale(x, y, 1);
+            transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            clipDirty = true;
+            this.applyTransform();
         }
 
         public void rotate(float angle) {
-            if ( isTransformSupported() ){
-                this.transform.rotate(angle, 0, 0);
-                transformApplied = false;
-            } else {
-                nativeInstance.rotateGlobal(angle);
-            }
+            this.transform.rotate(angle, 0, 0);
+            transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            clipDirty = true;
+            applyTransform();
+            
         }
 
         public void rotate(float angle, int x, int y) {
-            if ( isTransformSupported() ){
-                this.transform.rotate(angle, x, y);
-                transformApplied = false;
-                this.applyTransform();
-            } else {
-                nativeInstance.rotateGlobal(angle, x, y);
-            }
+            this.transform.rotate(angle, x, y);
+            transformApplied = false;
+            this.applyTransform();
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            clipDirty = true;
+
         }
 
         public void shear(float x, float y) {
             nativeInstance.shearGlobal(x, y);
         }
         
-        
-
+        @Override
         void setNativeClipping(int x, int y, int width, int height, boolean firstClip) {
             setNativeClippingGlobal(x, y, width, height, firstClip);
         }
         
-        void setNativeClipping(Shape clip){
-            if (transform != null && !transform.isIdentity()) {
-                GeneralPath p = null;
-                if (clip.getClass() == GeneralPath.class) {
-                    p = (GeneralPath)((GeneralPath)clip).createTransformedShape(transform);
-                } else {
-                    p = new GeneralPath();
-                    p.append(clip.getPathIterator(transform), false);
-                }
-                setNativeClippingGlobal(p);
+        void setNativeClipping(ClipShape clip){
+            if (clip.isRect()) {
+                clip.getBounds(reusableRect);
+                setNativeClippingGlobal(reusableRect.getX(), reusableRect.getY(), reusableRect.getWidth(), reusableRect.getHeight(), clipApplied);
             } else {
                 setNativeClippingGlobal(clip);
             }
@@ -4224,12 +4106,41 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeFillRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);
         }
 
+        private Stroke tmpStroke1px;
         void nativeDrawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-            nativeDrawArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
+            // Turns out that using a Shape instead of using a Shader is much faster so we just pipe this
+            // through to DrawShape.
+            // See https://gist.github.com/shannah/85d93674d709c7733e98 for Shader implementation that we decided 
+            // not to use.
+            if (drawingArcPath == null) {
+                drawingArcPath = new GeneralPath();
+            }
+            if (tmpStroke1px == null) {
+                tmpStroke1px = new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 1f);
+            }
+            drawingArcPath.reset();
+            //drawingArcPath.moveTo(x + width / 2, y + height / 2);
+            drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, false);
+            //drawingArcPath.closePath();
+            nativeDrawShape(drawingArcPath, tmpStroke1px);
         }
 
+        // path used by fillArc to fill arcs.
+        private GeneralPath drawingArcPath;
+        
         void nativeFillArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-            nativeFillArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
+            // Turns out that using a Shape instead of using a Shader is much faster so we just pipe this
+            // through to DrawShape.
+            // See https://gist.github.com/shannah/85d93674d709c7733e98 for Shader implementation that we decided 
+            // not to use.
+            if (drawingArcPath == null) {
+                drawingArcPath = new GeneralPath();
+            }
+            drawingArcPath.reset();
+            drawingArcPath.moveTo(x + width / 2, y + height / 2);
+            drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, true);
+            drawingArcPath.closePath();
+            nativeFillShape(drawingArcPath);
         }
 
         void nativeDrawString(int color, int alpha, long fontPeer, String str, int x, int y) {
@@ -4257,35 +4168,94 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.drawConvexPolygonGlobal(points, color, alpha, lineWidth, joinStyle, capStyle, miterLimit);
         }
         
+        private GeneralPath tmpDrawShape;
+        private Transform tmpTransform, tmpTransform2;
+        private Rectangle tmpRect2;
+        private Stroke tmpDrawStroke;
+        private Image coreGraphicsBuffer;
         void nativeDrawShape(Shape shape, Stroke stroke){//float lineWidth, int capStyle, int miterStyle, float miterLimit) {
-            TextureAlphaMask mask = textureCache.get(shape, stroke);
-            if ( mask == null ){
-                mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
-                textureCache.add(shape, stroke, mask);
-                
-            }
-            if (mask==null){
-                // A null mask generally means the shape had zero bounds
-                return;
-            }
-            //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
-            nativeDrawAlphaMask(mask);
-            /*
             
-            PathIterator path = shape.getPathIterator();
-            Rectangle rb = shape.getBounds();
-            // Notice that these will be cleaned up in the dealloc method of the DrawPath objective-c class
-            NativePathRenderer renderer = new NativePathRenderer(rb.getX(), rb.getY(), rb.getWidth(), rb.getHeight(), NativePathRenderer.WIND_NON_ZERO);
-            NativePathStroker stroker = new NativePathStroker(renderer, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
-            //renderer.reset(ng.clipX, ng.clipY, ng.clipW, ng.clipH, NativePathRenderer.WIND_NON_ZERO);
-            //stroker.reset(lineWidth, capStyle, miterStyle, miterLimit);
-            NativePathConsumer c = stroker.consumer;
-            fillPathConsumer(path, c);
+            if (shape instanceof GeneralPath) {
+                if (transform == null || transform.isIdentity()) {
 
-            // We don't need the stroker anymore because it has passed the strokes to the renderer.
-            stroker.destroy();
-            drawPath(renderer, this.color, this.alpha);
-            */
+                    TextureAlphaMask mask = textureCache.get(shape, stroke);
+                    if ( mask == null ){
+                        mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                        textureCache.add(shape, stroke, mask);
+
+                    }
+                    if (mask==null){
+                        // A null mask generally means the shape had zero bounds
+                        return;
+                    }
+                    //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                    nativeDrawAlphaMask(mask);
+
+
+                } else {
+                    GeneralPath p = (GeneralPath)shape;
+                    if (tmpDrawShape == null) {
+                        tmpDrawShape = new GeneralPath();
+                    }
+                    if (tmpTransform == null) {
+                        tmpTransform = Transform.makeIdentity();
+                    }
+                    if (tmpTransform2 == null) {
+                        tmpTransform2 = Transform.makeIdentity();
+                    }
+                    if (tmpRect2 == null) {
+                        tmpRect2 = new Rectangle();
+                    }
+                    if (tmpDrawStroke == null) {
+                        tmpDrawStroke = new Stroke();
+                    }
+                    // If the shape is very small and would be scaled dramatically
+                    // by the transform, then we will want to rasterize the shape in a larger
+                    // size to prevent the OGL transform from making the path too blurry.
+                    // But we can't just apply the full transform because the renderer
+                    // won't render the stroke correctly with transform
+                    // So we need to factor the transformation matrix
+                    Rectangle origBounds = reusableRect;
+                    Rectangle transformedBounds = tmpRect2;
+                    p.getBounds(origBounds);
+                    tmpDrawShape.setShape(shape, transform);
+                    tmpDrawShape.getBounds(transformedBounds);
+                    float scale = Math.max(transformedBounds.getWidth()/(float)origBounds.getWidth(), transformedBounds.getHeight()/(float)origBounds.getHeight());
+                    tmpTransform.setScale(scale, scale);
+                    tmpDrawShape.setShape(shape, tmpTransform);
+
+                    tmpTransform.setTransform(transform);
+                    tmpTransform.scale(1/scale, 1/scale);
+
+                    tmpTransform2.setTransform(transform);
+                    try {
+                        this.setTransform(tmpTransform);
+                        if (stroke != null) {
+
+                            tmpDrawStroke.setStroke(stroke);
+                            tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * scale);
+                        }
+                        //applyTransform();
+                        TextureAlphaMask mask = textureCache.get(tmpDrawShape, stroke==null?null:tmpDrawStroke);
+                        if ( mask == null ){
+                            mask = (TextureAlphaMask)createAlphaMask(tmpDrawShape, stroke==null?null:tmpDrawStroke);
+                            textureCache.add(tmpDrawShape, stroke==null?null:tmpDrawStroke, mask);
+
+                        }
+                        if (mask==null){
+                            // A null mask generally means the shape had zero bounds
+                            return;
+                        }
+                        //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                        nativeDrawAlphaMask(mask);
+                    } finally {
+                        setTransform(tmpTransform2);
+                        //applyTransform();
+                    }
+                }
+            } else {
+                Log.p("drawShape() only supported for GeneralPaths currently");
+            }
         }
 
         
@@ -4297,24 +4267,11 @@ public class IOSImplementation extends CodenameOneImplementation {
          */
         void nativeFillShape(Shape shape) {
             nativeDrawShape(shape, null);
-            /*
-            PathIterator path = shape.getPathIterator();
-
-            Rectangle rb = shape.getBounds();
-            // Notice that this will be cleaned up in the dealloc method of the DrawPath objective-c class.
-            NativePathRenderer renderer = new NativePathRenderer(rb.getX(), rb.getY(), rb.getWidth(), rb.getHeight(), NativePathRenderer.WIND_NON_ZERO);
-            //renderer.reset(ng.clipX, ng.clipY, ng.clipW, ng.clipH, NativePathRenderer.WIND_NON_ZERO);
-            NativePathConsumer c = renderer.consumer;
-            fillPathConsumer(path, c);
-            drawPath(renderer, this.color, this.alpha);
-            */
-
         }
         
-        
-        
         boolean isTransformSupported(){
-            return nativeInstance.nativeIsTransformSupportedGlobal();
+            //return nativeInstance.nativeIsTransformSupportedGlobal();
+            return true; // Since they both support it now.
         }
         
         boolean isPerspectiveTransformSupported(){
@@ -4322,15 +4279,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         boolean isShapeSupported(){
-            return nativeInstance.nativeIsShapeSupportedGlobal();
+            //return nativeInstance.nativeIsShapeSupportedGlobal();
+            return true;
         }
         
         
         boolean isAlphaMaskSupported(){
-            return nativeInstance.nativeIsAlphaMaskSupportedGlobal();
+            return true;
+            //return nativeInstance.nativeIsAlphaMaskSupportedGlobal();
         }
         
-
         public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
             nativeInstance.fillRectRadialGradientGlobal(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
         }
@@ -7434,6 +7392,245 @@ public class IOSImplementation extends CodenameOneImplementation {
          nativeInstance.cancelLocalNotification(id);
     }
 
+    
+    static class ClipShape implements Shape {
+        
+        private final Rectangle rect = new Rectangle();
+        private final GeneralPath p = new GeneralPath();
+        private boolean isRect;
+        private static ArrayList<ClipShape> pool = new ArrayList<ClipShape>();
+        
+        public static synchronized ClipShape create() {
+            if (!pool.isEmpty()) {
+                return pool.remove(pool.size()-1);
+            }
+            return new ClipShape();
+        }
+        
+        public synchronized static void recycle(ClipShape shape) {
+            if (pool.size() <= 20 && shape != null) {
+                pool.add(shape);
+            }
+        }
+        
+        public boolean isRect() {
+            return isRect;
+        }
+        
+        
+        
+        @Override
+        public PathIterator getPathIterator() {
+            if (isRect) {
+                return rect.getPathIterator();
+            } else {
+                return p.getPathIterator();
+            }
+        }
+
+        @Override
+        public PathIterator getPathIterator(Transform transform) {
+            if (isRect) {
+                return rect.getPathIterator(transform);
+            } else {
+                return p.getPathIterator(transform);
+            }
+        }
+
+        @Override
+        public Rectangle getBounds() {
+            if (isRect) {
+                return rect.getBounds();
+            } else {
+                return p.getBounds();
+            }
+        }
+        
+        
+        public void getBounds(Rectangle r) {
+            if (isRect) {
+                r.setBounds(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+            } else {
+                p.getBounds(r);
+            }
+        }
+
+        @Override
+        public float[] getBounds2D() {
+            if (isRect) {
+                return rect.getBounds2D();
+            } else {
+                return p.getBounds2D();
+            }
+        }
+        
+        public void getBounds2D(float[] out) {
+            if (isRect) {
+                out[0] = rect.getX();
+                out[1] = rect.getY();
+                out[2] = rect.getWidth();
+                out[3] = rect.getHeight();
+            } else {
+                p.getBounds2D(out);
+            }
+        }
+
+        @Override
+        public boolean isRectangle() {
+            if (isRect) {
+                return true;
+            } else {
+                return p.isRectangle();
+            }
+        }
+
+        @Override
+        public boolean contains(int x, int y) {
+            if (isRect) {
+                return rect.contains(x, y);
+            } else {
+                return p.contains(x, y);
+            }
+        }
+
+        @Override
+        public Shape intersection(Rectangle rect) {
+            if (isRect) {
+                return this.rect.intersection(rect);
+            } else {
+                return this.p.intersection(rect);
+            }
+        }
+        
+        
+        public boolean intersect(Rectangle r) {
+            if (isRect) {
+                rect.intersection(r, rect);
+                return rect.getWidth() > 0 && rect.getHeight() > 0;
+            } else {
+                if (!p.intersect(r)) {
+                    rect.setBounds(0,0,0,0);
+                    isRect = true;
+                    return false;
+                } else {
+                    if (p.isRectangle()) {
+                        p.getBounds(rect);
+                        isRect = true;
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        public boolean intersect(int x, int y, int w, int h) {
+            if (isRect) {
+                Rectangle.intersection(x, y, w, h, rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight(), rect);
+                return rect.getWidth() >0 && rect.getHeight() > 0;
+            } else {
+                if (!p.intersect(x, y, w, h)) {
+                    rect.setBounds(0,0,0,0);
+                    isRect = true;
+                    return false;
+                } else {
+                    if (p.isRectangle()) {
+                        p.getBounds(rect);
+                        isRect = true;
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        public void setBounds(int x, int y, int w, int h) {
+            rect.setBounds(x, y, w, h);
+            isRect = true;
+        }
+        
+        public boolean equals(int x, int y, int w, int h) {
+            return isRect &&
+                    rect.getX() == x &&
+                    rect.getY() == y &&
+                    rect.getWidth() == w &&
+                    rect.getHeight() == h;
+        }
+        
+        public void setShape(Shape s, Transform t) {
+            if (s.isRectangle() && (t == null || t.isIdentity())) {
+                if (s.getClass() == GeneralPath.class) {
+                    ((GeneralPath)s).getBounds(rect);
+                } else if (s.getClass() == Rectangle.class) {
+                    Rectangle r = (Rectangle)s;
+                    rect.setBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+                } else {
+                    Rectangle r = s.getBounds();
+                    rect.setBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+                }
+                isRect = true;
+            } else {
+                p.setShape(s, t);
+                if (p.isRectangle()) {
+                    p.getBounds(rect);
+                    isRect = true;
+                } else {
+                    isRect = false;
+                }
+            }
+        }
+        
+        /**
+        * Returns the number of path commands in this path.
+        * @return The number of path commands in this path.
+        */
+        public int getTypesSize() {
+            if (isRect) {
+                p.setShape(rect, null);
+                return p.getTypesSize();
+            } else {
+                return p.getTypesSize();
+            }
+        }
+
+        /**
+         * Returns the number of points in this path.
+         * @return The number of points in this path.
+         */
+        public int getPointsSize() {
+            if (isRect) {
+                p.setShape(rect, null);
+                
+            }
+            return p.getPointsSize();
+        }
+
+        /**
+         * Returns a copy of the types (aka path commands) in this path.
+         * @param out An array to copy the path commands into.
+         */
+        public void getTypes(byte[] out) {
+            if (isRect) {
+                p.setShape(rect, null);
+            }
+            p.getTypes(out);
+        }
+
+        /**
+         * Returns a copy of the points in this path.
+         * @param out An array to copy the points into.
+         */
+        public void getPoints(float[] out) {
+            if (isRect) {
+                p.setShape(rect, null);
+            }
+            p.getPoints(out);
+        }
+        
+        public boolean isPolygon() {
+            if (isRect) {
+                return true;
+            }
+            return p.isPolygon();
+        }
+    }
 }
 
 

@@ -40,6 +40,7 @@ public final class Graphics {
     private int xTranslate;
     private int yTranslate;
     private Transform translation;
+    private GeneralPath tmpClipShape; /// A buffer shape to use when we need to transform a shape
     private int color;
     private Font current = Font.getDefaultFont();
 
@@ -66,6 +67,13 @@ public final class Graphics {
             translation.setTranslation(xTranslate, yTranslate);
         }
         return translation;
+    }
+    
+    private GeneralPath tmpClipShape() {
+        if (tmpClipShape == null) {
+            tmpClipShape = new GeneralPath();
+        }
+        return tmpClipShape;
     }
 
     /**
@@ -261,13 +269,9 @@ public final class Graphics {
      */
     public void setClip(Shape shape) {
         if (xTranslate != 0 || yTranslate != 0) {
-            if (shape instanceof GeneralPath) {
-                shape = ((GeneralPath)shape).createTransformedShape(translation());
-            } else {
-                GeneralPath p = new GeneralPath();
-                p.append(shape.getPathIterator(translation()), false);
-                shape = p;
-            }
+            GeneralPath p = tmpClipShape();
+            p.setShape(shape, translation());
+            shape = p;
         }
         impl.setClip(nativeGraphics, shape);
     }
@@ -601,9 +605,8 @@ public final class Graphics {
     public void drawShape(Shape shape, Stroke stroke){
         if ( isShapeSupported()){
             if ( xTranslate != 0 || yTranslate != 0 ){
-                GeneralPath p = new GeneralPath();
-                Transform t = Transform.makeTranslation(xTranslate, yTranslate, 0);
-                p.append(shape.getPathIterator(t), true);
+                GeneralPath p = tmpClipShape();
+                p.setShape(shape, translation());
                 shape = p;
             }
             impl.drawShape(nativeGraphics, shape, stroke);
@@ -624,9 +627,8 @@ public final class Graphics {
         
         if ( isShapeSupported() ){
             if ( xTranslate != 0 || yTranslate != 0 ){
-                GeneralPath p = new GeneralPath();
-                Transform t = Transform.makeTranslation(xTranslate, yTranslate, 0);
-                p.append(shape.getPathIterator(t), true);
+                GeneralPath p = tmpClipShape();
+                p.setShape(shape, translation());
                 shape = p;
             }
         
@@ -717,13 +719,20 @@ public final class Graphics {
      * Gets the transformation matrix that is currently applied to this graphics context.
      * @return The current transformation matrix.
      * @see #setTransform
+     * @deprecated Use {@link #getTransform(com.codename1.ui.Transform) } instead.
      */
     public Transform getTransform(){
         return impl.getTransform(nativeGraphics);
         
     }
     
-    
+    /**
+     * Loads the provided transform with the current transform applied to this graphics context.
+     * @param t An "out" parameter to be filled with the current transform.
+     */
+    public void getTransform(Transform t) {
+        impl.getTransform(nativeGraphics, t);
+    }
     
     //--------------------------------------------------------------------------
     // END SHAPE DRAWING METHODS

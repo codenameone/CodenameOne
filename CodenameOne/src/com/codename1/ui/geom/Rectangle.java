@@ -257,6 +257,7 @@ public class Rectangle implements Shape {
      * @return the intersection
      */
     public Rectangle intersection(int rX, int rY, int rW, int rH) {
+        
         int tx1 = this.x;
         int ty1 = this.y;
         int rx1 = rX;

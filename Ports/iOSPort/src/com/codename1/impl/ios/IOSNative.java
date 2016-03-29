@@ -67,8 +67,6 @@ public final class IOSNative {
     native void nativeFillRoundRectGlobal(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight);
     native void nativeFillArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
     native void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
-    native void nativeFillArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
-    native void nativeDrawArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
     native void nativeDrawStringMutable(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height);
@@ -577,6 +575,10 @@ public final class IOSNative {
     native void setNativeClippingMutable(int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
 
     native void refreshContacts();
+
+    native void translatePoints(int pointSize, float tX, float tY, float tX0, float[] in, int srcPos, float[] out, int destPos, int numPoints);
+
+    native void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints);
 
    
 

@@ -1263,7 +1263,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getNativeGraphics(Object image) {
-        return new AndroidGraphics(this, new Canvas((Bitmap) image));
+        return new AndroidGraphics(this, new Canvas((Bitmap) image), true);
     }
 
     @Override
@@ -1697,8 +1697,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void setClip(Object graphics, Shape shape) {
-        Path p = cn1ShapeToAndroidPath(shape);
-        ((AndroidGraphics) graphics).setClip(p);
+        //Path p = cn1ShapeToAndroidPath(shape);
+        ((AndroidGraphics) graphics).setClip(shape);
     }
     
 
@@ -6452,6 +6452,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         return CN1Matrix4f.makeTranslation(translateX, translateY, translateZ);
     }
+    
+    @Override
+    public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        CN1Matrix4f m = (CN1Matrix4f)nativeTransform;
+        m.reset();
+        m.translate(translateX, translateY, translateZ);
+    }
 
     @Override
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
@@ -6459,26 +6466,59 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         t.scale(scaleX, scaleY, scaleZ);
         return t;
     }
+    
+    @Override
+    public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
+        CN1Matrix4f t = (CN1Matrix4f)nativeTransform;
+        t.reset();
+        t.scale(scaleX, scaleY, scaleZ);
+    }
 
     @Override
     public Object makeTransformRotation(float angle, float x, float y, float z) {
         return CN1Matrix4f.makeRotation(angle, x, y, z);
+    }
+    
+    @Override
+    public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
+        CN1Matrix4f m = (CN1Matrix4f)nativeTransform;
+        m.reset();
+        m.rotate(angle, x, y, z);
     }
 
     @Override
     public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
         return CN1Matrix4f.makePerspective(fovy, aspect, zNear, zFar);
     }
+    
+    @Override
+    public void setTransformPerspective(Object nativeGraphics, float fovy, float aspect, float zNear, float zFar) {
+        CN1Matrix4f m = (CN1Matrix4f)nativeGraphics;
+        m.setPerspective(fovy, aspect, zNear, zFar);
+    }
 
     @Override
     public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
         return CN1Matrix4f.makeOrtho(left, right, bottom, top, near, far);
+    }
+    
+    @Override
+    public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
+        CN1Matrix4f m = (CN1Matrix4f)nativeGraphics;
+        m.setOrtho(left, right, bottom, top, near, far);
     }
 
     @Override
     public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
        return CN1Matrix4f.makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
     }
+    
+    @Override
+    public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        CN1Matrix4f m = (CN1Matrix4f)nativeGraphics;
+        m.setCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+    }
+
 
     @Override
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
@@ -6513,7 +6553,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         //}
         //return null;
     }
+    
+    @Override
+    public void setTransformInverse(Object nativeTransform) throws com.codename1.ui.Transform.NotInvertibleException {
+        
+        CN1Matrix4f m = (CN1Matrix4f)nativeTransform;
+        if (!m.invert()) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+    }
 
+    @Override
+    public void setTransformIdentity(Object transform) {
+        CN1Matrix4f m = (CN1Matrix4f)transform;
+        m.setIdentity();
+    }
+    
     @Override
     public Object makeTransformIdentity() {
         return CN1Matrix4f.makeIdentity();
@@ -6542,7 +6597,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void setTransform(Object graphics, Transform transform) {
         AndroidGraphics ag = (AndroidGraphics) graphics;
-        ag.setTransform(transform);
+        Transform existing = ag.getTransform();
+        if (existing == null) {
+            existing = transform == null ? Transform.makeIdentity() : transform.copy();
+            ag.setTransform(existing);
+        } else {
+            if (transform == null) {
+                existing.setIdentity();
+            } else {
+                existing.setTransform(transform);
+            }
+            ag.setTransform(existing); // sets dirty flag for transform
+        }
+        
     }
 
     @Override
@@ -6551,12 +6618,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (t == null) {
             return Transform.makeIdentity();
         }
-        return t;
+        Transform t2 = Transform.makeIdentity();
+        t2.setTransform(t);
+        return t2;
     }
+
+    @Override
+    public void getTransform(Object graphics, Transform transform) {
+        com.codename1.ui.Transform t = ((AndroidGraphics) graphics).getTransform();
+        if (t == null) {
+            transform.setIdentity();
+        } else {
+            transform.setTransform(t);
+        }
+    }
+    
+    
     // END TRANSFORM STUFF
 
-    private Path cn1ShapeToAndroidPath(com.codename1.ui.geom.Shape shape) {
-        Path p = new Path();
+
+    static Path cn1ShapeToAndroidPath(com.codename1.ui.geom.Shape shape, Path p) {
+        //Path p = new Path();
+        p.rewind();
         com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
         //p.setWindingRule(it.getWindingRule() == com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
         float[] buf = new float[6];
@@ -6584,6 +6667,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         return p;
+    }
+
+    static Path cn1ShapeToAndroidPath(com.codename1.ui.geom.Shape shape) {
+        return cn1ShapeToAndroidPath(shape, new Path());
     }
 
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {

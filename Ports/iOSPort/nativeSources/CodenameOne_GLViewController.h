@@ -182,4 +182,7 @@
 +(CodenameOne_GLViewController*)instance;
 -(void)upcomingAddClip:(ExecutableOp*)op;
 
++(BOOL)isCurrentMutableTransformSet;
+
++(CGAffineTransform) currentMutableTransform;
 @end

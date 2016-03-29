@@ -219,17 +219,20 @@ public final class CN1Matrix4f {
 
     public void setPerspective(float fovy, float aspect, float zNear, float zFar) {
         Matrix.perspectiveM(data, 0, (float) (fovy * 180f / Math.PI), aspect, zNear, zFar);
+        type = TYPE_UNKNOWN;
     }
 
     public void setOrtho(float left, float right, float bottom, float top,
             float near, float far) {
         Matrix.orthoM(data, 0, left, right, bottom, top, near, far);
+        type = TYPE_UNKNOWN;
     }
 
     public void setCamera(float eyeX, float eyeY, float eyeZ,
             float centerX, float centerY, float centerZ, float upX, float upY,
             float upZ) {
         Matrix.setLookAtM(data, 0, eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+        type = TYPE_UNKNOWN;
     }
 
     public void setIdentity() {
@@ -334,6 +337,7 @@ public final class CN1Matrix4f {
             data[i] = 0;
         }
         data[0] = data[5] = data[10] = data[15] = 1;
+        type = TYPE_IDENTITY;
 
     }
 

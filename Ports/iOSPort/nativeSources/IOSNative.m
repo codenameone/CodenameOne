@@ -75,7 +75,7 @@
 #import "Rotate.h"
 extern int popoverSupported();
 
-#define INCLUDE_CN1_PUSH2
+////#define INCLUDE_CN1_PUSH2
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
  JAVA_OBJECT fromNSString(NSString* str)
@@ -179,12 +179,6 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableIm
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
-
-extern void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
-
-extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
@@ -678,23 +672,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
-{
-    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_int_int_int]
-    POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl(n1, n2, n3, n4, n5, n6, n7, n8);
-    POOL_END();
-    //XMLVM_END_WRAPPER
-}
 
-void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
-{
-    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_int_int_int]
-    POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl(n1, n2, n3, n4, n5, n6, n7, n8);
-    POOL_END();
-    //XMLVM_END_WRAPPER
-}
 
 
 extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
@@ -717,12 +695,16 @@ void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_
     POOL_END();
     
 }
-//native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
+
 void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
     POOL_BEGIN();
-    
+    if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
+        CGContextSaveGState(UIGraphicsGetCurrentContext());
+        CGContextConcatCTM(UIGraphicsGetCurrentContext(), [CodenameOne_GLViewController currentMutableTransform]);
+    }
     CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
     CGContextSaveGState(context);
+
     [UIColorFromRGB(color, alpha) set];
     CGContextSetLineWidth(context, lineWidth);
     CGLineCap cap = kCGLineCapButt;
@@ -765,6 +747,9 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_
     
     CGContextStrokePath(context);
     CGContextRestoreGState(context);
+    if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
+        CGContextRestoreGState(context);
+    }
     POOL_END();
 }
 
@@ -5718,6 +5703,87 @@ void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_floa
 #endif
 }
 
+
+//public static native void transformPoints(float[] data, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints);
+JAVA_VOID com_codename1_impl_ios_Matrix_MatrixUtil_transformPoints___float_1ARRAY_int_float_1ARRAY_int_float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG
+JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT out, JAVA_INT destPos, JAVA_INT numPoints
+) {
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)m)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)in)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+#else
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)m)->data;
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+#endif
+    GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData);
+    JAVA_INT len = numPoints * pointSize;
+    for (JAVA_INT i=0; i<len; i+=pointSize) {
+        JAVA_INT s0 = srcPos + i;
+        GLKVector3 inputVector = GLKVector3Make(inData[s0], inData[s0+1], 0);
+        if (pointSize==3) {
+            inputVector.v[2]= inData[s0+2];
+        }
+        GLKVector3 outputVector = GLKMatrix4MultiplyVector3(mMat, inputVector);
+        
+        int d0 = destPos + i;
+        outData[d0++] = outputVector.v[0];
+        outData[d0++] = outputVector.v[1];
+        if (pointSize==3) {
+            outData[d0] = outputVector.v[2];
+        }     
+    }
+    
+}
+
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_translatePoints___int_float_float_float_float_1ARRAY_int_float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance,
+    JAVA_INT pointSize, JAVA_FLOAT tX, JAVA_FLOAT tY, JAVA_FLOAT tZ, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT out, JAVA_INT destPos, JAVA_INT numPoints
+) {
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)in)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+#else
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+#endif
+    JAVA_INT len = numPoints * pointSize;
+    for (JAVA_INT i=0; i<len; i+= pointSize) {
+        JAVA_INT s0 = srcPos + i;
+        JAVA_INT d0 = destPos + i;
+        outData[d0++] = inData[s0++] + tX;
+        outData[d0++] = inData[s0++] + tY;
+        if (pointSize == 3) {
+            outData[d0] = inData[s0] + tZ;
+        }
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_scalePoints___int_float_float_float_float_1ARRAY_int_float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance,
+    JAVA_INT pointSize, JAVA_FLOAT sX, JAVA_FLOAT sY, JAVA_FLOAT sZ, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT out, JAVA_INT destPos, JAVA_INT numPoints
+) {
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)in)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+#else
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+#endif
+    JAVA_INT len = numPoints * pointSize;
+    for (JAVA_INT i=0; i<len; i+= pointSize) {
+        JAVA_INT s0 = srcPos + i;
+        JAVA_INT d0 = destPos + i;
+        outData[d0++] = inData[s0++] * sX;
+        outData[d0++] = inData[s0++] * sY;
+        if (pointSize == 3) {
+            outData[d0] = inData[s0] * sZ;
+        }
+    }
+}
 
 JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int_float_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT mInv, JAVA_INT mInvOffset, JAVA_OBJECT m, JAVA_INT mOffset)
 {
