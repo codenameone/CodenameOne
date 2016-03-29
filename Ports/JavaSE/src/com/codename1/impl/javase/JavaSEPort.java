@@ -3784,6 +3784,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D g2d = getGraphics(graphics);
         Shape currentClip = g2d.getClip();
+        AffineTransform at = g2d.getTransform();
+        if (!at.isIdentity()) {
+            try {
+                at.invert();
+            } catch (Exception ex){}
+        }
+        
+        currentClip = at.createTransformedShape(currentClip);
         
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
@@ -3800,6 +3808,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
             Shape oldClip = g.clipStack.pop();
+            
             g2d.setClip(oldClip);
         }
         
@@ -4575,6 +4584,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return clamp(AffineTransform.getTranslateInstance(translateX, translateY));
     }
 
+    @Override
+    public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        at.setToTranslation(translateX, translateY);
+        at.setTransform(clamp(at));
+    }
+
     /**
      * Makes a new native scale transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4589,7 +4605,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
         return clamp(AffineTransform.getScaleInstance(scaleX, scaleY));
     }
+    
+    
 
+    @Override
+    public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        at.setToScale(scaleX, scaleY);
+        at.setTransform(clamp(at));
+       
+    }
+    
     /**
      * Makes a new native rotation transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4606,6 +4632,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         return clamp(AffineTransform.getRotateInstance(angle, x, y));
     }
 
+    @Override
+    public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        at.setToRotation(angle, x, y);
+        at.setTransform(clamp(at));
+    }
+
+    
+    
     /**
      * Makes a new perspective transform. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4619,9 +4654,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @see #isPerspectiveTransformSupported()
      */
     public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
-        throw new RuntimeException("Transforms not supported");
+        throw new RuntimeException("Perspective transform not supported");
     }
 
+    @Override
+    public void setTransformPerspective(Object nativeTransform, float fovy, float aspect, float zNear, float zFar) {
+        throw new RuntimeException("Perspective transforms not supported");
+    }
+
+    
+    
     /**
      * Makes a new orthographic projection transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4637,9 +4679,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @see #isPerspectiveTransformSupported()
      */
     public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
-        throw new RuntimeException("Transforms not supported");
+        throw new RuntimeException("Perspective transforms not supported");
     }
 
+    @Override
+    public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
+        throw new RuntimeException("Perspective transforms not supported");
+    }
+
+    
+    
     /**
      * Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4661,6 +4710,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    @Override
+    public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        throw new RuntimeException("Perspective transforms not supported");
+    }
+
+    
+    
     /**
      * Rotates the provided  transform.
      * @param nativeTransform The transform to rotate. Each implementation can decide the format
@@ -4730,6 +4786,20 @@ public class JavaSEPort extends CodenameOneImplementation {
            return null;
        }
     }
+
+    @Override
+    public void setTransformInverse(Object nativeTransform) throws com.codename1.ui.Transform.NotInvertibleException {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        
+        try {
+            at.invert();
+            at.setTransform(clamp(at));
+        } catch (Exception ex) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+    }
+    
+    
     
     /**
      * Makes a new identity native transform. Each implementation can decide the format
@@ -4742,6 +4812,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object makeTransformIdentity(){
         return new AffineTransform();
     }
+
+    @Override
+    public void setTransformIdentity(Object transform) {
+        AffineTransform at = (AffineTransform)transform;
+        at.setToIdentity();
+    }
+    
+    
+    
 
     /**
      * Copies the setting of one transform into another.  Each implementation can decide the format
@@ -4787,7 +4866,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         clamp(out);
     }
 
-    // END TRANSFORM STUFF
+    
     @Override
     public void setTransform(Object graphics, Transform transform) {
         checkEDT();
@@ -4796,8 +4875,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         t.concatenate((AffineTransform)transform.getNativeTransform());
         clamp(t);
         g.setTransform(t);
+        Transform existing = getNativeScreenGraphicsTransform(graphics);
+        if (existing == null) {
+            existing = transform.copy();
+            setNativeScreenGraphicsTransform(graphics, existing);
+        } else {
+            existing.setTransform(transform);
+        }
         
-        setNativeScreenGraphicsTransform(graphics, transform);
     }
 
     @Override
@@ -4807,9 +4892,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ( t == null ){
             return Transform.makeIdentity();
         }
-        return t;
+        return t.copy();
+    }
+
+    @Override
+    public void getTransform(Object graphics, Transform transform) {
+        checkEDT();
+        com.codename1.ui.Transform t = getNativeScreenGraphicsTransform(graphics);
+        if ( t == null ){
+            transform.setIdentity();
+        } else {
+            transform.setTransform(t);
+        }
+
     }
     
+    
+    
+    // END TRANSFORM STUFF
     
     
     private com.codename1.ui.geom.Shape awtShapeToCn1Shape(Shape shape){
