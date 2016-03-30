@@ -2641,8 +2641,8 @@ static BOOL skipNextTouch = NO;
 -(void)foldKeyboard:(CGPoint) point {
     POOL_BEGIN();
     if(editingComponent != nil) {
-        if(!(editCompoentX <= point.x/scaleValue && editCompoentY <= point.y/scaleValue && editCompoentW + editCompoentX >= point.x/scaleValue &&
-             editCompoentY + editCompoentH >= point.y/scaleValue)) {
+        if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
+             editCompoentY + editCompoentH >= point.y)) {
             if([editingComponent isKindOfClass:[UITextView class]]) {
                 UITextView* v = (UITextView*)editingComponent;
                 stringEdit(YES, -1, v.text);
@@ -2727,8 +2727,8 @@ static BOOL skipNextTouch = NO;
         yArray[0] = (int)point.y * scaleValue;
     }
     if(!isVKBAlwaysOpen()) {
-        CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
-        [self foldKeyboard:scaledPoint];
+        //CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
+        [self foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
