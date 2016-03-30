@@ -7912,7 +7912,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
- 
+
+    /**
+     * @inheritDoc
+     */
+    public PeerComponent createNativePeer(Object nativeComponent) {
+        if (!(nativeComponent instanceof java.awt.Component)) {
+            throw new IllegalArgumentException(nativeComponent.getClass().getName());
+        }
+        java.awt.Container cnt = canvas.getParent();
+        while (!(cnt instanceof JFrame)) {
+            cnt = cnt.getParent();
+            if (cnt == null) {
+                return null;
+            }
+        }
+        
+        return new JavaSEPort.Peer((JFrame)cnt, (java.awt.Component) nativeComponent);
+    }
+    
     public Image gaussianBlurImage(Image image, float radius) {
         GaussianFilter gf = new GaussianFilter(radius);
         Image bim = Image.createImage(image.getWidth(), image.getHeight());        
@@ -7931,4 +7949,120 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
     
+    class Peer extends PeerComponent {
+        
+        private JPanel cnt = new JPanel();
+        private boolean init = false;
+        private JFrame frm;
+        private java.awt.Component cmp;
+        
+        Peer(JFrame f, java.awt.Component c) {
+            super(null);
+            this.frm = f;
+            this.cmp = c;
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    //cmp.setPreferredSize(cmp.getPreferredSize());
+                    cnt.setLayout(new BorderLayout());
+                    cnt.add(BorderLayout.CENTER, cmp);
+                    cnt.setVisible(false);
+                }
+            });
+        }
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+        }
+
+        @Override
+        protected void deinitialize() {
+            super.deinitialize();
+            if (testRecorder != null) {
+                testRecorder.dispose();
+                testRecorder = null;
+            }
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    frm.remove(cnt);
+                    frm.repaint();
+                }
+            });
+        }
+
+        protected void setLightweightMode(final boolean l) {
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+
+                    if (!l) {
+                        if (!init) {
+                            init = true;
+                            cnt.setVisible(true);
+                            frm.add(cnt, 0);
+                            frm.repaint();
+                        } else {
+                            cnt.setVisible(false);
+                        }
+                    } else {
+                        if (init) {
+                            cnt.setVisible(false);
+                        }
+                    }
+                }
+            });
+
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            //return new com.codename1.ui.geom.Dimension(50, 50);
+            return new com.codename1.ui.geom.Dimension((int)cmp.getPreferredSize().getWidth(), 
+                    (int)cmp.getPreferredSize().getHeight());
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            if (init) {
+                onPositionSizeChange();
+            }else{
+                if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
+                    setLightweightMode(false);
+                }
+            }
+        }
+
+        @Override
+        protected void onPositionSizeChange() {
+            final int x = getAbsoluteX();
+            final int y = getAbsoluteY();
+            final int w = getWidth();
+            final int h = getHeight();
+
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    int screenX = 0;
+                    int screenY = 0;
+                    if(getScreenCoordinates() != null) {
+                        screenX = getScreenCoordinates().x;
+                        screenY = getScreenCoordinates().y;
+                    }
+                    cnt.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
+                            (int) ((y + screenY + canvas.y) * zoomLevel),
+                            (int) (w * zoomLevel),
+                            (int) (h * zoomLevel));
+                    cnt.validate();
+                }
+            });
+
+        }
+
+    }
 }

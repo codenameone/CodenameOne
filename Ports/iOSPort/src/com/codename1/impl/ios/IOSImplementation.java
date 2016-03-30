@@ -5248,6 +5248,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean canDial() {
+        boolean s = super.canDial(); 
+        return s && nativeInstance.canExecute("tel://911");
+    }
+    
+    @Override
     public int getSMSSupport() {
         return Display.SMS_INTERACTIVE;
     }

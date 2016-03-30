@@ -131,7 +131,32 @@
             <entry key="build" value="${tstamp}"/>
         </propertyfile>
     </target>
-    
+
+    <target name="weeklyLibUpdate" depends="jar">
+        <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="clean" />
+        <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="jar" />
+
+        <delete dir="build/tempsource" />
+        <!-- this will get overriden the main value is keeping the package.html files -->
+        <copydir src="src" dest="build/tempsource" />
+        <java fork="true" jar="../../cn1-binraries/JavaDocSourceEmbed.jar">
+            <arg file="src" />
+            <arg file="build/tempsource" />
+        </java>        
+        <zip basedir="build/tempsource" destfile="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+
+        <deltree dir="build/tmp"/>
+        <mkdir dir="build/tmp"/>
+        <copy file="dist/CodenameOne.jar" todir="build/tmp" />
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="build/tmp" />
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
+        <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
+        <zip basedir="build/tmp" compress="true" file="updatedLibs.zip" />
+        <deltree dir="build/tmp"/>        
+    </target>
+            
     <target name="release" depends="jar">
         <delete dir="build/CodenameOneDist" />        
         <mkdir dir="build/CodenameOneDist/CodenameOne" />
@@ -331,7 +356,7 @@
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
         <copy file="../../CodenameOne/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
-        <zip basedir="build/tmp" compress="true" file="//Users/shai/dev/cn1/CodenameOne/repo/updatedLibs.zip" />
+        <zip basedir="build/tmp" compress="true" file="repo/updatedLibs.zip" />
         <deltree dir="build/tmp"/>
 
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/TZoneFriends/dist" />        

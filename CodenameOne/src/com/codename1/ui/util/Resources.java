@@ -1225,7 +1225,6 @@ public class Resources {
     }
     
     Font createTrueTypeFont(Font f, String fontName, String fileName, float fontSize, int sizeSetting) {
-        System.out.println("in createTrueTypeFont("+f+", "+fontName+", "+fileName+", "+fontSize+", "+sizeSetting);
         switch(sizeSetting) {
             case 0:
                 fontSize = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL).getHeight();
@@ -1242,7 +1241,6 @@ public class Resources {
         }
         if(!failOnMissingTruetype) {
             try {
-                System.out.println("Failed onMissingTruetype");
                 return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
             } catch(Exception err) {
                 err.printStackTrace();

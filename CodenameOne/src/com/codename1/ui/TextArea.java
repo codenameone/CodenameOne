@@ -1283,7 +1283,7 @@ public class TextArea extends Component {
      * @deprecated use Style.setAlignment instead
      */
     public void setAlignment(int align) {
-        getStyle().setAlignment(align);
+        getAllStyles().setAlignment(align);
     }
 
     /**
