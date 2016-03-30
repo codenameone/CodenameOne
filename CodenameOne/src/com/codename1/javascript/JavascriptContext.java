@@ -61,7 +61,7 @@ public class JavascriptContext  {
     /**
      * Flag to enable/disable logging to a debug log.
      */
-    public static boolean DEBUG=true;
+    public static boolean DEBUG=false;
     
     /**
      * The browser component on which this context operates.
