@@ -2641,8 +2641,8 @@ static BOOL skipNextTouch = NO;
 -(void)foldKeyboard:(CGPoint) point {
     POOL_BEGIN();
     if(editingComponent != nil) {
-        if(!(editCompoentX <= point.x && editCompoentY <= point.y && editCompoentW + editCompoentX >= point.x &&
-             editCompoentY + editCompoentH >= point.y)) {
+        if(!(editCompoentX <= point.x/scaleValue && editCompoentY <= point.y/scaleValue && editCompoentW + editCompoentX >= point.x/scaleValue &&
+             editCompoentY + editCompoentH >= point.y/scaleValue)) {
             if([editingComponent isKindOfClass:[UITextView class]]) {
                 UITextView* v = (UITextView*)editingComponent;
                 stringEdit(YES, -1, v.text);
