@@ -323,25 +323,19 @@ public final class GeneralPath implements Shape {
         
         
         public int currentSegment(double[] coords) {
-            if (isDone()) {
-                // awt.4B=Iterator out of bounds
-                throw new IndexOutOfBoundsException("Path done"); //$NON-NLS-1$
-            }
-            int type = p.types[typeIndex];
-            int count = GeneralPath.pointShift[type];
-            System.arraycopy(p.points, pointIndex, coords, 0, count);
-            if (transform != null) {
-
-                for (int i = 0; i < count; i += 2) {
-                    buf[0] = (float)coords[i];
-                    buf[1] = (float)coords[i + 1];
-                    transform.transformPoint(buf, buf);
-                    coords[i] = buf[0];
-                    coords[i + 1] = buf[1];
+            float[] fcoords = createFloatArrayFromPool(6);
+            try {
+                int res = currentSegment(fcoords);
+                int type = p.types[typeIndex];
+                int count = GeneralPath.pointShift[type];
+            
+                for (int i=0; i< count; i ++) {
+                    coords[i] = fcoords[i];
                 }
+                return res;
+            } finally {
+                recycle(fcoords);
             }
-            pointIndex += count;
-            return type;
         }
 
         private float[] buf = new float[2];
@@ -353,16 +347,10 @@ public final class GeneralPath implements Shape {
             }
             int type = p.types[typeIndex];
             int count = GeneralPath.pointShift[type];
-            System.arraycopy(p.points, pointIndex, coords, 0, count);
-            if (transform != null) {
-
-                for (int i = 0; i < count; i += 2) {
-                    buf[0] = coords[i];
-                    buf[1] = coords[i + 1];
-                    transform.transformPoint(buf, buf);
-                    coords[i] = buf[0];
-                    coords[i + 1] = buf[1];
-                }
+            if (transform == null) {
+                System.arraycopy(p.points, pointIndex, coords, 0, count);
+            } else {
+                transform.transformPoints(2, p.points, pointIndex, coords, 0, count / 2);
             }
             pointIndex += count;
             return type;
