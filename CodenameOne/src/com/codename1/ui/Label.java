@@ -607,9 +607,8 @@ public class Label extends Component {
     }
    
     /**
-     * If the Label text is too long fit the text to the widget and add "..."
-     * points at the end.
-     * By default this is set to true
+     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
+     * points at the end. By default this is set to {@code false} for faster performance.
      * 
      * @param endsWith3Points true if text should add "..." at the end
      */
@@ -618,7 +617,8 @@ public class Label extends Component {
     }
 
     /**
-     * Simple getter
+     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
+     * points at the end. By default this is set to {@code false} for faster performance.
      * 
      * @return true if this Label adds "..." when the text is too long
      */

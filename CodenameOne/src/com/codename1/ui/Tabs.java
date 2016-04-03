@@ -1191,13 +1191,15 @@ public class Tabs extends Container {
     
     /**
      * Allows developers to customize the motion object for the slide effect
-     * to provide a linear slide effect.
+     * to provide a linear slide effect. You can use the {@code tabsSlideSpeedInt} 
+     * theme constant to define the time in milliseconds between releasing the swiped
+     * tab and reaching the next tab. This currently defaults to 200.
      * @param start start position
      * @param end end position for the motion
      * @return the motion object
      */
     protected Motion createTabSlideMotion(int start, int end) {
-        return Motion.createSplineMotion(start, end, 250);
+        return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant("tabsSlideSpeedInt", 200));
     }
     
     class SwipeListener implements ActionListener{
