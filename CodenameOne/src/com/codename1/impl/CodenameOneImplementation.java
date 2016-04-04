@@ -351,6 +351,17 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Called when TextArea text is changed.  Can be used by the native 
+     * implementation to trigger an update to the native editor if in async edit
+     * mode.
+     * @param c The TextArea that is being edited.
+     * @param text 
+     */
+    public void updateNativeEditorText(Component c, String text) {
+        
+    }
+    
+    /**
      * In case of scrolling we can hide the text editor unless the user starts typing again,
      * this is only relevant for the async mode...
      */

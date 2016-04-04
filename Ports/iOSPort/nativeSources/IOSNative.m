@@ -5242,6 +5242,24 @@ void com_codename1_impl_ios_IOSNative_setNativeEditingComponentVisible___boolean
     });
 }
 
+void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text) {
+    if (editingComponent == nil) {
+        return;
+    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if(editingComponent != nil) {
+            NSString* nsText = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
+            NSString* currText = ((UITextView*)editingComponent).text;
+            if (![nsText isEqualToString:currText]) {
+                ((UITextView*)editingComponent).text = nsText;
+            }
+        }
+        POOL_END();
+    });
+    
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {
     POOL_BEGIN();
     SocketImpl* impl = [[SocketImpl alloc] init];

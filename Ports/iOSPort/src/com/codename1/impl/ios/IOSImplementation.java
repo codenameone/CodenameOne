@@ -828,6 +828,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
+    @Override
+    public void updateNativeEditorText(Component c, String text) {
+        if (isEditingText(c)) {
+            nativeInstance.updateNativeEditorText(text);
+        }
+    }
+    
+    
+
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
             ((NativeImage)image).deleteImage();
