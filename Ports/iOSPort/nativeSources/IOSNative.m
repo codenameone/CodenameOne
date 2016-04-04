@@ -75,7 +75,7 @@
 #import "Rotate.h"
 extern int popoverSupported();
 
-////#define INCLUDE_CN1_PUSH2
+#define INCLUDE_CN1_PUSH2
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
  JAVA_OBJECT fromNSString(NSString* str)
