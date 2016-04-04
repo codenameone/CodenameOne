@@ -162,7 +162,13 @@ public final class GeneralPath implements Shape {
         
     }
     
-    private static synchronized void recycle(GeneralPath p) {
+    /**
+     * Returns a GeneralPath to the reusable object pool for GeneralPaths.
+     * @param p The path to recycle.
+     * 
+     * @see #createFromPool() 
+     */
+    public static synchronized void recycle(GeneralPath p) {
         if (pathPool().size() >= MAX_POOL_SIZE || p == null) return;
         pathPool.add(p);
     }
@@ -191,6 +197,20 @@ public final class GeneralPath implements Shape {
         }
         iteratorPool.add(it);
     }
+    
+    /**
+     * Creates a new GeneralPath from an object Pool.  This is useful
+     * if you need to create a temporary General path that you wish
+     * to dispose of after using.  
+     * 
+     * <p>You should return this object back to the pool when you are done
+     * using the {@link #recycle(com.codename1.ui.geom.GeneralPath) } method.
+     * @return 
+     */
+    public static GeneralPath createFromPool() {
+        return createPathFromPool();
+    }
+    
     
     
     private boolean dirty = false;
@@ -535,6 +555,41 @@ public final class GeneralPath implements Shape {
         }
         dirty = true;
         this.rule = rule;
+    }
+    
+    
+    public boolean equals(Shape shape, Transform t) {
+        if (t != null && !t.isIdentity()) {
+            GeneralPath p = createPathFromPool();
+            p.setShape(shape, t);
+            try {
+                return equals(p, (Transform)null);
+            } finally {
+                recycle(p);
+            }
+        }
+        if (shape == this) return true;
+        if (shape instanceof Rectangle) {
+            Rectangle r = (Rectangle)shape;
+            Rectangle tmpRect = createRectFromPool();
+            try {
+                getBounds(tmpRect);
+                return r.equals(tmpRect);
+            } finally {
+                recycle(tmpRect);
+            }
+        } else if (shape instanceof GeneralPath) {
+            GeneralPath tmpPath = (GeneralPath)shape;
+            return Arrays.equals(points, tmpPath.points) && Arrays.equals(types, tmpPath.types);
+        } else {
+            GeneralPath tmpPath2 = createPathFromPool();
+            try {
+                tmpPath2.setShape(shape, null);
+                return equals(tmpPath2, (Transform)null);
+            } finally {
+                recycle(tmpPath2);
+            }
+        }
     }
 
     /**
