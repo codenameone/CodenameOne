@@ -2023,7 +2023,8 @@ UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
-        com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor whiteColor];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor clearColor];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.opaque = NO;
         com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizesSubviews = YES;
         UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.delegate = del;
