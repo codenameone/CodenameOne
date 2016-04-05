@@ -122,9 +122,9 @@ public class Table extends Container {
      * @param model the model underlying this table
      */
     public Table(TableModel model) {
+        setUIID("Table");
         this.model = model;
         updateModel();
-        setUIID("Table");
     }
 
     /**
