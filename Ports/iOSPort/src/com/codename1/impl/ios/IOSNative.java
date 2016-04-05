@@ -580,6 +580,8 @@ public final class IOSNative {
 
     native void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints);
 
+    native void updateNativeEditorText(String text);
+
    
 
 }

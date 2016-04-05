@@ -75,7 +75,7 @@
 #import "Rotate.h"
 extern int popoverSupported();
 
-////#define INCLUDE_CN1_PUSH2
+#define INCLUDE_CN1_PUSH2
 
 /*static JAVA_OBJECT utf8_constant = JAVA_NULL;
  JAVA_OBJECT fromNSString(NSString* str)
@@ -2023,7 +2023,8 @@ UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
-        com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor whiteColor];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor clearColor];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.opaque = NO;
         com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizesSubviews = YES;
         UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.delegate = del;
@@ -5240,6 +5241,24 @@ void com_codename1_impl_ios_IOSNative_setNativeEditingComponentVisible___boolean
         }
         POOL_END();
     });
+}
+
+void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text) {
+    if (editingComponent == nil) {
+        return;
+    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if(editingComponent != nil) {
+            NSString* nsText = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
+            NSString* currText = ((UITextView*)editingComponent).text;
+            if (![nsText isEqualToString:currText]) {
+                ((UITextView*)editingComponent).text = nsText;
+            }
+        }
+        POOL_END();
+    });
+    
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {

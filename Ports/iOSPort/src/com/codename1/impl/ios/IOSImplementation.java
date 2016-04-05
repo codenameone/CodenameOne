@@ -828,6 +828,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
 
+    @Override
+    public void updateNativeEditorText(Component c, String text) {
+        if (isEditingText(c)) {
+            nativeInstance.updateNativeEditorText(text);
+        }
+    }
+    
+    
+
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
             ((NativeImage)image).deleteImage();
@@ -3501,7 +3510,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     class NativeGraphics {
-        Rectangle reusableRect = new Rectangle();
+        final Rectangle reusableRect = new Rectangle();
+        final Rectangle reusableRect2 = new Rectangle();
         NativeImage associatedImage;
         int color;
         int alpha = 255;
@@ -3509,6 +3519,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int clipX, clipY, clipW = -1, clipH = -1;
         boolean clipApplied;
         ClipShape clip;
+        final ClipShape reusableClipShape = new ClipShape();
         /**
          * Used with the ES2 pipeline (or any engine where transforms are supported)
          * to record if the clipX, clipY, clipW, and clipH parameters need to be updated.
@@ -3531,11 +3542,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         
         void setClip(Shape newClip) {
-            clip.setShape(newClip, transform);
-            clipDirty = true;
-            clipApplied = false;
-            inverseClipDirty = true;
-            applyClip();
+            if (!clip.equals(newClip, transform)) { 
+                clip.setShape(newClip, transform);
+                clipDirty = true;
+                clipApplied = false;
+                inverseClipDirty = true;
+                applyClip();
+            }
         }
         
         
@@ -3549,16 +3562,19 @@ public class IOSImplementation extends CodenameOneImplementation {
                     clipDirty = true;
                     clipApplied = false;
                     inverseClipDirty = true;
-                    
+                    applyClip();
                 }
             } else {
                 reusableRect.setBounds(x, y, w, h);
-                clip.setShape(reusableRect, transform);
-                clipDirty = true;
-                clipApplied = false;
-                inverseClipDirty = true;
+                if (!clip.equals(reusableRect, transform)) {
+                    clip.setShape(reusableRect, transform);
+                    clipDirty = true;
+                    clipApplied = false;
+                    inverseClipDirty = true;
+                    applyClip();
+                }
             }
-            applyClip();
+            
         }
         
         void clipRect(int x, int y, int w, int h) {
@@ -3568,19 +3584,41 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             
             if (transform == null || transform.isIdentity()) {
+                // Preliminary checks to see if clipping is unnecessary
+                clip.getBounds(reusableRect);
+                reusableRect2.setBounds(x, y, w, h);
+                
+                boolean clipIsRect = clip.isRect();
+                if (clipIsRect && reusableRect2.contains(reusableRect)) {
+                    // The intersection did not change the resulting clip shape
+                    // Just retrun here.
+                    return;
+                } 
+                if (!clipIsRect) {
+                    reusableClipShape.setShape(clip, null);
+                }
                 clip.intersect(x, y, w, h);
+                if (!clipIsRect && clip.equals(reusableClipShape, null)) {
+                    return;
+                }
                 clipDirty = true;
                 clipApplied = false;
                 inverseClipDirty = true;
+                applyClip();
             } else {
                 GeneralPath inverseClip = inverseClip();
                 inverseClip.intersect(x, y, w, h);
+                reusableClipShape.setShape(clip, null);
                 clip.setShape(inverseClip, transform);
+                if (clip.equals(reusableClipShape, null)) {
+                    return;
+                }
                 clipDirty = true;
                 clipApplied = false;
                 inverseClipDirty = true;
+                applyClip();
             }
-            applyClip();
+            
         }
         
         void loadClipBounds(){
@@ -7559,6 +7597,53 @@ public class IOSImplementation extends CodenameOneImplementation {
                     rect.getWidth() == w &&
                     rect.getHeight() == h;
         }
+        
+        
+        public boolean equals(Shape s, Transform t) {
+            if (t != null && !t.isIdentity()) {
+                GeneralPath tmp = GeneralPath.createFromPool();
+                try {
+                    tmp.setShape(s, t);
+                    return equals(tmp, null);
+                } finally {
+                    GeneralPath.recycle(tmp);
+                }
+            }
+            
+            // At this point we know that t is null or the identity
+            if (s == this) {
+                return true;
+            }
+            
+            if (s instanceof ClipShape) {
+                ClipShape cs = (ClipShape)s;
+                return cs.isRect ? equals(cs.rect, t) : equals(cs.p, t);
+            } else if (s instanceof Rectangle) {
+                if (isRect) {
+                    return rect.equals((Rectangle)s);
+                } else {
+                    return p.equals(s, (Transform) null);
+                }
+            } else if (s instanceof GeneralPath) {
+                GeneralPath sPath = (GeneralPath)s;
+                if (isRect) {
+                    return sPath.equals(rect, (Transform)null);
+                } else {
+                    return sPath.equals(p, (Transform)null);
+                }
+            } else {
+                GeneralPath p2 = GeneralPath.createFromPool();
+                try {
+                    p2.setShape(s, null);
+                    return equals(p2, null);
+                } finally {
+                    GeneralPath.recycle(p2);
+                }
+            }
+            
+        }
+        
+        
         
         public void setShape(Shape s, Transform t) {
             if (s.isRectangle() && (t == null || t.isIdentity())) {

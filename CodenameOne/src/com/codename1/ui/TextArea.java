@@ -413,6 +413,7 @@ public class TextArea extends Component {
      * @param t new value for the text area
      */
     public void setText(String t) {
+        String old = this.text;
         this.text = (t != null) ? t : "";
         setShouldCalcPreferredSize(true);
         if(maxSize < text.length()) {
@@ -423,8 +424,12 @@ public class TextArea extends Component {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings=null; 
         }
+        
         // while native editing we don't need the cursor animations
         if(Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {
+            if (!text.equals(old)) {
+                Display.impl.updateNativeEditorText(this, text);
+            }
             return;
         }
         repaint();
