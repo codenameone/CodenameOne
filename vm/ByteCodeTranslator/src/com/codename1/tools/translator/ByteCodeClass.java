@@ -49,6 +49,8 @@ public class ByteCodeClass {
     private boolean isInterface;
     private boolean isAbstract;
     private boolean usedByNative;
+    private static boolean saveUnitTests;
+    private boolean isUnitTest;
 
     private static Set<String> arrayTypes = new TreeSet<String>();
     
@@ -70,6 +72,11 @@ public class ByteCodeClass {
     static ByteCodeClass getMainClass() {
 		return mainClass;
     }
+    
+    static void setSaveUnitTests(boolean save) {
+        saveUnitTests = save;
+    }
+    
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
             if (mainClass == null) {
@@ -128,6 +135,9 @@ public class ByteCodeClass {
                 bc.markDependent(lst);
             }
             if(!bc.marked && bc.isUsedByNative()){
+                bc.markDependent(lst);
+            }
+            if(!bc.marked && saveUnitTests && bc.isUnitTest) {
                 bc.markDependent(lst);
             }
         }
@@ -1399,6 +1409,10 @@ public class ByteCodeClass {
     public void setIsInterface(boolean isInterface) {
         this.isInterface = isInterface;
     }
+    
+    public void setIsUnitTest(boolean isUnitTest) {
+        this.isUnitTest = isUnitTest;
+    }
 
     /**
      * @return the isAbstract
@@ -1526,6 +1540,10 @@ public class ByteCodeClass {
             }
         }
         return usedByNative;
+    }
+
+    boolean isUnitTest() {
+        return isUnitTest;
     }
 
     
