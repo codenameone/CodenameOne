@@ -390,6 +390,7 @@
         
         <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Docs_Demos_${tstamp}.zip" />
 
+        <copy file="../../CodenameOne/NBPlugin/CodenameOne_Template/build.xml" tofile="../../CodenameOne/CodenameOneSettings/src/build.xml" />
         <ant inheritall="false" antfile="../../CodenameOne/GUIBuilder/GUIBuilderSE/build.xml" target="pack" />
         <ant inheritall="false" antfile="../CodenameOneDesigner/build.xml" target="release" />
         <!-- zip basedir="../CodenameOneDesigner/dist" includes="designer.jar" file="../nightly_builds/CodenameOneDesigner_${tstamp}.zip" / -->
@@ -546,7 +547,45 @@
         <ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOneSuite/build.xml" target="nbms" />
         <!-- ant inheritall="false" antfile="../../CodenameOne/NBPlugin/CodenameOneSuite/build.xml" target="build" / -->
         <zip basedir="../../CodenameOne/NBPlugin/CodenameOneSuite/build/updates" includes="*.nbm" file="../nightly_builds/CodenameOne_NetBeansPlugin_${tstamp}.zip" />
-                
+
+        <property name="ideaplugin" location="../../CodenameOne/IntelliJCodenameOneSupport/resources"/>
+        <copy file="../../CodenameOne/BuildClient/dist/CodenameOneBuildClient.jar"
+            tofile="${ideaplugin}/files/CodeNameOneBuildClient.jar" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/CodenameOneLibrary.zip"
+            tofile="${ideaplugin}/files/CodenameOneLibrary.zip" />
+        <copy file="../CodenameOneDesigner/dist/designer.jar"
+            tofile="${ideaplugin}/files/designer.jar" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/guibuilder.jar"
+            tofile="${ideaplugin}/files/guibuilder.jar" />
+
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/camera/CameraDemoProject.zip"
+            tofile="${ideaplugin}/files/CameraDemoProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/charts/ChartsProject.zip"
+            tofile="${ideaplugin}/files/ChartsProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/chrome/ChromeProject.zip"
+            tofile="${ideaplugin}/files/ChromeProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/poker/CN1PokerProject.zip"
+            tofile="${ideaplugin}/files/CN1PokerProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/drsbaitso/DrSbaitsoProject.zip"
+            tofile="${ideaplugin}/files/DrSbaitsoProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/flickr/FlickrProject.zip"
+            tofile="${ideaplugin}/files/FlickrProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/kitchen/KitchenSinkProject.zip"
+            tofile="${ideaplugin}/files/KitchenSinkProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/maps/MapsDemoProject.zip"
+            tofile="${ideaplugin}/files/MapsDemoProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/nativedemo/NativeDemoProject.zip"
+            tofile="${ideaplugin}/files/NativeDemoProject.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/propertycross/PropertyCross.zip"
+            tofile="${ideaplugin}/files/PropertyCross.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/sql/SQLSampleProject.zip"
+            tofile="${ideaplugin}/files/SQLSampleProject.zip" />
+                        
+        
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/CodenameOneProject.zip"
+            tofile="${ideaplugin}/templates/CodenameOneProject.zip" />
+
+
         <!-- Windows Version -->
         <!-- zip basedir="../CodenameOneDesigner/" includes="designer.exe" file="../nightly_builds/CodenameOneDesignerWindows_${tstamp}.zip" / -->
 
