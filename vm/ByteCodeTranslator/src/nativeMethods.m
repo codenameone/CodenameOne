@@ -763,6 +763,15 @@ JAVA_OBJECT java_lang_Class_newInstanceImpl___R_java_lang_Object(CODENAME_ONE_TH
     return f(threadStateData);
 }
 
+JAVA_OBJECT java_lang_Enum_valueOf___java_lang_Class_java_lang_String_R_java_lang_Enum(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT value) {
+    struct clazz* clz = (struct clazz*)cls;
+    enumValueOfFunctionPointer f = clz->enumValueOfFp;
+    if (f == 0) {
+        return JAVA_NULL;
+    }
+    return f(threadStateData, value);
+}
+
 JAVA_OBJECT java_lang_Object_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     char s[32];
     sprintf(s, "Obj[%i]", ((int)obj));

@@ -697,6 +697,9 @@ public class Parser extends ClassVisitor {
         if ("com/codename1/testing/UnitTest".equals(superName) || "com/codename1/testing/AbstractTest".equals(superName)) {
             cls.setIsUnitTest(true);
         }
+        if ((access & Opcodes.ACC_ENUM) == Opcodes.ACC_ENUM) {
+            cls.setIsEnum(true);
+        }
         super.visit(version, access, name, signature, superName, interfaces); 
     }    
     

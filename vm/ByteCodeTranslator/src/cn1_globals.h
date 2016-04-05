@@ -128,6 +128,8 @@ struct clazz {
     
     // virtual method table lookup
     void** vtable;
+    
+    void* enumValueOfFp;
 };
 
 #define EMPTY_INTERFACES ((const struct clazz**)0)
@@ -946,6 +948,7 @@ extern void codenameOneGCMark();
 extern void codenameOneGCSweep();
 
 typedef JAVA_OBJECT (*newInstanceFunctionPointer)(CODENAME_ONE_THREAD_STATE);
+typedef JAVA_OBJECT (*enumValueOfFunctionPointer)(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
 
 extern void** initVtableForInterface();
 

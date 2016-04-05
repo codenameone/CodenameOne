@@ -65,6 +65,7 @@ public class ByteCodeClass {
     private boolean marked;
     private static ByteCodeClass mainClass;
     private boolean finalClass;
+    private boolean isEnum;
     
     public ByteCodeClass(String clsName) {
         this.clsName = clsName;
@@ -391,6 +392,13 @@ public class ByteCodeClass {
         
         // vtable 
         b.append(", 0\n");
+        
+        if (isEnum) {
+            b.append(", &__VALUE_OF_");
+            b.append(clsName);
+        } else {
+            b.append(", 0");
+        }
         
         b.append("};\n\n");
 
@@ -775,6 +783,19 @@ public class ByteCodeClass {
             b.append("}\n\n");
         }
         
+        if (isEnum) {
+            b.append("JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value) {\n    ");
+            b.append("    JAVA_ARRAY values = (JAVA_ARRAY)get_static_").append(clsName).append("__VALUES(threadStateData);\n");
+            b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)values->data;\n");
+            b.append("    int len = values->length;\n");
+            b.append("    for (int i=0; i<len; i++) {\n");
+            b.append("        JAVA_OBJECT name = get_field_").append(clsName).append("_name(data[i]);\n");
+            b.append("        if (name != JAVA_NULL && java_lang_String_equals___java_lang_Object_R_boolean(threadStateData, name, value)) { return data[i];}\n");
+            b.append("    }\n");
+            b.append("    return JAVA_NULL;\n");
+            b.append("}\n\n");
+        }
+        
         // insert static initializer
         b.append("void __STATIC_INITIALIZER_");
         b.append(clsName);
@@ -1044,6 +1065,10 @@ public class ByteCodeClass {
                 b.append(clsName);
                 b.append("(CODENAME_ONE_THREAD_STATE);\n");
             }
+        }
+        
+        if (isEnum) {
+            b.append("extern JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value);\n");
         }
                 
         if(arrayTypes.contains("1_" + clsName)) {
@@ -1544,6 +1569,10 @@ public class ByteCodeClass {
 
     boolean isUnitTest() {
         return isUnitTest;
+    }
+
+    void setIsEnum(boolean b) {
+        this.isEnum = b;
     }
 
     
