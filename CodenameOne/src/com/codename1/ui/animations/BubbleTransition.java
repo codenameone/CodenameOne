@@ -46,7 +46,8 @@ import com.codename1.ui.plaf.Style;
  */
 public class BubbleTransition extends Transition {
 
-    private Component origin;
+    private Component originSrc;
+    private Component originDest;
     private Image destBuffer;
     private Motion clipMotion;
     private Motion locMotionX;
@@ -108,6 +109,11 @@ public class BubbleTransition extends Transition {
         if (w <= 0 || h <= 0) {
             return;
         }
+
+        Form sourceForm = source.getComponentForm();
+        originSrc = findByName(sourceForm, componentName);
+        Form destForm = destination.getComponentForm();
+        originDest = findByName(destForm, componentName);
         
         Display d = Display.getInstance();
         if (getDestination() instanceof Dialog) {
@@ -137,8 +143,13 @@ public class BubbleTransition extends Transition {
             stl.setBgTransparency(bgt & 0xff, true);
 
         } else {
-            destBuffer = createMutableImage(destination.getWidth(), destination.getHeight());
-            paint(destBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());
+            if(originDest != null){
+                destBuffer = createMutableImage(source.getWidth(), source.getHeight());
+                paint(destBuffer.getGraphics(), source, -source.getAbsoluteX(), -source.getAbsoluteY());            
+            }else{
+                destBuffer = createMutableImage(destination.getWidth(), destination.getHeight());
+                paint(destBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());
+            }
         }
         Component dest = getDestination();
         if (dest instanceof Dialog) {
@@ -149,24 +160,20 @@ public class BubbleTransition extends Transition {
             src = getDialogParent(src);
         }
 
-        Form sourceForm = source.getComponentForm();
-        origin = findByName(sourceForm, componentName);
         
-        if(origin != null){
-            locMotionX = Motion.createLinearMotion(origin.getAbsoluteX() + origin.getWidth()/2 - dest.getWidth()/2, dest.getAbsoluteX(), duration);
+        if(originSrc != null){
+            locMotionX = Motion.createLinearMotion(originSrc.getAbsoluteX() + originSrc.getWidth()/2 - dest.getWidth()/2, dest.getAbsoluteX(), duration);
             locMotionX.start();
-            locMotionY = Motion.createLinearMotion(origin.getAbsoluteY() + origin.getHeight()/2 - dest.getHeight()/2, dest.getAbsoluteY(), duration);
+            locMotionY = Motion.createLinearMotion(originSrc.getAbsoluteY() + originSrc.getHeight()/2 - dest.getHeight()/2, dest.getAbsoluteY(), duration);
             locMotionY.start();
-            clipMotion = Motion.createLinearMotion(Math.min(origin.getWidth(), origin.getHeight()), Math.max(dest.getWidth(), dest.getHeight())*3/2, duration);
+            clipMotion = Motion.createLinearMotion(Math.min(originSrc.getWidth(), originSrc.getHeight()), Math.max(dest.getWidth(), dest.getHeight())*3/2, duration);
         }else{
-            Form destForm = dest.getComponentForm();
-            origin = findByName(destForm, componentName);
-            if (origin != null) {
-                locMotionX = Motion.createLinearMotion(src.getAbsoluteX(), origin.getAbsoluteX() + origin.getWidth() / 2 - src.getWidth() / 2, duration);
+            if (originDest != null) {
+                locMotionX = Motion.createLinearMotion(src.getAbsoluteX(), originDest.getAbsoluteX() + originDest.getWidth() / 2 - src.getWidth() / 2, duration);
                 locMotionX.start();
-                locMotionY = Motion.createLinearMotion(src.getAbsoluteY(), origin.getAbsoluteY() + origin.getHeight() / 2 - src.getHeight() / 2, duration);
+                locMotionY = Motion.createLinearMotion(src.getAbsoluteY(), originDest.getAbsoluteY() + originDest.getHeight() / 2 - src.getHeight() / 2, duration);
                 locMotionY.start();
-                clipMotion = Motion.createLinearMotion(Math.max(src.getWidth(), src.getHeight()) * 3 / 2, Math.min(origin.getWidth(), origin.getHeight()), duration);
+                clipMotion = Motion.createLinearMotion(Math.max(src.getWidth(), src.getHeight()) * 3 / 2, Math.min(originDest.getWidth(), originDest.getHeight()), duration);
             } else {
                 clipMotion = Motion.createLinearMotion(0, Math.max(dest.getWidth(), dest.getHeight()) * 3 / 2, duration);
             }
@@ -178,7 +185,7 @@ public class BubbleTransition extends Transition {
     @Override
     public boolean animate() {
         clipSize = clipMotion.getValue();
-        if(origin != null){
+        if(originSrc != null || originDest != null){
             x = locMotionX.getValue();
             y = locMotionY.getValue();
         }
@@ -200,7 +207,8 @@ public class BubbleTransition extends Transition {
         Component srcCmp = source;
         Component destCmp = dest;
         
-        if (source instanceof Dialog && dest instanceof Form) {
+        if ((source instanceof Dialog && dest instanceof Form) 
+                || originDest != null) {
             srcCmp = dest;
             destCmp = source;
         }
@@ -267,7 +275,8 @@ public class BubbleTransition extends Transition {
     @Override
     public void cleanup() {
         destBuffer = null;
-        origin = null;
+        originSrc = null;
+        originDest = null;
     }
 
     /**
