@@ -67,6 +67,12 @@ public class GridLayout extends Layout{
     private boolean fillLastRow;
     private int rows;
     private int columns;
+    
+    /**
+     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This 
+     * makes animating a grid layout component MUCH easier.
+     */
+    private boolean hideZeroSized;
 
     /**
      * Auto fits columns/rows to available screen space
@@ -182,20 +188,26 @@ public class GridLayout extends Layout{
         }
         int row = 0;        
         
-        for(int i = 0 ; i < numOfcomponents ; i++){
-            Component cmp = parent.getComponentAt(i);
+        int offset = 0;
+        for(int iter = 0 ; iter < numOfcomponents ; iter++){
+            Component cmp = parent.getComponentAt(iter);
             Style cmpStyle = cmp.getStyle();
             int marginLeft = cmpStyle.getMargin(parent.isRTL(), Component.LEFT);
             int marginTop = cmpStyle.getMargin(false, Component.TOP);
+            if(hideZeroSized) {
+                if(cmp.isHidden()) {
+                    continue;
+                }
+            }
             cmp.setWidth(cmpWidth - marginLeft - cmpStyle.getMargin(parent.isRTL(), Component.RIGHT));
             cmp.setHeight(cmpHeight - marginTop - cmpStyle.getMargin(false, Component.BOTTOM));
             if (rtl) {
-            	cmp.setX(x + (localColumns - 1 - (i % localColumns)) * cmpWidth + marginLeft);
+            	cmp.setX(x + (localColumns - 1 - (offset % localColumns)) * cmpWidth + marginLeft);
             } else {
-            	cmp.setX(x + (i % localColumns) * cmpWidth + marginLeft);
+            	cmp.setX(x + (offset % localColumns) * cmpWidth + marginLeft);
             }
             cmp.setY(y + row * cmpHeight + marginTop);
-            if((i + 1) % columns == 0){
+            if((offset + 1) % columns == 0){
                 row++;
                 
                 // check if we need to recalculate component widths
@@ -207,6 +219,7 @@ public class GridLayout extends Layout{
                     cmpWidth = width / localColumns;
                 }
             }
+            offset++;
         }
     }
 
@@ -312,5 +325,23 @@ public class GridLayout extends Layout{
      */
     public boolean obscuresPotential(Container parent) {
         return parent.getComponentCount() == rows * columns || autoFit;
+    }
+
+    /**
+     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+     * makes animating a grid layout component MUCH easier.
+     * @return the hideZeroSized
+     */
+    public boolean isHideZeroSized() {
+        return hideZeroSized;
+    }
+
+    /**
+     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+     * makes animating a grid layout component MUCH easier.
+     * @param hideZeroSized the hideZeroSized to set
+     */
+    public void setHideZeroSized(boolean hideZeroSized) {
+        this.hideZeroSized = hideZeroSized;
     }
 }

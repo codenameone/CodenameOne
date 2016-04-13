@@ -424,7 +424,8 @@ public class FlowLayout extends Layout{
     }
     
     /**
-     * Shorthand for Container.encloseIn(new FlowLayout(), cmps); see:
+     * <p>Shorthand for {@link com.codename1.ui.Container#encloseIn(com.codename1.ui.layouts.Layout, com.codename1.ui.Component...)} 
+     * with a {@code FlowLayout instance} see:</p>
      * <script src="https://gist.github.com/codenameone/3481c77f93726745ad28.js"></script>
      * 
      * @param cmps the components to enclose in a new container
