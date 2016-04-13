@@ -5298,7 +5298,6 @@ public abstract class CodenameOneImplementation {
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
        Object rot = makeTransformRotation(angle, x, y, z);
        concatenateTransform(nativeTransform, rot);
-       copyTransform(rot, nativeTransform);
     }
 
     
@@ -5317,7 +5316,6 @@ public abstract class CodenameOneImplementation {
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
         Object tr = makeTransformTranslation(x, y, z);
         concatenateTransform(nativeTransform, tr);
-        copyTransform(tr, nativeTransform);
     }
 
     /**
@@ -5334,7 +5332,6 @@ public abstract class CodenameOneImplementation {
     public void transformScale(Object nativeTransform, float x, float y, float z) {
         Object scale = makeTransformScale(x, y, z);
         concatenateTransform(nativeTransform, scale);
-        copyTransform(scale, nativeTransform);
     }
 
     /**
@@ -5393,7 +5390,7 @@ public abstract class CodenameOneImplementation {
      * Concatenates two transforms and sets the first transform to be the result of the concatenation.
      * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
      * @param t1 The left native transform.  The result will also be stored in this transform.
-     * @param t2 The right native transform.  The result will also be stored in this transform.
+     * @param t2 The right native transform.
      * @see #isTransformSupported()
      */
     public void concatenateTransform(Object t1, Object t2) {
