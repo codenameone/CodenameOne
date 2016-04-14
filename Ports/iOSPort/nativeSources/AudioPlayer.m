@@ -94,6 +94,7 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (void)audioPlayerBeginInterruption:(AVAudioPlayer *)player {
+    
 }
 
 - (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player error:(NSError *)error {
@@ -150,12 +151,32 @@ AudioPlayer* currentlyPlaying = nil;
 }
 
 - (void)playAudio {
+    //[[AVAudioSession sharedInstance] setCategory: AVAudioSessionCategoryPlayAndRecord error: nil];
+    //UInt32 audioRouteOverride = kAudioSessionOverrideAudioRoute_Speaker;
+    //AudioSessionSetProperty (kAudioSessionProperty_OverrideAudioRoute,sizeof (audioRouteOverride),&audioRouteOverride);
+
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+    NSError *setCategoryError = nil;
+    BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback error:&setCategoryError];
+    if (!success) {
+        NSLog(@"ERROR");
+    }
+    NSError *activationError = nil;
+    success = [audioSession setActive:YES error:&activationError];
+    if (!success) {
+        NSLog(@"ERROR");
+    }
+    [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
+    
     currentlyPlaying = self;
     if(playerInstance != nil) {
 /*#ifndef CN1_USE_ARC
         [self retain];
 #endif*/
-        [playerInstance play];
+        BOOL res = [playerInstance play];
+        if (!res) {
+            NSLog(@"Failed to play");
+        }
     } else if(avPlayerInstance != nil){
         [avPlayerInstance play];
     } else if(runnableCallback != 0) {
