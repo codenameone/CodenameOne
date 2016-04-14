@@ -385,8 +385,8 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
 
             editCompoentX = (x + padLeft) / scale;
             editCompoentY = (y + padTop) / scale;
-            editComponentPadTop = padTop / scale;
-            editComponentPadLeft = padLeft / scale;
+            editComponentPadTop = padTop;
+            editComponentPadLeft = padLeft;
             if (scale > 1) {
                 editCompoentY -= 1.5;
             } else {
@@ -395,7 +395,15 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
             editCompoentW = (w - padLeft - padRight) / scale;
             editCompoentH = (h - padTop - padBottom) / scale;
             CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
-            editingComponent.frame = rect;
+            //NSLog(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+            if (fabs(existingBounds.size.width - rect.size.width) > 1 || fabs(existingBounds.size.height - rect.size.height) > 1 ||
+                fabs(existingBounds.origin.x - rect.origin.x) > 1 || fabs(existingBounds.origin.y - 1.5 - rect.origin.y) > 1
+                ) {
+                //NSLog(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+                editingComponent.frame = rect;
+            }
+            
+            
         }
         POOL_END();
     });
