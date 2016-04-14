@@ -725,6 +725,10 @@ public class InPlaceEditView extends FrameLayout {
         mEditText.setSingleLine(textArea.isSingleLineTextArea());
         mEditText.setAdapter((ArrayAdapter<String>) null);
         mEditText.setText(initialText);
+        if(!textArea.isSingleLineTextArea() && textArea.textArea.isGrowByContent() && textArea.textArea.getGrowLimit() > -1){
+            mEditText.setMaxLines(textArea.textArea.getGrowLimit());
+        }
+        
         if(textArea.nativeHintBool && textArea.getHint() != null) {
             mEditText.setHint(textArea.getHint());
         }
@@ -1144,8 +1148,8 @@ public class InPlaceEditView extends FrameLayout {
         }
 
         impl.setAsyncEditMode(asyncEdit);
-
-        textArea.setPreferredSize(prefSize);
+       
+        //textArea.setPreferredSize(prefSize);
         if (!impl.isAsyncEditMode() && textArea instanceof TextField) {
             ((TextField) textArea).setEditable(false);
         }

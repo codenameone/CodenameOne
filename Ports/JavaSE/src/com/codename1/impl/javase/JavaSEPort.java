@@ -3050,6 +3050,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
             JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
                 public void repaint(long tm, int x, int y, int width, int height) {
+                    
+                    int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
+                    int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
+                    int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                    int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                    Rectangle bounds;
+                    if (getSkin() != null) {
+                        bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                                (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                                (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
+                                (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
+                        
+                    } else {
+                        bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                    }
+                    if(!getBounds().equals(bounds)){
+                        setBounds(bounds);
+                    }
+                    
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             cmp.repaint();
