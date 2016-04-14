@@ -61,10 +61,14 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -509,7 +513,34 @@ public class InPlaceEditView extends FrameLayout {
             closedTime = System.currentTimeMillis();
         }
         showVKB = show;
+        
+        final boolean showKeyboard = showVKB;
+        final ActionListener listener = Display.getInstance().getVirtualKeyboardListener();
+        if(listener != null){
+            new Thread(new Runnable() {
 
+                @Override
+                public void run() {
+                    
+                    //this is ugly but there is no real API to know if the 
+                    //keyboard is opened or closed
+                    try {
+                        Thread.sleep(600);
+                    } catch (InterruptedException ex) {
+                    }
+                    
+                    Display.getInstance().callSerially(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            ActionEvent evt = new ActionEvent(showKeyboard);
+                            listener.actionPerformed(evt);
+                        }
+                    });
+                }
+            }).start();
+        }
+        
         Log.d(TAG, "InputMethodManager returned " + Boolean.toString(result).toUpperCase());
     }
 

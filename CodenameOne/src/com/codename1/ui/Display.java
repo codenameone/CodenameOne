@@ -536,6 +536,8 @@ public final class Display {
 
     private boolean multiKeyMode;
     
+    private ActionListener virtualKeyboardListener;
+    
     /**
      * Private constructor to prevent instanciation
      */
@@ -2435,7 +2437,29 @@ public final class Display {
         }
         return (VirtualKeyboardInterface)virtualKeyboards.get(selectedVirtualKeyboard);
     }
+    
+    /**
+     * Sets a listener for VirtualKeyboard hide/show events.
+     * The Listener will get an event once the keyboard is opened/closed with 
+     * a Boolean value that represents the state of the keyboard true for open 
+     * and false for closed getSource() on the ActionEvent will return the 
+     * Boolean value.
+     * 
+     * @param l the listener 
+     */
+    public void setVirtualKeyboardListener(ActionListener l){
+        virtualKeyboardListener = l;
+    }
 
+    /**
+     * Gets the VirtualKeyboardListener Objects of exists.
+     * 
+     * @return a Listener Object or null if not exists
+     */ 
+    public ActionListener getVirtualKeyboardListener() {
+        return virtualKeyboardListener;
+    }
+    
     /**
      * Returns the type of the input device one of:
      * KEYBOARD_TYPE_UNKNOWN, KEYBOARD_TYPE_NUMERIC, KEYBOARD_TYPE_QWERTY,
