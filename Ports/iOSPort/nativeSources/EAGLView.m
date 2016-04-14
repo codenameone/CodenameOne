@@ -304,6 +304,7 @@ extern BOOL isRetinaBug();
     } else {
         stringEdit(NO, -1, ((UITextField*)editingComponent).text);
     }
+    com_codename1_impl_ios_IOSImplementation_resizeNativeTextComponentCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 -(void)textFieldDidChange {
@@ -316,6 +317,8 @@ extern BOOL isRetinaBug();
     } else {
         stringEdit(NO, -1, ((UITextField*)editingComponent).text);
     }
+    
+    com_codename1_impl_ios_IOSImplementation_resizeNativeTextComponentCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 extern int currentlyEditingMaxLength;
