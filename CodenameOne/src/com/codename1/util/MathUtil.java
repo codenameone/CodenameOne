@@ -1307,7 +1307,7 @@ public abstract class MathUtil {
      * @return the closest integer
      */
     public static int round(float a) {
-        return (int)(a + 0.5f);
+        return Math.round(a);
     }
 
     /**
@@ -1316,7 +1316,7 @@ public abstract class MathUtil {
      * @return the closest integer
      */
     public static long round(double a) {
-        return (long)(a + 0.5f);
+        return Math.round(a);
     }
     
     /**

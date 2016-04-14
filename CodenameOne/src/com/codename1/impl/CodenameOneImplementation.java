@@ -5230,7 +5230,8 @@ public abstract class CodenameOneImplementation {
     }
 
     public void setTransformPerspective(Object nativeTransform, float fovy, float aspect, float zNear, float zFar) {
-        throw new RuntimeException("Transforms not supported");
+        Object persp = makeTransformPerspective(fovy, aspect, zNear, zFar);
+        copyTransform(persp, nativeTransform);
     }
     
     /**
@@ -5251,8 +5252,9 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
-    public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
-        throw new RuntimeException("Transforms not supported");
+    public void setTransformOrtho(Object nativeTransform, float left, float right, float bottom, float top, float near, float far) {
+        Object ortho = makeTransformOrtho(left, right, bottom, top, near, far);
+        copyTransform(ortho, nativeTransform);
     }
     
     /**
@@ -5276,8 +5278,9 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
-    public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
-        throw new RuntimeException("Transforms not supported");
+    public void setTransformCamera(Object nativeTransform, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        Object cam = makeTransformCamera(eyeX, eyeY, eyeZ,  centerX, centerY, centerZ, upX, upY, upZ);
+        copyTransform(cam, nativeTransform);
     }
     
     /**
@@ -5293,7 +5296,8 @@ public abstract class CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
-       throw new RuntimeException("Transforms not supported");
+       Object rot = makeTransformRotation(angle, x, y, z);
+       concatenateTransform(nativeTransform, rot);
     }
 
     
@@ -5310,7 +5314,8 @@ public abstract class CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
-        throw new RuntimeException("Transforms not supported");
+        Object tr = makeTransformTranslation(x, y, z);
+        concatenateTransform(nativeTransform, tr);
     }
 
     /**
@@ -5325,7 +5330,8 @@ public abstract class CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public void transformScale(Object nativeTransform, float x, float y, float z) {
-        throw new RuntimeException("Transforms not supported");
+        Object scale = makeTransformScale(x, y, z);
+        concatenateTransform(nativeTransform, scale);
     }
 
     /**
@@ -5344,7 +5350,7 @@ public abstract class CodenameOneImplementation {
     }
     
     public void setTransformInverse(Object nativeTransform) throws Transform.NotInvertibleException {
-       throw new RuntimeException("Transforms not supported");
+       copyTransform(makeTransformInverse(nativeTransform), nativeTransform);
     }
     
     /**
@@ -5384,7 +5390,7 @@ public abstract class CodenameOneImplementation {
      * Concatenates two transforms and sets the first transform to be the result of the concatenation.
      * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
      * @param t1 The left native transform.  The result will also be stored in this transform.
-     * @param t2 The right native transform.  The result will also be stored in this transform.
+     * @param t2 The right native transform.
      * @see #isTransformSupported()
      */
     public void concatenateTransform(Object t1, Object t2) {
