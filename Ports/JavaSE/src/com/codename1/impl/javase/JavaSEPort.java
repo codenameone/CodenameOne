@@ -3061,6 +3061,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             t.setLineWrap(true);
             swingT = t;
         }
+        swingT.setFocusTraversalKeysEnabled(false);
+        TextEditUtil.setCurrentEditComponent(cmp);
+        swingT.addKeyListener(new KeyListener() {
+            @Override
+            public void keyTyped(KeyEvent e) {
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if(e.getKeyCode() == KeyEvent.VK_TAB) {
+                    TextEditUtil.editNextTextArea();
+                }
+            }
+        });
         swingT.setBorder(null);
         swingT.setOpaque(false);
         swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
