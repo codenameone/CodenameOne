@@ -6893,6 +6893,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         minimized = true;
         if(instance.life != null) {
             instance.life.applicationDidEnterBackground();
+            if (instance.isEditingText()) {
+                foldKeyboard();
+            }
         }
     }
     /**
