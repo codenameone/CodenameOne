@@ -2306,11 +2306,11 @@ BOOL prefersStatusBarHidden = NO;
 #endif
             if(comp != NULL) {
 #ifndef NEW_CODENAME_ONE_VM
-                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX__(comp) + editComponentPadLeft) / scaleValue;
-                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY__(comp) + editComponentPadTop) / scaleValue;
+                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX__(comp) + com_codename1_ui_Component_getScrollX__(comp) + editComponentPadLeft) / scaleValue;
+                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY__(comp) + com_codename1_ui_Component_getScrollY__(comp) + editComponentPadTop) / scaleValue;
 #else
-                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadLeft) / scaleValue;
-                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadTop) / scaleValue;
+                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadLeft) / scaleValue;
+                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadTop) / scaleValue;
 #endif
                 if(newEditCompoentX != editCompoentX || newEditCompoentY != editCompoentY) {
                     for (UIWindow *window in [[UIApplication sharedApplication] windows])
