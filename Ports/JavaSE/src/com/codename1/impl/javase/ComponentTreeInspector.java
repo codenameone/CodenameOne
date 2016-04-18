@@ -29,6 +29,8 @@ import com.codename1.ui.Form;
 import com.codename1.ui.List;
 import com.codename1.ui.list.ContainerList;
 import javax.swing.JTree;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.TreeModelListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
@@ -43,11 +45,45 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class ComponentTreeInspector extends javax.swing.JFrame {
-    
+    private Component currentComponent; 
     /** Creates new form ComponentTreeInspector */
     public ComponentTreeInspector() {
         initComponents();
         refreshComponentTree();
+        
+        componentUIID.getDocument().addDocumentListener(new DocumentListener() {
+
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateUiid();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateUiid();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateUiid();
+            }
+
+            private void updateUiid() {
+                final String uiidText = componentUIID.getText();
+                if(currentComponent != null && uiidText.length() > 0) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            if(currentComponent != null && !currentComponent.getUIID().equals(uiidText)) {
+                                currentComponent.setUIID(uiidText);
+                                Display.getInstance().getCurrent().revalidate();
+                            }
+                        }
+                    });
+                }  
+            }
+        });
+        
         componentTree.setCellRenderer(new DefaultTreeCellRenderer() {
 
             @Override
@@ -69,6 +105,7 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                 if(e.getPath() != null) {
                     Component c = (Component)e.getPath().getLastPathComponent();
                     if(c != null) {
+                        currentComponent = c;
                         componentClass.setText(c.getClass().getName());
                         componentName.setText("" + c.getName());
                         componentUIID.setText("" + c.getUIID());
@@ -162,8 +199,6 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         componentClass.setEditable(false);
 
         componentName.setEditable(false);
-
-        componentUIID.setEditable(false);
 
         componentSelected.setEnabled(false);
 
