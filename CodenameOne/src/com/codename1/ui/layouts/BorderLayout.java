@@ -657,6 +657,26 @@ public class BorderLayout extends Layout {
     }
 
     /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerCenter(Component center) {
+        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER), center, BorderLayout.CENTER);
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_CENTER_ABSOLUTE} constraint applied
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerAbsolute(Component center) {
+        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE), center, BorderLayout.CENTER);
+    }
+
+    /**
      * Convenience method that creates a border layout container and places the given component in the north
      * @param north the north component
      * @return the created component
