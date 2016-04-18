@@ -2656,10 +2656,18 @@ public class Component implements Animation, StyleListener {
             }
         }
         if (draggedMotionY != null) {
-            if (draggedMotionY.getValue() < 0) {
+            int dmv = draggedMotionY.getValue();
+            if (dmv < 0) {
                 setScrollY(0);
-            } else if (draggedMotionY.getValue() > getScrollDimension().getHeight() - getHeight()) {
-                setScrollY(getScrollDimension().getHeight() - getHeight());
+            } else {
+                int hh = getScrollDimension().getHeight() - getHeight();
+                if (dmv > hh) {
+                    if(hh < 0) {
+                        setScrollY(0);
+                    } else {
+                        setScrollY(hh);
+                    }
+                }
             }
         }
         draggedMotionX = null;
