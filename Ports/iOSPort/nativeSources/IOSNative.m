@@ -7454,8 +7454,8 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 } else {
                     iconStringHGap = (fontHeight - iconHeight) / 2;
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x, y + iconStringHGap);
-                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
-                                    tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,
+                                    isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
                 }
                 break;
             case 2: /* Label.BOTTOM: */
