@@ -294,25 +294,37 @@ public class Socket {
         public void flush() throws IOException {
         }
 
+        private void handleSocketError() {
+            int code = Util.getImplementation().getSocketErrorCode(impl);
+            String msg = Util.getImplementation().getSocketErrorMessage(impl);
+            if(code > 0 || msg != null) {
+                con.connectionError(code, msg);
+            }
+        }
+        
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
             if(off == 0 && len == b.length) {
                 Util.getImplementation().writeToSocketStream(impl, b);
+                handleSocketError();
                 return;
             }
             byte[] arr = new byte[len];
             System.arraycopy(b, off, arr, 0, len);
             Util.getImplementation().writeToSocketStream(impl, arr);
+            handleSocketError();
         }
 
         @Override
         public void write(byte[] b) throws IOException {
             Util.getImplementation().writeToSocketStream(impl, b);
+            handleSocketError();
         }
 
         @Override
         public void write(int b) throws IOException {
             Util.getImplementation().writeToSocketStream(impl, new byte[] {(byte)b});
+            handleSocketError();
         }
         
     }
