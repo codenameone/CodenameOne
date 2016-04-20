@@ -71,6 +71,7 @@ public class SpanButton extends Container {
         text.setUIID("Button");
         text.setEditable(false);
         text.setFocusable(false);
+        text.setActAsLabel(true);
         removeBackground(text.getUnselectedStyle());
         removeBackground(text.getSelectedStyle());
         removeBackground(text.getPressedStyle());
