@@ -1602,6 +1602,7 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
         if([ns hasPrefix:@"file:"]) {
             ns = [ns substringFromIndex:5];
             UIDocumentInteractionController* preview = [UIDocumentInteractionController interactionControllerWithURL:[NSURL fileURLWithPath:ns]];
+            preview.delegate = [CodenameOne_GLViewController instance];
             [preview presentPreviewAnimated:YES];
         } else {
             [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
