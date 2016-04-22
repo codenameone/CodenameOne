@@ -42,8 +42,6 @@ import com.codename1.ui.layouts.FlowLayout;
  * 
  * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" /><br><br>
  * 
- * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
- * 
  *
  * @author Shai Almog
  */

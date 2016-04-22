@@ -504,6 +504,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 });
             }
         }
+        
+        if (Display.getInstance().getVirtualKeyboardListener() != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
+                    if (l != null) {
+                        l.actionPerformed(new ActionEvent(true));
+                    }
+                }
+            });
+        }
     }
     
     /**
@@ -522,6 +533,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             
         });
+        if (Display.getInstance().getVirtualKeyboardListener() != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
+                    if (l != null) {
+                        l.actionPerformed(new ActionEvent(false));
+                    }
+                }
+            });
+        }
     }
     
     public void setCurrentForm(Form f) {
@@ -6872,6 +6893,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         minimized = true;
         if(instance.life != null) {
             instance.life.applicationDidEnterBackground();
+            if (instance.isEditingText()) {
+                foldKeyboard();
+            }
         }
     }
     /**

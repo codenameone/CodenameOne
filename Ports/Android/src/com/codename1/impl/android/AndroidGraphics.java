@@ -790,9 +790,9 @@ class AndroidGraphics {
         paint.setAntiAlias(false);
         paint.setAlpha(255);
         if(!horizontal) {
-            paint.setShader(new LinearGradient(x, y, 0, height, startColor, endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(0, 0, 0, height, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         } else {
-            paint.setShader(new LinearGradient(x, y, width, 0, startColor, endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(0, 0, width, 0, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         }
         canvas.save();
         applyTransform();
@@ -808,7 +808,11 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setAlpha(255);
-        paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        float radius = Math.min((float)width, (float)height) * relativeSize;
+        int centerX = (int) (width * (1 - relativeX));
+        int centerY = (int) (height * (1 - relativeY));
+
+        paint.setShader(new RadialGradient(x + centerX, y + centerY, radius, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         canvas.save();
         applyTransform();
         canvas.drawRect(x, y, x + width, y + height, paint);
@@ -823,7 +827,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setAlpha(255);
-        paint.setShader(new RadialGradient(x, y, Math.max(width, height), startColor, endColor, Shader.TileMode.MIRROR));
+        paint.setShader(new RadialGradient(x, y, Math.max(width, height), 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         canvas.save();
         applyTransform();
         canvas.drawRect(x, y, x + width, y + height, paint);

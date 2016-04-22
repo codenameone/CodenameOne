@@ -900,13 +900,15 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             rows = ta.getLines();
         }
         prefH = (f.getHeight() + ta.getRowsGap()) * rows;
-        int columns = ta.getColumns();
-        String str = "";
-        for (int iter = 0; iter < columns; iter++) {
-            str += TextArea.getWidestChar();
-        }
-        if(columns > 0) {
-            prefW = Math.max(prefW, f.stringWidth(str));
+        if(!ta.isActAsLabel()) {
+            int columns = ta.getColumns();
+            String str = "";
+            for (int iter = 0; iter < columns; iter++) {
+                str += TextArea.getWidestChar();
+            }
+            if(columns > 0) {
+                prefW = Math.max(prefW, f.stringWidth(str));
+            }
         }
         prefH = Math.max(prefH, rows * f.getHeight());
 

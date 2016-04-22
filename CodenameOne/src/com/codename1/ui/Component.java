@@ -446,11 +446,17 @@ public class Component implements Animation, StyleListener {
             if (unSelectedStyle.getBgPainter() == null) {
                 unSelectedStyle.setBgPainter(new BGPainter());
             }
+            if(cellRenderer) {
+                unSelectedStyle.markAsRendererStyle();
+            }
         }
         if(disabledStyle != null) {
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
+            }
+            if(cellRenderer) {
+                disabledStyle.markAsRendererStyle();
             }
         }
     }
@@ -2656,10 +2662,18 @@ public class Component implements Animation, StyleListener {
             }
         }
         if (draggedMotionY != null) {
-            if (draggedMotionY.getValue() < 0) {
+            int dmv = draggedMotionY.getValue();
+            if (dmv < 0) {
                 setScrollY(0);
-            } else if (draggedMotionY.getValue() > getScrollDimension().getHeight() - getHeight()) {
-                setScrollY(getScrollDimension().getHeight() - getHeight());
+            } else {
+                int hh = getScrollDimension().getHeight() - getHeight();
+                if (dmv > hh) {
+                    if(hh < 0) {
+                        setScrollY(0);
+                    } else {
+                        setScrollY(hh);
+                    }
+                }
             }
         }
         draggedMotionX = null;
@@ -3610,6 +3624,9 @@ public class Component implements Animation, StyleListener {
             if (selectedStyle.getBgPainter() == null) {
                 selectedStyle.setBgPainter(new BGPainter());
             }
+            if(cellRenderer) {
+                selectedStyle.markAsRendererStyle();
+            }
         }
         return selectedStyle;
     }
@@ -4170,6 +4187,11 @@ public class Component implements Animation, StyleListener {
      */
     public void setCellRenderer(boolean cellRenderer) {
         this.cellRenderer = cellRenderer;
+        if(cellRenderer) {
+            getUnselectedStyle().markAsRendererStyle();
+            getSelectedStyle().markAsRendererStyle();
+            getDisabledStyle().markAsRendererStyle();
+        }
     }
 
     /**
