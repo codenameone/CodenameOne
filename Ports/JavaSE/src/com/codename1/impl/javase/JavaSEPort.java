@@ -6613,6 +6613,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JPanel cnt = new JPanel();
         private MediaView v;
         private boolean init = false;
+        private Rectangle bounds = new Rectangle();
 
         public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
             super(null);
@@ -6700,7 +6701,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         }
-
+        
+        
         @Override
         protected void onPositionSizeChange() {
             final int x = getAbsoluteX();
@@ -6708,32 +6710,45 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int w = getWidth();
             final int h = getHeight();
 
-            Platform.runLater(new Runnable() {
+            int screenX = 0;
+            int screenY = 0;
+            if(getScreenCoordinates() != null) {
+                screenX = getScreenCoordinates().x;
+                screenY = getScreenCoordinates().y;
+            }
+            bounds.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
+                    (int) ((y + screenY + canvas.y) * zoomLevel),
+                    (int) (w * zoomLevel),
+                    (int) (h * zoomLevel));
+            
+            if(!bounds.equals(cnt.getBounds())){
+            
+                Platform.runLater(new Runnable() {
 
-                @Override
-                public void run() {
-                    v.setFitWidth(w * zoomLevel);
-                    v.setFitHeight(h * zoomLevel);
+                    @Override
+                    public void run() {
 
-                    SwingUtilities.invokeLater(new Runnable() {
+                        v.setFitWidth(w * zoomLevel);
+                        v.setFitHeight(h * zoomLevel);
 
-                        @Override
-                        public void run() {
-                            int screenX = 0;
-                            int screenY = 0;
-                            if(getScreenCoordinates() != null) {
-                                screenX = getScreenCoordinates().x;
-                                screenY = getScreenCoordinates().y;
+                        SwingUtilities.invokeLater(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                cnt.setBounds(bounds);
+                                cnt.validate();
+                                Display.getInstance().callSerially(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        getComponentForm().repaint();
+                                    }
+                                });
                             }
-                            cnt.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
-                                    (int) ((y + screenY + canvas.y) * zoomLevel),
-                                    (int) (w * zoomLevel),
-                                    (int) (h * zoomLevel));
-                            cnt.validate();
-                        }
-                    });
-                }
-            });
+                        });
+                    }
+                });
+            }
 
         }
     }
