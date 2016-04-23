@@ -832,7 +832,7 @@ public class TextArea extends Component {
             return;
         }
         Font font = style.getFont();
-        if(actAsLabel && text.length() <= columns) {
+        if(actAsLabel && text.length() <= columns && text.indexOf('\n') < 0) {
             int w = font.stringWidth(text);
             if(w <= getWidth()) {
                 if(rowStrings == null) {
