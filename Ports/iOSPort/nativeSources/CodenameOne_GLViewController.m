@@ -415,6 +415,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
+            [utv setTextColor:UIColorFromRGB(color, 255)];
             editingComponent = utv;
             if(scale != 1) {
                 float s = ((BRIDGE_CAST UIFont*)font).pointSize / scale;
