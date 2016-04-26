@@ -147,6 +147,8 @@ import javafx.util.Duration;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.MenuEvent;
+import javax.swing.event.MenuListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
@@ -209,6 +211,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     private String[] imageExtensions = new String[] {"png", "jpg", "jpeg"};
     
+    private boolean menuDisplayed = false;
     
     /**
      * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
@@ -592,6 +595,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void blit() {
+            if(menuDisplayed){
+                return;
+            }
             try {
                 Runnable r = new Runnable() {
                     public void run() {
@@ -1419,7 +1425,24 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             JMenu simulatorMenu = new JMenu("Simulate");
             simulatorMenu.setDoubleBuffered(true);
+            simulatorMenu.addMenuListener(new MenuListener(){
 
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            
             JMenuItem rotate = new JMenuItem("Rotate");
             simulatorMenu.add(rotate);
             JMenu zoomMenu = new JMenu("Zoom");
@@ -1794,6 +1817,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             
 
             JMenu skinMenu = createSkinsMenu(frm, null);
+            skinMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+                
+                
+            
+            });
+            
 
             final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
             simulatorMenu.add(touchFlag);
@@ -1849,6 +1893,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             JMenu helpMenu = new JMenu("Help");
             helpMenu.setDoubleBuffered(true);
+            helpMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            
 
             JMenuItem javadocs = new JMenuItem("Javadocs");
             javadocs.addActionListener(new ActionListener() {
