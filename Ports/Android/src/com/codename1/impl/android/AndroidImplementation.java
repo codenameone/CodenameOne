@@ -699,6 +699,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent startMain = new Intent(Intent.ACTION_MAIN);
         startMain.addCategory(Intent.CATEGORY_HOME);
         startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startMain.putExtra("WaitForResult", Boolean.FALSE);
         activity.startActivity(startMain);
         return true;
     }

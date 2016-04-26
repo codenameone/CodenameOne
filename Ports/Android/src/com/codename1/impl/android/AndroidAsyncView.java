@@ -1024,13 +1024,25 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 return;
             }
             
-            if(legacyPaintLogic) {
+            if(legacyPaintLogic || StyleAccessor.isRendererStyle(s)) {
                 final int al = alpha;
+                final byte backgroundType = s.getBackgroundType();
+                final Image bgImage = s.getBgImage();
+                final int bgColor = s.getBgColor();
+                final byte bgTransparency = s.getBgTransparency();
+                final int backgroundGradientStartColor = s.getBackgroundGradientStartColor();
+                final int backgroundGradientEndColor = s.getBackgroundGradientEndColor();
+                final float backgroundGradientRelativeX = s.getBackgroundGradientRelativeX();
+                final float backgroundGradientRelativeY = s.getBackgroundGradientRelativeY();
+                final float backgroundGradientRelativeSize = s.getBackgroundGradientRelativeSize();
                 pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
                     @Override
                     public void execute(AndroidGraphics underlying) {
                         underlying.setAlpha(al);
-                        underlying.paintComponentBackground(s.getBackgroundType(), s.getBgImage(), s.getBgColor(), s.getBgTransparency(), s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(), s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(), s.getBackgroundGradientRelativeSize(), x, y, width, height);
+                        underlying.paintComponentBackground(backgroundType, bgImage, bgColor, bgTransparency,
+                                backgroundGradientStartColor, backgroundGradientEndColor,
+                                backgroundGradientRelativeX, backgroundGradientRelativeY,
+                                backgroundGradientRelativeSize, x, y, width, height);
                     }
                     public String toString() {
                         return "paintComponentBackground - Legacy";
@@ -1454,8 +1466,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             }
 
             public boolean equals(Object o) {
-                // == is totally fine here for the text which should be interned, the font might be cloned though...
-                return font != null && o != null && text == ((DrawStringCache)o).text && fgColor == ((DrawStringCache)o).fgColor && font.equals(((DrawStringCache)o).font);
+                return font != null && o != null && text != null &&
+                        (text == ((DrawStringCache)o).text || text.equals(((DrawStringCache)o).text)) &&
+                        fgColor == ((DrawStringCache)o).fgColor &&
+                        (font == ((DrawStringCache)o).font || font.equals(((DrawStringCache)o).font));
             }
 
             public int hashCode() {
@@ -2006,6 +2020,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                         Bitmap bitmap = Bitmap.createBitmap(stringWidth, font.fontHeight,
                                 Bitmap.Config.ARGB_8888);
                         Canvas cnv = new Canvas(bitmap);
+                        int c = 0xff000000 | color;
+                        font.setColor(c);
                         cnv.drawText(str, 0, font.getFontAscent() * -1, font);
                         stringBmp = bitmap;
                         drawStringCache.put(dc, stringBmp);

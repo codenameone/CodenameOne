@@ -1318,10 +1318,10 @@ public class Container extends Component implements Iterable<Component>{
         g.translate(-tx, -ty);
         if(sidemenuBarTranslation > 0) {
             g.translate(sidemenuBarTranslation, 0);
-            paintGlass(g);
+            paintGlassImpl(g);
             g.translate(-sidemenuBarTranslation, 0);
         } else {
-            paintGlass(g);
+            paintGlassImpl(g);
         }
         g.translate(tx, ty);
         g.translate(-getX(), -getY());

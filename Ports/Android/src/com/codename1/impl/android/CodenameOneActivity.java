@@ -535,14 +535,24 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     public void startActivityForResult(Intent intent, int requestCode) {
-        waitingForResult = true;
+        Bundle extra = intent.getExtras();
+        if(extra != null && extra.containsKey("WaitForResult") && !extra.getBoolean("WaitForResult")){
+            waitingForResult = false;            
+        }else{
+            waitingForResult = true;
+        }
         intentResult = new Vector();
         super.startActivityForResult(intent, requestCode);
     }
 
     @Override
     public void startActivity(Intent intent) {
-        waitingForResult = true;
+        Bundle extra = intent.getExtras();
+        if(extra != null && extra.containsKey("WaitForResult") && !extra.getBoolean("WaitForResult")){
+            waitingForResult = false;            
+        }else{
+            waitingForResult = true;
+        }
         super.startActivity(intent);
     }
 

@@ -415,6 +415,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
+            [utv setTextColor:UIColorFromRGB(color, 255)];
             editingComponent = utv;
             if(scale != 1) {
                 float s = ((BRIDGE_CAST UIFont*)font).pointSize / scale;
@@ -3205,6 +3206,15 @@ extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_
     com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG 0, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
 }
 #endif
+
+- (void)documentInteractionControllerDidEndPreview:(UIDocumentInteractionController *)controller
+{
+}
+
+- (UIViewController *) documentInteractionControllerViewControllerForPreview: (UIDocumentInteractionController *) controller
+{
+    return self;
+}
 @end
 
 

@@ -36,4 +36,8 @@ public class StyleAccessor {
     public static void setCachedData(Style s, Object o) {
         s.nativeOSCache = o;
     }
+    
+    public static boolean isRendererStyle(Style s) {
+        return s.renderer;
+    }
 }

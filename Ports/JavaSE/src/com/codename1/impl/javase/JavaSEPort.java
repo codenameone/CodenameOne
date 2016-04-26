@@ -147,8 +147,11 @@ import javafx.util.Duration;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.MenuEvent;
+import javax.swing.event.MenuListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -208,6 +211,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     private String[] imageExtensions = new String[] {"png", "jpg", "jpeg"};
     
+    private boolean menuDisplayed = false;
     
     /**
      * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
@@ -379,6 +383,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean exposeFilesystem;
     private boolean scrollWheeling;
     
+    private JComponent textCmp;
+
     
     public static void blockMonitors() {
         blockMonitors = true;
@@ -589,6 +595,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void blit() {
+            if(menuDisplayed){
+                return;
+            }
             try {
                 Runnable r = new Runnable() {
                     public void run() {
@@ -1416,7 +1425,24 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             JMenu simulatorMenu = new JMenu("Simulate");
             simulatorMenu.setDoubleBuffered(true);
+            simulatorMenu.addMenuListener(new MenuListener(){
 
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            
             JMenuItem rotate = new JMenuItem("Rotate");
             simulatorMenu.add(rotate);
             JMenu zoomMenu = new JMenu("Zoom");
@@ -1791,6 +1817,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             
 
             JMenu skinMenu = createSkinsMenu(frm, null);
+            skinMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+                
+                
+            
+            });
+            
 
             final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
             simulatorMenu.add(touchFlag);
@@ -1846,6 +1893,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             JMenu helpMenu = new JMenu("Help");
             helpMenu.setDoubleBuffered(true);
+            helpMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            
 
             JMenuItem javadocs = new JMenuItem("Javadocs");
             javadocs.addActionListener(new ActionListener() {
@@ -3009,6 +3074,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Display.getInstance().invokeAndBlock(l);
     }
 
+    
     /**
      * @inheritDoc
      */
@@ -3046,8 +3112,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 };
             }
             swingT = t;
+            textCmp = swingT;
         } else {
-            com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
+            final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
             JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
                 public void repaint(long tm, int x, int y, int width, int height) {
                     
@@ -3065,8 +3132,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     } else {
                         bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
                     }
-                    if(!getBounds().equals(bounds)){
-                        setBounds(bounds);
+                    if(textCmp != null && !textCmp.getBounds().equals(bounds)){
+                        textCmp.setBounds(bounds);
                     }
                     
                     Display.getInstance().callSerially(new Runnable() {
@@ -3075,14 +3142,25 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     });
                 }
+                
             };
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
+            JScrollPane pane = new JScrollPane(swingT);
+            pane.setBorder(null);
+            pane.setOpaque(false);
+            pane.getViewport().setOpaque(false);
+            pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+            pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            textCmp = pane;
         }
+        DefaultCaret caret = (DefaultCaret) swingT.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);            
         swingT.setFocusTraversalKeysEnabled(false);
         TextEditUtil.setCurrentEditComponent(cmp);
-        swingT.addKeyListener(new KeyListener() {
+        final javax.swing.text.JTextComponent txt = swingT;
+        txt.addKeyListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent e) {
             }
@@ -3112,20 +3190,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             setText(tf, text);
         }
-        canvas.add(tf);
+        textCmp.setBorder(null);
+        textCmp.setOpaque(false);
+        
+        canvas.add(textCmp);
         int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
         int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
         int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
         int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
         if (getSkin() != null) {
-            tf.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+            textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
                     (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
         } else {
-            tf.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+            textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         setCaretPosition(tf, getText(tf).length());
@@ -3135,7 +3216,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener {
 
             public synchronized void run() {
-                while (tf.getParent() != null) {
+                while (textCmp.getParent() != null) {
                     try {
                         wait(20);
                     } catch (InterruptedException ex) {
@@ -3155,7 +3236,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 ((JTextComponent) tf).getDocument().removeDocumentListener(this);
                 
                 tf.removeFocusListener(this);
-                canvas.remove(tf);
+                canvas.remove(textCmp);
                 synchronized (this) {
                     notify();
                 }
@@ -6613,6 +6694,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JPanel cnt = new JPanel();
         private MediaView v;
         private boolean init = false;
+        private Rectangle bounds = new Rectangle();
 
         public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
             super(null);
@@ -6700,7 +6782,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         }
-
+        
+        
         @Override
         protected void onPositionSizeChange() {
             final int x = getAbsoluteX();
@@ -6708,32 +6791,45 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int w = getWidth();
             final int h = getHeight();
 
-            Platform.runLater(new Runnable() {
+            int screenX = 0;
+            int screenY = 0;
+            if(getScreenCoordinates() != null) {
+                screenX = getScreenCoordinates().x;
+                screenY = getScreenCoordinates().y;
+            }
+            bounds.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
+                    (int) ((y + screenY + canvas.y) * zoomLevel),
+                    (int) (w * zoomLevel),
+                    (int) (h * zoomLevel));
+            
+            if(!bounds.equals(cnt.getBounds())){
+            
+                Platform.runLater(new Runnable() {
 
-                @Override
-                public void run() {
-                    v.setFitWidth(w * zoomLevel);
-                    v.setFitHeight(h * zoomLevel);
+                    @Override
+                    public void run() {
 
-                    SwingUtilities.invokeLater(new Runnable() {
+                        v.setFitWidth(w * zoomLevel);
+                        v.setFitHeight(h * zoomLevel);
 
-                        @Override
-                        public void run() {
-                            int screenX = 0;
-                            int screenY = 0;
-                            if(getScreenCoordinates() != null) {
-                                screenX = getScreenCoordinates().x;
-                                screenY = getScreenCoordinates().y;
+                        SwingUtilities.invokeLater(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                cnt.setBounds(bounds);
+                                cnt.validate();
+                                Display.getInstance().callSerially(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        getComponentForm().repaint();
+                                    }
+                                });
                             }
-                            cnt.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
-                                    (int) ((y + screenY + canvas.y) * zoomLevel),
-                                    (int) (w * zoomLevel),
-                                    (int) (h * zoomLevel));
-                            cnt.validate();
-                        }
-                    });
-                }
-            });
+                        });
+                    }
+                });
+            }
 
         }
     }
