@@ -1709,7 +1709,7 @@ namespace com.codename1.impl {
                 StorageFolder store = getStore((string)connection);
                 try {
                     Stream s = Task.Run(() => store.OpenStreamForWriteAsync(nativePathStore((string)connection), CreationCollisionOption.OpenIfExists)).GetAwaiter().GetResult();
-                    return new OutputStreamProxy(s);
+                    return new java.io.OutputStreamProxy(s);
                 }
                 catch (Exception e) {
                     java.io.FileNotFoundException ex = new global::java.io.FileNotFoundException("FileNotFoundException - " + e.Message);
@@ -1719,7 +1719,7 @@ namespace com.codename1.impl {
                     ///   return new OutputStreamProxy(s);
                 }
             }
-            com.codename1.io.BufferedOutputStream bo = new com.codename1.io.BufferedOutputStream(new OutputStreamProxy(((NetworkOperation)connection).requestStream));
+            com.codename1.io.BufferedOutputStream bo = new com.codename1.io.BufferedOutputStream(new java.io.OutputStreamProxy(((NetworkOperation)connection).requestStream));
             //bo.@this(new OutputStreamProxy(((NetworkOperation)connection).requestStream));
             return bo;
         }
@@ -1731,7 +1731,7 @@ namespace com.codename1.impl {
                     StorageFolder store = getStore((string)connection);
                     Stream stream = Task.Run(() => store.OpenStreamForWriteAsync(nativePathStore((string)connection), CreationCollisionOption.OpenIfExists)).ConfigureAwait(false).GetAwaiter().GetResult();
                     stream.Seek(offset, SeekOrigin.Current);
-                    return new OutputStreamProxy(stream);
+                    return new java.io.OutputStreamProxy(stream);
                 }
                 catch (Exception e) {
                     java.io.FileNotFoundException ex = new global::java.io.FileNotFoundException("FileNotFoundException - " + e.Message);
@@ -1749,7 +1749,7 @@ namespace com.codename1.impl {
                     string file = nativePathStore((string)connection);
                     Stream stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
 
-                    return new InputStreamProxy(stream);
+                    return new java.io.InputStreamProxy(stream);
                 }
                 catch (Exception e) {
                     java.io.FileNotFoundException ex = new global::java.io.FileNotFoundException("FileNotFoundException - " + e.Message);
@@ -1757,9 +1757,11 @@ namespace com.codename1.impl {
                     throw ex;
                 }
             }
-            com.codename1.io.BufferedInputStream bo = new com.codename1.io.BufferedInputStream(new InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream()));
+            //com.codename1.io.BufferedInputStream bo = new com.codename1.io.BufferedInputStream(new java.io.InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream()));
             //bo.@this(new InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream()));
-            return bo;
+            //return bo;
+            return new java.io.InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream());
+
         }
 
         public override void setPostRequest(object n1, bool n2) {
@@ -1839,7 +1841,7 @@ namespace com.codename1.impl {
         public override java.io.OutputStream createStorageOutputStream(string name) {
             try {
                 StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.OpenIfExists).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                return new OutputStreamProxy(Task.Run(() => file.OpenStreamForWriteAsync()).ConfigureAwait(false).GetAwaiter().GetResult());
+                return new java.io.OutputStreamProxy(Task.Run(() => file.OpenStreamForWriteAsync()).ConfigureAwait(false).GetAwaiter().GetResult());
             }
             catch (Exception e) {
                 java.io.FileNotFoundException ex = new global::java.io.FileNotFoundException("FileNotFoundException - " + e.Message);
@@ -1851,12 +1853,12 @@ namespace com.codename1.impl {
         public override java.io.InputStream createStorageInputStream(string name) {
             try {
                 StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.OpenIfExists).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                return new InputStreamProxy(Task.Run(() => file.OpenStreamForReadAsync()).GetAwaiter().GetResult());
+                return new java.io.InputStreamProxy(Task.Run(() => file.OpenStreamForReadAsync()).GetAwaiter().GetResult());
             }
             catch (Exception) {
                 try {
                     StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.GenerateUniqueName).AsTask().GetAwaiter().GetResult();
-                    return new InputStreamProxy(file.OpenReadAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult().AsStream());
+                    return new java.io.InputStreamProxy(file.OpenReadAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult().AsStream());
                 }
                 catch (Exception e) {
                     java.io.FileNotFoundException ex = new global::java.io.FileNotFoundException("FileNotFoundException - " + e.Message);

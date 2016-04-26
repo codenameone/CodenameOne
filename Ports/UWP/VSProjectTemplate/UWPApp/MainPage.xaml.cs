@@ -25,10 +25,10 @@ namespace UWPApp
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        public static String BUILD_KEY = "93a9e292-73df-45e9-a9f8-b653ac90d1a2";
-        public static String PACKAGE_NAME = "com.codename1.tests.hellowin";
-        public static String BUILT_BY_USER = "steve.hannah@codenameone.com";
-        public static String APP_NAME = "HelloWindows";
+        public static String BUILD_KEY = "null";
+        public static String PACKAGE_NAME = "com.mycompany.myapp";
+        public static String BUILT_BY_USER = "null";
+        public static String APP_NAME = "TestProject";
         public static String APP_VERSION = "1.0";
         private Main instance;
 
@@ -36,7 +36,7 @@ namespace UWPApp
         public MainPage()
         {
 
-            
+
             IKVMReflectionHelper.Initialize();
             NativeThreadHelper.setInstance(new NativeThreadHelperImpl());
             ImplementationFactory.getInstance().setImplementation(new SilverlightImplementation());
@@ -46,16 +46,18 @@ namespace UWPApp
             System.Diagnostics.Debug.WriteLine("About to init5.5");
             Loaded += delegate {
                 System.Diagnostics.Debug.WriteLine("About to init7.1");
-                
+
                 if (instance == null)
                 {
                     //java.io.FileDescriptor.init();
                     System.Diagnostics.Debug.WriteLine("About to init6");
 
-                    try {
+                    try
+                    {
                         com.codename1.impl.SilverlightImplementation.setCanvas(this, LayoutRoot);
                         //com.codename1.impl.SilverlightImplementation.setPushCallback(null);
-                    } finally { System.Diagnostics.Debug.WriteLine("About to init");  }
+                    }
+                    finally { System.Diagnostics.Debug.WriteLine("About to init"); }
 
 
                     com.codename1.ui.util.Resources.setFailOnMissingTruetype(false);
@@ -98,9 +100,9 @@ namespace UWPApp
                         com.codename1.io.NetworkManager n = (com.codename1.io.NetworkManager)com.codename1.io.NetworkManager.getInstance();
                         n.addToQueue(r);
                     }
-                         
-                 }
-                
+
+                }
+
             };
             System.Diagnostics.Debug.WriteLine("About to init7");
         }
@@ -116,7 +118,7 @@ namespace UWPApp
         //    {
         //        instance.start();
         //    }
-       // }
+        // }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
