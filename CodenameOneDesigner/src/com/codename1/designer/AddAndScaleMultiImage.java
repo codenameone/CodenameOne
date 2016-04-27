@@ -220,7 +220,8 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
     private static byte[] scale(BufferedImage bi, int w, int h) throws IOException {
         BufferedImage scaled = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = scaled.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         g2d.drawImage(bi, 0, 0, scaled.getWidth(), scaled.getHeight(), null);
         g2d.dispose();
         ByteArrayOutputStream output = new ByteArrayOutputStream();

@@ -188,8 +188,15 @@ namespace com.codename1.impl
             {
                 if (actualHeight < 0)
                 {
-                    CanvasTextLayout fontLayout = new CanvasTextLayout(SilverlightImplementation.screen, "Mg", font, 0.0f, 0.0f);
-                    actualHeight = Convert.ToInt32(Math.Ceiling(fontLayout.LayoutBounds.Height));
+                    try
+                    {
+                        CanvasTextLayout fontLayout = new CanvasTextLayout(SilverlightImplementation.screen, "Mg", font, 0.0f, 0.0f);
+                        actualHeight = Convert.ToInt32(Math.Ceiling(fontLayout.LayoutBounds.Height));
+                    } catch (System.ArgumentException ex)
+                    {
+                        return 1;
+                    }
+                    
                 }
                 return actualHeight;
             }
@@ -235,18 +242,24 @@ namespace com.codename1.impl
 
         internal int getStringWidth(string str)
         {
-            String aux = str.Trim();
-            if (aux.Length < str.Length)
+            try
             {
-                // WIN2D does not take space size into account
-                int spaceSize = getStringWidth("_ _") - getStringWidth("__");
-                CanvasTextLayout fontLayout = new CanvasTextLayout(SilverlightImplementation.screen, aux, font, 0.0f, 0.0f);
-                return Convert.ToInt32(Math.Ceiling(fontLayout.LayoutBounds.Width)) + spaceSize * (str.Length - aux.Length);
-            }
-            else
+                String aux = str.Trim();
+                if (aux.Length < str.Length)
+                {
+                    // WIN2D does not take space size into account
+                    int spaceSize = getStringWidth("_ _") - getStringWidth("__");
+                    CanvasTextLayout fontLayout = new CanvasTextLayout(SilverlightImplementation.screen, aux, font, 0.0f, 0.0f);
+                    return Convert.ToInt32(Math.Ceiling(fontLayout.LayoutBounds.Width)) + spaceSize * (str.Length - aux.Length);
+                }
+                else
+                {
+                    CanvasTextLayout fontLayout = new CanvasTextLayout(SilverlightImplementation.screen, str, font, 0.0f, 0.0f);
+                    return Convert.ToInt32(Math.Ceiling(fontLayout.LayoutBounds.Width));
+                }
+            } catch (System.ArgumentException ex)
             {
-                CanvasTextLayout fontLayout = new CanvasTextLayout(SilverlightImplementation.screen, str, font, 0.0f, 0.0f);
-                return Convert.ToInt32(Math.Ceiling(fontLayout.LayoutBounds.Width));
+                return str.Length * size;
             }
         }
     }
@@ -404,7 +417,7 @@ namespace com.codename1.impl
             postCompleted = true;
         }
     }
-
+    /*
     class InputStreamProxy : java.io.InputStream
     {
         private Stream internalStream;
@@ -421,10 +434,16 @@ namespace com.codename1.impl
             return 0;
         }
 
+        //public override void close()
+        //{
+        //    internalStream.Dispose();
+        // }
+
         public override void close()
         {
             internalStream.Dispose();
         }
+
         public override bool markSupported()
         {
             return internalStream.CanSeek;
@@ -467,7 +486,7 @@ namespace com.codename1.impl
             return n;
         }
     }
-
+    
     class OutputStreamProxy : java.io.OutputStream
     {
         private Stream internalStream;
@@ -533,7 +552,7 @@ namespace com.codename1.impl
         }
 
     }
-
+    */
     public class StringFontPair
     {
         public String str;

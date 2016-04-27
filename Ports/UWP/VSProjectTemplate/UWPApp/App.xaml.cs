@@ -31,9 +31,9 @@ namespace UWPApp
         /// </summary>
         public App()
         {
-            Microsoft.ApplicationInsights.WindowsAppInitializer.InitializeAsync(
-                Microsoft.ApplicationInsights.WindowsCollectors.Metadata |
-                Microsoft.ApplicationInsights.WindowsCollectors.Session);
+            //Microsoft.ApplicationInsights.WindowsAppInitializer.InitializeAsync(
+            //    Microsoft.ApplicationInsights.WindowsCollectors.Metadata |
+            //    Microsoft.ApplicationInsights.WindowsCollectors.Session);
             this.InitializeComponent();
             this.Suspending += OnSuspending;
         }
@@ -109,7 +109,7 @@ namespace UWPApp
             deferral.Complete();
         }
     }
-    
+
     class IKVMReflectionHelper : RuntimeReflectionHelper
     {
         public static void Initialize()
@@ -117,6 +117,7 @@ namespace UWPApp
             Instance = new IKVMReflectionHelper();
             java.lang.System.setOut(new DebugPrintStream());
             java.lang.System.setErr(new DebugPrintStream());
+            //java.lang.System.setOut(new java.io.OutputStreamProxy())
         }
 
         private IKVMReflectionHelper()
@@ -166,7 +167,7 @@ namespace UWPApp
         {
 #if !DEBUG || true
             return new[] {
-                new RemappedClassAttribute("java.lang.AutoCloseable", typeof(IDisposable)),
+                //new RemappedClassAttribute("java.lang.AutoCloseable", typeof(IDisposable)),
                 new RemappedClassAttribute("java.lang.Comparable", typeof(IComparable)),
                 new RemappedClassAttribute("java.lang.Object", typeof(object)),
                 new RemappedClassAttribute("java.lang.String", typeof(string)),
@@ -228,9 +229,11 @@ namespace UWPApp
                 // ignore
             }
 
-            
+
         }
+
+
     }
-    
-    
+
+
 }
