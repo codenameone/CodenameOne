@@ -1241,9 +1241,12 @@ public class Resources {
         }
         if(!failOnMissingTruetype) {
             try {
-                return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
-            } catch(Exception err) {
-                err.printStackTrace();
+                Font ttf = Font.createTrueTypeFont(fontName, fileName);
+                if (ttf != null) {
+                    return ttf.derive(fontSize, f.getStyle());
+                }
+                return f;
+            } catch (Exception ex) {
                 return f;
             }
         }
