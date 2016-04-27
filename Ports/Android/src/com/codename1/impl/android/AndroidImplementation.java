@@ -120,6 +120,7 @@ import com.codename1.ui.*;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
@@ -208,6 +209,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private Media background;
     private boolean asyncEditMode = false;
     private boolean compatPaintMode;
+    private MediaRecorder recorder = null;
 
     @Override
     public void setPlatformHint(String key, String value) {
@@ -5037,12 +5039,112 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.activity.startActivityForResult(intent, CAPTURE_VIDEO);
     }
 
-    @Override
-    public void captureAudio(ActionListener response) {
-        callback = new EventDispatcher();
-        callback.addListener(response);
-        Intent intent = new Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION);
-        this.activity.startActivityForResult(intent, CAPTURE_AUDIO);
+    public void captureAudio(final ActionListener response) {
+
+//        Intent intent = new Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION);
+//        if(isIntentAvailable(intent)){
+//            callback = new EventDispatcher();
+//            callback.addListener(response);
+//            this.activity.startActivityForResult(intent, CAPTURE_AUDIO);
+//            return;
+//        }
+        try {
+            final Form current = Display.getInstance().getCurrent();
+
+            final File temp = File.createTempFile("mtmp", "dat");
+            temp.deleteOnExit();
+
+            if (recorder != null) {
+                recorder.release();
+            }
+            recorder = new MediaRecorder();
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_WB);
+            recorder.setOutputFile(temp.getAbsolutePath());
+
+            final Form recording = new Form("Recording");
+            recording.setTransitionInAnimator(CommonTransitions.createEmpty());
+            recording.setTransitionOutAnimator(CommonTransitions.createEmpty());
+            recording.setLayout(new BorderLayout());
+
+            recorder.prepare();
+            recorder.start();
+
+            final Label time = new Label("00:00");
+            time.getAllStyles().setAlignment(Component.CENTER);
+            Font f = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE);
+            f = f.derive(getDisplayHeight() / 10, Font.STYLE_PLAIN);
+            time.getAllStyles().setFont(f);
+            recording.addComponent(BorderLayout.CENTER, time);
+
+            recording.registerAnimated(new Animation() {
+
+                long current = System.currentTimeMillis();
+                long zero = current;
+                int sec = 0;
+
+                public boolean animate() {
+                    long now = System.currentTimeMillis();
+                    if (now - current > 1000) {
+                        current = now;
+                        sec++;
+                        return true;
+                    }
+                    return false;
+                }
+
+                public void paint(Graphics g) {
+                    int seconds = sec % 60;
+                    int minutes = sec / 60;
+
+                    String secStr = seconds < 10 ? "0" + seconds : "" + seconds;
+                    String minStr = minutes < 10 ? "0" + minutes : "" + minutes;
+
+                    String txt = minStr + ":" + secStr;
+                    time.setText(txt);
+                }
+            });
+
+            Container south = new Container(new com.codename1.ui.layouts.GridLayout(1, 2));
+            Command cancel = new Command("Cancel") {
+
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    if (recorder != null) {
+                        recorder.stop();
+                        recorder.release();
+                        recorder = null;
+                    }
+                    current.showBack();
+                    response.actionPerformed(null);
+                }
+
+            };
+            recording.setBackCommand(cancel);
+            south.add(new com.codename1.ui.Button(cancel));
+            south.add(new com.codename1.ui.Button(new Command("Save") {
+
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    if (recorder != null) {
+                        recorder.stop();
+                        recorder.release();
+                        recorder = null;
+                    }
+                    current.showBack();
+                    response.actionPerformed(new ActionEvent(temp.getAbsolutePath()));
+                }
+
+            }));
+            recording.addComponent(BorderLayout.SOUTH, south);
+            recording.show();
+
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            throw new RuntimeException("failed to start audio recording");
+        }
+
     }
 
     /**
