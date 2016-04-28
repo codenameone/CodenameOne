@@ -1871,7 +1871,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(CN1_THREAD_STATE_MULTI
         POOL_BEGIN();
         AudioPlayer* pl = (BRIDGE_CAST AudioPlayer*)((void *)peer);
         if([pl isPlaying]) {
-            return;
+            [pl stop];
         }
 #ifndef CN1_USE_ARC
         [pl release];

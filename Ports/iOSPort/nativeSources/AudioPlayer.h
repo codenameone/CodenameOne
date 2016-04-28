@@ -46,5 +46,6 @@
 - (BOOL) isPlaying; 
 + (float)getVolume;
 + (void)setVolume:(float)vol;
++ (void)stop;
 
 @end

@@ -3046,13 +3046,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(moviePlayerPeer != 0) {
                 pause();
                 if(!isVideo) {
-                    nativeInstance.cleanupAudio(moviePlayerPeer);                    
+                    nativeInstance.cleanupAudio(moviePlayerPeer);
+                    moviePlayerPeer = 0;
                 }
                 removeMediaCallback(onCompletionCallbackId);
                 // SJH Nov. 13, 2015:  Uncommenting this because it seems that 
                 // we do need to release the peer when we're cleaning up.
-                nativeInstance.releasePeer(moviePlayerPeer);
-                moviePlayerPeer = 0;
+                if (isVideo) {
+                    nativeInstance.releasePeer(moviePlayerPeer);
+                    moviePlayerPeer = 0;
+                }
             }
         }
         
