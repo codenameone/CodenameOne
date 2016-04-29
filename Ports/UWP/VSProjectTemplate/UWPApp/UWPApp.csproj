@@ -113,7 +113,9 @@
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
+    
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <!-- CN1 SOURCES -->
     <Compile Include="src\AsyncPictureDecoderExtension.cs" />
     <Compile Include="src\com\codename1\impl\AsyncOp.cs" />
     <Compile Include="src\com\codename1\impl\ClearColorPainter.cs" />
@@ -139,6 +141,7 @@
     <Compile Include="src\com\codename1\impl\WindowsGraphics.cs" />
     <Compile Include="src\com\codename1\impl\WindowsMutableGraphics.cs" />
     <Compile Include="src\com\codename1\impl\WindowsPurchase.cs" />
+    <!-- END CN1 Sources -->
   </ItemGroup>
   
   <ItemGroup>

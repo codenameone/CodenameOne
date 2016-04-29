@@ -1,7 +1,11 @@
 {
   "dependencies": {
-    "Microsoft.NETCore.UniversalWindowsPlatform": "5.0.0",
-    "Win2D.uwp": "1.14.0"
+    "Microsoft.NETCore.UniversalWindowsPlatform": "5.1.0",
+    "Win2D.uwp": "1.17.0",
+    "Microsoft.ApplicationInsights": "1.0.0",
+    "Microsoft.ApplicationInsights.PersistenceChannel": "1.0.0",
+    "Microsoft.ApplicationInsights.WindowsApps": "1.0.0",
+    "ZXing.Net": "0.14.0.1"
   },
   "frameworks": {
     "uap10.0": {}
