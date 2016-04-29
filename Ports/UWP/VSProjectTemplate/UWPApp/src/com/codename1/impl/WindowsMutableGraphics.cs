@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿
+using com.codename1.ui;
+using Microsoft.Graphics.Canvas.Geometry;
 
 namespace com.codename1.impl
 {
@@ -155,11 +154,20 @@ namespace com.codename1.impl
         {
             return true;
         }
-
-        //internal override bool isMutable()
-        //{
-        //    return true;
-        //}
+        internal override void fillPath(CanvasPathBuilder p)
+        {
+            setGraphics(canvas.CreateDrawingSession());
+            base.setClip(clip);
+            base.fillPath(p);
+            base.removeClip();
+        }
+        internal override void drawPath(CanvasPathBuilder p, Stroke stroke)
+        {
+            setGraphics(canvas.CreateDrawingSession());
+            base.setClip(clip);
+            base.drawPath(p, stroke);
+            base.removeClip();
+        }
 
         #region nao implementar
         //internal override int getAlpha()
@@ -178,7 +186,7 @@ namespace com.codename1.impl
         //{
         //    setGraphics(canvas.CreateDrawingSession());
         //    return base.getFont();
-           
+
         //}
 
         //internal override void setAlpha(int p)
