@@ -141,7 +141,7 @@
     <Compile Include="src\com\codename1\impl\WindowsGraphics.cs" />
     <Compile Include="src\com\codename1\impl\WindowsMutableGraphics.cs" />
     <Compile Include="src\com\codename1\impl\WindowsPurchase.cs" />
-    <!-- END CN1 Sources -->
+    <!-- END CN1 SOURCES -->
   </ItemGroup>
   
   <ItemGroup>

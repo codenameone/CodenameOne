@@ -94,6 +94,7 @@
             <fileset dir="${cn1uwpport.dir}" excludes="TestProject/src/**,TestProject/lib/*.zip,dist/**,build/**,anttasks/**,TestProject/UWPProject/UWPApp/bin/**,UWPImplementationFactory/**,TestProject/dist/**,TestProject/build/**,TestProject/JavaSE.jar,TestProject/lib/*.jar,ikvm-uwp/**,TestProject/UWPProject/UWPApp/repro*/**,TestProject/UWPProject/UWPApp/lib/*.dll,TestProject/UWPProject/UWPApp/obj/**,TestProject/UWPProject/UWPApp/BundleArtifacts*/**">
             </fileset>
         </copy>
+        <delete dir="dist/CN1UWPPort/TestProject/UWPProject/UWPApp/src"/>
         <copy todir="dist/CN1UWPPort/TestProject/UWPProject" overwrite="true">
             <fileset dir="VSProjectTemplate" includes="**"/>
         </copy>
