@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
@@ -40,10 +41,32 @@ import com.codename1.ui.util.Resources;
 import java.util.Vector;
 
 /**
- * Toolbar can replace the default TitleArea component. Toolbar allows
- * customizing the Form title with different commands on the title area, within
- * the side menu or the overflow menu.
- *
+ * <p>Toolbar replaces the default title area with a powerful abstraction that allows functionality ranging
+ * from side menus (hamburger) to title animations and any arbitrary component type. Toolbar allows
+ * customizing the Form title with different commands on the title area, within the side menu or the overflow menu.</p>
+ * 
+ * <p>
+ * The Toolbar allows placing components in one of 4 positions as illustrated by the sample below:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/e72cfa6aedd7fcd1af72.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar.png" alt="Simple usage of Toolbar" />
+ *  
+ * <p>
+ * The following code demonstrates a more advanced search widget where the data is narrowed as we type
+ * directly into the title area search. Notice that the {@code TextField} and its hint are styled to look like the title.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/dce6598a226aaf9a3157.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-search.png" alt="Dynamic TextField search using the Toolbar" />
+ * 
+ * <p>
+ * This sample code show off title animations that allow a title to change (and potentially shrink) as the user scrolls
+ * down the UI.  The 3 frames below show a step by step process in the change.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/085e3a8fa1c36829d812.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-1.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-2.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-3.png" alt="Toolbar animation stages" />
+ * 
  * @author Chen
  */
 public class Toolbar extends Container {
@@ -80,6 +103,8 @@ public class Toolbar extends Container {
     
     private Container permanentSideMenuContainer;
 
+    private static boolean globalToolbar;
+    
     /**
      * Empty Constructor
      */
@@ -89,6 +114,25 @@ public class Toolbar extends Container {
         sideMenu = new ToolbarSideMenu();
     }
 
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant globalToobarBool.
+     * @param gt true to enable the toolbar globally
+     */
+    public static void setGlobalToolbar(boolean gt) {
+        globalToolbar = gt;
+    }
+    
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant globalToobarBool.
+     * 
+     * @return  true if the toolbar API is turned on by default
+     */
+    public static boolean isGlobalToolbar() {
+        return globalToolbar;
+    }
+    
     /**
      * This constructor places the Toolbar on a different layer on top of the 
      * Content Pane.
@@ -120,6 +164,22 @@ public class Toolbar extends Container {
         }
     }
 
+    /**
+     * Makes the title align to the center accurately by doing it at the layout level which also takes into 
+     * account right/left commands
+     * @param cent whether the title should be centered
+     */
+    public void setTitleCentered(boolean cent) {
+        ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+    } 
+    
+    /**
+     * Returns true if the title is centered via the layout
+     * @return true if the title is centered
+     */
+    public boolean isTitleCentered() {
+        return ((BorderLayout)getLayout()).getCenterBehavior() == BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;
+    }
 
     /**
      * Creates a static side menu that doesn't fold instead of the standard sidemenu.
@@ -153,7 +213,30 @@ public class Toolbar extends Container {
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }
+    
+    /**
+     * Returns the Toolbar title Component.
+     * 
+     * @return the Toolbar title component
+     */ 
+    public Component getTitleComponent(){
+        return titleComponent;
+    }
 
+    /**
+     * Adds a Command to the overflow menu
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToOverflowMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToOverflowMenu(cmd);
+        return cmd;
+    }
+    
     /**
      * Adds a Command to the overflow menu
      *
@@ -168,6 +251,20 @@ public class Toolbar extends Container {
         sideMenu.installRightCommands();
     }
 
+    /**
+     * Adds a Command to the side navigation menu
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToSideMenu(cmd);
+        return cmd;
+    }
+    
     /**
      * Adds a Command to the side navigation menu
      *
@@ -191,7 +288,8 @@ public class Toolbar extends Container {
             } else {
                 b.setUIID("SideCommand");
             }
-            permanentSideMenuContainer.addComponent(b);
+            addComponentToSideMenu(permanentSideMenuContainer, b);
+            
         } else {
             sideMenu.addCommand(cmd);
             sideMenu.installMenuBar();
@@ -223,7 +321,7 @@ public class Toolbar extends Container {
             Button btn = new Button(cmd);
             btn.setParent(cnt);
             cnt.setLeadComponent(btn);
-            permanentSideMenuContainer.addComponent(cnt);
+            addComponentToSideMenu(permanentSideMenuContainer, cnt);
         } else {
             cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
             cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
@@ -241,7 +339,7 @@ public class Toolbar extends Container {
         checkIfInitialized();
         if(permanentSideMenu) {
             constructPermanentSideMenu();
-            permanentSideMenuContainer.addComponent(cmp);
+            addComponentToSideMenu(permanentSideMenuContainer, cmp);
         } else {
             Command cmd = new Command("");
             cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
@@ -249,7 +347,7 @@ public class Toolbar extends Container {
             sideMenu.addCommand(cmd);
             sideMenu.installMenuBar();
         }
-        }
+    }
 
     /**
      * Find the command component instance if such an instance exists
@@ -288,12 +386,40 @@ public class Toolbar extends Container {
     /**
      * Adds a Command to the TitleArea on the right side.
      *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToRightBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToRightBar(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the right side.
+     *
      * @param cmd a Command
      */
     public void addCommandToRightBar(Command cmd) {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);        
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the left side.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToLeftBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToLeftBar(cmd);
+        return cmd;
     }
 
     /**
@@ -349,14 +475,37 @@ public class Toolbar extends Container {
         LookAndFeel lf = manager.getLookAndFeel();
         if (lf.getDefaultMenuTransitionIn() != null || lf.getDefaultMenuTransitionOut() != null) {
             transitionIn = lf.getDefaultMenuTransitionIn();
+            if(transitionIn instanceof BubbleTransition){
+                ((BubbleTransition)transitionIn).setComponentName("OverflowButton");
+            }
             transitionOut = lf.getDefaultMenuTransitionOut();
         } else {
-            transitionIn = CommonTransitions.createFade(300);
-            transitionOut = CommonTransitions.createFade(300);
+            transitionIn = CommonTransitions.createEmpty();
+            transitionOut = CommonTransitions.createEmpty();
         }
-        menu.setTransitionOutAnimator(transitionIn);
-        menu.setTransitionInAnimator(transitionOut);
-        return menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
+        menu.setTransitionInAnimator(transitionIn);
+        menu.setTransitionOutAnimator(transitionOut);
+        
+        if(isRTL()){
+            marginRight = marginLeft;
+            marginLeft = 0;
+        }
+        int tint = parent.getTintColor();
+        parent.setTintColor(0x00FFFFFF);
+        parent.tint = false;
+        boolean showBelowTitle = manager.isThemeConstant("showMenuBelowTitleBool", true);
+        int topPadding = 0;
+        Component statusBar = ((BorderLayout) getLayout()).getNorth();
+        if (statusBar != null) {
+            topPadding = statusBar.getAbsoluteY() + statusBar.getHeight();
+        }
+        if(showBelowTitle){
+            topPadding = th;
+        }
+        
+        Command r = menu.show(topPadding, Math.max(topPadding, height - topPadding), marginLeft, marginRight, true);
+        parent.setTintColor(tint);
+        return r;
     }
 
     /**
@@ -537,11 +686,23 @@ public class Toolbar extends Container {
     
     /**
      * Creates an empty side navigation panel.
-     */ 
-    protected Container constructSideNavigationComponent(){
+     */
+    protected Container constructSideNavigationComponent() {
         return sideMenu.constructSideNavigationPanel();
     }
-    
+
+    /**
+     * This method responsible to add a Component to the side navigation panel.
+     *
+     * @param menu the Menu Container that was created in the
+     * constructSideNavigationComponent() method
+     *
+     * @param cmp the Component to add to the side menu
+     */
+    protected void addComponentToSideMenu(Container menu, Component cmp) {
+        sideMenu.addComponentToSideMenuImpl(menu, cmp);
+    }
+
 
     class ToolbarSideMenu extends SideMenuBar {
 
@@ -554,6 +715,11 @@ public class Toolbar extends Container {
         protected Container constructSideNavigationComponent(){
             return Toolbar.this.constructSideNavigationComponent();
         }
+
+        @Override
+        protected void addComponentToSideMenu(Container menu, Component cmp) {
+            Toolbar.this.addComponentToSideMenu(menu, cmp);
+        }
         
         @Override
         protected Container getTitleAreaContainer() {
@@ -562,7 +728,7 @@ public class Toolbar extends Container {
 
         @Override
         protected Component getTitleComponent() {
-            return titleComponent;
+            return Toolbar.this.getTitleComponent();
         }
 
         @Override
@@ -610,8 +776,8 @@ public class Toolbar extends Container {
             super.installRightCommands();
             if (overflowCommands != null && overflowCommands.size() > 0) {
                 Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
-                if (i == null) {
-                    i = Resources.getSystemResource().getImage("of_menu.png");
+                if (i == null) { 
+                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), 4.5f);
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 
@@ -621,6 +787,7 @@ public class Toolbar extends Container {
                 });
                 menuButton.putClientProperty("overflow", Boolean.TRUE);
                 menuButton.setUIID("TitleCommand");
+                menuButton.setName("OverflowButton");
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     BorderLayout bl = (BorderLayout) l;

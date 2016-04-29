@@ -30,14 +30,49 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
 /**
- * Components are arranged in an equally sized grid based on available space
- *
+ * <p>The components are arranged in a grid based on available space, all cells in the grid are given exactly
+ * the same size which matches the largest preferred size or available space. The main use case for this layout
+ * is a grid of icons e.g. like one would see in the iPhone home screen. <br>
+ * If the number of rows * columns is smaller than the number of components added a new row is implicitly added to the grid.
+ * However, if the number of components is smaller than available cells (won't fill the last row) blank spaces will
+ * be left in place.
+ * </p> 
+ * <p>
+ * In this example we can see that a 2x2 grid is used to add 5 elements, this results in an additional row that's implicitly
+ * added turning the grid to a 3x2 grid implicitly and leaving one blank cell.
+ * </p>
+ *<script src="https://gist.github.com/codenameone/cd69363cc953f6bdb66c.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-2x2.png" alt="Grid Layout 2x2" />
+ * <p>
+ * When we use a 2x4 size ratio we would see elements getting cropped as we do here. The grid layout uses the grid
+ * size first and doesn't pay too much attention to the preferred size of the components it holds.
+ * </p>
+ * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-2x4.png" alt="Grid Layout 2x4" />
+ * <p>
+ * Grid also has an autoFit attribute that can be used to automatically calculate the column count based on 
+ * available space and preferred width. This is really useful for working with UI's where the device orientation
+ * might change.<br>
+ * There is also a terse syntax for working with a grid that has two versions, one that uses the "auto fit" option and
+ * another that accepts the column names. Heres a sample of the terse syntax coupled with the auto fit screenshots
+ * of the same code in two orientations:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/acb3e2dc10ea767a72db.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-portrait.png" alt="Grid Layout autofit portrait" />
+ * <img src="https://www.codenameone.com/img/developer-guide/grid-layout-autofit-landscape.png" alt="Grid Layout autofit landscape" />
+ * 
+ * 
  * @author Chen Fishbein
  */
 public class GridLayout extends Layout{
     private boolean fillLastRow;
     private int rows;
     private int columns;
+    
+    /**
+     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This 
+     * makes animating a grid layout component MUCH easier.
+     */
+    private boolean hideZeroSized;
 
     /**
      * Auto fits columns/rows to available screen space
@@ -59,6 +94,47 @@ public class GridLayout extends Layout{
         }
     }
 
+    /** 
+     * Creates a new instance of GridLayout with the given columns, rows is set to 1 but will implicitly grow
+     * if more components are added
+     * 
+     * @param columns - number of columns.
+     * @throws IllegalArgumentException if rows &lt; 1 or columns &lt; 1
+     */
+    public GridLayout(int columns) {
+        this(1, columns);
+    }
+
+    /**
+     * Returns a grid layout that implicitly auto-fits to width in term of number of columns
+     * @return a grid layout that automatically adapts its size
+     */
+    public static GridLayout autoFit() {
+        GridLayout g= new GridLayout(1);
+        g.setAutoFit(true);
+        return g;
+    }
+    
+    /**
+     * Creates a new container with an auto fit grid layout and the components added to it
+     * @param cmp the components
+     * @return a new container
+     */
+    public static Container encloseIn(Component... cmp) {
+        return Container.encloseIn(autoFit(), cmp);
+    }
+    
+    /**
+     * Creates a new container with the grid layout and the components added to it
+     * 
+     * @param columns the number of columns for the grid
+     * @param cmp the components
+     * @return a new container
+     */
+    public static Container encloseIn(int columns, Component... cmp) {
+        return Container.encloseIn(new GridLayout(columns), cmp);
+    }
+    
     private void autoSizeCols(Container parent, int width) {
         if(isAutoFit()) {
             int numOfcomponents = parent.getComponentCount();
@@ -85,7 +161,7 @@ public class GridLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */    
     public void layoutContainer(Container parent) {
         int width = parent.getLayoutWidth() - parent.getSideGap() - parent.getStyle().getPadding(false, Component.RIGHT) - parent.getStyle().getPadding(false, Component.LEFT);
@@ -112,20 +188,26 @@ public class GridLayout extends Layout{
         }
         int row = 0;        
         
-        for(int i = 0 ; i < numOfcomponents ; i++){
-            Component cmp = parent.getComponentAt(i);
+        int offset = 0;
+        for(int iter = 0 ; iter < numOfcomponents ; iter++){
+            Component cmp = parent.getComponentAt(iter);
             Style cmpStyle = cmp.getStyle();
             int marginLeft = cmpStyle.getMargin(parent.isRTL(), Component.LEFT);
             int marginTop = cmpStyle.getMargin(false, Component.TOP);
+            if(hideZeroSized) {
+                if(cmp.isHidden()) {
+                    continue;
+                }
+            }
             cmp.setWidth(cmpWidth - marginLeft - cmpStyle.getMargin(parent.isRTL(), Component.RIGHT));
             cmp.setHeight(cmpHeight - marginTop - cmpStyle.getMargin(false, Component.BOTTOM));
             if (rtl) {
-            	cmp.setX(x + (localColumns - 1 - (i % localColumns)) * cmpWidth + marginLeft);
+            	cmp.setX(x + (localColumns - 1 - (offset % localColumns)) * cmpWidth + marginLeft);
             } else {
-            	cmp.setX(x + (i % localColumns) * cmpWidth + marginLeft);
+            	cmp.setX(x + (offset % localColumns) * cmpWidth + marginLeft);
             }
             cmp.setY(y + row * cmpHeight + marginTop);
-            if((i + 1) % columns == 0){
+            if((offset + 1) % columns == 0){
                 row++;
                 
                 // check if we need to recalculate component widths
@@ -137,11 +219,12 @@ public class GridLayout extends Layout{
                     cmpWidth = width / localColumns;
                 }
             }
+            offset++;
         }
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */    
     public Dimension getPreferredSize(Container parent) {        
         int width = 0;
@@ -173,7 +256,7 @@ public class GridLayout extends Layout{
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "GridLayout";
@@ -194,7 +277,7 @@ public class GridLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return super.equals(o) && ((GridLayout)o).getRows() == getRows() &&
@@ -238,9 +321,27 @@ public class GridLayout extends Layout{
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean obscuresPotential(Container parent) {
         return parent.getComponentCount() == rows * columns || autoFit;
+    }
+
+    /**
+     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+     * makes animating a grid layout component MUCH easier.
+     * @return the hideZeroSized
+     */
+    public boolean isHideZeroSized() {
+        return hideZeroSized;
+    }
+
+    /**
+     * When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+     * makes animating a grid layout component MUCH easier.
+     * @param hideZeroSized the hideZeroSized to set
+     */
+    public void setHideZeroSized(boolean hideZeroSized) {
+        this.hideZeroSized = hideZeroSized;
     }
 }

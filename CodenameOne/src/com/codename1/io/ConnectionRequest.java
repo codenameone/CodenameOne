@@ -27,10 +27,17 @@ package com.codename1.io;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.Callback;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.CallbackDispatcher;
+import com.codename1.util.FailureCallback;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,9 +50,16 @@ import java.util.Map;
 import java.util.Vector;
 
 /**
- * This class represents a connection object in the form of a request response
- * typically common for HTTP/HTTPS connections. Elements of this type are
- * placed in a priority queue based 
+ * <p>This class represents a connection object in the form of a request response
+ * typically common for HTTP/HTTPS connections. A connection request is added to
+ * the {@link com.codename1.io.NetworkManager} for processing in a queue on one of the
+ * network threads. You can read more about networking in Codename One {@link com.codename1.io here}</p>
+ * 
+ * <p>The sample
+ * code below fetches a page of data from the nestoria housing listing API.<br>
+ * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
+ * class. You can read more about networking in Codename One {@link com.codename1.io here}.</p>
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
  */
@@ -179,10 +193,35 @@ public class ConnectionRequest implements IOProgressListener {
      */
     private static String cookieHeader = "cookie";
     
+    /**
+     * Default constructor
+     */
     public ConnectionRequest() {
         if(NetworkManager.getInstance().isAPSupported()) {
             silentRetryCount = 1;
         }
+    }
+
+    /**
+     * Construct a connection request to a url
+     * 
+     * @param url the url
+     */
+    public ConnectionRequest(String url) {
+        this();
+        setUrl(url);
+    }
+    
+
+    /**
+     * Construct a connection request to a url
+     * 
+     * @param url the url
+     * @param post whether the request is a post url or a get URL
+     */
+    public ConnectionRequest(String url, boolean post) {
+        this(url);
+        setPost(post);
     }
     
     /**
@@ -363,7 +402,8 @@ public class ConnectionRequest implements IOProgressListener {
                 String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
                 if(cookies != null && cookies.length > 0){
                     Vector cook = new Vector();
-                    for(int iter = 0 ; iter < cookies.length ; iter++) {
+                    int clen = cookies.length;
+                    for(int iter = 0 ; iter < clen ; iter++) {
                         Cookie coo = parseCookieHeader(cookies[iter]);
                         if(coo != null) {
                             cook.addElement(coo);
@@ -371,7 +411,8 @@ public class ConnectionRequest implements IOProgressListener {
                         }
                     }
                     Cookie [] arr = new Cookie[cook.size()];
-                    for (int i = 0; i < arr.length; i++) {
+                    int arlen = arr.length;
+                    for (int i = 0; i < arlen; i++) {
                         arr[i] = (Cookie) cook.elementAt(i);
                     }
                     impl.addCookie(arr);
@@ -841,7 +882,8 @@ public class ConnectionRequest implements IOProgressListener {
                     continue;
                 }
                 String[] val = (String[])requestVal;
-                for(int iter = 0 ; iter < val.length - 1; iter++) {
+                int vlen = val.length;
+                for(int iter = 0 ; iter < vlen - 1; iter++) {
                     b.append(key);
                     b.append("=");
                     b.append(val[iter]);
@@ -849,7 +891,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 b.append(key);
                 b.append("=");
-                b.append(val[val.length - 1]);
+                b.append(val[vlen - 1]);
                 if(e.hasMoreElements()) {
                     b.append("&");
                 }
@@ -883,7 +925,8 @@ public class ConnectionRequest implements IOProgressListener {
                     continue;
                 }
                 String[] valArray = (String[])requestVal;
-                for(int iter = 0 ; iter < valArray.length - 1; iter++) {
+                int vlen = valArray.length;
+                for(int iter = 0 ; iter < vlen - 1; iter++) {
                     val.append(key);
                     val.append("=");
                     val.append(valArray[iter]);
@@ -891,7 +934,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
                 val.append(key);
                 val.append("=");
-                val.append(valArray[valArray.length - 1]);
+                val.append(valArray[vlen - 1]);
                 if(e.hasMoreElements()) {
                     val.append("&");
                 }
@@ -1084,16 +1127,29 @@ public class ConnectionRequest implements IOProgressListener {
      * @param key the key of the argument
      * @param value the value for the argument
      */
+    public void addArgumentArray(String key, String... value) {
+        addArgument(key, value);
+    }
+    
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
     public void addArgument(String key, String[] value) {
         // copying the array to prevent mutation
         String[] v = new String[value.length];
         if(post) {
-            for(int iter = 0 ; iter < value.length ; iter++) {
+            int vlen = value.length;
+            for(int iter = 0 ; iter < vlen ; iter++) {
                 v[iter] = Util.encodeBody(value[iter]);
             }
             addArg(Util.encodeBody(key), v);
         } else {
-            for(int iter = 0 ; iter < value.length ; iter++) {
+            int vlen = value.length;
+            for(int iter = 0 ; iter < vlen ; iter++) {
                 v[iter] = Util.encodeUrl(value[iter]);
             }
             addArg(Util.encodeUrl(key), v);
@@ -1300,7 +1356,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void ioStreamUpdate(Object source, int bytes) {
         if(!isKilled()) {
@@ -1333,7 +1389,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void addResponseListener(ActionListener a) {
+    public void addResponseListener(ActionListener<NetworkEvent> a) {
         if(actionListeners == null) {
             actionListeners = new EventDispatcher();
             actionListeners.setBlocking(false);
@@ -1346,7 +1402,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void removeResponseListener(ActionListener a) {
+    public void removeResponseListener(ActionListener<NetworkEvent> a) {
         if(actionListeners == null) {
             return;
         }
@@ -1362,7 +1418,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void addResponseCodeListener(ActionListener a) {
+    public void addResponseCodeListener(ActionListener<NetworkEvent> a) {
         if(responseCodeListeners == null) {
             responseCodeListeners = new EventDispatcher();
             responseCodeListeners.setBlocking(false);
@@ -1375,7 +1431,7 @@ public class ConnectionRequest implements IOProgressListener {
      *
      * @param a listener
      */
-    public void removeResponseCodeListener(ActionListener a) {
+    public void removeResponseCodeListener(ActionListener<NetworkEvent> a) {
         if(responseCodeListeners == null) {
             return;
         }
@@ -1426,7 +1482,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         if(url != null) {
@@ -1440,7 +1496,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         if(o != null && o.getClass() == getClass()) {
@@ -1698,5 +1754,177 @@ public class ConnectionRequest implements IOProgressListener {
         JSONParser jp = new JSONParser();
         Map<String, Object> result = jp.parseJSON(new InputStreamReader(new ByteArrayInputStream(cr.getResponseData()), "UTF-8"));
         return result;
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param onFail Callback called if we fail to load the image.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, boolean useCache) {
+        setDestinationStorage(storageFile);
+        downloadImage(onSuccess, onFail, useCache);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * 
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess, boolean useCache) {
+        downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter<Image>(), useCache);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess) {
+        downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter<Image>(), true);
+    }
+    
+    /**
+     * Downloads an image to a specified storage file asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param storageFile The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @since 3.4
+     */
+    public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        downloadImageToStorage(storageFile, onSuccess, onFail, true);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param onFail Callback called if we fail to load the image.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, boolean useCache) {
+        setDestinationFile(file);
+        downloadImage(onSuccess, onFail, useCache);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * If useCache is true, then this will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param useCache If true, then this will first check the storage to see if the image is already downloaded.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess, boolean useCache) {
+        downloadImageToFileSystem(file, onSuccess, new CallbackAdapter<Image>(), useCache);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess) {
+        downloadImageToFileSystem(file, onSuccess, new CallbackAdapter<Image>(), true);
+    }
+    
+    /**
+     * Downloads an image to a the file system asynchronously and calls the onSuccessCallback with the resulting image.  
+     * This will first try to load the image from Storage if it exists.
+     * 
+     * @param file The storage file where the file should be saved.
+     * @param onSuccess Callback called if the image is successfully loaded.
+     * @param onFail Callback called if the image fails to load.
+     * @since 3.4
+     */
+    public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        downloadImageToFileSystem(file, onSuccess, onFail, true);
+    }
+    
+
+    private void downloadImage(final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        downloadImage(onSuccess, onFail,  true);
+    }
+    
+    private void downloadImage(final SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail, boolean useCache) {
+        if (useCache) {
+            Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                public void run() {
+                    if (getDestinationFile() != null) {
+                        String file = getDestinationFile();
+                        FileSystemStorage fs = FileSystemStorage.getInstance();
+                        if (fs.exists(file)) {
+                            try {
+                                EncodedImage img = EncodedImage.create(fs.openInputStream(file));
+                                if (img == null) {
+                                    throw new IOException("Failed to load image at "+file);
+                                }
+                                CallbackDispatcher.dispatchSuccess(onSuccess, img);
+                            } catch (Exception ex) {
+                                CallbackDispatcher.dispatchError(onFail, ex);
+                            }
+                        } else {
+                            downloadImage(onSuccess, onFail, false);
+                        }
+                    } else if (getDestinationStorage() != null) {
+                        String file = getDestinationStorage();
+                        Storage fs = Storage.getInstance();
+                        if (fs.exists(file)) {
+                            try {
+                                EncodedImage img = EncodedImage.create(fs.createInputStream(file));
+                                if (img == null) {
+                                    throw new IOException("Failed to load image at "+file);
+                                }
+                                CallbackDispatcher.dispatchSuccess(onSuccess, img);
+                            } catch (Exception ex) {
+                                CallbackDispatcher.dispatchError(onFail, ex);
+                            }
+                        } else {
+                            downloadImage(onSuccess, onFail, false);
+                        } 
+                    }
+                }
+            });
+                
+        } else {
+            final ActionListener onDownload = new ActionListener<NetworkEvent>() {
+
+                public void actionPerformed(NetworkEvent nevt) {
+                    if (nevt.getResponseCode() == 200) {
+                        downloadImage(onSuccess, onFail, true);
+                    } else {
+                        if (nevt.getError() == null) {
+                            nevt.setError(new IOException("Failed to get image:  Code was "+nevt.getResponseCode()));
+                        }
+                        CallbackDispatcher.dispatchError(onFail, nevt.getError());
+                    }
+                    removeResponseListener(this);
+                }
+
+               
+            };
+            addResponseListener(onDownload);
+            NetworkManager.getInstance().addToQueue(this);
+        }
+        
     }
 }

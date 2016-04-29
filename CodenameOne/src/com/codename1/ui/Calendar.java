@@ -43,12 +43,20 @@ import java.util.TimeZone;
 import java.util.Vector;
 
 /**
- * Date widget for selecting a date/time value.
+ * <p>Date widget for selecting a date/time value.<br>
  * To localize strings for month names
  * use the values "Calendar.Month" using the 3 first characters of the month name
- * in the resource localization e.g. "Calendar.Jan", "Calendar.Feb" etc...
+ * in the resource localization e.g. "{@code Calendar.Jan}", "{@code Calendar.Feb}" etc...<br>
  * To localize strings for day names
- * use the values "Calendar.Day" in the resource localization e.g. "Calendar.Sunday", "Calendar.Monday" etc...
+ * use the values "Calendar.Day" in the resource localization e.g. "{@code Calendar.Sunday}", 
+ * "{@code Calendar.Monday}" etc...</p>
+ * 
+ * <p>
+ * Note that we recommend using the {@link com.codename1.ui.spinner.Picker} class which is superior when
+ * running on the device for most use cases.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/8f520493f7681b5d16a3.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-calendar.png" alt="Default calendar look" />
  *
  * @author Iddo Ari, Shai Almog
  */
@@ -709,7 +717,7 @@ public class Calendar extends Container {
         protected void fireActionEvent() {
             componentChanged();
             super.fireActionEvent();
-            dispatcher.fireActionEvent(new ActionEvent(Calendar.this));
+            dispatcher.fireActionEvent(new ActionEvent(Calendar.this,ActionEvent.Type.Calendar));
         }
 
         public void actionPerformed(ActionEvent evt) {

@@ -26,13 +26,18 @@ public class BigDecimal {
     TBigDecimal peer;
 
     /**
-     * Returns a <code>BigDecimal</code> representing the same numerical
-     * value as <code>value</code>.
+     * Returns a <code>BigDecimal</code> with value <code>value / 2<sup>scale</sup> / 10<sup>scale</sup></code>
      * @param value The value of the <code>BigDecimal</code> to be
      * created. 
      * @param scale The scale of the <code>BigDecimal</code> to be
      * created. 
      * @return The such created <code>BigDecimal</code>.
+     * @deprecated This method is not part of the JDK's <code>BigDecimal</code> class and its presence is historical, 
+     * as the first implementation of Codename One's BigDecimal class was ported from BouncyCastle, which is different
+     * than the JDK's BigDecimal class in that is optimizes binary arithmetic. The implementation of this method
+     * is counter-intuitive since it performs a bitwise left shift on <code>value</code> before scaling it.  Use {@link #BigDecimal(com.codename1.util.BigInteger, int) }
+     * instead if you just want to convert a <code>BigInteger</code> into a <code>BigDecimal</code>.  <strong>Do not rely on this method
+     * as it will be removed in a future version of Codename One.</strong>.
      */
     public static BigDecimal getInstance(BigInteger value, int scale)
     {
@@ -42,7 +47,7 @@ public class BigDecimal {
     /**
      * Constructor for <code>BigDecimal</code>. The value of the
      * constructed <code>BigDecimal</code> equals <code>bigInt / 
-     * 2<sup>scale</sup></code>.
+     * 10<sup>scale</sup></code>.
      * @param bigInt The <code>bigInt</code> value parameter.
      * @param scale The scale of the constructed <code>BigDecimal</code>.
      */

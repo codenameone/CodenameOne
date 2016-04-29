@@ -35,11 +35,20 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
 
 /**
- * An optionally multi-line editable region that can display text and allow a user to edit it.
- * Depending on the platform editing might occur in a new screen. Notice that when creating
- * a text area with one row it will act as a text field and never grow beyond that, however 
- * when assigning a greater number of rows the text area becomes multi-line with a minimum
- * number of visible rows, the text area will grow based on its content.
+ * <p>An optionally multi-line editable region that can display text and allow a user to edit it.
+ * By default the text area will grow based on its content.<br>
+ * {@code TextArea} is useful both for text input and for displaying multi-line data, it is used internally
+ * by components such as {@link com.codename1.components.SpanLabel} &amp;  
+ * {@link com.codename1.components.SpanButton}.</p>
+ * 
+ * <p>
+ * {@code TextArea} &amp; {@link com.codename1.ui.TextField} are very similar, we discuss the main differences
+ * between the two {@link com.codename1.ui.TextField here}.  In fact they are so similar that our sample code
+ * below was written for {@link com.codename1.ui.TextField} but should be interchangeable with {@code TextArea}.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/fb63dd5d6efdb95932be.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-text-component.png" alt="Text field input sample" />
  *
  * @author Chen Fishbein
  */
@@ -182,6 +191,12 @@ public class TextArea extends Component {
     
     private boolean endsWith3Points = false;
 
+    /**
+     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds 
+     * this might make it slower as a result
+     */
+    private boolean actAsLabel;
+    
     
     // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
     
@@ -352,7 +367,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -385,7 +400,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setWidth(int width) {
         if(width != getWidth()) {
@@ -404,6 +419,7 @@ public class TextArea extends Component {
      * @param t new value for the text area
      */
     public void setText(String t) {
+        String old = this.text;
         this.text = (t != null) ? t : "";
         setShouldCalcPreferredSize(true);
         if(maxSize < text.length()) {
@@ -414,8 +430,12 @@ public class TextArea extends Component {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings=null; 
         }
+        
         // while native editing we don't need the cursor animations
         if(Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {
+            if (!text.equals(old)) {
+                Display.impl.updateNativeEditorText(this, text);
+            }
             return;
         }
         repaint();
@@ -481,7 +501,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         super.keyPressed(keyCode);
@@ -522,21 +542,21 @@ public class TextArea extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void fireClicked() {
         onClick();
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected boolean isSelectableInteraction() {
         return editable;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);
@@ -555,7 +575,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isScrollableY() {
         return isFocusable() && getScrollDimension().getHeight() > getHeight();
@@ -589,14 +609,14 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
         requestFocus();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
         requestFocus();
@@ -607,7 +627,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
         // prevent a drag operation from going into edit mode
@@ -616,7 +636,7 @@ public class TextArea extends Component {
         } else {
             super.pointerReleased(x, y);
             if (isEditable() && isEnabled() && !isCellRenderer()) {
-                if(Display.getInstance().getImplementation().isNativeInputImmediate()) {
+                if(Display.impl.isNativeInputImmediate()) {
                     editString();
                     return;
                 }
@@ -637,7 +657,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusGainedInternal() {
         super.focusGainedInternal();
@@ -645,7 +665,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void focusLostInternal() {
         super.focusLostInternal();
@@ -751,7 +771,8 @@ public class TextArea extends Component {
     }
     
     private int indexOf(char[] t, char c, int offset, int length) {
-        for(int iter = offset ; iter < t.length && iter < offset+length; iter++) {
+        int tlen = t.length;
+        for(int iter = offset ; iter < tlen && iter < offset+length; iter++) {
             if(t[iter] == c) {
                 return iter;
            }
@@ -792,7 +813,7 @@ public class TextArea extends Component {
                 rowStrings.add(getText());
                 return;
             }
-        }
+        }        
         Style style = getUnselectedStyle();
         rowStrings= new ArrayList();
         widthForRowCalculations = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT);
@@ -810,13 +831,27 @@ public class TextArea extends Component {
         if(text == null || text.equals("")){
             return;
         }
+        Font font = style.getFont();
+        if(actAsLabel && text.length() <= columns && text.indexOf('\n') < 0) {
+            int w = font.stringWidth(text);
+            if(w <= getWidth()) {
+                if(rowStrings == null) {
+                    rowStrings = new ArrayList();
+                    rowStrings.add(getText());
+                    return;
+                } else {
+                    rowStrings.clear();
+                    rowStrings.add(getText());
+                    return;
+                }
+            }
+        }
         char[] text = preprocess(getText());
         int rows = this.rows;
         if(growByContent) {
             rows = Math.max(rows, getLines());
         }
         
-        Font font = style.getFont();
         int charWidth = font.charWidth(widestChar);
         Style selectedStyle = getSelectedStyle();
         if(selectedStyle.getFont() != style.getFont()) {
@@ -842,7 +877,8 @@ public class TextArea extends Component {
             } else {
                 // special case for the edge case of "no room".
                 // Its important since sometimes this case occurs in the GUI builder by accident
-                for(int iter = 0 ; iter < text.length ; iter++) {
+                int tlen = text.length;
+                for(int iter = 0 ; iter < tlen ; iter++) {
                     rowStrings.add("" + text[iter]);
                 }
             }
@@ -884,7 +920,7 @@ public class TextArea extends Component {
             rowText="";
             int maxLength = to;
 
-            if(useStringWidth) {
+            if(useStringWidth || actAsLabel) {
                 // fix for an infinite loop issue: http://forums.java.net/jive/thread.jspa?messageID=482802
                 //currentRowWidth = 0;
                 String currentRow = "";
@@ -992,7 +1028,8 @@ public class TextArea extends Component {
                     } else {
                         // special case for the edge case of "no room".
                         // Its important since sometimes this case occurs in the GUI builder by accident
-                        for(int iter = 0 ; iter < text.length ; iter++) {
+                        int tlen = text.length;
+                        for(int iter = 0 ; iter < tlen ; iter++) {
                             rowStrings.add("" + text[iter]);
                         }
                     }
@@ -1028,12 +1065,11 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         
-        if(Display.getInstance().isNativeInputSupported() &&
-                Display.getInstance().isTextEditing(this)) {
+        if(Display.getInstance().isNativeEditorVisible(this)) {
             return;
         }
         
@@ -1049,7 +1085,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         if(shouldShowHint()) {
@@ -1064,7 +1100,7 @@ public class TextArea extends Component {
     }
         
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcScrollSize(){
         return getUIManager().getLookAndFeel().getTextAreaSize(this, false);
@@ -1104,7 +1140,7 @@ public class TextArea extends Component {
      */
     void fireActionEvent() {
         if(actionListeners != null) {
-            ActionEvent evt = new ActionEvent(this);
+            ActionEvent evt = new ActionEvent(this,ActionEvent.Type.Edit);
             actionListeners.fireActionEvent(evt);
         }
         if(bindListeners != null) {
@@ -1115,10 +1151,12 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void onEditComplete(String text) {
-        setText(text);
+        if (!Display.getInstance().getImplementation().isAsyncEditMode()) {
+            setText(text);
+        }
         if(getParent() != null) {
             getParent().revalidate();
         }
@@ -1270,7 +1308,7 @@ public class TextArea extends Component {
      * @deprecated use Style.setAlignment instead
      */
     public void setAlignment(int align) {
-        getStyle().setAlignment(align);
+        getAllStyles().setAlignment(align);
     }
 
     /**
@@ -1405,7 +1443,8 @@ public class TextArea extends Component {
     public static void autoDetectWidestChar(String s) {
         Font f = UIManager.getInstance().getComponentStyle("TextArea").getFont();
         int widest = 0;
-        for(int iter = 0 ; iter < s.length() ; iter++) {
+        int slen = s.length();
+        for(int iter = 0 ; iter < slen ; iter++) {
             char c = s.charAt(iter);
             int w = f.charWidth(c);
             if(w > widest) {
@@ -1540,21 +1579,21 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"text"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {String.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -1568,7 +1607,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -1585,7 +1624,7 @@ public class TextArea extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("text")) {
@@ -1595,7 +1634,7 @@ public class TextArea extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("text")) {
@@ -1684,4 +1723,37 @@ public class TextArea extends Component {
             Display.getInstance().stopEditing(this);
         }
     }
+
+    /**
+     * {@inheritDoc}
+     * We override get style here to return the selected style when editing
+     * @return the selected style if editing, <code>super.getStyle()</code> otherwise
+     */
+    @Override
+    public Style getStyle() {
+        if(isEditing()) {
+            return getSelectedStyle();
+        }
+        return super.getStyle(); 
+    }
+
+    /**
+     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+     * this might make it slower as a result
+     * @return the actAsLabel
+     */
+    public boolean isActAsLabel() {
+        return actAsLabel;
+    }
+
+    /**
+     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+     * this might make it slower as a result
+     * @param actAsLabel the actAsLabel to set
+     */
+    public void setActAsLabel(boolean actAsLabel) {
+        this.actAsLabel = actAsLabel;
+    }
+    
+    
 }

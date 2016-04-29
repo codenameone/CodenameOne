@@ -30,7 +30,7 @@ import org.objectweb.asm.Opcodes;
  *
  * @author Shai Almog
  */
-public class Field extends Instruction {
+public class Field extends Instruction implements AssignableExpression {
     private String owner;
     private String name;
     private String desc;
@@ -77,6 +77,8 @@ public class Field extends Instruction {
                 "_" + name + "(threadStateData, __cn1Arg" + arg + ", __cn1ThisObject);\n";        
     }
 
+    
+    
     public String pushFieldFromThis() {
         StringBuilder b = new StringBuilder("    ");
         switch(desc.charAt(0)) {
@@ -104,6 +106,62 @@ public class Field extends Instruction {
         b.append("(__cn1ThisObject));\n");
         return b.toString();
         
+    }
+    
+    @Override
+    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+        if (opcode == Opcodes.GETSTATIC || (opcode == Opcodes.GETFIELD && useThis)) {
+            StringBuilder b = new StringBuilder();
+            if (typeVarName != null) {
+                b.append(typeVarName).append(" = ");
+                switch(desc.charAt(0)) {
+                    case 'L':
+                    case '[':
+                        b.append("CN1_TYPE_OBJECT");
+                        break;
+                    case 'D':
+                        b.append("CN1_TYPE_DOUBLE");
+                        break;
+                    case 'F':
+                        b.append("CN1_TYPE_FLOAT");
+                        break;
+                    case 'J':
+                        b.append("CN1_TYPE_LONG");
+                        break;
+                    default:
+                        b.append("CN1_TYPE_INT");
+                        break;
+                }
+                b.append("; ");
+            }
+            if (varName != null) {
+                b.append(varName).append(" = ");
+            }
+            if (opcode == Opcodes.GETSTATIC) {
+                b.append("get_static_");
+                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append("_");
+                b.append(name.replace('/', '_').replace('$', '_'));
+                b.append("(threadStateData)");
+            } else {
+                // useThis
+                b.append("get_field_");
+                b.append(owner.replace('/', '_').replace('$', '_'));
+                b.append("_");
+                b.append(name);
+                b.append("(__cn1ThisObject)");
+            }
+            if (varName != null) {
+                b.append(";\n");
+            }
+            sb.append(b);
+            return true;
+        }
+        
+            
+            
+        
+        return false;
     }
     
     @Override
@@ -145,7 +203,7 @@ public class Field extends Instruction {
                 switch(desc.charAt(0)) {
                     case 'L':
                     case '[':
-                        b.append("PEEK_OBJ(1));\n    stackPointer--;\n");
+                        b.append("PEEK_OBJ(1));\n    SP--;\n");
                         return;
                     case 'D':
                         b.append("POP_DOUBLE");
@@ -203,7 +261,7 @@ public class Field extends Instruction {
                     case '[':
                         b.append("PEEK_OBJ");
                         if(useThis) {
-                            b.append("(1), __cn1ThisObject);\n    stackPointer--;\n");
+                            b.append("(1), __cn1ThisObject);\n    SP--;\n");
                         } else {
                             b.append("(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
                         }
@@ -243,5 +301,7 @@ public class Field extends Instruction {
     public void setUseThis(boolean useThis) {
         this.useThis = useThis;
     }
+
+    
 
 }

@@ -61,6 +61,10 @@ import com.codename1.ui.List;
  * wouldn't do anything but still cost in terms of processing.
  * 
  * @author Chen Fishbein, Shai Almog
+ * @deprecated this interface was added for ContainerList which is now deprecated. Use GenericListCellRenderer 
+ * or ListCellRenderer instead
+ * @see com.codename1.ui.list.GenericListCellRenderer
+ * @see com.codename1.ui.list.ListCellRenderer
  */
 public interface CellRenderer<T> { 
     /**
@@ -81,7 +85,7 @@ public interface CellRenderer<T> {
     /**
      * Returns a component instance that is painted under the currently focused renderer
      * and is animated to provide smooth scrolling. 
-     * When the selection moves, this component is drawn above/bellow the list items - 
+     * When the selection moves, this component is drawn above/below the list items - 
      * it is recommended to give this component some level of transparency (see above code example). 
      * This method is optional an implementation 
      * can choose to return null.

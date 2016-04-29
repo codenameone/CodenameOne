@@ -72,8 +72,9 @@ public class SmallByteArrayOutputStream extends OutputStream {
         byte[] response = new byte[count];
         count = 0;
         for(byte[] c : bytes) {
-            System.arraycopy(c, 0, response, count, c.length);
-            count += c.length;
+            int clen = c.length;
+            System.arraycopy(c, 0, response, count, clen);
+            count += clen;
         }
         return response;
     }

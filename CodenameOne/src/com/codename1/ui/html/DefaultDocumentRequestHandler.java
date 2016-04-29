@@ -47,14 +47,14 @@ public class DefaultDocumentRequestHandler implements AsyncDocumentRequestHandle
     private Vector visitedURLs;
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void resourceRequestedAsync(final DocumentInfo docInfo, final IOCallback callback) {
         resourceRequested(docInfo, callback);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public InputStream resourceRequested(DocumentInfo docInfo) {
         return null;

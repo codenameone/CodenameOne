@@ -27,12 +27,25 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * This class is the Media Manager creator.
- * Media can be created with a String URI or with a stream of the media.
+ * <p>
+ * Allow us to create {@ling com.codename1.media.Media} objects using String URI's or with a stream to 
+ * the media data.<br>
  * Notice that the underlying platforms contains the actual codecs, therefore 
- * you need to play common media file types such as mp3, mp4 to succeed playing 
- * on all target platforms.
+ * you need to play common media file types such as mp3, mp4 to successfully play them across devices
+ * on all target platforms. The simulator can't accurately reproduce the behavior of this class in all devices/cases.
+ * </p>
+ * <p>
+ * The sample code below demonstrates simple video playback.
+ * </p>
  * 
+ * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
+ * 
+ * <p>
+ *     The code below demonstrates capturing and playing back audio files using this API:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  */
 public class MediaManager {
 
@@ -157,7 +170,8 @@ public class MediaManager {
     public static Media createMediaRecorder(String path, String mimeType) throws IOException {
         boolean supportedMime = false;
         String [] supported  = getAvailableRecordingMimeTypes();
-        for (int i = 0; i < supported.length; i++) {
+        int slen = supported.length;
+        for (int i = 0; i < slen; i++) {
             String mime = supported[i];
             if(mime.equals(mimeType)){
                 supportedMime = true;

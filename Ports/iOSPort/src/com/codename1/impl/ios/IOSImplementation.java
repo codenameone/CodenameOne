@@ -92,6 +92,7 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.Picker;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -291,6 +292,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     // just scroll the text field into view and don't want this to happen.
     private int doNotHideTextEditorSemaphore=0;
     
+    /**
+     * A way to get the *actual* root content pane of a form without exposing Form.getActualPane().
+     * @param f The form whose root pane we want.
+     * @return The root pane of the form.  If there is no layered pane, then this should just
+     * return the content pane.  Otherwise it may return the parent of the layered pane and content pane.
+     */
+    private static Container getRootPane(Form f) {
+        Container root = f.getContentPane();
+        Container parent = null;
+        while ((parent = root.getParent()) != null && parent != f) {
+            root = parent;
+        }
+        return root;
+    }
+    
     @Override
     public void hideTextEditor() {
         if (doNotHideTextEditorSemaphore > 0) {
@@ -300,8 +316,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         Form current = getCurrentForm();
-        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && current.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
-            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && getRootPane(current).getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
             current.forceRevalidate();
         } 
         nativeInstance.hideTextEditing();
@@ -346,8 +362,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(f == cmp.getComponentForm()) {
                             cmp.requestFocus();
                         }
-                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && f.getContentPane().getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
-                            f.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && getRootPane(f).getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+                            getRootPane(f).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                             f.forceRevalidate();
                             return;
                         } 
@@ -448,13 +464,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(nativeInstance.isAsyncEditMode()) {
             // revalidate the parent since the size of form is now larger due to the vkb
             final Form current = Display.getInstance().getCurrent();
-            final Component currentEditingFinal = instance.currentEditing;
+            //final Component currentEditingFinal = instance.currentEditing;
             if(current.isFormBottomPaddingEditingMode()) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (current != null) {
-                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
+                            getRootPane(current).getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+                            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, nativeInstance.getVKBHeight());
                             current.revalidate();
                             Display.getInstance().callSerially(new Runnable() {
                                 public void run() {
@@ -488,6 +504,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                 });
             }
         }
+        
+        if (Display.getInstance().getVirtualKeyboardListener() != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
+                    if (l != null) {
+                        l.actionPerformed(new ActionEvent(true));
+                    }
+                }
+            });
+        }
     }
     
     /**
@@ -506,6 +533,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             
         });
+        if (Display.getInstance().getVirtualKeyboardListener() != null) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    ActionListener l = Display.getInstance().getVirtualKeyboardListener();
+                    if (l != null) {
+                        l.actionPerformed(new ActionEvent(false));
+                    }
+                }
+            });
+        }
     }
     
     public void setCurrentForm(Form f) {
@@ -519,11 +556,29 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static boolean editNext;
     public void editString(final Component cmp, final int maxSize, final int constraint, final String text, final int i) {
         
+        // The very first time we try to edit a string, let's determine if the 
+        // system default is to do async editing.  If the system default
+        // is not yet set, we set it here, and it will be used as the default from now on
+        //  We do this because the nativeInstance.isAsyncEditMode() value changes
+        // to reflect the currently edited field so it isn't a good way to keep a
+        // system default.
+        String defaultAsyncEditingSetting = Display.getInstance().getProperty("ios.VKBAlwaysOpen", null);
+        if (defaultAsyncEditingSetting == null) {
+            defaultAsyncEditingSetting = nativeInstance.isAsyncEditMode() ? "true" : "false";
+            Display.getInstance().setProperty("ios.VKBAlwaysOpen", defaultAsyncEditingSetting);
+            
+        }
+        boolean asyncEdit = "true".equals(defaultAsyncEditingSetting) ? true : false;
+        //Log.p("Application default for async editing is "+asyncEdit);
+        
         try {
             if (currentEditing != cmp && currentEditing != null && currentEditing instanceof TextArea) {
                 Display.getInstance().onEditingComplete(currentEditing, ((TextArea)currentEditing).getText());
                 currentEditing = null;
                 callHideTextEditor();
+                if (nativeInstance.isAsyncEditMode()) {
+                    nativeInstance.setNativeEditingComponentVisible(false);
+                }
                 synchronized(EDITING_LOCK) {
                     EDITING_LOCK.notify();
                 }
@@ -542,6 +597,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 } finally {
                     doNotHideTextEditorSemaphore--;
                 }
+                
+                // Notice here that we are checking isAsyncEditMode() which looks
+                // at the previously edited text area.  Not the async mode
+                // of our upcoming field.
                 if(isAsyncEditMode()) {
                     // flush the EDT so the focus will work...
 
@@ -554,22 +613,82 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             
+           // Check if the form has any setting for asyncEditing that should override
+           // the application defaults.
             Form parentForm = cmp.getComponentForm();
-            if(!parentForm.isFormBottomPaddingEditingMode()) {
+            if (parentForm == null) {
+                //Log.p("Attempt to edit text area that is not on a form.  This is not supported");
+                return;
+            }
+            if (parentForm.getClientProperty("asyncEditing") != null) {
+                Object async = parentForm.getClientProperty("asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Form overriding asyncEdit due to asyncEditing client property: "+asyncEdit);
+                }
+            }
+            
+            if (parentForm.getClientProperty("ios.asyncEditing") != null) {
+                Object async = parentForm.getClientProperty("ios.asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Form overriding asyncEdit due to ios.asyncEditing client property: "+asyncEdit);
+                }
+                
+            }
+            
+            // If the system default is to use async editing, we need to check
+            // the form to make sure that it is scrollable.  If it is not 
+            // scrollable, then this field should default to Non-async
+            // editing - and should instead revert to legacy editing mode.
+            if(asyncEdit && !parentForm.isFormBottomPaddingEditingMode()) {
                 Container p = cmp.getParent();
+                
+                // A crude estimate of how far the component needs to be able to scroll to make 
+                // async editing viable.  We start with half-way down the screen.
+                int keyboardClippingThresholdY = Display.getInstance().getDisplayWidth() / 2;
                 while(p != null) {
-                    if(p.isScrollableY()) {
+                    if(p.isScrollableY()  && p.getAbsoluteY() < keyboardClippingThresholdY) {
                         break;
                     }
                     p = p.getParent();
                 }
                 // no scrollabel parent automatically configure the text field for legacy mode
-                nativeInstance.setAsyncEditMode(p != null);
+                //nativeInstance.setAsyncEditMode(p != null);
+                asyncEdit = p != null;
+                //Log.p("Overriding asyncEdit due to form scrollability: "+asyncEdit);
                 
-            } else {
-                nativeInstance.setAsyncEditMode(true);
+            } else if (parentForm.isFormBottomPaddingEditingMode()){
+                // If form uses bottom padding mode, then we will always
+                // use async edit (unless the field explicitly overrides it).
+                asyncEdit = true;
+                //Log.p("Overriding asyncEdit due to form bottom padding edit mode: "+asyncEdit);
             }
 
+            
+            // If the field itself explicitly sets async editing behaviour
+            // then this will override all other settings.
+            if (cmp.getClientProperty("asyncEditing") != null) {
+                Object async = cmp.getClientProperty("asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Overriding asyncEdit due to field asyncEditing client property: "+asyncEdit);
+                }
+            }
+            
+            if (cmp.getClientProperty("ios.asyncEditing") != null) {
+                Object async = cmp.getClientProperty("ios.asyncEditing");
+                if (async instanceof Boolean) {
+                    asyncEdit = ((Boolean)async).booleanValue();
+                    //Log.p("Overriding asyncEdit due to field ios.asyncEditing client property: "+asyncEdit);
+                }
+                
+            }
+            
+            // Finally we set the async edit mode for this field.
+            //System.out.println("Async edit mode is "+asyncEdit);
+            nativeInstance.setAsyncEditMode(asyncEdit);
+            
             textEditorHidden = false;
             currentEditing = (TextArea)cmp;
 
@@ -592,23 +711,6 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             final boolean forceSlideUp = forceSlideUpTmp;
             
-            /*
-            if(isAsyncEditMode()) {
-                // revalidate the parent since the size of form is now larger due to the vkb
-                if(current.isFormBottomPaddingEditingMode()) {
-                    Display.getInstance().callSerially(new Runnable() {
-                        public void run() {
-                            current.getContentPane().getUnselectedStyle().setPaddingUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
-                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, getInvisibleAreaUnderVKB());
-                            current.forceRevalidate();
-                        }
-                    });
-                } else {
-                    current.revalidate();
-                }
-            } else {
-                cmp.repaint();
-            }*/
             cmp.repaint();
             // give the repaint one cycle to "do its magic...
             final Style stl = currentEditing.getStyle();
@@ -724,11 +826,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                             }
                             instance.currentEditing = null;
                             instance.callHideTextEditor();
+                            if (nativeInstance.isAsyncEditMode()) {
+                                nativeInstance.setNativeEditingComponentVisible(false);
+                            }
                             EDITING_LOCK.notify();
                         }
                         Form current = Display.getInstance().getCurrent();
                         if (current != null && current.isFormBottomPaddingEditingMode()) {
-                            current.getContentPane().getUnselectedStyle().setPadding(Component.BOTTOM, 0);
+                            getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                         }
                     } else {
                         instance.currentEditing.setText(s);
@@ -743,6 +848,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
         
     }
+
+    @Override
+    public void updateNativeEditorText(Component c, String text) {
+        if (isEditingText(c)) {
+            nativeInstance.updateNativeEditorText(text);
+        }
+    }
+    
+    
 
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
@@ -967,6 +1081,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
+    @Override
+    public boolean isGaussianBlurSupported() {
+        return true;
+    }
+
+    @Override
+    public Image gaussianBlurImage(Image image, float radius) {
+        NativeImage im = (NativeImage)image.getImage();
+        NativeImage n = new NativeImage("blurred:" + im.debugText );
+        n.width = im.width;
+        n.height = im.height;
+        n.peer = nativeInstance.gausianBlurImage(im.peer, radius);
+        return Image.createImage(n);
+    }
+
+    
     public Object createImage(byte[] bytes, int offset, int len) {
         int[] wh = widthHeight;
         if(offset != 0 || len != bytes.length) {
@@ -1069,96 +1199,38 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     
-    void loadClipBounds(Object graphics){
-        NativeGraphics ng = (NativeGraphics)graphics;
-        if ( ng.clipDirty){
-            ng.clipDirty = false;
-            if ( ng.isTransformSupported()){
-
-                if ( ng.transform == null ){
-                    ng.transform = Transform.makeIdentity();
-                }
-                if ( ng.clip == null ){
-                    return;
-                }
-                if ( ng.transform.isIdentity() ){
-                    Rectangle r = ng.clip.getBounds();
-                    ng.clipX = r.getX();
-                    ng.clipY = r.getY();
-                    ng.clipW = r.getWidth();
-                    ng.clipH = r.getHeight();
-                } else {
-                    Transform inverted = ng.transform.getInverse();
-                    GeneralPath gp = new GeneralPath();
-                    gp.append(ng.clip.getPathIterator(inverted), false);
-                    //gp.append(ng.clip.getPathIterator(inverted), false);
-                    Rectangle r = gp.getBounds();
-                    ng.clipX = r.getX();
-                    ng.clipY = r.getY();
-                    ng.clipW = r.getWidth();
-                    ng.clipH = r.getHeight();
-                } 
-            } 
-        }
-    }
+    
     
     public int getClipX(Object graphics) {
-        if ( isTransformSupported(graphics) ){
-            
-             loadClipBounds(graphics);
-            
-        }
-        return ((NativeGraphics)graphics).clipX;
+        
+        return ((NativeGraphics)graphics).getClipX();
     }
 
     public int getClipY(Object graphics) {
-         if ( isTransformSupported(graphics) ){
-            loadClipBounds(graphics);
-            
-        }
-        return ((NativeGraphics)graphics).clipY;
+         
+        return ((NativeGraphics)graphics).getClipY();
     }
 
     public int getClipWidth(Object graphics) {
-         if ( isTransformSupported(graphics) ){
-            loadClipBounds(graphics);
-            
-        }
-        if(((NativeGraphics)graphics).clipW < 0 && ((NativeGraphics)graphics).associatedImage != null) {
-            return ((NativeGraphics)graphics).associatedImage.width;
-        }
-        return ((NativeGraphics)graphics).clipW;
+        return ((NativeGraphics)graphics).getClipW();
     }
 
     public int getClipHeight(Object graphics) {
-         if ( isTransformSupported(graphics) ){
-            loadClipBounds(graphics);
-           
-        }
-        if(((NativeGraphics)graphics).clipH < 0 && ((NativeGraphics)graphics).associatedImage != null) {
-            return ((NativeGraphics)graphics).associatedImage.height;
-        }
-        return ((NativeGraphics)graphics).clipH;
+        
+        return ((NativeGraphics)graphics).getClipH();
     }
 
-    public void setClipShape(Object graphics, Shape shape){
+    @Override
+    public boolean isShapeClipSupported(Object graphics) {
         NativeGraphics ng = (NativeGraphics)graphics;
-        //Log.p("Setting clip shape "+shape);
-        ng.clip = shape;
-        ng.clipDirty = true;
-        
+        return ng.isShapeClipSupported();
     }
-    
-    public Shape getClipShape(Object graphics){
-        NativeGraphics ng = (NativeGraphics)graphics;
-        if ( ng.clip != null ){
-            //Log.p("Clip shape is not null");
-            return ng.clip;
-        } else {
-            //Log.p("Clip shape is null");
-            return this.getClipRect(graphics);
-        }
+
+    @Override
+    public void setClip(Object graphics, Shape shape) {
+        ((NativeGraphics)graphics).setClip(shape);
     }
+   
     
     public void pushClip(Object graphics){
         ((NativeGraphics)graphics).pushClip();
@@ -1170,84 +1242,34 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     public void setClip(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = ((NativeGraphics)graphics);
-        
         ng.checkControl();
-        ng.clipApplied = false;
-        boolean isTransformSupported = ng.isTransformSupported();
-        
-        if ( isTransformSupported ){
-            if ( ng.transform == null ){
-                ng.transform = Transform.makeIdentity();
-            }
-            if ( ng.transform.isIdentity()){
-                //Log.p("Identity transform");
-                if ( ng.clip != null ){
-                    if ( ng.clip.isRectangle() ){
-                        Rectangle r = ng.clip.getBounds();
-                        if ( r.getX() == x && r.getY() == y && r.getWidth() == width && r.getHeight() == height ){
-                            return;
-                        }
-                    }
-                }
-                ng.clip = new Rectangle(x, y, width, height);
-                if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-                    ng.setNativeClipping(x, y, width, height, ng.clipApplied);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                }
-            } else {
-                ng.clip = new Rectangle(x,y,width,height);
-                GeneralPath gp = new GeneralPath();
-                gp.append(ng.clip.getPathIterator(ng.transform), false);
-                //gp.append(ng.clip.getPathIterator(ng.transform), false);
-                if ( gp.isRectangle() ){
-                    Rectangle r = (Rectangle)gp.getBounds();
-                    ng.clip = r;
-                    if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-                        ng.setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), ng.clipApplied);
-                        ng.clipApplied = true;
-                        ng.clipDirty = true;
-                    }
-                } else {
-                    ng.clip = gp;
-                    if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-                        ng.setNativeClipping(ng.clip);
-                        ng.clipApplied = true;
-                        ng.clipDirty = true;
-                    }
-                }
-            }
-            return;
-        }
-        if ( ng.clipX == x && ng.clipY == y && ng.clipW == width && ng.clipH == height){
-            return;
-        }
-        ng.clipApplied = (ng.clipX == x) && (ng.clipY == y) && (ng.clipW == width) && (ng.clipH == height);
-        ng.clipX = x;
-        ng.clipY = y;
-        ng.clipW = width;
-        ng.clipH = height;
-        if(currentlyDrawingOn == graphics || graphics == globalGraphics) {
-            ng.setNativeClipping(x, y, width, height, ng.clipApplied);
-            ng.clipApplied = true;
-        } 
+        ng.setClip(x, y, width, height);
     }
 
     private  void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip) {
         nativeInstance.setNativeClippingMutable(x, y, width, height, firstClip);
     }
+    
+    
     private  void setNativeClippingGlobal(int x, int y, int width, int height, boolean firstClip) {
         nativeInstance.setNativeClippingGlobal(x, y, width, height, firstClip);
     }
     
-    private  void setNativeClippingGlobal(Shape shape){
+    float[] polygonPointsBuffer;
+    
+    private  void setNativeClippingGlobal(ClipShape shape){
         Rectangle bounds = shape.getBounds();
         if ( shape.isRectangle() || bounds.getWidth() <= 0 || bounds.getHeight() <= 0){
             setNativeClippingGlobal(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), true);
+        } else if (shape.isPolygon()) {
+            int pointsSize = shape.getPointsSize();
+            if (polygonPointsBuffer == null || polygonPointsBuffer.length < pointsSize) {
+                polygonPointsBuffer = new float[pointsSize];
+            }
+            shapeToPolygon(shape, polygonPointsBuffer);
+            nativeInstance.setNativeClippingPolygonGlobal(polygonPointsBuffer);
         } else {
-            float[] points = shapeToPolygon(shape);
-            nativeInstance.setNativeClippingPolygonGlobal(points);
-            /*
+            
             TextureAlphaMask mask = (TextureAlphaMask)textureCache.get(shape, null);
             if ( mask == null ){
                 mask = (TextureAlphaMask)this.createAlphaMask(shape, null);
@@ -1255,160 +1277,20 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             
            if ( mask != null ){
-               Log.p("Setting native clipping mask global with bounds "+mask.getBounds()+" : "+shape);
+               //Log.p("Setting native clipping mask global with bounds "+mask.getBounds()+" : "+shape);
                 nativeInstance.setNativeClippingMaskGlobal(mask.getTextureName(), mask.getBounds().getX(), mask.getBounds().getY(), mask.getBounds().getWidth(), mask.getBounds().getHeight());
             } else {
                Log.p("Failed to create texture mask for clipping region");
             }
-            */
+            
         }
     }
 
-    /*public void clipRect(Object graphics, int x, int y, int width, int height) {
-        NativeGraphics ng = (NativeGraphics)graphics;
-        if(ng.clipH == 0 || ng.clipW == 0) {
-            return;
-        }
-        if(ng.clipW == -1 || ng.clipH == -1) {
-            ng.clipW = ng.associatedImage.width;
-            ng.clipH = ng.associatedImage.height;
-        }
-        Rectangle r = new Rectangle(ng.clipX, ng.clipY, ng.clipW, ng.clipH).intersection(x, y, width, height);
-        Dimension d = r.getSize();
-        if(d.getWidth() <= 0 || d.getHeight() <= 0) {
-            ng.clipW = 0;
-            ng.clipH = 0;
-        } else {
-            ng.clipX = r.getX();
-            ng.clipY = r.getY();
-            ng.clipW = d.getWidth();
-            ng.clipH = d.getHeight();
-            setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
-        }
-    }*/
     
     public void clipRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
-        ng.clipApplied = false;
-        if ( ng.isTransformSupported() ){
-            if ( ng.clip == null ){
-                setClip(graphics, x, y, width, height);
-                return;
-            } 
-            Rectangle clipBounds = ng.clip.getBounds();
-            if ( clipBounds.getWidth() == 0 || clipBounds.getHeight() == 0 ){
-                return;
-            }
-            
-            if ( ng.transform == null ){
-                ng.transform = Transform.makeIdentity();
-            }
-            
-            if ( ng.transform.isIdentity() ){
-                // Case 1:  There is no transform
-                
-                Shape s = ng.clip;
-                
-                
-                if ( s.isRectangle() ){
-                    
-                    if ( clipBounds.getX() == x && clipBounds.getY() == y && clipBounds.getWidth() == width && clipBounds.getHeight() == height ){
-                        
-                        return;
-                    }
-                }
-                if ( s.contains(x,y) && s.contains(x+width, y) && s.contains(x+width, y+height) && s.contains(x, y+height)){
-                    ng.setNativeClipping(x, y, width, height, ng.clipApplied);
-                    ng.clip = clipBounds;
-                    clipBounds.setBounds(x, y, width, height);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                }
-                
-                ng.reusableRect.setBounds(x,y,width,height);
-                if ( ng.reusableRect.contains(clipBounds)){
-                    // We are clipping a greater region than the current clip... we don't need to clip at all here
-                    return;
-                }
-                
-                Shape newClip = s.intersection(ng.reusableRect);
-                if ( newClip.isRectangle() ){
-                    Rectangle r = newClip.getBounds();
-                    ng.clip = r;
-                    ng.setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), ng.clipApplied);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                } else {
-                    ng.clip = newClip;
-                    ng.setNativeClipping(ng.clip);
-                    ng.clipDirty = true;
-                    ng.clipApplied = true;
-                    return;
-                }
-                
-                
-            } else {
-                Transform inverseTransform = ng.transform.getInverse();
-                if ( inverseTransform == null ){
-                    throw new RuntimeException("Failed to invert transform");
-                }
-                GeneralPath clipProjection = new GeneralPath();
-                clipProjection.append(ng.clip.getPathIterator(inverseTransform), false);
-                //clipProjection.append(ng.clip.getPathIterator(inverseTransform), false);
-                ng.reusableRect.setBounds(x, y, width, height);
-                Shape clipIntersection = clipProjection.intersection(ng.reusableRect);
-                if ( clipIntersection == null ){
-                    ng.clip = new Rectangle(0,0,0,0);
-                    ng.setNativeClipping(0,0,0,0, ng.clipApplied);
-                    ng.clipDirty = true;
-                    ng.clipApplied = true;
-                    return;
-                }
-                ng.clip = new GeneralPath();
-                ((GeneralPath)ng.clip).append(clipIntersection.getPathIterator(ng.transform), false);
-                //((GeneralPath)ng.clip).append(clipIntersection.getPathIterator(ng.transform), false);
-                
-                if ( ng.clip.isRectangle() ){
-                    
-                    Rectangle r = ng.clip.getBounds();
-                    
-                    ng.clip = r;
-                    ng.setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), ng.clipApplied);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                } else {
-                    ng.setNativeClipping(ng.clip);
-                    ng.clipApplied = true;
-                    ng.clipDirty = true;
-                    return;
-                }
-                
-            }
-        } else {
-            if(ng.clipH == 0 || ng.clipW == 0) {
-                return;
-            }
-            if(ng.clipW == -1 || ng.clipH == -1) {
-                ng.clipW = ng.associatedImage.width;
-                ng.clipH = ng.associatedImage.height;
-            }
-
-            Rectangle.intersection(x, y, width, height, ng.clipX, ng.clipY, ng.clipW, ng.clipH, ng.reusableRect);
-            Dimension d = ng.reusableRect.getSize();
-            if(d.getWidth() <= 0 || d.getHeight() <= 0) {
-                ng.clipW = 0;
-                ng.clipH = 0;
-            } else {
-                ng.clipX = ng.reusableRect.getX();
-                ng.clipY = ng.reusableRect.getY();
-                ng.clipW = d.getWidth();
-                ng.clipH = d.getHeight();
-                setClip(graphics, ng.clipX, ng.clipY, ng.clipW, ng.clipH);
-            }
-        }
+        ng.checkControl();
+        ng.clipRect(x, y, width, height);
     }
 
     @Override
@@ -1425,31 +1307,68 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         return Matrix.makeTranslation(translateX, translateY, translateZ);
     }
+
+    @Override
+    public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        Matrix m = (Matrix)nativeTransform;
+        m.setTranslation(translateX, translateY, translateZ);
+    }
+    
     @Override
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
         Matrix out = Matrix.makeIdentity();
         out.scale(scaleX, scaleY, scaleZ);
         return out;
     }
+    
+    @Override
+    public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
+        Matrix out = (Matrix)nativeTransform;
+        out.reset();
+        out.scale(scaleX, scaleY, scaleZ);
+    }
 
     @Override
     public Object makeTransformRotation(float angle, float x, float y, float z) {
         return Matrix.makeRotation(angle, x, y, z);
+    }
+    
+    @Override
+    public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
+        Matrix m = (Matrix)nativeTransform;
+        m.reset();
+        m.rotate(angle, x, y, z);
     }
 
     @Override
     public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
         return Matrix.makePerspective(fovy, aspect, zNear, zFar);
     }
+    
+    public void setTransformPerspective(Object nativeGraphics, float fovy, float aspect, float zNear, float zFar) {
+        Matrix m = (Matrix)nativeGraphics;
+        m.setPerspective(fovy, aspect, zNear, zFar);
+    }
 
     @Override
     public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
         return Matrix.makeOrtho(left, right, bottom, top, near, far);
     }
+    
+    public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
+        Matrix m = (Matrix)nativeGraphics;
+        m.setOrtho(left, right, bottom, top, near, far);
+    }
 
     @Override
     public Object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
         return Matrix.makeCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+    }
+    
+    @Override
+    public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        Matrix m = (Matrix)nativeGraphics;
+        m.setCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
     }
 
     @Override
@@ -1479,8 +1398,21 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     @Override
+    public void setTransformInverse(Object nativeTransform) throws com.codename1.ui.Transform.NotInvertibleException {
+        Matrix m = (Matrix)nativeTransform;
+        if (!m.invert()) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+    }
+    
+    @Override
     public Object makeTransformIdentity(){
         return Matrix.makeIdentity();
+    }
+    
+    @Override
+    public void setTransformIdentity(Object nativeTransform){
+        ((Matrix)nativeTransform).setIdentity();
     }
 
     @Override
@@ -1500,10 +1432,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         ((Matrix)nativeTransform).transformCoord(in, out);
     }
-    
+
+    @Override
+    public void transformPoints(Object nativeTransform, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        Matrix m = (Matrix)nativeTransform;
+        m.transformPoints(pointSize, in, srcPos, out, destPos, numPoints);
+    }
+
+    @Override
+    public void translatePoints(int pointSize, float tX, float tY, float tZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        nativeInstance.translatePoints(pointSize, tX, tY, tX, in, srcPos, out, destPos, numPoints);
+    }
+
+    @Override
+    public void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        nativeInstance.scalePoints(pointSize, sX, sY, sZ, in, srcPos, out, destPos, numPoints);
+    }
    
-    
-    
     // END TRANSFORMATION METHODS--------------------------------------------------------------------
     
     
@@ -1601,13 +1546,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
         nativeInstance.nativeDrawArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
     }
-    private static void nativeFillArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        nativeInstance.nativeFillArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
-    }
-    private static void nativeDrawArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        nativeInstance.nativeDrawArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
-    }
-
     public void drawArc(Object graphics, int x, int y, int width, int height, int startAngle, int arcAngle) {
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
@@ -1773,38 +1711,15 @@ public class IOSImplementation extends CodenameOneImplementation {
  
     }
     
-    private float[] shapeToPolygon(Shape shape){
-        PathIterator it = shape.getPathIterator();
-        float[] buf = new float[6];
-        int size = 0;
-        while ( !it.isDone()){
-            int type = it.currentSegment(buf);
-            switch ( type ){
-                case PathIterator.SEG_MOVETO:
-                case PathIterator.SEG_LINETO:
-                    size++;
-                    break;
-
-            }
-            it.next();
+    private void shapeToPolygon(ClipShape shape, float[] pointsOut){
+        int size = shape.getPointsSize();
+        if (size > pointsOut.length) {
+            throw new RuntimeException("shapeToPolygon requires out array at least the size of the points in the polygon.  Requires "+size+" but found "+pointsOut.length);
         }
-        it = shape.getPathIterator();
-        float[] points = new float[size*2];
-        int i=0;
-        while ( !it.isDone()){
-            int type = it.currentSegment(buf);
-            switch ( type ){
-                case PathIterator.SEG_MOVETO:
-                case PathIterator.SEG_LINETO:
-                    points[i++] = buf[0];
-                    points[i++] = buf[1];
-                    break;
-            }
-            it.next();
-        }
-        return points;
+        shape.getPoints(pointsOut);
+        
     }
-    
+    /*
     public void drawConvexPolygon(Object graphics, Shape shape, Stroke stroke, int color, int alpha){
         NativeGraphics ng = (NativeGraphics)graphics;
         if ( ng.isShapeSupported()){
@@ -1821,12 +1736,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
     }
-
-    
-
-
-    
-    
+    */
 
     /**
      * Deletes an alpha mask that was created with {@link #createAlphaMask}.
@@ -1875,10 +1785,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         return ((NativeGraphics)graphics).isAlphaMaskSupported();
     }
     
-    
-    
-    
-    
     void nativeDeleteTexture(long textureID){
         nativeInstance.nativeDeleteTexture(textureID);
     }
@@ -1886,9 +1792,6 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Draws the outline of a shape in the given graphics context.
      * @param graphics the graphics context
      * @param shape The shape to be drawn.
-     * @param lineWidth The width of the line.
-     * @param capStyle The cap style to use for the line.
-     * @param path the path to draw.
      */
     @Override
     public void drawShape(Object graphics, Shape shape, Stroke stroke){// float lineWidth, int capStyle, int miterStyle, float miterLimit){
@@ -1952,16 +1855,36 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Transform getTransform(Object graphics) {
-        return ((NativeGraphics)graphics).transform;
+        return ((NativeGraphics)graphics).transform.copy();
+    }
+
+    @Override
+    public void getTransform(Object nativeGraphics, Transform t) {
+        NativeGraphics ng = (NativeGraphics)nativeGraphics;
+        if (ng.transform != null) {
+            t.setTransform(ng.transform);
+        } else {
+            t.setIdentity();
+        }
     }
 
     
     
     @Override
     public void setTransform(Object graphics, Transform transform) {
-        ((NativeGraphics)graphics).transform = transform;
-        ((NativeGraphics)graphics).transformApplied = false;
-        ((NativeGraphics)graphics).applyTransform();
+        NativeGraphics ng = (NativeGraphics)graphics;
+        if (ng.transform != null) {
+            if (transform == null) {
+                ng.transform.setIdentity();
+            } else {
+                ng.transform.setTransform(transform);
+            }
+        } else {
+            ng.transform = transform == null ? null : transform.copy();
+        }
+        ng.transformApplied = false;
+        ng.checkControl();
+        ng.applyTransform();
         
     }
     
@@ -1981,7 +1904,26 @@ public class IOSImplementation extends CodenameOneImplementation {
             0, 0
         );
     }
+    
+    public void setNativeTransformMutable(Transform transform){
+        Matrix t = (Matrix)transform.getNativeTransform();
+        float[] m = t.getData();
+        
+        
+        // Note that Matrix is stored in column-major format but GLKMatrix is stored in row-major
+        // that's why we transpose it here.
+        //Log.p("....Setting transform.....");
+        nativeInstance.nativeSetTransformMutable(
+            m[0], m[4], m[8], m[12],
+            m[1], m[5], m[9], m[13],
+            m[2], m[6], m[10], m[14],
+            m[3], m[7], m[11], m[15],
+            0, 0
+        );
+    }
 
+    
+    
     @Override
     public boolean transformEqualsImpl(Transform t1, Transform t2) {
         if ( t1 != null ){
@@ -3104,13 +3046,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(moviePlayerPeer != 0) {
                 pause();
                 if(!isVideo) {
-                    nativeInstance.cleanupAudio(moviePlayerPeer);                    
+                    nativeInstance.cleanupAudio(moviePlayerPeer);
+                    moviePlayerPeer = 0;
                 }
                 removeMediaCallback(onCompletionCallbackId);
                 // SJH Nov. 13, 2015:  Uncommenting this because it seems that 
                 // we do need to release the peer when we're cleaning up.
-                nativeInstance.releasePeer(moviePlayerPeer);
-                moviePlayerPeer = 0;
+                if (isVideo) {
+                    nativeInstance.releasePeer(moviePlayerPeer);
+                    moviePlayerPeer = 0;
+                }
             }
         }
         
@@ -3589,26 +3534,229 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     class NativeGraphics {
-        Rectangle reusableRect = new Rectangle();
+        final Rectangle reusableRect = new Rectangle();
+        final Rectangle reusableRect2 = new Rectangle();
         NativeImage associatedImage;
         int color;
         int alpha = 255;
         NativeFont font;
         int clipX, clipY, clipW = -1, clipH = -1;
         boolean clipApplied;
-        Shape clip;
-        Transform transform = Transform.makeIdentity();
-        boolean transformApplied = false;
-        Shape[] clipStack = new Shape[20];
-        private int clipStackPtr = 0; 
-        
-        
+        ClipShape clip;
+        final ClipShape reusableClipShape = new ClipShape();
         /**
          * Used with the ES2 pipeline (or any engine where transforms are supported)
          * to record if the clipX, clipY, clipW, and clipH parameters need to be updated.
          */
         boolean clipDirty = true;
 
+        GeneralPath inverseClip;
+        boolean inverseClipDirty=true;
+        Rectangle inverseClipBounds;
+        
+        
+        Transform transform = Transform.makeIdentity();
+        Transform inverseTransform;
+        boolean inverseTransformDirty=true;
+        
+        
+        boolean transformApplied = false;
+        ClipShape[] clipStack = new ClipShape[20];
+        private int clipStackPtr = 0; 
+        
+        
+        void setClip(Shape newClip) {
+            if (!clip.equals(newClip, transform)) { 
+                clip.setShape(newClip, transform);
+                clipDirty = true;
+                clipApplied = false;
+                inverseClipDirty = true;
+                applyClip();
+            }
+        }
+        
+        
+        void setClip(int x, int y, int w, int h) {
+            if (clip == null) {
+                clip = new ClipShape();
+            }
+            if (transform == null || transform.isIdentity()) {
+                if (!clip.equals(x, y, w, h)) {
+                    clip.setBounds(x, y, w, h);
+                    clipDirty = true;
+                    clipApplied = false;
+                    inverseClipDirty = true;
+                    applyClip();
+                }
+            } else {
+                reusableRect.setBounds(x, y, w, h);
+                if (!clip.equals(reusableRect, transform)) {
+                    clip.setShape(reusableRect, transform);
+                    clipDirty = true;
+                    clipApplied = false;
+                    inverseClipDirty = true;
+                    applyClip();
+                }
+            }
+            
+        }
+        
+        void clipRect(int x, int y, int w, int h) {
+            if (clip == null) {
+                setClip(x, y, w, h);
+                return;
+            }
+            
+            if (transform == null || transform.isIdentity()) {
+                // Preliminary checks to see if clipping is unnecessary
+                clip.getBounds(reusableRect);
+                reusableRect2.setBounds(x, y, w, h);
+                
+                boolean clipIsRect = clip.isRect();
+                if (clipIsRect && reusableRect2.contains(reusableRect)) {
+                    // The intersection did not change the resulting clip shape
+                    // Just retrun here.
+                    return;
+                } 
+                if (!clipIsRect) {
+                    reusableClipShape.setShape(clip, null);
+                }
+                clip.intersect(x, y, w, h);
+                if (!clipIsRect && clip.equals(reusableClipShape, null)) {
+                    return;
+                }
+                clipDirty = true;
+                clipApplied = false;
+                inverseClipDirty = true;
+                applyClip();
+            } else {
+                GeneralPath inverseClip = inverseClip();
+                inverseClip.intersect(x, y, w, h);
+                reusableClipShape.setShape(clip, null);
+                clip.setShape(inverseClip, transform);
+                if (clip.equals(reusableClipShape, null)) {
+                    return;
+                }
+                clipDirty = true;
+                clipApplied = false;
+                inverseClipDirty = true;
+                applyClip();
+            }
+            
+        }
+        
+        void loadClipBounds(){
+            NativeGraphics ng = this;
+            if ( ng.clipDirty){
+                ng.clipDirty = false;
+                if ( ng.transform == null ){
+                    ng.transform = Transform.makeIdentity();
+                }
+                if ( ng.clip == null ){
+                    ng.clip = ClipShape.create();
+                    if (associatedImage == null) {
+                        ng.clip.setBounds(0,0,Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+                    } else {
+                        ng.clip.setBounds(0, 0, associatedImage.width, associatedImage.height);
+                    }
+                }
+                if ( ng.transform.isIdentity() ){
+                    Rectangle r = reusableRect;
+                
+                    ng.clip.getBounds(r);
+                    ng.clipX = r.getX();
+                    ng.clipY = r.getY();
+                    ng.clipW = r.getWidth();
+                    ng.clipH = r.getHeight();
+                } else {
+                    
+                    GeneralPath inverseClip = ng.inverseClip();
+                    Rectangle r = reusableRect;
+                    inverseClip.getBounds(r);
+                    ng.clipX = r.getX();
+                    ng.clipY = r.getY();
+                    ng.clipW = r.getWidth();
+                    ng.clipH = r.getHeight();
+                } 
+
+            }
+        }
+        
+        int getClipX() {
+            loadClipBounds();
+            return clipX;
+        }
+        
+        int getClipY() {
+            loadClipBounds();
+            return clipY;
+        }
+        
+        int getClipW() {
+            loadClipBounds();
+            if(clipW < 0 && associatedImage != null) {
+                return associatedImage.width;
+            }
+            return clipW;
+        }
+        
+        int getClipH() {
+            loadClipBounds();
+            if(clipH < 0 && associatedImage != null) {
+                return associatedImage.height;
+            }
+            return clipH;
+        }
+        
+        void setTransform(Transform t) {
+            if (transform == null) {
+                transform = Transform.makeIdentity();
+            }
+            transform.setTransform(t);
+            inverseTransformDirty = true;
+            clipDirty = true;
+            transformApplied = false;
+            applyTransform();
+        }
+        
+        Transform inverseTransform() {
+            
+            if (inverseTransformDirty) {
+                if (inverseTransform == null) {
+                    inverseTransform = Transform.makeIdentity();
+                }
+                if (transform == null) {
+                    inverseTransform.setIdentity();
+                } else {
+                    try {
+                        transform.getInverse(inverseTransform);
+                    } catch (Transform.NotInvertibleException ex) {
+                        throw new RuntimeException("The transform "+transform+" cannot be inverted");
+                    }
+                }
+                inverseTransformDirty = false;
+            }
+            return inverseTransform;
+            
+        }
+        
+        
+        GeneralPath inverseClip() {
+            if (inverseClipDirty) {
+
+                if (clip == null) {
+                    return null;
+                }
+                if (inverseClip == null) {
+                    inverseClip = new GeneralPath();
+                }
+                inverseClip.setShape(clip, inverseTransform());
+                inverseClipDirty = false;
+            }
+            return inverseClip;
+        }
+        
+        
 
         public NativeFont getFont() {
             if(font != null) {
@@ -3618,56 +3766,63 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void applyTransform(){
-            
+            if (!transformApplied) {
+                setNativeTransformMutable(this.transform);
+                transformApplied = true;
+            }
         }
         
         public void pushClip(){
-            clipStack[clipStackPtr++] = getClipShape(this);
-            //Log.p("Pushing clip "+clipStack[clipStackPtr-1]);
+            
+            ClipShape newClip = ClipShape.create();
+            newClip.setShape(clip, null);
+            clipStack[clipStackPtr++] = newClip;
             
         }
         
         public Shape popClip(){
-            Shape s = clipStack[--clipStackPtr];
+            ClipShape s = clipStack[--clipStackPtr];
             //Log.p("Popping clip "+s);
             clipApplied = false;
-            setClipShape(this, s);
+            clip.setShape(s, null);
+            ClipShape.recycle(s);
+            applyClip();
             return s;
         }
         
         public void applyClip() {
-            if ( isTransformSupported()){
-                if ( clipApplied ){
-                    return;
-                }
-                //Log.p("In applyClip");
-                if ( this.clip == null ){
-                    //Log.p("Clip is null");
-                    int w = Display.getInstance().getDisplayWidth();
-                    int h = Display.getInstance().getDisplayHeight();
-                    setNativeClipping(0,0,w,h,clipApplied);
-                    
-                    return;
-                }
-                if ( this.clip.isRectangle() ){
-                    //Log.p("Clip is a rectangle");
-                    //Log.p(""+this.clip);
-                    Rectangle r = this.clip.getBounds();
-                    setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), clipApplied);
-                    clipApplied = true;
-                } else {
-                    //Log.p("Clip is not a rectangle");
-                    //Log.p(""+this.clip);
-                    setNativeClipping(this.clip);
-                    clipApplied = true;
-                }
-            } else {
-                //Log.p("In applyClip but transform is not supported");
-                if(clipH > -1 && clipW > -1) {
-                    setNativeClipping(clipX, clipY, clipW, clipH, clipApplied);
-                    clipApplied = true;
-                }
+            if ( clipApplied ){
+                return;
             }
+            //Log.p("In applyClip");
+            if ( this.clip == null ){
+                //Log.p("Clip is null");
+                int w = associatedImage == null ? Display.getInstance().getDisplayWidth() : associatedImage.width;
+                int h = associatedImage == null ? Display.getInstance().getDisplayHeight() : associatedImage.height;
+                clipX = 0;
+                clipY = 0;
+                clipW = w;
+                clipH = h;
+                this.clip = new ClipShape();
+                this.clip.setBounds(0,0,w,h);
+                setNativeClipping(0,0,w,h,clipApplied);
+                clipApplied = true;
+                return;
+            }
+            if ( this.clip.isRect() ){
+                //Log.p("Clip is a rectangle");
+                //Log.p(""+this.clip);
+                Rectangle r = this.reusableRect;
+                this.clip.getBounds(r);
+                setNativeClipping(r.getX(), r.getY(), r.getWidth(), r.getHeight(), clipApplied);
+                clipApplied = true;
+            } else {
+                //Log.p("Clip is not a rectangle");
+                //Log.p(""+this.clip);
+                setNativeClipping(this.clip);
+                clipApplied = true;
+            }
+            
         }
 
         public void checkControl() {
@@ -3685,8 +3840,21 @@ public class IOSImplementation extends CodenameOneImplementation {
             setNativeClippingMutable(x, y, width, height, firstClip);
         }
         
-        void setNativeClipping(Shape shape){
+        void setNativeClipping(ClipShape shape){
             
+            if (shape.isRect()) {
+                shape.getBounds(reusableRect);
+                setNativeClippingMutable(reusableRect.getX(), reusableRect.getY(), reusableRect.getWidth(), reusableRect.getHeight(), clipApplied);
+                
+            } else {
+                int commandsLen = shape.getTypesSize();
+                int pointsLen = shape.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                shape.getTypes(commandsArr);
+                shape.getPoints(pointsArr);
+                nativeInstance.setNativeClippingMutable(commandsLen, commandsArr, pointsLen, pointsArr);
+            }
         }
 
         void nativeDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
@@ -3730,49 +3898,95 @@ public class IOSImplementation extends CodenameOneImplementation {
         //----------------------------------------------------------------------
         // BEGIN DRAW SHAPE METHODS
         
-        
-        
-        
-        
         void nativeDrawAlphaMask(TextureAlphaMask mask){
             
         }
         
         
+        private float[] tmpNativeDrawShape_coords;
+        
+        private float[] getTmpNativeDrawShape_coords(int size) {
+            if (tmpNativeDrawShape_coords == null) {
+                tmpNativeDrawShape_coords = new float[size];
+            }
+            if (tmpNativeDrawShape_coords.length < size) {
+                float[] newArray = new float[size];
+                System.arraycopy(tmpNativeDrawShape_coords, 0, newArray, 0, tmpNativeDrawShape_coords.length);
+                tmpNativeDrawShape_coords = newArray;
+            }
+            return tmpNativeDrawShape_coords;
+        }
+        
+        private float[] growTmpNativeDrawShape_coords(int size, int factor) {
+            if (tmpNativeDrawShape_coords.length < size) {
+                float[] newArray = new float[size * factor];
+                System.arraycopy(tmpNativeDrawShape_coords, 0, newArray, 0, tmpNativeDrawShape_coords.length);
+                tmpNativeDrawShape_coords = newArray;
+            }
+            return tmpNativeDrawShape_coords;
+        }
+        
+        private byte[] getTmpNativeDrawShape_commands(int size) {
+            if (tmpNativeDrawShape_commands == null) {
+                tmpNativeDrawShape_commands = new byte[size];
+            }
+            if (tmpNativeDrawShape_commands.length < size) {
+                byte[] newArray = new byte[size];
+                System.arraycopy(tmpNativeDrawShape_commands, 0, newArray, 0, tmpNativeDrawShape_commands.length);
+                tmpNativeDrawShape_commands = newArray;
+            }
+            return tmpNativeDrawShape_commands;
+        }
+        
+        private byte[] tmpNativeDrawShape_commands;
+        
         /**
          * Draws a shape in the graphics context
          * @param shape
-         * @param lineWidth
-         * @param capStyle
-         * @param miterStyle
-         * @param miterLimit
-         * @param x
-         * @param y
-         * @param w
-         * @param h 
+         * @param stroke
          */
         void nativeDrawShape(Shape shape, Stroke stroke){//float lineWidth, int capStyle, int miterStyle, float miterLimit){
-      
+            if (shape.getClass() == GeneralPath.class) {
+                // GeneralPath gives us some easy access to the points
+                GeneralPath p = (GeneralPath)shape;
+                int commandsLen = p.getTypesSize();
+                int pointsLen = p.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                p.getTypes(commandsArr);
+                p.getPoints(pointsArr);
+                
+                nativeInstance.nativeDrawShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
+            } else {
+                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            }
+            
+            
         }
-        
         
         /**
          * Fills a shape in the graphics context.
          * @param shape
-         * @param x
-         * @param y
-         * @param w
-         * @param h 
          */
         void nativeFillShape(Shape shape) {
-
+            if (shape.getClass() == GeneralPath.class) {
+                // GeneralPath gives us some easy access to the points
+                GeneralPath p = (GeneralPath)shape;
+                int commandsLen = p.getTypesSize();
+                int pointsLen = p.getPointsSize();
+                byte[] commandsArr = getTmpNativeDrawShape_commands(commandsLen);
+                float[] pointsArr = getTmpNativeDrawShape_coords(pointsLen);
+                p.getTypes(commandsArr);
+                p.getPoints(pointsArr);
+                
+                nativeInstance.nativeFillShapeMutable(color, alpha, commandsLen, commandsArr, pointsLen, pointsArr);
+            } else {
+                Log.p("Drawing shapes that are not GeneralPath objects is not yet supported on mutable images.");
+            }
         }
         
-       
-        
-        
         boolean isTransformSupported(){
-            return false;
+            return true;
         }
         
         boolean isPerspectiveTransformSupported(){
@@ -3780,7 +3994,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         boolean isShapeSupported(){
-            return false;
+            return true;
         }
         
         boolean isAlphaMaskSupported(){
@@ -3791,15 +4005,39 @@ public class IOSImplementation extends CodenameOneImplementation {
         //----------------------------------------------------------------------
         
         public void resetAffine() {
+            this.transform.setIdentity();
+            transformApplied = false;
+            clipDirty = true;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            this.applyTransform();
         }
 
         public void scale(float x, float y) {
+            this.transform.scale(x, y, 1);
+            clipDirty = true;
+            transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            this.applyTransform();
         }
 
         public void rotate(float angle) {
+            this.transform.rotate(angle, 0, 0);
+            clipDirty = true;
+            transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            applyTransform();
         }
 
         public void rotate(float angle, int x, int y) {
+            this.transform.rotate(angle, x, y);
+            transformApplied = false;
+            clipDirty = true;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            this.applyTransform();
         }
         
         public void translate(int x, int y){
@@ -3831,6 +4069,10 @@ public class IOSImplementation extends CodenameOneImplementation {
         void drawConvexPolygon(float[] points, int color, int alpha, float lineWidth, int joinStyle, int capStyle, float miterLimit) {
             
         }
+
+        boolean isShapeClipSupported() {
+            return true;
+        }
     }
 
     class GlobalGraphics extends NativeGraphics {
@@ -3844,63 +4086,66 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         public void applyTransform(){
-            if ( !transformApplied && isTransformSupported() ){
+            if ( !transformApplied){
                 setNativeTransformGlobal(this.transform);
                 transformApplied = true;
             }
         }
         
         public void resetAffine() {
-            if ( isTransformSupported() ){
-                this.transform.setIdentity();
-                transformApplied = false;
-                this.applyTransform();
-            } else {
-                nativeInstance.resetAffineGlobal();
-            }
+            this.transform.setIdentity();
+            transformApplied = false;
+            inverseClipDirty = true;
+            clipDirty = true;
+            inverseTransformDirty = true;
+            this.applyTransform();
         }
 
         public void scale(float x, float y) {
-            if ( isTransformSupported() ){
-                this.transform.scale(x, y, 1);
-                transformApplied = false;
-                this.applyTransform();
-            } else {
-                nativeInstance.scaleGlobal(x, y);
-            }
+            this.transform.scale(x, y, 1);
+            transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            clipDirty = true;
+            this.applyTransform();
         }
 
         public void rotate(float angle) {
-            if ( isTransformSupported() ){
-                this.transform.rotate(angle, 0, 0);
-                transformApplied = false;
-            } else {
-                nativeInstance.rotateGlobal(angle);
-            }
+            this.transform.rotate(angle, 0, 0);
+            transformApplied = false;
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            clipDirty = true;
+            applyTransform();
+            
         }
 
         public void rotate(float angle, int x, int y) {
-            if ( isTransformSupported() ){
-                this.transform.rotate(angle, x, y);
-                transformApplied = false;
-                this.applyTransform();
-            } else {
-                nativeInstance.rotateGlobal(angle, x, y);
-            }
+            this.transform.rotate(angle, x, y);
+            transformApplied = false;
+            this.applyTransform();
+            inverseClipDirty = true;
+            inverseTransformDirty = true;
+            clipDirty = true;
+
         }
 
         public void shear(float x, float y) {
             nativeInstance.shearGlobal(x, y);
         }
         
-        
-
+        @Override
         void setNativeClipping(int x, int y, int width, int height, boolean firstClip) {
             setNativeClippingGlobal(x, y, width, height, firstClip);
         }
         
-        void setNativeClipping(Shape clip){
-            setNativeClippingGlobal(clip);
+        void setNativeClipping(ClipShape clip){
+            if (clip.isRect()) {
+                clip.getBounds(reusableRect);
+                setNativeClippingGlobal(reusableRect.getX(), reusableRect.getY(), reusableRect.getWidth(), reusableRect.getHeight(), clipApplied);
+            } else {
+                setNativeClippingGlobal(clip);
+            }
         }
 
         void nativeDrawLine(int color, int alpha, int x1, int y1, int x2, int y2) {
@@ -3923,12 +4168,41 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeFillRoundRectGlobal(color, alpha, x, y, width, height, arcWidth, arcHeight);
         }
 
+        private Stroke tmpStroke1px;
         void nativeDrawArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-            nativeDrawArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
+            // Turns out that using a Shape instead of using a Shader is much faster so we just pipe this
+            // through to DrawShape.
+            // See https://gist.github.com/shannah/85d93674d709c7733e98 for Shader implementation that we decided 
+            // not to use.
+            if (drawingArcPath == null) {
+                drawingArcPath = new GeneralPath();
+            }
+            if (tmpStroke1px == null) {
+                tmpStroke1px = new Stroke(1, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 1f);
+            }
+            drawingArcPath.reset();
+            //drawingArcPath.moveTo(x + width / 2, y + height / 2);
+            drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, false);
+            //drawingArcPath.closePath();
+            nativeDrawShape(drawingArcPath, tmpStroke1px);
         }
 
+        // path used by fillArc to fill arcs.
+        private GeneralPath drawingArcPath;
+        
         void nativeFillArc(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
-            nativeFillArcGlobal(color, alpha, x, y, width, height, startAngle, arcAngle);
+            // Turns out that using a Shape instead of using a Shader is much faster so we just pipe this
+            // through to DrawShape.
+            // See https://gist.github.com/shannah/85d93674d709c7733e98 for Shader implementation that we decided 
+            // not to use.
+            if (drawingArcPath == null) {
+                drawingArcPath = new GeneralPath();
+            }
+            drawingArcPath.reset();
+            drawingArcPath.moveTo(x + width / 2, y + height / 2);
+            drawingArcPath.arc(x, y, width, height, startAngle * Math.PI / 180, arcAngle * Math.PI / 180, true);
+            drawingArcPath.closePath();
+            nativeFillShape(drawingArcPath);
         }
 
         void nativeDrawString(int color, int alpha, long fontPeer, String str, int x, int y) {
@@ -3956,35 +4230,94 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.drawConvexPolygonGlobal(points, color, alpha, lineWidth, joinStyle, capStyle, miterLimit);
         }
         
+        private GeneralPath tmpDrawShape;
+        private Transform tmpTransform, tmpTransform2;
+        private Rectangle tmpRect2;
+        private Stroke tmpDrawStroke;
+        private Image coreGraphicsBuffer;
         void nativeDrawShape(Shape shape, Stroke stroke){//float lineWidth, int capStyle, int miterStyle, float miterLimit) {
-            TextureAlphaMask mask = textureCache.get(shape, stroke);
-            if ( mask == null ){
-                mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
-                textureCache.add(shape, stroke, mask);
-                
-            }
-            if (mask==null){
-                // A null mask generally means the shape had zero bounds
-                return;
-            }
-            //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
-            nativeDrawAlphaMask(mask);
-            /*
             
-            PathIterator path = shape.getPathIterator();
-            Rectangle rb = shape.getBounds();
-            // Notice that these will be cleaned up in the dealloc method of the DrawPath objective-c class
-            NativePathRenderer renderer = new NativePathRenderer(rb.getX(), rb.getY(), rb.getWidth(), rb.getHeight(), NativePathRenderer.WIND_NON_ZERO);
-            NativePathStroker stroker = new NativePathStroker(renderer, stroke.getLineWidth(), stroke.getCapStyle(), stroke.getJoinStyle(), stroke.getMiterLimit());
-            //renderer.reset(ng.clipX, ng.clipY, ng.clipW, ng.clipH, NativePathRenderer.WIND_NON_ZERO);
-            //stroker.reset(lineWidth, capStyle, miterStyle, miterLimit);
-            NativePathConsumer c = stroker.consumer;
-            fillPathConsumer(path, c);
+            if (shape instanceof GeneralPath) {
+                if (transform == null || transform.isIdentity()) {
 
-            // We don't need the stroker anymore because it has passed the strokes to the renderer.
-            stroker.destroy();
-            drawPath(renderer, this.color, this.alpha);
-            */
+                    TextureAlphaMask mask = textureCache.get(shape, stroke);
+                    if ( mask == null ){
+                        mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                        textureCache.add(shape, stroke, mask);
+
+                    }
+                    if (mask==null){
+                        // A null mask generally means the shape had zero bounds
+                        return;
+                    }
+                    //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                    nativeDrawAlphaMask(mask);
+
+
+                } else {
+                    GeneralPath p = (GeneralPath)shape;
+                    if (tmpDrawShape == null) {
+                        tmpDrawShape = new GeneralPath();
+                    }
+                    if (tmpTransform == null) {
+                        tmpTransform = Transform.makeIdentity();
+                    }
+                    if (tmpTransform2 == null) {
+                        tmpTransform2 = Transform.makeIdentity();
+                    }
+                    if (tmpRect2 == null) {
+                        tmpRect2 = new Rectangle();
+                    }
+                    if (tmpDrawStroke == null) {
+                        tmpDrawStroke = new Stroke();
+                    }
+                    // If the shape is very small and would be scaled dramatically
+                    // by the transform, then we will want to rasterize the shape in a larger
+                    // size to prevent the OGL transform from making the path too blurry.
+                    // But we can't just apply the full transform because the renderer
+                    // won't render the stroke correctly with transform
+                    // So we need to factor the transformation matrix
+                    Rectangle origBounds = reusableRect;
+                    Rectangle transformedBounds = tmpRect2;
+                    p.getBounds(origBounds);
+                    tmpDrawShape.setShape(shape, transform);
+                    tmpDrawShape.getBounds(transformedBounds);
+                    float scale = Math.max(transformedBounds.getWidth()/(float)origBounds.getWidth(), transformedBounds.getHeight()/(float)origBounds.getHeight());
+                    tmpTransform.setScale(scale, scale);
+                    tmpDrawShape.setShape(shape, tmpTransform);
+
+                    tmpTransform.setTransform(transform);
+                    tmpTransform.scale(1/scale, 1/scale);
+
+                    tmpTransform2.setTransform(transform);
+                    try {
+                        this.setTransform(tmpTransform);
+                        if (stroke != null) {
+
+                            tmpDrawStroke.setStroke(stroke);
+                            tmpDrawStroke.setLineWidth(tmpDrawStroke.getLineWidth() * scale);
+                        }
+                        //applyTransform();
+                        TextureAlphaMask mask = textureCache.get(tmpDrawShape, stroke==null?null:tmpDrawStroke);
+                        if ( mask == null ){
+                            mask = (TextureAlphaMask)createAlphaMask(tmpDrawShape, stroke==null?null:tmpDrawStroke);
+                            textureCache.add(tmpDrawShape, stroke==null?null:tmpDrawStroke, mask);
+
+                        }
+                        if (mask==null){
+                            // A null mask generally means the shape had zero bounds
+                            return;
+                        }
+                        //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                        nativeDrawAlphaMask(mask);
+                    } finally {
+                        setTransform(tmpTransform2);
+                        //applyTransform();
+                    }
+                }
+            } else {
+                Log.p("drawShape() only supported for GeneralPaths currently");
+            }
         }
 
         
@@ -3996,24 +4329,11 @@ public class IOSImplementation extends CodenameOneImplementation {
          */
         void nativeFillShape(Shape shape) {
             nativeDrawShape(shape, null);
-            /*
-            PathIterator path = shape.getPathIterator();
-
-            Rectangle rb = shape.getBounds();
-            // Notice that this will be cleaned up in the dealloc method of the DrawPath objective-c class.
-            NativePathRenderer renderer = new NativePathRenderer(rb.getX(), rb.getY(), rb.getWidth(), rb.getHeight(), NativePathRenderer.WIND_NON_ZERO);
-            //renderer.reset(ng.clipX, ng.clipY, ng.clipW, ng.clipH, NativePathRenderer.WIND_NON_ZERO);
-            NativePathConsumer c = renderer.consumer;
-            fillPathConsumer(path, c);
-            drawPath(renderer, this.color, this.alpha);
-            */
-
         }
         
-        
-        
         boolean isTransformSupported(){
-            return nativeInstance.nativeIsTransformSupportedGlobal();
+            //return nativeInstance.nativeIsTransformSupportedGlobal();
+            return true; // Since they both support it now.
         }
         
         boolean isPerspectiveTransformSupported(){
@@ -4021,15 +4341,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         boolean isShapeSupported(){
-            return nativeInstance.nativeIsShapeSupportedGlobal();
+            //return nativeInstance.nativeIsShapeSupportedGlobal();
+            return true;
         }
         
         
         boolean isAlphaMaskSupported(){
-            return nativeInstance.nativeIsAlphaMaskSupportedGlobal();
+            return true;
+            //return nativeInstance.nativeIsAlphaMaskSupportedGlobal();
         }
         
-
         public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
             nativeInstance.fillRectRadialGradientGlobal(startColor, endColor, x, y, width, height, relativeX, relativeY, relativeSize);
         }
@@ -4898,13 +5219,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public String[] getAllContacts(boolean withNumbers) {
         int[] c = new int[nativeInstance.getContactCount(withNumbers)];
+        int clen = c.length;
         nativeInstance.getContactRefIds(c, withNumbers);
-        String[] r = new String[c.length];
-        for(int iter = 0 ; iter < c.length ; iter++) {
+        String[] r = new String[clen];
+        for(int iter = 0 ; iter < clen ; iter++) {
             r[iter] = "" + c[iter];
         }
         return r;
     }
+
+    @Override
+    public void refreshContacts() {
+        nativeInstance.refreshContacts();
+    }
+    
+    
+    
+    
 
     @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
@@ -4978,6 +5309,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.dial("tel://" + phoneNumber);
     }
 
+    @Override
+    public boolean canDial() {
+        boolean s = super.canDial(); 
+        return s && nativeInstance.canExecute("tel://911");
+    }
+    
     @Override
     public int getSMSSupport() {
         return Display.SMS_INTERACTIVE;
@@ -5815,7 +6152,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         NetworkConnection n = (NetworkConnection)connection;
         n.ensureConnection();
         String[] s = new String[nativeInstance.getResponseHeaderCount(n.peer)];
-        for(int iter = 0 ; iter < s.length ; iter++) {
+        int slen = s.length;
+        for(int iter = 0 ; iter < slen ; iter++) {
             s[iter] = nativeInstance.getResponseHeaderName(n.peer, iter);
         }
         return s;
@@ -5973,7 +6311,8 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.getResourcesDir()
                 };
         }
-        for(int iter = 0 ; iter < roots.length ; iter++) {
+        int rlen = roots.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             if(roots[iter].startsWith("/")) {
                 roots[iter] = "file:/" + roots[iter];
             }
@@ -6154,6 +6493,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public native void paintComponentBackground(Object nativeGraphics, int x, int y, int width, int height, Style s);
+    
+    @Override
+    public native void fillRect(Object nativeGraphics, int x, int y, int w, int h, byte alpha);
+    
+    @Override
+    public native void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth,
+            Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl,
+            boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText,
+            boolean endsWith3Points, int valign);
+    
     @Override
     public void registerPush(Hashtable metaData, boolean noFallback) {
         nativeInstance.registerPush();
@@ -6545,6 +6896,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         minimized = true;
         if(instance.life != null) {
             instance.life.applicationDidEnterBackground();
+            if (instance.isEditingText()) {
+                foldKeyboard();
+            }
         }
     }
     /**
@@ -6940,25 +7294,34 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public Object showNativePicker(final int type, final Component source, final Object currentValue, final Object data) {
         datePickerResult = -2;
-        int x = 0, y = 0, w = 20, h = 20;
+        int x = 0, y = 0, w = 20, h = 20, preferredHeight = 0, preferredWidth = 0;
+        
         if(source != null) {
             x = source.getAbsoluteX();
             y = source.getAbsoluteY();
             w = source.getWidth();
             h = source.getHeight();
         }
+        
+        if (source instanceof Picker) {
+            Picker p = (Picker)source;
+            preferredHeight = p.getPreferredPopupHeight();
+            preferredWidth = p.getPreferredPopupWidth();
+        }
+        
         if(type == Display.PICKER_TYPE_STRINGS) {
             String[] strs = (String[])data;
             int offset = -1;
             if(currentValue != null) {
-                for(int iter = 0 ; iter < strs.length ; iter++) {
+                int slen = strs.length;
+                for(int iter = 0 ; iter < slen ; iter++) {
                     if(strs[iter].equals(currentValue)) {
                         offset = iter;
                         break;
                     }
                 }
             }
-            nativeInstance.openStringPicker(strs, offset, x, y, w, h);
+            nativeInstance.openStringPicker(strs, offset, x, y, w, h, preferredWidth, preferredHeight);
         } else {
             long time;
             if(currentValue instanceof Integer) {
@@ -6969,7 +7332,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 time = ((java.util.Date)currentValue).getTime();
             }
-            nativeInstance.openDatePicker(type, time, x, y, w, h);
+            nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight);
         }
         // wait for the native code to complete
         Display.getInstance().invokeAndBlock(new Runnable() {
@@ -7100,6 +7463,292 @@ public class IOSImplementation extends CodenameOneImplementation {
          nativeInstance.cancelLocalNotification(id);
     }
 
+    
+    static class ClipShape implements Shape {
+        
+        private final Rectangle rect = new Rectangle();
+        private final GeneralPath p = new GeneralPath();
+        private boolean isRect;
+        private static ArrayList<ClipShape> pool = new ArrayList<ClipShape>();
+        
+        public static synchronized ClipShape create() {
+            if (!pool.isEmpty()) {
+                return pool.remove(pool.size()-1);
+            }
+            return new ClipShape();
+        }
+        
+        public synchronized static void recycle(ClipShape shape) {
+            if (pool.size() <= 20 && shape != null) {
+                pool.add(shape);
+            }
+        }
+        
+        public boolean isRect() {
+            return isRect;
+        }
+        
+        
+        
+        @Override
+        public PathIterator getPathIterator() {
+            if (isRect) {
+                return rect.getPathIterator();
+            } else {
+                return p.getPathIterator();
+            }
+        }
+
+        @Override
+        public PathIterator getPathIterator(Transform transform) {
+            if (isRect) {
+                return rect.getPathIterator(transform);
+            } else {
+                return p.getPathIterator(transform);
+            }
+        }
+
+        @Override
+        public Rectangle getBounds() {
+            if (isRect) {
+                return rect.getBounds();
+            } else {
+                return p.getBounds();
+            }
+        }
+        
+        
+        public void getBounds(Rectangle r) {
+            if (isRect) {
+                r.setBounds(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+            } else {
+                p.getBounds(r);
+            }
+        }
+
+        @Override
+        public float[] getBounds2D() {
+            if (isRect) {
+                return rect.getBounds2D();
+            } else {
+                return p.getBounds2D();
+            }
+        }
+        
+        public void getBounds2D(float[] out) {
+            if (isRect) {
+                out[0] = rect.getX();
+                out[1] = rect.getY();
+                out[2] = rect.getWidth();
+                out[3] = rect.getHeight();
+            } else {
+                p.getBounds2D(out);
+            }
+        }
+
+        @Override
+        public boolean isRectangle() {
+            if (isRect) {
+                return true;
+            } else {
+                return p.isRectangle();
+            }
+        }
+
+        @Override
+        public boolean contains(int x, int y) {
+            if (isRect) {
+                return rect.contains(x, y);
+            } else {
+                return p.contains(x, y);
+            }
+        }
+
+        @Override
+        public Shape intersection(Rectangle rect) {
+            if (isRect) {
+                return this.rect.intersection(rect);
+            } else {
+                return this.p.intersection(rect);
+            }
+        }
+        
+        
+        public boolean intersect(Rectangle r) {
+            if (isRect) {
+                rect.intersection(r, rect);
+                return rect.getWidth() > 0 && rect.getHeight() > 0;
+            } else {
+                if (!p.intersect(r)) {
+                    rect.setBounds(0,0,0,0);
+                    isRect = true;
+                    return false;
+                } else {
+                    if (p.isRectangle()) {
+                        p.getBounds(rect);
+                        isRect = true;
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        public boolean intersect(int x, int y, int w, int h) {
+            if (isRect) {
+                Rectangle.intersection(x, y, w, h, rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight(), rect);
+                return rect.getWidth() >0 && rect.getHeight() > 0;
+            } else {
+                if (!p.intersect(x, y, w, h)) {
+                    rect.setBounds(0,0,0,0);
+                    isRect = true;
+                    return false;
+                } else {
+                    if (p.isRectangle()) {
+                        p.getBounds(rect);
+                        isRect = true;
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        public void setBounds(int x, int y, int w, int h) {
+            rect.setBounds(x, y, w, h);
+            isRect = true;
+        }
+        
+        public boolean equals(int x, int y, int w, int h) {
+            return isRect &&
+                    rect.getX() == x &&
+                    rect.getY() == y &&
+                    rect.getWidth() == w &&
+                    rect.getHeight() == h;
+        }
+        
+        
+        public boolean equals(Shape s, Transform t) {
+            if (t != null && !t.isIdentity()) {
+                GeneralPath tmp = GeneralPath.createFromPool();
+                try {
+                    tmp.setShape(s, t);
+                    return equals(tmp, null);
+                } finally {
+                    GeneralPath.recycle(tmp);
+                }
+            }
+            
+            // At this point we know that t is null or the identity
+            if (s == this) {
+                return true;
+            }
+            
+            if (s instanceof ClipShape) {
+                ClipShape cs = (ClipShape)s;
+                return cs.isRect ? equals(cs.rect, t) : equals(cs.p, t);
+            } else if (s instanceof Rectangle) {
+                if (isRect) {
+                    return rect.equals((Rectangle)s);
+                } else {
+                    return p.equals(s, (Transform) null);
+                }
+            } else if (s instanceof GeneralPath) {
+                GeneralPath sPath = (GeneralPath)s;
+                if (isRect) {
+                    return sPath.equals(rect, (Transform)null);
+                } else {
+                    return sPath.equals(p, (Transform)null);
+                }
+            } else {
+                GeneralPath p2 = GeneralPath.createFromPool();
+                try {
+                    p2.setShape(s, null);
+                    return equals(p2, null);
+                } finally {
+                    GeneralPath.recycle(p2);
+                }
+            }
+            
+        }
+        
+        
+        
+        public void setShape(Shape s, Transform t) {
+            if (s.isRectangle() && (t == null || t.isIdentity())) {
+                if (s.getClass() == GeneralPath.class) {
+                    ((GeneralPath)s).getBounds(rect);
+                } else if (s.getClass() == Rectangle.class) {
+                    Rectangle r = (Rectangle)s;
+                    rect.setBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+                } else {
+                    Rectangle r = s.getBounds();
+                    rect.setBounds(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+                }
+                isRect = true;
+            } else {
+                p.setShape(s, t);
+                if (p.isRectangle()) {
+                    p.getBounds(rect);
+                    isRect = true;
+                } else {
+                    isRect = false;
+                }
+            }
+        }
+        
+        /**
+        * Returns the number of path commands in this path.
+        * @return The number of path commands in this path.
+        */
+        public int getTypesSize() {
+            if (isRect) {
+                p.setShape(rect, null);
+                return p.getTypesSize();
+            } else {
+                return p.getTypesSize();
+            }
+        }
+
+        /**
+         * Returns the number of points in this path.
+         * @return The number of points in this path.
+         */
+        public int getPointsSize() {
+            if (isRect) {
+                p.setShape(rect, null);
+                
+            }
+            return p.getPointsSize();
+        }
+
+        /**
+         * Returns a copy of the types (aka path commands) in this path.
+         * @param out An array to copy the path commands into.
+         */
+        public void getTypes(byte[] out) {
+            if (isRect) {
+                p.setShape(rect, null);
+            }
+            p.getTypes(out);
+        }
+
+        /**
+         * Returns a copy of the points in this path.
+         * @param out An array to copy the points into.
+         */
+        public void getPoints(float[] out) {
+            if (isRect) {
+                p.setShape(rect, null);
+            }
+            p.getPoints(out);
+        }
+        
+        public boolean isPolygon() {
+            if (isRect) {
+                return true;
+            }
+            return p.isPolygon();
+        }
+    }
 }
 
 

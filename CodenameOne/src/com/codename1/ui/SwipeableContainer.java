@@ -31,8 +31,12 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
 
 /**
- * This Container enables to place Components below a Component and to swipe the
- * top Component to the right or to the left to expose the Components below.
+ * <p>{@code SwipeableContainer} allows us to side swipe a component and expose underlying configuration
+ * within it. This is useful for editing, ranking of elements within a set of components e.g. in the 
+ * sample code below we use a ranking widget and swiping to expose the elements:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/d1c091a171fe97fdeb5f.js"></script>
+ * <img src="https://www.codenameone.com/img/thumb/components-swipablecontainer.png" alt="Swipeable Container">
  * 
  * @author Chen
  */
@@ -99,7 +103,7 @@ public class SwipeableContainer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void deinitialize() {
         Form form = this.getComponentForm();
@@ -112,7 +116,7 @@ public class SwipeableContainer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         super.initComponent();
@@ -223,7 +227,7 @@ public class SwipeableContainer extends Container {
                     openedToLeft = false;
                     openedToRight = false;
                 }else{
-                    dispatcher.fireActionEvent(new ActionEvent(this));                
+                    dispatcher.fireActionEvent(new ActionEvent(this,ActionEvent.Type.Swipe));                
                 }
             }
             return !finished;

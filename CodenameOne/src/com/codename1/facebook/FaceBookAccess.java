@@ -85,7 +85,8 @@ public class FaceBookAccess {
     public Oauth2 createOAuth() {
         String scope = "";
         if (permissions != null && permissions.length > 0) {
-            for (int i = 0; i < permissions.length; i++) {
+            int plen = permissions.length;
+            for (int i = 0; i < plen; i++) {
                 String permission = permissions[i];
                 scope += permission + ",";
             }
@@ -850,14 +851,15 @@ public class FaceBookAccess {
             return null;
         }
         Hashtable[] h = new Hashtable[photoCount];
-        for(int iter = 0 ; iter < h.length ; iter++) {
+        int hlen = h.length;
+        for(int iter = 0 ; iter < hlen ; iter++) {
             h[iter] = new Hashtable();
             h[iter].put("photo", placeholder);
             if(iter < 30) {
                 h[iter].put("fetching", Boolean.TRUE);
             }
         }
-        DefaultListModel dl = new DefaultListModel(h) {
+        DefaultListModel dl = new DefaultListModel((Object[])h) {
             public Object getItem(int offset) {
                 Hashtable hash = (Hashtable)super.getItemAt(offset);
                 if(!hash.containsKey("fetching")) {
@@ -1163,14 +1165,16 @@ public class FaceBookAccess {
 
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/users.getInfo", false);
         String ids = usersIds[0];
-        for (int i = 1; i < usersIds.length; i++) {
+        int ulen = usersIds.length;
+        for (int i = 1; i < ulen; i++) {
             ids += "," + usersIds[i];
 
         }
         con.addArgumentNoEncoding("uids", ids);
 
         String fieldsStr = fields[0];
-        for (int i = 1; i < fields.length; i++) {
+        int flen = fields.length;
+        for (int i = 1; i < flen; i++) {
             fieldsStr += "," + fields[i];
 
         }
@@ -1276,7 +1280,8 @@ public class FaceBookAccess {
      */
     public void cleanTempStorage() {
         String[] entries = Storage.getInstance().listEntries();
-        for (int i = 0; i < entries.length; i++) {
+        int elen = entries.length;
+        for (int i = 0; i < elen; i++) {
             String key = entries[i];
             if (key.startsWith(TEMP_STORAGE)) {
                 Storage.getInstance().deleteStorageFile(key);

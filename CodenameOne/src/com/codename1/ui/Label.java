@@ -32,14 +32,23 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * Allows displaying labels and images with different alignment options, this class
- * is a base class for several components allowing them to declare alignement/icon
- * look in a similar way.
+ * <p>Allows displaying a single line of text and icon (both optional) with different alignment options. This class
+ * is a base class for several components allowing them to declare alignment/icon
+ * appearance universally.</p>
+ * <p>
+ * Label text can be positioned in one of 4 locations as such:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/3bfd03a497bc09700128.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-label-text-position.png" alt="Label text positioning" />
+ * 
  * 
  * @author Chen Fishbein
  */
 public class Label extends Component {
-
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     */
+    private boolean legacyRenderer;
     private String text = "";
     
     private Image icon;
@@ -72,6 +81,7 @@ public class Label extends Component {
     private boolean shouldLocalize = true;
     private boolean showEvenIfBlank = false;
     private int shiftMillimeters = 1;
+    private int stringWidthUnselected = -1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -119,6 +129,9 @@ public class Label extends Component {
     public Label(Image icon) {
         this("");
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
@@ -132,6 +145,9 @@ public class Label extends Component {
     public Label(Image icon, String uiid) {
         this("", uiid);
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
@@ -145,6 +161,9 @@ public class Label extends Component {
     public Label(String text, Image icon, String uiid) {
         this(text, uiid);
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
@@ -157,11 +176,14 @@ public class Label extends Component {
     public Label(String text, Image icon) {
         this(text);
         this.icon = icon;
+        if(icon != null && icon.requiresDrawImage()) {
+            legacyRenderer = true;
+        }
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getBaselineResizeBehavior() {
         switch(valign) {
@@ -196,6 +218,7 @@ public class Label extends Component {
     public void setText(String text){
         this.text = text;
         localize();
+        stringWidthUnselected = -1;
         setShouldCalcPreferredSize(true);
         repaint();
     }
@@ -208,7 +231,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void initComponentImpl() {
         super.initComponentImpl();
@@ -234,7 +257,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void deinitializeImpl() {
         super.deinitializeImpl(); 
@@ -266,8 +289,14 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
-        if(icon != null && mask != null) {
-            maskedIcon = icon.applyMaskAutoScale(mask);
+        if(icon != null) {
+            if(icon.requiresDrawImage()) {
+                legacyRenderer = true;
+            }
+
+            if(mask != null) {
+                maskedIcon = icon.applyMaskAutoScale(mask);
+            }
         }
         this.icon = icon;
         setShouldCalcPreferredSize(true);
@@ -329,7 +358,7 @@ public class Label extends Component {
 
     /**
      * Returns the vertical alignment of the Label, this will only work when the icon
-     * is in the side of the text and not above or bellow it.
+     * is in the side of the text and not above or below it.
      * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
      * only work when there is an icon</strong>
      * 
@@ -404,21 +433,48 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         return super.paramString() + ", text = " +getText() + ", gap = " + gap;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        getUIManager().getLookAndFeel().drawLabel(g, this);
+        if(legacyRenderer) {
+            getUIManager().getLookAndFeel().drawLabel(g, this);
+            return;
+        }
+        Object icn = null;
+        Image i = getIconFromState();
+        if(i != null) {
+            icn = i.getImage();
+        } else {
+            // optimize away a common usage pattern for drawing the background only
+            if(text == null || text.equals("") || text.equals(" ")) {
+                return;
+            }
+        }
+        //getUIManager().getLookAndFeel().drawLabel(g, this);
+        int cmpX = getX() + g.getTranslateX();
+        int cmpY = getY() + g.getTranslateY();
+        int cmpHeight = getHeight();
+        int cmpWidth = getWidth();
+        Style s = getStyle();
+        Font f = s.getFont();
+        String t = text;
+        if(text == null) { 
+            t = "";
+        }
+        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, t, 
+                icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
+                endsWith3Points, valign);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
@@ -460,7 +516,7 @@ public class Label extends Component {
     }
 
     Image getIconFromState() {
-        return getIcon();
+        return getMaskedIcon();
     }
 
     int getAvaliableSpaceForText() {
@@ -517,7 +573,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void tryDeregisterAnimated() {
     }
@@ -551,9 +607,8 @@ public class Label extends Component {
     }
    
     /**
-     * If the Label text is too long fit the text to the widget and add "..."
-     * points at the end.
-     * By default this is set to true
+     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
+     * points at the end. By default this is set to {@code false} for faster performance.
      * 
      * @param endsWith3Points true if text should add "..." at the end
      */
@@ -562,7 +617,8 @@ public class Label extends Component {
     }
 
     /**
-     * Simple getter
+     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
+     * points at the end. By default this is set to {@code false} for faster performance.
      * 
      * @return true if this Label adds "..." when the text is too long
      */
@@ -573,7 +629,7 @@ public class Label extends Component {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         boolean animateTicker = false;
@@ -581,8 +637,14 @@ public class Label extends Component {
             tickerStartTime = System.currentTimeMillis();
             if(rightToLeft){
                 shiftText -= Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(shiftText + getStringWidth(getStyle().getFont()) < 0) {
+                    shiftText = getStringWidth(getStyle().getFont()); 
+                }
             }else{
                 shiftText += Display.getInstance().convertToPixels(shiftMillimeters, true);
+                if(getStringWidth(getStyle().getFont()) - shiftText < 0) {
+                    shiftText = -getStringWidth(getStyle().getFont()); 
+                }
             }     
             animateTicker = true;
         }                
@@ -648,28 +710,28 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"maskName"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] { String.class };
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("maskName")) {
@@ -679,7 +741,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("maskName")) {
@@ -707,21 +769,21 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"text"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {String.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -735,7 +797,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("text")) {
@@ -752,7 +814,7 @@ public class Label extends Component {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("text")) {
@@ -762,7 +824,7 @@ public class Label extends Component {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("text")) {
@@ -827,4 +889,36 @@ public class Label extends Component {
     public void setShowEvenIfBlank(boolean showEvenIfBlank) {
         this.showEvenIfBlank = showEvenIfBlank;
     }    
+    
+    /**
+     * This method is equivalent to label.getStyle().getFont().stringWidth(label.getText()) but its faster
+     * @param fnt the font is passed as an optimization to save a call to getStyle
+     * @return the string width
+     */
+    public int getStringWidth(Font fnt) {
+        if(isUnselectedStyle) {
+            // very optimized way to get the string width of a label for the common unselected case in larger lists
+            if(stringWidthUnselected < 0) {
+                stringWidthUnselected = fnt.stringWidth(text);
+            }
+            return stringWidthUnselected;
+        }
+        return fnt.stringWidth(text);
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @return the legacyRenderer
+     */
+    public boolean isLegacyRenderer() {
+        return legacyRenderer;
+    }
+
+    /**
+     * Fallback to the old default look and feel renderer for cases where compatibility is essential
+     * @param legacyRenderer the legacyRenderer to set
+     */
+    public void setLegacyRenderer(boolean legacyRenderer) {
+        this.legacyRenderer = legacyRenderer;
+    }
 }

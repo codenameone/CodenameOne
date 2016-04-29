@@ -10,8 +10,24 @@
   </head>
     <body>
         <p>
-            Simple abstraction of location services (GPS/Triangulation) providing user global positioning and monitoring over
-            such changes.
+            Abstraction of location services (GPS/Geofencing etc.) providing user global positioning and monitoring over
+            such changes both in the foreground and background.
         </p>
+        
+        <p>
+            Trivial one time usage of location data can look like this sample:
+        </p>
+        <script src="https://gist.github.com/codenameone/5c2f411e1687793409d5.js"></script>
+        
+        <p>
+            You can also track location in the foreground using API calls like this:
+        </p>
+        <script src="https://gist.github.com/codenameone/9dc822cf80cc8bf3a6cc.js"></script>
+ 
+        <p>
+            Geofencing allows tracking whether a user entered a specific region, this can work when the app is completely
+            in the background and is very efficient in terms of battery life:
+        </p>
+        <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
     </body>
 </html>

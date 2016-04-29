@@ -61,8 +61,7 @@ import java.util.Timer;
 
 /**
  * Central class for the API that manages rendering/events and is used to place top
- * level components ({@link Form}) on the "display". Before any Form is shown the Developer must
- * invoke Display.init(Object m) in order to register the current MIDlet.
+ * level components ({@link Form}) on the "display". 
  * <p>This class handles the main thread for the toolkit referenced here on as the EDT
  * (Event Dispatch Thread) similar to the Swing EDT. This thread encapsulates the platform
  * specific event delivery and painting semantics and enables threading features such as
@@ -366,7 +365,7 @@ public final class Display {
 
     static int transitionDelay = -1;
 
-    private CodenameOneImplementation impl;
+    static CodenameOneImplementation impl;
 
     private boolean codenameOneRunning = false;
 
@@ -537,6 +536,8 @@ public final class Display {
 
     private boolean multiKeyMode;
     
+    private ActionListener virtualKeyboardListener;
+    
     /**
      * Private constructor to prevent instanciation
      */
@@ -547,7 +548,7 @@ public final class Display {
      * This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
      * This method must be called before any Form is shown
      *
-     * @param m the main running MIDlet
+     * @param m platform specific object used by the implementation
      * @deprecated this method is invoked internally do not invoke it!
      */
     public static void init(Object m) {
@@ -972,7 +973,7 @@ public final class Display {
             }
             if(!impl.handleEDTException(err)) {
                 if(errorHandler != null) {
-                    errorHandler.fireActionEvent(new ActionEvent(err));
+                    errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
                 } else {
                     Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                 }
@@ -1002,7 +1003,7 @@ public final class Display {
                 }
                 if(!impl.handleEDTException(err)) {
                     if(errorHandler != null) {
-                        errorHandler.fireActionEvent(new ActionEvent(err));
+                        errorHandler.fireActionEvent(new ActionEvent(err,ActionEvent.Type.Exception));
                     } else {
                         Dialog.show("Error", "An internal application error occurred: " + err.toString(), "OK", null);
                     }
@@ -1050,6 +1051,7 @@ public final class Display {
         synchronized(lock) {
             inputEventStackPointerTmp = inputEventStackPointer;
             inputEventStackPointer = 0;
+            lastDragOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
             inputEventStack = qt;
@@ -1059,6 +1061,7 @@ public final class Display {
         while(offset < inputEventStackPointerTmp) {            
             if(offset == inputEventStackPointer) {
                 inputEventStackPointer = 0;
+                lastDragOffset = -1;
             }
             offset = handleEvent(offset);
         }
@@ -1475,8 +1478,9 @@ public final class Display {
     }
 
     /**
-     * Encapsulates the editing code which is specific to the platform, some platforms
-     * would allow "in place editing" MIDP does not.
+     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead 
+     * use an API like {@link com.codename1.ui.TextArea#startEditingAsync()}, {@link com.codename1.ui.TextArea#startEditing()}
+     * or {@link com.codename1.ui.Form#setEditOnShow(com.codename1.ui.TextArea)}.
      *
      * @param cmp the {@link TextArea} component
      * @param maxSize the maximum size from the text area
@@ -1488,8 +1492,9 @@ public final class Display {
     }
 
     /**
-     * Encapsulates the editing code which is specific to the platform, some platforms
-     * would allow "in place editing" MIDP does not.
+     * Fires the native in place text editing logic, normally you wouldn't invoke this API directly and instead 
+     * use an API like {@link com.codename1.ui.TextArea#startEditingAsync()}, {@link com.codename1.ui.TextArea#startEditing()}
+     * or {@link com.codename1.ui.Form#setEditOnShow(com.codename1.ui.TextArea)}.
      *
      * @param cmp the {@link TextArea} component
      * @param maxSize the maximum size from the text area
@@ -1527,6 +1532,10 @@ public final class Display {
     
     boolean isTextEditing(Component c) {
         return impl.isEditingText(c);
+    }
+    
+    boolean isNativeEditorVisible(Component c) {
+        return impl.isNativeEditorVisible(c);
     }
 
     /**
@@ -1667,6 +1676,37 @@ public final class Display {
             lock.notify();
         }        
     }
+    
+    private int lastDragOffset;
+    private void addPointerDragEventWithTimestamp(int x, int y) {
+        synchronized(lock) {
+            if (this.dropEvents) {
+                return;
+            }
+            try {
+                if(lastDragOffset > -1) {
+                    inputEventStack[lastDragOffset] = x;
+                    inputEventStack[lastDragOffset + 1] = y;
+                    inputEventStack[lastDragOffset + 2] = (int)(System.currentTimeMillis() - displayInitTime);
+                } else {
+                    inputEventStack[inputEventStackPointer] = POINTER_DRAGGED;
+                    inputEventStackPointer++;
+                    lastDragOffset = inputEventStackPointer;
+                    inputEventStack[inputEventStackPointer] = x;
+                    inputEventStackPointer++;
+                    inputEventStack[inputEventStackPointer] = y;
+                    inputEventStackPointer++;
+                    inputEventStack[inputEventStackPointer] = (int)(System.currentTimeMillis() - displayInitTime);
+                    inputEventStackPointer++;
+                }
+            } catch(ArrayIndexOutOfBoundsException err) {
+                Log.p("EDT performance is very slow triggering this exception!");
+                Log.e(err);
+            }
+            lock.notify();
+        }        
+    }
+    
 
     private void addPointerEventWithTimestamp(int type, int x, int y) {
         synchronized(lock) {
@@ -1702,7 +1742,7 @@ public final class Display {
         }
         longPointerCharged = false;
         if(x.length == 1) {
-            addPointerEventWithTimestamp(POINTER_DRAGGED, x[0], y[0]);
+            addPointerDragEventWithTimestamp(x[0], y[0]);
         } else {
             addPointerEvent(POINTER_DRAGGED_MULTI, x, y);
         }
@@ -1890,7 +1930,8 @@ public final class Display {
     private int[] readArrayStackArgument(int offset) {
         int[] a = new int[inputEventStackTmp[offset]];
         offset++;
-        for(int iter = 0 ; iter < a.length ; iter++) {
+        int alen = a.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             a[iter] = inputEventStackTmp[offset + iter];
         }
         return a;
@@ -2253,6 +2294,18 @@ public final class Display {
         return impl.convertToPixels(dipCount, horizontal);
     }
 
+
+    /**
+     * Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
+     * to be relied upon. This version of the method assumes square pixels which is pretty much the norm.
+     * 
+     * @param dipCount the dips that we will convert to pixels
+     * @return value in pixels
+     */
+    public int convertToPixels(float dipCount) {
+        return Math.round(impl.convertToPixels((int)(dipCount * 1000), true) / 1000.0f);
+    }
+
     /**
      * Returns the game action code matching the given key combination
      *
@@ -2304,6 +2357,9 @@ public final class Display {
      * the vitual keyboard
      *
      * @param show toggles the virtual keyboards visibility
+     * @deprecated this method was only relevant for feature phones. 
+     * You should use {@link com.codename1.ui.TextArea#startEditingAsync()} or {@link com.codename1.ui.TextArea#stopEditing()}
+     * to control text field editing/VKB visibility
      */
     public void setShowVirtualKeyboard(boolean show) {
         if(isTouchScreenDevice()){
@@ -2318,6 +2374,8 @@ public final class Display {
      * Indicates if the virtual keyboard is currently showing or not
      *
      * @return true if the virtual keyboard is showing
+     * @deprecated this method was only relevant for feature phones. 
+     * You should use {@link com.codename1.ui.TextArea#isEditing()} instead.
      */
     public boolean isVirtualKeyboardShowing() {
         if(!isTouchScreenDevice()){
@@ -2329,6 +2387,7 @@ public final class Display {
     /**
      * Returns all platform supported virtual keyboards names
      * @return all platform supported virtual keyboards names
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public String [] getSupportedVirtualKeyboard(){
         String [] retVal = new String[virtualKeyboards.size()];
@@ -2343,6 +2402,7 @@ public final class Display {
     /**
      * Register a virtual keyboard
      * @param vkb
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public void registerVirtualKeyboard(VirtualKeyboardInterface vkb){
         virtualKeyboards.put(vkb.getVirtualKeyboardName(), vkb);
@@ -2353,6 +2413,7 @@ public final class Display {
      *
      * @param vkb a VirtualKeyboard to be used or null to disable the
      * VirtualKeyboard
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public void setDefaultVirtualKeyboard(VirtualKeyboardInterface vkb){
         if(vkb != null){
@@ -2368,6 +2429,7 @@ public final class Display {
     /**
      * Get the default virtual keyboard or null if the VirtualKeyboard is disabled
      * @return the default vkb
+     * @deprecated this method is only used in feature phones and has no modern equivalent
      */
     public VirtualKeyboardInterface getDefaultVirtualKeyboard(){
         if(selectedVirtualKeyboard == null){
@@ -2375,7 +2437,29 @@ public final class Display {
         }
         return (VirtualKeyboardInterface)virtualKeyboards.get(selectedVirtualKeyboard);
     }
+    
+    /**
+     * Sets a listener for VirtualKeyboard hide/show events.
+     * The Listener will get an event once the keyboard is opened/closed with 
+     * a Boolean value that represents the state of the keyboard true for open 
+     * and false for closed getSource() on the ActionEvent will return the 
+     * Boolean value.
+     * 
+     * @param l the listener 
+     */
+    public void setVirtualKeyboardListener(ActionListener l){
+        virtualKeyboardListener = l;
+    }
 
+    /**
+     * Gets the VirtualKeyboardListener Objects of exists.
+     * 
+     * @return a Listener Object or null if not exists
+     */ 
+    public ActionListener getVirtualKeyboardListener() {
+        return virtualKeyboardListener;
+    }
+    
     /**
      * Returns the type of the input device one of:
      * KEYBOARD_TYPE_UNKNOWN, KEYBOARD_TYPE_NUMERIC, KEYBOARD_TYPE_QWERTY,
@@ -2699,7 +2783,7 @@ public final class Display {
      * <li>User-Agent
      * <li>AppVersion
      * <li>Platform - Similar to microedition.platform
-     * <li>OS - returns what is the underlying platform e.g. - J2ME, RIM, SE...
+     * <li>OS - returns what is the underlying platform e.g. - iOS, Android, RIM, SE...
      * <li>OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
      *
      * </ol>
@@ -2738,6 +2822,11 @@ public final class Display {
             Container.blockOverdraw = true;
             return;
         }
+        if(key.startsWith("platformHint.")) {
+            impl.setPlatformHint(key, value);
+            return;
+        }
+        
         if(localProperties == null) {
             localProperties = new HashMap<String, String>();
         }
@@ -2749,8 +2838,10 @@ public final class Display {
     }
     
     /**
-     * Returns true if executing this URL should work, returns false if it will not
-     * and null if this is unknown.
+     * <p>Returns true if executing this URL should work, returns false if it will not
+     * and null if this is unknown.</p>
+     * <script src="https://gist.github.com/codenameone/7aefb64909e75e10c396.js"></script>
+     * 
      * @param url the url that would be executed
      * @return true if executing this URL should work, returns false if it will not
      * and null if this is unknown
@@ -2760,7 +2851,8 @@ public final class Display {
     }
 
     /**
-     * Executes the given URL on the native platform
+     * <p>Executes the given URL on the native platform</p>
+     * <script src="https://gist.github.com/codenameone/7aefb64909e75e10c396.js"></script>
      *
      * @param url the url to execute
      */
@@ -3010,7 +3102,32 @@ public final class Display {
     }
 
     /**
-     * This method returns the platform Location Control
+     * This method returns the platform Location Manager used for geofencing. This allows tracking the 
+     * user location in the background. Usage:
+     * 
+     * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
+<noscript><pre>{@code public class GeofenceListenerImpl implements GeofenceListener {
+    public void onExit(String id) {
+        System.out.println("Exited "+id);
+    }
+
+    public void onEntered(String id) {
+        System.out.println("Entered "+id);
+    }
+}
+Form hi = new Form("Hi World");
+hi.addComponent(new Label("Hi World"));
+        
+Location loc = new Location();
+loc.setLatitude(51.5033630);
+loc.setLongitude(-0.1276250);
+        
+Geofence gf = new Geofence("test", loc, 100, 100000);
+        
+LocationManager.getLocationManager().addGeoFencing(GeofenceListenerImpl.class, gf);
+        
+hi.show();}</pre></noscript>
+     * 
      * @return LocationManager Object
      */
     public LocationManager getLocationManager() {
@@ -3084,15 +3201,19 @@ public final class Display {
     }
     
     /**
-     * Opens the device gallery
-     * The method returns immediately and the response will be sent asynchronously
-     * to the given ActionListener Object
+     * <p>Opens the device gallery to pick an image or a video.<br>
+     * The method returns immediately and the response is sent asynchronously
+     * to the given ActionListener Object as the source value of the event (as a String)</p>
      * 
-     * use this in the actionPerformed to retrieve the file path
-     * String path = (String) evt.getSource();
+     * <p>E.g. within the callback action performed call you can use this code: {@code String path = (String) evt.getSource();}.<br>
+     * A more detailed sample of picking a video file can be seen here:
+     * </p>
+     * 
+     * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
      * 
      * @param response a callback Object to retrieve the file path
-     * @param type one of the following GALLERY_IMAGE, GALLERY_VIDEO, GALLERY_ALL
+     * @param type one of the following {@link #GALLERY_IMAGE}, {@link #GALLERY_VIDEO}, {@link #GALLERY_ALL}
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
     public void openGallery(ActionListener response, int type){
@@ -3118,7 +3239,11 @@ public final class Display {
     }
 
     /**
-     * Send an email using the platform mail client
+     * <p>Send an email using the platform mail client.<br>
+     * The code below demonstrates sending a simple message with attachments using the devices
+     * native email client:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js"></script>
      * @param recipients array of e-mail addresses
      * @param subject e-mail subject
      * @param msg the Message to send
@@ -3136,8 +3261,14 @@ public final class Display {
     }    
     
     /**
-     * Indicates the level of SMS support in the platform as one of: SMS_NOT_SUPPORTED (for desktop, tablet etc.), 
-     * SMS_SEAMLESS (no UI interaction), SMS_INTERACTIVE (with compose UI), SMS_BOTH.
+     * <p>Indicates the level of SMS support in the platform as one of: 
+     * {@link #SMS_NOT_SUPPORTED} (for desktop, tablet etc.), 
+     * {@link #SMS_SEAMLESS} (no UI interaction), {@link #SMS_INTERACTIVE} (with compose UI), 
+     * {@link #SMS_BOTH}.<br>
+     * The sample below demonstrates the use case for this property:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
+     * 
      * @return one of the SMS_* values
      */
     public int getSMSSupport() {
@@ -3155,7 +3286,11 @@ public final class Display {
     }
     
     /**
-     * Sends a SMS message to the given phone number
+     * <p>Sends a SMS message to the given phone number, the code below demonstrates the logic
+     * of detecting platform behavior for sending SMS.</p>
+     * <script src="https://gist.github.com/codenameone/da23d33b1a9e105efffd.js"></script>
+     * 
+     * @see #getSMSSupport() 
      * @param phoneNumber to send the sms
      * @param message the content of the sms
      * @param interactive indicates the SMS should show a UI or should not show a UI if applicable see getSMSSupport
@@ -3263,10 +3398,14 @@ public final class Display {
     }
 
     /**
-     * Notice: this method might be very slow and should be invoked on a separate thread!
+     * <p>Notice: this method might be very slow and should be invoked on a separate thread!
      * It might have platform specific optimizations over getAllContacts followed by looping
      * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
-     * information.
+     * information.<br>
+     * The sample below demonstrates listing all the contacts within the device with their photos</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
      * 
      * @param withNumbers if true returns only contacts that has a number
      * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
@@ -3299,8 +3438,12 @@ public final class Display {
     }
 
     /**
-     * This method returns a Contact by the contact id and fills it's data
-     * according to the given flags
+     * <p>This method returns a Contact by the contact id and fills it's data
+     * according to the given flags.<br>
+     * The sample below demonstrates listing all the contacts within the device with their photos</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
      * 
      * @param id of the Contact
      * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
@@ -3319,7 +3462,9 @@ public final class Display {
     }
     
     /**
-     * Some platforms allow the user to block contacts access on a per application basis (specifically iOS).
+     * Some platforms allow the user to block contacts access on a per application basis this method
+     * returns true if the user denied permission to access contacts. This can allow you to customize the error
+     * message presented to the user.
      * 
      * @return true if contacts access is allowed or globally available, false otherwise
      */
@@ -3406,7 +3551,7 @@ public final class Display {
      * 
      * @param text String to share.
      * @param image file path to the image or null
-     * @param mime type of the image or null if no image to share
+     * @param mimeType type of the image or null if no image to share
      * @param sourceRect The source rectangle of the button that originated the share request.  This is used on
      * some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
      * on the iPad with iOS 8 and higher.
@@ -3418,7 +3563,13 @@ public final class Display {
     
     
      /**
-     * Returns the localization manager instance for this platform
+     * <p>The localization manager allows adapting values for display in different locales thru parsing and formatting
+     * capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
+     * related API's similar to Locale/currency API's from JavaSE.<br>
+     * The sample code below just lists the various capabilities of the API:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/l10n-manager.png" alt="Localization formatting/parsing and information" />
      * 
      * @return an instance of the localization manager
      */
@@ -3643,6 +3794,7 @@ public final class Display {
     /**
      * Returns the native implementation of the code scanner or null
      * @return code scanner instance
+     * @deprecated Use the cn1-codescanner cn1lib.
      */
     public CodeScanner getCodeScanner() {
         if(!hasCamera()) {
@@ -3748,8 +3900,11 @@ public final class Display {
     }
     
     /**
-     * Schedules a local notification to occur.
-     *
+     * <p>Schedules a local notification that will occur after the given time elapsed.<br>
+     * The sample below combines this with the geofence API to show a local notification
+     * when entering a radius with the app in the background:</p>
+     * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+     * 
      * @param n The notification to schedule.
      * @param firstTime time in milliseconds when to schedule the notification
      * @param repeat repeat one of the following: REPEAT_NONE, REPEAT_FIFTEEN_MINUTES, 
@@ -3798,5 +3953,32 @@ public final class Display {
      */ 
     public Media createBackgroundMedia(String uri) throws IOException{
         return impl.createBackgroundMedia(uri);
+    }
+
+    /**
+     * Create a blur image from the given image.
+     * The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
+     * 
+     * @param image the image to blur
+     * @param radius the radius to be used in the algorithm
+     */ 
+    public Image gaussianBlurImage(Image image, float radius) {
+        return impl.gaussianBlurImage(image, radius);
+    }
+
+    /**
+     * Returns true if gaussian blur is supported on this platform
+     * 
+     * @return true if gaussian blur is supported.
+     */ 
+    public boolean isGaussianBlurSupported() {
+        return impl.isGaussianBlurSupported();
+    }
+
+    /**
+     * Refreshes the native list of contacts on devices that require this see {@link com.codename1.contacts.ContactsManager#refresh()}
+     */
+    public void refreshContacts() {
+        impl.refreshContacts();
     }
 }

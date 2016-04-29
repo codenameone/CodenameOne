@@ -99,14 +99,14 @@ public class Dimension {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "width = " + width + " height = " +height;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int hashCode() {
         int hash = 3;
@@ -116,7 +116,7 @@ public class Dimension {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object arg0) {
         return arg0 != null && ((Dimension)arg0).width == width && ((Dimension)arg0).height == height;

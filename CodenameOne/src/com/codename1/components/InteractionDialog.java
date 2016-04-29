@@ -39,11 +39,14 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 
 /**
- * Unlike a regular dialog the interaction dialog only looks like a dialog,
+ * <p>Unlike a regular dialog the interaction dialog only looks like a dialog,
  * it resides in the layered pane and can be used to implement features where 
- * interaction with the background form is still required.<br />
+ * interaction with the background form is still required.<br>
  * Since this code is designed for interaction all "dialogs" created thru here are
- * modless and never block.
+ * modless and never block.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/d1db2033981c835fb925.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-interaction-dialog.png" alt="InteractionDialog Sample" />
  *
  * @author Shai Almog
  */
@@ -91,63 +94,63 @@ public class InteractionDialog extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Layout getLayout() {
         return contentPane.getLayout();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String getTitle() {
         return title.getText();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Component cmp) {
         contentPane.addComponent(cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(Object constraints, Component cmp) {
         contentPane.addComponent(constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Object constraints, Component cmp) {
         contentPane.addComponent(index, constraints, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addComponent(int index, Component cmp) {
         contentPane.addComponent(index, cmp);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeAll() {
         contentPane.removeAll();
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeComponent(Component cmp) {
         contentPane.removeComponent(cmp);
@@ -155,21 +158,21 @@ public class InteractionDialog extends Container {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Label getTitleComponent() {
         return title;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setLayout(Layout layout) {
         contentPane.setLayout(layout);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setTitle(String title) {
         this.title.setText(title);
@@ -213,7 +216,7 @@ public class InteractionDialog extends Container {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void dispose() {
         Container p = getParent();

@@ -118,7 +118,8 @@ public class MenuBar extends Container implements ActionListener {
     private Form parent;
     private boolean thirdSoftButton;
     private boolean hideEmptyCommands;
-
+    private boolean menuDisplaying;
+    
     /**
      * Empty Constructor
      */
@@ -569,7 +570,7 @@ public class MenuBar extends Container implements ActionListener {
                         return;
                     }
                     if (softCommand[iter] != null) {
-                        ActionEvent e = new ActionEvent(softCommand[iter]);
+                        ActionEvent e = new ActionEvent(softCommand[iter],ActionEvent.Type.Command);
                         softCommand[iter].actionPerformed(e);
                         if (!e.isConsumed()) {
                             parent.actionCommandImpl(softCommand[iter]);
@@ -633,7 +634,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setUnselectedStyle(Style style) {
         style.setMargin(Component.TOP, 0, true);
@@ -673,6 +674,14 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
+     * This method will return true if the menu dialog is currently displaying
+     * @return true of the menu dialog is displaying
+     */
+    public boolean isMenuShowing(){
+        return menuDisplaying;
+    }
+    
+    /**
      * This method shows the menu on the Form.
      * The method creates a Dialog with the commands and calls showMenuDialog.
      * The method blocks until the user dispose the dialog.
@@ -710,13 +719,15 @@ public class MenuBar extends Container implements ActionListener {
         if (((Form) d).getMenuBar().commandList instanceof List) {
             ((List) ((Form) d).getMenuBar().commandList).addActionListener(((Form) d).getMenuBar());
         }
+        menuDisplaying = true;
         Command result = showMenuDialog(d);
+        menuDisplaying = false;
         if (result != cancelMenuItem) {
             Command c = null;
             if (result == selectMenuItem) {
                 c = getComponentSelectedCommand(((Form) d).getMenuBar().commandList);
                 if (c != null) {
-                    ActionEvent e = new ActionEvent(c);
+                    ActionEvent e = new ActionEvent(c,ActionEvent.Type.Command);
                     c.actionPerformed(e);
                 }
             } else {
@@ -725,7 +736,7 @@ public class MenuBar extends Container implements ActionListener {
                 if (!isTouchMenus()) {
                     c = result;
                     if (c != null) {
-                        ActionEvent e = new ActionEvent(c);
+                        ActionEvent e = new ActionEvent(c,ActionEvent.Type.Command);
                         c.actionPerformed(e);
                     }
                 }
@@ -1310,7 +1321,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1338,7 +1349,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int keyCode) {
         int commandBehavior = getCommandBehavior();
@@ -1407,7 +1418,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -1710,7 +1721,7 @@ public class MenuBar extends Container implements ActionListener {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected int getDragRegionStatus(int x, int y) {
         return DRAG_REGION_NOT_DRAGGABLE;

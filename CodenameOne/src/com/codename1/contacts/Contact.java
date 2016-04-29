@@ -28,7 +28,11 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 /**
- * This class represents a Contact information from the device Address Book
+ * <p>Represents a Contact entry from the device Address Book.<br>
+ * The sample below demonstrates listing all the contacts within the device with their photos</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
  * 
  * @author Chen
  */
@@ -91,7 +95,7 @@ public class Contact {
     public String getDisplayName() {
         if (displayName == null || "".equals(displayName)) {
             if (familyName != null && firstName != null) {
-                displayName = familyName + ", " + firstName;
+                displayName =  firstName + " " + familyName;
             } else if (getPrimaryPhoneNumber() != null) {
                 displayName = getPrimaryPhoneNumber();
             } else if (getPrimaryEmail() != null) {
@@ -100,6 +104,8 @@ public class Contact {
                 displayName = getFirstName();
             } else if (getFamilyName() != null) {
                 displayName = getFamilyName();
+            } else {
+                displayName = id;
             }
         }
         return displayName;
@@ -173,7 +179,7 @@ public class Contact {
      * @return the Contact primary email or null if not declared
      */
     public String getPrimaryEmail() {
-        if(primaryEmail == null) {
+        if(primaryEmail == null && emails != null) {
             Collection c = emails.values();
             if(c.size() > 0) {
                 return (String)c.iterator().next();
@@ -188,6 +194,12 @@ public class Contact {
      * @return the Contact primary phone number or null if not declared
      */
     public String getPrimaryPhoneNumber() {
+        if(primaryPhoneNumber == null && phoneNumbers != null) {
+            Collection c = phoneNumbers.values();
+            if(c.size() > 0) {
+                return (String)c.iterator().next();
+            }
+        }
         return primaryPhoneNumber;
     }
 

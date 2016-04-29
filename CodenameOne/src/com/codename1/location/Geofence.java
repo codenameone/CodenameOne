@@ -23,7 +23,11 @@
 package com.codename1.location;
 
 /**
- * This class represents a Geofence metadata
+ * <p>Metadata for geofencing support that allows tracking user location in the background while the app
+ * is inactive.<br>
+ * The sample below tracks location and posts a notification or shows a dialog based on the state of the app:</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
  *
  * @author Chen
  */

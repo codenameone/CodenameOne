@@ -27,6 +27,7 @@ package com.codename1.cloud;
  * are invoked on the EDT!
  *
  * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public interface CloudResponse<T> {
     /**

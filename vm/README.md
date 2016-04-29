@@ -4,7 +4,9 @@
 <img align="right" src="http://codenameone.com/img/parpar.png" height="250">
 ParparVM is the VM developed by Codename One to replace the defunct [XMLVM](http://xmlvm.org/) with which it was 
 originally built. We took our extensive experience both in JIT's and native OS development and built something
-that is both simple, concervative and performant. 
+that is both simple, conservative and performant. 
+
+ParparVM was designed as a client side VM and features a **concurrent GC** that doesn't block the current execution thread. In order to accomplish such concurrence a small penalty is paid during usage but this allows for smoother runtime.
 
 ## Usage
 The ByteCodeTranslator and JavaAPI projects are designed as a NetBeans project although it should be possible to work with any Java IDE or ant directly. It requires asm 5.0.3 which you can find in the [cn1-binaries](http://github.com/codenameone/cn1-binaries) project.
@@ -20,7 +22,7 @@ The main class name is expected to have a `public static void main(String[])` me
 
 ## Why Another VM for iOS?
 
-There are many VM's on the market and a few open source ones but none of the ones that translate to C are actively maintained.
+There are many VM's on the market and a few open source ones but none of the ones that translate to C are actively maintained. None of the other VM's have a non-blocking concurrent GC either at this time.
 
 [J2ObjC](https://github.com/google/j2objc) is an excellent tool for porting libraries to Objective-C but it isn't designed
 to be a full scale VM (no GC etc.).

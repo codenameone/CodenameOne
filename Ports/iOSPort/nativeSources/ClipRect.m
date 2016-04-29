@@ -170,20 +170,16 @@ static CGRect drawingRect;
             return;
         }
 #ifdef USE_ES2
-        // This is a hack!!!  I don't know why the clip needs to be one
-        // bigger in ES2 on each horizontal side, but it seems to .  R
-        // Requires more investigation
-        // https://code.google.com/p/codenameone/issues/detail?id=1223
-        clipX = x-1;
+        clipX = x;
         
-        clipW = width+1;
+        clipW = width;
         if (clipX<0){
             clipX=0;
             clipW=width;
         }
         
-        clipY = y-1;
-        clipH = height+1;
+        clipY = y;
+        clipH = height;
         if (clipY<0){
             clipY=0;
             clipH=height;

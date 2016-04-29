@@ -50,7 +50,7 @@ public class UIManager {
     private HashMap<String, Style> selectedStyles = new HashMap<String, Style>();
     private HashMap<String, Object> themeProps;
     private HashMap<String, Object> themeConstants = new HashMap<String, Object>();
-    static UIManager instance = new UIManager();
+    static UIManager instance;
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
     /**
@@ -86,6 +86,14 @@ public class UIManager {
     private EventDispatcher themelisteners;
 
     UIManager() {
+        // Lazy initialization of instance for js port compatibility.  We will
+        // do a double-lazy initialization to try to best prevent regressions
+        // from other projects that may be out of sync.  E.g. the Designer project
+        // uses the "instance" property directly.  This should guarantee that
+        // instance will be set
+        if (instance == null) {
+            instance = this;
+        }
         current = new DefaultLookAndFeel(this);    
         resetThemeProps(null);
     }
@@ -104,6 +112,9 @@ public class UIManager {
      * @return Instance of the ui manager
      */
     public static UIManager getInstance() {
+        if (instance == null) {
+            instance = new UIManager();
+        }
         return instance;
     }
 
@@ -311,6 +322,37 @@ public class UIManager {
         themeProps.put("dis#fgColor", disabledColor);
 
         // component specific settings
+        if (installedTheme == null || !installedTheme.containsKey("SignatureButton.derive")) {
+            themeProps.put("SignatureButton.align", centerAlign);
+            themeProps.put("SignatureButton.sel#derive", "SignatureButton");
+            themeProps.put("SignatureButton.press#derive", "SignatureButton");
+            themeProps.put("SignatureButton.dis#derive", "SignatureButton");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("ToastBar.derive")) {
+            themeProps.put("ToastBar.margin", "0,0,0,0");
+            themeProps.put("ToastBar.bgColor", "0");
+            themeProps.put("ToastBar.transparency", "200");
+            themeProps.put("ToastBar.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("ToastBar.border", Border.createEmpty());
+            themeProps.put("ToastBar.sel#derive", "ToastBar");
+            themeProps.put("ToastBar.press#derive", "ToastBar");
+            themeProps.put("ToastBar.dis#derive", "ToastBar");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("ToastBarMessage.derive")) {
+            
+            themeProps.put("ToastBarMessage.font", Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL));
+            themeProps.put("ToastBarMessage.transparency", "0");
+            themeProps.put("ToastBarMessage.fgColor", "FFFFFF");
+            themeProps.put("ToastBarMessage.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("ToastBarMessage.border", Border.createEmpty());
+            themeProps.put("ToastBarMessage.sel#derive", "ToastBarMessage");
+            themeProps.put("ToastBarMessage.press#derive", "ToastBarMessage");
+            themeProps.put("ToastBarMessage.dis#derive", "ToastBarMessage");
+        }
+        
+        
         if(installedTheme == null || !installedTheme.containsKey("Button.derive")) {
             themeProps.put("Button.border", Border.getDefaultBorder());
             themeProps.put("Button.padding", "4,4,4,4");
@@ -482,7 +524,9 @@ public class UIManager {
 
         if(installedTheme == null || !installedTheme.containsKey("Scroll.derive")) {
             themeProps.put("Scroll.margin", "0,0,0,0");
-            themeProps.put("Scroll.padding", "1,1,1,1");
+            int halfMM = Display.getInstance().convertToPixels(10, true) / 20;
+            halfMM = Math.max(1, halfMM);
+            themeProps.put("Scroll.padding", halfMM + "," + halfMM + "," + halfMM + "," + halfMM);
         }
 
         if(installedTheme == null || !installedTheme.containsKey("ScrollThumb.derive")) {
@@ -787,13 +831,28 @@ public class UIManager {
     
         if (installedTheme == null || !installedTheme.containsKey("AutoCompletePopup.derive")) {
             themeProps.put("AutoCompletePopup.transparency", "255");
+            themeProps.put("AutoCompletePopup.padding", "0,0,0,0");
             themeProps.put("AutoCompletePopup.border", Border.createLineBorder(1));       
         }
         if (installedTheme == null || !installedTheme.containsKey("AutoCompletePopup.sel#derive")) {
             themeProps.put("AutoCompletePopup.sel#transparency", "255");
+            themeProps.put("AutoCompletePopup.sel#padding", "0,0,0,0");
             themeProps.put("AutoCompletePopup.sel#border", Border.createLineBorder(1));
         }
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompleteList.derive")) {
+            themeProps.put("AutoCompleteList.margin", "1,1,1,1");
+            themeProps.put("AutoCompleteList.padding", "0,0,0,0");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompleteList.sel#derive")) {
+            themeProps.put("AutoCompleteList.sel#margin", "1,1,1,1");
+            themeProps.put("AutoCompleteList.sel#padding", "0,0,0,0");
+        }
+        if (installedTheme == null || !installedTheme.containsKey("AutoCompleteList.press#derive")) {
+            themeProps.put("AutoCompleteList.press#margin", "1,1,1,1");
+            themeProps.put("AutoCompleteList.press#padding", "0,0,0,0");
+        }
 
+        
         if (installedTheme == null || !installedTheme.containsKey("CommandList.derive")) {
             themeProps.put("CommandList.transparency", "255");
             themeProps.put("CommandList.border", Border.createLineBorder(1));       
@@ -940,7 +999,7 @@ public class UIManager {
         selectedStyles.clear();
         imageCache.clear();
         if (themelisteners != null) {
-            themelisteners.fireActionEvent(new ActionEvent(themeProps));
+            themelisteners.fireActionEvent(new ActionEvent(themeProps,ActionEvent.Type.Theme));
         }
         buildTheme(themeProps);
         current.refreshTheme(true);
@@ -1160,7 +1219,8 @@ public class UIManager {
     private int[] toIntArray(String str) {
         int[] retVal = new int[4];
         str = str + ",";
-        for (int i = 0; i < retVal.length; i++) {
+        int rlen = retVal.length;
+        for (int i = 0; i < rlen; i++) {
             retVal[i] = Integer.parseInt(str.substring(0, str.indexOf(",")));
             str = str.substring(str.indexOf(",") + 1, str.length());
         }
@@ -1170,7 +1230,8 @@ public class UIManager {
     private static Image parseImage(String value) throws IOException {
         int index = 0;
         byte[] imageData = new byte[value.length() / 2];
-        while (index < value.length()) {
+        int vlen = value.length();
+        while (index < vlen) {
             String byteStr = value.substring(index, index + 2);
             imageData[index / 2] = Integer.valueOf(byteStr, 16).byteValue();
             index += 2;
@@ -1300,7 +1361,8 @@ public class UIManager {
                 if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen; iter++) {
                         String val = tokenized[iter];
                         String actual = (String)bundle.get("@im-" + val);
                         // val can be null for builtin input mode types...
@@ -1336,7 +1398,8 @@ public class UIManager {
                 if(vkbInputMode != null && vkbInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
                     VirtualKeyboard.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen ; iter++) {
                         String val = tokenized[iter];
                         String[][] res = getInputMode("@vkb-", tokenized[iter], resourceBundle);
                         if(res != null) {
@@ -1348,7 +1411,8 @@ public class UIManager {
                 if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
                     String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
                     TextField.setDefaultInputModeOrder(tokenized);
-                    for(int iter = 0 ; iter < tokenized.length ; iter++) {
+                    int tlen = tokenized.length;
+                    for(int iter = 0 ; iter < tlen ; iter++) {
                         String val = tokenized[iter];
                         String actual = (String)resourceBundle.get("@im-" + val);
                         // val can be null for builtin input mode types...
@@ -1387,7 +1451,8 @@ public class UIManager {
 
     private String[] toStringArray(Vector v) {
         String[] arr = new String[v.size()];
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             arr[iter] = (String)v.elementAt(iter);
         }
         return arr;

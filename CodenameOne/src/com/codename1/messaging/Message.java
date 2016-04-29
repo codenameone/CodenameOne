@@ -29,7 +29,17 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Represents a message to be sent using underlying platform e-mail client.
+ * <p>Represents a message to be sent using underlying platform e-mail client or the cloud.<br>
+ * The code below demonstrates sending a simple message with attachments using the devices
+ * native email client:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js"></script>
+ * 
+ * <p>
+ * The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
+ * specific feature:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js"></script>
  * 
  * @author Chen
  */
@@ -80,8 +90,10 @@ public class Message {
     }
 
     /**
-     * Returns the attachment map which can be used to add multiple attachments
-     * @return a map of file name to mime type that can be used to add attachments
+     * Returns the attachment map which can be used to add multiple attachments.
+     * The path needs to point at a full absolute file URI within {@link com.codename1.io.FileSystemStorage},
+     * it will not work with {@link com.codename1.io.Storage} files!
+     * @return a map of full file paths to mime type that can be used to add attachments
      */
     public Map<String, String> getAttachments() {
         if(attachments == null) {
@@ -149,8 +161,10 @@ public class Message {
     
 
     /**
-     * Send an email message using the Codename One cloud to send the message, notice that this API
-     * will only work for pro accounts
+     * <p>Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts.</p>
+     * <script src="https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js"></script>
+     * 
      * @param sender the name of the sender, notice all email will arrive from Codename One to avoid spam issues
      * @param recipient the email for the recipient
      * @param recipientName the display name for the recipient
@@ -163,8 +177,10 @@ public class Message {
     }
 
     /**
-     * Send an email message using the Codename One cloud to send the message, notice that this API
-     * will only work for pro accounts
+     * <p>Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts.</p>
+     * <script src="https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js"></script>
+     * 
      * @param sender the name of the sender, notice all email will arrive from Codename One to avoid spam issues
      * @param recipient the email for the recipient
      * @param recipientName the display name for the recipient

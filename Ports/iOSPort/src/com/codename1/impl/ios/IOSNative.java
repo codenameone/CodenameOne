@@ -67,8 +67,6 @@ public final class IOSNative {
     native void nativeFillRoundRectGlobal(int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight);
     native void nativeFillArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
     native void nativeDrawArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
-    native void nativeFillArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
-    native void nativeDrawArcGlobal(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle);
     native void nativeDrawStringMutable(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawStringGlobal(int color, int alpha, long fontPeer, String str, int x, int y);
     native void nativeDrawImageMutable(long peer, int alpha, int x, int y, int width, int height);
@@ -413,8 +411,8 @@ public final class IOSNative {
 
     native String getUserAgentString();
     
-    native void openDatePicker(int type, long time, int x, int y, int w, int h);
-    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h);
+    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
+    native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
 
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
@@ -481,6 +479,13 @@ public final class IOSNative {
             float d0, float d1, float d2, float d3,
             int originX, int originY
     );
+    native void nativeSetTransformMutable( 
+            float a0, float a1, float a2, float a3, 
+            float b0, float b1, float b2, float b3,
+            float c0, float c1, float c2, float c3,
+            float d0, float d1, float d2, float d3,
+            int originX, int originY
+    );
     
     
     native boolean nativeIsTransformSupportedGlobal();
@@ -491,7 +496,9 @@ public final class IOSNative {
     
     native void drawTextureAlphaMask(long textureId, int color, int alpha, int x, int y, int w, int h);
     
-    
+    native void nativeFillShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr); 
+
+    native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
     
     // End paths
 
@@ -548,10 +555,33 @@ public final class IOSNative {
 
     native void cancelLocalNotification(String id);
 
+    native long gausianBlurImage(long peer, float radius);
+    
     /**
      * Removes an observer from NSNotificationCenter
      * @param nsObserverPeer The opaque Objective-C class that is being used as the observer.
      */
     native void removeNotificationCenterObserver(long nsObserverPeer);
+
+    /**
+     * This one simply hides the native editing component, but doesn't fold the 
+     * keyboard or remove the component.  It is used to bridge the gap in async
+     * edit mode between when the user clicks "next" and when the next 
+     * editing component is ready.
+     * @param b 
+     */
+    native void setNativeEditingComponentVisible(boolean b) ;
+
+    native void setNativeClippingMutable(int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr);
+
+    native void refreshContacts();
+
+    native void translatePoints(int pointSize, float tX, float tY, float tX0, float[] in, int srcPos, float[] out, int destPos, int numPoints);
+
+    native void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints);
+
+    native void updateNativeEditorText(String text);
+
+   
 
 }

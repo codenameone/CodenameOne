@@ -34,9 +34,17 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 
 /**
- * A floating hint is similar to a text field with a hint. However, when the text field has text in it the hint appears
- * above the text field instead including an animation when focus hits the text field see:
- * http://www.google.com/design/spec/components/text-fields.html#text-fields-floating-labels
+ * <p>A floating hint is similar to a text field with a hint. However, when the text field has text in it the hint appears
+ * above the text field instead including an animation when focus hits the text field see 
+ * <a href="http://www.google.com/design/spec/components/text-fields.html#text-fields-floating-labels"
+ * target="_blank">
+ * Googles take on this</a>.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/54e919b2be01561ac91c.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-floatinghint.png" alt="The FloatingHint component with one component that contains text and another that doesn't" />
+ * 
+ * <h4>The animation effect</h4>
+ * <img src="http://www.codenameone.com/img/blog/floatinghint.gif" alt="Animation" />
  *
  * @author Shai Almog
  */

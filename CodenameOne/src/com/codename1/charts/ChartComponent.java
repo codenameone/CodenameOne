@@ -41,7 +41,99 @@ import java.util.Queue;
 
 
 /**
- * A component for displaying a chart.
+ * <p>The top level component for displaying charts</p>
+ *         <p>
+        The <code>charts</code> package enables Codename One developers to add charts
+ * and visualizations to their apps without having to include external libraries
+ * or embedding web views. We also wanted to harness the new features in the
+ * graphics pipeline to maximize performance.</p>  
+ *       <h4>Device Support</h4>
+ * <p>
+ * Since the charts package makes use of 2D transformations and shapes, it
+ * requires some of the graphics features that are not yet available on all
+ * platforms. Currently the following platforms are supported:
+ * </p>
+ * <ol>
+ * <li>Simulator</li>
+ * <li>Android</li>
+ * <li>iOS</li>
+ * </ol>  
+ *       <h4>Features</h4>
+ * <ol>
+ * <li><strong>Built-in support for many common types of charts</strong>
+ * including bar charts, line charts, stacked charts, scatter charts, pie charts
+ * and more.</li>
+ * <li><strong>Pinch Zoom</strong> - The
+ * {@link com.codename1.charts,ChartComponent} class includes optional pinch
+ * zoom support.</li>
+ * <li><strong>Panning Support</strong> - The
+ * {@link com.codename1.charts,ChartComponent} class includes optional support
+ * for panning.</li>
+ * </ol>
+ *
+        <h4>Chart Types</h4>
+ * <p>
+ * The <code>com.codename1.charts</code> package includes models and renderers
+ * for many different types of charts. It is also extensible so that you can add
+ * your own chart types if required. The following screen shots demonstrate a
+ * small sampling of the types of charts that can be created.
+ * </p>
+ * <img src="https://www.codenameone.com/img/developer-guide/line_chart.png" alt="Line Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/line_chart_cubic_multi.png" alt="Cubic Line Charts">  *
+ *  <img src="https://www.codenameone.com/img/developer-guide/bar_chart.png" alt="Bar Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/bar_chart_stacked.png" alt="Stacked Bar Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/range_bar_chart.png" alt="Range Bar Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/pie_chart.png" alt="Pie Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/doughnut_chart.png" alt="Doughnut Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/scatter_chart.png" alt="Scatter Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/dial_chart.png" alt="Dial Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/combined.png" alt="Combined Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/bubble_chart.png" alt="Bubble Charts">
+ * <img src="https://www.codenameone.com/img/developer-guide/time_chart.png" alt="Time Charts">  
+ *       <table>
+ * <tbody><tr> <td class="icon"> <i class="fa icon-note" title="Note"></i> </td>
+ * <td class="content">
+ * The above screenshots were taken from the
+ * <a href="https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo">ChartsDemo
+ * app</a>. Y ou can start playing with this app by checking it out from our git
+ * repository. </td> </tr>
+ * </tbody>
+ * </table>  
+ *       <h4>How to Create A Chart</h4>
+ * <p>
+ * Adding a chart to your app involves four steps:</p>
+ * <ol>
+ * <li><strong>Build the model</strong>. You can construct a model (aka data
+ * set) for the chart using one of the existing model classes in the
+ * <code>com.codename1.charts.models</code> package. Essentially, this is just
+ * where you add the data that you want to display.</li>
+ * <li> <strong>Set up a renderer</strong>. You can create a renderer for your
+ * chart using one of the existing renderer classes in the
+ * <code>com.codename1.charts.renderers</code> package. The renderer allows you
+ * to specify how the chart should look. E.g. the colors, fonts, styles, to use.
+ * </li>
+ * <li> <strong>Create the Chart View</strong>. Use one of the existing
+ * <em>view</em> classes in the
+ * <code>com.codename1.charts.views</code> package.
+ * </li>
+ * <li> <strong>Create a {@link com.codename1.charts,ChartComponent} </strong>.
+ * In order to add your chart to the UI, you need to wrap it in a
+ * {@link com.codename1.charts,ChartComponent} object.</li>
+ * </ol>
+ *
+        <p>
+ * You can check out the
+ * <a href="https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo">ChartsDemo</a>
+ * app for specific examples, but here is a high level view of some code that
+ * creates a Pie Chart.</p>
+ *
+        <script src="https://gist.github.com/codenameone/c5b5bf22cd1db36d8c07.js"></script>
+ *
+        <p>
+ * The charts package is derived work from the excellent
+ * <a href="http://www.achartengine.org/">open source aChartEngine API.</a>
+ * </p>
+ *
  * @author shannah
  */
 public class ChartComponent extends Component {
@@ -86,6 +178,8 @@ public class ChartComponent extends Component {
      * the start of the pan.
      */
     private Transform dragTransformStart = null;
+    
+    private Transform tmpTransform = null;
     
     /**
      * The starting position of a pan operation.
@@ -159,11 +253,20 @@ public class ChartComponent extends Component {
         super.paint(g);
         boolean oldAntialias = g.isAntiAliased();
         g.setAntiAliased(true);
-        Transform oldTransform = null;
+        
+        boolean transformed = false;
         if ( getTransform() != null ){
-            oldTransform = g.getTransform();
+            transformed = true;
+            if (tmpTransform == null) {
+                tmpTransform = Transform.makeIdentity();
+            }
+            g.getTransform(tmpTransform);
             
-            currentTransform = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());
+            if (currentTransform == null) {
+                currentTransform = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());
+            } else {
+                currentTransform.setTranslation(getAbsoluteX(), getAbsoluteY());
+            }
             currentTransform.concatenate(transform);
             currentTransform.translate(-getAbsoluteX(), -getAbsoluteY());
             
@@ -175,8 +278,8 @@ public class ChartComponent extends Component {
         
         util.paintChart(g, chart, getBounds(), getAbsoluteX(), getAbsoluteY());
         
-        if ( oldTransform != null ){
-            g.setTransform(oldTransform);
+        if ( transformed){
+            g.setTransform(tmpTransform);
         }
         
         g.setAntiAliased(oldAntialias);
@@ -184,8 +287,8 @@ public class ChartComponent extends Component {
 
     /**
      * Converts screen coordinates to chart coordinates.
-     * @param x 
-     * @param y
+     * @param x screen x position
+     * @param y screen y position
      * @return The chart coordinate corresponding to the given screen coordinate.
      */
     public Point screenToChartCoord(int x, int y){
@@ -199,8 +302,13 @@ public class ChartComponent extends Component {
         return new Point(x-getAbsoluteX(), y-getAbsoluteY());
     }
     
-    
-    
+    /**
+     * Returns the screen position from a chart coordinate
+     *
+     * @param x the x position within the chart
+     * @param y the y position within the chart
+     * @return a position within the screen
+     */
     public Point chartToScreenCoord(int x, int y){
         x += getAbsoluteX();
         y += getAbsoluteY();
@@ -213,6 +321,11 @@ public class ChartComponent extends Component {
         return new Point(x, y);
     }
     
+    /**
+     * Converts a chart coordinate spaced shape to the same shape in the screen coordinate space
+     * @param s shape in screen coordinates
+     * @return same shape using chart space coordinates
+     */
     public Shape screenToChartShape(Shape s){
         GeneralPath p = new GeneralPath();
         Transform t = Transform.makeIdentity();
@@ -223,7 +336,12 @@ public class ChartComponent extends Component {
         p.append(s.getPathIterator(t), false);
         return p;
     }
-    
+        
+    /**
+     * Converts a screen coordinate spaced shape to the same shape in the chart  coordinate space
+     * @param s shape in chart  coordinates
+     * @return same shape using screen coordinate space
+     */
     public Shape chartToScreenShape(Shape s){
         GeneralPath p = new GeneralPath();
         Transform inverse = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());

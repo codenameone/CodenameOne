@@ -36,6 +36,7 @@ import java.util.Vector;
  * Seamlessly creates a cloud based searchable list model
  *
  * @author Shai Almog
+ * @deprecated the cloud storage API is no longer supported, we recommend switching to a solution such as parse4cn1
  */
 public class CloudListModel implements ListModel {
     
@@ -63,8 +64,8 @@ public class CloudListModel implements ListModel {
     
     /**
      * Creates a list model that shows all the cloud elements that have the given key matching
-     * the given value at the visibility scope listed bellow. This model can be further narrowed 
-     * down by using the filter functionality bellow.<br>
+     * the given value at the visibility scope listed below. This model can be further narrowed 
+     * down by using the filter functionality below.<br>
      * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
      * and caches data as needed.
      * 
@@ -107,15 +108,15 @@ public class CloudListModel implements ListModel {
         
     /**
      * Creates a list model that shows all the cloud elements that have the given key matching
-     * the given value at the visibility scope listed bellow. This model can be further narrowed 
-     * down by using the filter functionality bellow.<br>
+     * the given value at the visibility scope listed below. This model can be further narrowed 
+     * down by using the filter functionality below.<br>
      * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
      * and caches data as needed.
      * 
      * @param type the type of object shown on the list
      * @param visibilityScope the scope of the list (CloudObject.ACCESS_* values)
      * @param index the index by which we limit the entries
-     * @param value the queryValue for the given index
+     * @param queryValue the queryValue for the given index
      * @param ascending whether the sort is ascending or descending 
      */
     public CloudListModel(String type, int visibilityScope, int index, String queryValue, boolean ascending) {
@@ -235,7 +236,7 @@ public class CloudListModel implements ListModel {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getItemAt(int index) {
         if(keys != null && index < keys.length && index > -1){
@@ -299,7 +300,7 @@ public class CloudListModel implements ListModel {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSize() {
         if(keys == null) {
@@ -358,14 +359,14 @@ public class CloudListModel implements ListModel {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getSelectedIndex() {
         return selectedIndex;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setSelectedIndex(int index) {
         int oldIndex = selectedIndex;
@@ -374,28 +375,28 @@ public class CloudListModel implements ListModel {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addDataChangedListener(DataChangedListener l) {
         modelListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeDataChangedListener(DataChangedListener l) {
         modelListener.removeListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
@@ -404,7 +405,7 @@ public class CloudListModel implements ListModel {
     /**
      * <b>Notice</b> this method does NOT commit the data, after committing the data
      * the cache MUST be cleared!
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addItem(Object item) {
         CloudObject cld = (CloudObject)item;
@@ -417,7 +418,7 @@ public class CloudListModel implements ListModel {
     /**
      * <b>Notice</b> this method does NOT commit the data, after committing the data
      * the cache MUST be cleared!
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeItem(int index) {
         Object o = getItemAt(index);

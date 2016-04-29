@@ -182,9 +182,6 @@
               </Properties>
             </Component>
             <Component class="javax.swing.JTextField" name="componentUIID">
-              <Properties>
-                <Property name="editable" type="boolean" value="false"/>
-              </Properties>
             </Component>
             <Component class="javax.swing.JCheckBox" name="componentSelected">
               <Properties>

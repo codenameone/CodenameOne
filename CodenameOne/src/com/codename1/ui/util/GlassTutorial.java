@@ -41,10 +41,10 @@ import java.util.Vector;
  * but could be on any device and points to/circles components within the UI
  * coupled with explanation of what they do and a tint of the screen.
  * It is implemented as a GlassPane on top of a Form which is automatically
- * removed when a user touches the screen or presses a button.<br/>
+ * removed when a user touches the screen or presses a button.<br>
  * To position elements within the glass tutorial the elements must be 
  * associated with a component instance of the underlying UI and positioned 
- * relatively to said component.<br/>
+ * relatively to said component.<br>
  * The GlassTutorial uses the "GlassTutorial" UIID to paint itself it then paints
  * the hint components in their proper places.
  * 
@@ -61,7 +61,7 @@ public class GlassTutorial implements Painter {
      * is indicated with border layout attributes. Notice you can place multiple components on a single 
      * element and they will be rendered in order e.g. a component with a border can be used to "circle"
      * the destination by placing it in the CENTER position and another arrow with text can be places in 
-     * the south position bellow.
+     * the south position below.
      * 
      * @param hintComponent The component that would be renderered in the given position
      * @param destinationComponent the "hinted" component over which the hint will show
@@ -99,7 +99,7 @@ public class GlassTutorial implements Painter {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Rectangle rect) {
         if(internal == null) {

@@ -1420,7 +1420,7 @@ static int getColor(String colorStr,int defaultColor) {
 
     /**
      *
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public String toString() {
         return toString("");
@@ -1519,7 +1519,7 @@ static int getColor(String colorStr,int defaultColor) {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void removeChildAt(int index) { // Overiding is done to clear the associated components vector of the child
         HTMLElement child=(HTMLElement)getChildAt(index);

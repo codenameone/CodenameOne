@@ -40,14 +40,14 @@ import com.codename1.ui.events.ActionEvent;
 public class DefaultHTMLCallback implements HTMLCallback {
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void titleUpdated(HTMLComponent htmlC, String title) {
         // do nothing
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         System.out.println(description);
@@ -55,70 +55,70 @@ public class DefaultHTMLCallback implements HTMLCallback {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
         // do nothing
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public String fieldSubmitted(HTMLComponent htmlC, TextArea ta, String actionURL, String id, String value, int type, String errorMsg) {
         return value; // Returns the same value
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public String getAutoComplete(HTMLComponent htmlC, String actionURL, String id) {
         return null; // i.e. no auto complete value was found
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public int getLinkProperties(HTMLComponent htmlC, String url) {
         return LINK_REGULAR; // Regular link - not visited and not forbidden
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean linkClicked(HTMLComponent htmlC, String url) {
         return true;
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void actionPerformed(ActionEvent evt, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void focusGained(Component cmp, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void focusLost(Component cmp, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void selectionChanged(int oldSelected, int newSelected, HTMLComponent htmlC, List list, HTMLElement element) {
         // do nothing
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public void dataChanged(int type, int index, HTMLComponent htmlC, TextField textField, HTMLElement element) {
         // do nothing

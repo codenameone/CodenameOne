@@ -763,6 +763,15 @@ JAVA_OBJECT java_lang_Class_newInstanceImpl___R_java_lang_Object(CODENAME_ONE_TH
     return f(threadStateData);
 }
 
+JAVA_OBJECT java_lang_Enum_valueOf___java_lang_Class_java_lang_String_R_java_lang_Enum(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT value) {
+    struct clazz* clz = (struct clazz*)cls;
+    enumValueOfFunctionPointer f = clz->enumValueOfFp;
+    if (f == 0) {
+        return JAVA_NULL;
+    }
+    return f(threadStateData, value);
+}
+
 JAVA_OBJECT java_lang_Object_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     char s[32];
     sprintf(s, "Obj[%i]", ((int)obj));
@@ -1186,25 +1195,13 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
     threadStateData->callStackOffset++;
 }
 
-void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int stackPointer, int cn1SizeOfLocals, struct elementStruct* stack, struct elementStruct* locals) {
-    /*for(int iter = 0 ; iter < stackPointer ; iter++) {
-        safeRelease(threadStateData, &stack[iter]);
-    }
-    for(int iter = 0 ; iter < cn1SizeOfLocals ; iter++) {
-        safeRelease(threadStateData, &locals[iter]);
-    }*/
+void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
     threadStateData->callStackOffset--;
 }
 
-void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int stackPointer, int cn1SizeOfLocals, struct elementStruct* stack, struct elementStruct* locals, int methodBlockOffset) {
+void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset) {
     threadStateData->tryBlockOffset = methodBlockOffset;
-    /*for(int iter = 0 ; iter < stackPointer ; iter++) {
-        safeRelease(threadStateData, &stack[iter]);
-    }
-    for(int iter = 0 ; iter < cn1SizeOfLocals ; iter++) {
-        safeRelease(threadStateData, &locals[iter]);
-    }*/
     threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
     threadStateData->callStackOffset--;
 }

@@ -43,11 +43,26 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
 /**
- * The tree component allows constructing simple tree component hierechies that can be expaneded seamingly
- * with no limit. The tree is bound to a model that can provide data with free form depth such as file system
- * or similarly structured data.
- * To customize the look of the tree the component can be derived and component creation can be replaced.
+ * <p>The {@code Tree} component allows constructing simple tree component hierarchies that can be expanded 
+ * seamlessly with no limit. The tree is bound to a model that can provide data with free form depth such as file system
+ * or similarly structured data.<br>
+ * To customize the look of the tree the component can be derived and component creation can be replaced.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/870d4412694bca3092c4.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/tree.png" alt="Tree sample code" />
+ * 
+ * <p>
+ * And heres a more "real world" example showing an XML hierarchy in a {@code Tree}:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
  *
+ * <p>
+ * Another real world example showing the {@link com.codename1.io.FileSystemStorage} as a tree:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>            
+ * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
+ * 
  * @author Shai Almog
  */
 public class Tree extends Container {
@@ -105,16 +120,20 @@ public class Tree extends Container {
         public Vector getChildren(Object parent) {
             if(parent == null) {
                 Vector v = new Vector();
-                for(int iter = 0 ; iter < arr[0].length ; iter++) {
+                int a0len = arr[0].length;
+                for(int iter = 0 ; iter < a0len ; iter++) {
                     v.addElement(arr[0][iter]);
                 }
                 return v;
             }
+            int alen = arr.length;
+            int aolen = arr[0].length;
             Vector v = new Vector();
-            for(int iter = 0 ; iter < arr[0].length ; iter++) {
+            for(int iter = 0 ; iter < aolen ; iter++) {
                 if(parent == arr[0][iter]) {
-                    if(arr.length > iter + 1 && arr[iter + 1] != null) {
-                        for(int i = 0 ; i < arr[iter + 1].length ; i++) {
+                    if(alen > iter + 1 && arr[iter + 1] != null) {
+                        int ailen = arr[iter + 1].length;
+                        for(int i = 0 ; i < ailen ; i++) {
                             v.addElement(arr[iter + 1][i]);
                         }
                     }
@@ -130,28 +149,28 @@ public class Tree extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"data"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[][]"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("data")) {
@@ -161,7 +180,7 @@ public class Tree extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("data")) {
@@ -328,7 +347,8 @@ public class Tree extends Container {
      */
     public void expandPath(boolean animate, Object... path) {
         Container c = this;
-        for(int iter = 0 ; iter < path.length ; iter++) {
+        int plen = path.length;
+        for(int iter = 0 ; iter < plen ; iter++) {
             c = expandPathNode(animate, c, path[iter]);
         }
     }
@@ -339,10 +359,11 @@ public class Tree extends Container {
      */
     public void collapsePath(Object... path) {
         Container c = this;
-        for(int iter = 0 ; iter < path.length - 1; iter++) {
+        int plen = path.length;
+        for(int iter = 0 ; iter < plen - 1; iter++) {
             c = expandPathNode(isInitialized(), c, path[iter]);
         }        
-        collapsePathNode(c, path[path.length - 1]);
+        collapsePathNode(c, path[plen - 1]);
     }
     
     private void collapseNode(Component c) {
@@ -513,7 +534,7 @@ public class Tree extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         Dimension d = super.calcPreferredSize();
@@ -547,7 +568,7 @@ public class Tree extends Container {
 
         public void actionPerformed(ActionEvent evt) {
             if(current != null) {
-                leafListener.fireActionEvent(new ActionEvent(current));
+                leafListener.fireActionEvent(new ActionEvent(current,ActionEvent.Type.Other));
                 return;
             }
             Component c = (Component)evt.getSource();

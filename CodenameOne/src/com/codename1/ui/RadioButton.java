@@ -32,9 +32,13 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * RadioButton is a {@link Button} that maintains a selection state exclusively
- * within a specific {@link ButtonGroup}
+ * <p>RadioButton is a {@link Button} that maintains a selection state exclusively
+ * within a specific {@link ButtonGroup}. Check out {@link com.codename1.ui.CheckBox} for
+ * a looser selection approach. Both components support a toggle button
+ * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.</p>
  * 
+ * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
  * @author Chen Fishbein
  */
 public class RadioButton extends Button {
@@ -74,6 +78,30 @@ public class RadioButton extends Button {
         bg.add(rb);
         rb.setToggle(true);
         return rb;
+    }
+
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param text the text for the button
+     * @param bg the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(String text, ButtonGroup bg) {
+        return createToggle(text, null, bg);
+    }
+    
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param icon the icon for the button
+     * @param bg the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(Image icon, ButtonGroup bg) {
+        return createToggle(null, icon, bg);
     }
     
     /**
@@ -119,7 +147,7 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
@@ -143,7 +171,7 @@ public class RadioButton extends Button {
     
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "Radio Button " + getText();
@@ -191,7 +219,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void released(int x, int y) {
         // prevent the radio button from being "turned off"
@@ -202,7 +230,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(isToggle()) {
@@ -213,7 +241,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getRadioButtonPreferredSize(this);
@@ -229,7 +257,7 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void fireActionEvent() {
         if(group != null) {
@@ -297,21 +325,21 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"selected"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {Boolean.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -325,7 +353,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -342,7 +370,7 @@ public class RadioButton extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("selected")) {
@@ -355,7 +383,7 @@ public class RadioButton extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("selected")) {

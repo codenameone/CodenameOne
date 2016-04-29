@@ -40,7 +40,7 @@ public class GroupConstraint implements Constraint {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean isValid(Object value) {
@@ -54,7 +54,7 @@ public class GroupConstraint implements Constraint {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public String getDefaultFailMessage() {

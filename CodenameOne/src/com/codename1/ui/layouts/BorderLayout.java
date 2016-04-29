@@ -31,13 +31,48 @@ import com.codename1.ui.plaf.Style;
 import java.util.HashMap;
 
 /**
- * A border layout lays out a container, arranging and resizing its 
+ * <p>A border layout lays out a container, arranging and resizing its 
  * components to fit in five regions: north, south, east, west, and center. 
  * Each region may contain no more than one component, and is identified by a 
  * corresponding constant: NORTH, SOUTH, EAST, WEST, and CENTER. 
  * When adding a component to a container with a border layout, use one of 
- * these five constants.
+ * these five constants.</p>
+ * <p>
+ * The border layout scales all of the components within it to match the available 
+ * constraints. The NORTH &amp; SOUTH components use their preferred height but
+ * are stretched to take up the full width available. The EAST &amp; WEST do the same
+ * for the reverse axis however they leave room for the NORTH/SOUTH entries if they
+ * are defined.<br>
+ * The CENTER constraint will take up the rest of the available space regardless of its preferred
+ * size. This is normally very useful, however in some cases we would prefer that the center
+ * component will actually position itself in the middle of the available space. For this we have
+ * the <code>setCenterBehavior</code> method.
+ * </p>
+ * <p>
+ * Because of its scaling behavior scrolling a border layout makes no sense. However it is a 
+ * common mistake to apply a border layout to a scrollable container or trying to make a border
+ * layout scrollable. That is why the {@link com.codename1.ui.Container} class explicitly blocks
+ * scrolling on a BorderLayout.<br>
+ * Typical usage of this class:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/23e642b1a749e2f37e68.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/border-layout.png" alt="Border Layout" />
  *
+ * <p>
+ * When defining the center behavior we can get very different results:
+ * </p>
+ *<script src="https://gist.github.com/codenameone/108aa105386ed7c340ad.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/border-layout-center.png" alt="Border Layout Center" />
+ * 
+ * <p>Notice that in the case of RTL (right to left language also known as bidi) the
+ * EAST and WEST values are implicitly reversed as shown in this image:
+ * </p>
+ * <img src="https://www.codenameone.com/img/developer-guide/border-layout-RTL.png" alt="Border Layout bidi/RTL" />
+ * 
+ * <p>
+ * You can read further in the <a href="https://www.codenameone.com/manual/basics.html#_border_layout">BorderLayout section in the developer guide</a>.
+ * </p>
+ * 
  * @author Nir Shabi, Shai Almog
  */
 public class BorderLayout extends Layout {
@@ -65,6 +100,7 @@ public class BorderLayout extends Layout {
      * Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
      * The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
      * a layered effect
+     * @deprecated Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
      */
     public static final int CENTER_BEHAVIOR_TOTAL_BELLOW = 3;
 
@@ -123,7 +159,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void addLayoutComponent(Object name, Component comp, Container c) {
         // helper check for a common mistake...
@@ -159,7 +195,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void removeLayoutComponent(Component comp) {
         if (comp == portraitCenter) {
@@ -199,7 +235,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void layoutContainer(Container target) {
         Style s = target.getStyle();
@@ -358,7 +394,7 @@ public class BorderLayout extends Layout {
     private Dimension dim = new Dimension(0, 0);
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Dimension getPreferredSize(Container parent) {
         dim.setWidth(0);
@@ -481,7 +517,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "BorderLayout";
@@ -518,7 +554,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         if(super.equals(o) && centerBehavior == ((BorderLayout)o).centerBehavior) {
@@ -575,7 +611,7 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOverlapSupported(){
         return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW;
@@ -598,14 +634,14 @@ public class BorderLayout extends Layout {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isConstraintTracking() {
         return false;
     }    
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean obscuresPotential(Container parent) {
         return getCenter() != null;
@@ -618,6 +654,26 @@ public class BorderLayout extends Layout {
      */
     public static Container center(Component center) {
         return Container.encloseIn(new BorderLayout(), center, BorderLayout.CENTER);
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerCenter(Component center) {
+        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER), center, BorderLayout.CENTER);
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_CENTER_ABSOLUTE} constraint applied
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerAbsolute(Component center) {
+        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE), center, BorderLayout.CENTER);
     }
 
     /**

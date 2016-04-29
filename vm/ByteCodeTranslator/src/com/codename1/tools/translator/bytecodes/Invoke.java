@@ -41,7 +41,8 @@ public class Invoke extends Instruction {
     private String name;
     private String desc;
     private boolean itf;
-    private String[] literalArgs;
+    private char[] stackInputTypes;
+    private char[] stackOutputTypes;
     
     
     public Invoke(int opcode, String owner, String name, String desc, boolean itf) {
@@ -51,6 +52,23 @@ public class Invoke extends Instruction {
         this.desc = desc;
         this.itf = itf;
     }
+    
+    String getOwner() {
+        return owner;
+    }
+    
+    String getName() {
+        return name;
+    }
+    
+    String getDesc() {
+        return desc;
+    }
+    
+    boolean isItf() {
+        return itf;
+    }
+    
 
     public boolean isMethodUsed(String desc, String name) {
         return this.desc.equals(desc) && name.equals(name);
@@ -144,15 +162,11 @@ public class Invoke extends Instruction {
         bld.append("__");
         ArrayList<String> args = new ArrayList<String>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
-        int numLiteralArgs = this.getNumLiteralArgs();
-        if (numLiteralArgs > 0) {
-            b.append("/* INVOKE WITH LITERAL ARGS OPT*/");
-        }
         boolean noPop = false;
         if(returnVal == null) {
             b.append(bld);
         } else {
-            if(args.size() - numLiteralArgs == 0 && opcode == Opcodes.INVOKESTATIC) {
+            if(args.size() == 0 && opcode == Opcodes.INVOKESTATIC) {
                 // special case for static method
                 if(returnVal.equals("JAVA_OBJECT")) {
                     b.append("PUSH_OBJ");
@@ -192,8 +206,8 @@ public class Invoke extends Instruction {
         
         
         if(opcode != Opcodes.INVOKESTATIC) {
-            b.append(", stack[stackPointer - ");
-            b.append(args.size() + 1 - numLiteralArgs);
+            b.append(", SP[-");
+            b.append(args.size() + 1);
             b.append("].data.o");
         }
         int offset = args.size();
@@ -202,15 +216,13 @@ public class Invoke extends Instruction {
         for(String a : args) {
             
             b.append(", ");
-            if (literalArgs != null && literalArgs[argIndex] != null) {
-                b.append(literalArgs[argIndex]);
-            } else {
-                b.append("stack[stackPointer - ");
-                b.append(offset);
-                b.append("].data.");
-                b.append(a);
-                offset--;
-            }
+            
+            b.append("SP[-");
+            b.append(offset);
+            b.append("].data.");
+            b.append(a);
+            offset--;
+            
             argIndex++;
         }
         if(noPop) {
@@ -220,32 +232,32 @@ public class Invoke extends Instruction {
         if(returnVal != null) {
             b.append(");\n");
             if(opcode != Opcodes.INVOKESTATIC) {
-                if(args.size() - numLiteralArgs > 0) {
-                    b.append("    stackPointer -= ");
-                    b.append(args.size() - numLiteralArgs);
+                if(args.size() > 0) {
+                    b.append("    SP-=");
+                    b.append(args.size());
                     b.append(";\n");
                 }
             } else {
-                if(args.size() - numLiteralArgs > 1) {
-                    b.append("    stackPointer -= ");
-                    b.append(args.size() - numLiteralArgs - 1);
+                if(args.size() > 1) {
+                    b.append("    SP-=");
+                    b.append(args.size() - 1);
                     b.append(";\n");
                 }
             }
             if(returnVal.equals("JAVA_OBJECT")) {
-                b.append("    stack[stackPointer - 1].data.o = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_OBJECT; }\n");
+                b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
             } else {
                 if(returnVal.equals("JAVA_INT")) {
-                    b.append("    stack[stackPointer - 1].data.i = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_INT; }\n");
+                    b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
                 } else {
                     if(returnVal.equals("JAVA_LONG")) {
-                        b.append("    stack[stackPointer - 1].data.l = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_LONG; }\n");
+                        b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
                     } else {
                         if(returnVal.equals("JAVA_DOUBLE")) {
-                            b.append("    stack[stackPointer - 1].data.d = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_DOUBLE; }\n");
+                            b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
                         } else {
                             if(returnVal.equals("JAVA_FLOAT")) {
-                                b.append("    stack[stackPointer - 1].data.f = tmpResult; stack[stackPointer - 1].type = CN1_TYPE_FLOAT; }\n");
+                                b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
                             } else {
                                 throw new UnsupportedOperationException("Unknown type: " + returnVal);
                             }
@@ -266,15 +278,15 @@ public class Invoke extends Instruction {
         b.append("); ");
         int val; 
         if(opcode != Opcodes.INVOKESTATIC) {
-            val = args.size() + 1 - numLiteralArgs;
+            val = args.size() + 1;
         } else {
-            val = args.size() - numLiteralArgs;
+            val = args.size();
         }
         if(val > 0) {
             /*b.append("popMany(threadStateData, ");            
             b.append(val);
             b.append(", stack, &stackPointer); \n"); */
-            b.append("    stackPointer -= ");
+            b.append("    SP-= ");
             b.append(val);
             b.append(";\n");
         } else {
@@ -286,27 +298,64 @@ public class Invoke extends Instruction {
     public List<ByteCodeMethodArg> getArgs() {
         return Util.getMethodArgs(desc);
     }
-    
-    public void setLiteralArg(int index, String arg) {
-        if (literalArgs == null) {
-            literalArgs = new String[getArgs().size()];
-        }
-        if (index >= literalArgs.length) {
-            throw new RuntimeException("Attempt to set literal arg "+index+" on method invocation that only takes "+literalArgs.length+" args.  Method: "+owner+"."+name+" "+desc);
-        }
-        literalArgs[index] = arg;
-    }
-    
-    private int getNumLiteralArgs() {
-        if (literalArgs == null) {
-            return 0;
-        }
-        int count = 0;
-        for (int i=0; i < literalArgs.length; i++) {
-            if (literalArgs[i] != null) {
-                count++;
+
+    @Override
+    public char[] getStackInputTypes() {
+        if (stackInputTypes == null) {
+            List<ByteCodeMethodArg> args = getArgs();
+            int thisArg = 0;
+            if (opcode != Opcodes.INVOKESTATIC) {
+                thisArg++;
+                
+            }
+            stackInputTypes = new char[args.size() + thisArg];
+            if (opcode != Opcodes.INVOKESTATIC) {
+                stackInputTypes[0] = 'o';
+            }
+            int len = args.size();
+            for (int i=0; i<len; i++) {
+                stackInputTypes[i+thisArg] = args.get(i).getQualifier();
             }
         }
-        return count;
+        return stackInputTypes;
     }
+
+    @Override
+    public char[] getStackOutputTypes() {
+        if (stackOutputTypes == null) {
+            String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>());
+            if (returnVal == null) {
+                stackOutputTypes = new char[0];
+            } else {
+                stackOutputTypes = new char[1];
+                if(returnVal.equals("JAVA_OBJECT")) {
+                    stackOutputTypes[0] = 'o';
+                } else {
+                    if(returnVal.equals("JAVA_INT")) {
+                        stackOutputTypes[0] = 'i';
+                    } else {
+                        if(returnVal.equals("JAVA_LONG")) {
+                            stackOutputTypes[0] = 'l';
+                        } else {
+                            if(returnVal.equals("JAVA_DOUBLE")) {
+                                stackOutputTypes[0] = 'd';
+                            } else {
+                                if(returnVal.equals("JAVA_FLOAT")) {
+                                    stackOutputTypes[0] = 'f';
+                                } else {
+                                    throw new UnsupportedOperationException("Unknown type: " + returnVal);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return stackOutputTypes;
+    }
+    
+    
+    
+    
+    
 }

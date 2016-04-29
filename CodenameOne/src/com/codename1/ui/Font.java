@@ -24,43 +24,45 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
- * A simple abstraction of platform fonts and library fonts that enables the
- * library to use more elaborate fonts unsupported by a specific device.
- * This abstraction also supports bitmap fonts using an Ant task (more details
- * about the unifier are explained in the javadoc overview document).
- * <p>A bitmap font can be created manually but that is tedious, normally you would use
- * the Ant task as illustrated bellow to produce a resource file containing
- * the supported bitmap font. For further detail read the overview document and 
- * {@link com.codename1.ui.util.Resources}.
-<pre>
-&lt;target name="pre-init"&gt;
-     &lt;taskdef classpath="ImageUnifier.jar" classname="com.sun.jwt.resource.Builder" name="build" /&gt;
-     &lt;build dest="src/font.res"&gt;
-        &lt;font src="images/arial.ttf" bold="true" italic="true" size="11" /&gt;
-        &lt;font logicalName="Dialog" /&gt;
-    &lt;/build&gt;
-&lt;/target&gt;
-</pre>
- * <p>The following attributes can be expressed for a font ant task:
+ * <p>Codename One currently supports 3 font types:</p>
  * <ul>
- * <li>name - name for the font to load from the resource file (optional: defaults to logical name or file name).
- * <li>charset - defaults to the English alphabet, numbers and common signs. 
- * Should contain a list of all characters that should be supported by a font. E.g. if a font would always be
- * used for uppercase letters then it would save space to define the charset as: {@code "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
- * <li>src - font file in the case of using a file, defaults to TrueType font
- * <li>size - floating point size of the font
- * <li>bold - defaults to false indicates if the font should be bold
- * <li>italic - defaults to false indicates if the font should be italic
- * <li>trueType - defaults to true, relevant only when src is used. If set to false type 1 fonts are assumed.
- * <li>antiAliasing - defaults to true otherwise fonts will be aliased
- * <li>logicalName - logical name of the font as specified by java.awt.Font in Java SE: 
- * {@code Dialog, DialogInput, Monospaced, Serif, or SansSerif }
+ *      <li><b>System fonts</b> - these are very simplistic builtin fonts. They work on all platforms and come 
+ *                  in one of 3 sizes. However, they are ubiquitous and work in every platform in all languages.
+ *                    A system font can be created using {@link Font#createSystemFont(int, int, int)}.</li>
+ *
+ *      <li><b>TTF files</b> - you can just place a TTF file in the src directory of the project and it will appear in 
+ *                  the Codename One Designer as an option. You can load such a font using {@link Font#createTrueTypeFont(java.lang.String, java.lang.String)}.</li>
+ *      <li><b>Native fonts</b> - these aren't supported on all platforms but generally they allow you to use a set 
+ *                  of platform native good looking fonts. E.g. on Android the devices Roboto font will be used and on 
+ *                  iOS Helvetica Neue will be used. You can load such a font using {@link Font#createTrueTypeFont(java.lang.String, java.lang.String)}.</li>
  * </ul>
+ * <p>
+ *    <b>WARNING:</b> If you use a TTF file <b>MAKE SURE</b> not to delete the file when there <b>MIGHT</b> 
+ *          be a reference to it. This can cause hard to track down issues!<br />
+ *   <b>IMPORTANT:</b> due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it. 
+ *          In the simulator you will see Roboto as the fallback in some cases and not the device font unless you 
+ *          are running on a Mac. Notice that the Roboto font from Google doesn't support all languages and thus
+ *          special characters might not work on the simulator but would work on the device.
+ * </p>
+ * 
+ * <p>
+ * The sample code below demonstrates a catalog of available fonts, the scr
+ * </p>
+ * <script src="https://gist.github.com/codenameone/1081b77246b8485856be.js"></script>
+ * <h4>The demo code on the iPad simulator on a Mac</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/theme-font-catalog.png" alt="The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC" />
+ * 
+ * <h4>The demo code on an Android 5.1 OPO device (OnePlus One)</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/theme-font-catalog-opo.png" alt="The same demo running on a OnePlus One device with Android 5.1" />
+ * 
+ * <p>
+ *    The Font class also supports bitmap fonts but this support is strictly aimed at legacy applications. We no longer
+ * maintain that functionality.
+ * </p>
  */
 public class Font {
     /**
@@ -123,6 +125,13 @@ public class Font {
 
     private boolean ttf;
     
+    private float pixelSize=-1;	// for derived fonts only, the size that was requested
+    
+    private String fontUniqueId;
+
+    private static HashMap<String, Font> derivedFontCache = new HashMap<String, Font>();
+    private static float fontReturnedHeight;
+    
     /**
      * Creates a new Font
      */
@@ -169,7 +178,7 @@ public class Font {
      * a file
      */
     public static boolean isTrueTypeFileSupported() {
-        return Display.getInstance().getImplementation().isTrueTypeSupported();
+        return Display.impl.isTrueTypeSupported();
     }
 
     /**
@@ -180,7 +189,7 @@ public class Font {
      * user submitted string
      */
     public static boolean isCreationByStringSupported() {
-        return Display.getInstance().getImplementation().isLookupFontSupported();
+        return Display.impl.isLookupFontSupported();
     }
 
     /**
@@ -189,29 +198,34 @@ public class Font {
      * @return true if the "native:" prefix is supported by loadTrueTypeFont
      */
     public static boolean isNativeFontSchemeSupported() {
-        return Display.getInstance().getImplementation().isNativeFontSchemeSupported();
+        return Display.impl.isNativeFontSchemeSupported();
     }
     
     /**
      * Creates a true type font with the given name/filename (font name might be different from the file name
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
-     * order to be detectable. The file name should contain no slashes or any such value.<br />
+     * order to be detectable. The file name should contain no slashes or any such value.<br>
      * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
-     * to use the font name matching the weight, so the weight argument to derive will be ignored!<br />
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!<br>
      * This system also supports a special "native:" prefix that uses system native fonts e.g. HelveticaNeue
      * on iOS and Roboto on Android. It supports the following types:
      * native:MainThin, native:MainLight, native:MainRegular, native:MainBold, native:MainBlack,
      * native:ItalicThin, native:ItalicLight, native:ItalicRegular, native:ItalicBold, native:ItalicBlack.
      * <b>Important</b> due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it.
-     * In the simulator you will always see Roboto and not the device font
+     * In the simulator you will see Roboto and not the device font unless you are running on a Mac
      * 
      * @param fontName the name of the font
      * @param fileName the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
      * @return the font object created or null if true type fonts aren't supported on this platform
      */
     public static Font createTrueTypeFont(String fontName, String fileName) {
+        String alreadyLoaded = fileName + "_" + fontReturnedHeight + "_"+ Font.STYLE_PLAIN;
+        Font f = derivedFontCache.get(alreadyLoaded);
+        if(f != null) {
+            return f;
+        }
         if(fontName.startsWith("native:")) {
-            if(!Display.getInstance().getImplementation().isNativeFontSchemeSupported()) {
+            if(!Display.impl.isNativeFontSchemeSupported()) {
                 return null;
             }
         } else {
@@ -219,18 +233,22 @@ public class Font {
                 throw new IllegalArgumentException("The font file name must be relative to the root and end with ttf: " + fileName);
             }
         }
-        Object font = Display.getInstance().getImplementation().loadTrueTypeFont(fontName, fileName);
+        Object font = Display.impl.loadTrueTypeFont(fontName, fileName);
         if(font == null) {
             return null;
         }
-        Font f = new Font(font);
+        f = new Font(font);
         f.ttf = true;
+        f.fontUniqueId = fontName;
+        float h = f.getHeight();
+        fontReturnedHeight = h;
+        derivedFontCache.put(fileName + "_" + h + "_"+ Font.STYLE_PLAIN, f);
         return f;
     }
     
     /**
      * Creates a font based on this truetype font with the given pixel, <b>WARNING</b>! This method
-     * will only work in the case of truetype fonts!<br/>
+     * will only work in the case of truetype fonts!<br>
      * <b>Important</b> some platforms e.g. iOS don't support changing the weight of the font and require you 
      * to use the font name matching the weight, so the weight argument to derive will be ignored!
      * @param sizePixels the size of the font in pixels
@@ -238,11 +256,37 @@ public class Font {
      * @return scaled font instance
      */
     public Font derive(float sizePixels, int weight) {
-        Font f = new Font(Display.getInstance().getImplementation().deriveTrueTypeFont(font, sizePixels, weight));
-        f.ttf = true;
-        return f;
+        if(fontUniqueId != null) {
+            // derive should recycle instances of Font to allow smarter caching and logic on the native side of the fence
+            String key = fontUniqueId + "_" + sizePixels + "_"+ weight;
+            Font f = derivedFontCache.get(key);
+            if(f != null) {
+                return f;
+            }
+            f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+            f.pixelSize = sizePixels;
+            f.ttf = true;
+            derivedFontCache.put(key, f);
+            return f;
+        } else {
+            // not sure if this ever happens but don't want to break that code
+        	Font f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));
+        	f.pixelSize = sizePixels;
+        	f.ttf = true;
+            return f;
+        }
     }
 
+    /**
+     * Indicates if this is a TTF native font that can be derived and manipulated. This is true for a font loaded from
+     * file (TTF) or using the native: font name
+     * 
+     * @return true if this is a native font
+     */
+    public boolean isTTFNativeFont() {
+        return ttf;
+    }
+    
     /**
      * Creates a new font instance based on the platform specific string name of the
      * font. This method isn't supported on some platforms.
@@ -252,7 +296,11 @@ public class Font {
      * @return newly created font or null if creation failed
      */
     public static Font create(String lookup) {
-        Object n = Display.getInstance().getImplementation().loadNativeFont(lookup);
+        // for general convenience
+        if(lookup.startsWith("native:")) {
+            return createTrueTypeFont(lookup, lookup);
+        }
+        Object n = Display.impl.loadNativeFont(lookup);
         if(n == null) {
             return null;
         }
@@ -333,7 +381,7 @@ public class Font {
      * @return the width of the given characters in this font instance
      */
     public int charsWidth(char[] ch, int offset, int length){
-        return Display.getInstance().getImplementation().charsWidth(font, ch, offset, length);
+        return Display.impl.charsWidth(font, ch, offset, length);
     }
     
     /**
@@ -345,7 +393,7 @@ public class Font {
      * @return the width of the given string subset in this font instance
      */
     public int substringWidth(String str, int offset, int len){
-        return Display.getInstance().getImplementation().stringWidth(font, str.substring(offset, offset + len));
+        return Display.impl.stringWidth(font, str.substring(offset, offset + len));
     }
     
     /**
@@ -364,7 +412,7 @@ public class Font {
         if(str == " ") {
             return 5;
         }
-        return Display.getInstance().getImplementation().stringWidth(font, str);
+        return Display.impl.stringWidth(font, str);
     }
     
     /**
@@ -374,7 +422,7 @@ public class Font {
      * @return the width of the specific character when rendered alone
      */
     public int charWidth(char ch) {
-        return Display.getInstance().getImplementation().charWidth(font, ch);
+        return Display.impl.charWidth(font, ch);
     }
     
     /**
@@ -383,7 +431,7 @@ public class Font {
      * @return the total height of the font
      */
     public int getHeight() {
-        return Display.getInstance().getImplementation().getHeight(font);
+        return Display.impl.getHeight(font);
     }
     
     /**
@@ -450,7 +498,7 @@ public class Font {
      * @return Optional operation returning the font face for system fonts
      */
     public int getFace(){
-        return Display.getInstance().getImplementation().getFace(font);
+        return Display.impl.getFace(font);
     }
     
     /**
@@ -459,7 +507,7 @@ public class Font {
      * @return Optional operation returning the font size for system fonts
      */
     public int getSize(){
-        return Display.getInstance().getImplementation().getSize(font);
+        return Display.impl.getSize(font);
     }
 
     /**
@@ -468,7 +516,7 @@ public class Font {
      * @return Optional operation returning the font style for system fonts
      */
     public int getStyle() {
-        return Display.getInstance().getImplementation().getStyle(font);
+        return Display.impl.getStyle(font);
     }
     
     /**
@@ -516,7 +564,7 @@ public class Font {
     }
     
     /**
-    * @inheritDoc
+    * {@inheritDoc}
     */
    public boolean equals(Object o) {
        if(ttf) {
@@ -534,7 +582,7 @@ public class Font {
     * @return the ascent in pixels
     */
    public int getAscent() {
-       return Display.getInstance().getImplementation().getFontAscent(font);
+       return Display.impl.getFontAscent(font);
    }
    
    /**
@@ -542,6 +590,16 @@ public class Font {
     * @return the descent in pixels
     */
    public int getDescent() {
-       return Display.getInstance().getImplementation().getFontDescent(font);
+       return Display.impl.getFontDescent(font);
    }
+   
+   /**
+    * Returns the size with which the font object was created in case of truetype fonts/derived fonts. This
+    * is useful since a platform might change things slightly based on platform constraints but this value should
+    * be 100% consistent
+    * @return the size requested in the derive method
+    */
+    public float getPixelSize() { 
+        return pixelSize; 
+    }
 }

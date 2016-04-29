@@ -260,10 +260,10 @@ public class JavascriptContext  {
         }
         if (async) {
             
-            browser.execute(installCode()+"("+js+")");
+            browser.execute(installCode()+";("+js+")");
             return null;
         } else {
-            return browser.executeAndReturnString(installCode()+"("+js+")");
+            return browser.executeAndReturnString(installCode()+";("+js+")");
         }
     }
     

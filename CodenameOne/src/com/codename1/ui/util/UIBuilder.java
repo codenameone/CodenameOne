@@ -762,7 +762,8 @@ public class UIBuilder { //implements Externalizable {
 
     private Object[] readObjectArrayForListModel(DataInputStream in, Resources res) throws IOException {
         Object[] elements = new Object[in.readInt()];
-        for(int iter = 0 ; iter < elements.length ; iter++) {
+        int elen = elements.length;
+        for(int iter = 0 ; iter < elen ; iter++) {
             switch(in.readByte()) {
                 case 1: // String
                     elements[iter] = in.readUTF();
@@ -913,7 +914,8 @@ public class UIBuilder { //implements Externalizable {
             // resource might have been removed we need to fail gracefully
             String[] uiNames = res.getUIResourceNames();
             String currentName = in.readUTF();
-            for(int iter = 0 ; iter < uiNames.length ; iter++) {
+            int ulen = uiNames.length;
+            for(int iter = 0 ; iter < ulen ; iter++) {
                 if(uiNames[iter].equals(currentName)) {
                     return createContainer(res, currentName);
                 }
@@ -1425,7 +1427,7 @@ public class UIBuilder { //implements Externalizable {
                         items[iter] = in.readUTF();
                     }
                     if(!setListModel(((List)cmp))) {
-                        ((List)cmp).setModel(new DefaultListModel(items));
+                        ((List)cmp).setModel(new DefaultListModel((Object[])items));
                     }
                     break;
 
@@ -2669,7 +2671,7 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * Returns either the parent form or the component bellow the embedded container
+     * Returns either the parent form or the component below the embedded container
      * above c.
      * 
      * @param c the component whose root ancestor we should find
@@ -2686,7 +2688,7 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public final int getVersion() {
         return 1;
@@ -2713,7 +2715,7 @@ public class UIBuilder { //implements Externalizable {
     }*/
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public final void externalize(DataOutputStream out) throws IOException {
         Util.writeObject(baseFormNavigationStack, out);
@@ -2741,7 +2743,7 @@ public class UIBuilder { //implements Externalizable {
     //}
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public final void internalize(int version, DataInputStream in) throws IOException {
         baseFormNavigationStack = (Vector)Util.readObject(in);
@@ -2750,7 +2752,7 @@ public class UIBuilder { //implements Externalizable {
     }*/
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     /*public String getObjectId() {
         return "StateMachine";

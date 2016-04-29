@@ -279,6 +279,12 @@ public class CodenameOneActivity extends Activity {
     }
 
     @Override
+    public void onBackPressed() {
+        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
+        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
+    }
+    
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         AndroidImplementation.activity = this;
@@ -529,14 +535,24 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     public void startActivityForResult(Intent intent, int requestCode) {
-        waitingForResult = true;
+        Bundle extra = intent.getExtras();
+        if(extra != null && extra.containsKey("WaitForResult") && !extra.getBoolean("WaitForResult")){
+            waitingForResult = false;            
+        }else{
+            waitingForResult = true;
+        }
         intentResult = new Vector();
         super.startActivityForResult(intent, requestCode);
     }
 
     @Override
     public void startActivity(Intent intent) {
-        waitingForResult = true;
+        Bundle extra = intent.getExtras();
+        if(extra != null && extra.containsKey("WaitForResult") && !extra.getBoolean("WaitForResult")){
+            waitingForResult = false;            
+        }else{
+            waitingForResult = true;
+        }
         super.startActivity(intent);
     }
 

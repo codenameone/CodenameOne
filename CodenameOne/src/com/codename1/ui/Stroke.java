@@ -115,6 +115,17 @@ public class Stroke {
     public Stroke(){
         
     }
+    
+    /**
+     * Copies the properties of {@code stroke} into this stroke.
+     * @param stroke The stroke whose properties we wish to copy into the current stroke.
+     */
+    public void setStroke(Stroke stroke) {
+        this.lineWidth = stroke.lineWidth;
+        this.capStyle = stroke.capStyle;
+        this.joinStyle = stroke.joinStyle;
+        this.miterLimit = stroke.miterLimit;
+    }
 
     /**
      * Returns the join style used for this stroke.  

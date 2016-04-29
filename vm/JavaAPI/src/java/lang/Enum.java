@@ -22,6 +22,8 @@
  */
 package java.lang;
 
+import java.util.HashMap;
+
 /**
  * Implementation class required to compile enums
  *
@@ -49,11 +51,8 @@ public class Enum<E extends Enum<E>> implements Comparable<E> {
         return null;
     }
 
-    public static <T extends Enum<T>> T valueOf(final Class<T> enumType, final String name) {
-        throw new IllegalArgumentException("No enum const " + enumType + "."
-                + name);
-    }
-
+    public native static <T extends Enum<T>> T valueOf(final Class<T> enumType, final String name);
+    
     public final boolean equals(final Object other) {
         return other == this;
     }

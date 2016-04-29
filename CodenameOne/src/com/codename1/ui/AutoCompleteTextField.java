@@ -26,13 +26,22 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.list.*;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 
 /**
- * This class is an editable TextField with predefined completion suggestion 
- * that shows up in a drop down menu while the user types in text
+ * <p>An editable {@link com.codename1.ui.TextField} with completion suggestions 
+ * that show up in a drop down menu while the user types in text. <br>
+ * This class uses the "{@code TextField}" UIID by default as well as "{@code AutoCompletePopup}" &amp;
+ * "{@code AutoCompleteList}" for the popup list details.<br>
+ * The sample below shows the more trivial use case for this widget:
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/7e4dc757971e460e5823.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-autocomplete.png" alt="Simple usage of auto complete" />
+ * 
  *
  * @author Chen
  */
@@ -46,6 +55,11 @@ public class AutoCompleteTextField extends TextField {
     private ArrayList<ActionListener> listeners = new ArrayList<ActionListener>();
     private String pickedText;
     private int minimumLength;
+    
+    /**
+     * The number of elements shown for the auto complete popup
+     */
+    private int minimumElementsShownInPopup = -1;
     
     /**
      * Constructor with completion suggestions
@@ -83,11 +97,11 @@ public class AutoCompleteTextField extends TextField {
      * getSuggestionModel value as well as for the GUI builder
      */
     public AutoCompleteTextField() {
-        this(new DefaultListModel(new String[]{""}));
+        this(new DefaultListModel(new Object[]{""}));
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void initComponent() {
@@ -103,7 +117,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     protected void deinitialize() {
@@ -123,7 +137,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public void setText(String text) {
@@ -208,7 +222,7 @@ public class AutoCompleteTextField extends TextField {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyPressed(int k) {
         if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -222,7 +236,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void keyReleased(int k) {
         if(popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
@@ -238,8 +252,10 @@ public class AutoCompleteTextField extends TextField {
     private void removePopup() {
         Form f = getComponentForm();
         if (f != null) {
-            f.getLayeredPane().removeComponent(popup);
-            popup.setParent(null);
+            Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
+            Container parent = popup.getParent();
+            lay.removeComponent(parent);
+            popup.remove();
             f.revalidate();
         }
     }
@@ -271,6 +287,9 @@ public class AutoCompleteTextField extends TextField {
         popup.setEnabled(false);
         filter(getText());        
         final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        if(getMinimumElementsShownInPopup() > 0) {
+            l.setMinElementHeight(getMinimumElementsShownInPopup());
+        }
         l.setScrollToSelected(false);
         l.setItemGap(0);
         for(ActionListener al : listeners) {
@@ -302,15 +321,18 @@ public class AutoCompleteTextField extends TextField {
         if(units != null){
             units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;
             units[Component.TOP] = Style.UNIT_TYPE_PIXELS;
-            popup.getStyle().setMarginUnit(units);
+            popup.getAllStyles().setMarginUnit(units);
         }
-        popup.getUnselectedStyle().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
-        popup.getSelectedStyle().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
+        popup.getAllStyles().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
         
         int y = getAbsoluteY();
         int topMargin;
         int popupHeight;
-        int listHeight = l.getModel().getSize() * l.getElementSize(false, true).getHeight();
+        int items = l.getModel().getSize();
+        if(l.getModel() instanceof FilterProxyListModel){
+            items = ((FilterProxyListModel)l.getModel()).getUnderlying().getSize();
+        }
+        int listHeight = items * l.getElementSize(false, true).getHeight();
         if(y < f.getContentPane().getHeight()/2){
             topMargin =  y - f.getTitleArea().getHeight() + getHeight();
             popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
@@ -319,13 +341,7 @@ public class AutoCompleteTextField extends TextField {
             popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
             topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
         }
-        if(f.getToolbar() != null) {
-            // we need to add the status bar which is now missing from the titlebar entry
-            Style s = getUIManager().getComponentStyle("StatusBar");
-            topMargin += s.getPadding(TOP) + s.getPadding(BOTTOM);
-        }
-        popup.getUnselectedStyle().setMargin(TOP, Math.max(0, topMargin));
-        popup.getSelectedStyle().setMargin(TOP, Math.max(0, topMargin));                    
+        popup.getAllStyles().setMargin(TOP, Math.max(0, topMargin));                    
         popup.setPreferredH(popupHeight);
         popup.setPreferredW(getWidth());
         popup.setHeight(popupHeight);
@@ -337,7 +353,11 @@ public class AutoCompleteTextField extends TextField {
         
         if (f != null) {
             if (popup.getParent() == null) {
-                f.getLayeredPane().addComponent(popup);
+                Container lay = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
+                lay.setLayout(new LayeredLayout());
+                Container wrapper = new Container();
+                wrapper.add(popup);
+                lay.addComponent(wrapper);
             }
             f.revalidate();
         }
@@ -363,56 +383,94 @@ public class AutoCompleteTextField extends TextField {
         this.minimumLength = minimumLength;
     }
 
+    /**
+     * The number of elements shown for the auto complete popup
+     * @return the minimumElementsShownInPopup
+     */
+    public int getMinimumElementsShownInPopup() {
+        return minimumElementsShownInPopup;
+    }
+
+    /**
+     * The number of elements shown for the auto complete popup
+     * @param minimumElementsShownInPopup the minimumElementsShownInPopup to set
+     */
+    public void setMinimumElementsShownInPopup(int minimumElementsShownInPopup) {
+        this.minimumElementsShownInPopup = minimumElementsShownInPopup;
+    }
+
     class FormPointerListener implements ActionListener {
 
-        public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
-            if (f.getLayeredPane().getComponentCount() > 0 && popup.getComponentCount() > 0) {
-                if (!popup.getComponentAt(0).
-                        contains(evt.getX(), evt.getY())) {
-                    //removePopup();
-                    popup.setVisible(false);
-                    popup.setEnabled(false);
-                    f.repaint();
-                    
+        public void actionPerformed(final ActionEvent evt) {
+            final Form f = getComponentForm();
+            Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
+            
+            boolean canOpenPopup = true;
+            
+            for (int i = 0; i < layered.getComponentCount(); i++) {
+                Container wrap = (Container) layered.getComponentAt(i);
+                Component pop = wrap.getComponentAt(0);
+                if(pop.isVisible()){
+                    if(!pop.contains(evt.getX(), evt.getY())){
+                        pop.setVisible(false);
+                        pop.setEnabled(false);      
+                        f.repaint();
+                        evt.consume();
+                    }else{
+                        canOpenPopup = false;
+                    }
                 }
-            } else {
-                if (contains(evt.getX(), evt.getY())) {
-                    popup.getComponentAt(0).setScrollY(0);
-                    popup.setVisible(true);
-                    popup.setEnabled(true);
-                    evt.consume();
-                    pointerReleased(evt.getX(), evt.getY());
-                }
-
             }
+            
+            if(!canOpenPopup){
+                return;
+            }
+            
+            if (contains(evt.getX(), evt.getY())) {
+                //something went wrong re-init the popup
+                if(popup.getAbsoluteX() != getAbsoluteX()){
+                    removePopup();
+                    addPopup();
+                }
+                popup.getComponentAt(0).setScrollY(0);
+                popup.setVisible(true);
+                popup.setEnabled(true);
+                popup.repaint();
+                evt.consume();                
+                f.revalidate();
+                Display.getInstance().callSerially(new Runnable() {
 
+                    public void run() {
+                        pointerReleased(evt.getX(), evt.getY());
+                    }
+                });
+            }
         }
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"completion"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String[]"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("completion")) {
@@ -435,14 +493,15 @@ public class AutoCompleteTextField extends TextField {
      */
     public String[] getCompletion() {
         String[] r = new String[filter.getUnderlying().getSize()];
-        for(int iter = 0 ; iter < r.length ; iter++) {
+        int rlen = r.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             r[iter] = (String)filter.getUnderlying().getItemAt(iter);
         }
         return r;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("completion")) {

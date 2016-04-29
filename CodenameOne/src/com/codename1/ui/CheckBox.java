@@ -32,9 +32,13 @@ import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * Checkbox is a button that can be selected or deselected, and which displays
- * its state to the user.
+ *<p>CheckBox is a button that can be selected or deselected and displays
+ * its state to the user. Check out {@link com.codename1.ui.RadioButton} for
+ * a more exclusive selection approach. Both components support a toggle button
+ * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.</p>
  * 
+ * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
  * @author Chen Fishbein
  */
 public class CheckBox extends Button {
@@ -102,7 +106,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void released(int x, int y) {
         selected = !isSelected();
@@ -121,7 +125,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         if(isToggle()) {
@@ -132,14 +136,14 @@ public class CheckBox extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
         return getUIManager().getLookAndFeel().getCheckBoxPreferredSize(this);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected String paramString() {
         return super.paramString() + ", selected = " +selected;
@@ -157,7 +161,7 @@ public class CheckBox extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
@@ -198,21 +202,21 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getBindablePropertyNames() {
         return new String[] {"selected"};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getBindablePropertyTypes() {
         return new Class[] {Boolean.class};
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void bindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -226,7 +230,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unbindProperty(String prop, BindTarget target) {
         if(prop.equals("selected")) {
@@ -243,7 +247,7 @@ public class CheckBox extends Button {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
         if(prop.equals("selected")) {
@@ -256,7 +260,7 @@ public class CheckBox extends Button {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
         if(prop.equals("selected")) {
@@ -265,4 +269,47 @@ public class CheckBox extends Button {
         }
         super.setBoundPropertyValue(prop, value);
     }
+    
+    /**
+     * Shorthand for creating the check box setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param text the text for the button
+     * @param icon the icon for the button
+     * @return a check box
+     */
+    public static CheckBox createToggle(String text, Image icon) {
+        CheckBox cb = new CheckBox(text, icon);
+        cb.setToggle(true);
+        return cb;
+    }
+    
+    
+    /**
+     * Shorthand for creating the check box setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param text the text for the button
+     * @return a check box
+     */
+    public static CheckBox createToggle(String text) {
+        CheckBox cb = new CheckBox(text, null);
+        cb.setToggle(true);
+        return cb;
+    }
+    
+    
+    /**
+     * Shorthand for creating the check box setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param icon the icon for the button
+     * @return a check box
+     */
+    public static CheckBox createToggle(Image icon) {
+        CheckBox cb = new CheckBox("", icon);
+        cb.setToggle(true);
+        return cb;
+    }
+    
 }

@@ -24,24 +24,10 @@
 package com.codename1.util;
 
 /**
- * Simple interface that allows asynchronous code to perform a parameterized callback 
- * or failure in a similar way to GWT's callback interface
+ * <p>Simple interface that allows asynchronous code to perform a parameterized callback 
+ * or failure in a similar way to GWT's callback interface.</p>
  *
  * @author Shai Almog
  */
-public interface Callback<T> {
-    /**
-     * Invoked when the async method returns with a successful value
-     * @param value the value
-     */
-    public void onSucess(T value);
-    
-    /**
-     * Invoked when the async method throws an exception
-     * @param sender the source of the error e.g. connection request that triggered the error, could be null
-     * @param err in case of an error triggered by an exception
-     * @param errorCode if applicable e.g. with http error codes, -1 for unknown
-     * @param errorMessage if applicable a user displayable message (can be null)
-     */
-    public void onError(Object sender, Throwable err, int errorCode, String errorMessage);
+public interface Callback<T> extends SuccessCallback<T>, FailureCallback<T> {
 }

@@ -32,8 +32,10 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 
 /**
- * A complex button similar to MultiButton that breaks lines automatically and looks like a regular button (more or less).
- * Unlike the multi button the span button has the UIID style of a button.
+ * <p>A complex button similar to MultiButton that breaks lines automatically and looks like a regular button (more or less).
+ * Unlike the multi button the span button has the UIID style of a button.</p>
+ * <script src="https://gist.github.com/codenameone/7bc6baa3a0229ec9d6f6.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-spanbutton.png" alt="SpanButton Sample" />
  *
  * @author Shai Almog
  */
@@ -69,6 +71,7 @@ public class SpanButton extends Container {
         text.setUIID("Button");
         text.setEditable(false);
         text.setFocusable(false);
+        text.setActAsLabel(true);
         removeBackground(text.getUnselectedStyle());
         removeBackground(text.getSelectedStyle());
         removeBackground(text.getPressedStyle());
@@ -205,7 +208,7 @@ public class SpanButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -214,7 +217,7 @@ public class SpanButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -227,14 +230,14 @@ public class SpanButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "Image", "String", "String", "String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("text")) {
@@ -256,7 +259,7 @@ public class SpanButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("text")) {

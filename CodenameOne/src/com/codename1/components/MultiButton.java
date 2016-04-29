@@ -38,10 +38,14 @@ import java.util.Collection;
 import java.util.Vector;
 
 /**
- * A powerful button like component that allows multiple rows/and an icon to be added
+ * <p>A powerful button like component that allows multiple rows/and an icon to be added
  * every row/icon can have its own UIID. Internally the multi-button is a container with
- * a lead component. Up to 4 rows are supported.
+ * a lead component. Up to 4 rows are supported.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/c0991e96258f813df91e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-multibutton.png" alt="MultiButton usages Sample" />
  *
+ * @see SpanButton
  * @author Shai Almog
  */
 public class MultiButton extends Container {
@@ -742,7 +746,7 @@ public class MultiButton extends Container {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -755,7 +759,7 @@ public class MultiButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -790,7 +794,7 @@ public class MultiButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("line1")) {
@@ -893,7 +897,7 @@ public class MultiButton extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("line1")) {

@@ -26,7 +26,6 @@ package com.codename1.ui;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.geom.Shape;
-import com.codename1.ui.plaf.Style;
 
 /**
  * Abstracts the underlying platform graphics context thus allowing us to achieve
@@ -40,6 +39,8 @@ import com.codename1.ui.plaf.Style;
 public final class Graphics {
     private int xTranslate;
     private int yTranslate;
+    private Transform translation;
+    private GeneralPath tmpClipShape; /// A buffer shape to use when we need to transform a shape
     private int color;
     private Font current = Font.getDefaultFont();
 
@@ -56,7 +57,23 @@ public final class Graphics {
      */
     Graphics(Object nativeGraphics) {
         setGraphics(nativeGraphics);
-        impl = Display.getInstance().getImplementation();
+        impl = Display.impl;
+    }
+    
+    private Transform translation() {
+        if (translation == null) {
+            translation = Transform.makeTranslation(xTranslate, yTranslate);
+        } else {
+            translation.setTranslation(xTranslate, yTranslate);
+        }
+        return translation;
+    }
+    
+    private GeneralPath tmpClipShape() {
+        if (tmpClipShape == null) {
+            tmpClipShape = new GeneralPath();
+        }
+        return tmpClipShape;
     }
 
     /**
@@ -238,6 +255,29 @@ public final class Graphics {
     public void setClip(int x, int y, int width, int height) {
         impl.setClip(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
+
+    
+    
+    /**
+     * Clips the Graphics context to the Shape.
+     * <p>This is not supported on all platforms and contexts currently.  
+     * Use {@link #isShapeClipSupported} to check if the current 
+     * context supports clipping shapes.</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/65f531adae2e8c22afc8.js"></script>
+     * <img src="https://www.codenameone.com/img/blog/shaped-clipping.png" alt="Shaped clipping in action" />
+     * 
+     * @param shape The shape to clip.
+     * @see #isShapeClipSupported
+     */
+    public void setClip(Shape shape) {
+        if (xTranslate != 0 || yTranslate != 0) {
+            GeneralPath p = tmpClipShape();
+            p.setShape(shape, translation());
+            shape = p;
+        }
+        impl.setClip(nativeGraphics, shape);
+    }
     
     /**
      * Pushes the current clip onto the clip stack.  It can later be restored 
@@ -369,7 +409,9 @@ public final class Graphics {
     /**
      * Fills a circular or elliptical arc based on the given angles and bounding 
      * box. The resulting arc begins at startAngle and extends for arcAngle 
-     * degrees.
+     * degrees. Usage:
+     * 
+     * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
      * 
      * @param x the x coordinate of the upper-left corner of the arc to be filled.
      * @param y the y coordinate of the upper-left corner of the arc to be filled.
@@ -399,7 +441,7 @@ public final class Graphics {
 
     private void drawStringImpl(String str, int x, int y) {
         // remove a commonly used trick to create a spacer label from the paint queue
-        if(str.length() == 0 || str == " ") {
+        if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
             return;
         }
         if(!(current instanceof CustomFont)) {
@@ -419,52 +461,15 @@ public final class Graphics {
      * @param textDecoration Text decoration bitmask (See Style's TEXT_DECORATION_* constants)
      */
     public void drawString(String str, int x, int y,int textDecoration) {
-        if(str.length() == 0) {
+        // remove a commonly used trick to create a spacer label from the paint queue
+        if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
             return;
         }
-        
-        // this if has only the minor effect of providing a slighly faster execution path
-        if(textDecoration != 0) {
-            boolean raised = (textDecoration & Style.TEXT_DECORATION_3D)!=0;
-            boolean lowerd = (textDecoration & Style.TEXT_DECORATION_3D_LOWERED)!=0;
-            boolean north = (textDecoration & Style.TEXT_DECORATION_3D_SHADOW_NORTH)!=0;
-            if (raised || lowerd || north) {
-                textDecoration = textDecoration & (~Style.TEXT_DECORATION_3D) & (~Style.TEXT_DECORATION_3D_LOWERED) & (~Style.TEXT_DECORATION_3D_SHADOW_NORTH);
-                int c = getColor();
-                int a = getAlpha();
-                int newColor = 0;
-                int offset = -2;
-                if(lowerd) {
-                    offset  = 2;
-                    newColor = 0xffffff;
-                } else {
-                    if(north) {
-                        offset  = 2;
-                    }
-                }
-                setColor(newColor);
-                if(a == 0xff) {
-                    setAlpha(140);
-                }
-                drawString(str, x, y + offset, textDecoration);
-                setAlpha(a);
-                setColor(c);
-                drawString(str, x, y, textDecoration);
-                return;
-            }
-            drawStringImpl(str, x, y);
-            if ((textDecoration & Style.TEXT_DECORATION_UNDERLINE)!=0) {
-                drawLine(x, y+current.getHeight()-1, x+current.stringWidth(str), y+current.getHeight()-1);
-            }
-            if ((textDecoration & Style.TEXT_DECORATION_STRIKETHRU)!=0) {
-                drawLine(x, y+current.getHeight()/2, x+current.stringWidth(str), y+current.getHeight()/2);
-            }
-            if ((textDecoration & Style.TEXT_DECORATION_OVERLINE)!=0) {
-                drawLine(x, y, x+current.stringWidth(str), y);
-            }
-        } else {
-            drawStringImpl(str, x, y);
+        Object nativeFont = null;
+        if(current != null) {
+            nativeFont = current.getNativeFont();
         }
+        impl.drawString(nativeGraphics, nativeFont, str, x + xTranslate, y + yTranslate, textDecoration);
     }
     
     /**
@@ -594,7 +599,13 @@ public final class Graphics {
      * <p>This is not supported on
      * all platforms and contexts currently.  Use {@link #isShapeSupported} to check if the current 
      * context supports drawing shapes.</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
+     * 
+     * 
      * @param shape The shape to be drawn.
+     * @param stroke the stroke to use
      * 
      * @see #setStroke
      * @see #isShapeSupported
@@ -602,9 +613,8 @@ public final class Graphics {
     public void drawShape(Shape shape, Stroke stroke){
         if ( isShapeSupported()){
             if ( xTranslate != 0 || yTranslate != 0 ){
-                GeneralPath p = new GeneralPath();
-                Transform t = Transform.makeTranslation(xTranslate, yTranslate, 0);
-                p.append(shape.getPathIterator(t), true);
+                GeneralPath p = tmpClipShape();
+                p.setShape(shape, translation());
                 shape = p;
             }
             impl.drawShape(nativeGraphics, shape, stroke);
@@ -617,6 +627,11 @@ public final class Graphics {
      *  <p>This is not supported on
      * all platforms and contexts currently.  Use {@link #isShapeSupported} to check if the current 
      * context supports drawing shapes.</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
+     * 
+     * 
      * @param shape The shape to be filled.
      * 
      * @see #isShapeSupported
@@ -625,9 +640,8 @@ public final class Graphics {
         
         if ( isShapeSupported() ){
             if ( xTranslate != 0 || yTranslate != 0 ){
-                GeneralPath p = new GeneralPath();
-                Transform t = Transform.makeTranslation(xTranslate, yTranslate, 0);
-                p.append(shape.getPathIterator(t), true);
+                GeneralPath p = tmpClipShape();
+                p.setShape(shape, translation());
                 shape = p;
             }
         
@@ -667,9 +681,9 @@ public final class Graphics {
     }
     
     /**
-     * Checks to see if this graphics context supports drawing shapes (i.e. {@link #drawShape}
+     * <p>Checks to see if this graphics context supports drawing shapes (i.e. {@link #drawShape}
      * and {@link #fillShape} methods. If this returns {@literal false}, and you call {@link #drawShape} or {@link #fillShape}, then
-     * nothing will be drawn.
+     * nothing will be drawn.</p>
      * @return {@literal true} If {@link #drawShape} and {@link #fillShape} are supported.  
      * @see #drawShape
      * @see #fillShape
@@ -678,6 +692,14 @@ public final class Graphics {
         return impl.isShapeSupported(nativeGraphics);
     }
     
+    /**
+     * Checks to see if this graphics context supports clip Shape.
+     * If this returns {@literal false}, calling setClip(Shape) will have no effect on the Graphics clipping area
+     * @return {@literal true} If setClip(Shape) is supported.  
+     */
+    public boolean isShapeClipSupported(){
+        return impl.isShapeClipSupported(nativeGraphics);
+    }
     
     
     /**
@@ -710,13 +732,20 @@ public final class Graphics {
      * Gets the transformation matrix that is currently applied to this graphics context.
      * @return The current transformation matrix.
      * @see #setTransform
+     * @deprecated Use {@link #getTransform(com.codename1.ui.Transform) } instead.
      */
     public Transform getTransform(){
         return impl.getTransform(nativeGraphics);
         
     }
     
-    
+    /**
+     * Loads the provided transform with the current transform applied to this graphics context.
+     * @param t An "out" parameter to be filled with the current transform.
+     */
+    public void getTransform(Transform t) {
+        impl.getTransform(nativeGraphics, t);
+    }
     
     //--------------------------------------------------------------------------
     // END SHAPE DRAWING METHODS
@@ -798,6 +827,12 @@ public final class Graphics {
      * @param relativeSize  indicates the relative size of the gradient within the drawing region
      */
     public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height, float relativeX, float relativeY, float relativeSize) {
+        // people do that a lot sadly...
+        if(startColor == endColor) {
+            setColor(startColor);
+            fillRect(x, y, width, height, (byte)0xff);
+            return;
+        }
         impl.fillRectRadialGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, relativeX, relativeY, relativeSize);
     }
 
@@ -814,6 +849,12 @@ public final class Graphics {
      * @param horizontal indicating wheter it is a horizontal fill or vertical
      */
     public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        // people do that a lot sadly...
+        if(startColor == endColor) {
+            setColor(startColor);
+            fillRect(x, y, width, height, (byte)0xff);
+            return;
+        }
         impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
     }
 
@@ -827,12 +868,7 @@ public final class Graphics {
      * @param alpha the alpha values specify semitransparency
      */
     public void fillRect(int x, int y, int w, int h, byte alpha) {
-        if(alpha != 0) {
-            int oldAlpha = impl.getAlpha(nativeGraphics);
-            impl.setAlpha(nativeGraphics, alpha & 0xff);
-            impl.fillRect(nativeGraphics, x + xTranslate, y + yTranslate, w, h);
-            impl.setAlpha(nativeGraphics, oldAlpha);
-        }
+        impl.fillRect(nativeGraphics, x, y, w, h, alpha);
     }
 
     /**
@@ -1115,7 +1151,37 @@ public final class Graphics {
      * @param h coordinate to tile the image along 
      */
     public void tileImage(Image img, int x, int y, int w, int h) {
-        impl.tileImage(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h);
+        if(img.requiresDrawImage()) {
+            int iW = img.getWidth();
+            int iH = img.getHeight();
+            int clipX = getClipX();
+            int clipW = getClipWidth();
+            int clipY = getClipY();
+            int clipH = getClipHeight();
+            clipRect(x, y, w, h);
+            for (int xPos = 0; xPos <= w; xPos += iW) {
+                for (int yPos = 0; yPos < h; yPos += iH) {
+                    int actualX = xPos + x;
+                    int actualY = yPos + y;
+                    if(actualX > clipX + clipW) {
+                        continue;
+                    }
+                    if(actualX + iW < clipX) {
+                        continue;
+                    }
+                    if(actualY > clipY + clipH) {
+                        continue;
+                    }
+                    if(actualY + iH < clipY) {
+                        continue;
+                    }
+                    drawImage(img, actualX, actualY);
+                }
+            }
+            setClip(clipX, clipY, clipW, clipH);
+        } else {
+            impl.tileImage(nativeGraphics, img.getImage(), x + xTranslate, y + yTranslate, w, h);
+        }
     }
     
     /**

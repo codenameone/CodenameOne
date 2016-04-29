@@ -26,8 +26,11 @@ import com.codename1.ui.Display;
 import java.util.Vector;
 
 /**
- * This class uses as the Contacts manager of the device, it enables the possibility
- * To get the Contacts that are available on the device.
+ * <p>{@code ContactsManager} provides access to the contacts on the device for listing, adding and deleting contacts.<br>
+ * The sample below demonstrates listing all the contacts within the device with their photos</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
  *
  * @author Chen
  */
@@ -117,6 +120,7 @@ public class ContactsManager {
      * @param includesEmail if true try to fetch all Contact Emails
      * @param includeAddress if true try to fetch all Contact Addresses
      * @return array of the contacts
+     * @deprecated this method was incorrectly introduced use getContacts instead
      */
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         return Display.getInstance().getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
@@ -126,10 +130,49 @@ public class ContactsManager {
      * Indicates if the getAllContacts is platform optimized, notice that the method
      * might still take seconds or more to run so you should still use a separate thread!
      * @return true if getAllContacts will perform faster that just getting each contact
+     * @deprecated this method was incorrectly introduced and isn't static use isAllContactsFast instead
      */
     public boolean isGetAllContactsFast() {
         return Display.getInstance().isGetAllContactsFast();
     }
     
     
+    
+    /**
+     * Notice: this method might be very slow and should be invoked on a separate thread!
+     * It might have platform specific optimizations over getAllContacts followed by looping
+     * over individual contacts but that isn't guaranteed. See isGetAllContactsFast for
+     * information.
+     * 
+     * @param withNumbers if true returns only contacts that has a number
+     * @param includesFullName if true try to fetch the full name of the Contact(not just display name)
+     * @param includesPicture if true try to fetch the Contact Picture if exists
+     * @param includesNumbers if true try to fetch all Contact numbers
+     * @param includesEmail if true try to fetch all Contact Emails
+     * @param includeAddress if true try to fetch all Contact Addresses
+     * @return array of the contacts
+     */
+    public static Contact[] getContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        return Display.getInstance().getAllContacts(withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
+    }
+
+    /**
+     * Indicates if the getAllContacts is platform optimized, notice that the method
+     * might still take seconds or more to run so you should still use a separate thread!
+     * @return true if getAllContacts will perform faster that just getting each contact
+     */
+    public static boolean isAllContactsFast() {
+        return Display.getInstance().isGetAllContactsFast();
+    }
+    
+    /**
+     * Clears the contacts cache to that they will be loaded from the system the next time {@link #getContacts(boolean, boolean, boolean, boolean, boolean, boolean) }
+     * is called.  
+     * 
+     * <p>This is only necessary on platforms that use a transactional address book, if you want to reload contact changes
+     * that have occurred outside the app.  At time of writing, the only platform that does this is iOS.  This method will have no effect on other platforms.</p>
+     */
+    public static void refresh() {
+        Display.getInstance().refreshContacts();
+    }
 }

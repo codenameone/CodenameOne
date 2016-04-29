@@ -10,8 +10,28 @@
   </head>
     <body>
         <p>
-            Video and audio playback support are handled within this package using the Media/Media manager APIs.
-            Said API's allow for video playback both within a native full screen player and embedded within an application screen.
+            Video and Audio playback support are handled within this package using the 
+            {@link com.codename1.media.Media} &amp; {@link com.codename1.media.MediaManager} APIs.
+            Said API's allow for video playback both within a native full screen player and embedded within 
+            an application screen.
         </p>
+        <p>
+            Simplified video playback API is also available via the {@link com.codename1.components.MediaPlayer} class.
+            Capture/recording is handled separately for the most part thru the 
+            {@link com.codename1.capture.Capture} API. However, there is some basic low level recording
+            functionality within {@link com.codename1.media.MediaManager} as well. 
+        </p>
+        
+        <p>
+            The code below demonstrates capturing and playing back audio files using this API:
+        </p>
+        <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
+        <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
+        
+        <p>
+            The sample code below demonstrates simple video playback.
+        </p>
+        <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+        <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
     </body>
 </html>

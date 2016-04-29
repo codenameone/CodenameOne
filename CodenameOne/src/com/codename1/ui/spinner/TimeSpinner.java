@@ -119,21 +119,21 @@ public class TimeSpinner extends BaseSpinner {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem", "durationMode"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class, Boolean.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("durationMode")) {
@@ -167,7 +167,7 @@ public class TimeSpinner extends BaseSpinner {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("currentHour")) {

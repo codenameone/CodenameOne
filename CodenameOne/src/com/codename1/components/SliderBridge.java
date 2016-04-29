@@ -32,15 +32,18 @@ import com.codename1.io.NetworkManager;
 import java.util.Vector;
 
 /**
- * Binds a slider to network progress events so it shows the pro
- *
+ * <p>Binds a {@link com.codename1.ui.Slider} to network progress events so it shows the progress of
+ * the current {@link com.codename1.io.ConnectionRequest}</p>
+ * <script src="https://gist.github.com/codenameone/051bfa054fd3024c8292.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/network-sliderbridge.png" alt="SliderBridge progress for downloading the image in the slow network mode" />
+  *
  * @author Shai Almog
  */
 public class SliderBridge extends Slider {
     private ConnectionRequest[] sources;
 
     /**
-     * Default constuctor
+     * Default constructor
      */
     public SliderBridge() {
         bindProgress((ConnectionRequest[])null, this);
@@ -68,13 +71,14 @@ public class SliderBridge extends Slider {
      */
     public static void bindProgress(final ConnectionRequest[] sources, final Slider s) {
         Vector v = null;
-        int portions = 1000;
+        int portions = 100;
         if(sources != null) {
             v = new Vector();
-            for(int iter = 0 ; iter < sources.length ; iter++) {
+            int slen = sources.length;
+            for(int iter = 0 ; iter < slen ; iter++) {
                 v.addElement(sources[iter]);
             }
-            portions = portions / sources.length;
+            portions = portions / slen;
         }
         final Vector sourceVec = v;
         final int portionPerSource = portions;
@@ -83,7 +87,7 @@ public class SliderBridge extends Slider {
             private int soFar;
 
             /**
-             * @inheritDoc
+             * {@inheritDoc}
              */
             public void actionPerformed(ActionEvent evt) {
                 if(sources != null) {
@@ -109,7 +113,7 @@ public class SliderBridge extends Slider {
                     case NetworkEvent.PROGRESS_TYPE_OUTPUT:
                         if(e.getLength() > 0) {
                             currentLength = e.getLength();
-                            s.setMaxValue(1000);
+                            //s.setMaxValue(1000);
                             s.setInfinite(false);
                             float sentReceived = e.getSentReceived();
                             sentReceived = sentReceived / currentLength * portionPerSource;

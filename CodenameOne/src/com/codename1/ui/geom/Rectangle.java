@@ -24,6 +24,7 @@
 package com.codename1.ui.geom;
 
 import com.codename1.ui.Transform;
+import java.util.ArrayList;
 
 /**
  * Represents a Rectangle position (x, y) and {@link Dimension} (width, height),
@@ -37,6 +38,47 @@ public class Rectangle implements Shape {
     private int y;
     private Dimension size;
     private GeneralPath path;
+    
+    private static final int MAX_POOL_SIZE = 20;
+    private static ArrayList<Rectangle> pool;
+    
+    /**
+     * Creates a rectangle from a Rectangle object pool.  This is handy if you 
+     * need to create a temporary Rectangle that you wish to recycle later.
+     * 
+     * <p>When you are done with this object you should return it to the pool using
+     * {@link #recycle(com.codename1.ui.geom.Rectangle) }.
+     * @param x The x coordinate of the rect.
+     * @param y The y coordinate of the rect.
+     * @param w The width of the rect.
+     * @param h The height of the rect.
+     * @return A rectangle with the given dimensions.
+     * @see #recycle(com.codename1.ui.geom.Rectangle) 
+     */
+    public static synchronized Rectangle createFromPool(int x, int y, int w, int h) {
+        if (pool == null) {
+            pool = new ArrayList<Rectangle>();
+        }
+        if (pool.isEmpty()) {
+            return new Rectangle(x, y, w, h);
+        } else {
+            Rectangle r = pool.remove(pool.size()-1);
+            r.setBounds(x, y, w, h);
+            return r;
+        }
+    }
+    
+    /**
+     * Returns the given rectangle to the object pool.
+     * @param r The rectangle to recycle.
+     * @see #createFromPool(int, int, int, int) 
+     */
+    public static synchronized void recycle(Rectangle r) {
+        if (pool.size() >= MAX_POOL_SIZE || r == null) {
+            return;
+        }
+        pool.add(r);
+    }
 
     /** 
      * Creates a new instance of Rectangle 
@@ -158,7 +200,7 @@ public class Rectangle implements Shape {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String toString() {
         return "x = " + x + " y = " + y + " size = " + size;
@@ -257,6 +299,7 @@ public class Rectangle implements Shape {
      * @return the intersection
      */
     public Rectangle intersection(int rX, int rY, int rW, int rH) {
+        
         int tx1 = this.x;
         int ty1 = this.y;
         int rx1 = rX;
@@ -289,6 +332,41 @@ public class Rectangle implements Shape {
             ty2 = Integer.MIN_VALUE;
         }
         return new Rectangle(tx1, ty1, tx2, ty2);
+    }
+    
+    public void intersection(Rectangle input, Rectangle output) {
+        int tx1 = this.x;
+        int ty1 = this.y;
+        int rx1 = input.getX();
+        int ry1 = input.getY();
+        int tx2 = tx1; tx2 += this.size.getWidth();
+        int ty2 = ty1; ty2 += this.size.getHeight();
+        int rx2 = rx1; rx2 += input.getWidth();
+        int ry2 = ry1; ry2 += input.getHeight();
+        if (tx1 < rx1) {
+            tx1 = rx1;
+        }
+        if (ty1 < ry1) {
+            ty1 = ry1;
+        }
+        if (tx2 > rx2) {
+            tx2 = rx2;
+        }
+        if (ty2 > ry2) {
+            ty2 = ry2;
+        }
+        tx2 -= tx1;
+        ty2 -= ty1;
+        // tx2,ty2 will never overflow (they will never be
+        // larger than the smallest of the two source w,h)
+        // they might underflow, though...
+        if (tx2 < Integer.MIN_VALUE) {
+            tx2 = Integer.MIN_VALUE;
+        }
+        if (ty2 < Integer.MIN_VALUE) {
+            ty2 = Integer.MIN_VALUE;
+        }
+        output.setBounds(tx1, ty1, tx2, ty2);
     }
 
     /**
@@ -423,15 +501,17 @@ public class Rectangle implements Shape {
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(Transform m) {
         if ( path == null ){
             path = new GeneralPath();
+            int w = size.getWidth();
+            int h = size.getHeight();
             path.moveTo(x, y);
-            path.lineTo(x+size.getWidth(), y);
-            path.lineTo(x+size.getWidth(), y+size.getHeight());
-            path.lineTo(x, y+size.getHeight());
+            path.lineTo(x+w, y);
+            path.lineTo(x+w, y+h);
+            path.lineTo(x, y+h);
             path.closePath();
             
         }
@@ -440,28 +520,28 @@ public class Rectangle implements Shape {
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public PathIterator getPathIterator(){
         return getPathIterator(null);
     }
 
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public Rectangle getBounds() {
         return this;
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public float[] getBounds2D(){
         return new float[]{getX(), getY(), getWidth(), getHeight()};
     }
     
     /**
-     * {@inheritDoc}
+     * {{@inheritDoc}}
      */
     public boolean isRectangle(){
         return true;

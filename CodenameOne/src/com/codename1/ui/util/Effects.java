@@ -24,6 +24,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import com.codename1.ui.RGBImage;
 
@@ -37,7 +38,7 @@ public class Effects {
     private Effects() {}
 
     /**
-     * Takes the given image and appends an effect of reflection bellow it that
+     * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
      * 
@@ -49,7 +50,7 @@ public class Effects {
     }
     
     /**
-     * Takes the given image and appends an effect of reflection bellow it that
+     * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
      * 
@@ -66,7 +67,7 @@ public class Effects {
     }
 
     /**
-     * Takes the given image and appends an effect of reflection bellow it that
+     * Takes the given image and appends an effect of reflection below it that
      * is similar to the way elements appear in water beneath them. This method
      * shouldn't be used when numAlpha is very low.
      *
@@ -88,16 +89,16 @@ public class Effects {
         RGBImage rgbImg = new RGBImage(new int[w * (h + spacing) + mirrorHeight], w, h + ((int)(h  * mirrorRatio) + spacing));
         source.toRGB(rgbImg, 0, 0, 0, 0, w, h);
         int[] imageData = rgbImg.getRGB();
-
+        int ilen = imageData.length;
         for(int iter = 0 ; iter < mirrorHeight ; iter++) {
             int sourcePos = w * h - iter - 1;
             int off = iter % w;
             off = w - off + iter - off;
-            int mirrorPos = imageData.length - (mirrorHeight - off) + (spacing * w);
+            int mirrorPos = ilen - (mirrorHeight - off) + (spacing * w);
             int color = imageData[sourcePos];
 
             // if the color is not transparent
-            if((color & 0xff000000) != 0 && mirrorPos < imageData.length) {
+            if((color & 0xff000000) != 0 && mirrorPos < ilen) {
                 int alpha = (int)(alphaRatio * ((float)mirrorHeight - iter) / ((float)mirrorHeight));
                 imageData[mirrorPos] = (imageData[sourcePos] & 0xffffff) | ((alpha << 24) & 0xff000000);
             }
@@ -180,5 +181,26 @@ public class Effects {
         }
         
         return Image.createImage(destinationArray, destinationWidth, destinationHeight);
+    }
+    
+    
+    /**
+     * Create a blur image from the given image.
+     * The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
+     * 
+     * @param image the image to blur
+     * @param radius the radius to be used in the algorithm
+     */ 
+    public static Image gaussianBlurImage(Image image, float radius){
+        return Display.getInstance().gaussianBlurImage(image, radius);
+    }
+    
+    /**
+     * Returns true if gaussian blur is supported on this platform
+     * 
+     * @return true if gaussian blur is supported.
+     */ 
+    public static boolean isGaussianBlurSupported(){
+        return Display.getInstance().isGaussianBlurSupported();        
     }
 }

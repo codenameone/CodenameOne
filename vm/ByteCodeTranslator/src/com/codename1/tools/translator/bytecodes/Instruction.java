@@ -94,4 +94,12 @@ public abstract class Instruction {
     public void setOptimized(boolean opt) {
         optimized = opt;
     }
+    
+    public char[] getStackInputTypes() {
+        return null;
+    }
+    
+    public char[] getStackOutputTypes() {
+        return null;
+    }
 }

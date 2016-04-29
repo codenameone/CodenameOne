@@ -33,8 +33,8 @@ import java.io.InputStream;
 import java.util.HashMap;
 
 /**
- * Abstracts the underlying platform images allowing us to treat them as a uniform
- * object.
+ * <p>Abstracts the underlying platform images allowing us to treat them as a uniform
+ * object. </p>
  * 
  * @author Chen Fishbein
  */
@@ -60,12 +60,12 @@ public class Image {
      */
     protected Image(Object image) {
         this.image = image;
-        animated = Display.getInstance().getImplementation().isAnimation(image);
+        animated = Display.impl.isAnimation(image);
     }
 
     /** Creates a new instance of ImageImpl */
     Image(int[] imageArray, int w, int h) {
-        this(Display.getInstance().getImplementation().createImage(imageArray, w, h));
+        this(Display.impl.createImage(imageArray, w, h));
     }
 
     
@@ -155,7 +155,7 @@ public class Image {
      * from an SVG Input stream
      */
     public static boolean isSVGSupported() {
-        return Display.getInstance().getImplementation().isSVGSupported();
+        return Display.impl.isSVGSupported();
     }
 
     /**
@@ -166,7 +166,7 @@ public class Image {
      * be returned.
      */
     public Object getSVGDocument() {
-        return Display.getInstance().getImplementation().getSVGDocument(image);
+        return Display.impl.getSVGDocument(image);
     }
 
     /**
@@ -180,7 +180,7 @@ public class Image {
      * @throws IOException if resource lookup fail SVG is unsupported
      */
     public static Image createSVG(String baseURL, boolean animated, byte[] data) throws IOException {
-        Image i = new Image(Display.getInstance().getImplementation().createSVGImage(baseURL, data));
+        Image i = new Image(Display.impl.createSVGImage(baseURL, data));
         i.animated = animated;
         i.svgBaseURL = baseURL;
         i.svgData = data;
@@ -197,26 +197,35 @@ public class Image {
     }
 
     /**
-     * Creates a mask from the given image, a mask can be used to apply an arbitrary
+     * <p>Creates a mask from the given image, a mask can be used to apply an arbitrary
      * alpha channel to any image. A mask is derived from the blue channel (LSB) of
-     * the given image.
-     * The generated mask can be used with the apply mask method.
+     * the given image, other channels are ignored.<br>
+     * The generated mask can be used with the apply mask method.<br>
+     * The sample below demonstrates the masking of an image based on a circle drawn on a mutable image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
      * 
      * @return mask object that can be used with applyMask
      */
     public Object createMask() {
         int[] rgb = getRGBCached();
-        byte[] mask = new byte[rgb.length];
-        for(int iter = 0 ; iter < rgb.length ; iter++) {
+        int rlen = rgb.length;
+        byte[] mask = new byte[rlen];
+        for(int iter = 0 ; iter < rlen ; iter++) {
             mask[iter] = (byte)(rgb[iter] & 0xff);
         }
         return new IndexedImage(getWidth(), getHeight(), null, mask);
     }
 
     /**
-     * Applies the given alpha mask onto this image and returns the resulting image
+     * <p>Applies the given alpha mask onto this image and returns the resulting image
      * see the createMask method for indication on how to convert an image into an alpha
-     * mask.
+     * mask.</p>
+     * The sample below demonstrates the masking of an image based on a circle drawn on a mutable image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
      * 
      * @param mask mask object created by the createMask() method.
      * @param x starting x where to apply the mask
@@ -269,7 +278,8 @@ public class Image {
         if(mWidth != getWidth() || mHeight != getHeight()) {
             throw new IllegalArgumentException("Mask and image sizes don't match");
         }
-        for(int iter = 0 ; iter < maskData.length ; iter++) {
+        int mdlen = maskData.length;
+        for(int iter = 0 ; iter < mdlen ; iter++) {
             int maskAlpha = maskData[iter] & 0xff;
             maskAlpha = (maskAlpha << 24) & 0xff000000;
             rgb[iter] = (rgb[iter] & 0xffffff) | maskAlpha;
@@ -317,7 +327,7 @@ public class Image {
         int[] arr = new int[width * height];
         getRGB(arr, 0, x, y, width, height);
         
-        Image i = new Image(Display.getInstance().getImplementation().createImage(arr, width, height));
+        Image i = new Image(Display.impl.createImage(arr, width, height));
         i.opaque = opaque;
         i.opaqueTested = opaqueTested;
         return i;
@@ -338,7 +348,7 @@ public class Image {
                 arr[x + y * width] = tmp[width - x - 1 + y * width];
             }
         }
-        Image i = new Image(Display.getInstance().getImplementation().createImage(arr, width, height));
+        Image i = new Image(Display.impl.createImage(arr, width, height));
         i.opaque = opaque;
         i.opaqueTested = opaqueTested;
         return i;
@@ -356,7 +366,7 @@ public class Image {
      * @return new image instance with the closest possible rotation
      */
     public Image rotate(int degrees) {
-        CodenameOneImplementation i = Display.getInstance().getImplementation();
+        CodenameOneImplementation i = Display.impl;
         if(i.isRotationDrawingSupported()) {
             if(degrees >= 90) {
                 int newTransform = 0;
@@ -368,7 +378,7 @@ public class Image {
                 degrees %= 90;
                 newTransform -= degrees;
                 if(degrees != 0) {
-                    Image newImage = new Image(Display.getInstance().getImplementation().rotate(image, degrees));
+                    Image newImage = new Image(Display.impl.rotate(image, degrees));
                     newImage.transform = newTransform;
                     return newImage;
                 } else {
@@ -378,11 +388,11 @@ public class Image {
                 }
             }
             if(degrees != 0) {
-                return new Image(Display.getInstance().getImplementation().rotate(image, degrees));
+                return new Image(Display.impl.rotate(image, degrees));
             } 
             return this;
         } else {
-            return new Image(Display.getInstance().getImplementation().rotate(image, degrees));
+            return new Image(Display.impl.rotate(image, degrees));
         }
     }
 
@@ -398,7 +408,7 @@ public class Image {
      */
     public static Image createIndexed(int width, int height, int[] palette, byte[] data) {
         IndexedImage i = new IndexedImage(width, height, palette, data);
-        CodenameOneImplementation impl = Display.getInstance().getImplementation();
+        CodenameOneImplementation impl = Display.impl;
         if(impl.isNativeIndexed()) {
             return new Image(impl.createNativeIndexed(i));
         }
@@ -509,14 +519,14 @@ public class Image {
      */
     public static Image createImage(String path) throws IOException {
         try {
-            return new Image(Display.getInstance().getImplementation().createImage(path));
+            return new Image(Display.impl.createImage(path));
         } catch(OutOfMemoryError err) {
             // Images have a major bug on many phones where they sometimes throw 
             // an OOM with no reason. A system.gc followed by the same call over
             // solves the problem. This has something to do with the fact that 
             // there is no Image.dispose method in existance.
             System.gc();System.gc();
-            return new Image(Display.getInstance().getImplementation().createImage(path));
+            return new Image(Display.impl.createImage(path));
         }
     }
     
@@ -542,14 +552,14 @@ public class Image {
      */
     public static Image createImage(InputStream stream) throws IOException {
         try {
-            return new Image(Display.getInstance().getImplementation().createImage(stream));
+            return new Image(Display.impl.createImage(stream));
         } catch(OutOfMemoryError err) {
             // Images have a major bug on many phones where they sometimes throw 
             // an OOM with no reason. A system.gc followed by the same call over
             // solves the problem. This has something to do with the fact that 
             // there is no Image.dispose method in existance.
             System.gc();System.gc();
-            return new Image(Display.getInstance().getImplementation().createImage(stream));
+            return new Image(Display.impl.createImage(stream));
         }
     }
     
@@ -563,7 +573,7 @@ public class Image {
      */
     public static Image createImage(int[] rgb, int width, int height) {
         try {
-            Image i = new Image(Display.getInstance().getImplementation().createImage(rgb, width, height));
+            Image i = new Image(Display.impl.createImage(rgb, width, height));
             return i;
         } catch(OutOfMemoryError err) {
             // Images have a major bug on many phones where they sometimes throw 
@@ -571,12 +581,21 @@ public class Image {
             // solves the problem. This has something to do with the fact that 
             // there is no Image.dispose method in existance.
             System.gc();System.gc();
-            return new Image(Display.getInstance().getImplementation().createImage(rgb, width, height));
+            return new Image(Display.impl.createImage(rgb, width, height));
         }
     }
 
     /**
-     * Creates a mutable image that may be manipulated using getGraphics
+     * <p>Creates a white opaque mutable image that may be manipulated using {@link #getGraphics()}.<br>
+     * The sample below shows this method being used to create a screenshot for sharing the image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     * 
+     * <p>
+     * The sample below demonstrates the drawing of a mask image to create a round image effect
+     * </p>
+     * <script src="https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-image-masking.png" alt="Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable" />
      * 
      * @param width the image width
      * @param height the image height
@@ -592,11 +611,14 @@ public class Image {
      * @return true if mutable images support alpha in their fillColor argument
      */
     public static boolean isAlphaMutableImageSupported() {
-        return Display.getInstance().getImplementation().isAlphaMutableImageSupported();
+        return Display.impl.isAlphaMutableImageSupported();
     }
     
     /**
-     * Creates a mutable image that may be manipulated using getGraphics
+     * <p>Creates a mutable image that may be manipulated using {@link #getGraphics()}.<br>
+     * The sample below shows this method being used to create a screenshot for sharing the image:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
      * 
      * @param width the image width
      * @param height the image height
@@ -605,14 +627,14 @@ public class Image {
      */
     public static Image createImage(int width, int height, int fillColor) {
         try {
-            return new Image(Display.getInstance().getImplementation().createMutableImage(width, height, fillColor));
+            return new Image(Display.impl.createMutableImage(width, height, fillColor));
         } catch(OutOfMemoryError err) {
             // Images have a major bug on many phones where they sometimes throw 
             // an OOM with no reason. A system.gc followed by the same call over
             // solves the problem. This has something to do with the fact that 
             // there is no Image.dispose method in existance.
             System.gc();System.gc();
-            return new Image(Display.getInstance().getImplementation().createMutableImage(width, height, fillColor));
+            return new Image(Display.impl.createMutableImage(width, height, fillColor));
         }
     }
 
@@ -627,7 +649,7 @@ public class Image {
      */
     public static Image createImage(byte[] bytes,int offset,int len) {
         try {
-            Object o = Display.getInstance().getImplementation().createImage(bytes, offset, len);
+            Object o = Display.impl.createImage(bytes, offset, len);
             if(o == null) {
                 throw new IllegalArgumentException("create image failed for the given image data of length: " + len);
             }
@@ -638,7 +660,7 @@ public class Image {
             // solves the problem. This has something to do with the fact that 
             // there is no Image.dispose method in existance.
             System.gc();System.gc();
-            return new Image(Display.getInstance().getImplementation().createImage(bytes, offset, len));
+            return new Image(Display.impl.createImage(bytes, offset, len));
         }
     }
 
@@ -649,7 +671,7 @@ public class Image {
      * @return Graphics object allowing us to manipulate the content of a mutable image
      */
     public Graphics getGraphics() {
-        Graphics g = new Graphics(Display.getInstance().getImplementation().getNativeGraphics(image));
+        Graphics g = new Graphics(Display.impl.getNativeGraphics(image));
         return g;
     }
     
@@ -661,10 +683,10 @@ public class Image {
     public int getWidth() {
         if(transform != 0) {
             if(transform == 90 || transform == 270) {
-                return Display.getInstance().getImplementation().getImageHeight(image);
+                return Display.impl.getImageHeight(image);
             }
         }
-        return Display.getInstance().getImplementation().getImageWidth(image);
+        return Display.impl.getImageWidth(image);
     }
     
     /**
@@ -675,10 +697,10 @@ public class Image {
     public int getHeight() {
         if(transform != 0) {
             if(transform == 90 || transform == 270) {
-                return Display.getInstance().getImplementation().getImageWidth(image);
+                return Display.impl.getImageWidth(image);
             }
         }
-        return Display.getInstance().getImplementation().getImageHeight(image);
+        return Display.impl.getImageHeight(image);
     }
 
     /**
@@ -723,7 +745,7 @@ public class Image {
      * @param imageHeight size of the location within the image to draw
      */
     void drawImageArea(Graphics g, Object nativeGraphics, int x, int y, int imageX, int imageY, int imageWidth, int imageHeight) {
-        Display.getInstance().getImplementation().drawImageArea(nativeGraphics, image, x, y, imageX, imageY, imageWidth, imageHeight);
+        Display.impl.drawImageArea(nativeGraphics, image, x, y, imageX, imageY, imageWidth, imageHeight);
     }
 
     /**
@@ -755,7 +777,7 @@ public class Image {
             int y,
             int width,
             int height){
-        Display.getInstance().getImplementation().getRGB(image, rgbData, offset, x, y, width, height);
+        Display.impl.getRGB(image, rgbData, offset, x, y, width, height);
     }
     
     
@@ -938,6 +960,30 @@ public class Image {
     }
 
     /**
+     * Resizes/crops the image so that its center fills the given dimensions. This is similar to {@link com.codename1.ui.plaf.Style#BACKGROUND_IMAGE_SCALED_FILL}
+     * 
+     * @param width the width to fill
+     * @param height the height to fill
+     * @return a new image (or the same image if dimensions happen to match) filling the width/height 
+     */
+    public Image fill(int width, int height) {
+        if(getWidth() == width && getHeight() == height) {
+            return this;
+        }
+        Image nimage = scaledLargerRatio(width, height);
+        if(nimage.getWidth() > width) {
+            int diff = nimage.getWidth() - width;
+            nimage = nimage.subImage(diff / 2, 0, width, height, true);
+        } else {
+            if(nimage.getHeight() > height) {
+                int diff = nimage.getHeight() - height;
+                nimage = nimage.subImage(0, diff / 2, width, height, true);
+            }
+        }
+        return nimage;
+    }
+    
+    /**
      * Returns the platform specific image implementation, <strong>warning</strong> the
      * implementation class can change between revisions of Codename One and platforms.
      *
@@ -958,7 +1004,7 @@ public class Image {
      * use scaled(int, int) instead
      */
     public void scale(int width, int height) {
-        image = Display.getInstance().getImplementation().scale(image, width, height);
+        image = Display.impl.scale(image, width, height);
     }//resize image
     
     boolean scaleArray(int srcWidth, int srcHeight, int height, int width, int[] currentArray, int[] destinationArray) {
@@ -1005,13 +1051,13 @@ public class Image {
     }
 
     /**
-     * @inheritDoc 
+     * {@inheritDoc} 
      */
     public boolean animate() {
         if(imageTime == -1) {
             imageTime = System.currentTimeMillis();
         }
-        boolean val = Display.getInstance().getImplementation().animateImage(image, imageTime);
+        boolean val = Display.impl.animateImage(image, imageTime);
         imageTime = System.currentTimeMillis();
         return val;
     }
@@ -1023,7 +1069,7 @@ public class Image {
      */
     public boolean isOpaque() {
         if(!opaqueTested) {
-            opaque = Display.getInstance().getImplementation().isOpaque(this, image);
+            opaque = Display.impl.isOpaque(this, image);
             opaqueTested = true;
         }
         return opaque;
@@ -1056,7 +1102,7 @@ public class Image {
      */
     public void dispose(){
         if(image != null) {
-            Display.getInstance().getImplementation().releaseImage(image);
+            Display.impl.releaseImage(image);
         }
         image = null;
     }
@@ -1068,7 +1114,7 @@ public class Image {
      * @return a new image rotated by 90 degrees
      */
     public Image rotate90Degrees(boolean maintainOpacity) {
-        return Display.getInstance().getImplementation().rotate90Degrees(this, maintainOpacity);
+        return Display.impl.rotate90Degrees(this, maintainOpacity);
     }
     
     /**
@@ -1077,7 +1123,7 @@ public class Image {
      * @return a new image rotated by 180 degrees
      */
     public Image rotate180Degrees(boolean maintainOpacity) {
-        return Display.getInstance().getImplementation().rotate180Degrees(this, maintainOpacity);
+        return Display.impl.rotate180Degrees(this, maintainOpacity);
     }
     
     /**
@@ -1086,7 +1132,7 @@ public class Image {
      * @return a new image rotated by 270 degrees
      */
     public Image rotate270Degrees(boolean maintainOpacity) {
-        return Display.getInstance().getImplementation().rotate270Degrees(this, maintainOpacity);
+        return Display.impl.rotate270Degrees(this, maintainOpacity);
     }
     
     /**
@@ -1095,7 +1141,7 @@ public class Image {
      * @return a new image flipped
      */
     public Image flipHorizontally(boolean maintainOpacity) {
-        return Display.getInstance().getImplementation().flipImageHorizontally(this, maintainOpacity);
+        return Display.impl.flipImageHorizontally(this, maintainOpacity);
     }
     
     /**
@@ -1104,6 +1150,17 @@ public class Image {
      * @return a new image flipped
      */
     public Image flipVertically(boolean maintainOpacity) {
-        return Display.getInstance().getImplementation().flipImageVertically(this, maintainOpacity);
+        return Display.impl.flipImageVertically(this, maintainOpacity);
+    }
+    
+    /**
+     * New label optimizations don't invoke drawImage and instead just pass the native image directly to
+     * the underlying renderer. This is problematic for some image types specifically timeline &amp; FontImage
+     * and this method allows these classes to indicate that they need that legacy behavior of calling drawImage.
+     * 
+     * @return true if a drawImage call is a required
+     */
+    public boolean requiresDrawImage() {
+        return false;
     }
 }

@@ -59,6 +59,11 @@ import java.util.Map;
  * the response arrives.
  *
  * @author Shai Almog
+ * @see com.codename1.ui.URLImage
+ * @see com.codename1.io.Util#downloadUrlToFile(java.lang.String, java.lang.String, boolean) 
+ * @see com.codename1.io.Util#downloadUrlToStorage(java.lang.String, java.lang.String, boolean) 
+ * @deprecated this class uses an unconventional storage mechanism and has many issues, we recommend
+ * replacing it with the simpler and more powerful URLImage or Util.dowloadFileTo* calls.
  */
 public class ImageDownloadService extends ConnectionRequest {
 
@@ -382,7 +387,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleException(Exception err) {
         if(onErrorListeners != null) {
@@ -392,7 +397,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void handleErrorResponseCode(int code, String message) {
         if(onErrorListeners != null) {
@@ -767,7 +772,7 @@ public class ImageDownloadService extends ConnectionRequest {
 
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void postResponse() {
         // trigger an exception in case of an invalid image
@@ -844,7 +849,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException  {
         int imageScaleWidth = -1, imageScaleHeight = -1;
@@ -871,6 +876,12 @@ public class ImageDownloadService extends ConnectionRequest {
                     imageScaleWidth = (int)(actualW * r2);
                     imageScaleHeight = (int)(actualH * r2);
                 }
+
+                // workaround for http://stackoverflow.com/questions/35347353/label-image-scale-issue-in-codename-one-library-3-3/35354605
+                if(imageScaleWidth > -1 || imageScaleHeight > -1) {
+                    e = e.scaledEncoded(imageScaleWidth, imageScaleHeight);
+                }
+                
                 result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, keep);
                 //if the storage has failed create the image from the stream
                 if(result == null){
@@ -912,7 +923,7 @@ public class ImageDownloadService extends ConnectionRequest {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean equals(Object o) {
         return (o instanceof ImageDownloadService) && ((ImageDownloadService)o).cacheId != null && 

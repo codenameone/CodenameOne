@@ -80,11 +80,24 @@ public class UITimer {
      * @param repeat whether the timer repeats
      * @param parent  the form to which the timer is bound
      * @param r callback when the timer elapses
-     * @return 
+     * @return the timer instance
      */
     public static UITimer timer(int timeMillis, boolean repeat, Form parent, Runnable r) {
         UITimer uit = new UITimer(r);
         uit.schedule(timeMillis, repeat, parent);
+        return uit;
+    }
+    
+    /**
+     * Convenience method to schedule a UITimer more easily on the current form
+     * @param timeMillis the time from now in milliseconds
+     * @param repeat whether the timer repeats
+     * @param r callback when the timer elapses
+     * @return the timer instance
+     */
+    public static UITimer timer(int timeMillis, boolean repeat, Runnable r) {
+        UITimer uit = new UITimer(r);
+        uit.schedule(timeMillis, repeat, Display.getInstance().getCurrent());
         return uit;
     }
     
@@ -110,7 +123,7 @@ public class UITimer {
     
     class Internal implements Runnable, Animation {
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public boolean animate() {
             testEllapse();
@@ -118,7 +131,7 @@ public class UITimer {
         }
 
         /**
-         * @inheritDoc
+         * {@inheritDoc}
          */
         public void paint(Graphics g) {
         }

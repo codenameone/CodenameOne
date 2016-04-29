@@ -37,9 +37,15 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 /**
- * Main entry point for managing the connection requests, this is essentially a
+ * <p>Main entry point for managing the connection requests, this is essentially a
  * threaded queue that makes sure to route all connections via the network thread
- * while sending the callbacks through the Codename One EDT.
+ * while sending the callbacks through the Codename One EDT.</p>
+ * 
+ * <p>The sample
+ * code below fetches a page of data from the nestoria housing listing API.<br>
+ * You can see instructions on how to display the data in the {@link com.codename1.components.InfiniteScrollAdapter}
+ * class. You can read more about networking in Codename One {@link com.codename1.io here}</p>
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  *
  * @author Shai Almog
  */
@@ -138,6 +144,9 @@ public class NetworkManager {
      * the thread count might fail.
      *
      * @param threadCount the threadCount to set
+     * @deprecated since the network is always running in Codename One this method is quite confusing
+     * unfortunately fixing it will probably break working code. You should migrate the code to use 
+     * {@link #updateThreadCount(int)}
      */
     public void setThreadCount(int threadCount) {
         // in auto detect mode multiple threads can break the detections
@@ -145,11 +154,21 @@ public class NetworkManager {
             this.threadCount = threadCount;
         }
     }
+    
+    /**
+     * Sets the number of network threads and restarts the network threads
+     * @param threadCount the new number of threads
+     */
+    public void updateThreadCount(int threadCount) {
+        this.threadCount = threadCount;
+        shutdown();
+        start();
+    }
 
     class NetworkThread implements Runnable {
         private ConnectionRequest currentRequest;
         private Thread threadInstance;
-        private boolean stopped = false;
+        boolean stopped = false;
 
         public NetworkThread() {
         }
@@ -367,7 +386,8 @@ public class NetworkManager {
             if(aps == null) {
                 aps = new Vector();
                 String[] ids = getAPIds();
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                int idlen = ids.length;
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_WLAN) {
                         aps.insertElementAt(ids[iter ], 0);
@@ -379,7 +399,7 @@ public class NetworkManager {
                 }
                 
                 // add all the 2G networks at the end
-                for(int iter = 0 ; iter < ids.length ; iter++) {
+                for(int iter = 0 ; iter < idlen ; iter++) {
                     int t = getAPType(ids[iter]);
                     if(t == ACCESS_POINT_TYPE_NETWORK2G) {
                         aps.addElement(ids[iter]);
@@ -447,7 +467,8 @@ public class NetworkManager {
                             return;
                         }
                         // check for timeout violations on the currently executing threads
-                        for(int iter = 0 ; iter < networkThreads.length ; iter++) {
+                        int ntlen = networkThreads.length;
+                        for(int iter = 0 ; iter < ntlen ; iter++) {
                             ConnectionRequest c = networkThreads[iter].getCurrentRequest();
                             if(c != null) {
                                 int cTimeout = Math.min(timeout, c.getTimeout());
@@ -489,6 +510,11 @@ public class NetworkManager {
      */
     public void shutdown() {
         running = false;
+        if(networkThreads != null) {
+            for(NetworkThread n : networkThreads) {
+                n.stopped = true;
+            }
+        }
         networkThreads = null;
         synchronized(LOCK) {
             LOCK.notifyAll();
@@ -552,7 +578,7 @@ public class NetworkManager {
      * @param request the request object to add
      */
     public void addToQueueAndWait(final ConnectionRequest request) {
-        class WaitingClass implements Runnable, ActionListener {
+        class WaitingClass implements Runnable, ActionListener<NetworkEvent> {
             private boolean finishedWaiting;
             public void run() {
                 while(!finishedWaiting) {
@@ -564,8 +590,7 @@ public class NetworkManager {
                 }
             }
 
-            public void actionPerformed(ActionEvent evt) {
-                NetworkEvent e = (NetworkEvent)evt;
+            public void actionPerformed(NetworkEvent e) {
                 if(e.getError() != null) {
                     finishedWaiting = true;
                     removeProgressListener(this);
@@ -736,13 +761,13 @@ public class NetworkManager {
     }
 
     /**
-     * Adds a generic listener to a network error that is invoked before the exception is propogated.
+     * Adds a generic listener to a network error that is invoked before the exception is propagated.
      * Notice that this doesn't apply to server error codes!
-     * Consume the event in order to prevent it from propogating further.
+     * Consume the event in order to prevent it from propagating further.
      *
      * @param e callback will be invoked with the Exception as the source object
      */
-    public void addErrorListener(ActionListener e) {
+    public void addErrorListener(ActionListener<NetworkEvent> e) {
         if(errorListeners == null) {
             errorListeners = new EventDispatcher();
             errorListeners.setBlocking(true);
@@ -755,7 +780,7 @@ public class NetworkManager {
      *
      * @param e callback to remove
      */
-    public void removeErrorListener(ActionListener e) {
+    public void removeErrorListener(ActionListener<NetworkEvent> e) {
         if(errorListeners == null) {
             return;
         }
@@ -768,7 +793,7 @@ public class NetworkManager {
      *
      * @param al action listener
      */
-    public void addProgressListener(ActionListener al) {
+    public void addProgressListener(ActionListener<NetworkEvent> al) {
         if(progressListeners == null) {
             progressListeners = new EventDispatcher();
             progressListeners.setBlocking(false);
@@ -781,7 +806,7 @@ public class NetworkManager {
      *
      * @param al action listener
      */
-    public void removeProgressListener(ActionListener al) {
+    public void removeProgressListener(ActionListener<NetworkEvent> al) {
         if(progressListeners == null) {
             return;
         }

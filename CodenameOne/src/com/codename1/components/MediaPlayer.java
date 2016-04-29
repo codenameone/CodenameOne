@@ -39,8 +39,14 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * This is a Media Player Component with control buttons back, play/pause and 
- * forward buttons
+ * <p>Video playback component with control buttons for back, play/pause and 
+ * forward buttons. In the simulator those controls are implemented locally but on the
+ * device the native playback controls are used.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
+ * 
  */
 public class MediaPlayer extends Container {
     private Image playIcon;
@@ -80,7 +86,7 @@ public class MediaPlayer extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void initComponent() {
         if(userSetIcons){
@@ -97,7 +103,7 @@ public class MediaPlayer extends Container {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected Dimension calcPreferredSize() {
         if(video == null && dataSource == null) {
@@ -319,21 +325,21 @@ public class MediaPlayer extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {"backIcon", "forwardIcon", "pauseIcon", "playIcon", "dataSource"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {Image.class, Image.class, Image.class, Image.class, String.class};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("backIcon")) {
@@ -355,7 +361,7 @@ public class MediaPlayer extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("backIcon")) {

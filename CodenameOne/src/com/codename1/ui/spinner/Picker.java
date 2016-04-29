@@ -39,9 +39,17 @@ import java.util.Calendar;
 import java.util.Date;
 
 /**
- * The picker is a component and API that allows either poping up a spinner or
+ * <p>{@code Picker} is a component and API that allows either popping up a spinner or
  * using the native picker API when applicable. This is quite important for some
- * platforms where the native spinner behavior is very hard to replicate.
+ * platforms where the native spinner behavior is very hard to replicate.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/5e437d82812dfcbdf092.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker.png" alt="Picker UI" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-date-time-on-simulator.png" alt="Date And Time Picker On the simulator" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-date-android.png" alt="Android native date picker" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-strings-android.png" alt="Android native String picker" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-time-android.png" alt="Android native time picker" />
+ * 
  *
  * @author Shai Almog
  */
@@ -52,6 +60,8 @@ public class Picker extends Button {
     private Object metaData;
     private Object renderingPrototype;
     private SimpleDateFormat formatter;
+    private int preferredPopupWidth;
+    private int preferredPopupHeight;
     
     /**
      * Default constructor
@@ -80,9 +90,10 @@ public class Picker extends Button {
                                 gs.setRenderingPrototype((String)renderingPrototype);
                             }
                             String[] strArr = (String[])metaData;
-                            gs.setModel(new DefaultListModel(strArr));
+                            gs.setModel(new DefaultListModel((Object[])strArr));
                             if(value != null) {
-                                for(int iter = 0 ; iter < strArr.length ; iter++) {
+                                int slen = strArr.length;
+                                for(int iter = 0 ; iter < slen ; iter++) {
                                     if(strArr[iter].equals(value)) {
                                         gs.getModel().setSelectedIndex(iter);
                                         break;
@@ -232,11 +243,16 @@ public class Picker extends Button {
     }
     
     /**
-     * Sets the string entries for the string picker
+     * <p>Sets the string entries for the string picker. <br>
+     * sample usage for this method below:</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/47602e679f61712693bd.js"></script>
      * @param strs string array
      */
-    public void setStrings(String[] strs) {
-        for (int i = 0; i < strs.length; i++) {
+    public void setStrings(String... strs) {
+        this.type = Display.PICKER_TYPE_STRINGS;
+        int slen = strs.length;
+        for (int i = 0; i < slen; i++) {
             String str = strs[i];
             strs[i] = getUIManager().localize(str, str);
         }
@@ -396,5 +412,49 @@ public class Picker extends Button {
     public void setFormatter(SimpleDateFormat formatter) {
         this.formatter = formatter;
         updateValue();
+    }
+    
+    /**
+     * The preferred width of the popup dialog for the picker.  This will only 
+     * be used on devices where the popup width and height are configurable, such 
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the 
+     * screen along the bottom.
+     * @param width The preferred width of the popup.
+     */
+    public void setPreferredPopupWidth(int width) {
+        this.preferredPopupWidth = width;
+    }
+    
+    /**
+     * The preferred height of the popup dialog for the picker.  This will only 
+     * be used on devices where the popup width and height are configurable, such 
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the 
+     * screen along the bottom.
+     * @param width The preferred width of the popup.
+     */
+    public void setPreferredPopupHeight(int height) {
+        this.preferredPopupHeight = height;
+    }
+    
+    /**
+     * The preferred width of the popup dialog. This will only 
+     * be used on devices where the popup width and height are configurable, such 
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the 
+     * screen along the bottom. 
+     * @return 
+     */
+    public int getPreferredPopupWidth() {
+        return preferredPopupWidth;
+    }
+    
+    /**
+     * The preferred height of the popup dialog.  This will only 
+     * be used on devices where the popup width and height are configurable, such 
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the 
+     * screen along the bottom.
+     * @return 
+     */
+    public int getPreferredPopupHeight() {
+        return preferredPopupHeight;
     }
 }

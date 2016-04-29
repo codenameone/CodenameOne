@@ -23,10 +23,13 @@
 package com.codename1.codescan;
 
 /**
- * Callback for the code scanner indicating the result of a scan operation,
- * the methods of this call will always be invoked on the EDT!
+ * Deprecated!!:  Please use the <a href="https://github.com/codenameone/cn1-codescan">cn1-codescan library</a> instead.
+ * 
+ * <p>Callback for the code scanner indicating the result of a scan operation,
+ * the methods of this call will always be invoked on the EDT!</p>
  *
  * @author Shai Almog
+ * @deprecated Use the cn1-codescanner cn1lib.
  */
 public interface ScanResult {
     /**

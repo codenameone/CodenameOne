@@ -28,6 +28,7 @@
 @implementation DrawStringTextureCache
 static int MAX_CACHE_SIZE = 100;
 -(id)initWithString:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a {
+    stringWidth = -1;
     str = s;
     font = f;
 #ifndef CN1_USE_ARC
@@ -48,6 +49,18 @@ static int MAX_CACHE_SIZE = 100;
 
 static NSMutableArray* cachedStrings = nil;
 static NSMutableArray* pendingDeleteStrings = nil;
+
+-(int)stringWidth {
+    if (stringWidth == -1) {
+       
+        stringWidth = [str sizeWithFont:font].width;
+    }
+    return stringWidth;
+}
+
+-(GLuint)textureName {
+    return textureName;
+}
 
 +(void)cache:(NSString*)s f:(UIFont*)f t:(GLuint)t c:(int)c a:(int)a {
     DrawStringTextureCache* d = [[DrawStringTextureCache alloc] initWithString:s f:f t:t c:c a:a];
@@ -96,7 +109,7 @@ static NSMutableArray* pendingDeleteStrings = nil;
     [font isEqual:o->font];
 }
 
-+(GLuint)checkCache:(NSString*)s f:(UIFont*)f c:(int)c a:(int)a {
++(DrawStringTextureCache*)checkCache:(NSString*)s f:(UIFont*)f c:(int)c a:(int)a {
     DrawStringTextureCache* tmp = [[DrawStringTextureCache alloc] initWithString:s f:f t:0 c:c a:a];
     for(DrawStringTextureCache* d in cachedStrings) {
         if([tmp isEqual:d]) {
@@ -108,13 +121,13 @@ static NSMutableArray* pendingDeleteStrings = nil;
             [d->lastAccess retain];
             [tmp release];
 #endif
-            return d->textureName;
+            return d;
         }
     }
 #ifndef CN1_USE_ARC
     [tmp release];
 #endif
-    return 0;
+    return nil;
 }
 
 #ifndef CN1_USE_ARC
@@ -122,8 +135,10 @@ static NSMutableArray* pendingDeleteStrings = nil;
     [str release];
     [font release];
     [lastAccess release];
-    glDeleteTextures(1, &textureName);
-    GLErrorLog;
+    if (textureName != 0) {
+        glDeleteTextures(1, &textureName);
+        GLErrorLog;
+    }
     [super dealloc];
 }
 #else

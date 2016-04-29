@@ -32,9 +32,45 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * An image that only keeps the binary data of the source file used to load it
- * in permanent memory. This allows the bitmap to get collected while the binary
- * data remains, a weak reference is used for caching.
+ * <p>{@code EncodedImage} is the workhorse of Codename One. Images returned from resource files are 
+ * {@code EncodedImage} and many API's expect it.</p>
+ * 
+ * <p>{@code EncodedImage} is effectively a an image that is "hidden" and extracted as needed to remove the 
+ * memory overhead associated with loaded image. When creating an {@code EncodedImage} only the PNG 
+ * (or JPEG etc.) is loaded to an array in RAM. Normally such images are very small (relatively) so they can be 
+ * kept in memory without much overhead.</p>
+ * 
+ * <p>When image information is needed (pixels) the image is decoded into RAM and kept in a weak/sort 
+ * reference (see {@link com.codename1.ui.Display#createSoftWeakRef(java.lang.Object)}). This allows the 
+ * image to be cached for performance and allows the garbage collector to reclaim it when the memory becomes 
+ * scarce.</p>
+ * 
+ * <p>Since the fully decoded image can be pretty big ({@code width X height X 4}) the ability to store just the 
+ * encoded image can be pretty stark. E.g. A standard 50x100 image will take up 20,000 bytes of RAM for a 
+ * standard image but an {@code EncodedImage} can reduce that to 1kb-2kb of RAM.</p>
+ * 
+ * <p>When drawing an {@code EncodedImage} it checks the weak reference cache and if the image is cached then 
+ * it is shown  otherwise the image is loaded the encoded image cache it then drawn.</p>
+ * 
+ * <p>{@code EncodedImage} is not final and can be derived to produce complex image fetching strategies 
+ * e.g. the {@link com.codename1.ui.URLImage} class that can dynamically download its content from the web.</p>
+ * 
+ * <p>{@code EncodedImage} can be instantiated via the create methods in the class. Pretty much any image 
+ * can be converted into an `EncodedImage` via the  {@link #createFromImage(com.codename1.ui.Image, boolean)} 
+ * method.</p>
+ * 
+ * <h3>EncodedImage Locking</h3>
+ * <p>Naturally loading the image is more expensive so we want the images that are on the current form to remain in 
+ * cache (otherwise GC will thrash a lot). That's where {@link #lock()} kicks in, when {@link #lock()} is active we 
+ * keep a hard reference to the actual native image so it won't get GC'd. This significantly improves performance!</p>
+ * 
+ * <p>Internally this is invoked automatically for background images, icons etc. which results in a huge performance 
+ * boost. This makes sense since these images are currently showing and they will be in RAM anyway. However, 
+ * if you use a complex renderer or custom drawing UI you should {@link #lock()} your images where possible!</p>
+ * 
+ * <p>To verify that locking might be a problem you can launch the performance monitor tool (accessible from 
+ * the simulator menu), if you get log messages that indicate that an unlocked image was drawn you might 
+ * have a problem.</p>
  *
  * @author Shai Almog
  */
@@ -201,7 +237,8 @@ public class EncodedImage extends Image {
         int dpi = Display.getInstance().getDeviceDensity();
         int bestFitOffset = 0;
         int bestFitDPI = 0;
-        for(int iter = 0 ; iter < dpis.length ; iter++) {
+        int dlen = dpis.length;
+        for(int iter = 0 ; iter < dlen ; iter++) {
             int currentDPI = dpis[iter];
             if(dpi == currentDPI) {
                 bestFitOffset = iter;
@@ -253,7 +290,7 @@ public class EncodedImage extends Image {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getImage() {
         return getInternalImpl().getImage();
@@ -329,7 +366,7 @@ public class EncodedImage extends Image {
             if(opaqueChecked) {
                 i.setOpaque(opaque);
             }
-            CodenameOneImplementation impl = Display.getInstance().getImplementation();
+            CodenameOneImplementation impl = Display.impl;
             impl.setImageName(i.getImage(), getImageName());
         } catch(Exception err) {
             err.printStackTrace();
@@ -340,14 +377,14 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isLocked() {
         return locked;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void asyncLock(final Image internal) {
         if(!locked) {
@@ -367,7 +404,7 @@ public class EncodedImage extends Image {
                         if(opaqueChecked) {
                             i.setOpaque(opaque);
                         }
-                        CodenameOneImplementation impl = Display.getInstance().getImplementation();
+                        CodenameOneImplementation impl = Display.impl;
                         impl.setImageName(i.getImage(), getImageName());
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
@@ -389,7 +426,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void lock() {
         if(!locked) {
@@ -401,7 +438,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unlock() {
         if(locked) {
@@ -427,42 +464,42 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image subImage(int x, int y, int width, int height, boolean processAlpha)  {
         return getInternalImpl().subImage(x, y, width, height, processAlpha);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image rotate(int degrees) {
         return getInternalImpl().rotate(degrees);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image modifyAlpha(byte alpha) {
         return getInternalImpl().modifyAlpha(alpha);
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image modifyAlpha(byte alpha, int removeColor) {
         return getInternalImpl().modifyAlpha(alpha, removeColor);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Graphics getGraphics() {        
         return null;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getWidth() {
         if(width > -1) {
@@ -473,7 +510,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getHeight() {
         if(height > -1) {
@@ -484,10 +521,10 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
-        Display.getInstance().getImplementation().drawingEncodedImage(this);
+        Display.impl.drawingEncodedImage(this);
         Image internal = getInternalImpl();
         if(width > -1 && height > -1 && (internal.getWidth() != width || internal.getHeight() != height)) {
             internal.drawImage(g, nativeGraphics, x, y, width, height);
@@ -497,15 +534,15 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
-        Display.getInstance().getImplementation().drawingEncodedImage(this);
+        Display.impl.drawingEncodedImage(this);
         getInternalImpl().drawImage(g, nativeGraphics, x, y, w, h);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void getRGB(int[] rgbData,
             int offset,
@@ -517,7 +554,7 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void toRGB(RGBImage image,
             int destX,
@@ -530,36 +567,47 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaledWidth(int width) {
         return getInternalImpl().scaledWidth(width);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaledHeight(int height) {
         return getInternalImpl().scaledHeight(height);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaledSmallerRatio(int width, int height) {
         return getInternalImpl().scaledSmallerRatio(width, height);
     }
 
     /**
-     * Performs scaling using ImageIO to gnerate an encoded Image
-     * @param width the width of the image
-     * @param height the height of the image
+     * Performs scaling using ImageIO to generate an encoded Image
+     * @param width the width of the image, -1 to scale based on height and preserve aspect ratio
+     * @param height the height of the image, -1 to scale based on width and preserve aspect ratio
      * @return new encoded image
      */
     public EncodedImage scaledEncoded(int width, int height) {
         if(width == getWidth() && height == getHeight()) {
             return this;
         }
+        
+        if(width < 0) {
+            float ratio = ((float)height) / ((float)getHeight());
+            width = Math.max(1, (int)(getWidth() * ratio));
+        } else {
+            if(height < 0) {
+                float ratio = ((float)width) / ((float)getWidth());
+                height = Math.max(1, (int)(getHeight() * ratio));
+            }
+        }
+        
         try {
             ImageIO io = ImageIO.getImageIO();
             if(io != null) {
@@ -592,7 +640,7 @@ public class EncodedImage extends Image {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaled(int width, int height) {
         // J2ME/RIM don't support image IO and Windows Phone doesn't support PNG which prevents
@@ -605,21 +653,21 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void scale(int width, int height) {
         getInternalImpl().scale(width, height);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return false;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isOpaque() {
         if(opaqueChecked) {

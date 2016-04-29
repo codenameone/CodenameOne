@@ -23,6 +23,7 @@
 
 package com.codename1.tools.translator.bytecodes;
 
+import java.util.Objects;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
@@ -97,6 +98,34 @@ public class LocalVariable extends Instruction {
         }
     }
     
+    public char getQualifier() {
+        switch (desc.charAt(0)) {
+            case 'B' :
+            case 'C' :
+            case 'Z' :
+            case 'I' : 
+            case 'S' :
+                return 'i';
+            case 'J' :
+                return 'l';
+            case 'F' :
+                return 'f';
+            case 'D' : 
+                return 'd';
+            case 'L' :
+            case '[' :
+                return 'o';
+            default :
+                throw new RuntimeException("Unknown local variable type "+desc);
+               
+        }
+        
+    }
+    
+    public String getOrigName() {
+        return name;
+    }
+    
     public String getVarName() {
         if(name.equals("this")) {
             return "__cn1ThisObject";
@@ -136,5 +165,25 @@ public class LocalVariable extends Instruction {
         b.append("_");
         b.append(index);
         return b.toString();
+    }
+    
+    @Override
+    public boolean equals(Object o) {
+        if (o == null) {
+            return false;
+        }
+        if (o.getClass() == LocalVariable.class) {
+            LocalVariable lv = (LocalVariable)o;
+            return lv.getIndex() == this.getIndex() && lv.getQualifier() == this.getQualifier();
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 3;
+        hash = 19 * hash + Objects.hashCode(this.desc);
+        hash = 19 * hash + this.index;
+        return hash;
     }
 }

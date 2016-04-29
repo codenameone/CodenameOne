@@ -31,9 +31,17 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.FlowLayout;
 
 /**
- * Allows adapting a scroll container to scroll indefinitely (or at least until
- * we run out of data), this effectively works by showing an infinite progress
- * indicator when reaching scroll end then allowing code to fetch more components.
+ * <p>Allows adapting a scroll container to scroll indefinitely (or at least until
+ * running out of data), this effectively works by showing an infinite progress
+ * indicator when reaching scroll end then allowing code to fetch additional components.</p>
+ * 
+ * <p>
+ * The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/af27af111ba766627363.js"></script>
+ * 
+ * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" /><br><br>
+ * 
  *
  * @author Shai Almog
  */
@@ -42,6 +50,7 @@ public class InfiniteScrollAdapter {
     private Runnable fetchMore;
     private Component ip;
     private int componentLimit = -1;
+    private InfiniteProgress progress;
     
     class EdgeMarker extends Component {
         private boolean top;
@@ -62,7 +71,7 @@ public class InfiniteScrollAdapter {
     private Component endMarker = new EdgeMarker(true);
     
     private InfiniteScrollAdapter() {
-        InfiniteProgress progress = new InfiniteProgress();
+        progress = new InfiniteProgress();
         Container p = new Container(new FlowLayout(Component.CENTER));
         p.addComponent(progress);
         ip = p;
@@ -84,6 +93,7 @@ public class InfiniteScrollAdapter {
      * 
      * @param cont the container to bind, it MUST be empty and must be scrollable on the Y axis
      * @param fetchMore a callback that will be invoked on the EDT to fetch more data (do not block this method)
+     * @return an instance of this class that can be used to add components
      */
     public static InfiniteScrollAdapter createInfiniteScroll(Container cont, Runnable fetchMore) {
         return createInfiniteScroll(cont, fetchMore, true);
@@ -99,6 +109,7 @@ public class InfiniteScrollAdapter {
      * @param cont the container to bind, it MUST be empty and must be scrollable on the Y axis
      * @param fetchMore a callback that will be invoked on the EDT to fetch more data (do not block this method)
      * @param fetchOnCreate if true the fetchMore callback is called upon calling this method
+     * @return an instance of this class that can be used to add components
      */
     public static InfiniteScrollAdapter createInfiniteScroll(Container cont, Runnable fetchMore, boolean fetchOnCreate) {
         InfiniteScrollAdapter a = new InfiniteScrollAdapter();
@@ -178,5 +189,12 @@ public class InfiniteScrollAdapter {
     public void setComponentLimit(int componentLimit) {
         this.componentLimit = componentLimit;
     }
-    
+
+    /**
+     * Lets us manipulate the infinite progress object e.g. set the animation image etc.
+     * @return the infinite progress component underlying this adapter
+     */
+    public InfiniteProgress getInfiniteProgress() {
+        return progress;
+    }
 }

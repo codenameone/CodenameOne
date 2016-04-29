@@ -28,7 +28,13 @@ import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
- * Codename One port of the infamous GridBagLayout based on the Apache Harmony code
+ * <p>Codename One port of the infamous GridBagLayout based on the Apache Harmony code. For new applications
+ * we generally recommend a "native" Codename One layout such as {@link com.codename1.ui.table.TableLayout}
+ * and recommend avoiding this layout. Its here for developers who are accustomed to it and need to port existing code.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/6266580.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/gridbag-layout.png" alt="Sample gridbag layout usage" />
+ * 
  */
 public class GridBagLayout extends Layout {
     protected static final int MAXGRIDSIZE = 512;
@@ -78,12 +84,12 @@ public class GridBagLayout extends Layout {
             }
             cons = defaultConstraints;
         }
-        try {
+        /*try {
             //cons.verify();
         } catch (IllegalArgumentException e) {
             // awt.81=AddLayoutComponent: {0}
             throw new IllegalArgumentException("AddLayoutComponent: " + e.getMessage()); //$NON-NLS-1$
-        }
+        }*/
         GridBagConstraints consClone = (GridBagConstraints) cons.clone();
         comptable.put(comp, consClone);
         Container parent = comp.getParent();
@@ -109,12 +115,12 @@ public class GridBagLayout extends Layout {
 
     public void setConstraints(Component comp, GridBagConstraints constraints) {
         GridBagConstraints consClone = (GridBagConstraints) constraints.clone();
-        try {
+        /*try {
             //                consClone.verify();
         } catch (IllegalArgumentException e) {
             // awt.85=SetConstraints: {0}
             throw new IllegalArgumentException("SetConstraints: " + e.getMessage()); //$NON-NLS-1$
-        }
+        }*/
         ParentInfo info = getParentInfo(comp.getParent());
         if (info != null) {
             GridBagConstraints cons = comptable.get(comp);
@@ -147,6 +153,7 @@ public class GridBagLayout extends Layout {
             validate(parent, info);
         } catch (RuntimeException e) {
             // awt.87=PreferredLayoutSize: {0}
+            e.printStackTrace();
             throw new IllegalArgumentException("PreferredLayoutSize: " + e.getMessage()); //$NON-NLS-1$
         }
         Dimension d = info.grid.preferredSize();
@@ -165,6 +172,7 @@ public class GridBagLayout extends Layout {
             arrangeGridImpl(parent, info);
         } catch (RuntimeException e) {
             // awt.88=LayoutContainer: {0}
+            e.printStackTrace();
             throw new IllegalArgumentException("LayoutContainer: " + e.getMessage()); //$NON-NLS-1$
         }
         setComponentsBounds(info);
@@ -238,6 +246,7 @@ public class GridBagLayout extends Layout {
             arrangeGridImpl(parent, info);
         } catch (RuntimeException e) {
             // awt.86=MinimumLayoutSize: {0}
+            e.printStackTrace();
             throw new IllegalArgumentException("MinimumLayoutSize: " + e.getMessage()); //$NON-NLS-1$
         }
     }
@@ -273,12 +282,12 @@ public class GridBagLayout extends Layout {
     }*/
 
     protected void AdjustForGravity(GridBagConstraints constraints, Rectangle r) {
-        try {
+        /*try {
             //                ((GridBagConstraints) constraints).verify();
         } catch (IllegalArgumentException e) {
             // awt.8C={0}
             throw new IllegalArgumentException("AdjustForGravity: " + e.getMessage()); //$NON-NLS-1$
-        }
+        }*/
         //Don't get parent as param, so have to use older info if exists
         if (layoutInfo == null) {
             r.setBounds(0, 0, 0, 0);

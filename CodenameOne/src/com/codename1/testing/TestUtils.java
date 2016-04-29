@@ -275,7 +275,7 @@ public class TestUtils {
         Form f = Display.getInstance().getCurrent();
         Command c = f.getBackCommand();
         assertBool(c != null, "The current form doesn't have a back command at this moment! for form name " + f.getName());
-        f.dispatchCommand(c, new ActionEvent(c));
+        f.dispatchCommand(c, new ActionEvent(c,ActionEvent.Type.Command));
         waitFor(20);
     }
 
@@ -291,7 +291,7 @@ public class TestUtils {
         for(int iter = 0 ; iter < f.getCommandCount() ; iter++) {
             Command c = f.getCommand(iter);
             if(name.equals(c.getCommandName())) {
-                f.dispatchCommand(c, new ActionEvent(c));
+                f.dispatchCommand(c, new ActionEvent(c,ActionEvent.Type.Command));
                 return;
             }
         }
@@ -401,7 +401,7 @@ public class TestUtils {
      * If this is the first time the test is run then the screenshot is taken
      * and saved under the given name in the devices storage. The test passes
      * for this case but a warning is printed to the console. The name will have
-     * .png appended to it so it will be identified.<br/>
+     * .png appended to it so it will be identified.<br>
      * This test will only work on devices that support the ImageIO API with PNG
      * file format.
      *

@@ -84,8 +84,8 @@ public class Properties extends HashMap<String, String> {
             buffer.append("\\ ");
             i++;
         }
-
-        for (; i < string.length(); i++) {
+        int slen = string.length();
+        for (; i < slen; i++) {
             char ch = string.charAt(i);
             switch (ch) {
             case '\t':
@@ -109,7 +109,8 @@ public class Properties extends HashMap<String, String> {
                 } else {
                     String hex = Integer.toHexString(ch);
                     buffer.append("\\u");
-                    for (int j = 0; j < 4 - hex.length(); j++) {
+                    int hlen = hex.length();
+                    for (int j = 0; j < 4 - hlen; j++) {
                         buffer.append("0");
                     }
                     buffer.append(hex);

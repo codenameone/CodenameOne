@@ -95,6 +95,7 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
+import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.payment.Product;
@@ -107,6 +108,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
+import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseWheelEvent;
@@ -116,6 +118,9 @@ import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
+import java.awt.image.BufferedImageOp;
+import java.awt.image.ConvolveOp;
+import java.awt.image.Kernel;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
@@ -142,8 +147,11 @@ import javafx.util.Duration;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.MenuEvent;
+import javax.swing.event.MenuListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -203,6 +211,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     private String[] imageExtensions = new String[] {"png", "jpg", "jpeg"};
     
+    private boolean menuDisplayed = false;
     
     /**
      * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
@@ -374,6 +383,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static boolean exposeFilesystem;
     private boolean scrollWheeling;
     
+    private JComponent textCmp;
+
     
     public static void blockMonitors() {
         blockMonitors = true;
@@ -584,6 +595,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void blit() {
+            if(menuDisplayed){
+                return;
+            }
             try {
                 Runnable r = new Runnable() {
                     public void run() {
@@ -1411,7 +1425,24 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             JMenu simulatorMenu = new JMenu("Simulate");
             simulatorMenu.setDoubleBuffered(true);
+            simulatorMenu.addMenuListener(new MenuListener(){
 
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            
             JMenuItem rotate = new JMenuItem("Rotate");
             simulatorMenu.add(rotate);
             JMenu zoomMenu = new JMenu("Zoom");
@@ -1660,8 +1691,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         System.err.println("This simulation requires jdk 7");
                         return;
                     }
-                    locSimulation = new LocationSimulation();
-
+                    if(locSimulation==null) {
+                            locSimulation = new LocationSimulation();
+                    } else {
+                            locSimulation.setVisible(true);
+                    }
                 }
             });
             simulatorMenu.add(locactionSim);
@@ -1783,6 +1817,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             
 
             JMenu skinMenu = createSkinsMenu(frm, null);
+            skinMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+                
+                
+            
+            });
+            
 
             final JCheckBoxMenuItem touchFlag = new JCheckBoxMenuItem("Touch", touchDevice);
             simulatorMenu.add(touchFlag);
@@ -1838,6 +1893,24 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             JMenu helpMenu = new JMenu("Help");
             helpMenu.setDoubleBuffered(true);
+            helpMenu.addMenuListener(new MenuListener(){
+
+                @Override
+                public void menuSelected(MenuEvent e) {
+                    menuDisplayed = true;
+                }
+
+                @Override
+                public void menuCanceled(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+
+                @Override
+                public void menuDeselected(MenuEvent e) {
+                    menuDisplayed = false;
+                }
+            });
+            
 
             JMenuItem javadocs = new JMenuItem("Javadocs");
             javadocs.addActionListener(new ActionListener() {
@@ -3001,6 +3074,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Display.getInstance().invokeAndBlock(l);
     }
 
+    
     /**
      * @inheritDoc
      */
@@ -3038,21 +3112,70 @@ public class JavaSEPort extends CodenameOneImplementation {
                 };
             }
             swingT = t;
+            textCmp = swingT;
         } else {
-            com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
+            final com.codename1.ui.TextArea ta = (com.codename1.ui.TextArea)cmp;
             JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
                 public void repaint(long tm, int x, int y, int width, int height) {
+                    
+                    int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
+                    int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
+                    int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                    int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                    Rectangle bounds;
+                    if (getSkin() != null) {
+                        bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+                                (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
+                                (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
+                                (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
+                        
+                    } else {
+                        bounds = new Rectangle(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+                    }
+                    if(textCmp != null && !textCmp.getBounds().equals(bounds)){
+                        textCmp.setBounds(bounds);
+                    }
+                    
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             cmp.repaint();
                         }
                     });
                 }
+                
             };
             t.setWrapStyleWord(true);
             t.setLineWrap(true);
             swingT = t;
+            JScrollPane pane = new JScrollPane(swingT);
+            pane.setBorder(null);
+            pane.setOpaque(false);
+            pane.getViewport().setOpaque(false);
+            pane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+            pane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            textCmp = pane;
         }
+        DefaultCaret caret = (DefaultCaret) swingT.getCaret();
+        caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);            
+        swingT.setFocusTraversalKeysEnabled(false);
+        TextEditUtil.setCurrentEditComponent(cmp);
+        final javax.swing.text.JTextComponent txt = swingT;
+        txt.addKeyListener(new KeyListener() {
+            @Override
+            public void keyTyped(KeyEvent e) {
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if(e.getKeyCode() == KeyEvent.VK_TAB) {
+                    TextEditUtil.editNextTextArea();
+                }
+            }
+        });
         swingT.setBorder(null);
         swingT.setOpaque(false);
         swingT.setForeground(new Color(cmp.getUnselectedStyle().getFgColor()));
@@ -3067,20 +3190,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             setText(tf, text);
         }
-        canvas.add(tf);
+        textCmp.setBorder(null);
+        textCmp.setOpaque(false);
+        
+        canvas.add(textCmp);
         int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
         int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
         int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
         int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
         if (getSkin() != null) {
-            tf.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
+            textCmp.setBounds((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
                     (int) ((cmp.getAbsoluteY() + cmp.getScrollY() + getScreenCoordinates().y + canvas.y + marginTop) * zoomLevel),
                     (int) ((cmp.getWidth() - marginLeft - marginRight) * zoomLevel), 
                     (int) ((cmp.getHeight() - marginTop - marginBottom)* zoomLevel));
             java.awt.Font f = font(cmp.getStyle().getFont().getNativeFont());
             tf.setFont(f.deriveFont(f.getSize2D() * zoomLevel));
         } else {
-            tf.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
+            textCmp.setBounds(cmp.getAbsoluteX() + cmp.getScrollX() + marginLeft, cmp.getAbsoluteY() + cmp.getScrollY() + marginTop, cmp.getWidth() - marginRight - marginLeft, cmp.getHeight() - marginTop - marginBottom);
             tf.setFont(font(cmp.getStyle().getFont().getNativeFont()));
         }
         setCaretPosition(tf, getText(tf).length());
@@ -3090,7 +3216,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         class Listener implements ActionListener, FocusListener, KeyListener, TextListener, Runnable, DocumentListener {
 
             public synchronized void run() {
-                while (tf.getParent() != null) {
+                while (textCmp.getParent() != null) {
                     try {
                         wait(20);
                     } catch (InterruptedException ex) {
@@ -3110,7 +3236,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 ((JTextComponent) tf).getDocument().removeDocumentListener(this);
                 
                 tf.removeFocusListener(this);
-                canvas.remove(tf);
+                canvas.remove(textCmp);
                 synchronized (this) {
                     notify();
                 }
@@ -3736,12 +3862,29 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setClip(Object graphics, int x, int y, int width, int height) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
-        nativeGraphics.setClip(x, y, width, height);
+        nativeGraphics.setClip(x, y, width, height);        
         if (perfMonitor != null) {
             perfMonitor.setClip(x, y, width, height);
         }
     }
 
+    /**
+     * @inheritDoc
+     */
+    public boolean isShapeClipSupported(Object graphics){
+        return true;
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public void setClip(Object graphics, com.codename1.ui.geom.Shape shape){
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        Shape s = cn1ShapeToAwtShape(shape);
+        nativeGraphics.setClip(s);
+    }
+    
     /**
      * @inheritDoc
      */
@@ -3759,6 +3902,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D g2d = getGraphics(graphics);
         Shape currentClip = g2d.getClip();
+        AffineTransform at = g2d.getTransform();
+        if (!at.isIdentity()) {
+            try {
+                at.invert();
+            } catch (Exception ex){}
+        }
+        
+        currentClip = at.createTransformedShape(currentClip);
         
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
@@ -3775,6 +3926,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
             Shape oldClip = g.clipStack.pop();
+            
             g2d.setClip(oldClip);
         }
         
@@ -3902,6 +4054,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void setAlpha(Object graphics, int alpha) {
+        if(alpha > 255 || alpha < 0) {
+            throw new IllegalArgumentException("Invalid value for alpha: " + alpha);
+        }
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         float a = ((float) alpha) / 255.0f;
@@ -4547,6 +4702,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return clamp(AffineTransform.getTranslateInstance(translateX, translateY));
     }
 
+    @Override
+    public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        at.setToTranslation(translateX, translateY);
+        at.setTransform(clamp(at));
+    }
+
     /**
      * Makes a new native scale transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4561,7 +4723,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
         return clamp(AffineTransform.getScaleInstance(scaleX, scaleY));
     }
+    
+    
 
+    @Override
+    public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        at.setToScale(scaleX, scaleY);
+        at.setTransform(clamp(at));
+       
+    }
+    
     /**
      * Makes a new native rotation transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4578,6 +4750,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         return clamp(AffineTransform.getRotateInstance(angle, x, y));
     }
 
+    @Override
+    public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        at.setToRotation(angle, x, y);
+        at.setTransform(clamp(at));
+    }
+
+    
+    
     /**
      * Makes a new perspective transform. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4591,9 +4772,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @see #isPerspectiveTransformSupported()
      */
     public Object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar) {
-        throw new RuntimeException("Transforms not supported");
+        throw new RuntimeException("Perspective transform not supported");
     }
 
+    @Override
+    public void setTransformPerspective(Object nativeTransform, float fovy, float aspect, float zNear, float zFar) {
+        throw new RuntimeException("Perspective transforms not supported");
+    }
+
+    
+    
     /**
      * Makes a new orthographic projection transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4609,9 +4797,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @see #isPerspectiveTransformSupported()
      */
     public Object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far) {
-        throw new RuntimeException("Transforms not supported");
+        throw new RuntimeException("Perspective transforms not supported");
     }
 
+    @Override
+    public void setTransformOrtho(Object nativeGraphics, float left, float right, float bottom, float top, float near, float far) {
+        throw new RuntimeException("Perspective transforms not supported");
+    }
+
+    
+    
     /**
      * Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -4633,6 +4828,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    @Override
+    public void setTransformCamera(Object nativeGraphics, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        throw new RuntimeException("Perspective transforms not supported");
+    }
+
+    
+    
     /**
      * Rotates the provided  transform.
      * @param nativeTransform The transform to rotate. Each implementation can decide the format
@@ -4702,6 +4904,20 @@ public class JavaSEPort extends CodenameOneImplementation {
            return null;
        }
     }
+
+    @Override
+    public void setTransformInverse(Object nativeTransform) throws com.codename1.ui.Transform.NotInvertibleException {
+        AffineTransform at = (AffineTransform)nativeTransform;
+        
+        try {
+            at.invert();
+            at.setTransform(clamp(at));
+        } catch (Exception ex) {
+            throw new com.codename1.ui.Transform.NotInvertibleException();
+        }
+    }
+    
+    
     
     /**
      * Makes a new identity native transform. Each implementation can decide the format
@@ -4714,6 +4930,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object makeTransformIdentity(){
         return new AffineTransform();
     }
+
+    @Override
+    public void setTransformIdentity(Object transform) {
+        AffineTransform at = (AffineTransform)transform;
+        at.setToIdentity();
+    }
+    
+    
+    
 
     /**
      * Copies the setting of one transform into another.  Each implementation can decide the format
@@ -4759,7 +4984,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         clamp(out);
     }
 
-    // END TRANSFORM STUFF
+    
     @Override
     public void setTransform(Object graphics, Transform transform) {
         checkEDT();
@@ -4768,8 +4993,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         t.concatenate((AffineTransform)transform.getNativeTransform());
         clamp(t);
         g.setTransform(t);
+        Transform existing = getNativeScreenGraphicsTransform(graphics);
+        if (existing == null) {
+            existing = transform.copy();
+            setNativeScreenGraphicsTransform(graphics, existing);
+        } else {
+            existing.setTransform(transform);
+        }
         
-        setNativeScreenGraphicsTransform(graphics, transform);
     }
 
     @Override
@@ -4779,9 +5010,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ( t == null ){
             return Transform.makeIdentity();
         }
-        return t;
+        return t.copy();
+    }
+
+    @Override
+    public void getTransform(Object graphics, Transform transform) {
+        checkEDT();
+        com.codename1.ui.Transform t = getNativeScreenGraphicsTransform(graphics);
+        if ( t == null ){
+            transform.setIdentity();
+        } else {
+            transform.setTransform(t);
+        }
+
     }
     
+    
+    
+    // END TRANSFORM STUFF
     
     
     private com.codename1.ui.geom.Shape awtShapeToCn1Shape(Shape shape){
@@ -5167,15 +5413,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         LinkedList<Shape> clipStack = new LinkedList<Shape>();
     }
     
+    private Object lastNativeGraphics;
+    private Transform lastNativeGraphicsTransform;
+    
     private void setNativeScreenGraphicsTransform(Object nativeGraphics, com.codename1.ui.Transform transform){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             ((NativeScreenGraphics)nativeGraphics).transform = transform;
+        } else {
+            lastNativeGraphics = nativeGraphics;
+            lastNativeGraphicsTransform = transform;
         }
     }
     
     private com.codename1.ui.Transform getNativeScreenGraphicsTransform(Object nativeGraphics){
         if ( nativeGraphics instanceof NativeScreenGraphics ){
             return ((NativeScreenGraphics)nativeGraphics).transform;
+        } else if (lastNativeGraphics == nativeGraphics) {
+            return lastNativeGraphicsTransform;
         }
         return null;
     }
@@ -5917,7 +6171,29 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public LocationManager getLocationManager() {
-        return StubLocationManager.getLocationManager();
+        // the location simulation should ONLY apply to the simulator and not to JavaSE port, designer etc.
+        if(portraitSkin != null) {
+            return StubLocationManager.getLocationManager();
+        }
+        return new LocationManager() {
+            @Override
+            public Location getCurrentLocation() throws IOException {
+                return new Location();
+            }
+
+            @Override
+            public Location getLastKnownLocation() {
+                return new Location();
+            }
+
+            @Override
+            protected void bindListener() {
+            }
+
+            @Override
+            protected void clearListener() {
+            }
+        };
     }
 
     @Override
@@ -5983,6 +6259,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         Contact contact = getContactById(id);
         c.setId(contact.getId());
         c.setDisplayName(contact.getDisplayName());
+        
+        if(includesPicture){
+            c.setPhoto(contact.getPhoto());
+        }
         
         if (includesFullName) {
             c.setFirstName(contact.getFirstName());
@@ -6414,6 +6694,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JPanel cnt = new JPanel();
         private MediaView v;
         private boolean init = false;
+        private Rectangle bounds = new Rectangle();
 
         public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
             super(null);
@@ -6501,7 +6782,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         }
-
+        
+        
         @Override
         protected void onPositionSizeChange() {
             final int x = getAbsoluteX();
@@ -6509,32 +6791,45 @@ public class JavaSEPort extends CodenameOneImplementation {
             final int w = getWidth();
             final int h = getHeight();
 
-            Platform.runLater(new Runnable() {
+            int screenX = 0;
+            int screenY = 0;
+            if(getScreenCoordinates() != null) {
+                screenX = getScreenCoordinates().x;
+                screenY = getScreenCoordinates().y;
+            }
+            bounds.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
+                    (int) ((y + screenY + canvas.y) * zoomLevel),
+                    (int) (w * zoomLevel),
+                    (int) (h * zoomLevel));
+            
+            if(!bounds.equals(cnt.getBounds())){
+            
+                Platform.runLater(new Runnable() {
 
-                @Override
-                public void run() {
-                    v.setFitWidth(w * zoomLevel);
-                    v.setFitHeight(h * zoomLevel);
+                    @Override
+                    public void run() {
 
-                    SwingUtilities.invokeLater(new Runnable() {
+                        v.setFitWidth(w * zoomLevel);
+                        v.setFitHeight(h * zoomLevel);
 
-                        @Override
-                        public void run() {
-                            int screenX = 0;
-                            int screenY = 0;
-                            if(getScreenCoordinates() != null) {
-                                screenX = getScreenCoordinates().x;
-                                screenY = getScreenCoordinates().y;
+                        SwingUtilities.invokeLater(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                cnt.setBounds(bounds);
+                                cnt.validate();
+                                Display.getInstance().callSerially(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        getComponentForm().repaint();
+                                    }
+                                });
                             }
-                            cnt.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
-                                    (int) ((y + screenY + canvas.y) * zoomLevel),
-                                    (int) (w * zoomLevel),
-                                    (int) (h * zoomLevel));
-                            cnt.validate();
-                        }
-                    });
-                }
-            });
+                        });
+                    }
+                });
+            }
 
         }
     }
@@ -7318,13 +7613,20 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private Hashtable initContacts() {
         Hashtable retVal = new Hashtable();
-
+        
+        Image img = null;
+        try {
+            img = Image.createImage(getClass().getResourceAsStream("/com/codename1/impl/javase/user.jpg"));
+        } catch (IOException ex) {
+        }
+        
         Contact contact = new Contact();
         contact.setId("1");
 
         contact.setDisplayName("Chen Fishbein");
         contact.setFirstName("Chen");
         contact.setFamilyName("Fishbein");
+        contact.setPhoto(img);
 
         Hashtable phones = new Hashtable();
         phones.put("mobile", "+111111");
@@ -7332,7 +7634,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setPhoneNumbers(phones);
         
         Hashtable emails = new Hashtable();
-        emails.put("work", "chen@codenameone.com");
+        emails.put("work", "----");
         contact.setEmails(emails);
 
         Hashtable addresses = new Hashtable();
@@ -7349,13 +7651,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Shai Almog");
         contact.setFirstName("Shai");
         contact.setFamilyName("Almog");
+        contact.setPhoto(img);
 
         phones = new Hashtable();
         phones.put("mobile", "+111111");
         phones.put("home", "+222222");
         contact.setPhoneNumbers(phones);
         emails = new Hashtable();
-        emails.put("work", "shai@codenameone.com");
+        emails.put("work", "----");
         contact.setEmails(emails);
 
         addresses = new Hashtable();
@@ -7419,6 +7722,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         contact.setDisplayName("Kenny McCormick");
         contact.setFirstName("Kenny");
         contact.setFamilyName("McCormick");
+        contact.setPhoto(img);
 
 
         phones = new Hashtable();
@@ -7520,6 +7824,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 return shrink(arr, size);
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 err.printStackTrace();
                 errorMessage = err.toString();
                 return null;
@@ -7541,6 +7846,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 os.write(param);
                 os.flush();
             } catch(IOException err) {
+                socketInstance = null;	// no longer connected
                 errorMessage = err.toString();
                 err.printStackTrace();
             }
@@ -7680,10 +7986,34 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
 
+        String sep = File.separator;
+        File[] searchPaths = new File[]{
+            new File(f.getParent(), "build" + sep + "classes"+ sep + "html"),
+            new File(f.getParent(), "src" + sep + "html"),
+            new File(f.getParent(), "lib" + sep + "impl" + sep + "cls" + sep + "html")
+        };
+        
+        File u = null;
+        boolean found = false;
+        for (File htmldir : searchPaths) {
+            u = new File(htmldir, url);
+            if (u.exists()) {
+                u = htmldir;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            throw new RuntimeException("Could not display browser page "+url+" because it doesn't exist in bundle html hierarchy.");
+        }
+        /*
         File u = new File(f.getParent(), "build" + File.separator + "classes"+ File.separator + "html");
         if (!u.exists()) {
             u = new File(f.getParent(), "src" + File.separator + "html");
         }
+        if (!u.exists()) {
+            u = new File(f.getParent(), "lib" + File.separator + "impl" + File.separator + "cls" + File.separator )
+        }*/
         String base = u.toURI().toURL().toExternalForm(); 
         if(base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
@@ -7714,5 +8044,158 @@ public class JavaSEPort extends CodenameOneImplementation {
                 destination.close();
             }
         }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public PeerComponent createNativePeer(Object nativeComponent) {
+        if (!(nativeComponent instanceof java.awt.Component)) {
+            throw new IllegalArgumentException(nativeComponent.getClass().getName());
+        }
+        java.awt.Container cnt = canvas.getParent();
+        while (!(cnt instanceof JFrame)) {
+            cnt = cnt.getParent();
+            if (cnt == null) {
+                return null;
+            }
+        }
+        
+        return new JavaSEPort.Peer((JFrame)cnt, (java.awt.Component) nativeComponent);
+    }
+    
+    public Image gaussianBlurImage(Image image, float radius) {
+        GaussianFilter gf = new GaussianFilter(radius);
+        Image bim = Image.createImage(image.getWidth(), image.getHeight());        
+        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());        
+        return new NativeImage(blurredImage);
+    }
+
+    public boolean isGaussianBlurSupported() {
+        return true;
+    }
+ 
+    class NativeImage extends Image {
+
+        public NativeImage(BufferedImage nativeImage) {
+            super(nativeImage);
+        }
+    }
+    
+    class Peer extends PeerComponent {
+        
+        private JPanel cnt = new JPanel();
+        private boolean init = false;
+        private JFrame frm;
+        private java.awt.Component cmp;
+        
+        Peer(JFrame f, java.awt.Component c) {
+            super(null);
+            this.frm = f;
+            this.cmp = c;
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    //cmp.setPreferredSize(cmp.getPreferredSize());
+                    cnt.setLayout(new BorderLayout());
+                    cnt.add(BorderLayout.CENTER, cmp);
+                    cnt.setVisible(false);
+                }
+            });
+        }
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+        }
+
+        @Override
+        protected void deinitialize() {
+            super.deinitialize();
+            if (testRecorder != null) {
+                testRecorder.dispose();
+                testRecorder = null;
+            }
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    frm.remove(cnt);
+                    frm.repaint();
+                }
+            });
+        }
+
+        protected void setLightweightMode(final boolean l) {
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+
+                    if (!l) {
+                        if (!init) {
+                            init = true;
+                            cnt.setVisible(true);
+                            frm.add(cnt, 0);
+                            frm.repaint();
+                        } else {
+                            cnt.setVisible(false);
+                        }
+                    } else {
+                        if (init) {
+                            cnt.setVisible(false);
+                        }
+                    }
+                }
+            });
+
+        }
+
+        @Override
+        protected com.codename1.ui.geom.Dimension calcPreferredSize() {
+            //return new com.codename1.ui.geom.Dimension(50, 50);
+            return new com.codename1.ui.geom.Dimension((int)cmp.getPreferredSize().getWidth(), 
+                    (int)cmp.getPreferredSize().getHeight());
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            if (init) {
+                onPositionSizeChange();
+            }else{
+                if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
+                    setLightweightMode(false);
+                }
+            }
+        }
+
+        @Override
+        protected void onPositionSizeChange() {
+            final int x = getAbsoluteX();
+            final int y = getAbsoluteY();
+            final int w = getWidth();
+            final int h = getHeight();
+
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    int screenX = 0;
+                    int screenY = 0;
+                    if(getScreenCoordinates() != null) {
+                        screenX = getScreenCoordinates().x;
+                        screenY = getScreenCoordinates().y;
+                    }
+                    cnt.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
+                            (int) ((y + screenY + canvas.y) * zoomLevel),
+                            (int) (w * zoomLevel),
+                            (int) (h * zoomLevel));
+                    cnt.validate();
+                }
+            });
+
+        }
+
     }
 }

@@ -59,11 +59,12 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void lock() {
         if(animations != null) {
-            for(int iter = 0 ; iter < animations.length ; iter++) {
+            int alen = animations.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 animations[iter].lock();
             }
         }
@@ -71,18 +72,19 @@ public final class Timeline extends Image implements Animation, Painter {
 
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void unlock() {
         if(animations != null) {
-            for(int iter = 0 ; iter < animations.length ; iter++) {
+            int alen = animations.length;
+            for(int iter = 0 ; iter < alen ; iter++) {
                 animations[iter].unlock();
             }
         }
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int[] getRGB() {
         Image i = Image.createImage(getWidth(), getHeight());
@@ -91,7 +93,7 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int[] getRGBCached() {
         return getRGB();
@@ -153,14 +155,14 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean isAnimation() {
         return true;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public boolean animate() {
         if(!pause) {
@@ -188,14 +190,14 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g) {
         paint(g, null);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void paint(Graphics g, Rectangle rect) {
         float scaleX = 1;
@@ -208,7 +210,8 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     private void paintScaled(Graphics g, float scaleX, float scaleY) {
-        for(int iter = 0 ; iter < animations.length ; iter++) {
+        int alen = animations.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             int s = animations[iter].getStartTime();
             if(s > -1 && s > time) {
                 continue;
@@ -245,7 +248,7 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         g.translate(x, y);
@@ -260,7 +263,18 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
+     */
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+        g.translate(x, y);
+        float scaleX = ((float)w) / ((float)size.getWidth());
+        float scaleY = ((float)h) / ((float)size.getHeight());
+        paintScaled(g, scaleX, scaleY);
+        g.translate(-x, -y);
+    }
+    
+    /**
+     * {@inheritDoc}
      */
     public int getWidth() {
         if(scaledTo != null) {
@@ -270,7 +284,7 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getHeight() {
         if(scaledTo != null) {
@@ -280,7 +294,7 @@ public final class Timeline extends Image implements Animation, Painter {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaled(int width, int height) {
         Timeline t = new Timeline();
@@ -360,7 +374,8 @@ public final class Timeline extends Image implements Animation, Painter {
      * @return an animation object or null if no animation object is at that position.
      */
     public AnimationObject getAnimationAt(int x, int y) {
-        for(int iter = 0 ; iter < animations.length ; iter++) {
+        int alen = animations.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             float scaleX = 1;
             float scaleY = 1;
             if(scaledTo != null) {
@@ -401,5 +416,13 @@ public final class Timeline extends Image implements Animation, Painter {
      */
     public void setLoop(boolean loop) {
         this.loop = loop;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean requiresDrawImage() {
+        return true;
     }
 }

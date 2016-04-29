@@ -25,6 +25,7 @@ package com.codename1.ui.plaf;
 
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.*;
+import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.list.*;
@@ -34,6 +35,8 @@ import com.codename1.ui.list.*;
  * overriding drawing/sizing methods appropriately.
  *
  * @author Chen Fishbein
+ * @deprecated this class is still crucial for some features in Codename One. The deprecation is here to indicate 
+ * our desire to reduce usage/reliance on this class. 
  */
 public abstract class LookAndFeel {
     private Component verticalScroll;
@@ -100,6 +103,7 @@ public abstract class LookAndFeel {
      */
     private int defaultSmoothScrollingSpeed = 150;
 
+    private boolean scrollVisible;
     private boolean fadeScrollEdge;
     private boolean fadeScrollBar;
     private int fadeScrollBarSpeed = 5;
@@ -190,6 +194,7 @@ public abstract class LookAndFeel {
      * 
      * @param g graphics context
      * @param b component to draw
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public abstract void drawButton(Graphics g, Button b);
 
@@ -214,6 +219,7 @@ public abstract class LookAndFeel {
      * 
      * @param g graphics context
      * @param l component to draw
+     * @deprecated this method is no longer used by the implementation, we shifted code away to improve performance
      */
     public abstract void drawLabel(Graphics g, Label l);
 
@@ -904,7 +910,10 @@ public abstract class LookAndFeel {
             }
         }
 
+        Toolbar.setGlobalToolbar(manager.isThemeConstant("globalToobarBool", Toolbar.isGlobalToolbar()));
+        
         boolean isTouch = Display.getInstance().isTouchScreenDevice();
+        scrollVisible = manager.isThemeConstant("scrollVisibleBool", true);
         fadeScrollEdge = manager.isThemeConstant("fadeScrollEdgeBool", false);
         fadeScrollEdgeLength = manager.getThemeConstant("fadeScrollEdgeInt", fadeScrollEdgeLength);
         fadeScrollBar = manager.isThemeConstant("fadeScrollBarBool", false);
@@ -923,6 +932,7 @@ public abstract class LookAndFeel {
         disableColor = Integer.parseInt(manager.getThemeConstant("disabledColor", Integer.toHexString(disableColor)), 16);
         Dialog.setDefaultDialogPosition(manager.getThemeConstant("dialogPosition", Dialog.getDefaultDialogPosition()));
         Dialog.setCommandsAsButtons(manager.isThemeConstant("dialogButtonCommandsBool", Dialog.isCommandsAsButtons()));
+        Dialog.setDefaultBlurBackgroundRadius(manager.getThemeConstant("dialogBlurRadiusInt", (int)Dialog.getDefaultBlurBackgroundRadius()));
 
         List.setDefaultIgnoreFocusComponentWhenUnfocused(manager.isThemeConstant("ignorListFocusBool", List.isDefaultIgnoreFocusComponentWhenUnfocused()));
 
@@ -953,7 +963,7 @@ public abstract class LookAndFeel {
         defaultSnapToGrid = manager.isThemeConstant("snapGridBool", false);
         defaultAlwaysTensile = manager.isThemeConstant("alwaysTensileBool", false);
         defaultTensileDrag = manager.isThemeConstant("tensileDragBool", true);
-        defaultEndsWith3Points = manager.isThemeConstant("endsWith3PointsBool", true);
+        defaultEndsWith3Points = manager.isThemeConstant("endsWith3PointsBool", false);
         defaultTensileHighlight = manager.isThemeConstant("tensileHighlightBool", false);
         tensileHighlightBottomImage = null;
         tensileHighlightTopImage = null;
@@ -1062,6 +1072,11 @@ public abstract class LookAndFeel {
         }
         if(val.equalsIgnoreCase("pulse")) {
             return CommonTransitions.createDialogPulsate();
+        }
+        if(val.equalsIgnoreCase("bubble")) {
+            BubbleTransition transition = new BubbleTransition(speed);
+            transition.setRoundBubble(false);
+            return transition;
         }
         return t;
     }
@@ -1367,6 +1382,13 @@ public abstract class LookAndFeel {
         return fadeScrollBarSpeed;
     }
 
+    /**
+     * @return scrollVisible
+     */ 
+    public boolean isScrollVisible() {
+        return scrollVisible;
+    }
+    
     /**
      * @param fadeScrollBarSpeed the fadeScrollBarSpeed to set
      */

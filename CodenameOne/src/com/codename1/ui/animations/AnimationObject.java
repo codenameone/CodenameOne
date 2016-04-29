@@ -180,7 +180,8 @@ public final class AnimationObject {
                 frames = new Image[img.getWidth() / frameWidth * img.getHeight() / frameHeight];
                 int currentX = 0;
                 int currentY = 0;
-                for(int iter = 0 ; iter < frames.length ; iter++) {
+                int flen = frames.length;
+                for(int iter = 0 ; iter < flen ; iter++) {
                     frames[iter] = img.subImage(currentX, currentY, frameWidth, frameHeight, true);
                     currentX += frameWidth;
                     if(currentX + frameWidth > img.getWidth()) {

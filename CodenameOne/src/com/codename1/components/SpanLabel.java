@@ -33,8 +33,10 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
 
 /**
- * A multi line label component that can be easily localized, this is simply based
- * on a text area combined with a label.
+ * <p>A multi line label component that can be easily localized, this is simply based
+ * on a text area combined with a label.</p>
+ * <script src="https://gist.github.com/codenameone/55b73c621fea0263638a.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-spanlabel.png" alt="SpanLabel Sample" />
  *
  * @author Shai Almog
  */
@@ -66,6 +68,7 @@ public class SpanLabel extends Container {
         setUIID("Container");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
+        text.setActAsLabel(true);
         text.setColumns(text.getText().length() + 1);
         text.setUIID("Label");
         text.setEditable(false);
@@ -241,7 +244,7 @@ public class SpanLabel extends Container {
     
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyNames() {
         return new String[] {
@@ -250,7 +253,7 @@ public class SpanLabel extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Class[] getPropertyTypes() {
        return new Class[] {
@@ -263,14 +266,14 @@ public class SpanLabel extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String[] getPropertyTypeNames() {
         return new String[] {"String", "Image", "String", "String", "String"};
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
         if(name.equals("text")) {
@@ -292,7 +295,7 @@ public class SpanLabel extends Container {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("text")) {

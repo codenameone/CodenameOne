@@ -75,11 +75,12 @@ public class RGBImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image subImage(int x, int y, int width, int height, boolean processAlpha)  {
         int[] arr = new int[width * height];
-        for(int iter = 0 ; iter < arr.length ; iter++) {
+        int alen = arr.length;
+        for(int iter = 0 ; iter < alen ; iter++) {
             int destY = iter / width;
             int destX = iter % width;
             int offset = x + destX + ((y + destY) * this.width);
@@ -90,7 +91,7 @@ public class RGBImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image scaled(int width, int height) {
         int srcWidth = getWidth();
@@ -109,7 +110,7 @@ public class RGBImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void scale(int width, int height) {
         int srcWidth = getWidth();
@@ -136,13 +137,14 @@ public class RGBImage extends Image {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public Image modifyAlpha(byte alpha) {
         int[] arr = new int[rgb.length];
         System.arraycopy(rgb, 0, arr, 0, rgb.length);
         int alphaInt = (((int)alpha) << 24) & 0xff000000;
-        for(int iter = 0 ; iter < rgb.length ; iter++) {
+        int rlen = rgb.length;
+        for(int iter = 0 ; iter < rlen ; iter++) {
             if((arr[iter] & 0xff000000) != 0) {
                 arr[iter] = (arr[iter] & 0xffffff) | alphaInt;
             }
@@ -169,7 +171,7 @@ public class RGBImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     void getRGB(int[] rgbData,
             int offset,
@@ -188,14 +190,14 @@ public class RGBImage extends Image {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
        g.drawRGB(rgb, 0, x, y, width, height, !opaque);
     }    
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public void setOpaque(boolean opaque) {
         this.opaque = opaque;
@@ -210,16 +212,24 @@ public class RGBImage extends Image {
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getWidth() {
         return width;
     }
     
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public int getHeight() {
         return height;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean requiresDrawImage() {
+        return true;
     }
 }

@@ -26,8 +26,20 @@ import com.codename1.ui.Component;
 
 
 /**
- * Media control interface allows for media playback, recording. To get an instance
- * of this interface (implemented by the native port) see the MediaManager class.
+ *<p> Media control interface allows for media playback, recording. To get an instance
+ * of this interface (implemented by the native port) see the MediaManager class.</p>
+ * <p>
+ * The sample code below demonstrates simple video playback.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
+ * 
+ * <p>
+ *     The code below demonstrates capturing and playing back audio files using this API:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/capture-audio.png" alt="Captured recordings in the demo" />
  * 
  * @see MediaManager
  */
