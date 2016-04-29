@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
+﻿
 namespace com.codename1.impl 
 {
     class FillRadialGradientPainter : AsyncOp
     {
-        private global::com.codename1.ui.geom.Rectangle clip;
+        private ui.geom.Rectangle clip;
         private int startColor;
         private int endColor;
         private int x;
@@ -15,7 +11,7 @@ namespace com.codename1.impl
         private int width;
         private int height;
 
-        public FillRadialGradientPainter(global::com.codename1.ui.geom.Rectangle clip, int startColor, int endColor, int x, int y, int width, int height):base(clip)
+        public FillRadialGradientPainter(ui.geom.Rectangle clip, int startColor, int endColor, int x, int y, int width, int height):base(clip)
         {
             this.clip = clip;
             this.startColor = startColor;

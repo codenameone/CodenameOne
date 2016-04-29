@@ -3,86 +3,92 @@
 
 using System;
 using System.Globalization;
-namespace com.codename1.impl {
-public class SilverlightImplementation_2L10NManagerImpl: global::com.codename1.l10n.L10NManager {
+using java.util;
+
+namespace com.codename1.impl
+{
+    public class SilverlightImplementation_2L10NManagerImpl : l10n.L10NManager
+    {
         public SilverlightImplementation_2L10NManagerImpl() : base(defaultLanguage(), defaultCountry())
         {
-            
+           
         }
 
         private static string defaultLanguage()
         {
-            return java.util.Locale.getDefault().getLanguage();
+            return "es";//Locale.getDefault().getLanguage().ToString();
         }
-
         private static string defaultCountry()
         {
-            return java.util.Locale.getDefault().getCountry();
+            return "US"; //Locale.getDefault().getCountry();
         }
-       
-public override string getLanguage()
-{
-    return CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
-}
 
-public override string format(int n1)
-{
-    return n1.ToString(CultureInfo.CurrentCulture.NumberFormat);
-}
+        public override string getLanguage()
+        {
+            return CultureInfo.CurrentCulture.TwoLetterISOLanguageName;
+        }
 
-public override string format(double n1)
-{
-    return n1.ToString(CultureInfo.CurrentCulture.NumberFormat);
-}
+        public override string format(int n1)
+        {
+            return n1.ToString(CultureInfo.CurrentCulture.NumberFormat);
+        }
 
-public override string formatCurrency(double n1)
-{
-    return string.Format("{0:C}", n1);
-}
+        public override string format(double n1)
+        {
+            return n1.ToString(CultureInfo.CurrentCulture.NumberFormat);
+        }
 
-public override string getCurrencySymbol()
-{
-    return CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol;
-}
+        public override string formatCurrency(double n1)
+        {
+            return string.Format("{0:C}", n1);
+        }
 
-private DateTime toDateTime(global::java.util.Date n1)
-{
-    DateTime start = new DateTime(1970, 1, 1);
-    TimeSpan ts = TimeSpan.FromMilliseconds(n1.getTime());
-    return start.Add(ts);
-}
+        public override string getCurrencySymbol()
+        {
+            return CultureInfo.CurrentCulture.NumberFormat.CurrencySymbol;
+        }
 
-public override string formatDateLongStyle(global::java.util.Date n1)
-{
-    return toDateTime(n1).ToString();
-}
+        private DateTime toDateTime(Date n1)
+        {
+            DateTime start = new DateTime(1970, 1, 1);
+            TimeSpan ts = TimeSpan.FromMilliseconds(n1.getTime());
+            return start.Add(ts);
+        }
 
-public override string formatDateShortStyle(global::java.util.Date n1)
-{
-    return toDateTime(n1).ToString();
-}
+        public override string formatDateLongStyle(Date n1)
+        {
+            return toDateTime(n1).ToString();
+        }
 
-public override string formatDateTime(global::java.util.Date n1)
-{
-    return toDateTime(n1).ToString("G");
-}
+        public override string formatDateShortStyle(Date n1)
+        {
+            return toDateTime(n1).ToString();
+        }
 
-public override string formatDateTimeMedium(global::java.util.Date n1)
-{
-    return toDateTime(n1).ToString("g");
-}
+        public override string formatDateTime(Date n1)
+        {
+            return toDateTime(n1).ToString("G");
+        }
 
-override public string formatDateTimeShort(global::java.util.Date n1)
-{
-    return toDateTime(n1).ToString("g");
-}
+        public override string formatDateTimeMedium(Date n1)
+        {
+            return toDateTime(n1).ToString("g");
+        }
 
+        override public string formatDateTimeShort(Date n1)
+        {
+            return toDateTime(n1).ToString("g");
+        }
 
-public override string getLocale()
-{
-    return RegionInfo.CurrentRegion.TwoLetterISORegionName;
-}
+        public override bool isRTLLocale()
+        {
+            return true;
+        }
+        public override string getLocale()
+        {
+            return RegionInfo.CurrentRegion.TwoLetterISORegionName;
+        }
 
-} // end of class: SilverlightImplementation_2L10NManagerImpl
+    } // end of class: SilverlightImplementation_2L10NManagerImpl
 
-} // end of namespace: com.codename1.impl
+}// end of namespace: com.codename1.impl

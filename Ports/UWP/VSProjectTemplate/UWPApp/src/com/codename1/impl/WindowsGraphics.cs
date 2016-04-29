@@ -3,17 +3,18 @@ using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.Graphics.Canvas.Effects;
 using Microsoft.Graphics.Canvas.Geometry;
-//using Microsoft.Graphics.Canvas.Numerics;
+#if WINDOWS_UWP
 using System.Numerics;
+#else
+using Microsoft.Graphics.Canvas.Numerics;
+#endif
 using Microsoft.Graphics.Canvas.Text;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using Windows.Foundation;
 using Windows.UI;
-using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Shapes;
+using com.codename1.ui;
 
 namespace com.codename1.impl
 {
@@ -24,18 +25,19 @@ namespace com.codename1.impl
         private CanvasTextFormat font = new CanvasTextFormat();
         private CanvasActiveLayer layer;
         private bool disposed = false;
-        float alpha = 1f;
 
         public WindowsGraphics(CanvasDrawingSession graphics)
         {
             this.graphics = graphics;
             this.graphics.Units = CanvasUnits.Pixels;
         }
+
         internal void setGraphics(CanvasDrawingSession graphics)
         {
             this.graphics = graphics;
             this.graphics.Units = CanvasUnits.Pixels;
         }
+
         internal void removeClip()
         {
             if (layer != null)
@@ -56,7 +58,7 @@ namespace com.codename1.impl
             return disposed;
         }
 
-        internal virtual void setClip(Rectangle clip)
+        internal virtual void setClip(ui.geom.Rectangle clip)
         {
             if (clip == null)
             {
@@ -64,12 +66,12 @@ namespace com.codename1.impl
             }
             if (clip.getWidth() <= 0)
             {
-                System.Diagnostics.Debug.WriteLine("aaaaaaaaaaaaaaaaaaaa width");
+               // System.Diagnostics.Debug.WriteLine("aaaaaaaaaaaaaaaaaaaa width");
                 clip.setWidth(1);
             }
             if (clip.getHeight() <= 0)
             {
-                System.Diagnostics.Debug.WriteLine("aaaaaaaaaaaaaaaaaaaa height");
+               // System.Diagnostics.Debug.WriteLine("aaaaaaaaaaaaaaaaaaaa height");
                 clip.setHeight(1);
             }
             layer = graphics.CreateLayer(1, new Rect(
@@ -83,7 +85,6 @@ namespace com.codename1.impl
         internal virtual void setAlpha(int p)
         {
             c.A = (byte)(p & 0xff);
-            alpha = p / 255f;
         }
 
         internal virtual void setColor(int p)
@@ -150,11 +151,6 @@ namespace com.codename1.impl
                 p.Y = p2[pos];
                 pointsList.Add(p);
             }
-            //var convertedPoints = from point in pointsList.ToArray()
-            //                      select new Microsoft.Graphics.Canvas.Numerics.Vector2(point.X, point.Y);
-
-            //CanvasGeometry.CreatePolygon()
-
             graphics.FillGeometry(CanvasGeometry.CreatePolygon(graphics, pointsList.ToArray()), c);
         }
 
@@ -193,24 +189,20 @@ namespace com.codename1.impl
         }
 
         internal virtual void drawString(string str, int x, int y)
-        {
-            //graphics.DrawText(str, x, y, c, font);
-            //font.VerticalAlignment = CanvasVerticalAlignment.Center;
+        {            
             CanvasTextLayout l = new CanvasTextLayout(graphics, str, font, 0.0f, 0.0f);
-            //graphics.DrawRectangle(x, y, (float)l.DrawBounds.Width, (float)l.DrawBounds.Height, Colors.Red);
             graphics.DrawTextLayout(l, x, y, c);
         }
 
         internal virtual void drawImage(CanvasBitmap canvasBitmap, int x, int y)
         {
-              
             if (isMutable())
             {
-                graphics.DrawImage(image2Premultiply(canvasBitmap), x, y, canvasBitmap.Bounds, alpha);
+                graphics.DrawImage(image2Premultiply(canvasBitmap), x, y);
             }
             else
             {
-                graphics.DrawImage(canvasBitmap, x, y, canvasBitmap.Bounds, alpha);
+                graphics.DrawImage(canvasBitmap, x, y);
             }
         }
 
@@ -223,8 +215,7 @@ namespace com.codename1.impl
         }
 
         internal virtual void drawImage(CanvasBitmap canvasBitmap, int x, int y, int w, int h)
-        {
-
+        {           
             ScaleEffect scale = new ScaleEffect()
             {
                 Source = canvasBitmap,
@@ -236,11 +227,11 @@ namespace com.codename1.impl
             };
             if (isMutable())
             {
-                graphics.DrawImage(image2Premultiply(scale), x, y, canvasBitmap.Bounds, alpha);
+                graphics.DrawImage(image2Premultiply(scale), x, y);
             }
             else
             {
-                graphics.DrawImage(scale, x, y, canvasBitmap.Bounds, alpha);
+                graphics.DrawImage(scale, x, y);
             }
         }
 
@@ -267,8 +258,8 @@ namespace com.codename1.impl
 
         internal virtual void fillLinearGradient( int startColor, int endColor, int x, int y, int width, int height, bool horizontal)
         {
-            var starcolor = new Color() { A = (byte)(0xff), B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
-            var endcolor = new Color() { A = (byte)(0xff), B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
+            var starcolor = new Color() { A = 0xff, B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
+            var endcolor = new Color() { A = 0xff, B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
 
             CanvasLinearGradientBrush brush = new CanvasLinearGradientBrush(graphics, starcolor, endcolor);
             brush.StartPoint = new Vector2()
@@ -297,8 +288,8 @@ namespace com.codename1.impl
 
         internal virtual void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height)
         {
-            var startcolor = new Color() { A = (byte)(0xff), B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
-            var endcolor = new Color() { A = (byte)(0xff), B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
+            var startcolor = new Color() { A = 0xff, B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
+            var endcolor = new Color() { A = 0xff, B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
 
             CanvasRadialGradientBrush brush = new CanvasRadialGradientBrush(graphics, startcolor, endcolor);
             brush.Center = new Vector2()
@@ -318,5 +309,14 @@ namespace com.codename1.impl
             return false;
         }
 
+        internal virtual void fillPath(CanvasPathBuilder p)
+        {
+            graphics.DrawGeometry(CanvasGeometry.CreatePath(p), c);
+        }
+
+        internal virtual void drawPath(CanvasPathBuilder p, Stroke stroke)
+        {
+            graphics.DrawGeometry(CanvasGeometry.CreatePath(p), c, stroke.getLineWidth());
+        }
     }
 }
