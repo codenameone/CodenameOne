@@ -21,6 +21,7 @@ package com.codename1.maps;
 
 import com.codename1.maps.providers.MapProvider;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.util.WeakHashMap;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
@@ -31,31 +32,18 @@ import java.util.Hashtable;
 class CacheProviderProxy extends MapProvider {
 
     private final MapProvider provider;
-    private Hashtable _cache;
+    private WeakHashMap _cache;
     private int _time;
-    private long _initialFreeMemory;
     private int _maxSize;
-    private boolean freeMemoryWorks;
 
     CacheProviderProxy(MapProvider provider) {
         super(provider.projection(), provider.tileSize());
         this.provider = provider;
-        _cache = new Hashtable();
+        _cache = new WeakHashMap();
         _time = 0;
         _maxSize = 100;
-        _initialFreeMemory = freeMemory();
     }
     
-    private long freeMemory() {
-        try {
-            freeMemoryWorks = true;
-            return Runtime.getRuntime().freeMemory();
-        } catch(Throwable t) {
-            freeMemoryWorks = false;
-            return 1000000;
-        }
-    }
-
     public int maxZoomLevel() {
         return provider.maxZoomLevel();
     }
@@ -96,34 +84,7 @@ class CacheProviderProxy extends MapProvider {
     }
 
     protected void put(BoundingBox bbox, Tile tile) {
-        if(freeMemoryWorks) {
-            long freeMemory = freeMemory();
-            if (_cache.size() > _maxSize || (freeMemory * 2 < _initialFreeMemory && (freeMemory < 262144 || freeMemory < _initialFreeMemory / 10))) {
-                removeOld();
-            }
-        } 
         _cache.put(bbox, new AgeableTile(tile, _time));
-    }
-
-    private void removeOld() {
-        //#mdebug
-        System.out.println("= Cleaning cache");
-        System.out.println("Initial: " + _initialFreeMemory);
-        if(freeMemoryWorks) {
-            System.out.println("Available: " + Runtime.getRuntime().freeMemory());
-            System.out.println("Total: " + Runtime.getRuntime().totalMemory());
-        } 
-        //#enddebug
-        int leave = Math.min(_cache.size() / 10, _maxSize / 2);
-        Enumeration keys = _cache.keys();
-        while (keys.hasMoreElements()) {
-            Object key = keys.nextElement();
-            AgeableTile tile = (AgeableTile) _cache.get(key);
-            if (_time - tile.age > leave) {
-                _cache.remove(key);
-            }
-        }
-        Runtime.getRuntime().gc();
     }
 
     public void clearCache() {

@@ -1202,7 +1202,7 @@ public class Style {
             return;
         }
         if (opacity < 0 || opacity > 255) {
-            throw new IllegalArgumentException("valid values are between 0-255");
+            throw new IllegalArgumentException("valid values are between 0-255: " + opacity);
         }
         if (this.opacity != (byte) opacity) {
             this.opacity = (byte) opacity;
