@@ -235,7 +235,7 @@
         <zip basedir="dist/javadoc" file="build/CodenameOneDist/CodenameOne/docs/api/docs.zip" compress="false" />
         <copydir src="../../codenameone-demos/TZoneFriends" dest="build/CodenameOneDist/CodenameOne/demos/TZoneFriends" />
         <copydir src="../../codenameone-demos/NativeDemo" dest="build/CodenameOneDist/CodenameOne/demos/NativeDemo" />
-        <copydir src="../../codenameone-demos/CameraDemo" dest="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
+        <copydir src="../../CameraDemo" dest="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
         <copydir src="../../codenameone-demos/Tipster" dest="build/CodenameOneDist/CodenameOne/demos/Tipster" />
         <copydir src="../../codenameone-demos/KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
         <copydir src="../../codenameone-demos/MapsDemo" dest="build/CodenameOneDist/CodenameOne/demos/MapsDemo" />
