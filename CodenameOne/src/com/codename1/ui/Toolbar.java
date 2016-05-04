@@ -38,6 +38,8 @@ import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Vector;
 
 /**
@@ -75,7 +77,7 @@ public class Toolbar extends Container {
 
     private ToolbarSideMenu sideMenu;
 
-    private Vector overflowCommands;
+    private Vector<Command> overflowCommands;
 
     private Button menuButton;
 
@@ -245,10 +247,19 @@ public class Toolbar extends Container {
     public void addCommandToOverflowMenu(Command cmd) {
         checkIfInitialized();
         if (overflowCommands == null) {
-            overflowCommands = new Vector();
+            overflowCommands = new Vector<Command>();
         }
         overflowCommands.add(cmd);
         sideMenu.installRightCommands();
+    }
+    
+    /**
+     * Returns the commands within the overflow menu which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getOverflowCommands() {
+        return overflowCommands;
     }
 
     /**
@@ -433,7 +444,51 @@ public class Toolbar extends Container {
         cmd.putClientProperty("Left", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
     }
+    
+    /**
+     * Returns the commands within the right bar section which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getRightBarCommands() {
+        return getBarCommands(null);
+    }
 
+    /**
+     * Returns the commands within the left bar section which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getLeftBarCommands() {
+        return getBarCommands(Boolean.TRUE);
+    }
+
+    private Iterable<Command> getBarCommands(Object leftValue) {
+        ArrayList<Command> cmds = new ArrayList<Command>();
+        findAllCommands(this, cmds);
+        int commandCount = cmds.size() - 1;
+        while(commandCount > 0) {
+            Command c = cmds.get(commandCount);
+            if(c.getClientProperty("Left") != leftValue) {
+                cmds.remove(commandCount);
+            }
+            commandCount--;
+        }
+        return cmds;
+    }
+
+    private void findAllCommands(Container cnt, ArrayList<Command> cmds) {
+        for(Component c : cnt) {
+            if(c instanceof Container) {
+                findAllCommands((Container)c, cmds);
+                continue;
+            }
+            if(c instanceof Button) {
+                cmds.add(((Button)c).getCommand());
+            }
+        }
+    }
+    
     /**
      * Returns the associated SideMenuBar object of this Toolbar.
      *
@@ -703,6 +758,26 @@ public class Toolbar extends Container {
         sideMenu.addComponentToSideMenuImpl(menu, cmp);
     }
 
+    /**
+     * Returns the commands within the side menu which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getSideMenuCommands() {
+        ArrayList<Command> cmds = new ArrayList<Command>();
+        if(permanentSideMenu) {
+            findAllCommands(permanentSideMenuContainer, cmds);
+            return cmds;
+        }
+        Form f = getComponentForm();
+        int commands = f.getCommandCount();
+        for(int iter = 0 ; iter < commands ; iter++) {
+            cmds.add(f.getCommand(iter));
+        }
+        return cmds;
+    }
+
+    
 
     class ToolbarSideMenu extends SideMenuBar {
 
