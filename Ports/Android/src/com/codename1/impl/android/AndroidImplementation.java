@@ -4536,46 +4536,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-    @Override
     public Object notifyStatusBar(String tickerText, String contentTitle,
             String contentBody, boolean vibrate, boolean flashLights, Hashtable args) {
         int id = activity.getResources().getIdentifier("icon", "drawable", activity.getApplicationInfo().packageName);
 
         NotificationManager notificationManager = (NotificationManager) activity.getSystemService(Activity.NOTIFICATION_SERVICE);
-        Notification notification = new Notification(id, tickerText, System.currentTimeMillis());
-
-        notification.defaults |= Notification.DEFAULT_SOUND;
-        if (flashLights) {
-            notification.defaults |= Notification.DEFAULT_LIGHTS;
-            notification.flags |= Notification.FLAG_SHOW_LIGHTS;
-        }
-        if (vibrate) {
-            notification.defaults |= Notification.DEFAULT_VIBRATE;
-        }
-        
-        int notifyId = 10001;
-        if(args != null) {
-            Boolean b = (Boolean)args.get("persist");
-            if(b != null && b.booleanValue()) {
-                notification.flags |= Notification.FLAG_ONGOING_EVENT;
-                notification.flags |= Notification.FLAG_NO_CLEAR;
-            } else {
-                notification.flags |= Notification.FLAG_AUTO_CANCEL;
-            }
-            
-            Integer notId = (Integer)args.get("id");
-            if(notId != null) {
-                notifyId = notId.intValue();
-            }
-        } else {
-            notification.flags |= Notification.FLAG_AUTO_CANCEL;
-        }
         
         Intent notificationIntent = new Intent();
         notificationIntent.setComponent(activity.getComponentName());
         PendingIntent contentIntent = PendingIntent.getActivity(activity, 0, notificationIntent, 0);
 
-        notification.setLatestEventInfo(activity, contentTitle, contentBody, contentIntent);
+        
+        Notification.Builder builder = new Notification.Builder(activity)
+                .setContentIntent(contentIntent)
+                .setSmallIcon(id)
+                .setContentTitle(contentTitle)
+                .setTicker(tickerText);
+        if(flashLights){
+            builder.setLights(0, 1000, 1000);
+        }
+        if(vibrate){
+            builder.setVibrate(new long[]{0, 100, 1000});
+        }
+        if(args != null) {
+            Boolean b = (Boolean)args.get("persist");
+            if(b != null && b.booleanValue()) {
+                builder.setAutoCancel(false);
+                builder.setOngoing(true);
+            } else {
+                builder.setAutoCancel(false);
+            }
+        } else {
+            builder.setAutoCancel(true);
+        }
+        Notification notification = builder.build();
+        int notifyId = 10001;
         notificationManager.notify(notifyId, notification);
         return new Integer(notifyId);
     }
