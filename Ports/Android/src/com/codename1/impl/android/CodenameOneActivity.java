@@ -25,19 +25,17 @@ package com.codename1.impl.android;
 
 import android.app.Activity;
 import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.database.Cursor;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.PowerManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Window;
+import android.widget.Toast;
 import com.codename1.payment.Product;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.payments.v3.IabException;
@@ -52,11 +50,8 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
-import java.util.StringTokenizer;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -70,6 +65,7 @@ public class CodenameOneActivity extends Activity {
     private boolean waitingForResult;
     private boolean background;
     private Vector intentResult = new Vector();
+    boolean requestForPermission = false;
     
     //private final Object lock = new Object();
     private Inventory inventory;
@@ -664,4 +660,24 @@ public class CodenameOneActivity extends Activity {
         return true;
     }
 
+    public void setRequestForPermission(boolean requestForPermission) {
+        this.requestForPermission = requestForPermission;
+    }
+
+    public boolean isRequestForPermission() {
+        return requestForPermission;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            Log.i("Codename One", "PERMISSION_GRANTED");
+        } else {
+            // Permission Denied
+            Toast.makeText(this, "Permission is denied", Toast.LENGTH_SHORT).show();
+        }
+        requestForPermission = false;
+    }
+    
 }

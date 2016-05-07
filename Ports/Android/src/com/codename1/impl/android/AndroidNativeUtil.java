@@ -29,6 +29,7 @@ import android.graphics.Canvas;
 import android.os.Bundle;
 import android.view.View;
 import com.codename1.impl.android.AndroidImplementation;
+import static com.codename1.impl.android.AndroidImplementation.checkForPermission;
 import com.codename1.ui.Display;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -184,5 +185,18 @@ public class AndroidNativeUtil {
     
     public static interface BitmapViewRenderer {
         public Bitmap renderViewOnBitmap(View v, int w, int h);
+    }
+    
+    /**
+     * Check for a dangerous permission, if the permission is already granted return true, 
+     * otherwise ask the user for the permission.
+     * This method is blocking until a response is returned
+     * 
+     * @param permission the Permission to Ask
+     * @param description show a description to the user why this is needed
+     * @return true if granted false otherwise
+     */
+    public static boolean checkForPermission(String permission, String description){
+        return AndroidImplementation.checkForPermission(permission, description, false);
     }
 }

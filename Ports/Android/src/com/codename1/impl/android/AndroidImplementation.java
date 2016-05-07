@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.android;
 
+import android.Manifest;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -1985,6 +1986,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("cn1_push_prefix")) {
+            if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
+                return "";
+            }
             boolean has = hasAndroidMarket();
             if(has) {
                 return "gcm";
@@ -2000,6 +2004,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         if ("cellId".equals(key)) {
             try {
+                if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the cellId")){
+                    return defaultValue;
+                }
                 String serviceName = Context.TELEPHONY_SERVICE;
                 TelephonyManager telephonyManager = (TelephonyManager) activity.getSystemService(serviceName);
                 int cellId = ((GsmCellLocation) telephonyManager.getCellLocation()).getCid();
@@ -2054,10 +2061,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         try {
             if ("IMEI".equals(key) || "UDID".equals(key)) {
+                if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
+                    return "";
+                }
                 TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
                 return tm.getDeviceId();
             }
             if ("MSISDN".equals(key)) {
+                if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
+                    return "";
+                }
                 TelephonyManager tm = (TelephonyManager) activity.getSystemService(Context.TELEPHONY_SERVICE);
                 return tm.getLine1Number();
             }
@@ -2175,6 +2188,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (url.startsWith("intent")) {
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
+                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
+                    return;
+                }
                 url = fixAttachmentPath(url);
                 intent = new Intent();
                 intent.setAction(Intent.ACTION_VIEW);
@@ -2255,6 +2271,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createBackgroundMedia(String uri) throws IOException {
 
+        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
+            return null;
+        }
+        
         Intent serviceIntent = new Intent(activity, AudioService.class);
         serviceIntent.putExtra("mediaLink", uri);
         
@@ -2302,6 +2322,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMedia(final String uri, boolean isVideo, final Runnable onCompletion) throws IOException {
 
+        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
+            return null;
+        }
+        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+            return null;
+        }
         if (uri.startsWith("file://")) {
             return createMedia(uri.substring(7), isVideo, onCompletion);
         }
@@ -2365,6 +2391,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMedia(InputStream stream, String mimeType, final Runnable onCompletion) throws IOException {
 
+        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
+            return null;
+        }
+        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+            return null;
+        }
         boolean isVideo = mimeType.contains("video");
 
         if (!isVideo && stream instanceof FileInputStream) {
@@ -2442,6 +2474,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
 
+        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to access the mic")){
+            return null;
+        }
         final AndroidRecorder[] record = new AndroidRecorder[1];
         final IOException[] error = new IOException[1];
 
@@ -4082,6 +4117,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String[] listFilesystemRoots() {
+        
+        if(!checkForPermission(Manifest.permission.READ_EXTERNAL_STORAGE, "This is required to browse the file system")){
+            return new String[]{};
+        }
+        
         String [] storageDirs = getStorageDirectories();
         if(storageDirs != null){
             String [] roots = new String[storageDirs.length + 1];
@@ -4243,14 +4283,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public OutputStream openFileOutputStream(String file) throws IOException {
-        return createFileOuputStream(file);
+        OutputStream os = null;
+        try{
+            os = createFileOuputStream(file);        
+        }catch(FileNotFoundException fne){
+            //It is impossible to know if a path is considered an external 
+            //storage on the various android's versions.
+            //So we try to open the path and if failed due to permission we will 
+            //ask for the permission from the user
+            if(fne.getMessage().contains("Permission denied")){
+                
+                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to access the file")){
+                    //The user refused to give access.
+                    return null;
+                }else{
+                    //The user gave permission try again to access the path
+                    return createFileOuputStream(file);
+                }
+                
+            }else{
+                throw fne;
+            }
+        }
+        
+        return os;        
     }
 
     /**
      * @inheritDoc
      */
     public InputStream openFileInputStream(String file) throws IOException {
-        return createFileInputStream(file);
+        InputStream is = null;
+        try{
+            is = createFileInputStream(file);        
+        }catch(FileNotFoundException fne){
+            //It is impossible to know if a path is considered an external 
+            //storage on the various android's versions.
+            //So we try to open the path and if failed due to permission we will 
+            //ask for the permission from the user
+            if(fne.getMessage().contains("Permission denied")){
+                
+                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to access the file")){
+                    //The user refused to give access.
+                    return null;
+                }else{
+                    //The user gave permission try again to access the path
+                    return openFileInputStream(file);
+                }
+                
+            }else{
+                throw fne;
+            }
+        }
+        
+        return is;
     }
 
     @Override
@@ -4348,6 +4434,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @return LocationControl Object
      */
     public LocationManager getLocationManager() {
+        if(!checkForPermission(Manifest.permission.ACCESS_FINE_LOCATION, "This is required to get the location")){
+            return null;
+        }
+        
         boolean includesPlayServices = Display.getInstance().getProperty("IncludeGPlayServices", "false").equals("true");
         if (includesPlayServices && hasAndroidMarket()) {
             try {
@@ -4501,8 +4591,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
-//        PendingIntent deliveredPI = PendingIntent.getBroadcast(activity, 0,
-//                new Intent("SMS_DELIVERED"), 0);
+        if(!checkForPermission(Manifest.permission.SEND_SMS, "This is required to send a SMS")){
+            return;
+        }
+        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to send a SMS")){
+            return;
+        }
         if(i) {            
             Intent smsIntent = null;
             if(android.os.Build.VERSION.SDK_INT < 19){
@@ -4575,25 +4669,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new Integer(notifyId);
     }
 
+    public boolean isContactsPermissionGranted() {
+        if (android.os.Build.VERSION.SDK_INT < 23) {
+            return true;
+        }
+
+        if (android.support.v4.content.ContextCompat.checkSelfPermission(activity,
+                Manifest.permission.READ_CONTACTS)
+                != PackageManager.PERMISSION_GRANTED) {
+            return false;
+        }
+        return true;
+    }
+
+    
     @Override
     public String[] getAllContacts(boolean withNumbers) {
+        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+            return new String[]{};
+        }
         return AndroidContactsManager.getInstance().getContacts(activity, withNumbers);
     }
 
     @Override
     public Contact getContactById(String id) {
+        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+            return null;
+        }
         return AndroidContactsManager.getInstance().getContact(activity, id);
     }
 
     @Override 
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, 
             boolean includesNumbers, boolean includesEmail, boolean includeAddress){
+        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+            return null;
+        }
         return AndroidContactsManager.getInstance().getContact(activity, id, includesFullName, includesPicture, 
             includesNumbers, includesEmail, includeAddress);
     }
     
     @Override
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        if(!checkForPermission(Manifest.permission.READ_CONTACTS, "This is required to get the contacts")){
+            return new Contact[]{};
+        }
         return AndroidContactsManager.getInstance().getAllContacts(activity, withNumbers, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
     }
 
@@ -4603,10 +4723,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+        if(!checkForPermission(Manifest.permission.WRITE_CONTACTS, "This is required to create a contact")){
+            return null;
+        }
          return AndroidContactsManager.getInstance().createContact(activity, firstName, surname, officePhone, homePhone, cellPhone, email);
     }
 
     public boolean deleteContact(String id) {
+        if(!checkForPermission(Manifest.permission.WRITE_CONTACTS, "This is required to delete a contact")){
+            return false;
+        }
         return AndroidContactsManager.getInstance().deleteContact(activity, id);
     }
     
@@ -4617,6 +4743,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){   
+        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
+            return;
+        }
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         if(image == null){
             shareIntent.setType("text/plain");
@@ -4999,6 +5128,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void capturePhoto(ActionListener response) {
+        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")){
+            return;
+        }
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
@@ -5019,6 +5151,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void captureVideo(ActionListener response) {
+        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")){
+            return;
+        }
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_VIDEO_CAPTURE);
@@ -5036,13 +5171,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public void captureAudio(final ActionListener response) {
 
-//        Intent intent = new Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION);
-//        if(isIntentAvailable(intent)){
-//            callback = new EventDispatcher();
-//            callback.addListener(response);
-//            this.activity.startActivityForResult(intent, CAPTURE_AUDIO);
-//            return;
-//        }
+        if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record the audio")){
+            return;
+        }
+        
         try {
             final Form current = Display.getInstance().getCurrent();
 
@@ -5148,6 +5280,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @param response callback for the resulting image
      */
     public void openImageGallery(ActionListener response) {
+        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
+            return;
+        }
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
@@ -5155,6 +5290,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public void openGallery(final ActionListener response, int type){
+        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
+            return;
+        }
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
@@ -6861,5 +6999,59 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return android.os.Build.VERSION.SDK_INT >= 11;
     }
     
+    public static boolean checkForPermission(String permission, String description){
+        return checkForPermission(permission, description, false);
+    }
+    
+    public static boolean checkForPermission(String permission, String description, boolean forceAsk){
+
+        //before sdk 23 no need to ask for permission
+        if(android.os.Build.VERSION.SDK_INT < 23){
+            return true;
+        }
+
+        if (android.support.v4.content.ContextCompat.checkSelfPermission(activity,
+                permission)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // Should we show an explanation?
+            if (!forceAsk && android.support.v4.app.ActivityCompat.shouldShowRequestPermissionRationale(activity,
+                    permission)) {
+
+                // Show an expanation to the user *asynchronously* -- don't block
+                if(Dialog.show("Requires permission", description, "Ask again", "Don't Ask")){
+                    return checkForPermission(permission, description, true);
+                }else {
+                    return false;
+                }
+            } else {
+
+                // No explanation needed, we can request the permission.
+                ((CodenameOneActivity)activity).setRequestForPermission(true);
+                android.support.v4.app.ActivityCompat.requestPermissions(activity,
+                        new String[]{permission},
+                        1);
+                //wait for a response
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        while(((CodenameOneActivity)activity).isRequestForPermission()) {
+                            try {
+                                Thread.sleep(50);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                });
+                //check again if the permission is given after the dialog was displayed
+                return android.support.v4.content.ContextCompat.checkSelfPermission(activity,
+                        permission) == PackageManager.PERMISSION_GRANTED;
+
+            }
+        }
+        return true;
+    }
+ 
     
 }
