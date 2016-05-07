@@ -7004,14 +7004,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public static boolean checkForPermission(String permission, String description, boolean forceAsk){
-        
-        String prompt = Display.getInstance().getProperty(permission, description);
-        
+               
         //before sdk 23 no need to ask for permission
         if(android.os.Build.VERSION.SDK_INT < 23){
             return true;
         }
 
+        String prompt = Display.getInstance().getProperty(permission, description);
+        
         if (android.support.v4.content.ContextCompat.checkSelfPermission(activity,
                 permission)
                 != PackageManager.PERMISSION_GRANTED) {
