@@ -7004,7 +7004,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public static boolean checkForPermission(String permission, String description, boolean forceAsk){
-
+        
+        String prompt = Display.getInstance().getProperty(permission, description);
+        
         //before sdk 23 no need to ask for permission
         if(android.os.Build.VERSION.SDK_INT < 23){
             return true;
@@ -7019,7 +7021,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     permission)) {
 
                 // Show an expanation to the user *asynchronously* -- don't block
-                if(Dialog.show("Requires permission", description, "Ask again", "Don't Ask")){
+                if(Dialog.show("Requires permission", prompt, "Ask again", "Don't Ask")){
                     return checkForPermission(permission, description, true);
                 }else {
                     return false;
