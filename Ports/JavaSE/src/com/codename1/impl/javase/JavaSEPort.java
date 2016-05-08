@@ -213,13 +213,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private boolean menuDisplayed = false;
     
-    private static boolean android6PermissionsFlag = false;
-    
-    private static boolean waitForPermission = false;
-    
-    private static Map android6Permissions = new HashMap();
-    
-    
     /**
      * Allows the simulator to use the native filesystem completely rather than the "fake" filesystem
      * used, this is important when running a real application rather than just a simulator skin
@@ -492,7 +485,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         formChangeListener.addListener(al);
     }
 
-    public void setCurrentForm(Form f) {        
+    public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
         if (formChangeListener != null) {
             formChangeListener.fireActionEvent(new com.codename1.ui.events.ActionEvent(f));
@@ -1865,17 +1858,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Motion.setSlowMotion(slowMotionFlag.isSelected());
                 }
             });
-            final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 permissions", android6PermissionsFlag);
-            simulatorMenu.add(permFlag);
-            permFlag.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent e) {
-                    android6PermissionsFlag = !android6PermissionsFlag;
-                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
-                    pref.putBoolean("Android6Permissions", android6PermissionsFlag);
-                    
-                }
-            });
 
             final JMenuItem pause = new JMenuItem("Pause App");
             simulatorMenu.add(pause);
@@ -2754,8 +2736,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             hSelector.addAdjustmentListener(canvas);
             vSelector.addAdjustmentListener(canvas);
 
-            android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
-            
+
             scrollableSkin = pref.getBoolean("Scrollable", true);
             if (scrollableSkin) {
                 window.add(java.awt.BorderLayout.SOUTH, hSelector);
@@ -5182,32 +5163,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String getProperty(String key, String defaultValue) {
-        
-        if(key.equalsIgnoreCase("cn1_push_prefix") 
-                || key.equalsIgnoreCase("cellId") 
-                || key.equalsIgnoreCase("IMEI") 
-                || key.equalsIgnoreCase("UDID") 
-                || key.equalsIgnoreCase("MSISDN")) {
-            if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to get the phone state")){
-                return "";
-            }
-            return defaultValue;
-        }
         if ("OS".equals(key)) {
             return "SE";
-        }
-        if ("AppName".equals(key)) {
-            File f = new File("codenameone_settings.properties");
-            if (f.exists()) {
-                try {
-                    Properties p = new Properties();
-                    p.load(new FileInputStream(f));
-                    return p.getProperty("codename1.displayName");
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            }
-            return defaultValue;
         }
         if ("AppVersion".equals(key)) {
             File f = new File("codenameone_settings.properties");
@@ -5266,10 +5223,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void execute(String url) {
         try {
             if(url.startsWith("file:")) {
-                if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to open the file")){
-                    return;
-                }
-                
                 url = new File(unfile(url)).toURI().toURL().toExternalForm();
             }
             Desktop.getDesktop().browse(new URI(url));
@@ -5322,14 +5275,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.isBuiltinSoundAvailable(soundIdentifier);
     }
 
-    public Media createBackgroundMedia(String uri) throws IOException {
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            return null;
-        }
-        
-        return super.createBackgroundMedia(uri);
-    }
-    
     
     /**
      * Plays the sound in the given URI which is partially platform specific.
@@ -5341,14 +5286,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(String uriAddress, final boolean isVideo, final Runnable onCompletion) throws IOException {
-        
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            return null;
-        }
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-            return null;
-        }
-        
         if(uriAddress.startsWith("file:")) {
             uriAddress = unfile(uriAddress);
         }
@@ -5419,14 +5356,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @throws java.io.IOException if the URI access fails
      */
     public Media createMedia(final InputStream stream, final String mimeType, final Runnable onCompletion) throws IOException {
-
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to play media")){
-            return null;
-        }
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to play media")){
-            return null;
-        }
-        
         if (!fxExists) {
             String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
             System.out.println(msg);
@@ -6056,9 +5985,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] listFilesystemRoots() {
-        if(!checkForPermission("android.permission.READ_EXTERNAL_STORAGE", "This is required to browse the file system")){
-            return new String[]{};
-        }
         if(exposeFilesystem) {
             File[] f = File.listRoots();
             String[] roots = new String[f.length];
@@ -6245,9 +6171,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public LocationManager getLocationManager() {
-        if(!checkForPermission("android.permission.ACCESS_FINE_LOCATION", "This is required to get the location")){
-            return null;
-        }
         // the location simulation should ONLY apply to the simulator and not to JavaSE port, designer etc.
         if(portraitSkin != null) {
             return StubLocationManager.getLocationManager();
@@ -6292,12 +6215,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void sendSMS(final String phoneNumber, final String message, boolean i) throws IOException {
-        if(!checkForPermission("android.permission.SEND_SMS", "This is required to send a SMS")){
-            return;
-        }
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to send a SMS")){
-            return;
-        }
         System.out.println("sending sms to " + phoneNumber);
     }
 
@@ -6314,9 +6231,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public String[] getAllContacts(boolean withNumbers) {
-        if(!checkForPermission("android.permission.READ_CONTACTS", "This is required to get the contacts")){
-            return new String[]{};
-        }
         if(contacts == null){
             contacts = initContacts();
         }
@@ -6331,9 +6245,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Contact getContactById(String id) {
-        if(!checkForPermission("android.permission.READ_CONTACTS", "This is required to get the contacts")){
-            return null;
-        }
         if(contacts == null){
             contacts = initContacts();
         }
@@ -6344,9 +6255,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture,
             boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
 
-        if(!checkForPermission("android.permission.READ_CONTACTS", "This is required to get the contacts")){
-            return null;
-        }
         Contact c = new Contact();
         Contact contact = getContactById(id);
         c.setId(contact.getId());
@@ -6374,9 +6282,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public String createContact(String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
-        if(!checkForPermission("android.permission.WRITE_CONTACTS", "This is required to create a contact")){
-            return null;
-        }
         if(contacts == null){
             contacts = initContacts();
         }
@@ -6423,9 +6328,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public boolean deleteContact(String id) {
-        if(!checkForPermission("android.permission.WRITE_CONTACTS", "This is required to delete a contact")){
-            return false;
-        }
         if(contacts == null){
             contacts = initContacts();
         }
@@ -6506,9 +6408,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void openImageGallery(final com.codename1.ui.events.ActionListener response){    
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
-            return;
-        }
         capturePhoto(response);
     }
     
@@ -6523,9 +6422,6 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public void openGallery(final com.codename1.ui.events.ActionListener response, int type){
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
-            return;
-        }
         if(type == Display.GALLERY_VIDEO){
             capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
@@ -6540,9 +6436,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to take a picture")){
-            return;
-        }
         capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
     }
     
@@ -6580,17 +6473,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public void captureAudio(com.codename1.ui.events.ActionListener response) {
-        if(!checkForPermission("android.permission.RECORD_AUDIO", "This is required to record the audio")){
-            return;
-        }
         capture(response, new String[] {"wav", "mp3", "aac"}, "*.wav;*.mp3;*.aac");
     }
 
     @Override
     public void captureVideo(com.codename1.ui.events.ActionListener response) {
-        if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to take a video")){
-            return;
-        }
         capture(response, new String[] {"mp4", "avi", "mpg", "3gp"}, "*.mp4;*.avi;*.mpg;*.3gp");
     }
 
@@ -7058,9 +6945,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Media createMediaRecorder(String path, String mime) throws IOException {
-        if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
-            return null;
-        }        
         throw new IOException("Not supported on Simulator");
     }
     private com.codename1.ui.util.ImageIO imIO;
@@ -8313,56 +8197,5 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         }
 
-    }
-    
-    public static boolean checkForPermission(String permission, String description){
-        return checkForPermission(permission, description, false);
-    }
-    
-    public static boolean checkForPermission(String permission, String description, boolean forceAsk){
-               
-        if(!android6PermissionsFlag){
-            return true;
-        }
-
-        String prompt = Display.getInstance().getProperty(permission, description);
-        Boolean granted = (Boolean)android6Permissions.get(permission);
-        //if granted
-        if (granted == null || !granted.booleanValue()) {
-            waitForPermission = true;
-            
-            Boolean wasAsked = (Boolean)android6Permissions.get(permission + ".asked");
-            // Should we show an explanation?
-            if (!forceAsk && (wasAsked != null)) {
-                
-                // Show an explanation to the user *asynchronously* -- don't block
-                if(com.codename1.ui.Dialog.show("Requires permission", prompt, "Ask again", "Don't Ask")){
-                    return checkForPermission(permission, description, true);
-                }else {
-                    waitForPermission = false;
-                    return false;
-                }
-            } else {
-                
-                android6Permissions.put(permission + ".asked", true);
-                
-                boolean response = askPermission(permission);
-                android6Permissions.put(permission, response);
-                waitForPermission = false;
-                return response;
-            }
-        }
-        return true;
-    }
-    
-    private static boolean askPermission(String permission) {
-        String appname = Display.getInstance().getProperty("AppName", "");
-       
-        //This is a syatem dialog
-        int selectedOption = JOptionPane.showConfirmDialog(null,
-                "Allow " + appname + " to access your " + permission + "?",
-                "Permission Request",
-                JOptionPane.YES_NO_OPTION);
-        return selectedOption == JOptionPane.YES_OPTION;
     }
 }
