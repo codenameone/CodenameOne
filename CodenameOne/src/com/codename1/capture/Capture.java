@@ -164,21 +164,25 @@ public class Capture {
         private boolean completed;
         private int targetWidth = -1;
         private int targetHeight = -1;
-        public synchronized void actionPerformed(ActionEvent evt) {
+        public void actionPerformed(ActionEvent evt) {
             if(evt == null) {
                 url = null;
             } else {
                 url = (String)evt.getSource();
             }
             completed = true;
-            notify();
+            synchronized(this) {
+                this.notify();
+            }
         }
 
-        public synchronized void run() {
+        public void run() {
             while(!completed) {
-                try {
-                    wait();
-                } catch (InterruptedException ex) {
+                synchronized(this) {
+                    try {
+                        this.wait();
+                    } catch (InterruptedException ex) {
+                    }
                 }
             }
             if(url == null) {
