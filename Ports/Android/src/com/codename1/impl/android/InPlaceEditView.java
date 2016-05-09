@@ -1131,7 +1131,7 @@ public class InPlaceEditView extends FrameLayout {
         }
 
         if (component.getClientProperty("android.asyncEditing") != null) {
-            Object async = component.getClientProperty("ios.asyncEditing");
+            Object async = component.getClientProperty("android.asyncEditing");
             if (async instanceof Boolean) {
                 asyncEdit = ((Boolean)async).booleanValue();
                 //Log.p("Overriding asyncEdit due to field ios.asyncEditing client property: "+asyncEdit);
