@@ -4173,7 +4173,8 @@ public static void openInIDE(File f, int lineNumber) {
                         InputStream i = new FileInputStream(codenameone_settings);
                         projectGeneratorSettings.load(i);
                         i.close();
-                        if(selection.getName().equals(projectGeneratorSettings.getProperty("guiResource", null))) {
+                        if(selection.getName().equals(projectGeneratorSettings.getProperty("guiResource", null)) &&
+                                projectGeneratorSettings.getProperty("userClass") != null) {
                             projectGeneratorSettings.put("userClassAbs",
                                     new File(codenameone_settings.getParentFile(), projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
                             if(projectGeneratorSettings.containsKey("netbeans")) {
