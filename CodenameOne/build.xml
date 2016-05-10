@@ -242,7 +242,7 @@
         <copydir src="../../codenameone-demos/ZXing" dest="build/CodenameOneDist/CodenameOne/demos/ZXing" />
         <copydir src="../../codenameone-demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
         <copydir src="../../codenameone-demos/FacebookDemo" dest="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
-        <copydir src="../../codenameone-demos/Chrome" dest="build/CodenameOneDist/CodenameOne/demos/Chrome" />
+        <copydir src="../../Chrome" dest="build/CodenameOneDist/CodenameOne/demos/Chrome" />
         <copydir src="../../codenameone-demos/SocialBoo" dest="build/CodenameOneDist/CodenameOne/demos/SocialBoo" />
         <copydir src="../../codenameone-demos/Mapper" dest="build/CodenameOneDist/CodenameOne/demos/Mapper" />
         <copydir src="../../codenameone-demos/CN1Poker" dest="build/CodenameOneDist/CodenameOne/demos/CN1Poker" />
@@ -488,7 +488,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/Chrome" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/chrome/ChromeProject.zip" compress="false">
+        <zip basedir="../../Chrome" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/chrome/ChromeProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
