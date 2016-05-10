@@ -668,7 +668,6 @@ public class CodenameOneActivity extends Activity {
         return requestForPermission;
     }
 
-    @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
 
         if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
