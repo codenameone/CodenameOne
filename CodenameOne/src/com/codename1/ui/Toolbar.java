@@ -118,7 +118,9 @@ public class Toolbar extends Container {
 
     /**
      * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
-     * theme constant globalToobarBool.
+     * theme constant {@code globalToobarBool}. Notice that the name of this method might imply that
+     * one toolbar instance will be used for all forms which isn't the case, separate instances will be used for each form
+     * 
      * @param gt true to enable the toolbar globally
      */
     public static void setGlobalToolbar(boolean gt) {
@@ -127,7 +129,8 @@ public class Toolbar extends Container {
     
     /**
      * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
-     * theme constant globalToobarBool.
+     * theme constant {@code globalToobarBool}. Notice that the name of this method might imply that
+     * one toolbar instance will be used for all forms which isn't the case, separate instances will be used for each form
      * 
      * @return  true if the toolbar API is turned on by default
      */
