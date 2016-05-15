@@ -1158,6 +1158,13 @@ public class Form extends Container {
      * @return returns the form title
      */
     public String getTitle() {
+        if(toolbar != null) {
+            Component cmp = toolbar.getTitleComponent();
+            if(cmp instanceof Label) {
+                return ((Label)cmp).getText();
+            }
+            return null;
+        }
         return title.getText();
     }
 
