@@ -253,7 +253,7 @@ public class Toolbar extends Container {
         ALWAYS,
         
         /**
-         * Show the back command always but shows it with the UIID
+         * Show the back command always but shows it with the UIID standard UIID
          */
         AS_REGULAR_COMMAND,
 

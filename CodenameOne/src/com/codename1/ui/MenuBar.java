@@ -445,6 +445,9 @@ public class MenuBar extends Container implements ActionListener {
      */
     public void setBackCommand(Command backCommand) {
         this.backCommand = backCommand;
+        if(parent.getToolbar() != null) {
+            return;
+        }
         if(backCommand != null && UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
             removeCommand(backCommand);
         }
