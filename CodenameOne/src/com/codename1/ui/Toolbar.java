@@ -148,6 +148,7 @@ public class Toolbar extends Container {
         this();
         this.layered = layered;
     }
+    
     /**
      * Sets the title of the Toolbar.
      *
@@ -240,6 +241,93 @@ public class Toolbar extends Container {
         Command cmd = Command.create(name, icon, ev);
         addCommandToOverflowMenu(cmd);
         return cmd;
+    }
+    
+    /**
+     * The behavior of the back command  in the title
+     */
+    public static enum BackCommandPolicy {
+        /**
+         * Show the back command always within the title bar on the left hand side
+         */
+        ALWAYS,
+        
+        /**
+         * Show the back command always but shows it with the UIID
+         */
+        AS_REGULAR_COMMAND,
+
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme constant is defined to true which
+         * is the case for iOS themes
+         */
+        ONLY_WHEN_USES_TITLE,
+        
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme constant is defined to true 
+         * on other platforms uses the left arrow material icon
+         */
+        WHEN_USES_TITLE_OTHERWISE_ARROW,
+        
+        /**
+         * Never show the command in the title area and only set the back command to the toolbar
+         */
+        NEVER
+    }
+    
+    /**
+     * Sets the back command in the title bar and in the form, back command behaves based on the given
+     * policy type
+     * 
+     * @param title command title
+     * @param policy the behavior of the back command in the title
+     * @param listener action event for the back command
+     * @return  the created command
+     */
+    public Command setBackCommand(String title, BackCommandPolicy policy, ActionListener<ActionEvent> listener) {
+        Command cmd  = Command.create(title, null, listener);
+        setBackCommand(cmd, policy);
+        return cmd;
+    }
+    
+    /**
+     * Sets the back command in the title bar and in the form, back command behaves based on the given
+     * policy type
+     * 
+     * @param cmd the command 
+     * @param policy the behavior of the back command in the title
+     */
+    public void setBackCommand(Command cmd, BackCommandPolicy policy) {
+        getComponentForm().setBackCommand(cmd);
+        switch(policy) {
+            case ALWAYS:
+                cmd.putClientProperty("uiid", "BackCommand");
+                addCommandToLeftBar(cmd);
+                break;
+            case AS_REGULAR_COMMAND:
+                addCommandToLeftBar(cmd);
+                break;
+            case ONLY_WHEN_USES_TITLE:
+                if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
+                    cmd.putClientProperty("uiid", "BackCommand");
+                    addCommandToLeftBar(cmd);
+                }
+                break;
+            case WHEN_USES_TITLE_OTHERWISE_ARROW:
+                cmd.putClientProperty("uiid", "BackCommand");
+                if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
+                    addCommandToLeftBar(cmd);
+                } else {
+                    cmd.setCommandName("");
+                    cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "BackCommand", 3));
+                    addCommandToLeftBar(cmd);
+                }
+                break;
+            case NEVER:
+                break;
+        }
+        
+        
     }
     
     /**
