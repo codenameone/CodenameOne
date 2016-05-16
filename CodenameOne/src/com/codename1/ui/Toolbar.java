@@ -258,6 +258,11 @@ public class Toolbar extends Container {
         AS_REGULAR_COMMAND,
 
         /**
+         * Show the back command always as a back arrow image from the material design style
+         */
+        AS_ARROW,
+
+        /**
          * Shows the back command only if the {@code backUsesTitleBool} theme constant is defined to true which
          * is the case for iOS themes
          */
@@ -273,6 +278,30 @@ public class Toolbar extends Container {
          * Never show the command in the title area and only set the back command to the toolbar
          */
         NEVER
+    }
+    
+    /**
+     * Sets the back command in the title bar to an arrow type and maps the back command hardware key
+     * if applicable. This is functionally identical to {@code setBackCommand(title, Toolbar.BackCommandPolicy.AS_ARROW, listener); }
+     * 
+     * @param title command title
+     * @param listener action event for the back command
+     * @return  the created command
+     */
+    public Command setBackCommand(String title, ActionListener<ActionEvent> listener) {
+        Command cmd  = Command.create(title, null, listener);
+        setBackCommand(cmd, BackCommandPolicy.AS_ARROW);
+        return cmd;
+    }
+    
+    /**
+     * Sets the back command in the title bar to an arrow type and maps the back command hardware key
+     * if applicable. This is functionally identical to {@code setBackCommand(cmd, Toolbar.BackCommandPolicy.AS_ARROW); }
+     * 
+     * @param cmd the command 
+     */
+    public void setBackCommand(Command cmd) {
+        setBackCommand(cmd, BackCommandPolicy.AS_ARROW);
     }
     
     /**
@@ -304,22 +333,24 @@ public class Toolbar extends Container {
                 cmd.putClientProperty("uiid", "BackCommand");
                 addCommandToLeftBar(cmd);
                 break;
+            case WHEN_USES_TITLE_OTHERWISE_ARROW:
+                cmd.putClientProperty("uiid", "BackCommand");
+                if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
+                    addCommandToLeftBar(cmd);
+                    break;
+                } 
+                // we now internally fallback to as arrow...
+            case AS_ARROW:
+                cmd.setCommandName("");
+                cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "BackCommand", 3));
+                addCommandToLeftBar(cmd);
+                break;
             case AS_REGULAR_COMMAND:
                 addCommandToLeftBar(cmd);
                 break;
             case ONLY_WHEN_USES_TITLE:
                 if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
                     cmd.putClientProperty("uiid", "BackCommand");
-                    addCommandToLeftBar(cmd);
-                }
-                break;
-            case WHEN_USES_TITLE_OTHERWISE_ARROW:
-                cmd.putClientProperty("uiid", "BackCommand");
-                if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
-                    addCommandToLeftBar(cmd);
-                } else {
-                    cmd.setCommandName("");
-                    cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "BackCommand", 3));
                     addCommandToLeftBar(cmd);
                 }
                 break;
