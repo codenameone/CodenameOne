@@ -23,6 +23,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.Reader;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.Collections;
 import java.util.Date;
@@ -172,7 +173,11 @@ public class Properties extends HashMap<String, String> {
         if (in == null) {
             throw new NullPointerException("in == null");
         }
-        load(new InputStreamReader(in, "ISO-8859-1"));
+        try {
+            load(new InputStreamReader(in, "ISO-8859-1"));
+        } catch (UnsupportedEncodingException ex) {
+            load(new InputStreamReader(in, "UTF-8"));
+        }
     }
 
     /**
@@ -448,7 +453,11 @@ public class Properties extends HashMap<String, String> {
      * @throws ClassCastException if a key or value is not a string
      */
     public synchronized void store(OutputStream out, String comment) throws IOException {
-        store(new OutputStreamWriter(out, "ISO-8859-1"), comment);
+        try {
+            store(new OutputStreamWriter(out, "ISO-8859-1"), comment);
+        } catch (UnsupportedEncodingException ex) {
+            store(new OutputStreamWriter(out, "UTF-8"), comment);
+        }
     }
 
     /**
