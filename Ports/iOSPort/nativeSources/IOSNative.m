@@ -7491,4 +7491,27 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
         }
     }
 }
-                 
+   
+JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)
+{
+    __block UIBackgroundTaskIdentifier bgTask = UIBackgroundTaskInvalid;
+    bgTask = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
+        // Clean up any unfinished task business by marking where you
+        // stopped or ending the task outright.
+        [[UIApplication sharedApplication] endBackgroundTask:bgTask];
+        bgTask = UIBackgroundTaskInvalid;
+    }];
+    return (JAVA_LONG)((BRIDGE_CAST void*)bgTask);
+}
+
+#ifdef NEW_CODENAME_ONE_VM
+JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask___R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+    return com_codename1_impl_ios_IOSNative_beginBackgroundTask__(instanceObject);
+}
+#endif
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bgTask)
+{
+    [[UIApplication sharedApplication] endBackgroundTask:(UIBackgroundTaskIdentifier)bgTask];
+}

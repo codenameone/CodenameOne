@@ -6885,6 +6885,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     
+    public static long beginBackgroundTask() {
+        return nativeInstance.beginBackgroundTask();
+    }
+    
+    public static void endBackgroundTask(long taskId) {
+        nativeInstance.endBackgroundTask(taskId);
+    }
+    
     /**
      * Use this method to release shared resources, save user data, invalidate 
      * timers, and store enough application state information to restore your 

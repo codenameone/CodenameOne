@@ -37,6 +37,10 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public final class IOSNative {
+
+    native long beginBackgroundTask();
+
+    native void endBackgroundTask(long taskId);
     
     
     //native void startMainThread(Runnable r);
