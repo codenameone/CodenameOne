@@ -1165,6 +1165,10 @@ public class BytecodeMethod {
                                     case Opcodes.FLOAD:
                                     case Opcodes.ILOAD:
                                     case Opcodes.ALOAD:
+                                        int localOff = localsOffsetToArgOffset(((VarOp)next).getIndex());
+                                        if(localOff < 0) {
+                                            continue;
+                                        }
                                         instructions.remove(iter);
                                         instructions.remove(iter);
                                         instructions.remove(iter);
@@ -1173,7 +1177,7 @@ public class BytecodeMethod {
                                         if(isReturn && iter == 0) {
                                             instructions.remove(iter);
                                         }
-                                        String s = ((Field)isThisPutField).setFieldFromThis(localsOffsetToArgOffset(((VarOp)next).getIndex()) );
+                                        String s = ((Field)isThisPutField).setFieldFromThis(localOff);
                                         instructions.add(iter, new CustomIntruction(s, s, dependentClasses));
                                         iter = 0;
                                         instructionCount = instructions.size();
@@ -1861,6 +1865,6 @@ public class BytecodeMethod {
                 localsOffset++;
             }
         }
-        return offset;
+        return -1;
     }
 }
