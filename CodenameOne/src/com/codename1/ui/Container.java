@@ -1752,7 +1752,14 @@ public class Container extends Component implements Iterable<Component>{
         return null;
     }
 
-    Component findDropTargetAt(int x, int y) {
+    /**
+     * Recursively searches the container hierarchy for a drop target
+     * 
+     * @param x position in which we are searching for a drop target
+     * @param y position in which we are searching for a drop target
+     * @return a drop target or null if no drop target could be found at the x/y position
+     */
+    public Component findDropTargetAt(int x, int y) {
         int count = getComponentCount();
         for (int i = count - 1; i >= 0; i--) {
             Component cmp = getComponentAt(i);
