@@ -4561,6 +4561,25 @@ public class FontImage extends Image {
             Style s = new Style(l.getUnselectedStyle());
             s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
+            if(l instanceof Button) {
+                Button b = (Button)l;
+                Style sel = b.getSelectedStyle();
+                Style pre = b.getPressedStyle();
+                Style dis = b.getDisabledStyle();
+                if(sel.getFgColor() != s.getFgColor()) {
+                    sel.setFont(getMaterialDesignFont().derive(sel.getFont().getHeight(), Font.STYLE_PLAIN));
+                    b.setRolloverIcon(FontImage.create("" + icon, sel));
+                }
+                if(pre.getFgColor() != pre.getFgColor()) {
+                    pre.setFont(getMaterialDesignFont().derive(pre.getFont().getHeight(), Font.STYLE_PLAIN));
+                    b.setPressedIcon(FontImage.create("" + icon, pre));
+                    b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
+                }
+                if(dis.getFgColor() != dis.getFgColor()) {
+                    dis.setFont(getMaterialDesignFont().derive(dis.getFont().getHeight(), Font.STYLE_PLAIN));
+                    b.setDisabledIcon(FontImage.create("" + icon, dis));
+                }
+            }
         }
     }
 
@@ -4579,6 +4598,25 @@ public class FontImage extends Image {
             int sizePixels = Display.getInstance().convertToPixels(size);
             s.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
+            if(l instanceof Button) {
+                Button b = (Button)l;
+                Style sel = b.getSelectedStyle();
+                Style pre = b.getPressedStyle();
+                Style dis = b.getDisabledStyle();
+                if(sel.getFgColor() != s.getFgColor()) {
+                    sel.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
+                    b.setRolloverIcon(FontImage.create("" + icon, sel));
+                }
+                if(pre.getFgColor() != pre.getFgColor()) {
+                    pre.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
+                    b.setPressedIcon(FontImage.create("" + icon, pre));
+                    b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
+                }
+                if(dis.getFgColor() != dis.getFgColor()) {
+                    dis.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
+                    b.setDisabledIcon(FontImage.create("" + icon, dis));
+                }
+            }
         }
     }
 
