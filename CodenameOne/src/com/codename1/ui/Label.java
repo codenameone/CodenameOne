@@ -447,6 +447,10 @@ public class Label extends Component {
             getUIManager().getLookAndFeel().drawLabel(g, this);
             return;
         }
+        paintImpl(g);
+    }
+
+    void paintImpl(Graphics g) {
         Object icn = null;
         Image i = getIconFromState();
         if(i != null) {
@@ -472,7 +476,7 @@ public class Label extends Component {
                 icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
                 endsWith3Points, valign);
     }
-
+    
     /**
      * {@inheritDoc}
      */

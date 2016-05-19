@@ -4550,7 +4550,8 @@ public class FontImage extends Image {
 
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
-     * styling of the label</p>
+     * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
+     * will be set appropriately.</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * 
      * @param l a label or subclass (e.g. Button etc.)
@@ -4585,7 +4586,8 @@ public class FontImage extends Image {
 
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
-     * styling of the label</p>
+     * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
+     * will be set appropriately.</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * 
      * @param l a label or subclass (e.g. Button etc.)

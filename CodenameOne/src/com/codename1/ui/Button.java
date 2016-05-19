@@ -706,4 +706,14 @@ public class Button extends Label {
     public void setAutoRelease(boolean autoRelease){
         this.autoRelease = autoRelease;
     }
+
+    @Override
+    public void paint(Graphics g) {
+        if(isLegacyRenderer()) {
+            getUIManager().getLookAndFeel().drawButton(g, this);
+            return;
+        }
+        super.paintImpl(g);
+    }
+
 }
