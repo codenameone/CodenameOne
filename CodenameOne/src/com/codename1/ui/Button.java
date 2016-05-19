@@ -239,9 +239,6 @@ public class Button extends Label {
      */
     public void setRolloverPressedIcon(Image rolloverPressedIcon) {
         this.rolloverPressedIcon = rolloverPressedIcon;
-        if(rolloverPressedIcon != null) {
-            setLegacyRenderer(true);
-        }
     }
 
     /**
@@ -277,9 +274,6 @@ public class Button extends Label {
         setShouldCalcPreferredSize(true);
         checkAnimation();
         repaint();        
-        if(rolloverIcon != null) {
-            setLegacyRenderer(true);
-        }
     }
     
     /**
@@ -294,9 +288,6 @@ public class Button extends Label {
         setShouldCalcPreferredSize(true);
         checkAnimation();
         repaint();
-        if(pressedIcon != null) {
-            setLegacyRenderer(true);
-        }
     }
 
     /**
@@ -310,9 +301,6 @@ public class Button extends Label {
         setShouldCalcPreferredSize(true);
         checkAnimation();
         repaint();
-        if(disabledIcon != null) {
-            setLegacyRenderer(true);
-        }
     }
 
     void checkAnimation() {
