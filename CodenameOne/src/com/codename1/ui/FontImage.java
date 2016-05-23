@@ -4568,15 +4568,18 @@ public class FontImage extends Image {
                 Style pre = b.getPressedStyle();
                 Style dis = b.getDisabledStyle();
                 if(sel.getFgColor() != s.getFgColor()) {
+                    sel = new Style(sel);
                     sel.setFont(getMaterialDesignFont().derive(sel.getFont().getHeight(), Font.STYLE_PLAIN));
                     b.setRolloverIcon(FontImage.create("" + icon, sel));
                 }
-                if(pre.getFgColor() != pre.getFgColor()) {
+                if(pre.getFgColor() != s.getFgColor()) {
+                    pre = new Style(pre);
                     pre.setFont(getMaterialDesignFont().derive(pre.getFont().getHeight(), Font.STYLE_PLAIN));
                     b.setPressedIcon(FontImage.create("" + icon, pre));
                     b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
                 }
-                if(dis.getFgColor() != dis.getFgColor()) {
+                if(dis.getFgColor() != s.getFgColor()) {
+                    dis = new Style(dis);
                     dis.setFont(getMaterialDesignFont().derive(dis.getFont().getHeight(), Font.STYLE_PLAIN));
                     b.setDisabledIcon(FontImage.create("" + icon, dis));
                 }
@@ -4606,15 +4609,18 @@ public class FontImage extends Image {
                 Style pre = b.getPressedStyle();
                 Style dis = b.getDisabledStyle();
                 if(sel.getFgColor() != s.getFgColor()) {
+                    sel = new Style(sel);
                     sel.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
                     b.setRolloverIcon(FontImage.create("" + icon, sel));
                 }
-                if(pre.getFgColor() != pre.getFgColor()) {
+                if(pre.getFgColor() != s.getFgColor()) {
+                    pre = new Style(pre);
                     pre.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
                     b.setPressedIcon(FontImage.create("" + icon, pre));
                     b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
                 }
-                if(dis.getFgColor() != dis.getFgColor()) {
+                if(dis.getFgColor() != s.getFgColor()) {
+                    dis = new Style(dis);
                     dis.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
                     b.setDisabledIcon(FontImage.create("" + icon, dis));
                 }

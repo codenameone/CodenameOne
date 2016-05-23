@@ -606,9 +606,18 @@ public class ImageViewer extends Component {
     }
     
     /**
+     * Sets the current image without any changes to the panning/scaling
+     * @param image new image instance
+     */
+    public void setImageNoReposition(Image image) {
+        this.image = image;
+        repaint();
+    }
+    
+    /**
      * By providing this optional list of images you can allows swiping between multiple images
      * 
-     * @param list a list of images
+     * @param model a list of images
      */
     public void setImageList(ListModel<Image> model) {
         if(model == null || model.getSize() == 0) {

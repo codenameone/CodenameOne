@@ -155,7 +155,7 @@ public class ScaleImageButton extends Button {
      */
     @Override
     public Image getIconFromState() {
-        return getIcon();
+        return null;
     }
 
 }
