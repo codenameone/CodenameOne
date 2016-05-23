@@ -29,6 +29,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
@@ -48,6 +49,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -56,6 +58,7 @@ import android.widget.AutoCompleteTextView;
 import android.widget.FrameLayout;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
@@ -75,7 +78,7 @@ import java.util.logging.Logger;
  * @author lior.gonnen
  *
  */
-public class InPlaceEditView extends FrameLayout {
+public class InPlaceEditView extends FrameLayout{
 
     private static final String TAG = "InPlaceEditView";
     public static final int REASON_UNDEFINED = 0;
@@ -112,6 +115,8 @@ public class InPlaceEditView extends FrameLayout {
     // is still in progress.  This flag is only relevant in async edit mode.
     private boolean textEditorHidden = false;
 
+    private static boolean resizeMode;
+
     // Used to buffer input while the native editor is being initialized
     // This is necessary because initialization may require us to
     // asynchronously run code on the EDT to obtain the current text area
@@ -126,20 +131,21 @@ public class InPlaceEditView extends FrameLayout {
      * To use this class, call the static 'edit' method.
      * @param impl The current running activity
      */
-    private InPlaceEditView(AndroidImplementation impl) {
+    private InPlaceEditView(final AndroidImplementation impl) {
         super(impl.activity);
         this.impl = impl;
         mResources = impl.activity.getResources();
         mResultReceiver = new DebugResultReceiver(getHandler());
         mInputManager = (InputMethodManager) impl.activity.getSystemService(Context.INPUT_METHOD_SERVICE);
 
-        impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         // We place this view as an overlay that takes up the entire screen
-        setLayoutParams(new LayoutParams(LayoutParams.FILL_PARENT, LayoutParams.FILL_PARENT));
+        setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         setFocusableInTouchMode(true);
         initInputTypeMap();
         setBackgroundDrawable(null);
+
     }
+
 
     /**
      * Prepare an int-to-int map that maps Codename One input-types to
@@ -340,8 +346,17 @@ public class InPlaceEditView extends FrameLayout {
         });
         reLayoutEdit(true);
         repaintTextEditor(true);
+    }
 
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+    }
 
+    @Override
+    protected void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        endEdit(true);
     }
 
     /**
@@ -554,8 +569,6 @@ public class InPlaceEditView extends FrameLayout {
         return showVKB || (System.currentTimeMillis() - closedTime) < 2000;
     }
 
-
-
     static class TextAreaData {
         final int absoluteY;
         final int absoluteX;
@@ -677,9 +690,7 @@ public class InPlaceEditView extends FrameLayout {
      * @param initialText The text that appears in the Codename One text are before the call to startEditing
      */
     private synchronized void startEditing(Activity activity, TextAreaData textArea, String initialText, int codenameOneInputType) {
-        //if (mEditText != null) {
-        //    endEdit();
-        //}
+
         int txty = lastTextAreaY = textArea.getAbsoluteY() + textArea.getScrollY();
         int txtx = lastTextAreaX = textArea.getAbsoluteX() + textArea.getScrollX();
         lastTextAreaWidth = textArea.getWidth();
@@ -727,32 +738,33 @@ public class InPlaceEditView extends FrameLayout {
         }
         
         mEditText.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
-        addView(mEditText, mEditLayoutParams);
 
         Component nextDown = textArea.nextDown;
         boolean imeOptionTaken = true;
+        int ime = EditorInfo.IME_FLAG_NO_EXTRACT_UI;
         if (textArea.isSingleLineTextArea()) {
             if(textArea.getClientProperty("searchField") != null) {
-                mEditText.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+                mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_SEARCH);
             } else {
                 if(textArea.getClientProperty("sendButton") != null) {
-                    mEditText.setImeOptions(EditorInfo.IME_ACTION_SEND);
+                    mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_SEND);
                 } else {
                     if(textArea.getClientProperty("goButton") != null) {
-                        mEditText.setImeOptions(EditorInfo.IME_ACTION_GO);
+                        mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_GO);
                     } else {
                         if(textArea.isTextField && textArea.getDoneListener() != null){
-                            mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);            
+                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);
                         } else if (nextDown != null && nextDown instanceof TextArea && ((TextArea)nextDown).isEditable() && ((TextArea)nextDown).isEnabled()) {
-                            mEditText.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_NEXT);
                         } else {
-                            mEditText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+                            mEditText.setImeOptions(ime | EditorInfo.IME_ACTION_DONE);
                             imeOptionTaken = false;
                         }
                     }
                 }
             }
         }
+
         mEditText.setSingleLine(textArea.isSingleLineTextArea());
         mEditText.setAdapter((ArrayAdapter<String>) null);
         mEditText.setText(initialText);
@@ -763,6 +775,7 @@ public class InPlaceEditView extends FrameLayout {
         if(textArea.nativeHintBool && textArea.getHint() != null) {
             mEditText.setHint(textArea.getHint());
         }
+        addView(mEditText, mEditLayoutParams);
         invalidate();
         setVisibility(VISIBLE);
         bringToFront();
@@ -930,6 +943,19 @@ public class InPlaceEditView extends FrameLayout {
         endEditing(REASON_IME_ACTION, false);
     }
 
+    private static void setEditMode(final boolean resize){
+        resizeMode = resize;
+        if (resize) {
+            sInstance.impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        } else {
+            sInstance.impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
+        }
+    }
+
+    public static boolean isInputResize(){
+        return resizeMode;
+    }
+
     /**
      * Returns true if an edit is currently in progress, false otherwise
      */
@@ -1076,7 +1102,6 @@ public class InPlaceEditView extends FrameLayout {
 
 
 
-
         // The very first time we try to edit a string, let's determine if the
         // system default is to do async editing.  If the system default
         // is not yet set, we set it here, and it will be used as the default from now on
@@ -1093,7 +1118,7 @@ public class InPlaceEditView extends FrameLayout {
 
         // Check if the form has any setting for asyncEditing that should override
         // the application defaults.
-        Form parentForm = component.getComponentForm();
+        final Form parentForm = component.getComponentForm();
         if (parentForm == null) {
             com.codename1.io.Log.p("Attempt to edit text area that is not on a form.  This is not supported");
             return;
@@ -1185,7 +1210,7 @@ public class InPlaceEditView extends FrameLayout {
             ((TextField) textArea).setEditable(false);
         }
 
-
+        final boolean scrollableParent = isScrollableParent(textArea);
         // We wrap the text area so that we can safely pass data across to the
         // android UI thread.
         final TextAreaData textAreaData = new TextAreaData(textArea);
@@ -1194,9 +1219,16 @@ public class InPlaceEditView extends FrameLayout {
 
             @Override
             public void run() {
+                releaseEdit();
+
                 if (sInstance == null) {
                     sInstance = new InPlaceEditView(impl);
                     impl.relativeLayout.addView(sInstance);
+                }
+                if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
+                    setEditMode(true);
+                }else{
+                    setEditMode(false);
                 }
                 sInstance.startEditing(impl.activity, textAreaData, initialText, inputType);
             }
@@ -1298,6 +1330,17 @@ public class InPlaceEditView extends FrameLayout {
         waitForEditCompletion();
         
         onComplete.run();
+    }
+
+    private static boolean isScrollableParent(Component c){
+        Container p = c.getParent();
+        while( p != null){
+            if(p.isScrollableY()){
+                return true;
+            }
+            p = p.getParent();
+        }
+        return false;
     }
 
     private class DebugResultReceiver extends ResultReceiver {
@@ -1413,7 +1456,6 @@ public class InPlaceEditView extends FrameLayout {
                 }
             }
         };
-
 
         /**
          * Constructor
