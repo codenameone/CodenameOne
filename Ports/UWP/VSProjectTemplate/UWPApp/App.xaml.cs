@@ -164,6 +164,39 @@ namespace UWPApp
             java.lang.System.setOut(new DebugPrintStream());
         }
 
+        public override String getTimezoneId()
+        {
+            return TimeZoneInfo.Local.Id;
+        }
+        public override int getTimezoneOffset(string name, int year, int month, int day, int timeOfDayMillis)
+        {
+            int hours = timeOfDayMillis / 1000 / 60 / 60;
+            int minutes = timeOfDayMillis / 1000 / 60 - hours * 60;
+            int seconds = timeOfDayMillis / 1000 - (hours * 60 * 60) - (minutes * 60);
+            int millis = timeOfDayMillis % 1000;
+            return (int)TimeZoneInfo.FindSystemTimeZoneById(name).GetUtcOffset(new DateTime(year, month, day, hours, minutes, seconds, DateTimeKind.Local)).TotalMilliseconds;
+
+        }
+        public override int getTimezoneRawOffset(string name)
+        {
+            return (int)TimeZoneInfo.FindSystemTimeZoneById(name).GetUtcOffset(new DateTime()).TotalMilliseconds;
+        }
+        public override bool isTimezoneDST(string name, long millis)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(name).IsDaylightSavingTime(new DateTime(millis));
+        }
+
+        public override string getOSLanguage()
+        {
+            string tag = Windows.Globalization.ApplicationLanguages.Languages.First();
+            if (tag.IndexOf("-") >= 0)
+            {
+                tag = tag.Substring(tag.IndexOf("-") + 1);
+            }
+            return tag;
+        }
+
+
         public override Module GetTypeModule(Type type)
         {
             System.Diagnostics.Debug.WriteLine("In getTypeModule 1");
@@ -198,6 +231,10 @@ namespace UWPApp
 #else
             return assembly.Modules.ToArray();
 #endif
+        }
+
+        public override Type getTimeZoneInfo() {
+            return typeof(TimeZoneInfo);
         }
 
         public override RemappedClassAttribute[] GetRemappedClasses(Assembly assambly)
