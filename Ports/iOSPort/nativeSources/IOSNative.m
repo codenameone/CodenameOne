@@ -55,7 +55,6 @@
 #include <sqlite3.h>
 #include "OpenUDID.h"
 #import "StoreKit/StoreKit.h"
-#import "ScanCodeImpl.h"
 #include "com_codename1_contacts_Contact.h"
 #include "com_codename1_contacts_Address.h"
 #include "java_util_Hashtable.h"
@@ -4345,56 +4344,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(CN1_THREAD_STAT
 }
 
 void com_codename1_impl_ios_IOSNative_scanBarCode__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_IPHONE_SIMULATOR
-    dispatch_async(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        CVZBarReaderViewController *reader = [CVZBarReaderViewController new];
-        ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
-        reader.readerDelegate = scanCall;
-        reader.supportedOrientationsMask = ZBarOrientationMaskAll;
-        
-        //ZBAR_CONFIGURATIONS
-        
-        ZBarImageScanner *scanner = reader.scanner;
-        // TODO: (optional) additional reader configuration here
-        
-        // EXAMPLE: disable rarely used I2/5 to improve performance
-        [scanner setSymbology: ZBAR_I25
-                       config: ZBAR_CFG_ENABLE
-                           to: 0];
-        
-        // present and release the controller
-        [[CodenameOne_GLViewController instance] presentModalViewController:reader animated:NO];
-#ifndef CN1_USE_ARC
-        [reader release];
-#endif
-        POOL_END();
-    });
-#endif
 }
 
 void com_codename1_impl_ios_IOSNative_scanQRCode__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    /*dispatch_sync(dispatch_get_main_queue(), ^{
-     ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
-     ZXingWidgetController *widController = [[ZXingWidgetController alloc] initWithDelegate:scanCall showCancel:YES OneDMode:NO];
-     
-     NSMutableSet *readers = [[NSMutableSet alloc ] init];
-     
-     QRCodeReader* qrcodeReader = [[QRCodeReader alloc] init];
-     [readers addObject:qrcodeReader];
-     #ifndef CN1_USE_ARC
-     [qrcodeReader release];
-     #endif
-     
-     widController.readers = readers;
-     #ifndef CN1_USE_ARC
-     [readers release];
-     #endif
-     
-     [[CodenameOne_GLViewController instance] presentModalViewController:widController animated:YES];
-     [widController release];
-     });*/
-    com_codename1_impl_ios_IOSNative_scanBarCode__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 #ifdef NEW_CODENAME_ONE_VM
