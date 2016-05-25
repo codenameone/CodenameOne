@@ -4458,7 +4458,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ((weight & com.codename1.ui.Font.STYLE_ITALIC) == com.codename1.ui.Font.STYLE_ITALIC) {
             style = style | java.awt.Font.ITALIC;
         }
-        return fnt.deriveFont(style, size);
+        java.awt.Font fff = fnt.deriveFont(style, size);
+        if(Math.abs(size / 2 - fff.getSize())  < 3) {
+            // retina display bug!
+            return fnt.deriveFont(style, size * 2);
+        }
+        return fff;
     }
 
     private java.awt.Font createAWTFont(int[] i) {

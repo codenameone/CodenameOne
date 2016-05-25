@@ -157,8 +157,8 @@ public class InfiniteProgress extends Component {
                 }
                 FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_AUTORENEW, 
                         FontImage.getMaterialDesignFont(), 
-                        color, size, size);
-                fi.setPadding(0);
+                        color, size, size, 0);
+                
                 animation = fi.toImage();
             }
         }

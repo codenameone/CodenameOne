@@ -4747,6 +4747,31 @@ public class FontImage extends Image {
     }
 
     /**
+     * <p>Creates a font image with a fixed size/appearance</p>
+     *
+     * <script src="https://gist.github.com/codenameone/9c881350e1d142081aba.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-fontimage-fixed.png" alt="Icon font from material design icons created with the fixed size of display width" />
+     * 
+     * @param text the text of the font image
+     * @param fnt the font
+     * @param color the color for the image foreground
+     * @param width the width in pixels
+     * @param height the height in pixels
+     * @param padding the padding size in pixels
+     * @return the image instance
+     */
+    public static FontImage createFixed(String text, Font fnt, int color, int width, int height, int padding) {
+        FontImage f = new FontImage();
+        f.text = text;
+        f.color = color;
+        f.width = width;
+        f.fnt = sizeFont(fnt, Math.min(width, height), padding);
+        f.height = height;
+        f.padding = padding;
+        return f;
+    }
+    
+    /**
      * <p>Creates the font image based on the given style, the font in the style is assumed to be an icon font</p>
      *  
      * <script src="https://gist.github.com/codenameone/da3912b9ccef03f58058.js"></script>
