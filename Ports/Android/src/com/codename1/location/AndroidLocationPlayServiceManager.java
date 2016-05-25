@@ -25,6 +25,7 @@ package com.codename1.location;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -173,7 +174,10 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         Context context = AndroidNativeUtil.getActivity();
 
                         Intent intent = new Intent(context, BackgroundLocationHandler.class);
-                        intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
+                        //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
+                        //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
+                        //an ugly workaround to the putExtra bug 
+                        intent.setData(Uri.parse("http://a.com/a?" + getBackgroundLocationListener().getName()));
                         PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                                 intent,
                                 PendingIntent.FLAG_UPDATE_CURRENT);

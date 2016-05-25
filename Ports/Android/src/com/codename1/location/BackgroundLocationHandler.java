@@ -39,11 +39,18 @@ public class BackgroundLocationHandler extends IntentService {
 
     @Override
     protected void onHandleIntent(Intent intent) {
-        String className = intent.getStringExtra("backgroundClass");
+        //String className = intent.getStringExtra("backgroundClass");
+        String[] params = intent.getDataString().split("[?]");
         final android.location.Location location = intent.getParcelableExtra(FusedLocationProviderApi.KEY_LOCATION_CHANGED);
 
+        //might happen on some occasions, no need to do anything.
+        if(location == null){
+            return;
+        }
+
         try {
-            LocationListener l = (LocationListener) Class.forName(className).newInstance();
+            //the 2nd parameter is the class name we need to create
+            LocationListener l = (LocationListener) Class.forName(params[1]).newInstance();
             l.locationUpdated(AndroidLocationPlayServiceManager.convert(location));
         } catch (Exception e) {
             Log.e("Codename One", "background location error", e);
