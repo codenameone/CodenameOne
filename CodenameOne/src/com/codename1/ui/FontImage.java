@@ -4588,6 +4588,41 @@ public class FontImage extends Image {
     }
 
     /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given command using the 
+     * given UIID. Notice that the pressed/selected &amp; disabled states will be set appropriately.</p>
+     * 
+     * @param c a command 
+     * @param icon one of the MATERIAL_* icons
+     * @param uiid the UIID for the command (e.g. TitleCommand)
+     */
+    public static void setMaterialIcon(Command c, char icon, String uiid) {
+        if(Font.isTrueTypeFileSupported()) {
+            UIManager uim = UIManager.getInstance();
+            Style s = uim.getComponentStyle(uiid);
+            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            c.setIcon(FontImage.create("" + icon, s));
+            Style sel = uim.getComponentSelectedStyle(uiid);
+            Style pre = uim.getComponentCustomStyle(uiid, "press");
+            Style dis = uim.getComponentCustomStyle(uiid, "dis");;
+            if(sel.getFgColor() != s.getFgColor()) {
+                sel = new Style(sel);
+                sel.setFont(getMaterialDesignFont().derive(sel.getFont().getHeight(), Font.STYLE_PLAIN));
+                c.setRolloverIcon(FontImage.create("" + icon, sel));
+            }
+            if(pre.getFgColor() != s.getFgColor()) {
+                pre = new Style(pre);
+                pre.setFont(getMaterialDesignFont().derive(pre.getFont().getHeight(), Font.STYLE_PLAIN));
+                c.setPressedIcon(FontImage.create("" + icon, pre));
+            }
+            if(dis.getFgColor() != s.getFgColor()) {
+                dis = new Style(dis);
+                dis.setFont(getMaterialDesignFont().derive(dis.getFont().getHeight(), Font.STYLE_PLAIN));
+                c.setDisabledIcon(FontImage.create("" + icon, dis));
+            }
+        }
+    }
+    
+    /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
      * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
      * will be set appropriately.</p>
