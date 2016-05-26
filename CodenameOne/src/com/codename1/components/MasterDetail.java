@@ -42,6 +42,9 @@ import com.codename1.ui.layouts.BoxLayout;
  * @author Shai Almog
  */
 public class MasterDetail {
+    /**
+     * @deprecated this was a half baked idea that made it into the public API
+     */
     public static void bindTabletLandscapeMaster(final Form rootForm, Container parentContainer, Component landscapeUI, final Component portraitUI, final String commandTitle, Image commandIcon) {
         landscapeUI.setHideInPortrait(true);
         parentContainer.addComponent(BorderLayout.WEST, landscapeUI);
