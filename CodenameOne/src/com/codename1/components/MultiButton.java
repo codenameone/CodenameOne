@@ -1045,4 +1045,27 @@ public class MultiButton extends Container {
     public void setMaskName(String maskName) {
         icon.setMaskName(maskName);
     }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @return the shouldLocalize value
+     */
+    public boolean isShouldLocalize() {
+        return firstRow.isShouldLocalize();
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @param shouldLocalize the shouldLocalize to set
+     */
+    public void setShouldLocalize(boolean shouldLocalize) {
+        firstRow.setShouldLocalize(shouldLocalize);
+        secondRow.setShouldLocalize(shouldLocalize);
+        thirdRow.setShouldLocalize(shouldLocalize);
+        forthRow.setShouldLocalize(shouldLocalize);
+    }
 }

@@ -870,7 +870,7 @@ public class InPlaceEditView extends FrameLayout{
         mLastEndEditReason = reason;
 
         // If the IME action is set to NEXT, do not hide the virtual keyboard
-        boolean isNextActionFlagSet = (mEditText.getImeOptions() == EditorInfo.IME_ACTION_NEXT);
+        boolean isNextActionFlagSet = ((mEditText.getImeOptions() & EditorInfo.IME_ACTION_NEXT) != 0);
         boolean leaveKeyboardShowing = impl.isAsyncEditMode() || (reason == REASON_IME_ACTION) && isNextActionFlagSet || forceVKBOpen;
         if (forceVKBClose) {
             leaveKeyboardShowing = false;
@@ -880,7 +880,7 @@ public class InPlaceEditView extends FrameLayout{
         }
         int imo = mEditText.getImeOptions();
         if(reason == REASON_IME_ACTION &&
-            (imo == EditorInfo.IME_ACTION_DONE || imo == EditorInfo.IME_ACTION_SEARCH || imo == EditorInfo.IME_ACTION_SEND || imo == EditorInfo.IME_ACTION_GO) && 
+            ((imo & EditorInfo.IME_ACTION_DONE) != 0 || (imo & EditorInfo.IME_ACTION_SEARCH) != 0 || (imo & EditorInfo.IME_ACTION_SEND) != 0 || (imo & EditorInfo.IME_ACTION_GO) != 0) && 
                 mEditText.mTextArea instanceof TextField ){
             ((TextField)mEditText.mTextArea).fireDoneEvent();
         }
@@ -929,7 +929,7 @@ public class InPlaceEditView extends FrameLayout{
      * @param actionCode
      */
     void onEditorAction(int actionCode) {
-        if (actionCode == EditorInfo.IME_ACTION_NEXT && mEditText != null && 
+        if ((actionCode & EditorInfo.IME_ACTION_NEXT) != 0 && mEditText != null && 
                 mEditText.mTextArea != null) {
             Component next = mEditText.mTextArea.getNextFocusDown();
             if (next == null) {

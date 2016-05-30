@@ -183,7 +183,10 @@ namespace UWPApp
         }
         public override bool isTimezoneDST(string name, long millis)
         {
-            return TimeZoneInfo.FindSystemTimeZoneById(name).IsDaylightSavingTime(new DateTime(millis));
+            Int64 ticks = millis * 10000;
+            if (ticks < DateTime.MinValue.Ticks) ticks = DateTime.MinValue.Ticks;
+            if (ticks > DateTime.MaxValue.Ticks) ticks = DateTime.MaxValue.Ticks;
+            return TimeZoneInfo.FindSystemTimeZoneById(name).IsDaylightSavingTime(new DateTime(ticks));
         }
 
         public override string getOSLanguage()

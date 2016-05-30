@@ -2154,7 +2154,7 @@ public final class Display {
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged ) || (isMinimized() && !hasNoSerialCallsPending());
+                && !longPointerCharged ) || (isMinimized() && hasNoSerialCallsPending());
     }
 
 

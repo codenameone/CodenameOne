@@ -1299,8 +1299,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                     continue;
                 }
                 if (name.endsWith(".res")) {
-                    nativeThemeData = new byte[(int) e.getSize()];
-                    readFully(z, nativeThemeData);
+                    long esize = e.getSize();
+                    if(esize > 0) {
+                        nativeThemeData = new byte[(int) esize];
+                        readFully(z, nativeThemeData);
+                    } else {
+                        ByteArrayOutputStream b = new ByteArrayOutputStream();
+                        Util.copyNoClose(z, b, 8192);
+                        nativeThemeData = b.toByteArray();
+                    }
                     e = z.getNextEntry();
                     continue;
                 }

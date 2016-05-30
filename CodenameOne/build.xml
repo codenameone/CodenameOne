@@ -506,7 +506,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/PropertyCross" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/propertycross/PropertyCross.zip" compress="false">
+        <zip basedir="../../PropertyCross" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/propertycross/PropertyCross.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>

@@ -399,6 +399,76 @@ public class Toolbar extends Container {
     }
     
     /**
+     * Adds a Command to the side navigation menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        addCommandToSideMenu(cmd);
+        setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the right side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightBar(String name, char icon, final ActionListener ev) {
+        Command cmd = addCommandToRightBar(name, null, ev);
+        setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }    
+    
+    private void setCommandMaterialIcon(Command cmd, char icon) {
+        String uiid = (String)cmd.getClientProperty("uiid");
+        if(uiid != null) {
+            FontImage.setMaterialIcon(cmd, icon, uiid);
+        } else {
+            FontImage.setMaterialIcon(cmd, icon, "SideCommand");
+        }
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the left side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftBar(String name, char icon, final ActionListener ev) {
+        Command cmd = addCommandToRightBar(name, null, ev);
+        setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }    
+
+    /**
+     * Adds a Command to the overflow menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToOverflowMenu(String name, char icon, final ActionListener ev) {
+        Command cmd = addCommandToOverflowMenu(name, null, ev);
+        setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }
+    
+    /**
      * Adds a Command to the side navigation menu
      *
      * @param cmd a Command

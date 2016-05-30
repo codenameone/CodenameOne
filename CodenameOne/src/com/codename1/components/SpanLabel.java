@@ -22,12 +22,10 @@
  */
 package com.codename1.components;
 
-import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Style;
@@ -43,6 +41,7 @@ import com.codename1.ui.plaf.Style;
 public class SpanLabel extends Container {
     private Label icon;
     private TextArea text;
+    private boolean shouldLocalize = true;
     
     /**
      * Default constructor will be useful when adding this to the GUI builder
@@ -148,7 +147,11 @@ public class SpanLabel extends Container {
      * @param t text of the label
      */
     public void setText(String t) {
-        text.setText(getUIManager().localize(t, t));
+        if(shouldLocalize) {
+            text.setText(getUIManager().localize(t, t));
+        } else {
+            text.setText(t);
+        }
     }
 
     /**
@@ -319,5 +322,25 @@ public class SpanLabel extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @return the shouldLocalize value
+     */
+    public boolean isShouldLocalize() {
+        return shouldLocalize;
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @param shouldLocalize the shouldLocalize to set
+     */
+    public void setShouldLocalize(boolean shouldLocalize) {
+        this.shouldLocalize = shouldLocalize;
     }
 }
