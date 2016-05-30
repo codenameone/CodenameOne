@@ -2916,6 +2916,10 @@ public class Component implements Animation, StyleListener {
                 });
             }
             
+            if(dragActivated && p.getDraggedComponent() == null){
+                dragActivated = false;
+            }
+            
             if (!dragActivated) {
                 dragActivated = true;
                 setVisible(false);

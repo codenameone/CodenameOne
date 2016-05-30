@@ -860,6 +860,13 @@ public class Form extends Container {
     void setDraggedComponent(Component dragged) {
         this.dragged = dragged;
     }
+    
+    /**
+     * Gets the current dragged Component
+     */
+    Component getDraggedComponent() {
+        return dragged;
+    }
 
     /**
      * Returns true if the given dest component is in the column of the source component
