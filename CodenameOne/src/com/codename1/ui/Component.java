@@ -2915,11 +2915,7 @@ public class Component implements Animation, StyleListener {
                     }
                 });
             }
-            
-            if(dragActivated && p.getDraggedComponent() == null){
-                dragActivated = false;
-            }
-            
+                      
             if (!dragActivated) {
                 dragActivated = true;
                 setVisible(false);
@@ -2996,6 +2992,10 @@ public class Component implements Animation, StyleListener {
                 
             return;
         }
+        if(dragActivated && p.getDraggedComponent() == null){
+            dragActivated = false;
+        }
+        
         if(!dragActivated){
             boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
             shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
