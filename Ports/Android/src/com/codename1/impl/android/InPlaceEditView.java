@@ -288,34 +288,37 @@ public class InPlaceEditView extends FrameLayout{
                                     // Loop through any pending changes in the input buffer
                                     // (I.e. key strokes that have occurred since we initiated
                                     // this async callback hell!!)
-                                    for (TextChange change : inputBuffer) {
+                                    List<TextChange> tinput = inputBuffer;
+                                    if(tinput != null) {
+                                        for (TextChange change : tinput) {
 
-                                        // This change is "added" text.  Try to add it
-                                        // at the correct cursor position.  if not, add it at the
-                                        // end.
-                                        if (change.textToAppend != null) {
-                                            if (end >= 0 && end <= buf.length()) {
-                                                buf.insert(end, change.textToAppend);
-                                                end += change.textToAppend.length();
-                                                start = end;
-                                            } else {
-                                                buf.append(change.textToAppend);
-                                                end = buf.length();
-                                                start = end;
+                                            // This change is "added" text.  Try to add it
+                                            // at the correct cursor position.  if not, add it at the
+                                            // end.
+                                            if (change.textToAppend != null) {
+                                                if (end >= 0 && end <= buf.length()) {
+                                                    buf.insert(end, change.textToAppend);
+                                                    end += change.textToAppend.length();
+                                                    start = end;
+                                                } else {
+                                                    buf.append(change.textToAppend);
+                                                    end = buf.length();
+                                                    start = end;
+                                                }
+
                                             }
 
-                                        }
-
-                                        // The change is "deleted" text.
-                                        else if (change.deleteLength > 0) {
-                                            if (end >= change.deleteLength && end <= buf.length()) {
-                                                buf.delete(end - change.deleteLength, end);
-                                                end -= change.deleteLength;
-                                                start = end;
-                                            } else if (end > 0 && end < change.deleteLength) {
-                                                buf.delete(0, end);
-                                                end = 0;
-                                                start = end;
+                                            // The change is "deleted" text.
+                                            else if (change.deleteLength > 0) {
+                                                if (end >= change.deleteLength && end <= buf.length()) {
+                                                    buf.delete(end - change.deleteLength, end);
+                                                    end -= change.deleteLength;
+                                                    start = end;
+                                                } else if (end > 0 && end < change.deleteLength) {
+                                                    buf.delete(0, end);
+                                                    end = 0;
+                                                    start = end;
+                                                }
                                             }
                                         }
                                     }
