@@ -165,7 +165,7 @@ public class ConnectionRequest implements IOProgressListener {
     private OutputStream output;
     private int progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
     private int contentLength = -1;
-    private boolean duplicateSupported;
+    private boolean duplicateSupported = true;
     private EventDispatcher responseCodeListeners;
     private Hashtable userHeaders;
     private Dialog showOnInit;
