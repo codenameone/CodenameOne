@@ -29,6 +29,7 @@ import com.codename1.ui.Display;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Properties;
 import javax.swing.SwingUtilities;
@@ -100,6 +101,9 @@ public class Executor {
                                         start.invoke(app, new Object[0]);
                                     } catch (NoSuchMethodException err) {
                                         System.out.println("Couldn't find a main or a startup in " + argv[0]);
+                                    } catch (InvocationTargetException err) {
+                                        err.getTargetException().printStackTrace();
+                                        System.exit(1);
                                     } catch (Exception err) {
                                         err.printStackTrace();
                                         System.exit(1);
