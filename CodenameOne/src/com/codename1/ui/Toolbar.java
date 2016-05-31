@@ -36,6 +36,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import java.util.ArrayList;
@@ -408,9 +409,26 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
-        Command cmd = Command.create(name, null, ev);
+        Command cmd = Command.create(name, FontImage.createMaterial(icon, new Style()), ev);
         addCommandToSideMenu(cmd);
         setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }
+
+    /**
+     * Adds a Command to the side navigation menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = Command.create(name, FontImage.createMaterial(icon, new Style()), ev);
+        addCommandToSideMenu(cmd);
+        setCommandMaterialIcon(cmd, icon, size);
         return cmd;
     }
     
@@ -424,8 +442,24 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToRightBar(String name, char icon, final ActionListener ev) {
-        Command cmd = addCommandToRightBar(name, null, ev);
+        Command cmd = addCommandToRightBar(name, FontImage.createMaterial(icon, new Style()), ev);
         setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }    
+
+    /**
+     * Adds a Command to the TitleArea on the right side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size of the icon in millimeters
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightBar(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = addCommandToRightBar(name, FontImage.createMaterial(icon, new Style()), ev);
+        setCommandMaterialIcon(cmd, icon, size);
         return cmd;
     }    
     
@@ -435,6 +469,15 @@ public class Toolbar extends Container {
             FontImage.setMaterialIcon(cmd, icon, uiid);
         } else {
             FontImage.setMaterialIcon(cmd, icon, "SideCommand");
+        }
+    }
+    
+    private void setCommandMaterialIcon(Command cmd, char icon, float size) {
+        String uiid = (String)cmd.getClientProperty("uiid");
+        if(uiid != null) {
+            FontImage.setMaterialIcon(cmd, icon, uiid, size);
+        } else {
+            FontImage.setMaterialIcon(cmd, icon, "SideCommand", size);
         }
     }
     
@@ -448,8 +491,24 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToLeftBar(String name, char icon, final ActionListener ev) {
-        Command cmd = addCommandToRightBar(name, null, ev);
+        Command cmd = addCommandToLeftBar(name, FontImage.createMaterial(icon, new Style()), ev);
         setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }    
+
+    /**
+     * Adds a Command to the TitleArea on the left side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftBar(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = addCommandToLeftBar(name, FontImage.createMaterial(icon, new Style()), ev);
+        setCommandMaterialIcon(cmd, icon, size);
         return cmd;
     }    
 
@@ -463,8 +522,24 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToOverflowMenu(String name, char icon, final ActionListener ev) {
-        Command cmd = addCommandToOverflowMenu(name, null, ev);
+        Command cmd = addCommandToOverflowMenu(name, FontImage.createMaterial(icon, new Style()), ev);
         setCommandMaterialIcon(cmd, icon);
+        return cmd;
+    }
+
+    /**
+     * Adds a Command to the overflow menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToOverflowMenu(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = addCommandToOverflowMenu(name, FontImage.createMaterial(icon, new Style()), ev);
+        setCommandMaterialIcon(cmd, icon, size);
         return cmd;
     }
     
