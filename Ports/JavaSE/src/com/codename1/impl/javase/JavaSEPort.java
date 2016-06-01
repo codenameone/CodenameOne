@@ -3112,6 +3112,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             editStringLegacy(cmp, maxSize, constraint, text, keyCode);
             return;
         }
+        java.awt.Component [] cmps = canvas.getComponents();
+        for (int i = 0; i < cmps.length; i++) {
+            java.awt.Component cmp1 = cmps[i];
+            if(cmp1 instanceof JScrollPane || cmp1 instanceof javax.swing.text.JTextComponent){
+                canvas.remove(cmp1);
+            }
+        }
+        
         checkEDT();
         javax.swing.text.JTextComponent swingT;
         if (((com.codename1.ui.TextArea)cmp).isSingleLineTextArea()) {
