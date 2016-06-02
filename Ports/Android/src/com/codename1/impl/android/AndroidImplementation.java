@@ -193,7 +193,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean vibrateInitialized = false;
     private int displayWidth;
     private int displayHeight;
-    static Activity activity;
+    static CodenameOneActivity activity;
     RelativeLayout relativeLayout;
     final Vector nativePeers = new Vector();
     int lastDirectionalKeyEventReceivedByWrapper;
@@ -421,82 +421,83 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void init(Object m) {
-        this.activity = (Activity) m;
+        this.activity = (CodenameOneActivity) m;
            
-        if (!hasActionBar()) {
-            try {
-                activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
-            } catch (Exception e) {
-                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
-            }
-        } else {
-            activity.invalidateOptionsMenu();
-            try {
-                activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
-                activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
-                
-                if(android.os.Build.VERSION.SDK_INT >= 21){
-                    //WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
-                    activity.getWindow().addFlags(-2147483648);
+        if(activity.hasUI()){
+            if (!hasActionBar()) {
+                try {
+                    activity.requestWindowFeature(Window.FEATURE_NO_TITLE);
+                } catch (Exception e) {
+                    //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
                 }
-            } catch (Exception e) {
-                //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+            } else {
+                activity.invalidateOptionsMenu();
+                try {
+                    activity.requestWindowFeature(Window.FEATURE_ACTION_BAR);
+                    activity.requestWindowFeature(Window.FEATURE_PROGRESS);                
+
+                    if(android.os.Build.VERSION.SDK_INT >= 21){
+                        //WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
+                        activity.getWindow().addFlags(-2147483648);
+                    }
+                } catch (Exception e) {
+                    //Log.d("Codename One", "No idea why this throws a Runtime Error", e);
+                }
+                NotifyActionBar notify = new NotifyActionBar(activity, false);
+                notify.run();
             }
-            NotifyActionBar notify = new NotifyActionBar(activity, false);
-            notify.run();
-        }
 
-        if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
-            activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        }
-        
-        if(Display.getInstance().getProperty("KeepScreenOn", "").equals("true")){
-            activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        }
+            if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
+                activity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            }
 
-        if (m instanceof CodenameOneActivity) {
-            ((CodenameOneActivity) m).setDefaultIntentResultListener(this);
-            ((CodenameOneActivity) m).setIntentResultListener(this);
-        }
+            if(Display.getInstance().getProperty("KeepScreenOn", "").equals("true")){
+                activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
 
-        /**
-         * translate our default font height depending on the screen density.
-         * this is required for new high resolution devices. otherwise
-         * everything looks awfully small.
-         *
-         * we use our default font height value of 16 and go from there. i
-         * thought about using new Paint().getTextSize() for this value but if
-         * some new version of android suddenly returns values already tranlated
-         * to the screen then we might end up with too large fonts. the
-         * documentation is not very precise on that.
-         */
-        final int defaultFontPixelHeight = 16;
-        this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
+            if (m instanceof CodenameOneActivity) {
+                ((CodenameOneActivity) m).setDefaultIntentResultListener(this);
+                ((CodenameOneActivity) m).setIntentResultListener(this);
+            }
+
+            /**
+             * translate our default font height depending on the screen density.
+             * this is required for new high resolution devices. otherwise
+             * everything looks awfully small.
+             *
+             * we use our default font height value of 16 and go from there. i
+             * thought about using new Paint().getTextSize() for this value but if
+             * some new version of android suddenly returns values already tranlated
+             * to the screen then we might end up with too large fonts. the
+             * documentation is not very precise on that.
+             */
+            final int defaultFontPixelHeight = 16;
+            this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
 
 
-        this.defaultFont = (CodenameOneTextPaint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
-        Display.getInstance().setTransitionYield(-1);
-        
-        initSurface();
-        /**
-         * devices are extremely sensitive so dragging should start a little
-         * later than suggested by default implementation.
-         */
-        this.setDragStartPercentage(1);
-        VirtualKeyboardInterface vkb = new AndroidKeyboard(this);
-        Display.getInstance().registerVirtualKeyboard(vkb);
-        Display.getInstance().setDefaultVirtualKeyboard(vkb);
+            this.defaultFont = (CodenameOneTextPaint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
+            Display.getInstance().setTransitionYield(-1);
 
-        InPlaceEditView.endEdit();
+            initSurface();
+            /**
+             * devices are extremely sensitive so dragging should start a little
+             * later than suggested by default implementation.
+             */
+            this.setDragStartPercentage(1);
+            VirtualKeyboardInterface vkb = new AndroidKeyboard(this);
+            Display.getInstance().registerVirtualKeyboard(vkb);
+            Display.getInstance().setDefaultVirtualKeyboard(vkb);
 
-        activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+            InPlaceEditView.endEdit();
 
-        if (nativePeers.size() > 0) {
-            for (int i = 0; i < nativePeers.size(); i++) {
-                ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).init();
+            activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+
+            if (nativePeers.size() > 0) {
+                for (int i = 0; i < nativePeers.size(); i++) {
+                    ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).init();
+                }
             }
         }
-
         HttpURLConnection.setFollowRedirects(false);
         CookieHandler.setDefault(null);
     }
@@ -1262,7 +1263,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Object getNativeGraphics() {
-        return myView.getGraphics();
+        if(myView != null){
+            return myView.getGraphics();
+        }else{
+            return null;
+        }
     }
 
     @Override

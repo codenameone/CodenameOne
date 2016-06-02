@@ -24,7 +24,9 @@ package com.codename1.location;
 
 import android.app.IntentService;
 import android.content.Intent;
+import android.os.Bundle;
 import android.util.Log;
+import com.codename1.ui.Display;
 import com.google.android.gms.location.FusedLocationProviderApi;
 
 /**
@@ -44,16 +46,28 @@ public class BackgroundLocationHandler extends IntentService {
         final android.location.Location location = intent.getParcelableExtra(FusedLocationProviderApi.KEY_LOCATION_CHANGED);
 
         //might happen on some occasions, no need to do anything.
-        if(location == null){
+        if (location == null) {
             return;
         }
+        //if the Display is not initialized we need to launch the CodenameOneBackgroundLocationActivity 
+        //activity to handle this
+        if (!Display.isInitialized()) {            
+            Intent bgIntent = new Intent(getBaseContext(), CodenameOneBackgroundLocationActivity.class);
+            Bundle b = new Bundle();
+            b.putString("backgroundLocation", params[1]);
+            b.putParcelable("Location", location);
+            bgIntent.putExtras(b); //Put your id to your next Intent
+            bgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getApplication().startActivity(bgIntent);
+        } else {
 
-        try {
-            //the 2nd parameter is the class name we need to create
-            LocationListener l = (LocationListener) Class.forName(params[1]).newInstance();
-            l.locationUpdated(AndroidLocationPlayServiceManager.convert(location));
-        } catch (Exception e) {
-            Log.e("Codename One", "background location error", e);
+            try {
+                //the 2nd parameter is the class name we need to create
+                LocationListener l = (LocationListener) Class.forName(params[1]).newInstance();
+                l.locationUpdated(AndroidLocationPlayServiceManager.convert(location));
+            } catch (Exception e) {
+                Log.e("Codename One", "background location error", e);
+            }
         }
     }
 }

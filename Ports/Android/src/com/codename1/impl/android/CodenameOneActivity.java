@@ -679,4 +679,7 @@ public class CodenameOneActivity extends Activity {
         requestForPermission = false;
     }
     
+    public boolean hasUI(){
+        return true;
+    }
 }
