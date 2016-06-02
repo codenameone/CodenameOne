@@ -62,6 +62,9 @@ public class Socket {
      * @param sc callback for when the connection is established or fails
      */
     public static void connect(final String host, final int port, final SocketConnection sc) {
+        if(host.indexOf('.') > -1 && host.indexOf(':') > -1) {
+            throw new IllegalArgumentException("Port should be provided separately");
+        }
         Display.getInstance().startThread(new Runnable() {
             public void run() {
                 Object connection = Util.getImplementation().connectSocket(host, port);
