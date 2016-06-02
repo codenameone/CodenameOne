@@ -1635,6 +1635,171 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             networkDebug.add(networkMonitor);
 
+            JMenuItem proxy = new JMenuItem("Proxy Settings");
+            proxy.addActionListener(new ActionListener() {
+                
+                public void actionPerformed(ActionEvent e) {
+                    final JDialog proxy;
+                    if(window !=null){
+                        proxy = new JDialog(window);
+                    }else{
+                        proxy = new JDialog();                    
+                    }
+                    final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    int proxySel = pref.getInt("proxySel", 1);
+                    String proxySelHttp = pref.get("proxySel-http", ""); 
+                    String proxySelPort = pref.get("proxySel-port", "");                             
+                    
+                    JPanel panel = new JPanel();                    
+                    panel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));                    
+
+                    JPanel proxyUrl= new JPanel();
+                    proxyUrl.setLayout(new FlowLayout(FlowLayout.LEFT));                                        
+                    proxyUrl.add(new JLabel("Http Proxy:"));
+                    final JTextField http = new JTextField(proxySelHttp);
+                    http.setColumns(20);
+                    proxyUrl.add(http);
+                    proxyUrl.add(new JLabel("Port:"));
+                    final JTextField port = new JTextField(proxySelPort);
+                    port.setColumns(4);
+                    proxyUrl.add(port);
+                    
+                    final JRadioButton noproxy = new JRadioButton("No Proxy");
+                    JPanel rbPanel= new JPanel();
+                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
+                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                    rbPanel.add(noproxy);
+                    Dimension d = rbPanel.getPreferredSize();
+                    d.width = proxyUrl.getPreferredSize().width;
+                    rbPanel.setMinimumSize(d);
+                    //noproxy.setPreferredSize(d);
+                    panel.add(rbPanel);
+                    
+                    final JRadioButton systemProxy = new JRadioButton("Use System Proxy");
+                    rbPanel= new JPanel();
+                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
+                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                    rbPanel.add(systemProxy);
+                    d = rbPanel.getPreferredSize();
+                    d.width = proxyUrl.getPreferredSize().width;
+                    rbPanel.setPreferredSize(d);
+                    panel.add(rbPanel);
+                    
+                    final JRadioButton manual = new JRadioButton("Manual Proxy Settings:");
+                    rbPanel= new JPanel();
+                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
+                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                    rbPanel.add(manual);
+                    d = rbPanel.getPreferredSize();
+                    d.width = proxyUrl.getPreferredSize().width;
+                    rbPanel.setPreferredSize(d);
+                    panel.add(rbPanel);
+                                                            
+                    rbPanel= new JPanel();
+                    rbPanel.setLayout(new java.awt.GridLayout(1, 0));                                        
+                    rbPanel.setAlignmentX( java.awt.Component.LEFT_ALIGNMENT );
+                    rbPanel.add(proxyUrl);
+                    panel.add(rbPanel);
+                    
+                    ButtonGroup group = new ButtonGroup();
+                    group.add(noproxy);
+                    group.add(systemProxy);
+                    group.add(manual);
+                    noproxy.addActionListener(new ActionListener() {
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            http.setEnabled(false);
+                            port.setEnabled(false);
+                        }
+                    });
+                    systemProxy.addActionListener(new ActionListener() {
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            http.setEnabled(false);
+                            port.setEnabled(false);
+                        }
+                    });
+                    manual.addActionListener(new ActionListener() {
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            http.setEnabled(true);
+                            port.setEnabled(true);
+                        }
+                    });
+                    
+                    switch (proxySel){
+                        case 1:
+                            noproxy.setSelected(true);
+                            http.setEnabled(false);
+                            port.setEnabled(false);
+                            break;
+                        case 2:
+                            systemProxy.setSelected(true);
+                            http.setEnabled(false);
+                            port.setEnabled(false);
+                            break;
+                        case 3:
+                            manual.setSelected(true);                            
+                            break;
+                    }
+                    JPanel closePanel = new JPanel();
+                    JButton close = new JButton("Ok");
+                    close.addActionListener(new ActionListener() {
+
+                        public void actionPerformed(ActionEvent e) {
+                            if (noproxy.isSelected()) {
+                                pref.putInt("proxySel", 1);
+                            } else if (systemProxy.isSelected()) {
+                                pref.putInt("proxySel", 2);
+                            } else if (manual.isSelected()) {
+                                pref.putInt("proxySel", 3);
+                                pref.put("proxySel-http", http.getText());
+                                pref.put("proxySel-port", port.getText());
+                            }
+                            proxy.dispose();
+                            
+                            if (netMonitor != null) {
+                                netMonitor.dispose();
+                                netMonitor = null;
+                            }
+                            if (perfMonitor != null) {
+                                perfMonitor.dispose();
+                                perfMonitor = null;
+                            }
+                            String mainClass = System.getProperty("MainClass");
+                            if (mainClass != null) {
+                                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                                deinitializeSync();
+                                frm.dispose();
+                                System.setProperty("reload.simulator", "true");
+                            } else {
+                                refreshSkin(frm);
+                        }
+                            
+                        }
+                    });
+                    closePanel.add(close);
+                    panel.add(closePanel);
+                    
+                    proxy.add(panel);
+                    proxy.pack();
+                    if(window != null){
+                        proxy.setLocationRelativeTo(window);
+                    }
+                    proxy.setResizable(false);
+                    proxy.setVisible(true);
+                    
+                    
+                }
+            });
+            networkDebug.add(proxy);
+            networkDebug.addSeparator();
+            
+            
             JRadioButtonMenuItem regularConnection = new JRadioButtonMenuItem("Regular Connection");
             regularConnection.addActionListener(new ActionListener() {
                 @Override
@@ -2817,6 +2982,33 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (m instanceof Runnable) {
             Display.getInstance().callSerially((Runnable) m);
         }
+        int proxySel = pref.getInt("proxySel", 1);
+        String proxySelHttp = pref.get("proxySel-http", ""); 
+        String proxySelPort = pref.get("proxySel-port", "");                             
+        
+        switch (proxySel){
+            case 1:
+                System.getProperties().remove("java.net.useSystemProxies");            
+                System.getProperties().remove("http.proxyHost");
+                System.getProperties().remove("http.proxyPort"); 
+                System.getProperties().remove("https.proxyHost");
+                System.getProperties().remove("https.proxyPort");
+                break;
+            case 2:
+                System.setProperty("java.net.useSystemProxies", "true");
+                System.getProperties().remove("http.proxyHost");
+                System.getProperties().remove("http.proxyPort"); 
+                System.getProperties().remove("https.proxyHost");
+                System.getProperties().remove("https.proxyPort");
+                break;
+            case 3:
+                System.setProperty("http.proxyHost", proxySelHttp);
+                System.setProperty("http.proxyPort", proxySelPort); 
+                System.setProperty("https.proxyHost", proxySelHttp);
+                System.setProperty("https.proxyPort", proxySelPort); 
+                break;
+        }
+        
         inInit = false;
     }
 
@@ -3112,6 +3304,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             editStringLegacy(cmp, maxSize, constraint, text, keyCode);
             return;
         }
+        //a workaround to fix an issue where the previous Text Component wasn't removed properly. 
         java.awt.Component [] cmps = canvas.getComponents();
         for (int i = 0; i < cmps.length; i++) {
             java.awt.Component cmp1 = cmps[i];
