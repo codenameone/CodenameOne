@@ -25,6 +25,7 @@ package com.codename1.impl.javase;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import java.io.File;
 import java.io.FileInputStream;
@@ -32,6 +33,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Properties;
+import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
 
 /**
@@ -44,6 +46,9 @@ public class Executor {
     private static Object app;
     
     public static void main(final String[] argv) throws Exception {
+        
+        setProxySettings();
+        
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -153,5 +158,36 @@ public class Executor {
         }
     
     }
+    
+    private static void setProxySettings() {
+        Preferences proxyPref = Preferences.userNodeForPackage(Component.class);
+        int proxySel = proxyPref.getInt("proxySel", 1);
+        String proxySelHttp = proxyPref.get("proxySel-http", "");
+        String proxySelPort = proxyPref.get("proxySel-port", "");
+
+        switch (proxySel) {
+            case 1:
+                System.getProperties().remove("java.net.useSystemProxies");
+                System.getProperties().remove("http.proxyHost");
+                System.getProperties().remove("http.proxyPort");
+                System.getProperties().remove("https.proxyHost");
+                System.getProperties().remove("https.proxyPort");
+                break;
+            case 2:
+                System.setProperty("java.net.useSystemProxies", "true");
+                System.getProperties().remove("http.proxyHost");
+                System.getProperties().remove("http.proxyPort");
+                System.getProperties().remove("https.proxyHost");
+                System.getProperties().remove("https.proxyPort");
+                break;
+            case 3:
+                System.setProperty("http.proxyHost", proxySelHttp);
+                System.setProperty("http.proxyPort", proxySelPort);
+                System.setProperty("https.proxyHost", proxySelHttp);
+                System.setProperty("https.proxyPort", proxySelPort);
+                break;
+        }
+    }
+    
     
 }

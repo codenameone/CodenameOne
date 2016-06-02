@@ -1645,7 +1645,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }else{
                         proxy = new JDialog();                    
                     }
-                    final Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    final Preferences pref = Preferences.userNodeForPackage(Component.class);
                     int proxySel = pref.getInt("proxySel", 1);
                     String proxySelHttp = pref.get("proxySel-http", ""); 
                     String proxySelPort = pref.get("proxySel-port", "");                             
@@ -2981,32 +2981,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         if (m instanceof Runnable) {
             Display.getInstance().callSerially((Runnable) m);
-        }
-        int proxySel = pref.getInt("proxySel", 1);
-        String proxySelHttp = pref.get("proxySel-http", ""); 
-        String proxySelPort = pref.get("proxySel-port", "");                             
-        
-        switch (proxySel){
-            case 1:
-                System.getProperties().remove("java.net.useSystemProxies");            
-                System.getProperties().remove("http.proxyHost");
-                System.getProperties().remove("http.proxyPort"); 
-                System.getProperties().remove("https.proxyHost");
-                System.getProperties().remove("https.proxyPort");
-                break;
-            case 2:
-                System.setProperty("java.net.useSystemProxies", "true");
-                System.getProperties().remove("http.proxyHost");
-                System.getProperties().remove("http.proxyPort"); 
-                System.getProperties().remove("https.proxyHost");
-                System.getProperties().remove("https.proxyPort");
-                break;
-            case 3:
-                System.setProperty("http.proxyHost", proxySelHttp);
-                System.setProperty("http.proxyPort", proxySelPort); 
-                System.setProperty("https.proxyHost", proxySelHttp);
-                System.setProperty("https.proxyPort", proxySelPort); 
-                break;
         }
         
         inInit = false;
