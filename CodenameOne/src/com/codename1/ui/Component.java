@@ -2897,6 +2897,9 @@ public class Component implements Animation, StyleListener {
      */
     public void pointerDragged(final int x, final int y) {
         Form p = getComponentForm();
+        if(p == null){
+            return;
+        }
         
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));

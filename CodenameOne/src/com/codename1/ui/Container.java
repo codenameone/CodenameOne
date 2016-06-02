@@ -938,6 +938,10 @@ public class Container extends Component implements Iterable<Component>{
             if (parentForm.getFocused() == cmp || cmp instanceof Container && ((Container) cmp).contains(parentForm.getFocused())) {
                 parentForm.setFocused(null);
             }
+            Component dragged = parentForm.getDraggedComponent();
+            if(dragged == cmp){
+                parentForm.setDraggedComponent(null);
+            }
             if (cmp.isSmoothScrolling()) {
                 parentForm.deregisterAnimatedInternal(cmp);
             }
