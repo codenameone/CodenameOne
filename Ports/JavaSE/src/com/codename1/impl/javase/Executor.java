@@ -161,7 +161,7 @@ public class Executor {
     
     private static void setProxySettings() {
         Preferences proxyPref = Preferences.userNodeForPackage(Component.class);
-        int proxySel = proxyPref.getInt("proxySel", 1);
+        int proxySel = proxyPref.getInt("proxySel", 2);
         String proxySelHttp = proxyPref.get("proxySel-http", "");
         String proxySelPort = proxyPref.get("proxySel-port", "");
 

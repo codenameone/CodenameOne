@@ -1646,7 +1646,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         proxy = new JDialog();                    
                     }
                     final Preferences pref = Preferences.userNodeForPackage(Component.class);
-                    int proxySel = pref.getInt("proxySel", 1);
+                    int proxySel = pref.getInt("proxySel", 2);
                     String proxySelHttp = pref.get("proxySel-http", ""); 
                     String proxySelPort = pref.get("proxySel-port", "");                             
                     
