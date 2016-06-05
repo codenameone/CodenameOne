@@ -194,7 +194,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS
-            = "/iphone3gs.skin;/nexus.skin;/ipad.skin;/iphone4.skin;/android.skin;/iphone5.skin;/feature_phone.skin;/xoom.skin;/torch.skin;/lumia.skin";
+            = "/iphone3gs.skin;";
     private static String appHomeDir = ".cn1";
     
     /**
