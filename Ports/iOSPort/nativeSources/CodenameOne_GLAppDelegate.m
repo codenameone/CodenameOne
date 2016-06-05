@@ -191,6 +191,8 @@ extern UIView *editingComponent;
     }
 #endif
     
+    //openURLMarkerEntry
+    
 #ifdef NEW_CODENAME_ONE_VM
     JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #else
