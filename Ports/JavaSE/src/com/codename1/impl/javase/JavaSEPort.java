@@ -1465,6 +1465,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             JMenu debugEdtMenu = new JMenu("Debug EDT");
             simulatorMenu.add(debugEdtMenu);
 
+            JMenuItem zoom25 = new JMenuItem("25%");
+            zoomMenu.add(zoom25);
             JMenuItem zoom50 = new JMenuItem("50%");
             zoomMenu.add(zoom50);
             JMenuItem zoom100 = new JMenuItem("100%");
@@ -2248,6 +2250,20 @@ public class JavaSEPort extends CodenameOneImplementation {
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 1;
+                    if(Display.getInstance().getCurrent() != null) {
+                        Display.getInstance().getCurrent().repaint();
+                    }
+                    frm.repaint();
+                }
+            });
+            zoom25.addActionListener(new ActionListener() {
+
+                public void actionPerformed(ActionEvent ae) {
+                    frm.remove(canvas);
+                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() / 2, getSkin().getHeight() / 2));
+                    frm.add(BorderLayout.CENTER, canvas);
+                    frm.pack();
+                    zoomLevel = 0.25f;
                     if(Display.getInstance().getCurrent() != null) {
                         Display.getInstance().getCurrent().repaint();
                     }
