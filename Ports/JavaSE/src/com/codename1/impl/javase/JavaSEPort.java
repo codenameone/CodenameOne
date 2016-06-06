@@ -2833,7 +2833,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     ex.printStackTrace();
                 }
             } else {
-                loadSkinFile(getResourceAsStream(getClass(), f), frm);
+                InputStream is = getResourceAsStream(getClass(), f);
+                if(is != null) {
+                    loadSkinFile(is, frm);
+                } else {
+                    loadSkinFile(getResourceAsStream(getClass(), "/iphone3gs.skin"), frm);
+                }
             }
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             pref.put("skin", f);
