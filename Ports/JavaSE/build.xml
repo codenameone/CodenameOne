@@ -76,7 +76,11 @@
     </target>
     
     <target name="build-skins">
-        <copy file="../../Themes/androidTheme.res" todir="../../../codenameone-skins/android" />
+        <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/iphone3gs" />
+        <zip basedir="../../../codenameone-skins/iphone3gs" destfile="../../../codenameone-skins/iphone3gs.skin" compress="false">
+            <exclude name="**/svn/"/>
+        </zip>
+        <!-- copy file="../../Themes/androidTheme.res" todir="../../../codenameone-skins/android" />
         <copy file="../../Themes/androidTheme.res" todir="../../../codenameone-skins/nexus" />
         <copy file="../../Themes/iPhoneTheme.res" todir="../../../codenameone-skins/ipad" />
         <copy file="../../Themes/iPhoneTheme.res" todir="../../../codenameone-skins/iphone4" />
@@ -88,7 +92,6 @@
         <copy file="../../Themes/winTheme.res" todir="../../../codenameone-skins/lumia" />
         <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/iphone5_os7" />
         <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/ipad_os7" />
-        <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/iphone3gs_os7" />
         <copy file="../../Themes/iOS7Theme.res" todir="../../../codenameone-skins/iphone4_os7" />
 
         
@@ -105,9 +108,6 @@
             <exclude name="**/svn/"/>
         </zip>
         <zip basedir="../../../codenameone-skins/ipad3" destfile="../../../codenameone-skins/ipad3.skin" compress="false">
-            <exclude name="**/svn/"/>
-        </zip>
-        <zip basedir="../../../codenameone-skins/iphone3gs" destfile="../../../codenameone-skins/iphone3gs.skin" compress="false">
             <exclude name="**/svn/"/>
         </zip>
         <zip basedir="../../../codenameone-skins/iphone4" destfile="../../../codenameone-skins/iphone4.skin" compress="false">
@@ -135,7 +135,7 @@
         </zip>
         <zip basedir="../../../codenameone-skins/lumia" destfile="../../../codenameone-skins/lumia.skin" compress="false">
             <exclude name="**/svn/"/>
-        </zip>
+        </zip -->
     </target>    
     
     <target name="-pre-compile" >
