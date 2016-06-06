@@ -2378,9 +2378,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         final JMenu skinMenu = m;
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
-        if (!skinNames.contains("iphone5")) {
-            skinNames = DEFAULT_SKINS;
-        }
         if (skinNames != null) {
             if (skinNames.length() < DEFAULT_SKINS.length()) {
                 skinNames = DEFAULT_SKINS;
@@ -2399,6 +2396,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         name = f.getName();
 
                     } catch (Exception e) {
+                        continue;
+                    }
+                } else {
+                    // remove the old builtin skins from the menu
+                    if(current.startsWith("/") && !current.equals("/iphone3gs.skin")) {
                         continue;
                     }
                 }
