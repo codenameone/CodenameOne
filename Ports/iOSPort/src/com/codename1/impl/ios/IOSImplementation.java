@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.ios;
 
+import com.codename1.background.BackgroundFetch;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Address;
@@ -93,6 +94,7 @@ import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -128,6 +130,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     private boolean isActive=false;
     private final ArrayList<Runnable> onActiveListeners = new ArrayList<Runnable>();
+    private static BackgroundFetch backgroundFetchCallback;
     
     
     /**
@@ -6613,6 +6616,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
+    
+    
     public static void setMainClass(Object main) {
         if(main instanceof PushCallback) {
             pushCallback = (PushCallback)main;
@@ -6625,6 +6630,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         if (main instanceof LocalNotificationCallback) {
             setLocalNotificationCallback((LocalNotificationCallback) main);
+        }
+        if (main instanceof BackgroundFetch) {
+            backgroundFetchCallback = (BackgroundFetch)main;
         }
     }        
     
@@ -6939,6 +6947,52 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
     }
+    
+    public static void performBackgroundFetch() {
+        
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                // Note we have to check for backgroundFetchCallback inside this callSerially
+                // because it might not have been set yet if we call it outside.
+                if (backgroundFetchCallback != null) {
+                    backgroundFetchCallback.performBackgroundFetch(System.currentTimeMillis()+25*60*1000, new Callback<Boolean>() {
+
+                        @Override
+                        public void onSucess(Boolean value) {
+                            if (!value) {
+                                nativeInstance.fireUIBackgroundFetchResultNoData();
+                            } else {
+                                nativeInstance.fireUIBackgroundFetchResultNewData();
+                            }
+                        }
+
+                        @Override
+                        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                            Log.e(err);
+                            nativeInstance.fireUIBackgroundFetchResultFailed();
+                        }
+                    });
+
+                }
+            }
+        });
+  
+    }
+
+    @Override
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        super.setPreferredBackgroundFetchInterval(seconds);
+        nativeInstance.setPreferredBackgroundFetchInterval(seconds);
+    }
+
+    @Override
+    public boolean isBackgroundFetchSupported() {
+        return nativeInstance.isBackgroundFetchSupported();
+    }
+    
+    
+    
+    
     
     /**
      * Calls the given runnable when the app is active.  If the app is already

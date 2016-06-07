@@ -102,6 +102,7 @@ import android.view.*;
 import android.view.View.MeasureSpec;
 import android.webkit.*;
 import android.widget.*;
+import com.codename1.background.BackgroundFetch;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -128,6 +129,7 @@ import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.Callback;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
@@ -6914,6 +6916,97 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return cn1ShapeToAndroidPath(shape, new Path());
     }
 
+    /**
+     * The ID used for a local notification that should actually trigger a background
+     * fetch.  This type of notification is handled specially by the {@link LocalNotificationPublisher}.  It
+     * doesn't display a notification to the user, but instead just calls the {@link #performBackgroundFetch() }
+     * method.
+     */
+    static final String BACKGROUND_FETCH_NOTIFICATION_ID="$$$CN1_BACKGROUND_FETCH$$$";
+    
+    /**
+     * Calls the background fetch callback.  If the app is in teh background, this will
+     * check to see if the lifecycle class implements the {@link com.codename1.background.BackgroundFetch}
+     * interface.  If it does, it will execute its {@link com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback) }
+     * method.
+     */
+    public static void performBackgroundFetch() {
+        if (Display.getInstance().isMinimized()) {
+            // By definition, background fetch should only occur if the app is minimized.
+            // This keeps it consistent with the iOS implementation that doesn't have a 
+            // choice
+            
+            final Object lifecycle = activity.getApp();
+
+            if (lifecycle instanceof BackgroundFetch) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        ((BackgroundFetch)lifecycle).performBackgroundFetch(System.currentTimeMillis()+25*60*1000, new Callback<Boolean>() {
+
+                            @Override
+                            public void onSucess(Boolean value) {
+                                // On Android the OS doesn't care whether it worked or not
+                                // So we'll just consume this.
+                            }
+
+                            @Override
+                            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                                com.codename1.io.Log.e(err);
+                            }
+
+                        });
+                    }
+                });
+                
+            }
+        }
+    }
+    
+    /**
+     * Starts the background fetch service.
+     */
+    public void startBackgroundFetchService() {
+        LocalNotification n = new LocalNotification();
+        n.setId(BACKGROUND_FETCH_NOTIFICATION_ID);
+        cancelLocalNotification(BACKGROUND_FETCH_NOTIFICATION_ID);
+        // We schedule a local notification
+        // First callback will be at the repeat interval
+        // We don't specify a repeat interval because the scheduleLocalNotification will 
+        // set that for us using the getPreferredBackgroundFetchInterval method.
+        scheduleLocalNotification(n, System.currentTimeMillis() + getPreferredBackgroundFetchInterval() * 1000, 0);
+    }
+    
+    public void stopBackgroundFetchService() {
+        cancelLocalNotification(BACKGROUND_FETCH_NOTIFICATION_ID);
+    }
+    
+    
+    private boolean backgroundFetchInitialized;
+    
+    @Override
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        int oldInterval = getPreferredBackgroundFetchInterval();
+        super.setPreferredBackgroundFetchInterval(seconds);
+        
+        if (!backgroundFetchInitialized || oldInterval != seconds) {
+            backgroundFetchInitialized = true;
+            if (seconds > 0) {
+                startBackgroundFetchService();
+            } else {
+                stopBackgroundFetchService();
+            }
+        }
+    }
+
+    
+    
+    @Override
+    public boolean isBackgroundFetchSupported() {
+        return true;
+    }
+    
+    
+    
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
         
         Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
@@ -6931,25 +7024,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, notificationIntent, PendingIntent.FLAG_UPDATE_CURRENT);
         
         AlarmManager alarmManager = (AlarmManager) activity.getSystemService(Context.ALARM_SERVICE);
-        if(repeat == LocalNotification.REPEAT_NONE){
-            alarmManager.set(AlarmManager.RTC_WAKEUP, firstTime, pendingIntent);
-            
-        }else if(repeat == LocalNotification.REPEAT_MINUTE){
-            
-            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, 60*1000*1000, pendingIntent);
-            
-        }else if(repeat == LocalNotification.REPEAT_HOUR){
-            
-            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_HALF_HOUR, pendingIntent);
-            
-        }else if(repeat == LocalNotification.REPEAT_DAY){
-            
-            alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY, pendingIntent);
-            
-        }else if(repeat == LocalNotification.REPEAT_WEEK){
-            
-            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY * 7, pendingIntent);
-            
+        if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
+            alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, getPreferredBackgroundFetchInterval() * 1000, pendingIntent);
+        } else {
+            if(repeat == LocalNotification.REPEAT_NONE){
+                alarmManager.set(AlarmManager.RTC_WAKEUP, firstTime, pendingIntent);
+
+            }else if(repeat == LocalNotification.REPEAT_MINUTE){
+
+                alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, 60*1000, pendingIntent);
+
+            }else if(repeat == LocalNotification.REPEAT_HOUR){
+
+                alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_HALF_HOUR, pendingIntent);
+
+            }else if(repeat == LocalNotification.REPEAT_DAY){
+
+                alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY, pendingIntent);
+
+            }else if(repeat == LocalNotification.REPEAT_WEEK){
+
+                alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, firstTime, AlarmManager.INTERVAL_DAY * 7, pendingIntent);
+
+            }
         }
     }
 

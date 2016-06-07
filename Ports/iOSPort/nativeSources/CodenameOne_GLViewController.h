@@ -42,6 +42,7 @@
 #import "GooglePlus.h"
 #endif
 
+//#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
 #ifdef INCLUDE_FACEBOOK_CONNECT
 #import "FBSDKCoreKit.h"

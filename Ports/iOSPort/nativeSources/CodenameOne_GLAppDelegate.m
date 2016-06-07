@@ -41,7 +41,6 @@ extern UIView *editingComponent;
 
 #define INCLUDE_CN1_PUSH
 
-
 #ifdef INCLUDE_GOOGLE_CONNECT
 #import "GooglePlus.h"
 #endif
@@ -89,6 +88,10 @@ extern UIView *editingComponent;
     if (locationValue) {
         com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
+    
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    [application setMinimumBackgroundFetchInterval:UIApplicationBackgroundFetchIntervalMinimum];
+#endif
     
 #ifdef INCLUDE_CN1_PUSH
     //[[UIApplication sharedApplication] cancelAllLocalNotifications]; // <-- WHY IS THIS HERE? -- removing it for now
@@ -265,6 +268,15 @@ extern UIView *editingComponent;
 {
     com_codename1_impl_ios_IOSImplementation_applicationWillTerminate__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
+
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+typedef void (^CN1BackgroundFetchBlockType)(UIBackgroundFetchResult);
+CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
+-(void)application:(UIApplication *)application performFetchWithCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler{
+    cn1UIBackgroundFetchResultCompletionHandler = Block_copy(completionHandler);
+    com_codename1_impl_ios_IOSImplementation_performBackgroundFetch__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+#endif
 
 #ifdef INCLUDE_CN1_PUSH
 - (void)application:(UIApplication*)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData*)deviceToken {
