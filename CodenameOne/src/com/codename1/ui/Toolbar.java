@@ -409,9 +409,9 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
-        Command cmd = Command.create(name, FontImage.createMaterial(icon, new Style()), ev);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "SideCommand");
         addCommandToSideMenu(cmd);
-        setCommandMaterialIcon(cmd, icon);
         return cmd;
     }
 
@@ -426,9 +426,9 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
-        Command cmd = Command.create(name, FontImage.createMaterial(icon, new Style()), ev);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "SideCommand");
         addCommandToSideMenu(cmd);
-        setCommandMaterialIcon(cmd, icon, size);
         return cmd;
     }
     
@@ -442,8 +442,9 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToRightBar(String name, char icon, final ActionListener ev) {
-        Command cmd = addCommandToRightBar(name, FontImage.createMaterial(icon, new Style()), ev);
-        setCommandMaterialIcon(cmd, icon);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "TitleCommand");
+        addCommandToRightBar(cmd);
         return cmd;
     }    
 
@@ -458,26 +459,27 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToRightBar(String name, char icon, float size, final ActionListener ev) {
-        Command cmd = addCommandToRightBar(name, FontImage.createMaterial(icon, new Style()), ev);
-        setCommandMaterialIcon(cmd, icon, size);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "TitleCommand");
+        addCommandToRightBar(cmd);
         return cmd;
     }    
     
-    private void setCommandMaterialIcon(Command cmd, char icon) {
+    private void setCommandMaterialIcon(Command cmd, char icon, String defaultUIID) {
         String uiid = (String)cmd.getClientProperty("uiid");
         if(uiid != null) {
             FontImage.setMaterialIcon(cmd, icon, uiid);
         } else {
-            FontImage.setMaterialIcon(cmd, icon, "SideCommand");
+            FontImage.setMaterialIcon(cmd, icon, defaultUIID);
         }
     }
     
-    private void setCommandMaterialIcon(Command cmd, char icon, float size) {
+    private void setCommandMaterialIcon(Command cmd, char icon, float size, String defaultUIID) {
         String uiid = (String)cmd.getClientProperty("uiid");
         if(uiid != null) {
             FontImage.setMaterialIcon(cmd, icon, uiid, size);
         } else {
-            FontImage.setMaterialIcon(cmd, icon, "SideCommand", size);
+            FontImage.setMaterialIcon(cmd, icon, defaultUIID, size);
         }
     }
     
@@ -491,8 +493,9 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToLeftBar(String name, char icon, final ActionListener ev) {
-        Command cmd = addCommandToLeftBar(name, FontImage.createMaterial(icon, new Style()), ev);
-        setCommandMaterialIcon(cmd, icon);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "TitleCommand");
+        addCommandToLeftBar(cmd);
         return cmd;
     }    
 
@@ -507,8 +510,9 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToLeftBar(String name, char icon, float size, final ActionListener ev) {
-        Command cmd = addCommandToLeftBar(name, FontImage.createMaterial(icon, new Style()), ev);
-        setCommandMaterialIcon(cmd, icon, size);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "TitleCommand");
+        addCommandToLeftBar(cmd);
         return cmd;
     }    
 
@@ -522,8 +526,9 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToOverflowMenu(String name, char icon, final ActionListener ev) {
-        Command cmd = addCommandToOverflowMenu(name, FontImage.createMaterial(icon, new Style()), ev);
-        setCommandMaterialIcon(cmd, icon);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "Command");
+        addCommandToOverflowMenu(cmd);
         return cmd;
     }
 
@@ -538,8 +543,9 @@ public class Toolbar extends Container {
      * @return a newly created Command instance
      */
     public Command addMaterialCommandToOverflowMenu(String name, char icon, float size, final ActionListener ev) {
-        Command cmd = addCommandToOverflowMenu(name, FontImage.createMaterial(icon, new Style()), ev);
-        setCommandMaterialIcon(cmd, icon, size);
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "Command");
+        addCommandToOverflowMenu(cmd);
         return cmd;
     }
     
