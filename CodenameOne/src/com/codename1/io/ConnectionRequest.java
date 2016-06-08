@@ -132,6 +132,8 @@ public class ConnectionRequest implements IOProgressListener {
     private EventDispatcher actionListeners;
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @return the defaultFollowRedirects
      */
     public static boolean isDefaultFollowRedirects() {
@@ -139,6 +141,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @param aDefaultFollowRedirects the defaultFollowRedirects to set
      */
     public static void setDefaultFollowRedirects(boolean aDefaultFollowRedirects) {
@@ -799,6 +803,8 @@ public class ConnectionRequest implements IOProgressListener {
 
     /**
      * This is a callback method that been called when there is a redirect.
+     * <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      *
      * @param url the url to be redirected
      * @return true if the implementation would like to handle this by itself
@@ -1288,6 +1294,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @return the followRedirects
      */
     public boolean isFollowRedirects() {
@@ -1295,6 +1303,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @param followRedirects the followRedirects to set
      */
     public void setFollowRedirects(boolean followRedirects) {
