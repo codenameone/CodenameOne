@@ -410,6 +410,47 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
     POOL_END();
 }
 
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+typedef void (^CN1BackgroundFetchBlockType)(UIBackgroundFetchResult);
+
+extern CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler;
+#endif
+
+void com_codename1_impl_ios_IOSNative_fireUIBackgroundFetchResultFailed__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    cn1UIBackgroundFetchResultCompletionHandler(UIBackgroundFetchResultFailed);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_fireUIBackgroundFetchResultNoData__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    cn1UIBackgroundFetchResultCompletionHandler(UIBackgroundFetchResultNoData);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_fireUIBackgroundFetchResultNewData__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    cn1UIBackgroundFetchResultCompletionHandler(UIBackgroundFetchResultNewData);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundFetchSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    return YES;
+#else
+    return NO;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_setPreferredBackgroundFetchInterval___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT seconds) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    NSTimeInterval interval = seconds;
+    if (interval < 0) {
+        interval = UIApplicationBackgroundFetchIntervalNever;
+    }
+    [[UIApplication sharedApplication] setMinimumBackgroundFetchInterval:interval];
+#endif
+}
+
+
 void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int]

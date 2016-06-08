@@ -586,6 +586,16 @@ public final class IOSNative {
 
     native void updateNativeEditorText(String text);
 
+    native void fireUIBackgroundFetchResultNoData();
+
+    native void fireUIBackgroundFetchResultNewData();
+
+    native void fireUIBackgroundFetchResultFailed();
+
+    native void setPreferredBackgroundFetchInterval(int seconds);
+
+    native boolean isBackgroundFetchSupported();
+
    
 
 }

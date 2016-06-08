@@ -23,6 +23,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.background.BackgroundFetch;
 import com.codename1.cloud.CloudObjectConsole;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
@@ -108,6 +109,7 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.Callback;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
@@ -190,6 +192,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         
     }
     
+    private boolean minimized;
     private javafx.embed.swing.JFXPanel mediaContainer;
 
     private static File baseResourceDir;
@@ -392,6 +395,96 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     private JComponent textCmp;
 
+    private java.util.Timer backgroundFetchTimer;
+    
+    
+    private void startBackgroundFetchService() {
+        stopBackgroundFetchService();
+        backgroundFetchTimer = new java.util.Timer();
+        
+        TimerTask tt = new TimerTask() {
+
+            @Override
+            public void run() {
+                performBackgroundFetch();
+            }
+            
+        };
+        backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+    }
+    
+    private void stopBackgroundFetchService() {
+        if (backgroundFetchTimer != null) {
+            backgroundFetchTimer.cancel();
+            backgroundFetchTimer = null;
+        }
+    }
+
+    @Override
+    public boolean isBackgroundFetchSupported() {
+        return Display.getInstance().isSimulator();
+    }
+
+    private boolean backgroundFetchInitialized;
+    
+    @Override
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        int oldInterval = getPreferredBackgroundFetchInterval();
+        super.setPreferredBackgroundFetchInterval(seconds);
+        if (!backgroundFetchInitialized || oldInterval != seconds) {
+            backgroundFetchInitialized = true;
+            startBackgroundFetchService();
+        }
+    }
+    
+    
+    
+    private static void performBackgroundFetch() {
+        if (Display.getInstance().isMinimized()) {
+            // By definition, background fetch should only occur if the app is minimized.
+            // This keeps it consistent with the iOS implementation that doesn't have a 
+            // choice
+            
+            final Object lifecycle = Executor.getApp();
+            final boolean completed[] = new boolean[1];
+            final java.util.Timer t = new java.util.Timer();
+            final java.util.TimerTask overtimeChecker = new TimerTask() {
+                public void run() {
+                    if (!completed[0]) {
+                        com.codename1.io.Log.p("WARNING: performBackgroundFetch() was called over 30 seconds ago and has not called its completion callback.  This may cause problems on iOS devices.  performBackgroundFetch() must complete in under 30 seconds and call the completion callback when done.");
+                    }
+                }
+            };
+
+            if (lifecycle instanceof BackgroundFetch) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        // In callSerially
+                        t.schedule(overtimeChecker, 30*60*1000);
+                        
+                        ((BackgroundFetch)lifecycle).performBackgroundFetch(System.currentTimeMillis()+25*60*1000, new Callback<Boolean>() {
+
+                            @Override
+                            public void onSucess(Boolean value) {
+                                // On JavaSE the OS doesn't care whether it worked or not
+                                // So we'll just consume this.
+                                completed[0] = true;
+                            }
+
+                            @Override
+                            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+                                completed[0] = false;
+                                com.codename1.io.Log.e(err);
+                            }
+
+                        });
+                    }
+                });
+                
+            }
+        }
+    }
+    
     
     public static void blockMonitors() {
         blockMonitors = true;
@@ -1249,6 +1342,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public boolean isMinimized() {
+        if (Display.getInstance().isSimulator()) {
+            return minimized;
+        } else {
+            return super.isMinimized();
+        }
+    }
+
+    
+    
+    
     private void loadSkinFile(InputStream skin, final JFrame frm) {
         try {
             ZipInputStream z = new ZipInputStream(skin);
@@ -2061,6 +2166,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 Executor.stopApp();
+                                minimized = true;
                             }
                         });
                         canvas.setEnabled(false);
@@ -2069,6 +2175,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
                                 Executor.startApp();
+                                minimized = false;
                             }
                         });
                         canvas.setEnabled(true);

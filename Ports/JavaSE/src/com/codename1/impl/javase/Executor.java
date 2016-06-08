@@ -189,5 +189,8 @@ public class Executor {
         }
     }
     
+    static Object getApp() {
+        return app;
+    }
     
 }

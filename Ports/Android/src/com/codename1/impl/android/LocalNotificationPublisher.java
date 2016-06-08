@@ -56,9 +56,15 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         Bundle b = extras.getParcelable(NOTIFICATION);
         LocalNotification notif = AndroidImplementation.createNotificationFromBundle(b);
 
-        Notification notification = createAndroidNotification(context, notif, content);
-        notification.when = System.currentTimeMillis();
-        notificationManager.notify(notif.getId(), 0, notification);
+        if (AndroidImplementation.BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
+            // We piggy back onto the local notifications functionality to do background fetch
+            // since it is so similar.
+            AndroidImplementation.performBackgroundFetch();
+        } else {
+            Notification notification = createAndroidNotification(context, notif, content);
+            notification.when = System.currentTimeMillis();
+            notificationManager.notify(notif.getId(), 0, notification);
+        }
     }
 
     private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content) {

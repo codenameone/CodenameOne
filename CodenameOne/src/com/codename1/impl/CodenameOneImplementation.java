@@ -6921,6 +6921,56 @@ public abstract class CodenameOneImplementation {
     }
     //ENDS METHODS FOR DEALING Local Notifications
 
+    /**
+     * Sets the preferred time interval between background fetches.  This is only a
+     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign 
+     * control over when and if background fetches will be allowed. This number is used
+     * only as a guideline.
+     * 
+     * <p><strong>This method must be called in order to activate background fetch.</strong>></p>
+     * <p>Note: If the platform doesn't support background fetch (i.e. {@link #isBackgroundFetchSupported() } returns {@code false},
+     * then this method does nothing.</p>
+     * @param seconds The time interval in seconds.
+     * 
+     * @see #isBackgroundFetchSupported() 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        if (isBackgroundFetchSupported()) {
+            Preferences.set("$$CN1_BACKGROUND_FETCH_INTERVAL", seconds);
+        }
+    }
+    
+    /**
+     * Gets the preferred time (in seconds) between background fetches.
+     * @return The time interval in seconds.
+     * @see #isBackgroundFetchSupported() 
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public int getPreferredBackgroundFetchInterval() {
+        if (isBackgroundFetchSupported()) {
+            return Preferences.get("$$CN1_BACKGROUND_FETCH_INTERVAL", 60 * 60);
+        } else {
+            return -1;
+        }
+    }
+    
+    /**
+     * Checks to see if the current platform supports background fetch.
+     * @return True if the current platform supports background fetch.
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public boolean isBackgroundFetchSupported() {
+        return false;
+    }
+    
     
     //METHODS FOR Imgae blur
     public Image gaussianBlurImage(Image image, float radius) {
