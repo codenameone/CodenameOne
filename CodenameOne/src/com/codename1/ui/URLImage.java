@@ -248,7 +248,7 @@ public class URLImage extends EncodedImage {
             locked = super.isLocked();
             if(storageFile != null) {
                 if(Storage.getInstance().exists(storageFile)) {
-                    unlock();
+                    super.unlock();
                     imageData = new byte[Storage.getInstance().entrySize(storageFile)];
                     InputStream is = Storage.getInstance().createInputStream(storageFile);
                     Util.readFully(is, imageData);
@@ -264,7 +264,7 @@ public class URLImage extends EncodedImage {
                 }
             } else {
                 if(FileSystemStorage.getInstance().exists(fileSystemFile)) {
-                    unlock();
+                    super.unlock();
                     imageData = new byte[(int)FileSystemStorage.getInstance().getLength(fileSystemFile)];
                     InputStream is = FileSystemStorage.getInstance().openInputStream(fileSystemFile);
                     Util.readFully(is, imageData);
@@ -312,7 +312,7 @@ public class URLImage extends EncodedImage {
         if(repaintImage) {
             repaintImage = false;
             if(locked) {
-                lock();
+                super.lock();
                 locked = false;
             }
             return true;
@@ -320,6 +320,23 @@ public class URLImage extends EncodedImage {
         return false;
     }
 
+    /**
+     * Block this method from external callers as it might break the functionality
+     */
+    @Override
+    public void lock() {
+    }
+
+    /**
+     * Block this method from external callers as it might break the functionality
+     */
+    @Override
+    public void unlock() {
+    }
+
+
+    
+    
     /**
      * {@inheritDoc}
      */
