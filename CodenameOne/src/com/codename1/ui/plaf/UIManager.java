@@ -322,6 +322,21 @@ public class UIManager {
         themeProps.put("dis#fgColor", disabledColor);
 
         // component specific settings
+        if (installedTheme == null || !installedTheme.containsKey("AccordionItem.derive")) {
+            themeProps.put("AccordionItem.margin", "0,0,0,0");
+            themeProps.put("AccordionItem.padding", "1,1,1,1");
+            themeProps.put("AccordionItem.border", Border.createLineBorder(1));
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("AccordionHeader.derive")) {
+            themeProps.put("AccordionHeader.margin", "0,0,0,0");
+            themeProps.put("AccordionHeader.sel#margin", "0,0,0,0");
+            themeProps.put("AccordionHeader.press#margin", "0,0,0,0");
+            themeProps.put("AccordionHeader.padding", "0,0,0,0");
+            themeProps.put("AccordionHeader.sel#padding", "0,0,0,0");
+            themeProps.put("AccordionHeader.press#padding", "0,0,0,0");
+        }
+        
         if (installedTheme == null || !installedTheme.containsKey("SignatureButton.derive")) {
             themeProps.put("SignatureButton.align", centerAlign);
             themeProps.put("SignatureButton.sel#derive", "SignatureButton");

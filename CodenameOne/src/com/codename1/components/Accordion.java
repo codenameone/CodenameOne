@@ -38,13 +38,21 @@ import com.codename1.ui.plaf.UIManager;
  * The accordion ui pattern is a vertically stacked list of items. 
  * Each item can be opened/closed to reveal more content 
  * 
+ * <h3>Example Usage</h3>
+ * 
+ * <script src="https://gist.github.com/chen-fishbein/4104e30e24925e4be702da66236ffbe9.js"></script>
+ * 
+ * <h3>Screenshots</h3>
+ * <p><img src="https://www.codenameone.com/img/developer-guide/components-accordion.png" alt="Accordion Component"/></p>
+ * 
+ * 
  * @author Chen
  */
 public class Accordion extends Container {
 
-    private Image closedIcon;
+    private Image closeIcon;
 
-    private Image openedIcon;
+    private Image openIcon;
 
     private boolean autoClose = true;
 
@@ -53,8 +61,8 @@ public class Accordion extends Container {
      */ 
     public Accordion() {
         super.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-        closedIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("Label"));
-        openedIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("Label"));
+        closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("Label"));
+        openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("Label"));
     }
 
     /**
@@ -79,18 +87,18 @@ public class Accordion extends Container {
 
     /**
      * Sets the closed icon
-     * @param closedIcon closed icon
+     * @param closeIcon the close icon
      */ 
-    public void setClosedIcon(Image closedIcon) {
-        this.closedIcon = closedIcon;
+    public void setCloseIcon(Image closeIcon) {
+        this.closeIcon = closeIcon;
     }
 
     /**
-     * Sets the opened icon
-     * @param openedIcon opened icon
+     * Sets the open icon
+     * @param openIcon the open icon
      */ 
-    public void setOpenedIcon(Image openedIcon) {
-        this.openedIcon = openedIcon;
+    public void setOpenIcon(Image openIcon) {
+        this.openIcon = openIcon;
     }
 
     /**
@@ -114,14 +122,16 @@ public class Accordion extends Container {
         private Component body;
             
         public AccordionContent(final Component header, final Component body) {
+            setUIID("AccordionItem");
             setLayout(new BorderLayout());
             this.body = body;
             header.setSelectedStyle(header.getUnselectedStyle());
             header.setPressedStyle(header.getUnselectedStyle());
             Container top = new Container(new BorderLayout());
             top.add(BorderLayout.CENTER, header);
+            top.setUIID("AccordionHeader");
             arrow.setUIID("Label");
-            arrow.setIcon(closedIcon);
+            arrow.setIcon(closeIcon);
             arrow.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent evt) {
@@ -153,9 +163,9 @@ public class Accordion extends Container {
         public void openClose(boolean close) {
             closed = close;
             if (closed) {
-                arrow.setIcon(closedIcon);
+                arrow.setIcon(closeIcon);
             } else {
-                arrow.setIcon(openedIcon);
+                arrow.setIcon(openIcon);
             }
             body.setHidden(closed);
         }
