@@ -40,7 +40,7 @@ import com.codename1.ui.plaf.UIManager;
  * 
  * <h3>Example Usage</h3>
  * 
- * <script src="https://gist.github.com/chen-fishbein/4104e30e24925e4be702da66236ffbe9.js"></script>
+ * <script src="https://gist.github.com/codenameone/2b48d1650d8c5032d094066c79922cf1.js"></script>
  * 
  * <h3>Screenshots</h3>
  * <p><img src="https://www.codenameone.com/img/developer-guide/components-accordion.png" alt="Accordion Component"/></p>
