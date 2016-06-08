@@ -31,16 +31,12 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.util.Resources;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Vector;
 
 /**
@@ -358,8 +354,44 @@ public class Toolbar extends Container {
             case NEVER:
                 break;
         }
+    }
+    
+    /**
+     * This method add a search Command on the right bar of the Toolbar.
+     * When the search Command is invoked the current Toolbar is replaced with 
+     * a Search Toolbar to preform a search on the Current Form.
+     * The callback ActionListener gets the search string and it's up to developer 
+     * to do the actual filtering on the Form.
+     * It is possible to custom the default look of the Search Toolbar with the following 
+     * uiid's: ToolbarSearch, TextFieldSearch, TextHintSearch.
+     * 
+     * @param callback gets the search string callbacks
+     */ 
+    public void addSearchCommand(final ActionListener callback){
+        Command search = new Command(""){
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                SearchBar s = new SearchBar(Toolbar.this){
+
+                    @Override
+                    public void onSearch(String text) {
+                        callback.actionPerformed(new ActionEvent(text));
+                    }
+                
+                };
+                Form f = (Form)Toolbar.this.getParent();
+                setHidden(true);
+                f.removeComponentFromForm(Toolbar.this);
+                f.setToolbar(s);
+                s.initSearchBar();
+                f.animateLayout(100);
+            }
         
-        
+        };
+        Image img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"));
+        search.setIcon(img);
+        addCommandToRightBar(search);
     }
     
     /**
@@ -870,7 +902,7 @@ public class Toolbar extends Container {
                     + "Form#setToolBar(Toolbar toolbar) before calling this method");
         }
     }
-
+    
     /**
      * Sets the Toolbar to scroll off the screen upon content scroll. This
      * feature can only work if the Form contentPane is scrollableY

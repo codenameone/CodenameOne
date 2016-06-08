@@ -322,6 +322,24 @@ public class UIManager {
         themeProps.put("dis#fgColor", disabledColor);
 
         // component specific settings
+        if (installedTheme == null || !installedTheme.containsKey("ToolbarSearch.derive")) {
+            themeProps.put("ToolbarSearch.derive", "Toolbar");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
+            //themeProps.put("TextFieldSearch.derive", "TextField");
+            themeProps.put("TextFieldSearch.transparency", "0");
+            themeProps.put("TextFieldSearch.bgType", new Byte(Style.BACKGROUND_NONE));
+            themeProps.put("TextFieldSearch.border", Border.createEmpty());
+            themeProps.put("TextFieldSearch.sel#derive", "TextFieldSearch");
+            themeProps.put("TextFieldSearch.press#derive", "TextFieldSearch");
+            themeProps.put("TextFieldSearch.dis#derive", "TextFieldSearch");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("TextHintSearch.derive")) {
+            themeProps.put("TextHintSearch.derive", "TextHint");
+        }
+
         if (installedTheme == null || !installedTheme.containsKey("AccordionItem.derive")) {
             themeProps.put("AccordionItem.margin", "0,0,0,0");
             themeProps.put("AccordionItem.padding", "1,1,1,1");
