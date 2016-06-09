@@ -323,7 +323,7 @@ public class Picker extends Button {
                     } else {
                         text = "am";
                     }
-                    setText(twoDigits(hour % 13 + 1) + ":" + twoDigits(minute) + text);
+                    setText(twoDigits(hour <= 12 ? hour : hour - 12) + ":" + twoDigits(minute) + text);
                 } else {
                     setText(twoDigits(hour) + ":" + twoDigits(minute));
                 }
