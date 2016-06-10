@@ -119,8 +119,8 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
     // Indentation for various tags
     private static final int INDENT_BLOCKQUOTE = 20;
     private static final int INDENT_DD = 20;
-    private static final int INDENT_OL = Font.getDefaultFont().stringWidth("8888. "); //Ordered list
-    private static final int INDENT_UL = Font.getDefaultFont().charWidth('W'); //Unordered list
+    private static int INDENT_OL = -1;//Font.getDefaultFont().stringWidth("8888. "); //Ordered list
+    private static int INDENT_UL = -1;//Font.getDefaultFont().charWidth('W'); //Unordered list
 
     // The minimum number of visible items of a multiple combobox (Unless it has less)
     private static final int MIN_MULTI_COMBOBOX_ITEMS = 4;
@@ -177,7 +177,7 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
     /**
      * The default font to use
      */
-    private static HTMLFont DEFAULT_FONT = new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
+    private static HTMLFont DEFAULT_FONT = null;//new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
 
     /**
      * The color given to visited links
@@ -537,6 +537,16 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
      * @param handler The HttpRequestHandler to which all requests for links will be sent
      */
     public HTMLComponent(DocumentRequestHandler handler) {
+        if (INDENT_OL < 0) {
+            INDENT_OL = Font.getDefaultFont().stringWidth("8888. "); //Ordered list
+        }
+        if (INDENT_UL < 0) {
+            INDENT_UL = Font.getDefaultFont().charWidth('W'); //Unordered list
+        }
+        if (DEFAULT_FONT == null) {
+            DEFAULT_FONT = new HTMLFont(null,Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
+        }
+        
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         this.handler=handler;
         threadQueue=new ResourceThreadQueue(this);
