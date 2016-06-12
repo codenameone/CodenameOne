@@ -327,10 +327,11 @@ public class UIManager {
         }
         
         if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
-            //themeProps.put("TextFieldSearch.derive", "TextField");
-            themeProps.put("TextFieldSearch.transparency", "0");
-            themeProps.put("TextFieldSearch.bgType", new Byte(Style.BACKGROUND_NONE));
-            themeProps.put("TextFieldSearch.border", Border.createEmpty());
+            themeProps.put("TextFieldSearch.derive", "Title");
+            themeProps.put("TextFieldSearch.align", leftAlign);
+            themeProps.put("TextFieldSearch.sel#align", leftAlign);
+            themeProps.put("TextFieldSearch.press#align", leftAlign);
+            themeProps.put("TextFieldSearch.dis#align", leftAlign);
             themeProps.put("TextFieldSearch.sel#derive", "TextFieldSearch");
             themeProps.put("TextFieldSearch.press#derive", "TextFieldSearch");
             themeProps.put("TextFieldSearch.dis#derive", "TextFieldSearch");
@@ -338,6 +339,7 @@ public class UIManager {
         
         if (installedTheme == null || !installedTheme.containsKey("TextHintSearch.derive")) {
             themeProps.put("TextHintSearch.derive", "TextHint");
+            themeProps.put("TextHintSearch.transparency", "0");            
         }
 
         if (installedTheme == null || !installedTheme.containsKey("AccordionItem.derive")) {

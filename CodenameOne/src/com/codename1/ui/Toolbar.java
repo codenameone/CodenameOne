@@ -315,15 +315,19 @@ public class Toolbar extends Container {
         setBackCommand(cmd, policy);
         return cmd;
     }
-    
+
     /**
      * Sets the back command in the title bar and in the form, back command behaves based on the given
      * policy type
      * 
      * @param cmd the command 
      * @param policy the behavior of the back command in the title
+     * @param iconSize the size of the back command icon in millimeters
      */
-    public void setBackCommand(Command cmd, BackCommandPolicy policy) {
+    public void setBackCommand(Command cmd, BackCommandPolicy policy, float iconSize) {
+        if(iconSize < 0) {
+            iconSize = 3;
+        }
         getComponentForm().setBackCommand(cmd);
         switch(policy) {
             case ALWAYS:
@@ -339,7 +343,7 @@ public class Toolbar extends Container {
                 // we now internally fallback to as arrow...
             case AS_ARROW:
                 cmd.setCommandName("");
-                cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "BackCommand", 3));
+                cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "TitleCommand", iconSize));
                 addCommandToLeftBar(cmd);
                 break;
             case AS_REGULAR_COMMAND:
@@ -357,22 +361,34 @@ public class Toolbar extends Container {
     }
     
     /**
-     * This method add a search Command on the right bar of the Toolbar.
-     * When the search Command is invoked the current Toolbar is replaced with 
-     * a Search Toolbar to preform a search on the Current Form.
-     * The callback ActionListener gets the search string and it's up to developer 
-     * to do the actual filtering on the Form.
-     * It is possible to custom the default look of the Search Toolbar with the following 
-     * uiid's: ToolbarSearch, TextFieldSearch, TextHintSearch.
+     * Sets the back command in the title bar and in the form, back command behaves based on the given
+     * policy type
+     * 
+     * @param cmd the command 
+     * @param policy the behavior of the back command in the title
+     */
+    public void setBackCommand(Command cmd, BackCommandPolicy policy) {
+        setBackCommand(cmd, policy, -1);
+    }
+
+    /**
+     * <p>This method add a search Command on the right bar of the {@code Toolbar}.
+     * When the search Command is invoked the current {@code Toolbar} is replaced with 
+     * a search {@code Toolbar} to perform a search on the Current Form.</p>
+     * <p>The callback ActionListener gets the search string and it's up to developer 
+     * to do the actual filtering on the Form.</>
+     * <p>It is possible to customize the default look of the search {@code Toolbar} with the following 
+     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch}, {@code TextHintSearch}.</>
      * 
      * @param callback gets the search string callbacks
+     * @param iconSize indicates the size of the icons used in the search/back in millimeters
      */ 
-    public void addSearchCommand(final ActionListener callback){
+    public void addSearchCommand(final ActionListener callback, final float iconSize){
         Command search = new Command(""){
 
             @Override
             public void actionPerformed(ActionEvent evt) {
-                SearchBar s = new SearchBar(Toolbar.this){
+                SearchBar s = new SearchBar(Toolbar.this, iconSize){
 
                     @Override
                     public void onSearch(String text) {
@@ -389,9 +405,29 @@ public class Toolbar extends Container {
             }
         
         };
-        Image img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"));
+        Image img;
+        if(iconSize > 0) {
+            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"), iconSize);
+        } else {
+            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"));
+        }
         search.setIcon(img);
         addCommandToRightBar(search);
+    }    
+    
+    /**
+     * <p>This method add a search Command on the right bar of the {@code Toolbar}.
+     * When the search Command is invoked the current {@code Toolbar} is replaced with 
+     * a search {@code Toolbar} to perform a search on the Current Form.</p>
+     * <p>The callback ActionListener gets the search string and it's up to developer 
+     * to do the actual filtering on the Form.</>
+     * <p>It is possible to customize the default look of the search {@code Toolbar} with the following 
+     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch}, {@code TextHintSearch}.</>
+     * 
+     * @param callback gets the search string callbacks
+     */ 
+    public void addSearchCommand(final ActionListener callback){
+        addSearchCommand(callback, -1);
     }
     
     /**
