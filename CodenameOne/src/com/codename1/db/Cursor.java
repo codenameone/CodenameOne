@@ -22,6 +22,7 @@
  */
 package com.codename1.db;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
@@ -37,7 +38,7 @@ import java.io.IOException;
  *
  * @author Chen
  */
-public interface Cursor {
+public interface Cursor extends Closeable {
 
     /**
      * Move the cursor to the first row.
