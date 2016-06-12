@@ -23,7 +23,6 @@
 package com.codename1.db;
 
 import com.codename1.ui.Display;
-import java.io.Closeable;
 import java.io.IOException;
 
 /**
@@ -46,7 +45,7 @@ import java.io.IOException;
  * 
  * @author Chen
  */
-public abstract class Database implements Closeable {
+public abstract class Database {
     
     /**
      * Opens a database or create one if not exists
