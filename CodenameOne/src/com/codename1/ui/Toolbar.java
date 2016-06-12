@@ -51,8 +51,16 @@ import java.util.Vector;
  * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar.png" alt="Simple usage of Toolbar" />
  *  
  * <p>
- * The following code demonstrates a more advanced search widget where the data is narrowed as we type
- * directly into the title area search. Notice that the {@code TextField} and its hint are styled to look like the title.
+ * {@code Toolbar} supports a search mode that implicitly replaces the title with a search field/magnifying glass
+ * effect. The code below demonstrates searching thru the contacts using this API:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
+ * 
+ * <p>
+ * The following code demonstrates also demonstrates search with a more custom UX where the title
+ * area was replaced dynamically. This code predated the builtin search support above. 
+ * Notice that the {@code TextField} and its hint are styled to look like the title.
  * </p>
  * <script src="https://gist.github.com/codenameone/dce6598a226aaf9a3157.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-search.png" alt="Dynamic TextField search using the Toolbar" />
@@ -378,7 +386,9 @@ public class Toolbar extends Container {
      * <p>The callback ActionListener gets the search string and it's up to developer 
      * to do the actual filtering on the Form.</>
      * <p>It is possible to customize the default look of the search {@code Toolbar} with the following 
-     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch}, {@code TextHintSearch}.</>
+     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch} &amp; {@code TextHintSearch}.</>
+     * <script src="https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
      * 
      * @param callback gets the search string callbacks
      * @param iconSize indicates the size of the icons used in the search/back in millimeters
@@ -422,7 +432,9 @@ public class Toolbar extends Container {
      * <p>The callback ActionListener gets the search string and it's up to developer 
      * to do the actual filtering on the Form.</>
      * <p>It is possible to customize the default look of the search {@code Toolbar} with the following 
-     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch}, {@code TextHintSearch}.</>
+     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch} &amp; {@code TextHintSearch}.</>
+     * <script src="https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
      * 
      * @param callback gets the search string callbacks
      */ 
