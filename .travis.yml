@@ -13,6 +13,14 @@ script:
  - wget https://github.com/codenameone/cn1-binaries/archive/master.zip
  - unzip master.zip -d ../
  - mv ../cn1-binaries-master ../cn1-binaries
+ - rm master.zip
+ - wget https://github.com/codenameone/codenameone-skins/archive/master.zip
+ - unzip master.zip -d ../
+ - mv ../codenameone-skins-master ../codenameone-skins
+ - cd ../codenameone-skins
+ - ./build_skins.sh
+ - mv ../CodenameOne ../cn1
+ - cd ../cn1
  - cd CodenameOne
  - ant jar
  - cd ../CodenameOneDesigner
