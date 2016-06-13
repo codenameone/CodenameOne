@@ -24,4 +24,6 @@ script:
  - cd CodenameOne
  - ant jar
  - cd ../CodenameOneDesigner
+ - mkdir dist
+ - mkdir dist/lib
  - ant release
