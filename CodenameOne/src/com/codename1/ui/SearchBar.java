@@ -37,17 +37,24 @@ class SearchBar extends Toolbar {
     private TextField search;
 
     private Toolbar parent;
+    private float iconSize;
 
     /**
      * Creates the SearchBar Toolbar
      * 
      * @param parent the Toolbar parent
      */ 
-    public SearchBar(Toolbar parent) {
+    public SearchBar(Toolbar parent, float iconSize) {
         this.parent = parent;
+        this.iconSize = iconSize;
         search = new TextField();
         search.setUIID("TextFieldSearch");
-        Image img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TextHintSearch"));
+        Image img;
+        if(iconSize > 0) {
+            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TextHintSearch"), iconSize);
+        } else {
+            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TextHintSearch"));
+        }
         Label hint = new Label("Search", img);
         hint.setUIID("TextHintSearch");
         search.setHintLabelImpl(hint);
@@ -59,6 +66,7 @@ class SearchBar extends Toolbar {
             }
         });
         setUIID("ToolbarSearch");        
+        search.startEditingAsync();
     }
 
     void initSearchBar() {
@@ -67,14 +75,19 @@ class SearchBar extends Toolbar {
 
             @Override
             public void actionPerformed(ActionEvent evt) {
-                Form f = (Form) SearchBar.this.getParent();
-                f.removeComponentFromForm(SearchBar.this);
-                f.setToolbar(parent);
-                parent.setHidden(false);
-                f.animateLayout(100);
+                onSearch("");
+                final Form f = (Form) SearchBar.this.getParent();
+                f.getAnimationManager().flushAnimation(new Runnable() {
+                    public void run() {
+                        f.removeComponentFromForm(SearchBar.this);
+                        f.setToolbar(parent);
+                        parent.setHidden(false);
+                        f.animateLayout(100);
+                    }
+                });
             }
 
-        });
+        }, BackCommandPolicy.AS_ARROW, iconSize);
         Command clear = new Command("") {
 
             @Override
@@ -83,7 +96,12 @@ class SearchBar extends Toolbar {
             }
 
         };
-        Image img = FontImage.createMaterial(FontImage.MATERIAL_CLOSE, UIManager.getInstance().getComponentStyle("TitleCommand"));
+        Image img;
+        if(iconSize > 0) {
+            img = FontImage.createMaterial(FontImage.MATERIAL_CLOSE, UIManager.getInstance().getComponentStyle("TitleCommand"), iconSize);
+        } else {
+            img = FontImage.createMaterial(FontImage.MATERIAL_CLOSE, UIManager.getInstance().getComponentStyle("TitleCommand"));
+        }
         clear.setIcon(img);
         addCommandToRightBar(clear);
     }

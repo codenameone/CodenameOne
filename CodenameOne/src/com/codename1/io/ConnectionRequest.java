@@ -1113,6 +1113,40 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key, notice that this doesn't implicitly
+     * encode the value
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgumentNoEncoding(String key, String[] value) {
+        if(value == null || value.length == 0) {
+            return;
+        }
+        if(value.length == 1) {
+            addArgumentNoEncoding(key, value[0]);
+            return;
+        }
+        // copying the array to prevent mutation
+        String[] v = new String[value.length];
+        System.arraycopy(value, 0, v, 0, value.length);
+        addArg(key, v);
+    }
+    
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key, notice that this doesn't implicitly
+     * encode the value
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgumentNoEncodingArray(String key, String... value) {
+        addArgumentNoEncoding(key, (String[])value);
+    }
+
+    /**
      * Add an argument to the request response
      *
      * @param key the key of the argument
