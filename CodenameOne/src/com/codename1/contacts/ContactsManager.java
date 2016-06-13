@@ -23,6 +23,8 @@
 package com.codename1.contacts;
 
 import com.codename1.ui.Display;
+import java.util.Collection;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -175,4 +177,14 @@ public class ContactsManager {
     public static void refresh() {
         Display.getInstance().refreshContacts();
     }
+    
+    /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     */
+    //public static Contact[] getLinkedContacts(Contact c) {
+    //    return Display.getInstance().getLinkedContacts(c);
+    //}
+    
 }

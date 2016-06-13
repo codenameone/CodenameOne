@@ -71,6 +71,8 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -4941,6 +4943,41 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * 
+     * Implementations should override the {@link #getLinkedContactIds(com.codename1.contacts.Contact) } method.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     * @see com.codename1.contacts.ContactsManager#getLinkedContacts(com.codename1.contacts.Contact) 
+     * 
+     */
+    //public final Contact[] getLinkedContacts(Contact c) {
+    //    String[] ids = getLinkedContactIds(c);
+    //    if (ids != null) {
+    //        Contact[] out = new Contact[ids.length];
+    //        int len = ids.length;
+    //        for (int i=0; i< len; i++) {
+    //            out[i] = getContactById(ids[i]);
+    //        }
+    //        return out;
+    //    }
+    //    return new Contact[0];
+    //}
+    
+    
+    /**
+     * Gets the IDs of all contacts that are linked to the provided contact.
+     * @param c The contact
+     * @return Array of IDs for contacts that are linked to {@code c}.
+     */
+    public String[] getLinkedContactIds(Contact c) {
+        if (c == null || c.getId() == null) {
+            return new String[0];
+        }
+        return new String[]{c.getId()};
+    }
+    
     /**
      * Get a Contact according to it's contact id.
      * @param id unique id of the Contact

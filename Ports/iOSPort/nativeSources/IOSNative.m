@@ -3162,6 +3162,47 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(CN1_THREAD_S
     return MAX(nPeople, 0);
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_countLinkedContacts___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
+    POOL_BEGIN();
+    ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
+    NSArray *linkedRecordsArray = (__bridge NSArray *)ABPersonCopyArrayOfAllLinkedPeople(i);
+    int numLinked = [linkedRecordsArray count];
+    [linkedRecordsArray release];
+    POOL_END();
+    return numLinked;
+}
+
+#ifdef NEW_CODENAME_ONE_VM
+JAVA_INT com_codename1_impl_ios_IOSNative_countLinkedContacts___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
+    return com_codename1_impl_ios_IOSNative_countLinkedContacts___int(CN1_THREAD_STATE_PASS_ARG instanceObject, recId);
+}
+#endif
+
+
+
+void com_codename1_impl_ios_IOSNative_getLinkedContactIds___int_int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT num, JAVA_INT refId, JAVA_OBJECT out) {
+    POOL_BEGIN();
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* iArray = intArray;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    int size = iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)out)->data;
+    int size = ((JAVA_ARRAY)out)->length;
+#endif
+    ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), refId);
+    NSArray *linkedRecordsArray = (__bridge NSArray *)ABPersonCopyArrayOfAllLinkedPeople(i);
+    JAVA_INT minNum = MIN(num, [linkedRecordsArray count]);
+    minNum = MIN(minNum, size);
+    for (int iter=0; iter < minNum; iter++) {
+        ABRecordRef ref = (__bridge ABRecordRef)[linkedRecordsArray objectAtIndex:iter];
+        data[iter] = ABRecordGetRecordID(ref);
+    }
+    [linkedRecordsArray release];
+    POOL_END();
+}
+
+
 void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT intArray, JAVA_BOOLEAN includeNumbers) {
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM

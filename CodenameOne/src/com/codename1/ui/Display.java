@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
+import com.codename1.contacts.ContactsManager;
 import com.codename1.db.Database;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
@@ -3426,6 +3427,25 @@ hi.show();}</pre></noscript>
      */
     public boolean isGetAllContactsFast() {
         return impl.isGetAllContactsFast();
+    }
+    
+    /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     * @see ContactsManager#getLinkedContacts(com.codename1.contacts.Contact) 
+     */
+    //public Contact[] getLinkedContacts(Contact c) {
+    //    return impl.getLinkedContacts(c);
+    //}
+    
+    /**
+     * Gets IDs of all contacts that are linked to a given contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return IDs of linked contacts.
+     */
+    public String[] getLinkedContactIds(Contact c) {
+        return impl.getLinkedContactIds(c);
     }
     
     /**

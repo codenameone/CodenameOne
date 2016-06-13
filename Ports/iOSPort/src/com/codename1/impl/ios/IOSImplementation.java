@@ -5235,11 +5235,25 @@ public class IOSImplementation extends CodenameOneImplementation {
     public void refreshContacts() {
         nativeInstance.refreshContacts();
     }
-    
-    
-    
-    
 
+    @Override
+    public String[] getLinkedContactIds(Contact c) {
+        int recId = Integer.parseInt(c.getId());
+        int num = nativeInstance.countLinkedContacts(recId);
+        String[] out = new String[num];
+        if (num > 0) {
+            int[] iout = new int[num];
+            nativeInstance.getLinkedContactIds(num, recId, iout);
+            for (int i=0; i<num; i++) {
+                out[i] = String.valueOf(iout[i]);
+            }
+        }
+        return out;
+        
+    }
+    
+    
+    
     @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         int recId = Integer.parseInt(id);

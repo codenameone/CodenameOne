@@ -596,6 +596,10 @@ public final class IOSNative {
 
     native boolean isBackgroundFetchSupported();
 
+    native int countLinkedContacts(int recId);
+
+    native void getLinkedContactIds(int num, int recId, int[] out);
+
    
 
 }
