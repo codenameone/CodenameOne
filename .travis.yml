@@ -3,6 +3,11 @@ language: java
 # Set JDK needed for JavaTestApplication
 jdk:
   - oraclejdk8    
+  
+install:
+  - wget https://github.com/codenameone/cn1-binaries/archive/master.zip
+  - mkdir ../cn1-binaries
+  - unzip master.zip -d ../cn1-binaries
 
  # Enable initializing of GUI context required for running tests
 before_script:
