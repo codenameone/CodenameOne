@@ -11,9 +11,8 @@ before_script:
   
 script: 
  - wget https://github.com/codenameone/cn1-binaries/archive/master.zip
- - mkdir ../cn1-binaries
- - pwd
- - unzip master.zip -d ../cn1-binaries
+ - unzip master.zip -d ../
+ - mv ../cn1-binaries-master ../cn1-binaries
  - cd CodenameOne
  - ant jar
  - cd ../CodenameOneDesigner
