@@ -515,6 +515,15 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
+        <zip basedir="../../SocialBoo" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/socialboo/SocialBooProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
         <zip basedir="../../codenameone-demos/KitchenSink" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/kitchen/KitchenSinkProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
@@ -576,8 +585,10 @@
             tofile="${ideaplugin}/files/MapsDemoProject.zip" />
         <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/nativedemo/NativeDemoProject.zip"
             tofile="${ideaplugin}/files/NativeDemoProject.zip" />
-        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/propertycross/PropertyCross.zip"
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/propertycross/PropertyCrossProject.zip"
             tofile="${ideaplugin}/files/PropertyCross.zip" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/socialboo/SocialBooProject.zip"
+            tofile="${ideaplugin}/files/SocialBooProject.zip" />
         <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/sql/SQLSampleProject.zip"
             tofile="${ideaplugin}/files/SQLSampleProject.zip" />
                         
