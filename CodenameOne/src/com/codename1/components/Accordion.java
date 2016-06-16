@@ -35,8 +35,20 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 
 /**
- * The accordion ui pattern is a vertically stacked list of items. 
- * Each item can be opened/closed to reveal more content 
+ * <p>The {@code Accordion} ui pattern is a vertically stacked list of items. 
+ * Each item can be opened/closed to reveal more content similarly to a {@link com.codename1.ui.tree.Tree}
+ * however unlike the {@link com.codename1.ui.tree.Tree} the {@code Accordion} is designed to include
+ * containers or arbitrary components rather than model based data.</p>
+ * <p>
+ * This makes the {@code Accordion} more convenient as a tool for folding/collapsing UI elements known in advance
+ * whereas a {@link com.codename1.ui.tree.Tree} makes more sense as a tool to map data e.g. filesystem 
+ * structure, XML hierarchy etc.
+ * </p>
+ * <p>
+ * Note that the {@code Accordion} like many composite components in Codename One is scrollable by default
+ * which means you should use it within a non-scrollable hierarchy. If you wish to add it into a scrollable 
+ * {@link com.codename1.ui.Container} you should disable it's default scrollability using {@code setScrollable(false)}.
+ * </p>
  * 
  * <h3>Example Usage</h3>
  * 
@@ -63,6 +75,7 @@ public class Accordion extends Container {
         super.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("Label"));
         openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("Label"));
+        setScrollableY(true);
     }
 
     /**
