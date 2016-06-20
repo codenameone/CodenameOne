@@ -76,7 +76,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     public Location getLastKnownLocation() {
         android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         if (location != null) {
-            return convert(location);
+            return AndroidLocationManager.convert(location);
         }
         return null;
     }
@@ -229,7 +229,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
                     @Override
                     public void run() {
-                        Location lastLocation = convert(loc);
+                        Location lastLocation = AndroidLocationManager.convert(loc);
                         l.locationUpdated(lastLocation);
                     }
                 });
@@ -256,17 +256,6 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         setLocationManagerStatus(OUT_OF_SERVICE);
     }
 
-    public static Location convert(android.location.Location loc) {
-        Location retVal = new Location();
-        retVal.setAccuracy(loc.getAccuracy());
-        retVal.setAltitude(loc.getAltitude());
-        retVal.setLatitude(loc.getLatitude());
-        retVal.setLongitude(loc.getLongitude());
-        retVal.setTimeStamp(loc.getTime());
-        retVal.setVelocity(loc.getSpeed());
-        retVal.setDirection(loc.getBearing());
-        return retVal;
-    }
 
     private void setLocationManagerStatus(final int status) {
 

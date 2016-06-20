@@ -64,7 +64,7 @@ public class BackgroundLocationHandler extends IntentService {
             try {
                 //the 2nd parameter is the class name we need to create
                 LocationListener l = (LocationListener) Class.forName(params[1]).newInstance();
-                l.locationUpdated(AndroidLocationPlayServiceManager.convert(location));
+                l.locationUpdated(AndroidLocationManager.convert(location));
             } catch (Exception e) {
                 Log.e("Codename One", "background location error", e);
             }
