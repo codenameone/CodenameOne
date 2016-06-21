@@ -92,6 +92,7 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
@@ -6425,6 +6426,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(!file.startsWith("file:/")){
                 throw new IllegalArgumentException( file + " is not a valid path, use "
                         + "FileSystemStorage.getInstance().getAppHomePath() to get a valid dir path to read/write files");
+            }
+        } else {
+            if(file.indexOf("%") > 0) {
+                // this is an encoded file URL convert it to a regular file
+                try {
+                    File f = new File(new URI(file));
+                    return f.getAbsolutePath();
+                } catch(Exception err) {
+                    Log.e(err);
+                    throw new RuntimeException(err);
+                }
             }
         }
         
