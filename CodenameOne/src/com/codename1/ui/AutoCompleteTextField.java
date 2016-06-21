@@ -436,12 +436,14 @@ public class AutoCompleteTextField extends TextField {
                     removePopup();
                     addPopup();
                 }
+                evt.consume();                
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(true);
                 popup.setEnabled(true);
                 popup.repaint();
-                evt.consume();                
+                dontCalcSize = false;
                 f.revalidate();
+                dontCalcSize = true;
                 Display.getInstance().callSerially(new Runnable() {
 
                     public void run() {
