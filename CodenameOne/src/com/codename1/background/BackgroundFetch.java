@@ -54,7 +54,7 @@ import com.codename1.util.Callback;
  * 
  * <h4>Examples</h4>
  * 
- * <script src="https://gist.github.com/shannah/4b023ed09e7f64ab6420647b22d1823d.js"></script>
+ * <script src="https://gist.github.com/codenameone/ecccc5c6452d055359f12374b2db2644.js"></script>
  * @author shannah
  */
 public interface BackgroundFetch {

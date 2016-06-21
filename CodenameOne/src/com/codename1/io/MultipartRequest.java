@@ -174,6 +174,23 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
+    public void addArgumentNoEncoding(String key, String[] value) {
+        addArgument(key, value);
+        ignoreEncoding.add(key);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addArgumentNoEncodingArray(String key, String... value) {
+        addArgumentNoEncoding(key, (String[])value);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
     public void addArgument(String name, String[] value) {
         args.put(name, value);
     }

@@ -1533,6 +1533,10 @@ public class Component implements Animation, StyleListener {
         if(parent != null) {
             parent.paintGlassImpl(g);
         }
+        paintTensile(g);
+    }
+
+    void paintTensile(Graphics g) {
         if(tensileHighlightIntensity > 0) {
             int i = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
             if(scrollY >= i - 1) {
@@ -1544,9 +1548,9 @@ public class Component implements Animation, StyleListener {
                     tensileHighlightIntensity = 0;
                 }
             }
-        }
+        }        
     }
-
+    
     private void drawPainters(com.codename1.ui.Graphics g, Component par, Component c,
             int x, int y, int w, int h) {
         if(flatten && getWidth() > 0 && getHeight() > 0) {
