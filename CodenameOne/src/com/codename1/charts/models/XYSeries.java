@@ -264,6 +264,22 @@ public class XYSeries{
   }
 
   /**
+   * Add an String at (x,y) coordinates
+   * 
+   * @param annotation String text
+   * @param index the index to add the annotation to
+   * @param x
+   * @param y
+   */
+  public void addAnnotation(String annotation, int index, double x, double y) {
+    mAnnotations.add(index, annotation);
+    while (mStringXY.get(x) != null) {
+      x += getPadding(x);
+    }
+    mStringXY.put(x, y);
+  }
+
+  /**
    * Remove an String at index
    * 
    * @param index
