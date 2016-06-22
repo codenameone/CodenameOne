@@ -89,6 +89,37 @@ public class Accordion extends Container {
     }
 
     /**
+     * Replaces the title for content that was already added. Notice that this will fail if the content isn't
+     * in yet.
+     * @param header the new title for the content
+     * @param body the content that was already added with a different header using addContent
+     */
+    public void setHeader(String header, Component body) {
+        AccordionContent ac = (AccordionContent) body.getParent();
+        ((Label)ac.header).setText(header);
+    }
+    
+    /**
+     * Replaces the title for content that was already added. Notice that this will fail if the content isn't
+     * in yet.
+     * @param header the new title for the content
+     * @param body the content that was already added with a different header using addContent
+     */
+    public void setHeader(Component header, Component body) {
+        AccordionContent ac = (AccordionContent) body.getParent();
+        ac.header.getParent().replace(ac.header, header, null);
+    }
+    
+    /**
+     * Removes the content from the accordion
+     * @param body the body previously added with {@link #addContent(com.codename1.ui.Component, com.codename1.ui.Component)} or
+     */
+    public void removeContent(Component body) {
+        body.getParent().remove();
+        body.remove();
+    }
+    
+    /**
      * Add an item to the Accordion Container
      * 
      * @param header the item title Component
@@ -133,11 +164,13 @@ public class Accordion extends Container {
         private Button arrow = new Button();
         
         private Component body;
+        Component header;
             
-        public AccordionContent(final Component header, final Component body) {
+        public AccordionContent(Component header, final Component body) {
             setUIID("AccordionItem");
             setLayout(new BorderLayout());
             this.body = body;
+            this.header = header;
             header.setSelectedStyle(header.getUnselectedStyle());
             header.setPressedStyle(header.getUnselectedStyle());
             Container top = new Container(new BorderLayout());
