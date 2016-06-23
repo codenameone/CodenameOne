@@ -400,24 +400,28 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     private void startBackgroundFetchService() {
-        stopBackgroundFetchService();
-        backgroundFetchTimer = new java.util.Timer();
-        
-        TimerTask tt = new TimerTask() {
+        if (isBackgroundFetchSupported()) {
+            stopBackgroundFetchService();
+            backgroundFetchTimer = new java.util.Timer();
 
-            @Override
-            public void run() {
-                performBackgroundFetch();
-            }
-            
-        };
-        backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+            TimerTask tt = new TimerTask() {
+
+                @Override
+                public void run() {
+                    performBackgroundFetch();
+                }
+
+            };
+            backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+        }
     }
     
     private void stopBackgroundFetchService() {
-        if (backgroundFetchTimer != null) {
-            backgroundFetchTimer.cancel();
-            backgroundFetchTimer = null;
+        if (isBackgroundFetchSupported()) {
+            if (backgroundFetchTimer != null) {
+                backgroundFetchTimer.cancel();
+                backgroundFetchTimer = null;
+            }
         }
     }
 
@@ -430,11 +434,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public void setPreferredBackgroundFetchInterval(int seconds) {
-        int oldInterval = getPreferredBackgroundFetchInterval();
-        super.setPreferredBackgroundFetchInterval(seconds);
-        if (!backgroundFetchInitialized || oldInterval != seconds) {
-            backgroundFetchInitialized = true;
-            startBackgroundFetchService();
+        if (isBackgroundFetchSupported()) {
+            int oldInterval = getPreferredBackgroundFetchInterval();
+            super.setPreferredBackgroundFetchInterval(seconds);
+            if (!backgroundFetchInitialized || oldInterval != seconds) {
+                backgroundFetchInitialized = true;
+                startBackgroundFetchService();
+            }
         }
     }
     
