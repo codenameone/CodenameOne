@@ -42,7 +42,11 @@ extern UIView *editingComponent;
 #define INCLUDE_CN1_PUSH
 
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifdef GOOGLE_CONNECT_PODS
+#import <GooglePlus/GooglePlus.h>
+#else
 #import "GooglePlus.h"
+#endif
 #endif
 
 #ifdef INCLUDE_FACEBOOK_CONNECT

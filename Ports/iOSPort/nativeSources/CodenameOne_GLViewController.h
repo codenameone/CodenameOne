@@ -37,9 +37,14 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+//#define GOOGLE_CONNECT_PODS
 //#define INCLUDE_GOOGLE_CONNECT
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifdef GOOGLE_CONNECT_PODS
+#import <GooglePlus/GooglePlus.h>
+#else
 #import "GooglePlus.h"
+#endif
 #endif
 
 //#define INCLUDE_CN1_BACKGROUND_FETCH
