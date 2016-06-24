@@ -4423,7 +4423,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void drawString(Object graphics, String str, int x, int y) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
-        if (zoomLevel != 1) {
+        // the latter indicates mutable image graphics
+        if (zoomLevel != 1 && nativeGraphics  != graphics) {
             nativeGraphics = (Graphics2D) nativeGraphics.create();
             nativeGraphics.setTransform(AffineTransform.getTranslateInstance(0, 0));
             java.awt.Font currentFont = nativeGraphics.getFont();
