@@ -269,9 +269,9 @@ public class MultipartRequest extends ConnectionRequest {
         writer = new OutputStreamWriter(os, "UTF-8"); 
         Enumeration e = args.keys();
         while(e.hasMoreElements()) {
-        	if (shouldStop()) {
-        		break;
-        	}
+            if (shouldStop()) {
+                    break;
+            }
             String key = (String)e.nextElement();
             Object value = args.get(key);
             
@@ -300,7 +300,14 @@ public class MultipartRequest extends ConnectionRequest {
                 }
             } else { 
                 if(value instanceof String[]) {
+                    boolean first = true;
                     for(String s : (String[])value) {
+                        if(!first) {
+                            writer.write("--");
+                            writer.write(boundary);
+                            writer.write(CRLF);                            
+                        }
+                        first = false;
                         writer.write("Content-Disposition: form-data; name=\"");
                         writer.write(key);
                         writer.write("\"");
