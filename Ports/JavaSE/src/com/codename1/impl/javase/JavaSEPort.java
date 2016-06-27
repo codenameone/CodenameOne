@@ -92,6 +92,7 @@ import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
@@ -399,24 +400,28 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     private void startBackgroundFetchService() {
-        stopBackgroundFetchService();
-        backgroundFetchTimer = new java.util.Timer();
-        
-        TimerTask tt = new TimerTask() {
+        if (isBackgroundFetchSupported()) {
+            stopBackgroundFetchService();
+            backgroundFetchTimer = new java.util.Timer();
 
-            @Override
-            public void run() {
-                performBackgroundFetch();
-            }
-            
-        };
-        backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+            TimerTask tt = new TimerTask() {
+
+                @Override
+                public void run() {
+                    performBackgroundFetch();
+                }
+
+            };
+            backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+        }
     }
     
     private void stopBackgroundFetchService() {
-        if (backgroundFetchTimer != null) {
-            backgroundFetchTimer.cancel();
-            backgroundFetchTimer = null;
+        if (isBackgroundFetchSupported()) {
+            if (backgroundFetchTimer != null) {
+                backgroundFetchTimer.cancel();
+                backgroundFetchTimer = null;
+            }
         }
     }
 
@@ -429,11 +434,13 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     @Override
     public void setPreferredBackgroundFetchInterval(int seconds) {
-        int oldInterval = getPreferredBackgroundFetchInterval();
-        super.setPreferredBackgroundFetchInterval(seconds);
-        if (!backgroundFetchInitialized || oldInterval != seconds) {
-            backgroundFetchInitialized = true;
-            startBackgroundFetchService();
+        if (isBackgroundFetchSupported()) {
+            int oldInterval = getPreferredBackgroundFetchInterval();
+            super.setPreferredBackgroundFetchInterval(seconds);
+            if (!backgroundFetchInitialized || oldInterval != seconds) {
+                backgroundFetchInitialized = true;
+                startBackgroundFetchService();
+            }
         }
     }
     
@@ -4416,7 +4423,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void drawString(Object graphics, String str, int x, int y) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
-        if (zoomLevel != 1) {
+        // the latter indicates mutable image graphics
+        if (zoomLevel != 1 && nativeGraphics  != graphics) {
             nativeGraphics = (Graphics2D) nativeGraphics.create();
             nativeGraphics.setTransform(AffineTransform.getTranslateInstance(0, 0));
             java.awt.Font currentFont = nativeGraphics.getFont();
@@ -6425,6 +6433,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(!file.startsWith("file:/")){
                 throw new IllegalArgumentException( file + " is not a valid path, use "
                         + "FileSystemStorage.getInstance().getAppHomePath() to get a valid dir path to read/write files");
+            }
+        } else {
+            if(file.indexOf("%") > 0) {
+                // this is an encoded file URL convert it to a regular file
+                try {
+                    File f = new File(new URI(file));
+                    return f.getAbsolutePath();
+                } catch(Exception err) {
+                    Log.e(err);
+                    throw new RuntimeException(err);
+                }
             }
         }
         

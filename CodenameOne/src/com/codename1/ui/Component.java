@@ -98,6 +98,12 @@ public class Component implements Animation, StyleListener {
     private int tensileLength = -1;
 
     /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that 
+     * hierarchy to still act as a standalone component
+     */
+    private boolean blockLead;
+    
+    /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
      */
@@ -117,7 +123,7 @@ public class Component implements Animation, StyleListener {
     private Component nextFocusLeft;
     private String name;
     boolean hasLead;
-
+    
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
@@ -517,6 +523,9 @@ public class Component implements Animation, StyleListener {
     }
 
     Component getLeadComponent() {
+        if(isBlockLead()) {
+            return null;
+        }
         Container p = getParent();
         if(p != null) {
             return p.getLeadComponent();
@@ -2296,6 +2305,27 @@ public class Component implements Animation, StyleListener {
         return animationSpeed;
     }
 
+    /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that
+     * hierarchy to still act as a standalone component
+     * @return the blockLead
+     */
+    public boolean isBlockLead() {
+        return blockLead;
+    }
+
+    /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that
+     * hierarchy to still act as a standalone component
+     * @param blockLead the blockLead to set
+     */
+    public void setBlockLead(boolean blockLead) {
+        this.blockLead = blockLead;
+        if(blockLead) {
+            hasLead = false;
+        }
+    }
+
     class AnimationTransitionPainter implements Painter{
         int alpha;
         Style originalStyle;
@@ -3535,7 +3565,7 @@ public class Component implements Animation, StyleListener {
         }
         isUnselectedStyle = false;
 
-        if(hasLead) {
+        if(hasLead && !blockLead) {
             Component lead = getLeadComponent();
             if(lead != null) {
                 if(!lead.isEnabled()) {

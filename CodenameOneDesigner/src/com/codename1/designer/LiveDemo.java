@@ -22,12 +22,15 @@
  */
 package com.codename1.designer;
 
+import com.codename1.components.MultiButton;
+import com.codename1.components.ToastBar;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
@@ -54,12 +57,34 @@ public class LiveDemo {
     
     public void start() {
         Form previewForm = new Form("Preview Theme");
+        Toolbar tb = new Toolbar();
+        previewForm.setToolbar(tb);
+        tb.setTitle("Preview Theme");
+        tb.addMaterialCommandToSideMenu("Side Command", FontImage.MATERIAL_HELP, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                ToastBar.showErrorMessage("Unmapped....");
+            }
+        });
+        tb.addMaterialCommandToOverflowMenu("Overflow Command", FontImage.MATERIAL_HELP, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                ToastBar.showErrorMessage("Unmapped....");
+            }
+        });
+        tb.addMaterialCommandToRightBar("", FontImage.MATERIAL_HELP, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                ToastBar.showErrorMessage("Unmapped....");
+            }
+        });
         
         previewForm.setLayout(new BorderLayout());
         
         Container first = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         first.addComponent(new Label("This is a Label"));
         first.addComponent(new Button("This is a Button"));
+        MultiButton mb = new MultiButton("This is a MultiButton");
+        mb.setTextLine2("Second line of text");
+        FontImage.setMaterialIcon(mb, FontImage.MATERIAL_HELP);
+        first.addComponent(mb);
         TextField txt = new TextField();
         txt.setHint("This is a TextField");
         first.addComponent(txt);
