@@ -164,6 +164,11 @@ namespace UWPApp
             java.lang.System.setOut(new DebugPrintStream());
         }
 
+        public override string getCurrentStackTrace()
+        {
+            return Environment.StackTrace;
+        }
+
         public override String getTimezoneId()
         {
             return TimeZoneInfo.Local.Id;

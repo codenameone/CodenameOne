@@ -286,6 +286,9 @@ public class Container extends Component implements Iterable<Component>{
      * @return the lead component
      */
     public Component getLeadComponent() {
+        if(isBlockLead()) {
+            return null;
+        }
         if(leadComponent != null) {
             return leadComponent;
         }
@@ -302,6 +305,9 @@ public class Container extends Component implements Iterable<Component>{
      * @return the lead component
      */
     public Container getLeadParent() {
+        if(isBlockLead()) {
+            return null;
+        }
         if(leadComponent != null) {
             return this;
         }
@@ -314,7 +320,7 @@ public class Container extends Component implements Iterable<Component>{
     private void initLead() {
         disableFocusAndInitLead(this);
         setFocusable(true);
-        hasLead = true;
+        hasLead = !isBlockLead();
     }
 
     /**
@@ -344,7 +350,7 @@ public class Container extends Component implements Iterable<Component>{
                 disableFocusAndInitLead((Container)cu);
             }
             cu.setFocusable(false);
-            cu.hasLead = true;
+            cu.hasLead = !cu.isBlockLead();
         }
     }
 
@@ -1736,6 +1742,13 @@ public class Container extends Component implements Iterable<Component>{
             if (cmp.contains(x, y)) {
                 component = cmp;
                 if (!overlaps && component.isFocusable()) {
+                    // special case for lead blocking
+                    if(component instanceof Container && ((Container)component).getLeadParent() == component) {
+                        Component c = ((Container)component).getComponentAt(x, y);
+                        if(c.isBlockLead()) {
+                            return c;
+                        }
+                    }
                     return component;
                 }
                 if (cmp instanceof Container) {
