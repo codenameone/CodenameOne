@@ -357,7 +357,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         public void run() {
                             Display.getInstance().setProperty("pendingPush", "true");                            
                             Display.getInstance().setProperty("pushType", t);
-                            if(t != null && "3".equals(t)) {                                
+                            if(t != null && ("3".equals(t) || "6".equals(t))) {                                
                                 String[] a = b.split(";");
                                 c.push(a[0]);
                                 c.push(a[1]);
@@ -393,7 +393,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 final String t = actualType;
                 final String b = is.readUTF();
                 long s = is.readLong();
-                if(t != null && "3".equals(t)) {                                
+                if(t != null && ("3".equals(t) || "6".equals(t))) {                               
                     String[] m = b.split(";");
                     v.add(m[0]);
                 } else if(t != null && "2".equals(t)){
