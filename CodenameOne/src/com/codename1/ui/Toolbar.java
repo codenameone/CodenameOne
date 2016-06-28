@@ -719,6 +719,10 @@ public class Toolbar extends Container {
      * @return the button instance
      */
     public Button findCommandComponent(Command c) {
+        if(permanentSideMenu) {
+            Button b = findCommandComponent(c, permanentSideMenuContainer);
+            return b;
+        }
         Button b = sideMenu.findCommandComponent(c);
         if(b != null) {
             return b;
