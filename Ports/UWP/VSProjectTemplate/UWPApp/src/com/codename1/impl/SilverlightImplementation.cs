@@ -2137,8 +2137,18 @@ namespace com.codename1.impl
         {
             try
             {
-                StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.OpenIfExists).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                return new java.io.OutputStreamProxy(Task.Run(() => file.OpenStreamForWriteAsync()).ConfigureAwait(false).GetAwaiter().GetResult());
+                StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.OpenIfExists)
+                    .AsTask()
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
+                return new java.io.OutputStreamProxy(
+                    Task.Run(() => file.OpenStreamForWriteAsync())
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult()
+                    
+                    );
             }
             catch (Exception e)
             {
@@ -2147,26 +2157,74 @@ namespace com.codename1.impl
             }
         }
 
+
+
         public override java.io.InputStream createStorageInputStream(string name)
         {
             try
             {
-                StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.OpenIfExists).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                return new InputStreamProxy(Task.Run(() => file.OpenStreamForReadAsync()).GetAwaiter().GetResult());
-            }
-            catch (Exception)
-            {
+                StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.OpenIfExists)
+                    .AsTask()
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
+
                 try
                 {
-                    StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.GenerateUniqueName).AsTask().GetAwaiter().GetResult();
-                    return new InputStreamProxy(file.OpenReadAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult().AsStream());
+                    return new InputStreamProxy(Task.Run(() => file.OpenStreamForReadAsync())
+                        .ConfigureAwait(false)
+                        .GetAwaiter()
+                        .GetResult());
                 }
-                catch (Exception e)
+                catch (Exception ex2)
                 {
-                    java.io.FileNotFoundException ex = new java.io.FileNotFoundException("FileNotFoundException - " + e.Message);
-                    throw ex;
+                    java.lang.System.err.println("Failed to create storage input stream by simply opening the file.  Trying to open a copy instead " + ex2.Message);
+                    // If it failed to create the input stream, it is possible that
+                    // it is because the file is already being used (e.g. an output stream is writing to it).
+                    // In this case, we'll create a copy to a temp file, and create an inputstream from that one.
+                    try
+                    {
+                        StorageFile tempFile = file.CopyAsync(ApplicationData.Current.TemporaryFolder, file.Name, NameCollisionOption.GenerateUniqueName)
+                            .AsTask()
+                            .ConfigureAwait(false)
+                            .GetAwaiter()
+                            .GetResult();
+                        return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                            .ConfigureAwait(false)
+                            .GetAwaiter()
+                            .GetResult());
+                    }
+                    catch (Exception e3)
+                    {
+                        java.lang.System.err.println("Failed to open storage file via copy " + e3.Message);
+                    }
+
                 }
             }
+            catch (Exception) { }
+            
+            // If our first attempt failed, let's try again a different way.
+            try
+            {
+                StorageFile file = iDefaultStore.CreateFileAsync(nativePath(name), CreationCollisionOption.GenerateUniqueName)
+                    .AsTask()
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult();
+                return new InputStreamProxy(file.OpenReadAsync()
+                    .AsTask()
+                    .ConfigureAwait(false)
+                    .GetAwaiter()
+                    .GetResult()
+                    .AsStream());
+                        
+            }
+            catch (Exception e)
+            {
+                java.io.FileNotFoundException ex = new java.io.FileNotFoundException("FileNotFoundException - " + e.Message);
+                throw ex;
+            }
+            
         }
 
         public override bool storageFileExists(string name)
@@ -2190,6 +2248,47 @@ namespace com.codename1.impl
                 ss[i] = filesInFolder.ElementAt(i).Name;
             }
             return ss;
+        }
+
+        public override void printStackTraceToStream(Exception t, Writer o)
+        {
+            string trace = t.StackTrace;
+            if (t is java.lang.Throwable)
+            {
+                java.lang.Throwable th = (java.lang.Throwable)t;
+                trace = "\n" + th.getStackTraceString();
+            }
+            java.lang.System.@out.println("Stack trace is " + trace);
+            char[] buf = trace.ToCharArray();
+            int len = buf.Length;
+            o.write(buf, 0, len);
+        }
+
+        internal class CodenameOneUWPThread : com.codename1.impl.CodenameOneThread
+        {
+            public CodenameOneUWPThread(java.lang.Runnable r, string name) : base(r, name)
+            {
+
+            }
+
+            public override void run()
+            {
+                try {
+                    base.run();
+                } catch (System.Exception ex)
+                {
+                    java.lang.System.err.println(ex.StackTrace);
+                    CodenameOneThread.handleException(new java.lang.Exception("Native UWP Exception: " + ex.Message + "\n" + ex.StackTrace));
+                }
+                
+            }
+        }
+
+        public override void startThread(string name, java.lang.Runnable r)
+        {
+            CodenameOneUWPThread t = new CodenameOneUWPThread(r, name);
+            t.start();
+
         }
 
         public override string getAppHomePath()
