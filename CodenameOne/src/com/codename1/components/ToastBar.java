@@ -746,7 +746,7 @@ public class ToastBar {
     public static void showMessage(String msg, char icon, int timeout) {
         ToastBar.Status s = ToastBar.getInstance().createStatus();
         Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
-        s.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ERROR, stl, 4));
+        s.setIcon(FontImage.createMaterial(icon, stl, 4));
         s.setMessage(msg);
         s.setExpires(timeout);
         s.show();
