@@ -245,7 +245,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             return;
         }
         //if the input is pan mode, there is no need to resize the screen
-        if(InPlaceEditView.isEditing() && !InPlaceEditView.isInputResize()){
+        if((InPlaceEditView.isEditing() || InPlaceEditView.isKeyboardShowing()) && !InPlaceEditView.isInputResize()){
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
