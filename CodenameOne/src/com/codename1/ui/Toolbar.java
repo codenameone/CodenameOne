@@ -78,6 +78,22 @@ import java.util.Vector;
  */
 public class Toolbar extends Container {
 
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     * @return the centeredDefault
+     */
+    public static boolean isCenteredDefault() {
+        return centeredDefault;
+    }
+
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     * @param aCenteredDefault the centeredDefault to set
+     */
+    public static void setCenteredDefault(boolean aCenteredDefault) {
+        centeredDefault = aCenteredDefault;
+    }
+
     private Component titleComponent;
 
     private ToolbarSideMenu sideMenu;
@@ -113,14 +129,22 @@ public class Toolbar extends Container {
     private static boolean globalToolbar;
     
     /**
+     * Indicates whether the toolbar should be properly centered by default
+     */
+    private static boolean centeredDefault = true;
+    
+    /**
      * Empty Constructor
      */
     public Toolbar() {
         setLayout(new BorderLayout());
         setUIID("Toolbar");
         sideMenu = new ToolbarSideMenu();
+        if(centeredDefault) {
+            setTitleCentered(true);
+        }
     }
-
+    
     /**
      * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
      * theme constant {@code globalToobarBool}. Notice that the name of this method might imply that
