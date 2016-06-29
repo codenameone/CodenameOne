@@ -539,6 +539,7 @@ public class ChartComponent extends Component {
      */
     public void setZoomEnabled(boolean zoomEnabled) {
         this.zoomEnabled = zoomEnabled;
+        setFocusable(isFocusable() || zoomEnabled);
     }
     
     
