@@ -309,7 +309,7 @@ public class SwipeableContainer extends Container {
             }
             final int x = evt.getX();
             final int y = evt.getY();
-            if (!topWrapper.contains(x, y)) {
+            if (!waitForRelease && !topWrapper.contains(x, y)) {
                 return;
             }
             Component bottomL;
