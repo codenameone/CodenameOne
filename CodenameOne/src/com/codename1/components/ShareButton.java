@@ -132,46 +132,52 @@ public class ShareButton extends Button implements ActionListener{
      * @param evt 
      */
     public void actionPerformed(ActionEvent evt) {
-        if(Display.getInstance().isNativeShareSupported()){
-            Display.getInstance().share(textToShare, imageToShare, imageMimeType, new Rectangle(
-                    ShareButton.this.getAbsoluteX(),
-                    ShareButton.this.getAbsoluteY(),
-                    ShareButton.this.getWidth(),
-                    ShareButton.this.getHeight()
-            ));                
-            return;
-        }
-        Vector sharing;
-        if(imageToShare != null){
-            sharing = new Vector();
-            for (int i = 0; i < shareServices.size(); i++) {
-                ShareService share = (ShareService) shareServices.elementAt(i);
-                if(share.canShareImage()){
-                    sharing.add(share);
+        // postpone the share button action to the next EDT cycle to allow action listeners on the button to 
+        // process first
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if(Display.getInstance().isNativeShareSupported()){
+                    Display.getInstance().share(textToShare, imageToShare, imageMimeType, new Rectangle(
+                            ShareButton.this.getAbsoluteX(),
+                            ShareButton.this.getAbsoluteY(),
+                            ShareButton.this.getWidth(),
+                            ShareButton.this.getHeight()
+                    ));                
+                    return;
                 }
-            }
-        }else{
-            sharing = shareServices;
-        }
-        for (int i = 0; i < sharing.size(); i++) {
-            ShareService share = (ShareService) sharing.elementAt(i);
-            share.setMessage(textToShare);
-            share.setImage(imageToShare, imageMimeType);
-            share.setOriginalForm(getComponentForm());
-        }
-        List l = new List(sharing);
-        l.setCommandList(true);
-        final Dialog dialog = new Dialog("Share");
-        dialog.setLayout(new BorderLayout());
-        dialog.addComponent(BorderLayout.CENTER, l);
-        dialog.placeButtonCommands(new Command[]{new Command("Cancel")});
-        l.addActionListener(new ActionListener() {
+                Vector sharing;
+                if(imageToShare != null){
+                    sharing = new Vector();
+                    for (int i = 0; i < shareServices.size(); i++) {
+                        ShareService share = (ShareService) shareServices.elementAt(i);
+                        if(share.canShareImage()){
+                            sharing.add(share);
+                        }
+                    }
+                }else{
+                    sharing = shareServices;
+                }
+                for (int i = 0; i < sharing.size(); i++) {
+                    ShareService share = (ShareService) sharing.elementAt(i);
+                    share.setMessage(textToShare);
+                    share.setImage(imageToShare, imageMimeType);
+                    share.setOriginalForm(getComponentForm());
+                }
+                List l = new List(sharing);
+                l.setCommandList(true);
+                final Dialog dialog = new Dialog("Share");
+                dialog.setLayout(new BorderLayout());
+                dialog.addComponent(BorderLayout.CENTER, l);
+                dialog.placeButtonCommands(new Command[]{new Command("Cancel")});
+                l.addActionListener(new ActionListener() {
 
-            public void actionPerformed(ActionEvent evt) {
-                dialog.dispose();
+                    public void actionPerformed(ActionEvent evt) {
+                        dialog.dispose();
+                    }
+                });
+                dialog.show();
             }
         });
-        dialog.show();
     }
 
     /**
