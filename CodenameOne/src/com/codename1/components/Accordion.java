@@ -67,7 +67,7 @@ public class Accordion extends Container {
     private Image openIcon;
 
     private boolean autoClose = true;
-
+    
     /**
      * Empty Constructor
      */ 
@@ -155,8 +155,6 @@ public class Accordion extends Container {
         this.autoClose = autoClose;
     }
     
-    
-
     class AccordionContent extends Container {
         
         private boolean closed = true;
@@ -176,7 +174,7 @@ public class Accordion extends Container {
             Container top = new Container(new BorderLayout());
             top.add(BorderLayout.CENTER, header);
             top.setUIID("AccordionHeader");
-            arrow.setUIID("Label");
+            arrow.setUIID("AccordionArrow");
             arrow.setIcon(closeIcon);
             arrow.addActionListener(new ActionListener() {
 
