@@ -140,7 +140,7 @@ public class Toolbar extends Container {
         setLayout(new BorderLayout());
         setUIID("Toolbar");
         sideMenu = new ToolbarSideMenu();
-        if(centeredDefault) {
+        if(centeredDefault && getUnselectedStyle().getAlignment() == CENTER) {
             setTitleCentered(true);
         }
     }
