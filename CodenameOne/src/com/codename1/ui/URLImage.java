@@ -126,7 +126,7 @@ public class URLImage extends EncodedImage {
         }
         
         public boolean isAsyncAdapter() {
-            return true;
+            return false;
         }        
     }
     

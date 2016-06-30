@@ -421,10 +421,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return null;
     }
     
+    private static AndroidImplementation instance;
+    public static void clearAppArg() {
+        if (instance != null) {
+            instance.setAppArg(null);
+        }
+    }
+    
     @Override
     public void init(Object m) {
         this.activity = (CodenameOneActivity) m;
-           
+        instance = this;
         if(activity.hasUI()){
             if (!hasActionBar()) {
                 try {
@@ -1956,7 +1963,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     tmp.write(buffer);
                                 }
                                 tmp.close();
-                                attachment.close();
+                                attachment.close(); 
+                                setAppArg(filePath);
                                 return filePath;
                             }
                         }
@@ -1977,8 +1985,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         if(query != null && query.length() > 0){
                             encodedPath += "?" + query;
                         }
+                        setAppArg(encodedPath);
                         return encodedPath;
                     }
+                    setAppArg(u.toString());
                     return u.toString();
                 }
             }
@@ -2105,7 +2115,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         } catch (Exception e) {
         }
-        return System.getProperty(key, defaultValue);
+        return System.getProperty(key, super.getProperty(key, defaultValue));
     }
 
     private String getContentName(ContentResolver resolver, Uri uri) {
