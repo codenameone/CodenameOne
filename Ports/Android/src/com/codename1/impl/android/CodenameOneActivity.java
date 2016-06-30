@@ -333,6 +333,7 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     protected void onStop() {
+        AndroidImplementation.clearAppArg();
         super.onStop();
         background = true;
         unlockScreen();
