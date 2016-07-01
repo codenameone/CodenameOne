@@ -1947,6 +1947,7 @@ namespace com.codename1.impl
             NetworkOperation n = new NetworkOperation();
             Uri uri = new Uri(nativePath(n1));
             n.request = (HttpWebRequest)WebRequest.Create(uri);
+            n.request.Headers["User-agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2486.0 Safari/537.36 Edge/13.10586";
             return n;
         }
 
@@ -1963,8 +1964,7 @@ namespace com.codename1.impl
             if (key.ToLower().Equals("connection") || key.ToLower().Equals("keepalive") ||
                 key.ToLower().Equals("expect") || key.ToLower().Equals("date") || key.ToLower().Equals("host") ||
                 key.ToLower().Equals("if-modified-since") || key.ToLower().Equals("range") ||
-                key.ToLower().Equals("referer") || key.ToLower().Equals("transfer-encoding") ||
-                key.ToLower().Equals("user-agent"))
+                key.ToLower().Equals("referer") || key.ToLower().Equals("transfer-encoding"))
             {
                 return;
             }
