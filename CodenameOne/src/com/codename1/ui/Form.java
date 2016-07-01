@@ -1409,19 +1409,21 @@ public class Form extends Container {
         
         super.refreshTheme(merge);
 
-        // when  changing the theme the menu behavior might also change
-        hideMenu();
-        restoreMenu();
-        Command[] cmds = new Command[getCommandCount()];
-        for (int iter = 0; iter < cmds.length; iter++) {
-            cmds[iter] = getCommand(iter);
-        }
-        removeAllCommands();
-        for (int iter = 0; iter < cmds.length; iter++) {
-            addCommand(cmds[iter], getCommandCount());
-        }
-        if (getBackCommand() != null) {
-            setBackCommand(getBackCommand());
+        if (toolbar == null) {
+            // when  changing the theme the menu behavior might also change
+            hideMenu();
+            restoreMenu();
+            Command[] cmds = new Command[getCommandCount()];
+            for (int iter = 0; iter < cmds.length; iter++) {
+                cmds[iter] = getCommand(iter);
+            }
+            removeAllCommands();
+            for (int iter = 0; iter < cmds.length; iter++) {
+                addCommand(cmds[iter], getCommandCount());
+            }
+            if (getBackCommand() != null) {
+                setBackCommand(getBackCommand());
+            }
         }
 
         revalidate();
