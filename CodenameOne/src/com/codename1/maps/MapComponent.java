@@ -1132,6 +1132,17 @@ public class MapComponent extends Container {
         }
         return super.setPropertyValue(name, value);
     }
+
+    /**
+     * Indicates whether the tap is long and without dragging.
+     *
+     * @return {@code true} if a long tap were pressed on the map without
+     * dragging, otherwise {@code false}
+     */
+    public boolean isLongTap() {
+        return (System.currentTimeMillis() - lastPressed >= singleTapThreshold) && pressedx == draggedx && pressedy == draggedy;
+    }
+
 }
 class LayerWithZoomLevels {
 
