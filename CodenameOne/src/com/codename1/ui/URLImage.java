@@ -117,7 +117,8 @@ public class URLImage extends EncodedImage {
                     }
                 }
                 tmp = postProcess(tmp);
-                return EncodedImage.createFromImage(tmp, tmp.isOpaque());
+                //return EncodedImage.createFromImage(tmp, tmp.isOpaque());
+                return EncodedImage.createFromImage(tmp, false);
             }
             return downloadedImage;
         }
