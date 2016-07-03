@@ -106,13 +106,13 @@ public class URLImage extends EncodedImage {
                 if(tmp.getWidth() > placeholderImage.getWidth()) {
                     int diff = tmp.getWidth() - placeholderImage.getWidth();
                     int x = diff / 2;
-                    g.drawImage(tmp, x, 0);
+                    g.drawImage(tmp, -x, 0);
                     tmp = i;
                 } else {
                     if(tmp.getHeight() > placeholderImage.getHeight()) {
                         int diff = tmp.getHeight() - placeholderImage.getHeight();
                         int y = diff / 2;
-                        g.drawImage(tmp, 0, y);
+                        g.drawImage(tmp, 0, -y);
                         tmp = i;
                     }
                 }
