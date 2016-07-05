@@ -57,7 +57,7 @@ import java.util.Vector;
  */
 public class RSSReader extends List {
     private Vector existingData;
-    private String url = "http://codenameone.blogspot.com/feeds/posts/default?alt=rss";
+    private String url = "https://codenameone.blogspot.com/feeds/posts/default?alt=rss";
     private RSSService service;
     private int limit = 20;
     private boolean waitingForResponseLock;
