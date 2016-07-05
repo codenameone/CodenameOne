@@ -35,6 +35,8 @@ import java.io.IOException;
  * You can ask it to list your posts and then seek the correct id within the returned JSON
  * 
  * @author Chen Fishbein
+ * @deprecated This functionality is no longer possible open a BrowserComponent 
+ * with the link instead, this class will be removed in next version
  */
 public class LikeButton extends Button implements ActionListener {
     private String appId = "132970916828080";
