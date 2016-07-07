@@ -2007,7 +2007,12 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         @Override
         public void drawString(final String str, final int x, final int y) {
             final int col = this.color;
-            final CodenameOneTextPaint font = (CodenameOneTextPaint)getFont();
+            Paint fnt = getFont();
+            if(fnt == null) {
+                fnt = impl.defaultFont;
+            } 
+
+            final CodenameOneTextPaint font = (CodenameOneTextPaint)fnt;
             final int alph = this.alpha;
 
             Bitmap stringBmp = null;
