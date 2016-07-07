@@ -1979,6 +1979,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         return null;
                     }
                 } else {
+                    
+                    /*
+                    // Why do we need this special case?  u.toString()
+                    // will include the full URL including query string.
+                    // This special case causes urls like myscheme://part1/part2
+                    // to only return "/part2" which is obviously problematic and
+                    // is inconsistent with iOS.  Is this special case necessary
+                    // in some versions of Android?
                     String encodedPath = u.getEncodedPath();
                     if (encodedPath != null && encodedPath.length() > 0) {
                         String query = u.getQuery();
@@ -1988,6 +1996,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         setAppArg(encodedPath);
                         return encodedPath;
                     }
+                    */
                     setAppArg(u.toString());
                     return u.toString();
                 }
