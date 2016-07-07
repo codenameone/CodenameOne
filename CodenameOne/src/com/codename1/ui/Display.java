@@ -1244,11 +1244,10 @@ public final class Display {
     }
 
     /**
-     * Indicates if this is a touch screen device that will return pen events,
-     * defaults to true if the device has pen events but can be overriden by
-     * the developer.
+     * The name of this method is misleading due to it's legacy. It will return true on the desktop too where
+     * the mouse sends pointer events.
      *
-     * @return true if this device supports touch events
+     * @return true if this device supports touch/pointer events
      */
     public boolean isTouchScreenDevice() {
         return touchScreen;
