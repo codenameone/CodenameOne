@@ -3005,11 +3005,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         public boolean dispatchKeyEvent(KeyEvent event) {
+            
             int keycode = event.getKeyCode();
             keycode = CodenameOneView.internalKeyCodeTranslate(keycode);
             if (keycode == AndroidImplementation.DROID_IMPL_KEY_BACK) {
-                Display.getInstance().keyPressed(keycode);
-                Display.getInstance().keyReleased(keycode);
+                switch (event.getAction()) {
+                    case KeyEvent.ACTION_DOWN:
+                        Display.getInstance().keyPressed(keycode);
+                        break;
+                    case KeyEvent.ACTION_UP:
+                        Display.getInstance().keyReleased(keycode);
+                        break;
+                }
                 return true;
             } else {
                 return super.dispatchKeyEvent(event);
