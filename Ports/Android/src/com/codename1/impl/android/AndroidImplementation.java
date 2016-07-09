@@ -214,6 +214,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean compatPaintMode;
     private MediaRecorder recorder = null;
 
+    private boolean superPeerMode;
+
     @Override
     public void setPlatformHint(String key, String value) {
         if(key.equals("platformHint.compatPaintMode")) {
@@ -627,6 +629,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 int hardwareAcceleration = 16777216;
                 activity.getWindow().setFlags(hardwareAcceleration, hardwareAcceleration);
+                superPeerMode = true;
                 myView = new AndroidAsyncView(activity, AndroidImplementation.this);                
             }
         } else {
@@ -2631,6 +2634,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     }
 
+    @Override
+    public void edtIdle(boolean enter) {
+        super.edtIdle(enter);
+        if(enter) {
+            // check if we have peers waiting for resize...
+            if(myView instanceof AndroidAsyncView) {
+                ((AndroidAsyncView)myView).resizeViews();
+            }
+        }
+    }
+
     /**
      * wrapper component that capsules a native view object in a Codename One
      * component. this involves A LOT of back and forth between the Codename One
@@ -2661,8 +2675,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public AndroidPeer(View vv) {
             super(vv);
             this.v = vv;
-            v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+            if(!superPeerMode) {
+                v.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                        MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+            }
         }
 
         @Override
@@ -2681,10 +2697,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         protected boolean shouldRenderPeerImage() {
-            return lightweightMode || !isInitialized();
+            return !superPeerMode && (lightweightMode || !isInitialized());
         }
 
         protected void setLightweightMode(boolean l) {
+            if(superPeerMode) {
+                return;
+            }
             doSetVisibility(!l);
             if (lightweightMode == l) {
                 return;
@@ -2726,13 +2745,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         protected void deinitialize() {
-            Image i = generatePeerImage();
-            setPeerImage(i);
-            super.deinitialize();
-            synchronized (nativePeers) {
-                nativePeers.remove(this);
+            if(!superPeerMode) {
+                Image i = generatePeerImage();
+                setPeerImage(i);
+                super.deinitialize();
+                synchronized (nativePeers) {
+                    nativePeers.remove(this);
+                }
+                deinit();
             }
-            deinit();
         }
 
         public void deinit(){
@@ -2759,14 +2780,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         protected void initComponent() {
             super.initComponent();
-            synchronized (nativePeers) {
-                nativePeers.add(this);
+            if(!superPeerMode) {
+                synchronized (nativePeers) {
+                    nativePeers.add(this);
+                }
+                init();
+                setPeerImage(null);
             }
-            init();
-            setPeerImage(null);
         }
         
         public void init(){
+            if(superPeerMode) {
+                return;
+            }
             runOnUiThreadAndBlock(new Runnable() {
                 public void run() {
                     if (layoutWrapper == null) {
@@ -2836,40 +2862,88 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         }
+        private Image peerImage;
+        public void paint(final Graphics g) {
+            if(superPeerMode) {
+                //g.setColor(0xff);
+                //g.fillRect(getX(), getY(), getWidth(), getHeight());
+                Object nativeGraphics = com.codename1.ui.Accessor.getNativeGraphics(g);
+
+                AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();
+                if (lp == null) {
+                    lp = new AndroidAsyncView.LayoutParams(
+                            getX() + g.getTranslateX(),
+                            getY() + g.getTranslateY(),
+                            getWidth(),
+                            getHeight(), AndroidPeer.this);
+                    v.setLayoutParams(lp);
+                    lp.dirty = true;
+                } else {
+                    int x = getX() + g.getTranslateX();
+                    int y = getY() + g.getTranslateY();
+                    int w = getWidth();
+                    int h = getHeight();
+                    if(x != lp.x || y != lp.y || w != lp.w || h != lp.h) {
+                        lp.dirty = true;
+                        lp.x = x;
+                        lp.y = y;
+                        lp.w = w;
+                        lp.h = h;
+                    }
+                }
+
+                // this is a mutable image or side menu etc. where the peer is drawn on a different form...
+                // Special case...
+                if(nativeGraphics.getClass() == AndroidGraphics.class) {
+                    if(peerImage == null) {
+                        peerImage = generatePeerImage();
+                    }
+                    //systemOut("Drawing native image");
+                    g.drawImage(peerImage, getX(), getY());
+                    return;
+                }
+                peerImage = null;
+
+                ((AndroidGraphics)nativeGraphics).drawView(v);
+            }
+        }
 
         @Override
         protected void onPositionSizeChange() {
-            
-            Form f = getComponentForm();
-            if (v.getVisibility() == View.INVISIBLE
-                    && f != null
-                    && Display.getInstance().getCurrent() == f) {
-                doSetVisibilityInternal(true);
-                return;
+            if(!superPeerMode) {
+                Form f = getComponentForm();
+                if (v.getVisibility() == View.INVISIBLE
+                        && f != null
+                        && Display.getInstance().getCurrent() == f) {
+                    doSetVisibilityInternal(true);
+                    return;
+                }
+                layoutPeer();
             }
-            layoutPeer();
         }
 
         protected void layoutPeer(){
-            // called by Codename One EDT to position the native component.
-            activity.runOnUiThread(new Runnable() {
-                public void run() {
-                    if (layoutWrapper != null) {
-                        if (v.getVisibility() == View.VISIBLE) {
+            if(!superPeerMode) {
+                // called by Codename One EDT to position the native component.
+                activity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        if (layoutWrapper != null) {
+                            if (v.getVisibility() == View.VISIBLE) {
 
-                            RelativeLayout.LayoutParams layoutParams = layoutWrapper.createMyLayoutParams(
-                                    AndroidImplementation.AndroidPeer.this.getAbsoluteX(),
-                                    AndroidImplementation.AndroidPeer.this.getAbsoluteY(),
-                                    AndroidImplementation.AndroidPeer.this.getWidth(),
-                                    AndroidImplementation.AndroidPeer.this.getHeight());
-                            layoutWrapper.setLayoutParams(layoutParams);
-                            if(AndroidImplementation.this.relativeLayout != null){
-                                AndroidImplementation.this.relativeLayout.requestLayout();
+                                RelativeLayout.LayoutParams layoutParams = layoutWrapper.createMyLayoutParams(
+                                        AndroidImplementation.AndroidPeer.this.getAbsoluteX(),
+                                        AndroidImplementation.AndroidPeer.this.getAbsoluteY(),
+                                        AndroidImplementation.AndroidPeer.this.getWidth(),
+                                        AndroidImplementation.AndroidPeer.this.getHeight());
+                                layoutWrapper.setLayoutParams(layoutParams);
+                                if (AndroidImplementation.this.relativeLayout != null) {
+                                    AndroidImplementation.this.relativeLayout.requestLayout();
+                                }
                             }
                         }
                     }
-                }
-            });        
+                });
+            }
         }
         
         void blockNativeFocus(boolean block) {
