@@ -5994,8 +5994,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             throw new IOException("Unreachable");
         }
         if(url.toLowerCase().startsWith("http:"))  {
-            System.out.print("WARNING: Apple will no longer accept http URL connections from applications you tried to connect to " + 
-                    url +"\nto learn more check out https://www.codenameone.com/blog/ios-http-urls.html" );
+            System.out.println("WARNING: Apple will no longer accept http URL connections from applications you tried to connect to " + 
+                    url +" to learn more check out https://www.codenameone.com/blog/ios-http-urls.html" );
         }
         URL u = new URL(url);        
 
