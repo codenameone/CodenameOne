@@ -5621,7 +5621,8 @@ public abstract class CodenameOneImplementation {
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
         Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
-        if(Preferences.get("push_id", (long)-1) == -1) {
+        Preferences.set("push_key", id);
+        /*if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);
             ConnectionRequest r = new ConnectionRequest() {
                 protected void readResponse(InputStream input) throws IOException  {
@@ -5646,7 +5647,7 @@ public abstract class CodenameOneImplementation {
             r.addArgument("r", packageName);
             NetworkManager.getInstance().addToQueueAndWait(r);
             return r.getResponseCode() == 200;
-        }
+        }*/
         return true;
     }
     
