@@ -5106,7 +5106,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setWidth(int width) {
             super.setWidth(width);
-            if(nativeVideo != null){
+            if(nativeVideo != null && !superPeerMode){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
@@ -5123,7 +5123,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setHeight(int height) {
             super.setHeight(height);
-            if(nativeVideo != null){
+            if(nativeVideo != null  && !superPeerMode){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
