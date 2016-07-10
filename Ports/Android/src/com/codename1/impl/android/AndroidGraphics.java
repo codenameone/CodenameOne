@@ -1404,7 +1404,7 @@ class AndroidGraphics {
         clipFresh = false;
     }
 
-    public void drawView(final View v) {
+    public void drawView(final View v, AndroidAsyncView.LayoutParams lp) {
     }
 
     public void rotate(float angle, int x, int y) {

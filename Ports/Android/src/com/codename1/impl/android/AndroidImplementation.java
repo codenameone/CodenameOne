@@ -214,7 +214,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean compatPaintMode;
     private MediaRecorder recorder = null;
 
-    private boolean superPeerMode;
+    private boolean superPeerMode = true;
 
     @Override
     public void setPlatformHint(String key, String value) {
@@ -2865,31 +2865,53 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private Image peerImage;
         public void paint(final Graphics g) {
             if(superPeerMode) {
-                //g.setColor(0xff);
-                //g.fillRect(getX(), getY(), getWidth(), getHeight());
                 Object nativeGraphics = com.codename1.ui.Accessor.getNativeGraphics(g);
 
-                AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();
-                if (lp == null) {
-                    lp = new AndroidAsyncView.LayoutParams(
+                Object o = v.getLayoutParams();
+                AndroidAsyncView.LayoutParams lp;
+                if(o instanceof AndroidAsyncView.LayoutParams) {
+                    lp = (AndroidAsyncView.LayoutParams) o;
+                    if (lp == null) {
+                        lp = new AndroidAsyncView.LayoutParams(
+                                getX() + g.getTranslateX(),
+                                getY() + g.getTranslateY(),
+                                getWidth(),
+                                getHeight(), AndroidPeer.this);
+                        final AndroidAsyncView.LayoutParams finalLp = lp;
+                        v.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                v.setLayoutParams(finalLp);
+                            }
+                        });
+                        lp.dirty = true;
+                    } else {
+                        int x = getX() + g.getTranslateX();
+                        int y = getY() + g.getTranslateY();
+                        int w = getWidth();
+                        int h = getHeight();
+                        if (x != lp.x || y != lp.y || w != lp.w || h != lp.h) {
+                            lp.dirty = true;
+                            lp.x = x;
+                            lp.y = y;
+                            lp.w = w;
+                            lp.h = h;
+                        }
+                    }
+                } else {
+                    final AndroidAsyncView.LayoutParams finalLp = new AndroidAsyncView.LayoutParams(
                             getX() + g.getTranslateX(),
                             getY() + g.getTranslateY(),
                             getWidth(),
                             getHeight(), AndroidPeer.this);
-                    v.setLayoutParams(lp);
-                    lp.dirty = true;
-                } else {
-                    int x = getX() + g.getTranslateX();
-                    int y = getY() + g.getTranslateY();
-                    int w = getWidth();
-                    int h = getHeight();
-                    if(x != lp.x || y != lp.y || w != lp.w || h != lp.h) {
-                        lp.dirty = true;
-                        lp.x = x;
-                        lp.y = y;
-                        lp.w = w;
-                        lp.h = h;
-                    }
+                    v.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            v.setLayoutParams(finalLp);
+                        }
+                    });
+                    finalLp.dirty = true;
+                    lp = finalLp;
                 }
 
                 // this is a mutable image or side menu etc. where the peer is drawn on a different form...
@@ -2904,7 +2926,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 peerImage = null;
 
-                ((AndroidGraphics)nativeGraphics).drawView(v);
+                ((AndroidGraphics)nativeGraphics).drawView(v, lp);
             }
         }
 
@@ -3508,7 +3530,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
             super(web);
-            doSetVisibility(false);
+            if(!superPeerMode) {
+                doSetVisibility(false);
+            }
             parent = (BrowserComponent) p;
             this.web = web;
             web.getSettings().setJavaScriptEnabled(true);
