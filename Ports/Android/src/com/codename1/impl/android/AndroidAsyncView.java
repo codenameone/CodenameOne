@@ -586,8 +586,11 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 ((Activity)v.getContext()).runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        v.setLayoutParams(lp);
-                        addView(v);
+                        // this might happen twice if draw view is invoked twice before the screen has time to draw
+                        if(v.getParent() == null) {
+                            v.setLayoutParams(lp);
+                            addView(v);
+                        }
                     }
                 });
             }
