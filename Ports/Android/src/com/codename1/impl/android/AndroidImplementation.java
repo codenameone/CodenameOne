@@ -4754,9 +4754,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void dismissNotification(Object o) {
-        Integer n = (Integer)o;
         NotificationManager notificationManager = (NotificationManager) activity.getSystemService(Activity.NOTIFICATION_SERVICE);
-        notificationManager.cancel(n.intValue());
+        if(o != null){
+            Integer n = (Integer)o;
+            notificationManager.cancel("CN1", n.intValue());
+        }else{
+            notificationManager.cancelAll();
+        }
     }
     
     @Override
@@ -4799,7 +4803,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         Notification notification = builder.build();
         int notifyId = 10001;
-        notificationManager.notify(notifyId, notification);
+        notificationManager.notify("CN1", notifyId, notification);
         return new Integer(notifyId);
     }
 
