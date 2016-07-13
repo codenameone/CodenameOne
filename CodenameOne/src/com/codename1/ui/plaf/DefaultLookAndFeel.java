@@ -38,6 +38,7 @@ import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.geom.Rectangle;
@@ -1571,6 +1572,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
      * {@inheritDoc}
      */
     public void drawPullToRefresh(Graphics g, final Component cmp, boolean taskExecuted) {
+        final Form parentForm = cmp.getComponentForm();
         final int scrollY = cmp.getScrollY();
         Component cmpToDraw;
         if (taskExecuted) {
@@ -1584,7 +1586,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
 
         if (pull.getComponentAt(0) != updating && cmpToDraw != pull.getComponentAt(0)) {
-            cmp.getComponentForm().registerAnimated(new Animation() {
+            parentForm.registerAnimated(new Animation() {
 
                 int counter = 0;
                 Image i;
@@ -1607,7 +1609,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     if (counter == 6) {
                         ((Label) releaseToRefresh).setIcon(i);
                         ((Label) pullDown).setIcon(i.rotate(180));                        
-                        cmp.getComponentForm().deregisterAnimated(this);
+                        parentForm.deregisterAnimated(this);
                     }
                     cmp.repaint(cmp.getAbsoluteX(), cmp.getAbsoluteY() - getPullToRefreshHeight(), cmp.getWidth(), 
                             getPullToRefreshHeight());
