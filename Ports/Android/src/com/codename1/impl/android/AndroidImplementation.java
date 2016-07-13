@@ -2245,6 +2245,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         try {
+            if(editInProgress()) {
+                stopEditing(true);
+            }
             activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Exception e) {
             e.printStackTrace();
@@ -4638,7 +4641,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void sendMessage(String[] recipients, String subject, Message msg) {
         if(editInProgress()) {
-            stopEditing();
+            stopEditing(true);
         }
         Intent emailIntent;
         String attachment = msg.getAttachment();
@@ -5414,6 +5417,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to browse the photos")){
             return;
         }
+        
+        if(editInProgress()) {
+            stopEditing(true);
+        }
+        
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent galleryIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.INTERNAL_CONTENT_URI);
@@ -5839,7 +5847,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(getCurrentForm() == null){
             flushGraphics();
         }
-        if(InPlaceEditView.isKeyboardShowing()){
+        if(editInProgress()) {
             stopEditing(true);
         }
         super.setCurrentForm(f);
@@ -6307,6 +6315,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         final boolean [] canceled = new boolean[1];
         final boolean [] dismissed = new boolean[1];
         
+        if(editInProgress()) {
+            stopEditing(true);
+        }
         if(type == Display.PICKER_TYPE_TIME) {
             
             class TimePick implements TimePickerDialog.OnTimeSetListener, TimePickerDialog.OnCancelListener, Runnable {
