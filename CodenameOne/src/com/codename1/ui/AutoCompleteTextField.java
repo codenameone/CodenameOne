@@ -42,6 +42,13 @@ import java.util.ArrayList;
  * <script src="https://gist.github.com/codenameone/7e4dc757971e460e5823.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-autocomplete.png" alt="Simple usage of auto complete" />
  * 
+ * <p>
+ * The following sample shows more dynamic usage of the class where the auto-complete model is mutated
+ * based on webservice results.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/6ac9cca810fc467ab15c192faf50907e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/dynamic-autocomplete.png" alt="Dynamic autocomplete" />
  *
  * @author Chen
  */

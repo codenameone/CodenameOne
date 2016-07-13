@@ -642,7 +642,7 @@ public class TableLayout extends Layout {
         for(int iter = 0 ; iter < columns ; iter++) {
             Constraint c = tablePositions[row * columns + iter];
 
-            if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT) {
+            if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanVertical > 1) {
                 continue;
             }
 
