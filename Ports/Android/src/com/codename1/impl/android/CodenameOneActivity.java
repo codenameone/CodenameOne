@@ -539,6 +539,9 @@ public class CodenameOneActivity extends Activity {
             waitingForResult = true;
         }
         intentResult = new Vector();
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
         super.startActivityForResult(intent, requestCode);
     }
 
@@ -549,6 +552,9 @@ public class CodenameOneActivity extends Activity {
             waitingForResult = false;            
         }else{
             waitingForResult = true;
+        }
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
         }
         super.startActivity(intent);
     }
