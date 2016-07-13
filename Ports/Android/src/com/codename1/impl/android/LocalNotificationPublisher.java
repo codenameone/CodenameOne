@@ -63,7 +63,13 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         } else {
             Notification notification = createAndroidNotification(context, notif, content);
             notification.when = System.currentTimeMillis();
-            notificationManager.notify(notif.getId(), 0, notification);
+            try{
+                int notifId = Integer.parseInt(notif.getId());
+                notificationManager.notify("CN1", notifId, notification);                
+            }catch(Exception e){
+                //that was a mistake, the first param is the tag not the id
+                notificationManager.notify(notif.getId(), 0, notification);
+            }
         }
     }
 
