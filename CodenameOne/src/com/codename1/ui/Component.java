@@ -2682,7 +2682,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHover(int[] x, int[] y) {
-        pointerDragged(x, y);
     }
 
     void clearDrag() {
@@ -2744,8 +2743,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHoverPressed(int[] x, int[] y) {
-        dragActivated = false;
-        clearDrag();
     }
     
     /**
