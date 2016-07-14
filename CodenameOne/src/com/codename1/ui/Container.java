@@ -1796,20 +1796,7 @@ public class Container extends Component implements Iterable<Component>{
         }
         return null;
     }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public void pointerHover(int[] x, int[] y) {
-        if(!isDragActivated()) {
-            Component c = getComponentAt(x[0], y[0]);
-            if(c != null && c.isFocusable()) {
-                c.requestFocus();
-            }
-        }
-        super.pointerDragged(x[0], y[0]);
-    }
-    
+        
     /**
      * {@inheritDoc}
      */

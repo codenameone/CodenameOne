@@ -175,6 +175,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    
+    /**
+     * When set to true pointer hover events will be called for mouse move events
+     */
+    private static boolean invokePointerHover;
+    
     static {
         String n = System.getProperty("os.name");
         if (n != null && n.startsWith("Mac")) {
@@ -191,6 +197,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             fontFaceSystem = "Arial";
         }
         
+    }
+
+    /**
+     * When set to true pointer hover events will be called for mouse move events
+     * @return the invokePointerHover
+     */
+    public static boolean isInvokePointerHover() {
+        return invokePointerHover;
+    }
+
+    /**
+     * When set to true pointer hover events will be called for mouse move events
+     * @param aInvokePointerHover the invokePointerHover to set
+     */
+    public static void setInvokePointerHover(boolean aInvokePointerHover) {
+        invokePointerHover = aInvokePointerHover;
     }
     
     private boolean minimized;
@@ -1111,6 +1133,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             e.consume();
             if (!isEnabled()) {
                 return;
+            }
+            if(invokePointerHover) {
+                int x = scaleCoordinateX(e.getX());
+                int y = scaleCoordinateY(e.getY());
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                    JavaSEPort.this.pointerHover(x, y);
+                } 
             }
             if (getSkinHotspots() != null) {
                 java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
