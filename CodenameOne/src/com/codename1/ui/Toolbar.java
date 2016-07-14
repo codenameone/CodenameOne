@@ -58,7 +58,7 @@ import java.util.Vector;
  * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
  * 
  * <p>
- * The following code demonstrates also demonstrates search with a more custom UX where the title
+ * The following code also demonstrates search with a more custom UX where the title
  * area was replaced dynamically. This code predated the builtin search support above. 
  * Notice that the {@code TextField} and its hint are styled to look like the title.
  * </p>
