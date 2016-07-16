@@ -1172,13 +1172,12 @@ public final class Display {
 
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
-     * edt it will still be blocked however a separate thread would be launched
-     * to perform the duties of the EDT while it is blocked. Once blocking is finished
-     * the EDT would be restored to its original position. This is very similar to the
-     * "foxtrot" Swing toolkit and allows coding "simpler" logic that requires blocking
-     * code in the middle of event sensitive areas.
-     *
-     * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
+     * EDT it will still be blocked in a way that doesn't break event dispatch .
+     * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
+     * See <a href="https://www.codenameone.com/manual/edt.html#_invoke_and_block">
+     * this section</a> in the developer guide for further information.
+     * 
+     * @param r runnable (NOT A THREAD!) that will be invoked synchronously by this method
      * @param dropEvents indicates if the display should drop all events
      * while this runnable is running
      */
@@ -1231,11 +1230,10 @@ public final class Display {
 
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
-     * edt it will still be blocked however a separate thread would be launched
-     * to perform the duties of the EDT while it is blocked. Once blocking is finished
-     * the EDT would be restored to its original position. This is very similar to the
-     * "foxtrot" Swing toolkit and allows coding "simpler" logic that requires blocking
-     * code in the middle of event sensitive areas.
+     * EDT it will still be blocked in a way that doesn't break event dispatch .
+     * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
+     * See <a href="https://www.codenameone.com/manual/edt.html#_invoke_and_block">
+     * this section</a> in the developer guide for further information.
      *
      * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
      */

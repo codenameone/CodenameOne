@@ -2736,6 +2736,9 @@ public class Container extends Component implements Iterable<Component>{
         public MorphAnimation(Container thisContainer, int duration, Motion[][] motions) {
             startTime = System.currentTimeMillis();
             this.duration = duration;
+            if(Motion.isSlowMotion()) {
+                this.duration *= 50;
+            }
             this.thisContainer = thisContainer;
             this.motions = motions;
         }

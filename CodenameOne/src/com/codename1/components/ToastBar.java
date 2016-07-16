@@ -22,6 +22,9 @@
  */
 package com.codename1.components;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -40,6 +43,8 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.SuccessCallback;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -280,6 +285,7 @@ public class ToastBar {
          */
         public void setProgress(int progress) {
             this.progress = progress;
+            updateStatus();
         }
         
         /**
@@ -496,7 +502,12 @@ public class ToastBar {
                     if (!c.contains(c.progressBar)) {
                         c.addComponent(BorderLayout.SOUTH, c.progressBar);
                     }
-                    c.progressBar.setProgress(s.getProgress());
+                    if(s.getProgress() < 0) {
+                        c.progressBar.setInfinite(true);
+                    } else {
+                        c.progressBar.setInfinite(false);
+                        c.progressBar.setProgress(s.getProgress());
+                    }
                 } else {
                     c.removeComponent(c.progressBar);
                 }
@@ -769,4 +780,65 @@ public class ToastBar {
     public static void showErrorMessage(String msg, int timeout) {
         showMessage(msg, FontImage.MATERIAL_ERROR, timeout);
     }
+    
+    /*
+     * Shows a progress indicator based on connection request, this is incomplete but it meant to serve as 
+     * a replacement for the inifinte progress
+     * 
+     * @param message a message to show on the progress indicator
+     * @param cr the connection request whose progress should be shown
+     * @param onSuccess invoked when the connection request completes, can be null
+     * @param onError invoked on case of an error, can be null
+     */
+    /*public static void showConnectionProgress(String message, final ConnectionRequest cr, 
+            final SuccessCallback<NetworkEvent> onSuccess, final FailureCallback<NetworkEvent> onError) {
+        final ToastBar.Status s = ToastBar.getInstance().createStatus();
+        s.setShowProgressIndicator(true);
+        s.setProgress(-1);
+        s.show();
+        final ActionListener[] progListener = new ActionListener[1];
+        final ActionListener<NetworkEvent> errorListener = new ActionListener<NetworkEvent>() {
+            public void actionPerformed(NetworkEvent evt) {
+                s.clear();
+                NetworkManager.getInstance().removeErrorListener(this);
+                if(progListener[0] != null) {
+                    NetworkManager.getInstance().removeProgressListener(progListener[0]);
+                }
+                if(onError != null) {
+                    onError.onError(cr, evt.getError(), evt.getResponseCode(), evt.getMessage());
+                }
+            }
+        };
+        NetworkManager.getInstance().addErrorListener(errorListener);
+        progListener[0] = new ActionListener<NetworkEvent>() {
+            private int soFar;
+            public void actionPerformed(NetworkEvent evt) {
+                switch(evt.getProgressType()) {
+                    case NetworkEvent.PROGRESS_TYPE_COMPLETED:
+                        NetworkManager.getInstance().removeErrorListener(errorListener);
+                        NetworkManager.getInstance().removeProgressListener(this);
+                        s.clear();
+                        if(onSuccess != null) {
+                            onSuccess.onSucess(evt);
+                        }
+                        break;
+                    case NetworkEvent.PROGRESS_TYPE_INITIALIZING:
+                        s.setProgress(-1);
+                        break;
+                    case NetworkEvent.PROGRESS_TYPE_INPUT:
+                    case NetworkEvent.PROGRESS_TYPE_OUTPUT:
+                        int currentLength = evt.getLength();
+                        if(currentLength > 0) {
+                            float sentReceived = evt.getSentReceived();
+                            sentReceived = sentReceived / currentLength;
+                            float prog = (sentReceived + soFar) / ((float)currentLength)  * 100f;
+                            s.setProgress((int)prog);
+                        } else {
+                            s.setProgress(-1);
+                        }
+                }
+            }
+        };
+        NetworkManager.getInstance().addProgressListener(progListener[0]);
+    }*/
 }
