@@ -125,6 +125,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static boolean minimized;
     private String userAgent;
     private TextureCache textureCache = new TextureCache();
+    private static boolean dropEvents;
     
     private NativePathRenderer globalPathRenderer;
     private NativePathStroker globalPathStroker;
@@ -901,14 +902,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     private final static int[] singleDimensionX = new int[1];
     private final static int[] singleDimensionY = new int[1];
     public static void pointerPressedCallback(int x, int y) {
+        if(dropEvents) {
+            return;
+        }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerPressed(singleDimensionX, singleDimensionY);
     }
     public static void pointerReleasedCallback(int x, int y) {
+        if(dropEvents) {
+            return;
+        }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerReleased(singleDimensionX, singleDimensionY);
     }
     public static void pointerDraggedCallback(int x, int y) {
+        if(dropEvents) {
+            return;
+        }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerDragged(singleDimensionX, singleDimensionY);
     }
@@ -922,6 +932,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     protected void pointerDragged(final int[] x, final int[] y) {
+        if(dropEvents) {
+            return;
+        }
         super.pointerDragged(x, y);
     }
 
@@ -2691,6 +2704,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native layer
      */
     public static void capturePictureResult(String r) {
+        dropEvents = false;
         if(captureCallback != null) {
             if(r != null) {
                 if(r.startsWith("file:")) {
@@ -2707,6 +2721,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     public void captureAudio(ActionListener response) {
+        dropEvents = false;
         String p = FileSystemStorage.getInstance().getAppHomePath();
         if(!p.endsWith("/")) {
             p += "/";
@@ -2737,6 +2752,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native layer
      */
     public static void captureMovieResult(String r) {
+        dropEvents = false;
         capturePictureResult(r);
     }
     
@@ -2750,6 +2766,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false);
+        dropEvents = true;
     }
 
     @Override
@@ -2869,6 +2886,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(true);
+        dropEvents = true;
     }
 
     @Override
@@ -2881,7 +2899,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
-        
     }
     
     
