@@ -486,6 +486,38 @@ public abstract class CodenameOneImplementation {
     protected void paintOverlay(Graphics g) {
     }
 
+    /**
+     * Calculates the paintable bounds of a component.  The paintable bounds is 
+     * the bounds (in screen coordinates) that will be vislble on the screen.  This
+     * accounts for possible clipping by parent components.
+     * @param c The component whose paintable bounds we are interested in.
+     * @param out A rectangle to return the bounds in.
+     */
+    private void getPaintableBounds(Component c, Rectangle out) {
+        int x = c.getAbsoluteX() + c.getScrollX();
+        int y = c.getAbsoluteY() + c.getScrollY();
+        int x2 = x + c.getWidth();
+        int y2 = y + c.getHeight();
+        
+        Container parent = null;
+        if ((parent = c.getParent()) != null) {
+            getPaintableBounds(parent, out);
+            x = Math.max(out.getX(), x);
+            y = Math.max(out.getY(), y);
+            x2 = Math.min(out.getX() + out.getWidth(), x2);
+            y2 = Math.min(out.getY() + out.getHeight(), y2);
+            
+            
+        }
+        out.setBounds(x, y, x2-x, y2-y);
+        
+    }
+   
+    /**
+     * For use inside paintDirty() so that we don't have to instantiate
+     * a rectangle each time it is called.
+     */
+    private Rectangle paintDirtyTmpRect = new Rectangle();
     
     /**
      * Invoked by the EDT to paint the dirty regions
@@ -527,12 +559,13 @@ public abstract class CodenameOneImplementation {
                     }
 
                     cmp.paintComponent(wrapper);
-                    int cmpAbsX = cmp.getAbsoluteX() + cmp.getScrollX();
+                    getPaintableBounds(cmp, paintDirtyTmpRect);
+                    int cmpAbsX = paintDirtyTmpRect.getX();
                     topX = Math.min(cmpAbsX, topX);
-                    bottomX = Math.max(cmpAbsX + cmp.getWidth(), bottomX);
-                    int cmpAbsY = cmp.getAbsoluteY() + cmp.getScrollY();
+                    bottomX = Math.max(cmpAbsX + paintDirtyTmpRect.getWidth(), bottomX);
+                    int cmpAbsY = paintDirtyTmpRect.getY();
                     topY = Math.min(cmpAbsY, topY);
-                    bottomY = Math.max(cmpAbsY + cmp.getHeight(), bottomY);
+                    bottomY = Math.max(cmpAbsY + paintDirtyTmpRect.getHeight(), bottomY);
                 } else {
                     bottomX = dwidth;
                     bottomY = dheight;
@@ -5621,7 +5654,8 @@ public abstract class CodenameOneImplementation {
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
         Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
-        if(Preferences.get("push_id", (long)-1) == -1) {
+        Preferences.set("push_key", id);
+        /*if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);
             ConnectionRequest r = new ConnectionRequest() {
                 protected void readResponse(InputStream input) throws IOException  {
@@ -5646,7 +5680,7 @@ public abstract class CodenameOneImplementation {
             r.addArgument("r", packageName);
             NetworkManager.getInstance().addToQueueAndWait(r);
             return r.getResponseCode() == 200;
-        }
+        }*/
         return true;
     }
     

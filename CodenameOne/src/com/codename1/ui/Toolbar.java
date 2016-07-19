@@ -58,7 +58,7 @@ import java.util.Vector;
  * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
  * 
  * <p>
- * The following code demonstrates also demonstrates search with a more custom UX where the title
+ * The following code also demonstrates search with a more custom UX where the title
  * area was replaced dynamically. This code predated the builtin search support above. 
  * Notice that the {@code TextField} and its hint are styled to look like the title.
  * </p>
@@ -745,7 +745,9 @@ public class Toolbar extends Container {
     public Button findCommandComponent(Command c) {
         if(permanentSideMenu) {
             Button b = findCommandComponent(c, permanentSideMenuContainer);
-            return b;
+            if(b != null) {
+                return b;
+            }
         }
         Button b = sideMenu.findCommandComponent(c);
         if(b != null) {

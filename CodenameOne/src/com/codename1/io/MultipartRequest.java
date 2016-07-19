@@ -303,6 +303,7 @@ public class MultipartRequest extends ConnectionRequest {
                     boolean first = true;
                     for(String s : (String[])value) {
                         if(!first) {
+                            writer.write(CRLF);
                             writer.write("--");
                             writer.write(boundary);
                             writer.write(CRLF);                            

@@ -101,22 +101,24 @@ public class URLImage extends EncodedImage {
         public EncodedImage adaptImage(EncodedImage downloadedImage, EncodedImage placeholderImage) {
             if(downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {
                 Image tmp = downloadedImage.getInternal().scaledLargerRatio(placeholderImage.getWidth(), placeholderImage.getHeight());
+                Image i = Image.createImage(placeholderImage.getWidth(), placeholderImage.getHeight(), 0);
+                Graphics g = i.getGraphics();
                 if(tmp.getWidth() > placeholderImage.getWidth()) {
                     int diff = tmp.getWidth() - placeholderImage.getWidth();
                     int x = diff / 2;
-                    tmp = tmp.subImage(x, 0, 
-                            Math.min(placeholderImage.getWidth(), tmp.getWidth()), 
-                            Math.min(placeholderImage.getHeight(), tmp.getHeight()), true);
+                    g.drawImage(tmp, -x, 0);
+                    tmp = i;
                 } else {
                     if(tmp.getHeight() > placeholderImage.getHeight()) {
                         int diff = tmp.getHeight() - placeholderImage.getHeight();
                         int y = diff / 2;
-                        tmp = tmp.subImage(0, y, Math.min(placeholderImage.getWidth(), tmp.getWidth()), 
-                                Math.min(placeholderImage.getHeight(), tmp.getHeight()), true);
+                        g.drawImage(tmp, 0, -y);
+                        tmp = i;
                     }
                 }
                 tmp = postProcess(tmp);
-                return EncodedImage.createFromImage(tmp, tmp.isOpaque());
+                //return EncodedImage.createFromImage(tmp, tmp.isOpaque());
+                return EncodedImage.createFromImage(tmp, false);
             }
             return downloadedImage;
         }
