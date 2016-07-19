@@ -1297,14 +1297,11 @@ namespace com.codename1.impl
             }).AsTask().GetAwaiter();
         }
 
-        public override void execute(string n1)
-        {
-            using (AutoResetEvent are = new AutoResetEvent(false))
-            {
-                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                {
-                    webView = new WebView();
-                    webView.Source = new Uri(n1, UriKind.RelativeOrAbsolute);
+        public override void execute(string n1) {
+            var uri = new Uri(n1, UriKind.RelativeOrAbsolute);
+            using (AutoResetEvent are = new AutoResetEvent(false)) {
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
+                    var result = Windows.System.Launcher.LaunchUriAsync(uri);
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
                 are.WaitOne();
