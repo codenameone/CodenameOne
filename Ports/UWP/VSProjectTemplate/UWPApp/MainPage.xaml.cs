@@ -58,49 +58,20 @@ namespace UWPApp
                         //com.codename1.impl.SilverlightImplementation.setPushCallback(null);
                     }
                     finally { System.Diagnostics.Debug.WriteLine("About to init"); }
-
-
-                    com.codename1.ui.util.Resources.setFailOnMissingTruetype(false);
-                    System.Diagnostics.Debug.WriteLine("Display instance " + typeof(com.codename1.ui.Display));
-                    com.codename1.ui.Display.init(null);
-                    System.Diagnostics.Debug.WriteLine("after init");
-                    com.codename1.ui.Display disp = (com.codename1.ui.Display)com.codename1.ui.Display.getInstance();
-                    disp.setProperty("package_name", PACKAGE_NAME);
-                    disp.setProperty("built_by_user", BUILT_BY_USER);
-                    disp.setProperty("build_key", BUILD_KEY);
-                    disp.setProperty("AppName", APP_NAME);
-                    disp.setProperty("AppVersion", APP_VERSION);
-                    instance = new Main();
-                    instance.start();
-                    //PhoneApplicationService.Current.Activated += Current_Activated;
-                    //PhoneApplicationService.Current.Deactivated += Current_Deactivated;
-
-                    bool firstTime = com.codename1.io.Preferences.get("cn1_first_time_req", true);
-                    if (firstTime)
-                    {
-                        com.codename1.io.Preferences.set("cn1_first_time_req", false);
-                        Request r = new Request();
-                        r.setPost(false);
-                        r.setFailSilently(true);
-                        r.setUrl("https://codename-one.appspot.com/registerDeviceServlet");
-                        r.addArgument("a",
-                            "HelloWorldWindows");
-                        r.addArgument("b",
-                            BUILD_KEY);
-                        r.addArgument("by",
-                            BUILT_BY_USER);
-                        r.addArgument("p",
-                            PACKAGE_NAME);
-                        string ver = disp.getProperty(
-                            "AppVersion",
-                            "1.0");
-                        r.addArgument("v", ver);
-                        r.addArgument("pl", disp.getPlatformName());
-                        r.addArgument("u", "");
-                        com.codename1.io.NetworkManager n = (com.codename1.io.NetworkManager)com.codename1.io.NetworkManager.getInstance();
-                        n.addToQueue(r);
-                    }
-
+ SilverlightImplementation.screen.Loaded += delegate {
+                        com.codename1.ui.util.Resources.setFailOnMissingTruetype(false);
+                        System.Diagnostics.Debug.WriteLine("Display instance " + typeof(com.codename1.ui.Display));
+                        com.codename1.ui.Display.init(null);
+                        System.Diagnostics.Debug.WriteLine("after init");
+                        com.codename1.ui.Display disp = (com.codename1.ui.Display)com.codename1.ui.Display.getInstance();
+                        disp.setProperty("package_name", PACKAGE_NAME);
+                        disp.setProperty("built_by_user", BUILT_BY_USER);
+                        disp.setProperty("build_key", BUILD_KEY);
+                        disp.setProperty("AppName", APP_NAME);
+                        disp.setProperty("AppVersion", APP_VERSION);
+                        instance = new Main();
+                        instance.start();
+                    };
                 }
 
             };
