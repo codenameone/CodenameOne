@@ -658,7 +658,7 @@ public class Container extends Component implements Iterable<Component>{
      *  a Transition can be null
      */
     public void replaceAndWait(final Component current, final Component next, final Transition t) {
-        replaceComponents(current, next, t, true, false, null, 0, 0);
+        replaceComponents(current, next, t, true, false, null, 0, 0, true);
     }
 
     /**
@@ -674,7 +674,7 @@ public class Container extends Component implements Iterable<Component>{
      */
     public void replaceAndWait(final Component current, final Component next, final Transition t, int layoutAnimationSpeed) {
         enableLayoutOnPaint = false;
-        replaceComponents(current, next, t, true, false, null, 0, layoutAnimationSpeed);
+        replaceComponents(current, next, t, true, false, null, 0, layoutAnimationSpeed, true);
         if(layoutAnimationSpeed > 0) {
             animateLayoutAndWait(layoutAnimationSpeed);
         }
@@ -695,7 +695,7 @@ public class Container extends Component implements Iterable<Component>{
      * a special case where no validation occurs
      */
     public void replace(final Component current, final Component next, final Transition t, Runnable onFinish, int growSpeed) {
-        replaceComponents(current, next, t, false, false, onFinish, growSpeed, 0);
+        replaceComponents(current, next, t, false, false, onFinish, growSpeed, 0, true);
     }
 
     /**
@@ -712,7 +712,7 @@ public class Container extends Component implements Iterable<Component>{
      */
     public void replaceAndWait(final Component current, final Component next,
             final Transition t, boolean dropEvents) {
-        replaceComponents(current, next, t, true, dropEvents, null, 0, 0);
+        replaceComponents(current, next, t, true, dropEvents, null, 0, 0, true);
     }
 
     /**
@@ -726,11 +726,27 @@ public class Container extends Component implements Iterable<Component>{
      *  a Transition can be null
      */
     public void replace(final Component current, final Component next, final Transition t) {
-        replaceComponents(current, next, t, false, false, null, 0, 0);
+        replaceComponents(current, next, t, false, false, null, 0, 0, true);
     }
 
-    private void replaceComponents(final Component current, final Component next, 
-            final Transition t, boolean wait, boolean dropEvents, Runnable onFinish, int growSpeed, int layoutAnimationSpeed) {
+    /**
+     * This method creates an animation component that replaces the current Component with the next Component.
+     * Current Component must be contained in this Container.
+     * This method return immediately.
+     * 
+     * @param current a Component to remove from the Container
+     * @param next a Component that replaces the current Component
+     * @param t a Transition between the add and removal of the Components
+     *  a Transition can be null
+     * @return animation component that can be queued
+     */
+    public ComponentAnimation createReplaceTransition(Component current, Component next, Transition t) {
+        return replaceComponents(current, next, t, false, false, null, 0, 0, false);
+    }
+    
+    private ComponentAnimation replaceComponents(final Component current, final Component next, 
+            final Transition t, boolean wait, boolean dropEvents, Runnable onFinish, int growSpeed, int layoutAnimationSpeed,
+            boolean addAnimtion) {
         if (!contains(current)) {
             throw new IllegalArgumentException("Component " + current + " is not contained in this Container");
         }
@@ -740,7 +756,7 @@ public class Container extends Component implements Iterable<Component>{
             next.setWidth(current.getWidth());
             next.setHeight(current.getHeight());
             replace(current, next, false);
-            return;
+            return null;
         }
 
         setScrollX(0);
@@ -765,15 +781,18 @@ public class Container extends Component implements Iterable<Component>{
         if (wait) {
             Display.getInstance().invokeAndBlock(anim, dropEvents);
         }*/
-        if(wait) {
-            getAnimationManager().addAnimationAndBlock(anim);
-        } else {
-            if(onFinish != null) {
-                getAnimationManager().addAnimation(anim, onFinish);
+        if(addAnimtion) {
+            if(wait) {
+                getAnimationManager().addAnimationAndBlock(anim);
             } else {
-                getAnimationManager().addAnimation(anim);
+                if(onFinish != null) {
+                    getAnimationManager().addAnimation(anim, onFinish);
+                } else {
+                    getAnimationManager().addAnimation(anim);
+                }
             }
         }
+        return anim;
     }
 
     private boolean isParentOf(Component c) {
@@ -2238,7 +2257,19 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      */
     public void animateLayoutFadeAndWait(final int duration, int startingOpacity) {
-        animateLayout(duration, true, startingOpacity);
+        animateLayout(duration, true, startingOpacity, true);
+    }
+    
+    /**
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation. This method
+     * waits until the operation is completed before returning
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @param startingOpacity the initial opacity to give to the animated components
+     * @return the animation object that should be added to the animation manager
+     */
+    public ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
+        return animateLayout(duration, true, startingOpacity, false);
     }
 
     /**
@@ -2248,7 +2279,18 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      */
     public void animateLayoutFade(final int duration, int startingOpacity) {
-        animateLayout(duration, false, startingOpacity);
+        animateLayout(duration, false, startingOpacity, true);
+    }
+    
+    /**
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @param startingOpacity the initial opacity to give to the animated components
+     * @return the animation object that should be added to the animation manager
+     */
+    public ComponentAnimation createAnimateLayoutFade(final int duration, int startingOpacity) {
+        return animateLayout(duration, false, startingOpacity, false);
     }
 
     /**
@@ -2258,7 +2300,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      */
     public void animateLayoutAndWait(final int duration) {
-        animateLayout(duration, true, 255);
+        animateLayout(duration, true, 255, false);
     }
 
     /**
@@ -2272,9 +2314,24 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      */
     public void animateLayout(final int duration) {
-        animateLayout(duration, false, 255);
+        animateLayout(duration, false, 255, false);
     }
 
+    /**
+     * <p>
+     * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation<br>
+     * See: 
+     * </p>
+     * 
+     * <script src="https://gist.github.com/codenameone/38c076760e309c066126.js"></script>
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @return the animation object that should be added to the animation manager
+     */
+    public ComponentAnimation createAnimateLayout(final int duration) {
+        return animateLayout(duration, false, 255, true);
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -2565,11 +2622,11 @@ public class Container extends Component implements Iterable<Component>{
      *
      * @param duration the duration in milliseconds for the animation
      */
-    private void animateLayout(final int duration, boolean wait, int opacity) {
+    private ComponentAnimation animateLayout(final int duration, boolean wait, int opacity, boolean addAnimation) {
         // this happens for some reason
         Form f = getComponentForm();
         if(f == null) {
-            return;
+            return null;
         }
         setShouldCalcPreferredSize(true);
         enableLayoutOnPaint = false;
@@ -2609,11 +2666,16 @@ public class Container extends Component implements Iterable<Component>{
             xMotions, yMotions, wMotions, hMotions
         });
         setAnimOpacity(opacity, 255, a, componentCount, duration);
-        if(wait) {
-            getAnimationManager().addAnimationAndBlock(a);
+        if(addAnimation) {
+            if(wait) {
+                getAnimationManager().addAnimationAndBlock(a);
+            } else {
+                getAnimationManager().addAnimation(a);
+            }
         } else {
-            getAnimationManager().addAnimation(a);
+            a.dontRevalidate = true;
         }
+        return a;
     }
 
     private void setAnimOpacity(int source, int dest, MorphAnimation a, int componentCount, int duration) {
