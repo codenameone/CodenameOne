@@ -133,12 +133,31 @@ public abstract class ComponentAnimation {
     
     static class CompoundAnimation extends ComponentAnimation {
         private ComponentAnimation[] anims;
+        int sequence;
         public CompoundAnimation(ComponentAnimation[] anims) {
             this.anims = anims;
+            sequence = -1;
+        }
+
+        public CompoundAnimation(ComponentAnimation[] anims, boolean s) {
+            this.anims = anims;
+            sequence = 0;
         }
 
         @Override
         public boolean isInProgress() {
+            if(sequence > -1) {
+                if(anims[sequence].isInProgress()) {
+                    return true;
+                }
+                while(anims.length < sequence) {
+                    sequence++;
+                    if(anims[sequence].isInProgress()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
             for(ComponentAnimation a : anims) {
                 if(a.isInProgress()) {
                     return true;
@@ -149,6 +168,10 @@ public abstract class ComponentAnimation {
 
         @Override
         protected void updateState() {
+            if(sequence > -1) {
+                anims[sequence].updateState();
+                return;
+            }
             for(ComponentAnimation a : anims) {
                 a.updateState();
             }

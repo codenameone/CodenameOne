@@ -205,7 +205,11 @@ public class Toolbar extends Container {
      * @param cent whether the title should be centered
      */
     public void setTitleCentered(boolean cent) {
-        ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        if(cent) {
+            ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        } else {
+            ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+        }
     } 
     
     /**
