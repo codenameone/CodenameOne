@@ -869,7 +869,10 @@ public class InPlaceEditView extends FrameLayout{
         if (!mIsEditing || mEditText == null) {
             return;
         }
-        setVisibility(GONE);
+        // SJH: Setting visibility GONE causes a size change event to be fired even when the
+        // input mode is adjustPan.  This causes problems and glitches with the layout because we
+        // have to guess if a resize even is accurate or not.
+        //setVisibility(GONE);
         mLastEndEditReason = reason;
 
         // If the IME action is set to NEXT, do not hide the virtual keyboard
