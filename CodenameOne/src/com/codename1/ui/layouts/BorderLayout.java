@@ -299,7 +299,7 @@ public class BorderLayout extends Layout {
                 case CENTER_BEHAVIOR_CENTER_ABSOLUTE: {
                     Dimension d = c.getPreferredSize();
                     if(d.getWidth() < w) {
-                        int newX = s.getPadding(target.isRTL(), Component.LEFT) + targetWidth / 2 - d.getWidth() / 2;
+                        int newX = targetWidth / 2 - d.getWidth() / 2;
                         if(newX > x) {
                             x = newX;
                         }
