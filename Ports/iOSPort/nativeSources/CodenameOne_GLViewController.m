@@ -1368,7 +1368,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     float scaleY = ((float)imgHeight)/((float)img.size.height);
     CGRect r = CGRectMake(-x / scaleX, -(imgHeight - y - height) / scaleY, img.size.width * scaleX, img.size.height * scaleY);
     CGImageRef cgImg = [img CGImage];
-    //CGContextDrawImage(context, r, cgImg);
+    CGContextDrawImage(context, r, cgImg);
     
     CGColorSpaceRelease(coloSpaceRgb);
     CGContextRelease(context);
