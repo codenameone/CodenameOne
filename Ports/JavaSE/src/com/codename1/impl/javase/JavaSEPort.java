@@ -2614,8 +2614,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
 
-                            URL u = new URL("https://codenameone.com/OTA/Skins.xml");
-                            URLConnection uc = u.openConnection();
+                            URL u = new URL("https://www.codenameone.com/OTA/Skins.xml");
+                            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+                            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
                             InputStream is = uc.getInputStream();
                             doc[0] = db.parse(is);
                             NodeList skins = doc[0].getElementsByTagName("Skin");
