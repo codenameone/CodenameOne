@@ -1348,7 +1348,10 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
+    BOOL currentlyDrawing = NO;
+    BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
+        currentlyDrawing = YES;
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     // set all pixels to transparent white to solve http://code.google.com/p/codenameone/issues/detail?id=923
@@ -1365,11 +1368,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     float scaleY = ((float)imgHeight)/((float)img.size.height);
     CGRect r = CGRectMake(-x / scaleX, -(imgHeight - y - height) / scaleY, img.size.width * scaleX, img.size.height * scaleY);
     CGImageRef cgImg = [img CGImage];
-    CGContextDrawImage(context, r, cgImg);
+    //CGContextDrawImage(context, r, cgImg);
     
     CGColorSpaceRelease(coloSpaceRgb);
     CGContextRelease(context);
+    if (currentlyDrawing) {
+        Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
+        currentMutableTransformSet = oldCurrentMutableTransformSet;
+    }
 }
+
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
