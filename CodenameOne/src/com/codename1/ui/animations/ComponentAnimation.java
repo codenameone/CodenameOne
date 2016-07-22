@@ -130,6 +130,16 @@ public abstract class ComponentAnimation {
     public static ComponentAnimation compoundAnimation(ComponentAnimation... anims) {
         return new CompoundAnimation(anims);
     }
+
+    /**
+     * Allows us to create an animation that places several separate animations in a sequence so they appear as a 
+     * single animation to the system and process one after the other
+     * @param anims the animations
+     * @return the sequential animation
+     */
+    public static ComponentAnimation sequentialAnimation(ComponentAnimation... anims) {
+        return new CompoundAnimation(anims, true);
+    }
     
     static class CompoundAnimation extends ComponentAnimation {
         private ComponentAnimation[] anims;

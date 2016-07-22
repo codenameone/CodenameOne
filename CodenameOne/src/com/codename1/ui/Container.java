@@ -740,7 +740,7 @@ public class Container extends Component implements Iterable<Component>{
      *  a Transition can be null
      * @return animation component that can be queued
      */
-    public ComponentAnimation createReplaceTransition(Component current, Component next, Transition t) {
+    private ComponentAnimation createReplaceTransition(Component current, Component next, Transition t) {
         return replaceComponents(current, next, t, false, false, null, 0, 0, false);
     }
     
@@ -2268,7 +2268,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      * @return the animation object that should be added to the animation manager
      */
-    public ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
+    private ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
         return animateLayout(duration, true, startingOpacity, false);
     }
 
@@ -2289,7 +2289,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      * @return the animation object that should be added to the animation manager
      */
-    public ComponentAnimation createAnimateLayoutFade(final int duration, int startingOpacity) {
+    private ComponentAnimation createAnimateLayoutFade(final int duration, int startingOpacity) {
         return animateLayout(duration, false, startingOpacity, false);
     }
 
@@ -2328,7 +2328,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      * @return the animation object that should be added to the animation manager
      */
-    public ComponentAnimation createAnimateLayout(final int duration) {
+    private ComponentAnimation createAnimateLayout(final int duration) {
         return animateLayout(duration, false, 255, true);
     }
     
