@@ -191,6 +191,10 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     protected void clearBackgroundListener() {
+        final Class bgListenerClass = getBackgroundLocationListener();
+        if (bgListenerClass == null) {
+            return;
+        }
         new Thread(new Runnable() {
 
             @Override
@@ -208,7 +212,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     public void run() {
                         Context context = AndroidNativeUtil.getActivity();
                         Intent intent = new Intent(context, BackgroundLocationHandler.class);
-                        intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
+                        intent.putExtra("backgroundClass", bgListenerClass.getName());
                         PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                                 intent,
                                 PendingIntent.FLAG_UPDATE_CURRENT);
