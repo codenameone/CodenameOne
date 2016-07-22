@@ -740,7 +740,7 @@ public class Container extends Component implements Iterable<Component>{
      *  a Transition can be null
      * @return animation component that can be queued
      */
-    private ComponentAnimation createReplaceTransition(Component current, Component next, Transition t) {
+    public ComponentAnimation createReplaceTransition(Component current, Component next, Transition t) {
         return replaceComponents(current, next, t, false, false, null, 0, 0, false);
     }
     
@@ -2268,7 +2268,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      * @return the animation object that should be added to the animation manager
      */
-    private ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
+    public ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
         return animateLayout(duration, true, startingOpacity, false);
     }
 
@@ -2289,7 +2289,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      * @return the animation object that should be added to the animation manager
      */
-    private ComponentAnimation createAnimateLayoutFade(final int duration, int startingOpacity) {
+    public ComponentAnimation createAnimateLayoutFade(final int duration, int startingOpacity) {
         return animateLayout(duration, false, startingOpacity, false);
     }
 
@@ -2300,7 +2300,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      */
     public void animateLayoutAndWait(final int duration) {
-        animateLayout(duration, true, 255, false);
+        animateLayout(duration, true, 255, true);
     }
 
     /**
@@ -2314,7 +2314,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      */
     public void animateLayout(final int duration) {
-        animateLayout(duration, false, 255, false);
+        animateLayout(duration, false, 255, true);
     }
 
     /**
@@ -2328,7 +2328,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      * @return the animation object that should be added to the animation manager
      */
-    private ComponentAnimation createAnimateLayout(final int duration) {
+    public ComponentAnimation createAnimateLayout(final int duration) {
         return animateLayout(duration, false, 255, true);
     }
     
