@@ -280,26 +280,26 @@ public class BorderLayout extends Layout {
         if (realEast != null) {
             Component c = realEast;
             positionLeftRight(realEast, targetWidth, bottom, top);
-            c.setX(right - c.getWidth() - c.getStyle().getMargin(target.isRTL(), Component.RIGHT));
+            c.setX(right - c.getWidth() - c.getStyle().getMargin(rtl, Component.RIGHT));
             right -= (c.getWidth() + c.getStyle().getMargin(false, Component.LEFT) + c.getStyle().getMargin(false, Component.RIGHT));
         }
         if (realWest != null) {
             Component c = realWest;
             positionLeftRight(realWest, targetWidth, bottom, top);
-            c.setX(left + c.getStyle().getMargin(target.isRTL(), Component.LEFT));
+            c.setX(left + c.getStyle().getMargin(rtl, Component.LEFT));
             left += (c.getWidth() + c.getStyle().getMargin(false, Component.LEFT) + c.getStyle().getMargin(false, Component.RIGHT));
         }
         if (center != null) {
             Component c = center;
             int w = right - left - c.getStyle().getMargin(false, Component.LEFT) - c.getStyle().getMargin(false, Component.RIGHT);
             int h = bottom - top - c.getStyle().getMargin(false, Component.TOP) - c.getStyle().getMargin(false, Component.BOTTOM);
-            int x = left + c.getStyle().getMargin(target.isRTL(), Component.LEFT);
+            int x = left + c.getStyle().getMargin(rtl, Component.LEFT);
             int y = top + c.getStyle().getMargin(false, Component.TOP);
             switch(centerBehavior) {
                 case CENTER_BEHAVIOR_CENTER_ABSOLUTE: {
                     Dimension d = c.getPreferredSize();
                     if(d.getWidth() < w) {
-                        int newX = (s.getPadding(target.isRTL(), Component.LEFT) - s.getPadding(target.isRTL(), Component.RIGHT) ) + targetWidth / 2 - d.getWidth() / 2;
+                        int newX = (s.getPadding(rtl, Component.LEFT) - s.getPadding(rtl, Component.RIGHT) ) + targetWidth / 2 - d.getWidth() / 2;
                         if(newX > x) {
                             x = newX;
                         }
@@ -339,7 +339,7 @@ public class BorderLayout extends Layout {
                 case CENTER_BEHAVIOR_TOTAL_BELOW: {
                     w = targetWidth;
                     h = targetHeight;
-                    x = s.getPadding(target.isRTL(), Component.LEFT);
+                    x = s.getPadding(rtl, Component.LEFT);
                     y = s.getPadding(false, Component.TOP);;
                 }
             } 
