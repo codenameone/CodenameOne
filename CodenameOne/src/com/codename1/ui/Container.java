@@ -2214,9 +2214,20 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      */
     public void animateHierarchyAndWait(final int duration) {
-        animateHierarchy(duration, true, 255);
+        animateHierarchy(duration, true, 255, true);
     }
 
+    /**
+     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
+     * a more visual form of animation. 
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @return the animation object that should be added to the animation manager
+     */
+    public ComponentAnimation createAnimateHierarchy(final int duration) {
+        return animateHierarchy(duration, false, 255, false);
+    }
+    
     /**
      * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
      * a more visual form of animation
@@ -2224,7 +2235,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      */
     public void animateHierarchy(final int duration) {
-        animateHierarchy(duration, false, 255);
+        animateHierarchy(duration, false, 255, true);
     }
 
     /**
@@ -2235,9 +2246,21 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      */
     public void animateHierarchyFadeAndWait(final int duration, int startingOpacity) {
-        animateHierarchy(duration, true, startingOpacity);
+        animateHierarchy(duration, true, startingOpacity, true);
     }
 
+    /**
+     * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
+     * a more visual form of animation. 
+     *
+     * @param duration the duration in milliseconds for the animation
+     * @param startingOpacity the initial opacity to give to the animated components
+     * @return the animation object that should be added to the animation manager
+     */
+    public ComponentAnimation createAnimateHierarchyFade(final int duration, int startingOpacity) {
+        return animateHierarchy(duration, false, startingOpacity, false);
+    }
+    
     /**
      * Animates a pending hierarchy of components into place, this effectively replaces revalidate with 
      * a more visual form of animation
@@ -2246,7 +2269,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param startingOpacity the initial opacity to give to the animated components
      */
     public void animateHierarchyFade(final int duration, int startingOpacity) {
-        animateHierarchy(duration, false, startingOpacity);
+        animateHierarchy(duration, false, startingOpacity, true);
     }
 
     /**
@@ -2329,7 +2352,7 @@ public class Container extends Component implements Iterable<Component>{
      * @return the animation object that should be added to the animation manager
      */
     public ComponentAnimation createAnimateLayout(final int duration) {
-        return animateLayout(duration, false, 255, true);
+        return animateLayout(duration, false, 255, false);
     }
     
     /**
@@ -2488,7 +2511,7 @@ public class Container extends Component implements Iterable<Component>{
      *
      * @param duration the duration in milliseconds for the animation
      */
-    private void animateHierarchy(final int duration, boolean wait, int opacity) {
+    private ComponentAnimation animateHierarchy(final int duration, boolean wait, int opacity, boolean add) {
         setShouldCalcPreferredSize(true);
         enableLayoutOnPaint = false;
         dontRecurseContainer = true;
@@ -2531,11 +2554,14 @@ public class Container extends Component implements Iterable<Component>{
         });
         setAnimOpacity(opacity, 255, a, componentCount, duration);
         a.animatedComponents = comps;
-        if(wait) {
-            getAnimationManager().addAnimationAndBlock(a);
-        } else {
-            getAnimationManager().addAnimation(a);
+        if(add) {
+            if(wait) {
+                getAnimationManager().addAnimationAndBlock(a);
+            } else {
+                getAnimationManager().addAnimation(a);
+            }
         }
+        return a;
     }
     
     /**
