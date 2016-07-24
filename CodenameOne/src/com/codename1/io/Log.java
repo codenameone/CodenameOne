@@ -328,7 +328,9 @@ public class Log {
             initialized  = true;
             try {
                 InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/cn1-version-numbers");
-                print("Codename One revisions: " + Util.readToString(is), INFO);
+                if(is != null) {
+                    print("Codename One revisions: " + Util.readToString(is), INFO);
+                }
             } catch(IOException err) {
                 // shouldn't happen...
                 err.printStackTrace();
