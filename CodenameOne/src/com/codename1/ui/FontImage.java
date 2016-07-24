@@ -5044,7 +5044,12 @@ public class FontImage extends Image {
     }
 
     Image scaledImpl(int width, int height) {
-        return createFixed(text, fnt, color, width, height);
+        FontImage i = createFixed(text, fnt, color, width, height);
+        i.backgroundColor = backgroundColor;
+        i.backgroundOpacity = backgroundOpacity;
+        i.padding = padding;
+        i.rotated = rotated;
+        return i;
     }
 
     /**
