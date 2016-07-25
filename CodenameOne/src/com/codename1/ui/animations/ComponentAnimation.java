@@ -23,6 +23,8 @@
 
 package com.codename1.ui.animations;
 
+import java.util.ArrayList;
+
 /**
  * Parent class representing an animation object within the AnimationManager queue.
  *
@@ -32,6 +34,19 @@ public abstract class ComponentAnimation {
     private Object notifyLock;
     private Runnable onCompletion;
     private int step = -1;
+    private ArrayList<Runnable> post;
+
+    /**
+     * Invokes the runnable just as the animation finishes thus allowing cleanup of the UI for the upcoming 
+     * animations, this is useful when running a complex sequence
+     * @param r the runnable to call when the animation is done
+     */
+    public void addOnCompleteCall(Runnable r) {
+        if(post == null) {
+            post = new ArrayList<Runnable>();
+        }
+        post.add(r);        
+    }
     
     /**
      * Step mode allows stepping thru an animation one frame at a time, e.g. when scrolling down an animation
@@ -86,6 +101,11 @@ public abstract class ComponentAnimation {
             }
             if(onCompletion != null) {
                 onCompletion.run();
+            }
+            if(post != null) {
+                for(Runnable p : post) {
+                    p.run();
+                }
             }
         }
     }
