@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
@@ -222,7 +223,7 @@ public class ToastBar {
         /**
          * Optional progress for the task.  (Not tested or implemented yet).
          */
-        private int progress=-1;
+        private int progress=-2;
         
         /**
          * Optional icon to show in the {@code ToastBar}.  (Not tested or implemented yet).
@@ -279,8 +280,8 @@ public class ToastBar {
         }
         
         /**
-         * Sets the progress (1..100) that should be displayed in the progress bar
-         * for this status.  (Not tested or used yet).
+         * Sets the progress (-1..100) that should be displayed in the progress bar
+         * for this status.  When set to -1 it will act as an infinite progress
          * @param progress 
          */
         public void setProgress(int progress) {
@@ -497,8 +498,8 @@ public class ToastBar {
                         c.removeComponent(c.progressLabel);
                     }
                 }
-                c.progressBar.setVisible(s.getProgress() >= 0);
-                if (s.getProgress() >= 0) {
+                c.progressBar.setVisible(s.getProgress() >= -1);
+                if (s.getProgress() >= -1) {
                     if (!c.contains(c.progressBar)) {
                         c.addComponent(BorderLayout.SOUTH, c.progressBar);
                     }
@@ -790,11 +791,11 @@ public class ToastBar {
      * @param onSuccess invoked when the connection request completes, can be null
      * @param onError invoked on case of an error, can be null
      */
-    /*public static void showConnectionProgress(String message, final ConnectionRequest cr, 
+    public static void showConnectionProgress(String message, final ConnectionRequest cr, 
             final SuccessCallback<NetworkEvent> onSuccess, final FailureCallback<NetworkEvent> onError) {
         final ToastBar.Status s = ToastBar.getInstance().createStatus();
-        s.setShowProgressIndicator(true);
         s.setProgress(-1);
+        s.setMessage(message);
         s.show();
         final ActionListener[] progListener = new ActionListener[1];
         final ActionListener<NetworkEvent> errorListener = new ActionListener<NetworkEvent>() {
@@ -827,11 +828,10 @@ public class ToastBar {
                         break;
                     case NetworkEvent.PROGRESS_TYPE_INPUT:
                     case NetworkEvent.PROGRESS_TYPE_OUTPUT:
-                        int currentLength = evt.getLength();
+                        int currentLength = cr.getContentLength();
                         if(currentLength > 0) {
-                            float sentReceived = evt.getSentReceived();
-                            sentReceived = sentReceived / currentLength;
-                            float prog = (sentReceived + soFar) / ((float)currentLength)  * 100f;
+                            int sentReceived = evt.getSentReceived();
+                            float prog = ((float)sentReceived) / ((float)currentLength)  * 100f;
                             s.setProgress((int)prog);
                         } else {
                             s.setProgress(-1);
@@ -840,5 +840,5 @@ public class ToastBar {
             }
         };
         NetworkManager.getInstance().addProgressListener(progListener[0]);
-    }*/
+    }
 }
