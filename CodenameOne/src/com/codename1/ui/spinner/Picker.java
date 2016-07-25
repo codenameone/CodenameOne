@@ -58,7 +58,7 @@ public class Picker extends Button {
     private Object value = new Date();
     private boolean showMeridiem;
     private Object metaData;
-    private Object renderingPrototype;
+    private Object renderingPrototype = "XXXXXXXXXXXXXX";
     private SimpleDateFormat formatter;
     private int preferredPopupWidth;
     private int preferredPopupHeight;
