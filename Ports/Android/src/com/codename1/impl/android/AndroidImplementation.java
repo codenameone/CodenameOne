@@ -7094,6 +7094,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     static final String BACKGROUND_FETCH_NOTIFICATION_ID="$$$CN1_BACKGROUND_FETCH$$$";
     
+    
+    /**
+     * Static reference to the BackgroundFetch object.  Usually this will just be accessible
+     * via activity.getApp(), but if running in background, this might not be initialized.
+     */
+    static BackgroundFetch backgroundFetch;
+    
     /**
      * Calls the background fetch callback.  If the app is in teh background, this will
      * check to see if the lifecycle class implements the {@link com.codename1.background.BackgroundFetch}
@@ -7101,11 +7108,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * method.
      */
     public static void performBackgroundFetch() {
+        
         if (Display.getInstance().isMinimized()) {
             // By definition, background fetch should only occur if the app is minimized.
             // This keeps it consistent with the iOS implementation that doesn't have a 
             // choice
-            
+            final boolean[] complete = new boolean[1];
+            final Object lock = new Object();
             final Object lifecycle = activity.getApp();
 
             if (lifecycle instanceof BackgroundFetch) {
@@ -7117,11 +7126,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             public void onSucess(Boolean value) {
                                 // On Android the OS doesn't care whether it worked or not
                                 // So we'll just consume this.
+                                synchronized (lock) {
+                                    complete[0] = true;
+                                    lock.notify();
+                                }
                             }
 
                             @Override
                             public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
                                 com.codename1.io.Log.e(err);
+                                synchronized (lock) {
+                                    complete[0] = true;
+                                    lock.notify();
+                                }
                             }
 
                         });
@@ -7129,6 +7146,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 });
                 
             }
+            
+            while (!complete[0]) {
+                synchronized (lock) {
+                    try {
+                        lock.wait(30000);
+                    } catch (Exception ex){}
+                }
+            }
+            
         }
     }
     
@@ -7186,6 +7212,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Intent contentIntent = new Intent();
         contentIntent.setComponent(activity.getComponentName());
         contentIntent.putExtra("LocalNotificationID", notif.getId());
+        if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
+            if (activity.getApp() != null) {
+                Intent bgActivityIntent = new Intent(activity, CodenameOneBackgroundFetchActivity.class);
+                bgActivityIntent.setData(Uri.parse("http://a.com/a?" + CodenameOneBackgroundFetchActivity.class.getName()));
+                notificationIntent.putExtra("backgroundFetchClass", activity.getApp().getClass().getName());
+                notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, PendingIntent.getActivity(activity, 0, bgActivityIntent, PendingIntent.FLAG_UPDATE_CURRENT));
+
+            } else {
+                Log.d("BACKGROUND FETCH", "App is null so we can't add a background fetch notification");
+            }
+        }
         PendingIntent pendingContentIntent = PendingIntent.getActivity(activity, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION_INTENT, pendingContentIntent);
