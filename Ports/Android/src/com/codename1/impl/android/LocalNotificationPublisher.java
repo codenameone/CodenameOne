@@ -31,8 +31,12 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.util.Log;
 import static com.codename1.impl.android.AndroidImplementation.activity;
+
+import com.codename1.background.BackgroundFetch;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.Display;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.logging.Level;
@@ -46,6 +50,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
 
     public static String NOTIFICATION = "notification";
     public static String NOTIFICATION_INTENT = "notification-intent";
+    public static String BACKGROUND_FETCH_INTENT = "background-fetch-intent";
 
     public void onReceive(Context context, Intent intent) {
         //Fire the notification to the display
@@ -57,9 +62,35 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         LocalNotification notif = AndroidImplementation.createNotificationFromBundle(b);
 
         if (AndroidImplementation.BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
-            // We piggy back onto the local notifications functionality to do background fetch
-            // since it is so similar.
-            AndroidImplementation.performBackgroundFetch();
+            
+            if (!Display.isInitialized()) {
+                try {
+                    // We piggy back onto the local notifications functionality to do background fetch
+                    // since it is so similar.
+                    String fetchClass = extras.getString("backgroundFetchClass");
+                    if (fetchClass != null) {
+                        try {
+                            AndroidImplementation.backgroundFetch = (BackgroundFetch) Class.forName(fetchClass).newInstance();
+
+                        } catch (Exception e) {
+                            Log.e("Codename One", "background fetch error", e);
+                        }
+                    }
+                    PendingIntent backgroundFetchIntent = extras.getParcelable(BACKGROUND_FETCH_INTENT);
+                    backgroundFetchIntent.send();
+                } catch (PendingIntent.CanceledException ex) {
+                    Logger.getLogger(LocalNotificationPublisher.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            } else {
+                try {
+                    AndroidImplementation.performBackgroundFetch();
+                } catch (Exception ex) {
+                    com.codename1.io.Log.e(ex);
+                }
+            }
+            
+            
+            
         } else {
             Notification notification = createAndroidNotification(context, notif, content);
             notification.when = System.currentTimeMillis();
