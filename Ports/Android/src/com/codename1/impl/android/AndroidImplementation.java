@@ -6977,8 +6977,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * check to see if the lifecycle class implements the {@link com.codename1.background.BackgroundFetch}
      * interface.  If it does, it will execute its {@link com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback) }
      * method.
+     * @param blocking True if this should block until it is complete.
      */
-    public static void performBackgroundFetch() {
+    public static void performBackgroundFetch(boolean blocking) {
         
         if (Display.getInstance().isMinimized()) {
             // By definition, background fetch should only occur if the app is minimized.
@@ -7018,7 +7019,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 
             }
             
-            while (!complete[0]) {
+            while (!complete[0] && blocking) {
                 synchronized (lock) {
                     try {
                         lock.wait(30000);
