@@ -83,7 +83,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
                 }
             } else {
                 try {
-                    AndroidImplementation.performBackgroundFetch();
+                    AndroidImplementation.performBackgroundFetch(false);
                 } catch (Exception ex) {
                     com.codename1.io.Log.e(ex);
                 }
