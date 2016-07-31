@@ -1355,9 +1355,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     // set all pixels to transparent white to solve http://code.google.com/p/codenameone/issues/detail?id=923
-    for(int iter = 0 ; iter < width * height ; iter++) {
+    // This caused a regression in masking for some reason...
+    /*for(int iter = 0 ; iter < width * height ; iter++) {
         arr[iter] = 0xffffff;
-    }
+    }*/
     UIImage* img = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGColorSpaceRef coloSpaceRgb = CGColorSpaceCreateDeviceRGB();
     CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4,
