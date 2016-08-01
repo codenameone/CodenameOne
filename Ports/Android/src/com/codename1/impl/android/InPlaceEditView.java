@@ -882,10 +882,12 @@ public class InPlaceEditView extends FrameLayout{
             showVirtualKeyboard(false);
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
-        if(reason == REASON_IME_ACTION &&
-            (EditorInfo.IME_ACTION_DONE == imo || EditorInfo.IME_ACTION_SEARCH == imo ||  EditorInfo.IME_ACTION_SEND == imo || EditorInfo.IME_ACTION_GO == imo) &&
-                mEditText.mTextArea instanceof TextField ){
-            ((TextField)mEditText.mTextArea).fireDoneEvent();
+        if (reason == REASON_IME_ACTION
+                && ((TextField) mEditText.mTextArea).getDoneListener() != null
+                && ((imo & EditorInfo.IME_ACTION_DONE) != 0 || (imo & EditorInfo.IME_ACTION_SEARCH) != 0 || (imo & EditorInfo.IME_ACTION_SEND) != 0 || (imo & EditorInfo.IME_ACTION_GO) != 0)
+                && mEditText.mTextArea instanceof TextField) {
+            ((TextField) mEditText.mTextArea).fireDoneEvent();
+            showVirtualKeyboard(false);
         }
 
         // Call this in onComplete instead
