@@ -2290,9 +2290,10 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      * @param startingOpacity the initial opacity to give to the animated components
      * @return the animation object that should be added to the animation manager
+     * @deprecated this was added by mistake!
      */
     public ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
-        return animateLayout(duration, true, startingOpacity, false);
+        return null;
     }
 
     /**
