@@ -2203,12 +2203,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return type;
     }
     
-    public void execute(String url, ActionListener response) {
-        if (response != null) {
-            callback = new EventDispatcher();
-            callback.addListener(response);
-        }
-
+    private Intent createIntentForURL(String url) {
         Intent intent;
         Uri uri;
         try {
@@ -2216,7 +2211,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
                 if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
-                    return;
+                    return null;
                 }
                 url = fixAttachmentPath(url);
                 intent = new Intent();
@@ -2233,6 +2228,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     intent.setData(uri);
                 }
             }
+            return intent;
+        } catch(Exception err) {
+            com.codename1.io.Log.e(err);
+            return null;
+        }
+    }
+
+    @Override
+    public Boolean canExecute(String url) {
+        try {
+            Intent it = createIntentForURL(url);
+            if(it == null) {
+                return false;
+            }
+            final PackageManager mgr = activity.getPackageManager();
+            List<ResolveInfo> list = mgr.queryIntentActivities(it, PackageManager.MATCH_DEFAULT_ONLY);
+            return list.size() > 0;            
+        } catch(Exception err) {
+            com.codename1.io.Log.e(err);
+            return false;
+        }
+    }
+
+    
+    public void execute(String url, ActionListener response) {
+        if (response != null) {
+            callback = new EventDispatcher();
+            callback.addListener(response);
+        }
+
+        try {
+            Intent intent = createIntentForURL(url);
+            if(intent == null) {
+                return;
+            }
             if(response != null){
                 activity.startActivityForResult(intent, IntentResultListener.URI_SCHEME);
             }else{
@@ -2240,6 +2270,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             return;
         } catch (Exception ex) {           
+            com.codename1.io.Log.e(ex);
         }
         
         try {
