@@ -24,7 +24,7 @@ package com.codename1.impl.android;
 
 import android.os.Bundle;
 import android.util.Log;
-import com.codename1.impl.android.CodenameOneActivity;
+import com.codename1.background.BackgroundFetch;
 import com.codename1.ui.Display;
 
 /**
@@ -32,7 +32,6 @@ import com.codename1.ui.Display;
  * @author Steve
  */
 public class CodenameOneBackgroundFetchActivity extends CodenameOneActivity{
-    private boolean shouldDeinit;
     public CodenameOneBackgroundFetchActivity() {
     }
 
@@ -47,26 +46,28 @@ public class CodenameOneBackgroundFetchActivity extends CodenameOneActivity{
     protected void onStart() {
         super.onStart();
         if(!Display.isInitialized()) {
-            Display.init(this);
-            shouldDeinit = true;
+            // Since callingStartActivity() on this activity automatically launches
+            // the CodenameOneStub (the main activity), the Display should be initialized by this point.
+            // It it is not initialized, then this is an exceptional case.  Just log it so we
+            // know it isn't initializing
+            Log.d("Codename One", "Display not initialized in CodenameOneBackgroundFetchActivity.  Skipping background fetch");
+            finish();
+            return;
         }
+        
         try {
-            AndroidImplementation.performBackgroundFetch(true);
+            AndroidImplementation.performBackgroundFetch();
         } catch (Exception e) {
             Log.e("Codename One", "Background fetch error", e);
         } finally {
             finish();
         }
-
-
     }
 
     protected void onDestroy() {
         Log.d("CN1", "end CodenameOneBackgroundFetchActivity");
         super.onDestroy();
-        if (shouldDeinit) {
-            Display.getInstance().callSerially(new Runnable() { public void run() { Display.deinitialize();} });
-        }
+        
     }
 
     public boolean hasUI(){

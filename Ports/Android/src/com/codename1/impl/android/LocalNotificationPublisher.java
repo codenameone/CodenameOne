@@ -62,35 +62,16 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         LocalNotification notif = AndroidImplementation.createNotificationFromBundle(b);
 
         if (AndroidImplementation.BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
-            
-            if (!Display.isInitialized()) {
+            PendingIntent backgroundFetchIntent = extras.getParcelable(BACKGROUND_FETCH_INTENT);
+            if (backgroundFetchIntent != null) {
                 try {
-                    // We piggy back onto the local notifications functionality to do background fetch
-                    // since it is so similar.
-                    String fetchClass = extras.getString("backgroundFetchClass");
-                    if (fetchClass != null) {
-                        try {
-                            AndroidImplementation.backgroundFetch = (BackgroundFetch) Class.forName(fetchClass).newInstance();
-
-                        } catch (Exception e) {
-                            Log.e("Codename One", "background fetch error", e);
-                        }
-                    }
-                    PendingIntent backgroundFetchIntent = extras.getParcelable(BACKGROUND_FETCH_INTENT);
                     backgroundFetchIntent.send();
-                } catch (PendingIntent.CanceledException ex) {
-                    Logger.getLogger(LocalNotificationPublisher.class.getName()).log(Level.SEVERE, null, ex);
+                } catch (Exception ex) {
+                    Log.e("Codename One", "Failed to send BackgroundFetchHandler intent", ex);
                 }
             } else {
-                try {
-                    AndroidImplementation.performBackgroundFetch(false);
-                } catch (Exception ex) {
-                    com.codename1.io.Log.e(ex);
-                }
+                Log.d("Codename One", "BackgroundFetch intent was null");
             }
-            
-            
-            
         } else {
             Notification notification = createAndroidNotification(context, notif, content);
             notification.when = System.currentTimeMillis();
