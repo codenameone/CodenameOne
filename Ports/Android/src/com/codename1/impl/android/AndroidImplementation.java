@@ -87,6 +87,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
@@ -6967,16 +6968,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     
     /**
-     * Static reference to the BackgroundFetch object.  Usually this will just be accessible
-     * via activity.getApp(), but if running in background, this might not be initialized.
-     */
-    static BackgroundFetch backgroundFetch;
-    
-    /**
      * Calls the background fetch callback.  If the app is in teh background, this will
      * check to see if the lifecycle class implements the {@link com.codename1.background.BackgroundFetch}
      * interface.  If it does, it will execute its {@link com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback) }
      * method.
+     * @param blocking True if this should block until it is complete.
      */
     public static void performBackgroundFetch() {
         
@@ -6986,12 +6982,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // choice
             final boolean[] complete = new boolean[1];
             final Object lock = new Object();
-            final Object lifecycle = activity.getApp();
+            final BackgroundFetch bgFetchListener = instance.getBackgroundFetchListener();
 
-            if (lifecycle instanceof BackgroundFetch) {
+            if (bgFetchListener != null) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        ((BackgroundFetch)lifecycle).performBackgroundFetch(System.currentTimeMillis()+25*60*1000, new Callback<Boolean>() {
+                        bgFetchListener.performBackgroundFetch(System.currentTimeMillis()+25*60*1000, new Callback<Boolean>() {
 
                             @Override
                             public void onSucess(Boolean value) {
@@ -7018,13 +7014,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 
             }
             
-            while (!complete[0]) {
-                synchronized (lock) {
-                    try {
-                        lock.wait(30000);
-                    } catch (Exception ex){}
-                }
-            }
             
         }
     }
@@ -7072,27 +7061,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
     
-    
+    BackgroundFetch getBackgroundFetchListener() {
+        if (activity != null && activity.getApp() instanceof BackgroundFetch) {
+            return (BackgroundFetch)activity.getApp();
+        } else {
+            return null;
+        }
+    }
     
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
         
-        Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
+        final Intent notificationIntent = new Intent(activity, LocalNotificationPublisher.class);
         notificationIntent.setAction(activity.getApplicationInfo().packageName + "." + notif.getId());        
         notificationIntent.putExtra(LocalNotificationPublisher.NOTIFICATION, createBundleFromNotification(notif));
         
         Intent contentIntent = new Intent();
         contentIntent.setComponent(activity.getComponentName());
         contentIntent.putExtra("LocalNotificationID", notif.getId());
-        if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
-            if (activity.getApp() != null) {
-                Intent bgActivityIntent = new Intent(activity, CodenameOneBackgroundFetchActivity.class);
-                bgActivityIntent.setData(Uri.parse("http://a.com/a?" + CodenameOneBackgroundFetchActivity.class.getName()));
-                notificationIntent.putExtra("backgroundFetchClass", activity.getApp().getClass().getName());
-                notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, PendingIntent.getActivity(activity, 0, bgActivityIntent, PendingIntent.FLAG_UPDATE_CURRENT));
+        if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId()) && getBackgroundFetchListener() != null) {
+            Context context = AndroidNativeUtil.getActivity();
 
-            } else {
-                Log.d("BACKGROUND FETCH", "App is null so we can't add a background fetch notification");
-            }
+            Intent intent = new Intent(context, BackgroundFetchHandler.class);
+            //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
+            //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
+            //an ugly workaround to the putExtra bug 
+            intent.setData(Uri.parse("http://a.com/a?" + getBackgroundFetchListener().getClass().getName()));
+            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT);
+            notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
+
         }
         PendingIntent pendingContentIntent = PendingIntent.getActivity(activity, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
