@@ -181,7 +181,7 @@ public class FacebookImpl extends FacebookConnect {
     public boolean hasPublishPermissions() {
         AccessToken fbToken = AccessToken.getCurrentAccessToken();
         if (fbToken != null && !fbToken.isExpired()) {
-            return fbToken.getPermissions().contains(PUBLISH_PERMISSIONS);
+            return fbToken.getPermissions().contains(PUBLISH_PERMISSIONS.get(0));
         }
         return false;
     }
