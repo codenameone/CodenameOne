@@ -22,16 +22,16 @@
  */
 package com.codename1.impl.android;
 
+import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
-import com.codename1.background.BackgroundFetch;
 import com.codename1.ui.Display;
 
 /**
  * Activity for Background Fetch
  * @author Steve
  */
-public class CodenameOneBackgroundFetchActivity extends CodenameOneActivity{
+public class CodenameOneBackgroundFetchActivity extends Activity {
     public CodenameOneBackgroundFetchActivity() {
     }
 
