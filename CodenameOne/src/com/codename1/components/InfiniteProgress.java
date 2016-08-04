@@ -126,7 +126,11 @@ public class InfiniteProgress extends Component {
      */
     protected void deinitialize() {
         super.deinitialize();
-        getComponentForm().deregisterAnimated(this);
+        Form f = getComponentForm();
+        if(f == null) {
+            f = Display.getInstance().getCurrent();
+        } 
+        f.deregisterAnimated(this);
     }
     
     /**
