@@ -181,7 +181,7 @@ public abstract class InfiniteContainer extends Container {
      * @return this is set to true for compatibility with older versions of the infinite container
      */
     protected boolean isAsync() {
-        return true;
+        return false;
     }
     
     /**

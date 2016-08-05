@@ -5702,7 +5702,7 @@ public abstract class CodenameOneImplementation {
      * For use by implementations, stop receiving push notifications from the server
      */
     public static void deregisterPushFromServer() {
-        long i = Preferences.get("push_id", (long)-1);
+        /*long i = Preferences.get("push_id", (long)-1);
         if(i > -1) {
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
@@ -5712,7 +5712,7 @@ public abstract class CodenameOneImplementation {
             NetworkManager.getInstance().addToQueue(r);
             Preferences.delete("push_id");
             Preferences.delete("push_key");
-        }
+        }*/
     }
     
     /**
