@@ -12,8 +12,11 @@ import android.util.Log;
 import com.codename1.ui.Display;
 
 /**
- *
+ * DEPRECATED!  We no longer use activities for performing background functions.  These 
+ * are now handled directly in services.
  * @author Chen
+ * @deprecated
+ * @see BackgroundLocationHandler
  */
 public class CodenameOneBackgroundLocationActivity extends Activity {
 

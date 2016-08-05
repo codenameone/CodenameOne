@@ -32,7 +32,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Log;
-import static com.codename1.impl.android.AndroidImplementation.activity;
 
 import com.codename1.background.BackgroundFetch;
 import com.codename1.notifications.LocalNotification;
@@ -86,10 +85,11 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
     }
 
     private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content) {
-        int smallIcon = activity.getResources().getIdentifier("ic_stat_notify", "drawable", activity.getApplicationInfo().packageName);
-        int icon = activity.getResources().getIdentifier("icon", "drawable", activity.getApplicationInfo().packageName);
+        Context ctx = AndroidImplementation.getContext();
+        int smallIcon = ctx.getResources().getIdentifier("ic_stat_notify", "drawable", ctx.getApplicationInfo().packageName);
+        int icon = AndroidImplementation.getContext().getResources().getIdentifier("icon", "drawable", ctx.getApplicationInfo().packageName);
 
-        Notification.Builder builder = new Notification.Builder(activity);
+        Notification.Builder builder = new Notification.Builder(ctx);
         builder.setContentTitle(localNotif.getAlertTitle());
         builder.setContentText(localNotif.getAlertBody());
         builder.setAutoCancel(true);
@@ -119,7 +119,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         String sound = localNotif.getAlertSound();
         if (sound != null && sound.length() > 0) {
             sound = sound.toLowerCase();
-            builder.setSound(android.net.Uri.parse("android.resource://"+activity.getApplicationInfo().packageName+"/raw"+sound.substring(0, sound.indexOf("."))));
+            builder.setSound(android.net.Uri.parse("android.resource://"+ctx.getApplicationInfo().packageName+"/raw"+sound.substring(0, sound.indexOf("."))));
         }
         Notification n = builder.build();
         n.icon = icon;

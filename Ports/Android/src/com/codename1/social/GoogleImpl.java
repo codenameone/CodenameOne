@@ -105,7 +105,9 @@ public class GoogleImpl extends GoogleConnect implements
     }
 
     public void onConnectionFailed(final ConnectionResult cr) {
-
+        if (AndroidNativeUtil.getActivity() == null) {
+            return;
+        }
         final CodenameOneActivity main = (CodenameOneActivity) AndroidNativeUtil.getActivity();
 
         if (!mIntentInProgress && cr.hasResolution()) {
@@ -147,7 +149,7 @@ public class GoogleImpl extends GoogleConnect implements
     }
 
     public void onResume() {
-        Context ctx = AndroidNativeUtil.getActivity();
+        Context ctx = AndroidNativeUtil.getContext();
         if (mGoogleApiClient == null) {
             mGoogleApiClient = new GoogleApiClient.Builder(ctx)
                     .addConnectionCallbacks(this)
@@ -181,7 +183,7 @@ public class GoogleImpl extends GoogleConnect implements
             String token = null;
 
             try {
-                Context ctx = AndroidNativeUtil.getActivity();
+                Context ctx = AndroidNativeUtil.getContext();
                 token = GoogleAuthUtil.getToken(
                         ctx,
                         Plus.AccountApi.getAccountName(mGoogleApiClient),

@@ -239,7 +239,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        AndroidImplementation.activity = this;
+        AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
         waitingForResult = false;
         background = false;
@@ -283,7 +283,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        AndroidImplementation.activity = this;
+        AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onCreate(savedInstanceState);
 
         if (android.os.Build.VERSION.SDK_INT >= 11) {

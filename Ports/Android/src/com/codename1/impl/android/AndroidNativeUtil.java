@@ -23,6 +23,7 @@
 package com.codename1.impl.android;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -129,13 +130,20 @@ public class AndroidNativeUtil {
      * Get the main activity
      */ 
     public static Activity getActivity(){
-        return AndroidImplementation.activity;
+        return AndroidImplementation.getActivity();
+    }
+    
+    public static Context getContext() {
+        return AndroidImplementation.getContext();
     }
     
     /**
      * Start an intent for result
      */ 
     public static void startActivityForResult(Intent intent, final IntentResultListener listener){
+        if (getActivity() == null) {
+            throw new RuntimeException("Cannot start activity for result when running in background.");
+        }
         final CodenameOneActivity act = (CodenameOneActivity) getActivity();
         act.startActivityForResult(intent, 2000);
         act.setIntentResultListener(new IntentResultListener() {
