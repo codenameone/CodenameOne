@@ -958,6 +958,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             offset = 0;
         }
         NativeImage nimg = (NativeImage)nativeImage;
+        if(nimg.scaled) {
+            Object mute = createMutableImage(nimg.width, nimg.height, 0);
+            Object graph = getNativeGraphics(mute);
+            drawImage(graph, nimg, 0, 0);
+            nimg = (NativeImage)mute;
+        }
         imageRgbToIntArray(nimg.peer, arr, x, y, width, height, nimg.width, nimg.height);
     }
 
@@ -1143,6 +1149,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object scale(Object nativeImage, int width, int height) {
         NativeImage original = (NativeImage)nativeImage;
         NativeImage n = new NativeImage("Scaled image from peer: " + original.peer + " width " + width + " height " + height);
+        n.scaled = true;
         n.peer = original.peer;
         n.width = width;
         n.height = height;
@@ -4435,6 +4442,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     class NativeImage {
+        boolean scaled;
         NativeGraphics child;
         int width;
         int height;
