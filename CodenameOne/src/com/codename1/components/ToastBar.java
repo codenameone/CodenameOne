@@ -797,9 +797,11 @@ public class ToastBar {
         s.setProgress(-1);
         s.setMessage(message);
         s.show();
-        final ActionListener[] progListener = new ActionListener[1];
+        final boolean[] error = new boolean[1];
+         final ActionListener[] progListener = new ActionListener[1];
         final ActionListener<NetworkEvent> errorListener = new ActionListener<NetworkEvent>() {
             public void actionPerformed(NetworkEvent evt) {
+                error[0] = true;
                 s.clear();
                 NetworkManager.getInstance().removeErrorListener(this);
                 if(progListener[0] != null) {
@@ -819,7 +821,7 @@ public class ToastBar {
                         NetworkManager.getInstance().removeErrorListener(errorListener);
                         NetworkManager.getInstance().removeProgressListener(this);
                         s.clear();
-                        if(onSuccess != null) {
+                        if(onSuccess != null && !error[0]) {
                             onSuccess.onSucess(evt);
                         }
                         break;
