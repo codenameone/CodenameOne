@@ -593,7 +593,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();
-        getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        if (getActivity() != null) {
+            getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        } else {
+            metrics = getContext().getResources().getDisplayMetrics();
+        }
         switch (metrics.densityDpi) {
             case DisplayMetrics.DENSITY_LOW:
                 return Display.DENSITY_LOW;
