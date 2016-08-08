@@ -50,7 +50,7 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
     private String failMessage;
     
     public ZoozPurchase() {
-        activity = AndroidImplementation.activity;
+        activity = AndroidImplementation.getActivity();
         hasMarket= AndroidImplementation.hasAndroidMarket(activity);
     }
 

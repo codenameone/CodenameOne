@@ -26,6 +26,7 @@ import android.app.IntentService;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import com.codename1.background.BackgroundFetch;
 import com.codename1.ui.Display;
 
 /**
@@ -41,20 +42,25 @@ public class BackgroundFetchHandler extends IntentService {
     @Override
     protected void onHandleIntent(Intent intent) {
         String[] params = intent.getDataString().split("[?]");
-        if (!Display.isInitialized()) {            
-            Intent bgIntent = new Intent(getBaseContext(), CodenameOneBackgroundFetchActivity.class);
-            Bundle b = new Bundle();
-            b.putString("backgroundFetch", params[1]);
-            bgIntent.putExtras(b); //Put your id to your next Intent
-            bgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getApplication().startActivity(bgIntent);
-        } else {
-
+        if (!Display.isInitialized()) {
+            Display.init(this);
             try {
-                AndroidImplementation.performBackgroundFetch();
-            } catch (Exception e) {
-                Log.e("Codename One", "background fetch error", e);
+                Class cls = Class.forName(params[1]);
+                BackgroundFetch obj = (BackgroundFetch)cls.newInstance();
+                AndroidImplementation.backgroundFetchListener = obj;
+               
+            } catch (Exception ex) {
+                Log.d("CN1", "Failed to instantiate background fetch class "+params[1]);
+                ex.printStackTrace();
+                return;
             }
+
+        } 
+
+        try {
+            AndroidImplementation.performBackgroundFetch();
+        } catch (Exception e) {
+            Log.e("Codename One", "background fetch error", e);
         }
     }
 }

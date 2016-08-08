@@ -176,7 +176,7 @@ public class CodenameOneView {
 
                 @Override
                 public void actionPerformed(ActionEvent evt) {
-                    CodenameOneView.this.implementation.activity.runOnUiThread(new Runnable() {
+                    CodenameOneView.this.implementation.getActivity().runOnUiThread(new Runnable() {
 
                         @Override
                         public void run() {

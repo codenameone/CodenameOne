@@ -303,9 +303,14 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
             return;
         }
         //if the input is pan mode, there is no need to resize the screen
-        if((InPlaceEditView.isEditing() || InPlaceEditView.isKeyboardShowing()) && !InPlaceEditView.isInputResize()){
-            return;
-        }
+        // It turns out that this was only necessary because the InPlaceEditView was causing
+        // an onSizeChanged event to be fired when its visibility was set to GONE.
+        // Removing that visibility setting removes the erroneous resize event.
+        // Keeping this was problematic because sometimes a resize event is correct even when
+        // the keyboard is showing, e.g. when the device is rotated.
+        //if((InPlaceEditView.isEditing() || InPlaceEditView.isKeyboardShowing()) && !InPlaceEditView.isInputResize()){
+        //    return;
+        //}
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 cn1View.handleSizeChange(w, h);
