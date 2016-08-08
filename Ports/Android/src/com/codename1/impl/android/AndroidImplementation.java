@@ -657,7 +657,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
                     }
                 }
-                relativeLayout.removeAllViews();
+                if (relativeLayout != null) {
+                    relativeLayout.removeAllViews();
+                }
                 relativeLayout = null;
                 myView = null;
             }
