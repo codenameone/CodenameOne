@@ -567,7 +567,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isInitialized(){
-        if(myView == null){
+        if(getActivity() != null && myView == null){
             //if the view is null deinitialize the Display
             if(super.isInitialized()){
                 syncDeinitialize();
