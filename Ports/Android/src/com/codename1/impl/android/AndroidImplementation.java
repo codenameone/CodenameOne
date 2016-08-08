@@ -1426,6 +1426,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean areMutableImagesFast() {
+        if (myView == null) return false;
         return !myView.alwaysRepaintAll();
     }
     
@@ -2703,6 +2704,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                  * the native wrappers, we have to simulate key events to make
                  * Codename One move the focus to the next component.
                  */
+                if (myView == null) {
+                    return;
+                }
                 if (!myView.getAndroidView().isInTouchMode()) {
                     switch (lastDirectionalKeyEventReceivedByWrapper) {
                         case AndroidImplementation.DROID_IMPL_KEY_LEFT:
@@ -2905,6 +2909,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     lastDirectionalKeyEventReceivedByWrapper = CodenameOneView.internalKeyCodeTranslate(ke.getKeyCode());
 
                                     // move focus back to base view.
+                                    if (AndroidImplementation.this.myView == null) return false;
                                     AndroidImplementation.this.myView.getAndroidView().requestFocus();
 
                                     /**
@@ -2925,6 +2930,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             });
                             layoutWrapper.setOnTouchListener(new View.OnTouchListener() {
                                 public boolean onTouch(View v, MotionEvent me) {
+                                    if (myView == null) return false;
                                     return myView.getAndroidView().onTouchEvent(me);
                                 }
                             });
