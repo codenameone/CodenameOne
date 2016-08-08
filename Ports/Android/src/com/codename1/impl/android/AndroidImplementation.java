@@ -543,6 +543,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).init();
                 }
             }
+        } else {
+            /**
+             * translate our default font height depending on the screen density.
+             * this is required for new high resolution devices. otherwise
+             * everything looks awfully small.
+             *
+             * we use our default font height value of 16 and go from there. i
+             * thought about using new Paint().getTextSize() for this value but if
+             * some new version of android suddenly returns values already tranlated
+             * to the screen then we might end up with too large fonts. the
+             * documentation is not very precise on that.
+             */
+            final int defaultFontPixelHeight = 16;
+            this.defaultFontHeight = this.translatePixelForDPI(defaultFontPixelHeight);
+
+
+            this.defaultFont = (CodenameOneTextPaint) ((NativeFont) this.createFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM)).font;
         }
         HttpURLConnection.setFollowRedirects(false);
         CookieHandler.setDefault(null);
@@ -580,7 +597,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     public int translatePixelForDPI(int pixel) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, pixel,
-                getActivity().getResources().getDisplayMetrics());
+                getContext().getResources().getDisplayMetrics());
     }
 
     /**
@@ -642,7 +659,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
                     }
                 }
-                relativeLayout.removeAllViews();
+                if (relativeLayout != null) {
+                    relativeLayout.removeAllViews();
+                }
                 relativeLayout = null;
                 myView = null;
             }
