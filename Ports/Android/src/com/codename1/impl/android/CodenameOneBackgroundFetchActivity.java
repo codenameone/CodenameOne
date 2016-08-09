@@ -64,7 +64,7 @@ public class CodenameOneBackgroundFetchActivity extends Activity {
         }
         
         try {
-            AndroidImplementation.performBackgroundFetch();
+            AndroidImplementation.performBackgroundFetch(false);
         } catch (Exception e) {
             Log.e("Codename One", "Background fetch error", e);
         } finally {

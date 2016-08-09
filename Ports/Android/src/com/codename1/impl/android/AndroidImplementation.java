@@ -232,6 +232,75 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     private boolean superPeerMode = true;
 
+    /**
+     * Keeps track of running contexts.
+     * @see #startContext(Context)
+     * @see #stopContext(Context)
+     */
+    private static HashSet<Context> activeContexts = new HashSet<Context>();
+
+    /**
+     * A method to be called when a Context begins its execution.  This adds the
+     * context to the context set.  When the contenxt's execution completes, it should
+     * call {@link #stopContext} to clear up resources.
+     * @param ctx The context that is starting.
+     * @see #stopContext(Context)
+     */
+    public static void startContext(Context ctx) {
+
+        while (deinitializingEdt) {
+            // It is possible that deinitialize was called just before the
+            // last context was destroyed so there is a pending deinitialize
+            // working its way through the system.  Give it some time
+            // before forcing the deinitialize
+            System.out.println("Waiting for deinitializing to complete before starting a new initialization");
+            try {
+                Thread.sleep(30);
+
+            } catch (Exception ex){}
+        }
+        if (deinitializing && instance != null) {
+            instance.deinitialize();
+        }
+        synchronized(activeContexts) {
+            activeContexts.add(ctx);
+            if (instance == null) {
+                // If this is our first rodeo, just call Display.init() as that should
+                // be sufficient to set everything up.
+                Display.init(ctx);
+            } else {
+                // If we've initialized before, we should "re-initialize" the implementation
+                // Reinitializing will force views to be created even if the EDT was already
+                // running in background mode.
+                reinit(ctx);
+            }
+        }
+    }
+
+    /**
+     * Cleans up resources in the given context.  This method should be called by
+     * any Activity or Service that called startContext() when it started.
+     * @param ctx The context to stop.
+     *
+     * @see #startContext(Context)
+     */
+    public static void stopContext(Context ctx) {
+        synchronized(activeContexts) {
+            activeContexts.remove(ctx);
+            if (activeContexts.isEmpty()) {
+                // If we are the last context, we should deinitialize
+                syncDeinitialize();
+            } else {
+                if (instance != null && getActivity() != null) {
+                    // if this is an activity, then we should clean up
+                    // our UI resources anyways because the last context
+                    // to be cleaned up might not have access to the UI thread.
+                    instance.deinitialize();
+                }
+            }
+        }
+    }
+
     @Override
     public void setPlatformHint(String key, String value) {
         if(key.equals("platformHint.compatPaintMode")) {
@@ -440,6 +509,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     private static AndroidImplementation instance;
+    
+    public static AndroidImplementation getInstance() {
+        return instance;
+    }
+    
     public static void clearAppArg() {
         if (instance != null) {
             instance.setAppArg(null);
@@ -564,19 +638,62 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         HttpURLConnection.setFollowRedirects(false);
         CookieHandler.setDefault(null);
     }
-    
+
+
+
     @Override
     public boolean isInitialized(){
-        if(getActivity() != null && myView == null){
-            //if the view is null deinitialize the Display
-            if(super.isInitialized()){
-                syncDeinitialize();
-            }    
-            return false;
-        }
+// Removing the check for null view to prevent strange things from happening when
+// calling from a Service context.  
+//        if(getActivity() != null && myView == null){
+//            //if the view is null deinitialize the Display
+//            if(super.isInitialized()){
+//                syncDeinitialize();
+//            }    
+//            return false;
+//        }
         return super.isInitialized();
     }
-    
+
+    /**
+     * Reinitializes CN1.
+     * @param i Context to initialize it with.
+     *
+     * @see #startContext(Context)
+     */
+    private static void reinit(Object i) {
+        if (instance != null && ((i instanceof CodenameOneActivity) || instance.myView == null)) {
+            instance.init(i);
+        }
+        System.out.println("Calling Display.init(i) in reinit()");
+        Display.init(i);
+
+        // This is a hack to fix an issue that caused the screen to appear blank when
+        // the app is loaded from memory after being unloaded.
+
+        // This issue only seems to occur when the Activity had been unloaded
+        // so to test this you'll need to check the "Don't keep activities" checkbox under/
+        // Developer options.
+        // Developer options.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Display.getInstance().invokeAndBlock(new Runnable(){ public void run(){
+                    try {
+                        Thread.sleep(50);
+
+                    } catch (Exception ex){}
+                }});
+                if (!Display.isInitialized() || Display.getInstance().isMinimized()) {
+                    return;
+                }
+                Form cur = Display.getInstance().getCurrent();
+                if (cur != null) {
+                    cur.forceRevalidate();
+                }
+            }
+
+        });
+    }
     
     private static class InvalidateOptionsMenuImpl implements Runnable {
         private Activity activity;
@@ -640,40 +757,63 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /**
+     * A status flag to indicate that CN1 is in the process of deinitializing.
+     */
+    private static boolean deinitializing;
+    private static boolean deinitializingEdt;
+
     public static void syncDeinitialize() {
+        if (deinitializingEdt){
+            return;
+        }
+        deinitializingEdt = true; // This will get unset in {@link #deinitialize()}
+        deinitializing = true;
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
                 Display.deinitialize();
+                deinitializingEdt = false;
             }
         });
     }
     
     public void deinitialize() {
         //activity.getWindowManager().removeView(relativeLayout);
-        getActivity().runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (nativePeers.size() > 0) {
-                    for (int i = 0; i < nativePeers.size(); i++) {
-                        ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
+
+        if (getActivity() != null) {
+
+            Runnable r = new Runnable() {
+                public void run() {
+                    if (nativePeers.size() > 0) {
+                        for (int i = 0; i < nativePeers.size(); i++) {
+                            ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
+                        }
                     }
+                    if (relativeLayout != null) {
+                        relativeLayout.removeAllViews();
+                    }
+                    relativeLayout = null;
+                    myView = null;
+                    deinitializing = false;
                 }
-                if (relativeLayout != null) {
-                    relativeLayout.removeAllViews();
-                }
-                relativeLayout = null;
-                myView = null;
+            };
+
+            if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
+                r.run();
+            } else {
+                getActivity().runOnUiThread(r);
             }
-        });
+        } else {
+            deinitializing = false;
+        }
     }
     
     /**
      * init view. a lot of back and forth between this thread and the UI thread.
      */
     private void initSurface() {
-        
-        if (getActivity() != null) {
+        if (getActivity() != null && myView == null) {
             relativeLayout=  new RelativeLayout(getActivity());
             relativeLayout.setLayoutParams(new RelativeLayout.LayoutParams(
                     RelativeLayout.LayoutParams.FILL_PARENT,
@@ -1333,12 +1473,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new NativeFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM, paint);
     }
 
+
+    private AndroidGraphics nullGraphics;
+
+    private AndroidGraphics getNullGraphics() {
+        if (nullGraphics == null) {
+            Bitmap bitmap = Bitmap.createBitmap(getDisplayWidth()==0?100:getDisplayWidth(), getDisplayHeight()==0?100:getDisplayHeight(),
+                    Bitmap.Config.ARGB_8888);
+            nullGraphics = (AndroidGraphics) this.getNativeGraphics(bitmap);
+        }
+        return nullGraphics;
+    }
+
+
     @Override
     public Object getNativeGraphics() {
         if(myView != null){
+            nullGraphics = null;
             return myView.getGraphics();
         }else{
-            return null;
+            return getNullGraphics();
         }
     }
 
@@ -1450,6 +1604,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void repaint(Animation cmp) {
+        System.out.println("In repaint "+cmp+" "+myView);
         if(myView != null && myView.alwaysRepaintAll()) {
             if(cmp instanceof Component) {
                 Component c = (Component)cmp;
@@ -1471,6 +1626,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         }
+        System.out.println("Repainting "+cmp);
         super.repaint(cmp);
     }
     
@@ -2885,6 +3041,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (layoutWrapper != null && AndroidImplementation.this.relativeLayout != null) {
                         AndroidImplementation.this.relativeLayout.removeView(layoutWrapper);
                         AndroidImplementation.this.relativeLayout.requestLayout();
+                        layoutWrapper = null;
                     }
                     removed[0] = true;
                 }
@@ -2910,7 +3067,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 setPeerImage(null);
             }
         }
-        
+
         public void init(){
             if(superPeerMode || getActivity() == null) {
                 return;
@@ -3202,6 +3359,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             this.peer = peer;
             this.setLayoutParams(createMyLayoutParams(peer.getAbsoluteX(), peer.getAbsoluteY(),
                     peer.getWidth(), peer.getHeight()));
+            if (v.getParent() != null) {
+                ((ViewGroup)v.getParent()).removeView(v);
+            }
             this.addView(v, new RelativeLayout.LayoutParams(
                     RelativeLayout.LayoutParams.FILL_PARENT,
                     RelativeLayout.LayoutParams.FILL_PARENT));
@@ -7268,7 +7428,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * method.
      * @param blocking True if this should block until it is complete.
      */
-    public static void performBackgroundFetch() {
+    public static void performBackgroundFetch(boolean blocking) {
         
         if (Display.getInstance().isMinimized()) {
             // By definition, background fetch should only occur if the app is minimized.
@@ -7305,6 +7465,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         });
                     }
                 });
+                
+            }
+
+            while (blocking && !complete[0]) {
+                System.out.println("Waiting for background fetch to complete.  Make sure your background fetch handler calls onSuccess() or onError() in the callback when complete");
+                synchronized(lock) {
+                    try {
+                        lock.wait(1000);
+                    } catch (Exception ex){}
+                }
                 
             }
             

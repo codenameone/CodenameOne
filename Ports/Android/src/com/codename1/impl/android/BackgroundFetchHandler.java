@@ -35,6 +35,7 @@ import com.codename1.ui.Display;
  */
 public class BackgroundFetchHandler extends IntentService {
 
+    private boolean shouldStopContext=false;
     public BackgroundFetchHandler() {
         super("com.codename1.impl.android.BackgroundFetchHandler");
     }
@@ -43,7 +44,8 @@ public class BackgroundFetchHandler extends IntentService {
     protected void onHandleIntent(Intent intent) {
         String[] params = intent.getDataString().split("[?]");
         if (!Display.isInitialized()) {
-            Display.init(this);
+            shouldStopContext = true;
+            AndroidImplementation.startContext(this);
             try {
                 Class cls = Class.forName(params[1]);
                 BackgroundFetch obj = (BackgroundFetch)cls.newInstance();
@@ -58,9 +60,15 @@ public class BackgroundFetchHandler extends IntentService {
         } 
 
         try {
-            AndroidImplementation.performBackgroundFetch();
+            AndroidImplementation.performBackgroundFetch(shouldStopContext);
         } catch (Exception e) {
             Log.e("Codename One", "background fetch error", e);
         }
+
+        if (shouldStopContext) {
+            AndroidImplementation.stopContext(this);
+        }
     }
+
+
 }
