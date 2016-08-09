@@ -380,7 +380,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             if(isWriteRequest()) {
-            	progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
+                progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
                 output = impl.openOutputStream(connection);
                 if(shouldStop()) {
                     return;
@@ -1063,6 +1063,10 @@ public class ConnectionRequest implements IOProgressListener {
         }
         if(value == null || key == null){
             return;
+        }
+        if(post) {
+            // this needs to be implicit for a post request with arguments
+            setWriteRequest(true);
         }
         requestArguments.put(key, value);
     }
