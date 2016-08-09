@@ -1985,6 +1985,8 @@ public class Container extends Component implements Iterable<Component>{
      * 
      * @param scrollable whether the component should/could scroll on the 
      * X and Y axis
+     * 
+     * @deprecated use setScrollableX and setScrollableY instead. This method is deprecated since it breeds confusion and is often misunderstood.
      */
     public void setScrollable(boolean scrollable) {
         setScrollableX(scrollable);
