@@ -267,6 +267,7 @@ public class MultiButton extends Container {
             }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
+            emblem.setShowEvenIfBlank(true);
         }
     }
     
