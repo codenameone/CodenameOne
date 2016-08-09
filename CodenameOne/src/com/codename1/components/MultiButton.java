@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
@@ -266,6 +267,7 @@ public class MultiButton extends Container {
             }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
+            emblem.setShowEvenIfBlank(true);
         }
     }
     
@@ -1067,5 +1069,13 @@ public class MultiButton extends Container {
         secondRow.setShouldLocalize(shouldLocalize);
         thirdRow.setShouldLocalize(shouldLocalize);
         forthRow.setShouldLocalize(shouldLocalize);
+    }
+    
+    /**
+     * Sets the button group for a radio button mode multibutton
+     * @param bg the button group
+     */
+    public void setGroup(ButtonGroup bg) {
+        bg.add((RadioButton)emblem);
     }
 }

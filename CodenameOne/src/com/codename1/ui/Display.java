@@ -1276,7 +1276,7 @@ public final class Display {
      * @param newForm the Form to Display
      */
     void setCurrent(final Form newForm, boolean reverse){
-        if(edt == null || Display.isInitialized()) {
+        if(edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
         Form current = impl.getCurrentForm();
