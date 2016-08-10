@@ -1826,7 +1826,6 @@ namespace com.codename1.impl
 
         public override object loadTrueTypeFont(string fontName, string fileName)
         {
-
             NativeFont nf = new NativeFont(0, 0, 0, new CanvasTextFormat());
             string file = nativePath(fileName);
             string family = fontName;
@@ -1834,13 +1833,43 @@ namespace com.codename1.impl
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    nf.font.FontFamily = @"res\" + file + "#" + family;
+                    nf.font.FontFamily = generateFontFamilyFromFontName(family, fileName);
                     nf.font.WordWrapping = CanvasWordWrapping.NoWrap;
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
                 are.WaitOne();
             }
             return nf;
+        }
+
+        private string generateFontFamilyFromFontName(string fontName, string fileName)
+        {
+            string file = nativePath(fileName);
+            CanvasFontSet fontSet = new CanvasFontSet(new Uri(@"ms-appx:///res/" + file));
+            string first = null;
+            foreach (var font in fontSet.Fonts)
+            {
+                foreach (var fam in font.FamilyNames)
+                {
+                    if (first == null)
+                    {
+                        first = @"res\" + file + "#" + fam.Value;
+                    }
+                    java.lang.System.@out.println("Key: "+fam.Key+" value "+fam.Value);
+                    if (fam.Value.Equals(fontName))
+                    {
+                        return @"res\" + file + "#" + fam.Value;
+                    }
+                }
+            }
+
+            if (first != null)
+            {
+                return first;
+            }
+
+            return @"res\" + file + "#" + fontName;
+
         }
 
         public override object deriveTrueTypeFont(object font, float size, int weight)
