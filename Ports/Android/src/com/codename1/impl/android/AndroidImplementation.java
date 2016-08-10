@@ -663,7 +663,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (instance != null && ((i instanceof CodenameOneActivity) || instance.myView == null)) {
             instance.init(i);
         }
-        System.out.println("Calling Display.init(i) in reinit()");
         Display.init(i);
 
         // This is a hack to fix an issue that caused the screen to appear blank when
@@ -1605,7 +1604,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public void repaint(Animation cmp) {
-        System.out.println("In repaint "+cmp+" "+myView);
         if(myView != null && myView.alwaysRepaintAll()) {
             if(cmp instanceof Component) {
                 Component c = (Component)cmp;
@@ -1627,7 +1625,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         }
-        System.out.println("Repainting "+cmp);
         super.repaint(cmp);
     }
     
@@ -7378,11 +7375,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
 
             while (blocking && !complete[0]) {
-                System.out.println("Waiting for background fetch to complete.  Make sure your background fetch handler calls onSuccess() or onError() in the callback when complete");
                 synchronized(lock) {
                     try {
                         lock.wait(1000);
                     } catch (Exception ex){}
+                }
+                if (!complete[0]) {
+                    System.out.println("Waiting for background fetch to complete.  Make sure your background fetch handler calls onSuccess() or onError() in the callback when complete");
+                
                 }
                 
             }
