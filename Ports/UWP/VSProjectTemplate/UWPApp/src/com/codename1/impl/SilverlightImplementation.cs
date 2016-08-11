@@ -42,6 +42,7 @@ using Windows.Devices.Input;
 using Windows.Graphics.Imaging;
 using Microsoft.Graphics.Canvas.Geometry;
 using java.io;
+using Windows.Foundation.Metadata;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -1307,6 +1308,36 @@ namespace com.codename1.impl
             }
         }
 
+        /**
+        * Returns true if the underlying OS supports opening the native navigation
+        * application
+        * @return true if the underlying OS supports launch of native navigation app
+        */
+        public override bool isOpenNativeNavigationAppSupported(){
+            return true;
+        }
+
+       /**
+        * Opens the native navigation app in the given coordinate.
+        * @param latitude 
+        * @param longitude 
+        */ 
+        public override void openNativeNavigationApp(double latitude, double longitude){    
+            using (AutoResetEvent are = new AutoResetEvent(false)) {
+
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
+                    var uri = new Uri(@"bingmaps:?cp="+latitude+"~"+longitude);
+
+                    // Launch the Windows Maps app
+                    var launcherOptions = new Windows.System.LauncherOptions();
+                    launcherOptions.TargetApplicationPackageFamilyName = "Microsoft.WindowsMaps_8wekyb3d8bbwe";
+                    var result = Windows.System.Launcher.LaunchUriAsync(uri, launcherOptions);
+                    are.Set();
+                }).AsTask().GetAwaiter().GetResult();
+                are.WaitOne();
+            }
+        }
+        
         public override void browserExecute(PeerComponent n1, string n2)
         {
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
@@ -1410,6 +1441,21 @@ namespace com.codename1.impl
             chatMessage.Recipients.Add(n1);
             Windows.ApplicationModel.Chat.ChatMessageManager.ShowComposeSmsMessageAsync(chatMessage).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
 #endif
+        }
+
+        public override void dial(string phoneNumber) {
+            java.lang.System.@out.println("Trying to dial phone number "+phoneNumber);
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+                {
+                    if (ApiInformation.IsApiContractPresent("Windows.ApplicationModel.Calls.CallsPhoneContract", 1, 0))
+                    {
+                        Windows.ApplicationModel.Calls.PhoneCallStore phoneCallStore = await Windows.ApplicationModel.Calls.PhoneCallManager.RequestStoreAsync();
+                        Guid LineGuid = await phoneCallStore.GetDefaultLineAsync();
+
+                        Windows.ApplicationModel.Calls.PhoneLine phoneLine = await Windows.ApplicationModel.Calls.PhoneLine.FromIdAsync(LineGuid);
+                        phoneLine.Dial(phoneNumber, phoneNumber);
+                    }
+                }).AsTask().GetAwaiter().GetResult();
         }
 
         public override object createMutableImage(int width, int height, int color)

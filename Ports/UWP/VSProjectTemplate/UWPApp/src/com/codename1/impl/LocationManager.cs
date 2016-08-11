@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Windows.Devices.Geolocation;
 using Windows.Foundation;
 
@@ -9,6 +9,7 @@ namespace com.codename1.impl
 
         private Geolocator watcher;
         private Geoposition lastPosition;
+        private bool requestedAccess;
 
         public LocationManager()
         {
@@ -17,7 +18,11 @@ namespace com.codename1.impl
 
         protected override void bindListener()
         {
+            SilverlightImplementation.dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
+            {
+                var r = await Geolocator.RequestAccessAsync();
 
+            }).AsTask().GetAwaiter().GetResult();
             if (watcher == null)
             {
                 watcher = new Geolocator()
@@ -31,19 +36,23 @@ namespace com.codename1.impl
             this.watcher.PositionChanged += new TypedEventHandler<Geolocator, PositionChangedEventArgs>(watcher_PositionChanged);
         }
 
-        void watcher_StatusChanged(Geolocator sender, StatusChangedEventArgs eventArgs)
+        async void watcher_StatusChanged(Geolocator sender, StatusChangedEventArgs eventArgs)
         {
+            
             switch (eventArgs.Status)
             {
                 case PositionStatus.Disabled:
                     setStatus(OUT_OF_SERVICE);
+                    com.codename1.ui.Display.getInstance().callSerially(new LocationManagerStatusUpdater(getLocationListener(), OUT_OF_SERVICE));
                     break;
                 case PositionStatus.Initializing:
                 case PositionStatus.NoData:
                     setStatus(TEMPORARILY_UNAVAILABLE);
+                    com.codename1.ui.Display.getInstance().callSerially(new LocationManagerStatusUpdater(getLocationListener(), TEMPORARILY_UNAVAILABLE));
                     break;
                 case PositionStatus.Ready:
                     setStatus(AVAILABLE);
+                    com.codename1.ui.Display.getInstance().callSerially(new LocationManagerStatusUpdater(getLocationListener(), AVAILABLE));
                     break;
             }
         }
@@ -53,7 +62,8 @@ namespace com.codename1.impl
             lastPosition = await sender.GetGeopositionAsync();
             if (lastPosition != null && lastPosition.Coordinate.AltitudeAccuracy.HasValue)
             {
-                getLocationListener().locationUpdated(convert(lastPosition));
+                com.codename1.ui.Display.getInstance().callSerially(new LocationManagerLocationUpdater(getLocationListener(), convert(lastPosition)));
+                //getLocationListener().locationUpdated(convert(lastPosition));
             }
         }
 
@@ -96,6 +106,50 @@ namespace com.codename1.impl
             location.setAccuracy((float)position.Coordinate.Accuracy); ///FA vertical is more usufull AltitudeAccuracy);
             location.setStatus(getStatus());
             return location;
+        }
+
+        
+
+    }
+
+    public class LocationManagerStatusUpdater : java.lang.Object, java.lang.Runnable
+    {
+        private int status;
+        private location.LocationListener listener;
+
+        public LocationManagerStatusUpdater(location.LocationListener listener, int status)
+        {
+            this.listener = listener;
+            this.status = status;
+        }
+
+        public virtual void run()
+        {
+            if (listener != null)
+            {
+                listener.providerStateChanged(status);
+            }
+        }
+    }
+
+    public class LocationManagerLocationUpdater : java.lang.Object, java.lang.Runnable
+    {
+        private location.LocationListener listener;
+        private location.Location location;
+
+        public LocationManagerLocationUpdater(location.LocationListener listener, location.Location location)
+        {
+            this.listener = listener;
+            this.location = location;
+        }
+
+        public virtual void run()
+        {
+            if (listener != null)
+            {
+                listener.locationUpdated(location);
+            }
+
         }
     }
 }
