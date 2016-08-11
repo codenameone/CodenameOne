@@ -410,7 +410,9 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         setComponentValue(entries[iter], h.getObject(currentName), list, cmp);
                     }
                 } else {
-                    setComponentValue(entries[0], value, list, cmp);
+                    if(entries.length > 0) {
+                        setComponentValue(entries[0], value, list, cmp);
+                    }
                 }
             }
             return cmp;
