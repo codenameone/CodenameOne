@@ -1,4 +1,3 @@
-
 using System.IO;
 using System.Linq;
 using System;
@@ -1824,16 +1823,93 @@ namespace com.codename1.impl
             return true;
         }
 
+        public override bool isNativeFontSchemeSupported()
+        {
+            return true;
+        }
+
         public override object loadTrueTypeFont(string fontName, string fileName)
         {
+            
+            
+
             NativeFont nf = new NativeFont(0, 0, 0, new CanvasTextFormat());
-            string file = nativePath(fileName);
+            string file = fileName != null ? nativePath(fileName) : null;
             string family = fontName;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    nf.font.FontFamily = generateFontFamilyFromFontName(family, fileName);
+                    if (fontName.StartsWith("native:"))
+                    {
+                        if ("native:MainThin".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Thin;
+
+                        }
+                        else if ("native:MainLight".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Light;
+                        }
+                        else if ("native:MainRegular".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                        }
+
+                        else if ("native:MainBold".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Bold;
+                        }
+
+                        else if ("native:MainBlack".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Black;
+                        }
+
+                        else if ("native:ItalicThin".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Thin;
+
+                        }
+
+                        else if ("native:ItalicLight".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Light;
+                        }
+
+                        else if ("native:ItalicRegular".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                        }
+
+                        else if ("native:ItalicBold".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Bold;
+                        }
+
+                        else if ("native:ItalicBlack".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Black;
+                        }
+                    }
+                    else
+                    {
+
+                        nf.font.FontFamily = generateFontFamilyFromFontName(family, fileName);
+                    }
                     nf.font.WordWrapping = CanvasWordWrapping.NoWrap;
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
@@ -1845,7 +1921,7 @@ namespace com.codename1.impl
         private string generateFontFamilyFromFontName(string fontName, string fileName)
         {
             string file = nativePath(fileName);
-            CanvasFontSet fontSet = new CanvasFontSet(new Uri(@"ms-appx:///res/" + file));
+             Microsoft.Graphics.Canvas.Text.CanvasFontSet fontSet = new Microsoft.Graphics.Canvas.Text.CanvasFontSet(new Uri(@"ms-appx:///res/" + file));
             string first = null;
             foreach (var font in fontSet.Fonts)
             {
@@ -1855,7 +1931,6 @@ namespace com.codename1.impl
                     {
                         first = @"res\" + file + "#" + fam.Value;
                     }
-                    java.lang.System.@out.println("Key: "+fam.Key+" value "+fam.Value);
                     if (fam.Value.Equals(fontName))
                     {
                         return @"res\" + file + "#" + fam.Value;
@@ -1882,6 +1957,8 @@ namespace com.codename1.impl
                 {
                     n.font.FontFamily = fnt.font.FontFamily;
                     n.font.FontSize = size;
+                    n.font.FontStyle = fnt.font.FontStyle;
+                    n.font.FontWeight = fnt.font.FontWeight;
                     if ((weight & 1) != 0) // bold
                     {
                         n.font.FontWeight = FontWeights.Bold;
