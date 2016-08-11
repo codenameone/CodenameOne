@@ -402,7 +402,10 @@ public class ComboBox<T> extends List<T> {
         Dialog popupDialog = createPopupDialog(l);
         int originalSel = getSelectedIndex();
         Form.comboLock = includeSelectCancel;
+        float rr = Dialog.getDefaultBlurBackgroundRadius();
+        Dialog.setDefaultBlurBackgroundRadius(-1);
         Command result = showPopupDialog(popupDialog, l);
+        Dialog.setDefaultBlurBackgroundRadius(rr);
         Form.comboLock = false;
         parentForm.setTintColor(tint);
         if(result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() ||
