@@ -1481,7 +1481,7 @@ namespace com.codename1.impl
 
         public override bool isAlphaMutableImageSupported()
         {
-            return false;
+            return true;
         }
 
         public override object scale(object sourceImage, int width, int height)
