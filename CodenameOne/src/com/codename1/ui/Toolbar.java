@@ -1237,9 +1237,16 @@ public class Toolbar extends Container {
         void installRightCommands() {
             super.installRightCommands();
             if (overflowCommands != null && overflowCommands.size() > 0) {
-                Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
+                UIManager uim = UIManager.getInstance();
+                Image i = (Image) uim.getThemeImageConstant("menuImage");
                 if (i == null) { 
-                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), 4.5f);
+                    float size = 4.5f;
+                    try {
+                        size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
+                    } catch(Throwable t) {
+                        t.printStackTrace();
+                    }
+                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), size);
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 
