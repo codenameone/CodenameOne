@@ -6926,7 +6926,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(!exposeFilesystem) { 
                     if (selected != null) {
                         try {
-                            File tmp = File.createTempFile("temp", "." + imageTypes[0]);
+                            String ext = selected.getName();
+                            int idx = ext.lastIndexOf(".");
+                            if(idx > 0) {
+                                ext = ext.substring(idx);
+                            } else {
+                                ext= imageTypes[0];
+                            }
+                            File tmp = File.createTempFile("temp", "." + ext);
                             tmp.deleteOnExit();
                             copyFile(selected, tmp);
                             result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'));
