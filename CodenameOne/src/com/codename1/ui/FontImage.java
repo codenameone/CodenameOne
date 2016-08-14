@@ -4569,6 +4569,30 @@ public class FontImage extends Image {
     }
     
     /**
+     * Helper method that generalizes icon setting code for various component types
+     * @param cmp the component, currently supports Labels, MultiButton &amp; SpanButton. If the type isn't supported 
+     * this method return false
+     * @param icon the material icon
+     * @param size the size of the icon
+     * @return false if the type isn't supported
+     */
+    public static boolean setMaterialIcon(Component cmp, char icon, float size) {
+        if(cmp instanceof Label) {
+            setMaterialIcon((Label)cmp, icon, size);
+            return true;
+        }
+        if(cmp instanceof MultiButton) {
+            setMaterialIcon((MultiButton)cmp, icon, size);
+            return true;
+        }
+        if(cmp instanceof SpanButton) {
+            setMaterialIcon((SpanButton)cmp, icon, size);
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
      * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
      * will be set appropriately.</p>
