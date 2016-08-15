@@ -115,7 +115,9 @@ public final class GeneralPath implements Shape {
     
     private static synchronized GeneralPath createPathFromPool() {
         if (!pathPool().isEmpty()) {
-            return pathPool.remove(pathPool.size()-1);
+            GeneralPath out = pathPool.remove(pathPool.size()-1);
+            out.reset();
+            return out;
         }
         return new GeneralPath();
     }
