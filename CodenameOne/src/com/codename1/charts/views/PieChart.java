@@ -18,6 +18,8 @@ package com.codename1.charts.views;
 import java.util.ArrayList;
 import java.util.List;
 import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.GradientDrawable;
+import com.codename1.charts.compat.GradientDrawable.Orientation;
 import com.codename1.charts.compat.Paint;
 import com.codename1.charts.compat.Paint.Style;
 
@@ -62,95 +64,110 @@ public class PieChart extends RoundChart {
    * @param paint the paint
    */
   @Override
-  public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
-    paint.setAntiAlias(mRenderer.isAntialiasing());
-    paint.setStyle(Style.FILL);
-    paint.setTextSize(mRenderer.getLabelsTextSize());
-    int legendSize = getLegendSize(mRenderer, height / 5, 0);
-    int left = x;
-    int top = y;
-    int right = x + width;
-    int sLength = mDataset.getItemCount();
-    double total = 0;
-    String[] titles = new String[sLength];
-    for (int i = 0; i < sLength; i++) {
-      total += mDataset.getValue(i);
-      titles[i] = mDataset.getCategory(i);
+    public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+        paint.setAntiAlias(mRenderer.isAntialiasing());
+        paint.setStyle(Style.FILL);
+        paint.setTextSize(mRenderer.getLabelsTextSize());
+        int legendSize = getLegendSize(mRenderer, height / 5, 0);
+        int left = x;
+        int top = y;
+        int right = x + width;
+        int sLength = mDataset.getItemCount();
+        double total = 0;
+        String[] titles = new String[sLength];
+        for (int i = 0; i < sLength; i++) {
+            total += mDataset.getValue(i);
+            titles[i] = mDataset.getCategory(i);
+        }
+        if (mRenderer.isFitLegend()) {
+            legendSize = drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize,
+                    paint, true);
+        }
+        int bottom = y + height - legendSize;
+        drawBackground(mRenderer, canvas, x, y, width, height, paint, false, DefaultRenderer.NO_COLOR);
+
+        float currentAngle = mRenderer.getStartAngle();
+        int mRadius = Math.min(Math.abs(right - left), Math.abs(bottom - top));
+        int radius = (int) (mRadius * 0.35 * mRenderer.getScale());
+
+        if (autoCalculateCenter || mCenterX == NO_VALUE) {
+            mCenterX = (left + right) / 2;
+        }
+        if (autoCalculateCenter || mCenterY == NO_VALUE) {
+            mCenterY = (bottom + top) / 2;
+        }
+
+        // Hook in clip detection after center has been calculated
+        mPieMapper.setDimensions(radius, mCenterX, mCenterY);
+        boolean loadPieCfg = !mPieMapper.areAllSegmentPresent(sLength);
+        if (loadPieCfg) {
+            mPieMapper.clearPieSegments();
+        }
+
+        float shortRadius = radius * 0.9f;
+        float longRadius = radius * 1.1f;
+        Rectangle2D oval = PkgUtils.makeRect(mCenterX - radius, mCenterY - radius, mCenterX + radius, mCenterY
+                + radius);
+        List<Rectangle2D> prevLabelsBounds = new ArrayList<Rectangle2D>();
+
+        for (int i = 0; i < sLength; i++) {
+            SimpleSeriesRenderer seriesRenderer = mRenderer.getSeriesRendererAt(i);
+            boolean gradient = false;
+            GradientDrawable gradientDrawable = null;
+            if (seriesRenderer.isGradientEnabled()) {
+                // Gradient not enabled right now
+                System.out.println("Gradient is enabled");
+                gradient = true;
+                gradientDrawable = new GradientDrawable(Orientation.TOP_BOTTOM, new int[]{ seriesRenderer.getGradientStartColor(), seriesRenderer.getGradientStopColor()});
+                paint.setColor(seriesRenderer.getGradientStartColor());
+            } else {
+                paint.setColor(seriesRenderer.getColor());
+            }
+
+
+            float value = (float) mDataset.getValue(i);
+            float angle = (float) (value / total * 360);
+            if (seriesRenderer.isHighlighted()) {
+                double rAngle = Math.toRadians(90 - (currentAngle + angle / 2));
+                float translateX = (float) (radius * 0.1 * Math.sin(rAngle));
+                float translateY = (float) (radius * 0.1 * Math.cos(rAngle));
+                oval.translate(translateX, translateY);
+                if (gradient) {
+                    canvas.drawArcWithGradient(oval, currentAngle, angle, true, paint, gradientDrawable);
+                } else {
+                    canvas.drawArc(oval, currentAngle, angle, true, paint);
+                }
+                oval.translate(-translateX, -translateY);
+            } else {
+                if (gradient) {
+                    canvas.drawArcWithGradient(oval, currentAngle, angle, true, paint, gradientDrawable);
+                } else {
+                    canvas.drawArc(oval, currentAngle, angle, true, paint);
+                }
+            }
+            paint.setColor(seriesRenderer.getColor());
+            //paint.setShader(null);
+            drawLabel(canvas, mDataset.getCategory(i), mRenderer, prevLabelsBounds, mCenterX, mCenterY,
+                    shortRadius, longRadius, currentAngle, angle, left, right, mRenderer.getLabelsColor(),
+                    paint, true, false);
+            if (mRenderer.isDisplayValues()) {
+                drawLabel(
+                        canvas,
+                        getLabel(mRenderer.getSeriesRendererAt(i).getChartValuesFormat(), mDataset.getValue(i)),
+                        mRenderer, prevLabelsBounds, mCenterX, mCenterY, shortRadius / 2, longRadius / 2,
+                        currentAngle, angle, left, right, mRenderer.getLabelsColor(), paint, false, true);
+            }
+
+            // Save details for getSeries functionality
+            if (loadPieCfg) {
+                mPieMapper.addPieSegment(i, value, currentAngle, angle);
+            }
+            currentAngle += angle;
+        }
+        prevLabelsBounds.clear();
+        drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize, paint, false);
+        drawTitle(canvas, x, y, width, paint);
     }
-    if (mRenderer.isFitLegend()) {
-      legendSize = drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize,
-          paint, true);
-    }
-    int bottom = y + height - legendSize;
-    drawBackground(mRenderer, canvas, x, y, width, height, paint, false, DefaultRenderer.NO_COLOR);
-
-    float currentAngle = mRenderer.getStartAngle();
-    int mRadius = Math.min(Math.abs(right - left), Math.abs(bottom - top));
-    int radius = (int) (mRadius * 0.35 * mRenderer.getScale());
-
-    if (autoCalculateCenter || mCenterX == NO_VALUE) {
-      mCenterX = (left + right) / 2;
-    }
-    if (autoCalculateCenter || mCenterY == NO_VALUE) {
-      mCenterY = (bottom + top) / 2;
-    }
-
-    // Hook in clip detection after center has been calculated
-    mPieMapper.setDimensions(radius, mCenterX, mCenterY);
-    boolean loadPieCfg = !mPieMapper.areAllSegmentPresent(sLength);
-    if (loadPieCfg) {
-      mPieMapper.clearPieSegments();
-    }
-
-    float shortRadius = radius * 0.9f;
-    float longRadius = radius * 1.1f;
-    Rectangle2D oval = PkgUtils.makeRect(mCenterX - radius, mCenterY - radius, mCenterX + radius, mCenterY
-        + radius);
-    List<Rectangle2D> prevLabelsBounds = new ArrayList<Rectangle2D>();
-
-    for (int i = 0; i < sLength; i++) {
-      SimpleSeriesRenderer seriesRenderer = mRenderer.getSeriesRendererAt(i);
-      if (false && seriesRenderer.isGradientEnabled()) {
-        // Gradient not enabled right now
-      } else {
-        paint.setColor(seriesRenderer.getColor());
-      }
-
-      float value = (float) mDataset.getValue(i);
-      float angle = (float) (value / total * 360);
-      if (seriesRenderer.isHighlighted()) {
-        double rAngle = Math.toRadians(90 - (currentAngle + angle / 2));
-        float translateX = (float) (radius * 0.1 * Math.sin(rAngle));
-        float translateY = (float) (radius * 0.1 * Math.cos(rAngle));
-        oval.translate(translateX, translateY);
-        canvas.drawArc(oval, currentAngle, angle, true, paint);
-        oval.translate(-translateX, -translateY);
-      } else {
-        canvas.drawArc(oval, currentAngle, angle, true, paint);
-      }
-      paint.setColor(seriesRenderer.getColor());
-      //paint.setShader(null);
-      drawLabel(canvas, mDataset.getCategory(i), mRenderer, prevLabelsBounds, mCenterX, mCenterY,
-          shortRadius, longRadius, currentAngle, angle, left, right, mRenderer.getLabelsColor(),
-          paint, true, false);
-      if (mRenderer.isDisplayValues()) {
-        drawLabel(
-            canvas,
-            getLabel(mRenderer.getSeriesRendererAt(i).getChartValuesFormat(), mDataset.getValue(i)),
-            mRenderer, prevLabelsBounds, mCenterX, mCenterY, shortRadius / 2, longRadius / 2,
-            currentAngle, angle, left, right, mRenderer.getLabelsColor(), paint, false, true);
-      }
-
-      // Save details for getSeries functionality
-      if (loadPieCfg) {
-        mPieMapper.addPieSegment(i, value, currentAngle, angle);
-      }
-      currentAngle += angle;
-    }
-    prevLabelsBounds.clear();
-    drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize, paint, false);
-    drawTitle(canvas, x, y, width, paint);
-  }
 
   public SeriesSelection getSeriesAndPointForScreenCoordinate(Point screenPoint) {
     return mPieMapper.getSeriesAndPointForScreenCoordinate(screenPoint);
