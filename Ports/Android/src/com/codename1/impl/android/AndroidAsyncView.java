@@ -114,7 +114,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
     private synchronized static Path createPathFromPool() {
         if (!pathPool.isEmpty()) {
-            return pathPool.remove(pathPool.size()-1);
+            Path out = pathPool.remove(pathPool.size()-1);
+            out.rewind();
+            return out;
         }
         return new Path();
     }
