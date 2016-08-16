@@ -2362,7 +2362,11 @@ public abstract class CodenameOneImplementation {
         int destB = endColor & 0xff;
         int oldColor = getColor(graphics);
         int originalHeight = height;
+        boolean outermost = true;
         while (width > 0 && height > 0) {
+            if (outermost) {
+                setAntiAliased(graphics, true);
+            }
             updateGradientColor(graphics, sourceR, sourceG, sourceB, destR,
                     destG, destB, originalHeight, height);
             fillArc(graphics, x, y, width, height, 0, 360);
@@ -2370,6 +2374,10 @@ public abstract class CodenameOneImplementation {
             y++;
             width -= 2;
             height -= 2;
+            if (outermost) {
+                outermost = false;
+                setAntiAliased(graphics, false);
+            }
         }
         setColor(graphics, oldColor);
         if(aa) {
