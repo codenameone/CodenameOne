@@ -240,8 +240,8 @@ public class Canvas  {
             double cX = oval.getX() + rX;
             double cY = oval.getY() + rY;
             p.moveTo(cX, cY);
-            p.lineTo(cX + rX * Math.cos(-currentAngle * Math.PI/180), cY - rY * Math.sin(-currentAngle * Math.PI/180));
-                
+            p.lineTo(cX + 1.1*rX * Math.cos(-currentAngle * Math.PI/180), cY - 1.1*rY * Math.sin(-currentAngle * Math.PI/180));
+             
             
             /*
             p.arc(
@@ -260,10 +260,10 @@ public class Canvas  {
             int direction = sweepAngle < 0 ? 1 : -1;
             for (int i=0; i<steps; i++) {
                 currDegree += direction;
-                p.lineTo(cX + rX * Math.cos(currDegree*Math.PI/180.0), cY - rY * Math.sin(currDegree*Math.PI/180.0));
+                p.lineTo(cX + 1.1*rX * Math.cos(currDegree*Math.PI/180.0), cY - 1.1*rY * Math.sin(currDegree*Math.PI/180.0));
             }
             
-            p.lineTo(cX + rX * Math.cos(-(currentAngle+sweepAngle) * Math.PI/180), cY - rY * Math.sin(-(currentAngle + sweepAngle)*Math.PI/180));
+            p.lineTo(cX + 1.1*rX * Math.cos(-(currentAngle+sweepAngle) * Math.PI/180), cY - 1.1*rY * Math.sin(-(currentAngle + sweepAngle)*Math.PI/180));
             
             p.closePath();
             
@@ -290,7 +290,11 @@ public class Canvas  {
             //  Until I figure out how to make radial gradients work correctly, linear gradients look best. - SJH
             //g.fillRadialGradient(startColor, stopColor, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
             //g.setColor(0xffffff);
+            boolean antialias = g.isAntiAliased();
+            g.setAntiAliased(true);
+            
             g.fillRadialGradient(startColor, stopColor, (int)oval.getX(), (int)oval.getY(), (int)oval.getWidth(), (int)oval.getHeight());
+            g.setAntiAliased(antialias);
             g.setClip(clipX, clipY, clipW, clipH);
             
         } else {
