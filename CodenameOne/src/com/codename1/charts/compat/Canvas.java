@@ -231,75 +231,8 @@ public class Canvas  {
         
     }
 
-    
     public void drawArcWithGradient(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint, GradientDrawable gradient) {
-        if (g.isShapeClipSupported()) {
-            GeneralPath p = new GeneralPath();
-            double rX = oval.getWidth()/2;
-            double rY = oval.getHeight()/2;
-            double cX = oval.getX() + rX;
-            double cY = oval.getY() + rY;
-            p.moveTo(cX, cY);
-            p.lineTo(cX + 1.1*rX * Math.cos(-currentAngle * Math.PI/180), cY - 1.1*rY * Math.sin(-currentAngle * Math.PI/180));
-             
-            
-            /*
-            p.arc(
-                    (int)Math.round(oval.getX()), 
-                    (int)Math.round(oval.getY()), 
-                    (int)Math.round(oval.getWidth()), 
-                    (int)Math.round(oval.getHeight()), 
-                    -currentAngle*Math.PI/180.0, 
-                    -sweepAngle*Math.PI/180.0,
-                    true);
-            */
-            // Currently GeneralPath can't intersect shapes with curves, so we need to
-            // create the arcs with line segments.
-            int steps = (int)Math.ceil(Math.abs(sweepAngle));
-            int currDegree = -(int)currentAngle;
-            int direction = sweepAngle < 0 ? 1 : -1;
-            for (int i=0; i<steps; i++) {
-                currDegree += direction;
-                p.lineTo(cX + 1.1*rX * Math.cos(currDegree*Math.PI/180.0), cY - 1.1*rY * Math.sin(currDegree*Math.PI/180.0));
-            }
-            
-            p.lineTo(cX + 1.1*rX * Math.cos(-(currentAngle+sweepAngle) * Math.PI/180), cY - 1.1*rY * Math.sin(-(currentAngle + sweepAngle)*Math.PI/180));
-            
-            p.closePath();
-            
-            int clipX = g.getClipX();
-            int clipY = g.getClipY();
-            int clipW = g.getClipWidth();
-            int clipH = g.getClipHeight();
-            g.setClip(p);
-            g.clipRect(clipX, clipY, clipW, clipH);
-            int startColor = gradient.colors[0];
-            int stopColor = gradient.colors[1];
-            if (gradient.orientation == Orientation.RIGHT_LEFT || gradient.orientation == Orientation.TOP_BOTTOM) {
-                int tmp = stopColor;
-                stopColor = startColor;
-                startColor = tmp;
-            }
-            boolean horizontal = gradient.orientation == Orientation.LEFT_RIGHT || gradient.orientation == Orientation.RIGHT_LEFT;
-            Rectangle bounds = p.getBounds();
-            
-            // This didn't look quite right with linear gradients... but leaving commented out
-            //g.fillLinearGradient(startColor, stopColor, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), horizontal);
-            
-            // I would prefer a radial gradient here but they seem to be turning out too dark.... 
-            //  Until I figure out how to make radial gradients work correctly, linear gradients look best. - SJH
-            //g.fillRadialGradient(startColor, stopColor, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
-            //g.setColor(0xffffff);
-            boolean antialias = g.isAntiAliased();
-            g.setAntiAliased(true);
-            
-            g.fillRadialGradient(startColor, stopColor, (int)oval.getX(), (int)oval.getY(), (int)oval.getWidth(), (int)oval.getHeight());
-            g.setAntiAliased(antialias);
-            g.setClip(clipX, clipY, clipW, clipH);
-            
-        } else {
-            drawArc(oval, currentAngle, sweepAngle, useCenter, paint);
-        }
+        g.fillRadialGradient(gradient.colors[1], gradient.colors[0], (int)oval.getX(), (int)oval.getY(), (int)oval.getWidth(), (int)oval.getHeight(), -(int)Math.floor(currentAngle), -(int)Math.ceil(sweepAngle));
     }
     
     public void drawPoint(Float get, Float get0, Paint paint) {

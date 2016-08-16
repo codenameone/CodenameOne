@@ -809,6 +809,25 @@ public final class Graphics {
     }
 
     /**
+     * Draws a radial gradient in the given coordinates with the given colors, 
+     * doesn't take alpha into consideration when drawing the gradient.
+     * Notice that a radial gradient will result in a circular shape, to create
+     * a square use fillRect or draw a larger shape and clip to the appropriate size.
+     * 
+     * @param startColor the starting RGB color
+     * @param endColor  the ending RGB color
+     * @param x the x coordinate
+     * @param y the y coordinate
+     * @param width the width of the region to be filled
+     * @param height the height of the region to be filled
+     * @param startAngle the beginning angle.  Zero is at 3 o'clock.  Positive angles are counter-clockwise.
+     * @param arcAngle the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
+     */
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        impl.fillRadialGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, startAngle, arcAngle);
+    }
+    
+    /**
      * Draws a radial gradient in the given coordinates with the given colors,
      * doesn't take alpha into consideration when drawing the gradient. Notice that this method
      * differs from fillRadialGradient since it draws a square gradient at all times

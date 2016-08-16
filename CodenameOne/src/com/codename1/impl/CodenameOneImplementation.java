@@ -2315,7 +2315,7 @@ public abstract class CodenameOneImplementation {
                 Object imageGraphics = getNativeGraphics(r);
                 setColor(imageGraphics, endColor);
                 fillRect(imageGraphics, 0, 0, width, height);
-                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size);
+                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size, 0, 360);
                 drawImage(graphics, r, x, y);
                 if(radialGradientCache == null) {
                     radialGradientCache = new Hashtable();
@@ -2326,7 +2326,7 @@ public abstract class CodenameOneImplementation {
             setColor(graphics, endColor);
             fillRect(graphics, x, y, width, height);
 
-            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size);
+            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size, 0, 360);
         }
         if(aa) {
             setAntiAliased(graphics, true);
@@ -2348,10 +2348,31 @@ public abstract class CodenameOneImplementation {
      * @param height the height of the region to be filled
      */
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
-        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height);
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, 0, 360);
+    }
+    
+    
+    /**
+     * Draws a radial gradient in the given coordinates with the given colors,
+     * doesn't take alpha into consideration when drawing the gradient.
+     * Notice that a radial gradient will result in a circular shape, to create
+     * a square use fillRect or draw a larger shape and clip to the appropriate size.
+     *
+     * @param graphics the graphics context
+     * @param startColor the starting RGB color
+     * @param endColor  the ending RGB color
+     * @param x the x coordinate
+     * @param y the y coordinate
+     * @param width the width of the region to be filled
+     * @param height the height of the region to be filled
+     * @param startAngle the beginning angle.  Zero is at 3 o'clock.  Positive angles are counter-clockwise.
+     * @param arcAngle the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
+     */
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, startAngle, arcAngle);
     }
 
-    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         boolean aa = isAntiAliased(graphics);
         setAntiAliased(graphics, false);
         int sourceR = startColor >> 16 & 0xff;
@@ -2369,7 +2390,7 @@ public abstract class CodenameOneImplementation {
             }
             updateGradientColor(graphics, sourceR, sourceG, sourceB, destR,
                     destG, destB, originalHeight, height);
-            fillArc(graphics, x, y, width, height, 0, 360);
+            fillArc(graphics, x, y, width, height, startAngle, arcAngle);
             x++;
             y++;
             width -= 2;

@@ -821,8 +821,11 @@ class AndroidGraphics {
         unapplyTransform();
         canvas.restore();
     }
-
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+        fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);
+    }
+    
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
@@ -830,11 +833,15 @@ class AndroidGraphics {
         paint.setShader(new RadialGradient(x, y, Math.max(width, height), 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         canvas.save();
         applyTransform();
-        canvas.drawRect(x, y, x + width, y + height, paint);
+        this.tmprectF.set(x, y, x + width, y + height);
+        canvas.drawArc(this.tmprectF, 360 - startAngle,
+                -arcAngle, true, paint);
+        //canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         paint.setShader(null);
         unapplyTransform();
         canvas.restore();
+        
     }
 
     public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text,
