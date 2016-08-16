@@ -5065,6 +5065,9 @@ public abstract class CodenameOneImplementation {
      */
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         String[] arr = getAllContacts(withNumbers);
+        if(arr == null) {
+            return null;
+        }
         Contact[] retVal = new Contact[arr.length];
         int alen = arr.length;
         for(int iter = 0 ; iter  < alen ; iter++) {
