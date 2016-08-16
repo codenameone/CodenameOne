@@ -7658,7 +7658,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         String prompt = Display.getInstance().getProperty(permission, description);
         
-        if (android.support.v4.content.ContextCompat.checkSelfPermission(getActivity(),
+        if (android.support.v4.content.ContextCompat.checkSelfPermission(getContext(),
                 permission)
                 != PackageManager.PERMISSION_GRANTED) {
 
