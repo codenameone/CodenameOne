@@ -137,12 +137,12 @@ public class JSONParser implements JSONParseCallback {
         ReaderClass rc = new ReaderClass();
         rc.buffOffset = 0;
         rc.buffSize = -1;
+        int row = 1;
+        int column = 1;
         StringBuilder currentToken = new StringBuilder();
         KeyStack blocks = new KeyStack();
         String currentBlock = "";
         String lastKey = null;
-        int row = 1;
-        int column = 0;
         try {
             while (callback.isAlive()) {
                 int currentChar = rc.read(i);
