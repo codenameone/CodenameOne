@@ -115,8 +115,6 @@ public class PieChart extends RoundChart {
             boolean gradient = false;
             GradientDrawable gradientDrawable = null;
             if (seriesRenderer.isGradientEnabled()) {
-                // Gradient not enabled right now
-                System.out.println("Gradient is enabled");
                 gradient = true;
                 gradientDrawable = new GradientDrawable(Orientation.TOP_BOTTOM, new int[]{ seriesRenderer.getGradientStartColor(), seriesRenderer.getGradientStopColor()});
                 paint.setColor(seriesRenderer.getGradientStartColor());
