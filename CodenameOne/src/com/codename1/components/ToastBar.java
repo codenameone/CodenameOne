@@ -696,7 +696,7 @@ public class ToastBar {
         Form f = Display.getInstance().getCurrent();
         if (f != null && !(f instanceof Dialog)) {
             ToastBarComponent c = (ToastBarComponent)f.getClientProperty("ToastBarComponent");
-            if (c == null) {
+            if (c == null || c.getParent() == null) {
                 c = new ToastBarComponent();
                 c.hidden = true;
                 f.putClientProperty("ToastBarComponent", c);
