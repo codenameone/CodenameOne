@@ -1846,7 +1846,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         ((AndroidGraphics)graphics).fillRadialGradient(startColor, endColor, x, y, width, height);
     }
         
-
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        ((AndroidGraphics)graphics).fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);
+    }
+    
     @Override
     public void drawLabelComponent(Object nativeGraphics, int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text, Object icon, Object stateIcon, int preserveSpaceForState, int gap, boolean rtl, boolean isOppositeSide, int textPosition, int stringWidth, boolean isTickerRunning, int tickerShiftText, boolean endsWith3Points, int valign) {
         if(AndroidAsyncView.legacyPaintLogic) {

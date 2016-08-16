@@ -1037,6 +1037,12 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
 
         @Override
         public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height) {
+            fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);
+            
+        }
+        
+        @Override
+        public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
             if (alpha == 0) {
                 return;
             }
@@ -1045,7 +1051,7 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                 @Override
                 public void execute(AndroidGraphics underlying) {
                     underlying.setAlpha(al);
-                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height);
+                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);
                 }
                 public String toString() {
                     return "fillRadialGradient";
