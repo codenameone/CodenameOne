@@ -4385,6 +4385,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+        checkEDT();
+        Graphics2D nativeGraphics = (Graphics2D)getGraphics(graphics).create();
+        Paint p = new RadialGradientPaint(x+width/2, y+height/2, width/2, new float[]{0,1}, new Color[]{new Color(startColor), new Color(endColor)});
+        nativeGraphics.setPaint(p);
+        nativeGraphics.fillOval(x+1, y+1, width-2, height-2);
+    }
+
+    
+    
     /**
      * @inheritDoc
      */
