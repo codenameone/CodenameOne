@@ -1449,7 +1449,7 @@ class AndroidGraphics {
                 // In such cases, we
                 float strokeWidthUpperBound = ratio * stroke.getLineWidth();
                 Bitmap nativeBuffer = Bitmap.createBitmap(
-                        (int)(bounds2.width()+2*strokeWidthUpperBound), (int)(bounds2.height()+2*strokeWidthUpperBound), Bitmap.Config.ARGB_8888);
+                        Math.max(1, (int)(bounds2.width()+2*strokeWidthUpperBound)), Math.max(1, (int)(bounds2.height()+2*strokeWidthUpperBound)), Bitmap.Config.ARGB_8888);
                 //int restorePoint = canvas.saveLayer(bounds2, paint, Canvas.ALL_SAVE_FLAG);
                 Canvas c = new Canvas(nativeBuffer);
                 Matrix translateM = new Matrix();
