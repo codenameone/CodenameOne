@@ -482,6 +482,7 @@ public class UIManager {
         }
         themeProps.put("Container.sel#derive", "Container");
         themeProps.put("Container.dis#derive", "Container");
+        themeProps.put("Container.press#derive", "Container");
 
         if(installedTheme == null || !installedTheme.containsKey("OnOffSwitch.derive")) {
             themeProps.put("OnOffSwitch.transparency", "255");
