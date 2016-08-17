@@ -260,12 +260,12 @@ public class MediaPlayer extends Container {
             play.setText("play");
         }
         if(autoplay) {
-            if (getPauseIcon() != null) {
-                play.setIcon(getPauseIcon());
-            } else {
-                play.setText("pause");
-            }
             if(video != null && !video.isPlaying()){
+                if (getPauseIcon() != null) {
+                    play.setIcon(getPauseIcon());
+                } else {
+                    play.setText("pause");
+                }
                 video.play();
             }
         }
