@@ -1563,6 +1563,27 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.nativeFillArc(ng.color, ng.alpha, x, y, width, height, startAngle, arcAngle);
     }
 
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        Paint oldPaint = ng.paint;
+        ng.paint = new RadialGradient(startColor, endColor, x, y, width, height);
+        ng.applyPaint();
+        ng.nativeFillArc(ng.color, ng.alpha, x, y, width, height, startAngle, arcAngle);
+        ng.unapplyPaint();
+        ng.paint = oldPaint;
+    }
+
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+        fillRadialGradient(graphics, startColor, endColor, x, y, width, height, 0, 360); 
+    }
+    
+    
+
     private static void nativeFillArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
         nativeInstance.nativeFillArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
     }
@@ -3559,8 +3580,30 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
     
+    abstract class Paint {
+        
+    }
+    
+    abstract class Gradient extends Paint {
+        int startColor;
+        int endColor;
+    }
+    
+    class RadialGradient extends Gradient {
+        int x, y, width, height;
+        
+        RadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.startColor = startColor;
+            this.endColor = endColor;
+        }
+    }
     
     class NativeGraphics {
+        Paint paint;
         final Rectangle reusableRect = new Rectangle();
         final Rectangle reusableRect2 = new Rectangle();
         NativeImage associatedImage;
@@ -4100,9 +4143,35 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean isShapeClipSupported() {
             return true;
         }
+        
+        public void applyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                RadialGradient g = (RadialGradient)paint;
+                nativeInstance.applyRadialGradientPaintMutable(g.startColor, g.endColor, g.x, g.y, g.width, g.height);
+            }
+        }
+        
+        public void unapplyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                nativeInstance.clearRadialGradientPaintMutable();
+            }
+        }
     }
 
     class GlobalGraphics extends NativeGraphics {
+        public void applyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                RadialGradient g = (RadialGradient)paint;
+                nativeInstance.applyRadialGradientPaintGlobal(g.startColor, g.endColor, g.x, g.y, g.width, g.height);
+            }
+        }
+        
+        public void unapplyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                nativeInstance.clearRadialGradientPaintGlobal();
+            }
+        }
+        
         public void checkControl() {
             if(currentlyDrawingOn != this) {
                 if(currentlyDrawingOn != null) {

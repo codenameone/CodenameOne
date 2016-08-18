@@ -21,25 +21,31 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
-#import "ExecutableOp.h"
+#import "PaintOp.h"
 #import "CN1ES2compat.h"
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
 #endif
 
-@interface Rotate : ExecutableOp {
-#ifdef USE_ES2
-    GLKMatrix4 m;
-    float bar;
-#endif
+@interface RadialGradientPaint : PaintOp {
+
     int x;
     int y;
-    float angle;
-    float foo;
-
+    int width;
+    int height;
+    int startColor;
+    int endColor;
+    BOOL clear;
 }
 
--(id)initWithArgs:(float)ang xx:(int)xx yy:(int)yy;
--(void)execute;
+@property int startColor;
+@property int endColor;
+@property int x;
+@property int y;
+@property int width;
+@property int height;
 
+-(id)initClear;
+-(id)initWithArgs:(int)xx y:(int)yy width:(int)w height:(int)h startColor:(int)sc endColor:(int)ec;
+-(void)execute;
 @end

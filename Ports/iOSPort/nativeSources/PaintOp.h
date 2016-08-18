@@ -23,17 +23,9 @@
 #import <Foundation/Foundation.h>
 #import "ExecutableOp.h"
 
-
-@interface DrawLine : ExecutableOp {
-    int color;
-    int alpha;
-    int x1;
-    int y1;
-    int x2;
-    int y2;
+@interface PaintOp : ExecutableOp {
 }
 
--(id)initWithArgs:(int)c a:(int)a xpos1:(int)xpos1 ypos1:(int)ypos1 xpos2:(int)xpos2 ypos2:(int)ypos2 ;
--(void)execute;
-
++(void)setCurrent:(PaintOp*)op;
++(PaintOp*)getCurrent;
 @end
