@@ -28,4 +28,7 @@
 
 +(void)setCurrent:(PaintOp*)op;
 +(PaintOp*)getCurrent;
+
++(void)setCurrentMutable:(PaintOp*)op;
++(PaintOp*)getCurrentMutable;
 @end

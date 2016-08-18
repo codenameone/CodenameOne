@@ -39,6 +39,8 @@
 #import "ResetAffine.h"
 #import "Scale.h"
 #import "Rotate.h"
+#import "PaintOp.h"
+#import "RadialGradientPaint.h"
 #import <AudioToolbox/AudioToolbox.h>
 #import "DrawGradientTextureCache.h"
 #import "DrawStringTextureCache.h"
@@ -774,6 +776,35 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
     }
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl
+(CGContextRef context, RadialGradientPaint* gradient, int x, int y, int width, int height, int startAngle, int angle) {
+    if (angle < 0) {
+        startAngle += angle;
+        angle = -angle;
+    }
+    int scolor = gradient.startColor;
+    int ecolor = gradient.endColor;
+    CGFloat components[8] = {
+        ((float)((scolor >> 16) & 0xff))/255.0, \
+        ((float)((scolor >> 8) & 0xff))/255.0, ((float)(scolor & 0xff))/255.0, 1.0,
+        ((float)((ecolor >> 16) & 0xff))/255.0, \
+        ((float)((ecolor >> 8) & 0xff))/255.0, ((float)(ecolor & 0xff))/255.0, 1.0
+    };
+    size_t num_locations = 2;
+    CGFloat locations[2] = { 0.0, 1.0 };
+    
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGGradientRef myGradient = CGGradientCreateWithColorComponents (colorSpace, components, locations, num_locations);
+    CGColorSpaceRelease(colorSpace); colorSpace = NULL;
+    
+    CGContextSaveGState(context);
+    drawArc(context, gradient.startColor, 1.0, x, y, width, height, startAngle, angle, YES);
+    CGContextClip(context);
+    CGContextDrawRadialGradient(context, myGradient, CGPointMake(gradient.x+gradient.width/2, gradient.y+gradient.height/2), 0, CGPointMake(gradient.x+gradient.width/2, gradient.y+gradient.height/2), gradient.width/2, 0);
+    CGGradientRelease(myGradient), myGradient = NULL;
+    CGContextRestoreGState(context);
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -781,7 +812,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
-    CGContextFillPath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, YES));
+    if ([PaintOp getCurrentMutable] != NULL && [[PaintOp getCurrentMutable] isKindOfClass:[RadialGradientPaint class]]) {
+        Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl(
+            context, (RadialGradientPaint*)[PaintOp getCurrentMutable], x, y, width, height, startAngle, angle
+        );
+    } else {
+        CGContextFillPath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, YES));
+    }
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }

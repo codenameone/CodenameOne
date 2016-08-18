@@ -2092,12 +2092,16 @@ void com_codename1_impl_ios_IOSNative_applyRadialGradientPaintMutable___int_int_
         JAVA_INT width,
         JAVA_INT height)
 {
-    NSLog(@"Mutable radial gradient paint not implemented yet");
+    RadialGradientPaint *f = [[RadialGradientPaint alloc] initWithArgs:x y:y width:width height:height startColor:startColor endColor:endColor];
+    [PaintOp setCurrentMutable:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
 }
 
 void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintMutable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) 
 {
-    NSLog(@"Mutable clear radial gradient paint not implemented yet");
+    [PaintOp setCurrentMutable:NULL];
 }
 
 void com_codename1_impl_ios_IOSNative_releasePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {

@@ -25,6 +25,7 @@
 #include "xmlvm.h"
 
 static PaintOp* current = 0;
+static PaintOp* currentMutable=0;
 
 @implementation PaintOp
 
@@ -47,6 +48,21 @@ static PaintOp* current = 0;
 +(PaintOp*)getCurrent 
 {
     return current;
+}
+
++(void)setCurrentMutable:(PaintOp*)op
+{
+    if (currentMutable != NULL) {
+        [currentMutable release];
+    }
+    currentMutable = op;
+    if (currentMutable != NULL) {
+        [currentMutable retain];
+    }
+}
++(PaintOp*)getCurrentMutable
+{
+    return currentMutable;
 }
 
 -(NSString*)getName {
