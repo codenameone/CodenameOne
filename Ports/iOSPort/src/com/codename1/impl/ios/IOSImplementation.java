@@ -4405,6 +4405,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                             return;
                         }
                         //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                        if (paint != null && paint instanceof RadialGradient) {
+                            RadialGradient rgp = (RadialGradient)paint;
+                            rgp.x *= scale;
+                            rgp.y *= scale;
+                            rgp.width *= scale;
+                            rgp.height *= scale;
+                            applyPaint();
+                        }
                         nativeDrawAlphaMask(mask);
                     } finally {
                         setTransform(tmpTransform2);
