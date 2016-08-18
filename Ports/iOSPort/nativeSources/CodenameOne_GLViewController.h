@@ -30,6 +30,7 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 #import "ExecutableOp.h"
+#import "PaintOp.h"
 #import "GLUIImage.h"
 #import <MessageUI/MFMailComposeViewController.h>
 #import <MessageUI/MFMessageComposeViewController.h>
@@ -162,7 +163,6 @@
 -(void)startAnimation;
 -(void)stopAnimation;
 +(BOOL)isDrawTextureSupported;
-
 -(void)initVars;
 
 +(void)upcoming:(ExecutableOp*)op;

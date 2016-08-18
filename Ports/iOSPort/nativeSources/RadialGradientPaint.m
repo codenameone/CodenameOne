@@ -20,62 +20,50 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-#import "Rotate.h"
-#import "ClipRect.h"
+#import "RadialGradientPaint.h"
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
 #ifdef USE_ES2
 #import "SetTransform.h"
 #endif
 
-float currentRotate = 1;
-float currentRotateX = 1;
-float currentRotateY = 1;
 
-@implementation Rotate
+@implementation RadialGradientPaint
 
--(id)initWithArgs:(float)ang xx:(int)xx yy:(int)yy {
-    x = xx;
-    y = yy;
-    angle = ang;
-#ifdef USE_ES2
-    m = [SetTransform currentTransform];
-    float a = angle * M_PI / 180.0;
-    m = GLKMatrix4Translate(m, x, y, 0);
-    m = GLKMatrix4Rotate(m, a, 0, 0, 1);
-    m = GLKMatrix4Translate(m, -x, -y, 0);
+@synthesize startColor;
+@synthesize endColor;
+@synthesize x;
+@synthesize y;
+@synthesize width;
+@synthesize height;
 
-    [SetTransform currentTransform:m];
-    
-#endif
+-(id)initClear {
+    clear = YES;
     return self;
 }
 
--(void)execute {
-#ifndef USE_ES2
-    _glTranslatef(x, y, 0);
-    _glRotatef(angle, 0, 0, 1);
-    _glTranslatef(-x, -y, 0);
+-(id)initWithArgs:(int)xx y:(int)yy width:(int)w height:(int)h startColor:(int)sc endColor:(int)ec
+{
+    x=xx;
+    y=yy;
+    width=w;
+    height=h;
+    startColor=sc;
+    endColor=ec;
+    return self;
+}
+-(void)execute 
+{
+    if (clear) {
+        [PaintOp setCurrent:NULL];
+    } else {
+        [PaintOp setCurrent:self];
+    }
     
-    GLErrorLog;
-#else
-    SetTransform *f = [[SetTransform alloc] initWithArgs:m originX:0 originY:0];
-    [f execute];
-    [f release];
-#endif
-    currentRotateX = x;
-    currentRotateY = y;
-    currentRotate = angle;
 }
-
-#ifndef CN1_USE_ARC
--(void)dealloc {
-	[super dealloc];
-}
-#endif
 
 -(NSString*)getName {
-    return @"Rotate";
+    return @"RadialGradientPaint";
 }
 
 
