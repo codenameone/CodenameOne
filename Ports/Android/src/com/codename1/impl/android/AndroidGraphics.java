@@ -1441,15 +1441,20 @@ class AndroidGraphics {
             p.transform(getTransformMatrix(), p2);
             RectF bounds2 = new RectF();
             p2.computeBounds(bounds2, false);
-            float ratio = Math.max(bounds2.width()/bounds.width(), bounds2.height()/bounds.height());
+            float b2w = bounds2.width();
+            float bw = bounds.width();
+            float bw2 = Math.max(1, b2w) / Math.max(1, bw);
+            float bh2 = Math.max(1, bounds2.height())/Math.max(1, bounds.height());
+            float ratio = Math.max(bw2, bh2);
             if (ratio > 2 && !isMutableImageGraphics) {
                 // If the canvas is hardware accelerated, then it will rasterize the path
                 // first, then apply the transform which leads to blurry paths if the transform does
                 // significant scaling.
                 // In such cases, we
                 float strokeWidthUpperBound = ratio * stroke.getLineWidth();
-                Bitmap nativeBuffer = Bitmap.createBitmap(
-                        Math.max(1, (int)(bounds2.width()+2*strokeWidthUpperBound)), Math.max(1, (int)(bounds2.height()+2*strokeWidthUpperBound)), Bitmap.Config.ARGB_8888);
+                int ww = Math.max(1, (int)(bounds2.width()+2*strokeWidthUpperBound));
+                int hh = Math.max(1, (int)(bounds2.height()+2*strokeWidthUpperBound));
+                Bitmap nativeBuffer = Bitmap.createBitmap(ww, hh, Bitmap.Config.ARGB_8888);
                 //int restorePoint = canvas.saveLayer(bounds2, paint, Canvas.ALL_SAVE_FLAG);
                 Canvas c = new Canvas(nativeBuffer);
                 Matrix translateM = new Matrix();
