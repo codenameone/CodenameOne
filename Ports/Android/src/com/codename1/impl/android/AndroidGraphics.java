@@ -832,7 +832,7 @@ class AndroidGraphics {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setAlpha(255);
-        paint.setShader(new RadialGradient(x, y, Math.max(width, height), 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+        paint.setShader(new RadialGradient(x+width/2, y+width/2, Math.max(width, height)/2, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         canvas.save();
         applyTransform();
         this.tmprectF.set(x, y, x + width, y + height);
