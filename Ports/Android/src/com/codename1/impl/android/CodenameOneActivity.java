@@ -241,7 +241,6 @@ public class CodenameOneActivity extends Activity {
         super.onResume();
         AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
-        waitingForResult = false;
         background = false;
     }
 
@@ -519,6 +518,10 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void setIntentResultListener(IntentResultListener l) {
+        //if the activity is waiting for result don't override the intent listener
+        if(waitingForResult){
+            return;
+        }
         this.intentResultListener = l;
     }
 
@@ -527,6 +530,7 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void restoreIntentResultListener() {
+        waitingForResult = false;
         setIntentResultListener(defaultResultListener);
     }
 
