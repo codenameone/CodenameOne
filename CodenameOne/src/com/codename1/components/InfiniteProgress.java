@@ -118,7 +118,10 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
         }
-        getComponentForm().registerAnimated(this);
+        Form f = getComponentForm();
+        if(f != null) {
+            f.registerAnimated(this);
+        }
     }
 
     /**
