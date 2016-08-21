@@ -5331,6 +5331,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (nativePlayer && curentForm == null) {
                 curentForm = Display.getInstance().getCurrent();
                 Form f = new Form();
+                f.setBackCommand(new Command("") {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        Component cmp = getVideoComponent();
+                        if(cmp != null) {
+                            cmp.remove();
+                            pause();
+                        }
+                        curentForm.showBack();
+                        curentForm = null;
+                    }
+                });
                 f.setLayout(new BorderLayout());
                 Component cmp = getVideoComponent();
                 if(cmp.getParent() != null) {
