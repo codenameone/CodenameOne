@@ -107,6 +107,19 @@ public class MediaPlayer extends Container {
         }
         initUI();
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        if(autoplay) {
+            if(video != null && video.isPlaying()){
+                video.pause();
+            }
+        }
+    }
     
     /**
      * {@inheritDoc}
