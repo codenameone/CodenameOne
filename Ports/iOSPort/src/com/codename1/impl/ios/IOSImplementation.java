@@ -4378,7 +4378,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                     p.getBounds(origBounds);
                     tmpDrawShape.setShape(shape, transform);
                     tmpDrawShape.getBounds(transformedBounds);
-                    float scale = Math.max(transformedBounds.getWidth()/(float)origBounds.getWidth(), transformedBounds.getHeight()/(float)origBounds.getHeight());
+                    
+                    double h1 = Math.sqrt(origBounds.getWidth() * origBounds.getWidth() + origBounds.getHeight() * origBounds.getHeight());
+                    double h2 = Math.sqrt(transformedBounds.getWidth() * transformedBounds.getWidth() + transformedBounds.getHeight() * transformedBounds.getHeight());
+                    if (h2 < 1) h2 = 1;
+                    if (h1 < 1) h1 = 1;
+                    
+                    
+                    float scale = (float)(h2/h1);
                     tmpTransform.setScale(scale, scale);
                     tmpDrawShape.setShape(shape, tmpTransform);
 
