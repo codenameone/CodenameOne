@@ -580,6 +580,10 @@ public class Label extends Component {
      * {@inheritDoc}
      */
     void tryDeregisterAnimated() {
+        if(tickerEnabled || tickerRunning) {
+            return;
+        }
+        super.tryDeregisterAnimated();
     }
 
     /**
