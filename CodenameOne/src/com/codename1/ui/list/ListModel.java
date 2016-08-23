@@ -29,7 +29,9 @@ import com.codename1.ui.events.SelectionListener;
 /**
  * <p>Represents the data structure of the list, thus allowing a list to
  * represent any potential data source by referencing different implementations of this
- * interface. E.g. a list model can be implemented in such a way that it retrieves data
+ * interface, <b>notice</b> that 
+ * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
+ * discourage usage of lists</a>.. E.g. a list model can be implemented in such a way that it retrieves data
  * directly from storage (although caching would be recommended).</p>
  * <p>It is the responsibility of the list to notify observers (specifically the view 
  * {@link com.codename1.ui.List} of any changes to its state (items removed/added/changed etc.)
