@@ -81,6 +81,12 @@ public class Resources {
     private static Resources globalResources;
     
     /**
+     * This variable is used to cache the system resources file CN1Resource.res
+     */
+    private static Resources systemResource;
+    
+    
+    /**
      * @return the failOnMissingTruetype
      */
     public static boolean isFailOnMissingTruetype() {
@@ -716,6 +722,9 @@ public class Resources {
      */
     public static Resources open(String resource, int dpi) throws IOException {
         try {
+            if (resource.equals(Resources.systemResourceLocation) && systemResource != null) {
+                return systemResource;
+            }
             if(lastLoadedName != null && lastLoadedName.equals(resource) && lastLoadedDPI == dpi) {
                 Resources r = (Resources)Display.getInstance().extractHardRef(cachedResource);
                 if(r != null) {
@@ -728,9 +737,9 @@ public class Resources {
             }
             Resources r = new Resources(is, dpi);
             is.close();
-            //no need to cache the system resource it is very small and we rather 
-            //keep the app resource in the cache 
+            
             if(resource.equals(Resources.systemResourceLocation)){
+                systemResource = r;
                 return r;
             }
             
