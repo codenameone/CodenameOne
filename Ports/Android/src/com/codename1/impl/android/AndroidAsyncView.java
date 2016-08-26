@@ -187,6 +187,9 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         setWillNotCacheDrawing(true);
         setWillNotDraw(true);
         setBackgroundDrawable(null);
+        this.setFocusable(true);
+        this.setFocusableInTouchMode(false);
+        this.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
     }
 
 
