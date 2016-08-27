@@ -1666,6 +1666,9 @@ public class SideMenuBar extends MenuBar {
 
         public CommandWrapper(Command cmd) {
             super(cmd.getCommandName(), cmd.getIcon(), cmd.getId());
+            super.setPressedIcon(cmd.getPressedIcon());
+            super.setRolloverIcon(cmd.getRolloverIcon());
+            super.setDisabledIcon(cmd.getDisabledIcon());
             this.cmd = cmd;
         }
 
