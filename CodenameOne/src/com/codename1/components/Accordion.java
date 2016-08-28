@@ -129,6 +129,55 @@ public class Accordion extends Container {
         add(new AccordionContent(header, body));
     }
 
+
+    /**
+     * Returns the body component of the currently expanded accordion element or null if none is expanded
+     * @return a component
+     */
+    public Component getCurrentlyExpanded() {
+        for (Component cc : this) {
+            AccordionContent c = (AccordionContent)cc;
+            if(!c.isClosed()){
+                return c.body;
+            }
+        }
+        return null;
+    }
+
+
+    /**
+     * Expands the accordion with the given "body" 
+     * @param body the body component of the accordion to expand
+     */
+    public void expand(Component body) {
+        if(autoClose) {
+            for (Component cc : this) {
+                AccordionContent c = (AccordionContent)cc;
+                c.openClose(body == c.body);
+            }
+        } else {
+            for (Component cc : this) {
+                AccordionContent c = (AccordionContent)cc;
+                if(body == c.body) {
+                    c.openClose(true);
+                }
+            }
+        }
+    }
+
+    /**
+     * Closes the accordion with the given "body" 
+     * @param body the body component of the accordion to close
+     */
+    public void collapse(Component body) {
+        for (Component cc : this) {
+            AccordionContent c = (AccordionContent)cc;
+            if(body == c.body) {
+                c.openClose(false);
+            }
+        }
+    }    
+    
     /**
      * Sets the closed icon
      * @param closeIcon the close icon
