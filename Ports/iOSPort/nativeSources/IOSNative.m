@@ -446,6 +446,12 @@ void com_codename1_impl_ios_IOSNative_setPreferredBackgroundFetchInterval___int(
     if (interval < 0) {
         interval = UIApplicationBackgroundFetchIntervalNever;
     }
+    if (interval < 3600) {
+        // Minimum fetch interval appears to be between 10 minutes and 35 minutes
+        // Setting custom intervals seem to give unpredictable results, so for low values (< 1 hour)
+        // it is best to just use minimum interval and let the system work it out.
+        interval = UIApplicationBackgroundFetchIntervalMinimum;
+    }
     [[UIApplication sharedApplication] setMinimumBackgroundFetchInterval:interval];
 #endif
 }
