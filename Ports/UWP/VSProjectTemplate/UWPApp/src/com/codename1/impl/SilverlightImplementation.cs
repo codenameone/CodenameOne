@@ -719,7 +719,7 @@ namespace com.codename1.impl
             using (var ds = cr.CreateDrawingSession())
             {
                 float angle = (float)Math.PI * degrees / 180;
-                ds.Transform = Matrix3x2.CreateRotation(angle, new Vector2(cr.SizeInPixels.Width / 2, cr.SizeInPixels.Height / 2));
+                ds.Transform = Matrix3x2.CreateRotation(angle, new Vector2((float)cn.image.Size.Width / 2, (float)cn.image.Size.Height / 2));
                 ds.DrawImage(cn.image);
                 ds.Dispose();
             }
