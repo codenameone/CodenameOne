@@ -145,7 +145,6 @@ public class AndroidNativeUtil {
             throw new RuntimeException("Cannot start activity for result when running in background.");
         }
         final CodenameOneActivity act = (CodenameOneActivity) getActivity();
-        act.startActivityForResult(intent, 2000);
         act.setIntentResultListener(new IntentResultListener() {
 
             @Override
@@ -154,6 +153,7 @@ public class AndroidNativeUtil {
                 act.restoreIntentResultListener();
             }
         });
+        act.startActivityForResult(intent, 2000);
     }
     
     private static HashMap<Class, BitmapViewRenderer> viewRendererMap;
