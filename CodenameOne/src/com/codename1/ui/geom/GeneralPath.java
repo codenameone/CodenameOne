@@ -774,9 +774,15 @@ public final class GeneralPath implements Shape {
     }
     
     
-    
     private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
                                           double startX, double startY, double endX, double endY) {
+        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY, false);
+    }
+    
+    
+    
+    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+                                          double startX, double startY, double endX, double endY, boolean clockwise) {
         if ( startX != endX || startY != endY ){
             double ax = startX - cx;
             double ay = startY - cy;
@@ -795,9 +801,46 @@ public final class GeneralPath implements Shape {
                 
                 ay = startY - cy;
                 by = endY - cy;
+            } else {
+                double startAngle = MathUtil.atan2(ay, ax);
+                double endAngle = MathUtil.atan2(by, bx);
+                
+                double dist = Math.abs(endAngle - startAngle);
+                if (clockwise) {
+                    if (startAngle > endAngle) {
+                        dist = Math.PI*2-dist;
+                    }
+                } else {
+                    if (startAngle < endAngle) {
+                        dist = Math.PI*2-dist;
+                    }
+                }
+                
+                //System.out.println("dist: "+dist+" startAngle: "+startAngle+" endAngle: "+endAngle);
+                if (dist > Math.PI/3) {
+                    // We bisect
+                    double r = Math.sqrt(r1s);
+                    double bisectAngle = (startAngle + endAngle)/2;
+                    if (clockwise) {
+                        if (startAngle > endAngle) {
+                            bisectAngle += Math.PI;
+                        }
+                    } else {
+                        if (startAngle < endAngle) {
+                            bisectAngle += Math.PI;
+                        }
+                    }
+                    double bisectX = cx + r * Math.cos(bisectAngle);
+                    double bisectY = cy + r * Math.sin(bisectAngle);
+                    addBezierArcToPath(path, cx, cy, startX, startY, bisectX, bisectY, clockwise);
+                    addBezierArcToPath(path, cx, cy, bisectX, bisectY, endX, endY, clockwise);
+                    return;
+                }
+                
+                
             }
             
-            final double q1 = ax * ax + ay * ay;
+            final double q1 = r1s;//ax * ax + ay * ay;
             final double q2 = q1 + ax * bx + ay * by;
             final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
             final float x2 = (float)(cx + ax - k2 * ay);
@@ -962,6 +1005,22 @@ public final class GeneralPath implements Shape {
         return radians;
     }
     
+    
+    /**
+     * Adds an arc to the path.  This method uses an approximation of an arc using
+     * a cubic path.  It is not a precise arc.
+     * 
+     * <p>Note:  The arc is drawn counter-clockwise around the center point.  See {@link #arcTo(double, double, double, double, boolean) } 
+     * to draw clockwise.</p>
+     * 
+     * @param cX The x-coordinate of the oval center.
+     * @param cY The y-coordinate of the oval center.
+     * @param endX The end X coordinate.
+     * @param endY The end Y coordinate.
+     */
+    public void arcTo(float cX, float cY, float endX, float endY) {
+        arcTo(cX, cY, endX, endY, false);
+    }
     /**
      * Adds an arc to the path.  This method uses an approximation of an arc using
      * a cubic path.  It is not a precise arc.
@@ -969,15 +1028,30 @@ public final class GeneralPath implements Shape {
      * @param cY The y-coordinate of the oval center.
      * @param endX The end X coordinate.
      * @param endY The end Y coordinate.
+     * @param clockwise If true, the arc is drawn clockwise around the center point.
      */
-    public void arcTo(float cX, float cY, float endX, float endY){
+    public void arcTo(float cX, float cY, float endX, float endY, boolean clockwise){
         if ( pointSize < 2 ){
             throw new RuntimeException("Cannot add arc to path if it doesn't already have a starting point.");
             
         }
         float startX = points[pointSize-2];
         float startY = points[pointSize-1];
-        addBezierArcToPath(this, cX, cY, startX, startY, endX, endY);
+        addBezierArcToPath(this, cX, cY, startX, startY, endX, endY, clockwise);
+    }
+    
+    /**
+     * Adds an arc to the path.  This method uses an approximation of an arc using
+     * a cubic path.  It is not a precise arc.
+     * <p>Note:  The arc is drawn counter-clockwise around the center point.  See {@link #arcTo(double, double, double, double, boolean) } 
+     * to draw clockwise.</p>
+     * @param cX The x-coordinate of the oval center.
+     * @param cY The y-coordinate of the oval center.
+     * @param endX The end X coordinate.
+     * @param endY The end Y coordinate.
+     */
+    public void arcTo(double cX, double cY, double endX, double endY) {
+        arcTo(cX, cY, endX, endY, false);
     }
     
     /**
@@ -987,9 +1061,11 @@ public final class GeneralPath implements Shape {
      * @param cY The y-coordinate of the oval center.
      * @param endX The end X coordinate.
      * @param endY The end Y coordinate.
+     * @param clockwise If true, the arc is drawn clockwise around the center point.
+     * 
      */
-    public void arcTo(double cX, double cY, double endX, double endY){
-        arcTo((float)cX, (float)cY, (float)endX, (float)endY);
+    public void arcTo(double cX, double cY, double endX, double endY, boolean clockwise){
+        arcTo((float)cX, (float)cY, (float)endX, (float)endY, clockwise);
     }
 
     /**
