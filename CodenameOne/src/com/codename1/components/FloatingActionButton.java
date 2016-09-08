@@ -29,8 +29,12 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -174,7 +178,7 @@ public class FloatingActionButton extends Button {
         }
         //if this fab has sub fab's display them
         if (subMenu != null) {
-            Container con = createPopupContent(subMenu);
+            final Container con = createPopupContent(subMenu);
             Dialog d = new Dialog();
             d.setDialogUIID("Container");
             d.getContentPane().setUIID("Container");
@@ -183,7 +187,26 @@ public class FloatingActionButton extends Button {
             for (FloatingActionButton next : subMenu) {
                 next.current = d;
             }
+            d.setTransitionInAnimator(CommonTransitions.createEmpty());
+            d.setTransitionOutAnimator(CommonTransitions.createEmpty());
+            for(Component c : con) {
+                c.setVisible(false);
+            }
+            Form f = getComponentForm();
+            int oldTint = f.getTintColor();
+            f.setTintColor(0);
+            d.setBlurBackgroundRadius(-1);
+            d.addShowListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    for(Component c : con) {
+                        c.setY(con.getHeight());
+                        c.setVisible(true);
+                    }
+                    con.animateLayout(200);
+                }
+            });
             showPopupDialog(d);
+            f.setTintColor(oldTint);
             for (FloatingActionButton next : subMenu) {
                 next.remove();
             }
