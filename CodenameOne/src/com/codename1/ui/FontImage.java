@@ -4680,7 +4680,6 @@ public class FontImage extends Image {
         }
     }
     
-
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
@@ -4689,9 +4688,21 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(MultiButton l, char icon) {
+        setMaterialIcon(l, icon, -1);
+    }
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a multibutton
+     * @param icon one of the MATERIAL_* icons
+     * @param size the size of the icon in millimeters
+     */
+    public static void setMaterialIcon(MultiButton l, char icon, float size) {
         if(Font.isTrueTypeFileSupported()) {
             Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
         }
     }
@@ -4704,9 +4715,21 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(SpanButton l, char icon) {
+        setMaterialIcon(l, icon, -1);
+    }    
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanButton
+     * @param icon one of the MATERIAL_* icons
+     * @param size the size of the icon in millimeters
+     */
+    public static void setMaterialIcon(SpanButton l, char icon, float size) {
         if(Font.isTrueTypeFileSupported()) {
             Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
         }
     }
