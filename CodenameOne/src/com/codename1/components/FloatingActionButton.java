@@ -27,6 +27,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
@@ -35,13 +36,15 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * This is a FloatingActionButton. Floating action buttons are used for a
- * special type of promoted action. They are distinguished by a circled icon
- * floating above the UI.
+ * Floating action buttons are a material design element used to promote a special action in a Form.
+ * They are represented as a floating circle with a flat icon floating above the UI typically in the bottom right
+ * area.
  *
  * @author Chen
  */
@@ -50,7 +53,7 @@ public class FloatingActionButton extends Button {
     private List<FloatingActionButton> subMenu;
 
     private String text;
-
+    private int shadowOpacity = 100;
     private Dialog current;
 
     /**
@@ -66,9 +69,35 @@ public class FloatingActionButton extends Button {
         setText("");
         this.text = text;
         setUIID("FloatingActionButton");
-        setAlignment(CENTER);
+        Style all = getAllStyles();
+        all.setAlignment(CENTER);
+        updateBorder();
     }
 
+    private void updateBorder() {
+        getUnselectedStyle().setBorder(RoundBorder.create().
+                color(getUnselectedStyle().getBgColor()).
+                shadowOpacity(shadowOpacity));
+        getSelectedStyle().setBorder(RoundBorder.create().
+                color(getSelectedStyle().getBgColor()).
+                shadowOpacity(shadowOpacity));
+        getPressedStyle().setBorder(RoundBorder.create().
+                color(getPressedStyle().getBgColor()).
+                shadowOpacity(shadowOpacity));
+    }
+        
+    /**
+     * We override this method to track style changes to the background color and map them to the border
+     * 
+     * {@inheritDoc}
+     */
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        if(propertyName.equals(Style.BG_COLOR)) {
+            updateBorder();
+        }
+    }    
+    
     /**
      * a factory method to create a FloatingActionButton.
      *
@@ -98,32 +127,8 @@ public class FloatingActionButton extends Button {
     }
 
     @Override
-    protected void paintBackground(Graphics g) {
-        boolean antiAliased = g.isAntiAliased();
-        g.setAntiAliased(true);
-        int r = Math.min(getWidth(), getHeight()) / 2;
-        int x = getX() + getWidth() / 2 - r;
-        int y = getY() + getHeight() / 2 - r;
-        int alpha = g.getAlpha();
-
-        g.setAlpha(20);
-        g.setColor(0);
-        g.fillArc(x, y, 2 * r - 1, 2 * r - 1, 0, 360);
-
-        g.setAlpha(alpha);
-        int per = getWidth() * 2 / 100;
-        r = r - per;
-        x = x + per;
-        y = y + per / 2;
-        g.setColor(getStyle().getBgColor());
-        g.fillArc(x, y, 2 * r - 1, 2 * r - 1, 0, 360);
-
-        g.setAntiAliased(antiAliased);
-    }
-
-    @Override
     protected Dimension calcPreferredSize() {
-        return new Dimension(getIcon().getWidth() * 9 / 4, getIcon().getHeight() * 9 / 4);
+        return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
     }
 
     /**
