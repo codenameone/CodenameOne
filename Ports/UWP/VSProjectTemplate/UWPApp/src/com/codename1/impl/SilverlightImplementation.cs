@@ -1444,6 +1444,7 @@ namespace com.codename1.impl
         }
 
         public override void dial(string phoneNumber) {
+            execute("tel:" + phoneNumber);/*
             java.lang.System.@out.println("Trying to dial phone number "+phoneNumber);
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
                 {
@@ -1455,7 +1456,7 @@ namespace com.codename1.impl
                         Windows.ApplicationModel.Calls.PhoneLine phoneLine = await Windows.ApplicationModel.Calls.PhoneLine.FromIdAsync(LineGuid);
                         phoneLine.Dial(phoneNumber, phoneNumber);
                     }
-                }).AsTask().GetAwaiter().GetResult();
+                }).AsTask().GetAwaiter().GetResult();*/
         }
 
         public override object createMutableImage(int width, int height, int color)
