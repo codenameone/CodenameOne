@@ -2536,6 +2536,9 @@ public class Component implements Animation, StyleListener {
             
             @Override
             public boolean isInProgress() {
+                if(!stepMode && !started) {
+                    return true;
+                }
                 return stepMode ||
                         !((bgMotion == null || bgMotion.isFinished()) && 
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&

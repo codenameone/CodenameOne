@@ -176,15 +176,15 @@ public abstract class ComponentAnimation {
 
         @Override
         public boolean isInProgress() {
-            if(sequence > -1) {
+            if(sequence > -1 && sequence < anims.length) {
                 if(anims[sequence].isInProgress()) {
                     return true;
                 }
-                while(anims.length < sequence) {
-                    sequence++;
+                while(anims.length > sequence) {
                     if(anims[sequence].isInProgress()) {
                         return true;
                     }
+                    sequence++;
                 }
                 return false;
             }
@@ -199,7 +199,7 @@ public abstract class ComponentAnimation {
         @Override
         protected void updateState() {
             if(sequence > -1) {
-                anims[sequence].updateState();
+                anims[Math.min(sequence, anims.length - 1)].updateState();
                 return;
             }
             for(ComponentAnimation a : anims) {
