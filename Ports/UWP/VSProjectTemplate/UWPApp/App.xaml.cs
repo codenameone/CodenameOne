@@ -150,6 +150,8 @@ namespace UWPApp
     }  
     class IKVMReflectionHelper : RuntimeReflectionHelper
     {
+
+        
         public static void Initialize()
         {
             Instance = new IKVMReflectionHelper();
@@ -162,6 +164,15 @@ namespace UWPApp
 
             System.Diagnostics.Debug.WriteLine("In IKVMReflectionHelper 1");
             java.lang.System.setOut(new DebugPrintStream());
+        }
+
+        public override System.String convertToStringImpl(System.Object obj)
+        {
+            if (obj != null && obj is java.lang.Object)
+            {
+                return ((java.lang.Object)obj).toString();
+            }
+            return base.convertToStringImpl(obj);
         }
 
         public override string getCurrentStackTrace()
