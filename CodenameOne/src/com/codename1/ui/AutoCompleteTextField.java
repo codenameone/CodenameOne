@@ -42,6 +42,13 @@ import java.util.ArrayList;
  * <script src="https://gist.github.com/codenameone/7e4dc757971e460e5823.js"></script>
  * <img src="https://www.codenameone.com/img/developer-guide/components-autocomplete.png" alt="Simple usage of auto complete" />
  * 
+ * <p>
+ * The following sample shows more dynamic usage of the class where the auto-complete model is mutated
+ * based on webservice results.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/6ac9cca810fc467ab15c192faf50907e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/dynamic-autocomplete.png" alt="Dynamic autocomplete" />
  *
  * @author Chen
  */
@@ -193,9 +200,19 @@ public class AutoCompleteTextField extends TextField {
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(v);
                 popup.setEnabled(v);
+                Form f = getComponentForm();
+                if(f != null) {
+                    if(popup.getHeight() < f.getContentPane().getHeight()/2){
+                        int popupHeight = calcPopuupHeight((List)popup.getComponentAt(0));
+                        popup.setHeight(popupHeight);
+                        dontCalcSize = false;                        
+                        popup.forceRevalidate();
+                        dontCalcSize = true;
+                        f.repaint();
+                    }                  
+                }
 
                 if(!v) {
-                    Form f = getComponentForm();
                     if(f != null) {
                         f.repaint();
                     }
@@ -325,27 +342,12 @@ public class AutoCompleteTextField extends TextField {
         }
         popup.getAllStyles().setMargin(LEFT, Math.max(0, getAbsoluteX()));        
         
-        int y = getAbsoluteY();
-        int topMargin;
-        int popupHeight;
-        int items = l.getModel().getSize();
-        if(l.getModel() instanceof FilterProxyListModel){
-            items = ((FilterProxyListModel)l.getModel()).getUnderlying().getSize();
-        }
-        int listHeight = items * l.getElementSize(false, true).getHeight();
-        if(y < f.getContentPane().getHeight()/2){
-            topMargin =  y - f.getTitleArea().getHeight() + getHeight();
-            popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
-        }else{
-            popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
-            popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
-            topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
-        }
-        popup.getAllStyles().setMargin(TOP, Math.max(0, topMargin));                    
-        popup.setPreferredH(popupHeight);
+        int popupHeight = calcPopuupHeight(l);
+        
         popup.setPreferredW(getWidth());
         popup.setHeight(popupHeight);
         popup.setWidth(getWidth());
+        
         popup.addComponent(l);
         popup.layoutContainer();
         //block the reflow of this popup, which can cause painting problems
@@ -399,6 +401,29 @@ public class AutoCompleteTextField extends TextField {
         this.minimumElementsShownInPopup = minimumElementsShownInPopup;
     }
 
+    private int calcPopuupHeight(List l) {
+        int y = getAbsoluteY();
+        int topMargin;
+        int popupHeight;
+        int items = l.getModel().getSize();
+        final Form f = getComponentForm();
+        if(l.getModel() instanceof FilterProxyListModel){
+            items = ((FilterProxyListModel)l.getModel()).getUnderlying().getSize();
+        }
+        int listHeight = items * l.getElementSize(false, true).getHeight();
+        if(y < f.getContentPane().getHeight()/2){
+            topMargin =  y - f.getTitleArea().getHeight() + getHeight();
+            popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
+        }else{
+            popupHeight = Math.min(listHeight, f.getContentPane().getHeight()/2);  
+            popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());
+            topMargin =  y - f.getTitleArea().getHeight() - popupHeight;
+        }
+        popup.getAllStyles().setMargin(TOP, Math.max(0, topMargin));                    
+        popup.setPreferredH(popupHeight);
+        return popupHeight;
+    }
+
     class FormPointerListener implements ActionListener {
 
         public void actionPerformed(final ActionEvent evt) {
@@ -427,17 +452,23 @@ public class AutoCompleteTextField extends TextField {
             }
             
             if (contains(evt.getX(), evt.getY())) {
+                //if the suggestions are empty don't show the no need to show the popup
+                if(((List)popup.getComponentAt(0)).getModel().getSize() == 0){
+                    return;
+                }
                 //something went wrong re-init the popup
                 if(popup.getAbsoluteX() != getAbsoluteX()){
                     removePopup();
                     addPopup();
                 }
+                evt.consume();                
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(true);
                 popup.setEnabled(true);
                 popup.repaint();
-                evt.consume();                
+                dontCalcSize = false;
                 f.revalidate();
+                dontCalcSize = true;
                 Display.getInstance().callSerially(new Runnable() {
 
                     public void run() {

@@ -77,7 +77,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
         mergeSort(filterArray, tempArray, 0, filterArray.length, 0, ascending);
 
         for(int iter = 0 ; iter < filter.size() ; iter++) {
-            filter.set(iter, filterArray[iter]);
+            filter.set(iter, tempArray[iter]);
         }
         dataChanged(DataChangedListener.CHANGED, -1);
     }

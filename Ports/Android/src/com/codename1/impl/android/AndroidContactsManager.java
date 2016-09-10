@@ -22,7 +22,7 @@
  */
 package com.codename1.impl.android;
 
-import android.app.Activity;
+//import android.app.Activity;
 import android.content.*;
 import android.database.Cursor;
 import android.net.Uri;
@@ -61,7 +61,7 @@ public class AndroidContactsManager {
         return instance;
     }
 
-    public String[] getContacts(Activity context, boolean withNumbers) {
+    public String[] getContacts(Context context, boolean withNumbers) {
         Vector ids = new Vector();
 
         String selection = null;
@@ -84,7 +84,7 @@ public class AndroidContactsManager {
         return contacts;
     }
     
-    public Contact getContact(Activity activity, String id) {
+    public Contact getContact(Context activity, String id) {
         return getContact(activity, id, true, true, true, true, true);
     }
 
@@ -122,7 +122,7 @@ public class AndroidContactsManager {
         return null;
     }
 
-    public String createContact(final Activity activity, String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
+    public String createContact(final Context activity, String firstName, String familyName, String officePhone, String homePhone, String cellPhone, String email) {
         
         String contactId = null;
         
@@ -196,7 +196,7 @@ public class AndroidContactsManager {
         return contactId;
     }
     
-    public boolean deleteContact(Activity activity, String id) {
+    public boolean deleteContact(Context activity, String id) {
         try {
             final ArrayList ops = new ArrayList();
             final ContentResolver cr = activity.getContentResolver();
@@ -212,7 +212,7 @@ public class AndroidContactsManager {
         return true;
     }
 
-    public Contact getContact(Activity activity, String id, boolean includesFullName, 
+    public Contact getContact(Context activity, String id, boolean includesFullName, 
             boolean includesPicture, boolean includesNumbers, boolean includesEmail, 
             boolean includeAddress) {
         Contact retVal = new Contact();
@@ -431,7 +431,7 @@ public class AndroidContactsManager {
         return retVal;
     }
     
-    public Contact[] getAllContacts(Activity activity, boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+    public Contact[] getAllContacts(Context activity, boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         HashMap<String,Contact> contacts = new HashMap<String, Contact>();
         ArrayList sortedContacts = new ArrayList();
         

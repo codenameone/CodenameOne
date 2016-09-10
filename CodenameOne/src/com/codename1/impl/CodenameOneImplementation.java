@@ -71,6 +71,8 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -484,6 +486,38 @@ public abstract class CodenameOneImplementation {
     protected void paintOverlay(Graphics g) {
     }
 
+    /**
+     * Calculates the paintable bounds of a component.  The paintable bounds is 
+     * the bounds (in screen coordinates) that will be vislble on the screen.  This
+     * accounts for possible clipping by parent components.
+     * @param c The component whose paintable bounds we are interested in.
+     * @param out A rectangle to return the bounds in.
+     */
+    private void getPaintableBounds(Component c, Rectangle out) {
+        int x = c.getAbsoluteX() + c.getScrollX();
+        int y = c.getAbsoluteY() + c.getScrollY();
+        int x2 = x + c.getWidth();
+        int y2 = y + c.getHeight();
+        
+        Container parent = null;
+        if ((parent = c.getParent()) != null) {
+            getPaintableBounds(parent, out);
+            x = Math.max(out.getX(), x);
+            y = Math.max(out.getY(), y);
+            x2 = Math.min(out.getX() + out.getWidth(), x2);
+            y2 = Math.min(out.getY() + out.getHeight(), y2);
+            
+            
+        }
+        out.setBounds(x, y, x2-x, y2-y);
+        
+    }
+   
+    /**
+     * For use inside paintDirty() so that we don't have to instantiate
+     * a rectangle each time it is called.
+     */
+    private Rectangle paintDirtyTmpRect = new Rectangle();
     
     /**
      * Invoked by the EDT to paint the dirty regions
@@ -525,12 +559,13 @@ public abstract class CodenameOneImplementation {
                     }
 
                     cmp.paintComponent(wrapper);
-                    int cmpAbsX = cmp.getAbsoluteX() + cmp.getScrollX();
+                    getPaintableBounds(cmp, paintDirtyTmpRect);
+                    int cmpAbsX = paintDirtyTmpRect.getX();
                     topX = Math.min(cmpAbsX, topX);
-                    bottomX = Math.max(cmpAbsX + cmp.getWidth(), bottomX);
-                    int cmpAbsY = cmp.getAbsoluteY() + cmp.getScrollY();
+                    bottomX = Math.max(cmpAbsX + paintDirtyTmpRect.getWidth(), bottomX);
+                    int cmpAbsY = paintDirtyTmpRect.getY();
                     topY = Math.min(cmpAbsY, topY);
-                    bottomY = Math.max(cmpAbsY + cmp.getHeight(), bottomY);
+                    bottomY = Math.max(cmpAbsY + paintDirtyTmpRect.getHeight(), bottomY);
                 } else {
                     bottomX = dwidth;
                     bottomY = dheight;
@@ -2280,7 +2315,7 @@ public abstract class CodenameOneImplementation {
                 Object imageGraphics = getNativeGraphics(r);
                 setColor(imageGraphics, endColor);
                 fillRect(imageGraphics, 0, 0, width, height);
-                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size);
+                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size, 0, 360);
                 drawImage(graphics, r, x, y);
                 if(radialGradientCache == null) {
                     radialGradientCache = new Hashtable();
@@ -2291,7 +2326,7 @@ public abstract class CodenameOneImplementation {
             setColor(graphics, endColor);
             fillRect(graphics, x, y, width, height);
 
-            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size);
+            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size, 0, 360);
         }
         if(aa) {
             setAntiAliased(graphics, true);
@@ -2313,10 +2348,31 @@ public abstract class CodenameOneImplementation {
      * @param height the height of the region to be filled
      */
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
-        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height);
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, 0, 360);
+    }
+    
+    
+    /**
+     * Draws a radial gradient in the given coordinates with the given colors,
+     * doesn't take alpha into consideration when drawing the gradient.
+     * Notice that a radial gradient will result in a circular shape, to create
+     * a square use fillRect or draw a larger shape and clip to the appropriate size.
+     *
+     * @param graphics the graphics context
+     * @param startColor the starting RGB color
+     * @param endColor  the ending RGB color
+     * @param x the x coordinate
+     * @param y the y coordinate
+     * @param width the width of the region to be filled
+     * @param height the height of the region to be filled
+     * @param startAngle the beginning angle.  Zero is at 3 o'clock.  Positive angles are counter-clockwise.
+     * @param arcAngle the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
+     */
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, startAngle, arcAngle);
     }
 
-    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         boolean aa = isAntiAliased(graphics);
         setAntiAliased(graphics, false);
         int sourceR = startColor >> 16 & 0xff;
@@ -2327,14 +2383,22 @@ public abstract class CodenameOneImplementation {
         int destB = endColor & 0xff;
         int oldColor = getColor(graphics);
         int originalHeight = height;
+        boolean outermost = true;
         while (width > 0 && height > 0) {
+            if (outermost) {
+                setAntiAliased(graphics, true);
+            }
             updateGradientColor(graphics, sourceR, sourceG, sourceB, destR,
                     destG, destB, originalHeight, height);
-            fillArc(graphics, x, y, width, height, 0, 360);
+            fillArc(graphics, x, y, width, height, startAngle, arcAngle);
             x++;
             y++;
             width -= 2;
             height -= 2;
+            if (outermost) {
+                outermost = false;
+                setAntiAliased(graphics, false);
+            }
         }
         setColor(graphics, oldColor);
         if(aa) {
@@ -4942,6 +5006,41 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * 
+     * Implementations should override the {@link #getLinkedContactIds(com.codename1.contacts.Contact) } method.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     * @see com.codename1.contacts.ContactsManager#getLinkedContacts(com.codename1.contacts.Contact) 
+     * 
+     */
+    //public final Contact[] getLinkedContacts(Contact c) {
+    //    String[] ids = getLinkedContactIds(c);
+    //    if (ids != null) {
+    //        Contact[] out = new Contact[ids.length];
+    //        int len = ids.length;
+    //        for (int i=0; i< len; i++) {
+    //            out[i] = getContactById(ids[i]);
+    //        }
+    //        return out;
+    //    }
+    //    return new Contact[0];
+    //}
+    
+    
+    /**
+     * Gets the IDs of all contacts that are linked to the provided contact.
+     * @param c The contact
+     * @return Array of IDs for contacts that are linked to {@code c}.
+     */
+    public String[] getLinkedContactIds(Contact c) {
+        if (c == null || c.getId() == null) {
+            return new String[0];
+        }
+        return new String[]{c.getId()};
+    }
+    
+    /**
      * Get a Contact according to it's contact id.
      * @param id unique id of the Contact
      * @return a Contact Object
@@ -4966,6 +5065,9 @@ public abstract class CodenameOneImplementation {
      */
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         String[] arr = getAllContacts(withNumbers);
+        if(arr == null) {
+            return null;
+        }
         Contact[] retVal = new Contact[arr.length];
         int alen = arr.length;
         for(int iter = 0 ; iter  < alen ; iter++) {
@@ -5584,7 +5686,8 @@ public abstract class CodenameOneImplementation {
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
         Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
-        if(Preferences.get("push_id", (long)-1) == -1) {
+        Preferences.set("push_key", id);
+        /*if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);
             ConnectionRequest r = new ConnectionRequest() {
                 protected void readResponse(InputStream input) throws IOException  {
@@ -5609,7 +5712,7 @@ public abstract class CodenameOneImplementation {
             r.addArgument("r", packageName);
             NetworkManager.getInstance().addToQueueAndWait(r);
             return r.getResponseCode() == 200;
-        }
+        }*/
         return true;
     }
     
@@ -5631,7 +5734,7 @@ public abstract class CodenameOneImplementation {
      * For use by implementations, stop receiving push notifications from the server
      */
     public static void deregisterPushFromServer() {
-        long i = Preferences.get("push_id", (long)-1);
+        /*long i = Preferences.get("push_id", (long)-1);
         if(i > -1) {
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
@@ -5641,7 +5744,7 @@ public abstract class CodenameOneImplementation {
             NetworkManager.getInstance().addToQueue(r);
             Preferences.delete("push_id");
             Preferences.delete("push_key");
-        }
+        }*/
     }
     
     /**
@@ -6921,6 +7024,56 @@ public abstract class CodenameOneImplementation {
     }
     //ENDS METHODS FOR DEALING Local Notifications
 
+    /**
+     * Sets the preferred time interval between background fetches.  This is only a
+     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign 
+     * control over when and if background fetches will be allowed. This number is used
+     * only as a guideline.
+     * 
+     * <p><strong>This method must be called in order to activate background fetch.</strong>></p>
+     * <p>Note: If the platform doesn't support background fetch (i.e. {@link #isBackgroundFetchSupported() } returns {@code false},
+     * then this method does nothing.</p>
+     * @param seconds The time interval in seconds.
+     * 
+     * @see #isBackgroundFetchSupported() 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        if (isBackgroundFetchSupported()) {
+            Preferences.set("$$CN1_BACKGROUND_FETCH_INTERVAL", seconds);
+        }
+    }
+    
+    /**
+     * Gets the preferred time (in seconds) between background fetches.
+     * @return The time interval in seconds.
+     * @see #isBackgroundFetchSupported() 
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public int getPreferredBackgroundFetchInterval() {
+        if (isBackgroundFetchSupported()) {
+            return Preferences.get("$$CN1_BACKGROUND_FETCH_INTERVAL", 60 * 60);
+        } else {
+            return -1;
+        }
+    }
+    
+    /**
+     * Checks to see if the current platform supports background fetch.
+     * @return True if the current platform supports background fetch.
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public boolean isBackgroundFetchSupported() {
+        return false;
+    }
+    
     
     //METHODS FOR Imgae blur
     public Image gaussianBlurImage(Image image, float radius) {

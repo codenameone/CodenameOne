@@ -145,7 +145,12 @@ public class L10nEditor extends BaseForm {
             }
 
             public boolean isCellEditable(int row, int col) {
-                return col != 0;
+                boolean b = col != 0;
+                if(b) {
+                    String s = (String)getValueAt(row, col);
+                    return s == null || !s.contains("\n");
+                }
+                return b;
             }
             
             public String getColumnName(int columnIndex) {

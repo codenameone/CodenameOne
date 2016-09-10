@@ -174,6 +174,23 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
+    public void addArgumentNoEncoding(String key, String[] value) {
+        addArgument(key, value);
+        ignoreEncoding.add(key);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addArgumentNoEncodingArray(String key, String... value) {
+        addArgumentNoEncoding(key, (String[])value);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
     public void addArgument(String name, String[] value) {
         args.put(name, value);
     }
@@ -252,9 +269,9 @@ public class MultipartRequest extends ConnectionRequest {
         writer = new OutputStreamWriter(os, "UTF-8"); 
         Enumeration e = args.keys();
         while(e.hasMoreElements()) {
-        	if (shouldStop()) {
-        		break;
-        	}
+            if (shouldStop()) {
+                    break;
+            }
             String key = (String)e.nextElement();
             Object value = args.get(key);
             
@@ -283,7 +300,15 @@ public class MultipartRequest extends ConnectionRequest {
                 }
             } else { 
                 if(value instanceof String[]) {
+                    boolean first = true;
                     for(String s : (String[])value) {
+                        if(!first) {
+                            writer.write(CRLF);
+                            writer.write("--");
+                            writer.write(boundary);
+                            writer.write(CRLF);                            
+                        }
+                        first = false;
                         writer.write("Content-Disposition: form-data; name=\"");
                         writer.write(key);
                         writer.write("\"");

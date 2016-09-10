@@ -24,7 +24,11 @@ package com.codename1.location;
 
 import android.app.IntentService;
 import android.content.Intent;
+import android.os.Bundle;
 import android.util.Log;
+
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.ui.Display;
 import com.google.android.gms.location.FusedLocationProviderApi;
 
 /**
@@ -39,14 +43,42 @@ public class BackgroundLocationHandler extends IntentService {
 
     @Override
     protected void onHandleIntent(Intent intent) {
-        String className = intent.getStringExtra("backgroundClass");
+        //String className = intent.getStringExtra("backgroundClass");
+        String[] params = intent.getDataString().split("[?]");
         final android.location.Location location = intent.getParcelableExtra(FusedLocationProviderApi.KEY_LOCATION_CHANGED);
 
+        //might happen on some occasions, no need to do anything.
+        if (location == null) {
+            return;
+        }
+        //if the Display is not initialized we need to launch the CodenameOneBackgroundLocationActivity 
+        //activity to handle this
+        boolean shouldStopWhenDone = false;
+        if (!Display.isInitialized()) {
+            shouldStopWhenDone = true;
+            AndroidImplementation.startContext(this);
+            //Display.init(this);
+            /*
+            Intent bgIntent = new Intent(getBaseContext(), CodenameOneBackgroundLocationActivity.class);
+            Bundle b = new Bundle();
+            b.putString("backgroundLocation", params[1]);
+            b.putParcelable("Location", location);
+            bgIntent.putExtras(b); //Put your id to your next Intent
+            bgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getApplication().startActivity(bgIntent);
+                    */
+        } //else {
+
         try {
-            LocationListener l = (LocationListener) Class.forName(className).newInstance();
-            l.locationUpdated(AndroidLocationPlayServiceManager.convert(location));
+            //the 2nd parameter is the class name we need to create
+            LocationListener l = (LocationListener) Class.forName(params[1]).newInstance();
+            l.locationUpdated(AndroidLocationManager.convert(location));
         } catch (Exception e) {
             Log.e("Codename One", "background location error", e);
         }
+        if (shouldStopWhenDone) {
+            AndroidImplementation.stopContext(this);
+        }
+        //}
     }
 }

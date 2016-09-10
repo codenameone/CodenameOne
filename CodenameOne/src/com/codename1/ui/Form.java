@@ -860,6 +860,13 @@ public class Form extends Container {
     void setDraggedComponent(Component dragged) {
         this.dragged = dragged;
     }
+    
+    /**
+     * Gets the current dragged Component
+     */
+    Component getDraggedComponent() {
+        return dragged;
+    }
 
     /**
      * Returns true if the given dest component is in the column of the source component
@@ -1158,6 +1165,13 @@ public class Form extends Container {
      * @return returns the form title
      */
     public String getTitle() {
+        if(toolbar != null) {
+            Component cmp = toolbar.getTitleComponent();
+            if(cmp instanceof Label) {
+                return ((Label)cmp).getText();
+            }
+            return null;
+        }
         return title.getText();
     }
 
@@ -1395,19 +1409,21 @@ public class Form extends Container {
         
         super.refreshTheme(merge);
 
-        // when  changing the theme the menu behavior might also change
-        hideMenu();
-        restoreMenu();
-        Command[] cmds = new Command[getCommandCount()];
-        for (int iter = 0; iter < cmds.length; iter++) {
-            cmds[iter] = getCommand(iter);
-        }
-        removeAllCommands();
-        for (int iter = 0; iter < cmds.length; iter++) {
-            addCommand(cmds[iter], getCommandCount());
-        }
-        if (getBackCommand() != null) {
-            setBackCommand(getBackCommand());
+        if (toolbar == null) {
+            // when  changing the theme the menu behavior might also change
+            hideMenu();
+            restoreMenu();
+            Command[] cmds = new Command[getCommandCount()];
+            for (int iter = 0; iter < cmds.length; iter++) {
+                cmds[iter] = getCommand(iter);
+            }
+            removeAllCommands();
+            for (int iter = 0; iter < cmds.length; iter++) {
+                addCommand(cmds[iter], getCommandCount());
+            }
+            if (getBackCommand() != null) {
+                setBackCommand(getBackCommand());
+            }
         }
 
         revalidate();
@@ -2462,11 +2478,7 @@ public class Form extends Container {
         Container actual = getActualPane();
         Component cmp = actual.getComponentAt(x[0], y[0]);
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
-                setFocused(cmp);
-            }
             cmp.pointerHoverReleased(x, y);
-            cmp.repaint();
         }
     }
 
@@ -2481,7 +2493,6 @@ public class Form extends Container {
                 setFocused(cmp);
             }
             cmp.pointerHoverPressed(x, y);
-            cmp.repaint();
         }
     }
 
@@ -2502,7 +2513,6 @@ public class Form extends Container {
                 setFocused(cmp);
             }
             cmp.pointerHover(x, y);
-            cmp.repaint();
         }
     }
 

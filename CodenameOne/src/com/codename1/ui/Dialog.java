@@ -178,7 +178,7 @@ public class Dialog extends Form {
      * devices without the common softbuttons (e.g. blackberries). 
      * The default value is false
      */
-    private static boolean commandsAsButtons;
+    private static boolean commandsAsButtons = true;
 
     private boolean disposeWhenPointerOutOfBounds = false;
     private boolean pressedOutOfBounds;

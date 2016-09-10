@@ -22,11 +22,16 @@
  */
 package com.codename1.components;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -39,6 +44,8 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.SuccessCallback;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -216,7 +223,7 @@ public class ToastBar {
         /**
          * Optional progress for the task.  (Not tested or implemented yet).
          */
-        private int progress=-1;
+        private int progress=-2;
         
         /**
          * Optional icon to show in the {@code ToastBar}.  (Not tested or implemented yet).
@@ -273,12 +280,13 @@ public class ToastBar {
         }
         
         /**
-         * Sets the progress (1..100) that should be displayed in the progress bar
-         * for this status.  (Not tested or used yet).
+         * Sets the progress (-1..100) that should be displayed in the progress bar
+         * for this status.  When set to -1 it will act as an infinite progress
          * @param progress 
          */
         public void setProgress(int progress) {
             this.progress = progress;
+            updateStatus();
         }
         
         /**
@@ -490,12 +498,17 @@ public class ToastBar {
                         c.removeComponent(c.progressLabel);
                     }
                 }
-                c.progressBar.setVisible(s.getProgress() >= 0);
-                if (s.getProgress() >= 0) {
+                c.progressBar.setVisible(s.getProgress() >= -1);
+                if (s.getProgress() >= -1) {
                     if (!c.contains(c.progressBar)) {
                         c.addComponent(BorderLayout.SOUTH, c.progressBar);
                     }
-                    c.progressBar.setProgress(s.getProgress());
+                    if(s.getProgress() < 0) {
+                        c.progressBar.setInfinite(true);
+                    } else {
+                        c.progressBar.setInfinite(false);
+                        c.progressBar.setProgress(s.getProgress());
+                    }
                 } else {
                     c.removeComponent(c.progressBar);
                 }
@@ -683,7 +696,7 @@ public class ToastBar {
         Form f = Display.getInstance().getCurrent();
         if (f != null && !(f instanceof Dialog)) {
             ToastBarComponent c = (ToastBarComponent)f.getClientProperty("ToastBarComponent");
-            if (c == null) {
+            if (c == null || c.getParent() == null) {
                 c = new ToastBarComponent();
                 c.hidden = true;
                 f.putClientProperty("ToastBarComponent", c);
@@ -726,5 +739,106 @@ public class ToastBar {
             }
             c.setVisible(false); 
         }
+    }
+    
+    /**
+     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+     * @param msg the error message
+     */
+    public static void showErrorMessage(String msg) {
+        showErrorMessage(msg, 3500);
+    }
+
+    /**
+     * Simplifies a common use case of showing a message with an icon that fades out after a few seconds
+     * @param msg the message
+     * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
+     * @param timeout the timeout value in milliseconds
+     */
+    public static void showMessage(String msg, char icon, int timeout) {
+        ToastBar.Status s = ToastBar.getInstance().createStatus();
+        Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
+        s.setIcon(FontImage.createMaterial(icon, stl, 4));
+        s.setMessage(msg);
+        s.setExpires(timeout);
+        s.show();
+    }
+
+    /**
+     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+     * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
+     * @param msg the message
+     */
+    public static void showMessage(String msg, char icon) {
+        showMessage(msg, icon, 3500);
+    }
+
+    /**
+     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+     * @param msg the error message
+     * @param timeout the timeout value in milliseconds
+     */
+    public static void showErrorMessage(String msg, int timeout) {
+        showMessage(msg, FontImage.MATERIAL_ERROR, timeout);
+    }
+    
+    /*
+     * Shows a progress indicator based on connection request, this is incomplete but it meant to serve as 
+     * a replacement for the inifinte progress
+     * 
+     * @param message a message to show on the progress indicator
+     * @param cr the connection request whose progress should be shown
+     * @param onSuccess invoked when the connection request completes, can be null
+     * @param onError invoked on case of an error, can be null
+     */
+    public static void showConnectionProgress(String message, final ConnectionRequest cr, 
+            final SuccessCallback<NetworkEvent> onSuccess, final FailureCallback<NetworkEvent> onError) {
+        final ToastBar.Status s = ToastBar.getInstance().createStatus();
+        s.setProgress(-1);
+        s.setMessage(message);
+        s.show();
+         final ActionListener[] progListener = new ActionListener[1];
+        final ActionListener<NetworkEvent> errorListener = new ActionListener<NetworkEvent>() {
+            public void actionPerformed(NetworkEvent evt) {
+                s.clear();
+                NetworkManager.getInstance().removeErrorListener(this);
+                if(progListener[0] != null) {
+                    NetworkManager.getInstance().removeProgressListener(progListener[0]);
+                }
+                if(onError != null) {
+                    onError.onError(cr, evt.getError(), evt.getResponseCode(), evt.getMessage());
+                }
+            }
+        };
+        NetworkManager.getInstance().addErrorListener(errorListener);
+        progListener[0] = new ActionListener<NetworkEvent>() {
+            private int soFar;
+            public void actionPerformed(NetworkEvent evt) {
+                switch(evt.getProgressType()) {
+                    case NetworkEvent.PROGRESS_TYPE_COMPLETED:
+                        NetworkManager.getInstance().removeErrorListener(errorListener);
+                        NetworkManager.getInstance().removeProgressListener(this);
+                        s.clear();
+                        if(onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
+                            onSuccess.onSucess(evt);
+                        }
+                        break;
+                    case NetworkEvent.PROGRESS_TYPE_INITIALIZING:
+                        s.setProgress(-1);
+                        break;
+                    case NetworkEvent.PROGRESS_TYPE_INPUT:
+                    case NetworkEvent.PROGRESS_TYPE_OUTPUT:
+                        int currentLength = cr.getContentLength();
+                        if(currentLength > 0) {
+                            int sentReceived = evt.getSentReceived();
+                            float prog = ((float)sentReceived) / ((float)currentLength)  * 100f;
+                            s.setProgress((int)prog);
+                        } else {
+                            s.setProgress(-1);
+                        }
+                }
+            }
+        };
+        NetworkManager.getInstance().addProgressListener(progListener[0]);
     }
 }

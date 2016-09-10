@@ -1,15 +1,10 @@
 ﻿using Microsoft.Graphics.Canvas;
 using System.Collections.Generic;
-using System.Linq;
-using com.codename1.impl;
 using Microsoft.Graphics.Canvas.UI.Xaml;
-using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
-using System.Diagnostics;
 using com.codename1.ui.geom;
-using System.Threading.Tasks;
-using Microsoft.Graphics.Canvas.UI;
 using System;
+using Microsoft.Graphics.Canvas.Geometry;
 
 namespace com.codename1.impl
 {
@@ -17,7 +12,6 @@ namespace com.codename1.impl
     public class WindowsAsyncView 
     {
         private static CanvasControl _screen;
-        //private SilverlightImplementation _implementation;
         private NativeGraphics _graphics;
         private static IList<AsyncOp> renderingOperations = new List<AsyncOp>();
         private static IList<AsyncOp> pendingRenderingOperations = new List<AsyncOp>();
@@ -25,14 +19,14 @@ namespace com.codename1.impl
         public WindowsAsyncView(CanvasControl screen)
         {
            _screen = screen;
-           _screen.Draw += OnDraw;
-           // _implementation = implementation;
+           _screen.Draw += OnDraw;      
         }
+
         private void OnDraw(CanvasControl sender, CanvasDrawEventArgs args)
         {
+          
             if (_graphics == null)
             {
-               // Debug.WriteLine("OnDraw - initializing graphics");
                 _graphics = new NativeGraphics();
                 _graphics.destination = new AsyncGraphics(args.DrawingSession);
                 _graphics.resetClip();
@@ -52,30 +46,11 @@ namespace com.codename1.impl
             args.DrawingSession.Dispose();
             renderingOperations.Clear();
         }
-
+    
+        /// </summary>
+        /// <param name="rect"></param>
         internal void flushGraphics(Rectangle rect)
-        {
-            //int counter = 0;
-            //while (renderingOperations.Count() > 0)
-            //{
-            //    try
-            //    {
-            //        global::System.Threading.Tasks.Task.Run(() => global::System.Threading.Tasks.Task.Delay(global::System.TimeSpan.FromMilliseconds(5))).ConfigureAwait(false).GetAwaiter().GetResult();
-
-            //        // don't let the EDT die here
-            //        counter++;
-            //        if (counter > 10)
-            //        {
-            //            Debug.WriteLine("Flush graphics timed out!!!");
-            //            return;
-            //        }
-            //    }
-            //    catch (System.Exception e)
-            //    {
-            //        global::System.Diagnostics.Debug.WriteLine(e);
-            //    }
-            //}
-
+        {          
             using (System.Threading.AutoResetEvent are = new System.Threading.AutoResetEvent(false))
             {
                 SilverlightImplementation.dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
@@ -111,6 +86,7 @@ namespace com.codename1.impl
         {
             return _graphics;
         }
+
         public class AsyncGraphics : WindowsGraphics
         {
             private Rectangle clip;
@@ -155,12 +131,12 @@ namespace com.codename1.impl
                 return color;
             }
 
-            internal override void setFont(Microsoft.Graphics.Canvas.Text.CanvasTextFormat font)
+            internal override void setFont(CanvasTextFormat font)
             {
                 this.font = font;
             }
 
-            internal override Microsoft.Graphics.Canvas.Text.CanvasTextFormat getFont()
+            internal override CanvasTextFormat getFont()
             {
                 return font;
             }
@@ -238,6 +214,7 @@ namespace com.codename1.impl
             {
                 pendingRenderingOperations.Add(new FillLinearGradientPainter(clip, startColor, endColor, x, y, width, height, horizontal));
             }
+
             internal override void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height)
             {
                 pendingRenderingOperations.Add(new FillRadialGradientPainter(clip, startColor, endColor, x, y, width, height));

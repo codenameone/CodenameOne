@@ -37,6 +37,10 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public final class IOSNative {
+
+    native long beginBackgroundTask();
+
+    native void endBackgroundTask(long taskId);
     
     
     //native void startMainThread(Runnable r);
@@ -581,6 +585,30 @@ public final class IOSNative {
     native void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints);
 
     native void updateNativeEditorText(String text);
+
+    native void fireUIBackgroundFetchResultNoData();
+
+    native void fireUIBackgroundFetchResultNewData();
+
+    native void fireUIBackgroundFetchResultFailed();
+
+    native void setPreferredBackgroundFetchInterval(int seconds);
+
+    native boolean isBackgroundFetchSupported();
+
+    native int countLinkedContacts(int recId);
+
+    native void getLinkedContactIds(int num, int recId, int[] out);
+
+    native void fillRadialGradientMutable(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle);
+
+    native void applyRadialGradientPaintMutable(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintMutable();
+
+    native void applyRadialGradientPaintGlobal(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintGlobal();
 
    
 

@@ -442,6 +442,7 @@ public class Style {
     
     // used by the Android port, do not remove!
     Object nativeOSCache;
+    boolean renderer;
     
     /**
      * Each component when it draw itself uses this Object 
@@ -455,6 +456,14 @@ public class Style {
         modifiedFlag = 0;
     }
 
+    /**
+     * Disables native OS optimizations that might collide with cell renderers which do things like sharing style
+     * objects
+     */
+    public void markAsRendererStyle() {
+        renderer = true;
+    }
+    
     /**
      * Creates a "proxy" style whose setter methods map to the methods in the given styles passed and whose
      * getter methods are meaningless
@@ -1193,7 +1202,7 @@ public class Style {
             return;
         }
         if (opacity < 0 || opacity > 255) {
-            throw new IllegalArgumentException("valid values are between 0-255");
+            throw new IllegalArgumentException("valid values are between 0-255: " + opacity);
         }
         if (this.opacity != (byte) opacity) {
             this.opacity = (byte) opacity;

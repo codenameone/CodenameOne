@@ -1,52 +1,53 @@
 ﻿using IKVM.Attributes;
 using IKVM.Internal;
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Controls.Primitives;
-using Windows.UI.Xaml.Data;
-using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
+#if WINDOWS_UWP
 using Windows.UI.Xaml.Navigation;
+#else
+using Windows.UI.Xaml.Media.Animation;
+using Windows.UI.Xaml.Navigation;
+#endif
+
 
 namespace UWPApp
 {
-    /// <summary>
+   /// <summary>
     /// Provides application-specific behavior to supplement the default Application class.
     /// </summary>
-    sealed partial class App : Application
+    public sealed partial class App : Application
     {
+#if WINDOWS_PHONE_APP
+        private TransitionCollection transitions;
+#endif
         /// <summary>
         /// Initializes the singleton application object.  This is the first line of authored code
         /// executed, and as such is the logical equivalent of main() or WinMain().
         /// </summary>
         public App()
         {
-            Microsoft.ApplicationInsights.WindowsAppInitializer.InitializeAsync(
+#if WINDOWS_UWP
+             Microsoft.ApplicationInsights.WindowsAppInitializer.InitializeAsync(
                 Microsoft.ApplicationInsights.WindowsCollectors.Metadata |
                 Microsoft.ApplicationInsights.WindowsCollectors.Session);
+#endif
             this.InitializeComponent();
-            this.Suspending += OnSuspending;
+            this.Suspending += this.OnSuspending;
         }
-
         /// <summary>
         /// Invoked when the application is launched normally by the end user.  Other entry points
-        /// will be used such as when the application is launched to open a specific file.
+        /// will be used when the application is launched to open a specific file, to display
+        /// search results, and so forth.
         /// </summary>
         /// <param name="e">Details about the launch request and process.</param>
         protected override void OnLaunched(LaunchActivatedEventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine("in OnLaunched1");
-            //IKVMReflectionHelper.Initialize();
 #if DEBUG
             if (System.Diagnostics.Debugger.IsAttached)
             {
@@ -62,12 +63,20 @@ namespace UWPApp
             {
                 // Create a Frame to act as the navigation context and navigate to the first page
                 rootFrame = new Frame();
-
-                rootFrame.NavigationFailed += OnNavigationFailed;
+#if WINDOWS_UWP
+                   rootFrame.NavigationFailed += OnNavigationFailed;
+#endif
+             //   rootFrame.Background = new ImageBrush
+            //    {
+            //        Stretch = Windows.UI.Xaml.Media.Stretch.UniformToFill,
+            //        ImageSource = new Windows.UI.Xaml.Media.Imaging.BitmapImage { UriSource = new Uri("ms-appx:///res/SplashScreen.png") },
+            //    };
+                // TODO: change this value to a cache size that is appropriate for your application
+                rootFrame.CacheSize = 1;
 
                 if (e.PreviousExecutionState == ApplicationExecutionState.Terminated)
                 {
-                    //TODO: Load state from previously suspended application
+                    // TODO: Load state from previously suspended application
                 }
 
                 // Place the frame in the current Window
@@ -76,25 +85,55 @@ namespace UWPApp
 
             if (rootFrame.Content == null)
             {
+#if WINDOWS_PHONE_APP
+                // Removes the turnstile navigation for startup.
+                if (rootFrame.ContentTransitions != null)
+                {
+                    this.transitions = new TransitionCollection();
+                    foreach (var c in rootFrame.ContentTransitions)
+                    {
+                        this.transitions.Add(c);
+                    }
+                }
+
+                rootFrame.ContentTransitions = null;
+                rootFrame.Navigated += this.RootFrame_FirstNavigated;
+#endif
+#if WINDOWS_UWP
+                rootFrame.Navigate(typeof(MainPage), e.Arguments);
+#else
                 // When the navigation stack isn't restored navigate to the first page,
                 // configuring the new page by passing required information as a navigation
                 // parameter
-                rootFrame.Navigate(typeof(MainPage), e.Arguments);
+                if (!rootFrame.Navigate(typeof(MainPage), e.Arguments))
+                {
+                    throw new Exception("Failed to create initial page");
+                }
+#endif
             }
+
             // Ensure the current window is active
             Window.Current.Activate();
         }
-
-        /// <summary>
-        /// Invoked when Navigation to a certain page fails
-        /// </summary>
-        /// <param name="sender">The Frame which failed navigation</param>
-        /// <param name="e">Details about the navigation failure</param>
-        void OnNavigationFailed(object sender, NavigationFailedEventArgs e)
+#if WINDOWS_UWP
+         void OnNavigationFailed(object sender, NavigationFailedEventArgs e)
         {
             throw new Exception("Failed to load Page " + e.SourcePageType.FullName);
         }
-
+#endif
+#if WINDOWS_PHONE_APP
+        /// <summary>
+        /// Restores the content transitions after the app has launched.
+        /// </summary>
+        /// <param name="sender">The object where the handler is attached.</param>
+        /// <param name="e">Details about the navigation event.</param>
+        private void RootFrame_FirstNavigated(object sender, NavigationEventArgs e)
+        {
+            var rootFrame = sender as Frame;
+            rootFrame.ContentTransitions = this.transitions ?? new TransitionCollection() { new NavigationThemeTransition() };
+            rootFrame.Navigated -= this.RootFrame_FirstNavigated;
+        }
+#endif
         /// <summary>
         /// Invoked when application execution is being suspended.  Application state is saved
         /// without knowing whether the application will be terminated or resumed with the contents
@@ -105,13 +144,14 @@ namespace UWPApp
         private void OnSuspending(object sender, SuspendingEventArgs e)
         {
             var deferral = e.SuspendingOperation.GetDeferral();
-            //TODO: Save application state and stop any background activity
+            // TODO: Save application state and stop any background activity
             deferral.Complete();
         }
-    }
-    
+    }  
     class IKVMReflectionHelper : RuntimeReflectionHelper
     {
+
+        
         public static void Initialize()
         {
             Instance = new IKVMReflectionHelper();
@@ -125,6 +165,56 @@ namespace UWPApp
             System.Diagnostics.Debug.WriteLine("In IKVMReflectionHelper 1");
             java.lang.System.setOut(new DebugPrintStream());
         }
+
+        public override System.String convertToStringImpl(System.Object obj)
+        {
+            if (obj != null && obj is java.lang.Object)
+            {
+                return ((java.lang.Object)obj).toString();
+            }
+            return base.convertToStringImpl(obj);
+        }
+
+        public override string getCurrentStackTrace()
+        {
+            return Environment.StackTrace;
+        }
+
+        public override String getTimezoneId()
+        {
+            return TimeZoneInfo.Local.Id;
+        }
+        public override int getTimezoneOffset(string name, int year, int month, int day, int timeOfDayMillis)
+        {
+            int hours = timeOfDayMillis / 1000 / 60 / 60;
+            int minutes = timeOfDayMillis / 1000 / 60 - hours * 60;
+            int seconds = timeOfDayMillis / 1000 - (hours * 60 * 60) - (minutes * 60);
+            int millis = timeOfDayMillis % 1000;
+            return (int)TimeZoneInfo.FindSystemTimeZoneById(name).GetUtcOffset(new DateTime(year, month, day, hours, minutes, seconds, DateTimeKind.Local)).TotalMilliseconds;
+
+        }
+        public override int getTimezoneRawOffset(string name)
+        {
+            return (int)TimeZoneInfo.FindSystemTimeZoneById(name).GetUtcOffset(new DateTime()).TotalMilliseconds;
+        }
+        public override bool isTimezoneDST(string name, long millis)
+        {
+            Int64 ticks = millis * 10000;
+            if (ticks < DateTime.MinValue.Ticks) ticks = DateTime.MinValue.Ticks;
+            if (ticks > DateTime.MaxValue.Ticks) ticks = DateTime.MaxValue.Ticks;
+            return TimeZoneInfo.FindSystemTimeZoneById(name).IsDaylightSavingTime(new DateTime(ticks));
+        }
+
+        public override string getOSLanguage()
+        {
+            string tag = Windows.Globalization.ApplicationLanguages.Languages.First();
+            if (tag.IndexOf("-") >= 0)
+            {
+                tag = tag.Substring(tag.IndexOf("-") + 1);
+            }
+            return tag;
+        }
+
 
         public override Module GetTypeModule(Type type)
         {
@@ -160,6 +250,10 @@ namespace UWPApp
 #else
             return assembly.Modules.ToArray();
 #endif
+        }
+
+        public override Type getTimeZoneInfo() {
+            return typeof(TimeZoneInfo);
         }
 
         public override RemappedClassAttribute[] GetRemappedClasses(Assembly assambly)

@@ -98,6 +98,12 @@ public class Component implements Animation, StyleListener {
     private int tensileLength = -1;
 
     /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that 
+     * hierarchy to still act as a standalone component
+     */
+    private boolean blockLead;
+    
+    /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
      */
@@ -117,7 +123,7 @@ public class Component implements Animation, StyleListener {
     private Component nextFocusLeft;
     private String name;
     boolean hasLead;
-
+    
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
@@ -446,11 +452,17 @@ public class Component implements Animation, StyleListener {
             if (unSelectedStyle.getBgPainter() == null) {
                 unSelectedStyle.setBgPainter(new BGPainter());
             }
+            if(cellRenderer) {
+                unSelectedStyle.markAsRendererStyle();
+            }
         }
         if(disabledStyle != null) {
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
+            }
+            if(cellRenderer) {
+                disabledStyle.markAsRendererStyle();
             }
         }
     }
@@ -511,6 +523,9 @@ public class Component implements Animation, StyleListener {
     }
 
     Component getLeadComponent() {
+        if(isBlockLead()) {
+            return null;
+        }
         Container p = getParent();
         if(p != null) {
             return p.getLeadComponent();
@@ -1527,6 +1542,10 @@ public class Component implements Animation, StyleListener {
         if(parent != null) {
             parent.paintGlassImpl(g);
         }
+        paintTensile(g);
+    }
+
+    void paintTensile(Graphics g) {
         if(tensileHighlightIntensity > 0) {
             int i = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
             if(scrollY >= i - 1) {
@@ -1538,9 +1557,9 @@ public class Component implements Animation, StyleListener {
                     tensileHighlightIntensity = 0;
                 }
             }
-        }
+        }        
     }
-
+    
     private void drawPainters(com.codename1.ui.Graphics g, Component par, Component c,
             int x, int y, int w, int h) {
         if(flatten && getWidth() > 0 && getHeight() > 0) {
@@ -2286,6 +2305,27 @@ public class Component implements Animation, StyleListener {
         return animationSpeed;
     }
 
+    /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that
+     * hierarchy to still act as a standalone component
+     * @return the blockLead
+     */
+    public boolean isBlockLead() {
+        return blockLead;
+    }
+
+    /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that
+     * hierarchy to still act as a standalone component
+     * @param blockLead the blockLead to set
+     */
+    public void setBlockLead(boolean blockLead) {
+        this.blockLead = blockLead;
+        if(blockLead) {
+            hasLead = false;
+        }
+    }
+
     class AnimationTransitionPainter implements Painter{
         int alpha;
         Style originalStyle;
@@ -2440,6 +2480,7 @@ public class Component implements Animation, StyleListener {
         return new ComponentAnimation() {
             private boolean finished;
             private boolean stepMode;
+            private boolean started;
             
             @Override
             public boolean isStepModeSupported() {
@@ -2495,6 +2536,9 @@ public class Component implements Animation, StyleListener {
             
             @Override
             public boolean isInProgress() {
+                if(!stepMode && !started) {
+                    return true;
+                }
                 return stepMode ||
                         !((bgMotion == null || bgMotion.isFinished()) && 
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&
@@ -2513,6 +2557,43 @@ public class Component implements Animation, StyleListener {
             protected void updateState() {
                 if(finished) {
                     return;
+                }
+                
+                if(!started && !stepMode) {
+                    started = true;
+                    if(bgMotion != null) {
+                        bgMotion.start();
+                    }
+                    if(fgColorMotion != null) {
+                        fgColorMotion.start();
+                    }
+                    if(fontMotion != null) {
+                        fontMotion.start();
+                    }
+                    if(paddingTop != null) {
+                        paddingTop.start();
+                    }
+                    if(paddingBottom != null) {
+                        paddingBottom.start();
+                    }
+                    if(paddingLeft != null) {
+                        paddingLeft.start();
+                    }
+                    if(paddingRight != null) {
+                        paddingRight.start();
+                    }
+                    if(marginTop != null) {
+                        marginTop.start();
+                    }
+                    if(marginBottom != null) {
+                        marginBottom.start();
+                    }
+                    if(marginLeft != null) {
+                        marginLeft.start();
+                    }
+                    if(marginRight != null) {
+                        marginRight.start();
+                    }
                 }
                                 
                 if(!isInProgress()) {
@@ -2642,7 +2723,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHover(int[] x, int[] y) {
-        pointerDragged(x, y);
     }
 
     void clearDrag() {
@@ -2704,8 +2784,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHoverPressed(int[] x, int[] y) {
-        dragActivated = false;
-        clearDrag();
     }
     
     /**
@@ -2891,6 +2969,9 @@ public class Component implements Animation, StyleListener {
      */
     public void pointerDragged(final int x, final int y) {
         Form p = getComponentForm();
+        if(p == null){
+            return;
+        }
         
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
@@ -2909,7 +2990,7 @@ public class Component implements Animation, StyleListener {
                     }
                 });
             }
-            
+                      
             if (!dragActivated) {
                 dragActivated = true;
                 setVisible(false);
@@ -2986,6 +3067,10 @@ public class Component implements Animation, StyleListener {
                 
             return;
         }
+        if(dragActivated && p.getDraggedComponent() == null){
+            dragActivated = false;
+        }
+        
         if(!dragActivated){
             boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
             shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
@@ -3518,7 +3603,7 @@ public class Component implements Animation, StyleListener {
         }
         isUnselectedStyle = false;
 
-        if(hasLead) {
+        if(hasLead && !blockLead) {
             Component lead = getLeadComponent();
             if(lead != null) {
                 if(!lead.isEnabled()) {
@@ -3617,6 +3702,9 @@ public class Component implements Animation, StyleListener {
             selectedStyle.addStyleListener(this);
             if (selectedStyle.getBgPainter() == null) {
                 selectedStyle.setBgPainter(new BGPainter());
+            }
+            if(cellRenderer) {
+                selectedStyle.markAsRendererStyle();
             }
         }
         return selectedStyle;
@@ -4178,6 +4266,11 @@ public class Component implements Animation, StyleListener {
      */
     public void setCellRenderer(boolean cellRenderer) {
         this.cellRenderer = cellRenderer;
+        if(cellRenderer) {
+            getUnselectedStyle().markAsRendererStyle();
+            getSelectedStyle().markAsRendererStyle();
+            getDisabledStyle().markAsRendererStyle();
+        }
     }
 
     /**

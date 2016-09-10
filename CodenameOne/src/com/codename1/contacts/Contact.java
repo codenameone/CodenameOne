@@ -22,6 +22,7 @@
  */
 package com.codename1.contacts;
 
+import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import java.util.Collection;
 import java.util.Hashtable;
@@ -63,6 +64,8 @@ public class Contact {
     private Image photo;
     
     private String [] urls;
+    
+    private String[] linkedIds;
     
     /**
      * Empty Constructor
@@ -323,4 +326,22 @@ public class Contact {
         this.urls = urls;
     }
     
+    /**
+     * Returns all of the contacts that are linked to this contact.
+     * @return The contacts that are linked to this contact.
+     */
+    //public Contact[] getLinkedContacts() {
+    //    return ContactsManager.getLinkedContacts(this);
+    //}
+    
+    /**
+     * Returns the IDs of all contacts that are linked to this contact.
+     * @return IDs of all contacts that are linked to this contact.
+     */
+    public String[] getLinkedContactIds() {
+        if (linkedIds == null) {
+            linkedIds = Display.getInstance().getLinkedContactIds(this);
+        }
+        return linkedIds;
+    }
 }

@@ -31,8 +31,11 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import static com.codename1.impl.android.AndroidImplementation.activity;
+import android.util.Log;
+
+import com.codename1.background.BackgroundFetch;
 import com.codename1.notifications.LocalNotification;
+import com.codename1.ui.Display;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.logging.Level;
@@ -46,6 +49,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
 
     public static String NOTIFICATION = "notification";
     public static String NOTIFICATION_INTENT = "notification-intent";
+    public static String BACKGROUND_FETCH_INTENT = "background-fetch-intent";
 
     public void onReceive(Context context, Intent intent) {
         //Fire the notification to the display
@@ -56,16 +60,36 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         Bundle b = extras.getParcelable(NOTIFICATION);
         LocalNotification notif = AndroidImplementation.createNotificationFromBundle(b);
 
-        Notification notification = createAndroidNotification(context, notif, content);
-        notification.when = System.currentTimeMillis();
-        notificationManager.notify(notif.getId(), 0, notification);
+        if (AndroidImplementation.BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId())) {
+            PendingIntent backgroundFetchIntent = extras.getParcelable(BACKGROUND_FETCH_INTENT);
+            if (backgroundFetchIntent != null) {
+                try {
+                    backgroundFetchIntent.send();
+                } catch (Exception ex) {
+                    Log.e("Codename One", "Failed to send BackgroundFetchHandler intent", ex);
+                }
+            } else {
+                Log.d("Codename One", "BackgroundFetch intent was null");
+            }
+        } else {
+            Notification notification = createAndroidNotification(context, notif, content);
+            notification.when = System.currentTimeMillis();
+            try{
+                int notifId = Integer.parseInt(notif.getId());
+                notificationManager.notify("CN1", notifId, notification);                
+            }catch(Exception e){
+                //that was a mistake, the first param is the tag not the id
+                notificationManager.notify(notif.getId(), 0, notification);
+            }
+        }
     }
 
     private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content) {
-        int smallIcon = activity.getResources().getIdentifier("ic_stat_notify", "drawable", activity.getApplicationInfo().packageName);
-        int icon = activity.getResources().getIdentifier("icon", "drawable", activity.getApplicationInfo().packageName);
+        Context ctx = AndroidImplementation.getContext();
+        int smallIcon = ctx.getResources().getIdentifier("ic_stat_notify", "drawable", ctx.getApplicationInfo().packageName);
+        int icon = AndroidImplementation.getContext().getResources().getIdentifier("icon", "drawable", ctx.getApplicationInfo().packageName);
 
-        Notification.Builder builder = new Notification.Builder(activity);
+        Notification.Builder builder = new Notification.Builder(ctx);
         builder.setContentTitle(localNotif.getAlertTitle());
         builder.setContentText(localNotif.getAlertBody());
         builder.setAutoCancel(true);
@@ -95,7 +119,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         String sound = localNotif.getAlertSound();
         if (sound != null && sound.length() > 0) {
             sound = sound.toLowerCase();
-            builder.setSound(android.net.Uri.parse("android.resource://"+activity.getApplicationInfo().packageName+"/raw"+sound.substring(0, sound.indexOf("."))));
+            builder.setSound(android.net.Uri.parse("android.resource://"+ctx.getApplicationInfo().packageName+"/raw"+sound.substring(0, sound.indexOf("."))));
         }
         Notification n = builder.build();
         n.icon = icon;

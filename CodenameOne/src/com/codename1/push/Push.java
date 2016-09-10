@@ -193,9 +193,11 @@ public class Push {
     public static String getPushKey() {
         String key = Preferences.get("push_key", null);
         if(key != null) {
-            String pushPrefix = Display.getInstance().getProperty("cn1_push_prefix", null);
-            if(pushPrefix != null) {
-                return "cn1-" + pushPrefix + "-" + key;
+            if(!key.startsWith("cn1-")) {
+                String pushPrefix = Display.getInstance().getProperty("cn1_push_prefix", null);
+                if(pushPrefix != null) {
+                    return "cn1-" + pushPrefix + "-" + key;
+                }
             }
         }
         return null;

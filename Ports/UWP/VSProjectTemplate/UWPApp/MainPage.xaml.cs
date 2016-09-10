@@ -25,10 +25,10 @@ namespace UWPApp
     /// </summary>
     public sealed partial class MainPage : Page
     {
-        public static String BUILD_KEY = "93a9e292-73df-45e9-a9f8-b653ac90d1a2";
-        public static String PACKAGE_NAME = "com.codename1.tests.hellowin";
-        public static String BUILT_BY_USER = "steve.hannah@codenameone.com";
-        public static String APP_NAME = "HelloWindows";
+        public static String BUILD_KEY = "null";
+        public static String PACKAGE_NAME = "com.mycompany.myapp";
+        public static String BUILT_BY_USER = "null";
+        public static String APP_NAME = "TestProject";
         public static String APP_VERSION = "1.0";
         private Main instance;
 
@@ -36,7 +36,7 @@ namespace UWPApp
         public MainPage()
         {
 
-            
+
             IKVMReflectionHelper.Initialize();
             NativeThreadHelper.setInstance(new NativeThreadHelperImpl());
             ImplementationFactory.getInstance().setImplementation(new SilverlightImplementation());
@@ -46,61 +46,34 @@ namespace UWPApp
             System.Diagnostics.Debug.WriteLine("About to init5.5");
             Loaded += delegate {
                 System.Diagnostics.Debug.WriteLine("About to init7.1");
-                
+
                 if (instance == null)
                 {
                     //java.io.FileDescriptor.init();
                     System.Diagnostics.Debug.WriteLine("About to init6");
 
-                    try {
+                    try
+                    {
                         com.codename1.impl.SilverlightImplementation.setCanvas(this, LayoutRoot);
                         //com.codename1.impl.SilverlightImplementation.setPushCallback(null);
-                    } finally { System.Diagnostics.Debug.WriteLine("About to init");  }
-
-
-                    com.codename1.ui.util.Resources.setFailOnMissingTruetype(false);
-                    System.Diagnostics.Debug.WriteLine("Display instance " + typeof(com.codename1.ui.Display));
-                    com.codename1.ui.Display.init(null);
-                    System.Diagnostics.Debug.WriteLine("after init");
-                    com.codename1.ui.Display disp = (com.codename1.ui.Display)com.codename1.ui.Display.getInstance();
-                    disp.setProperty("package_name", PACKAGE_NAME);
-                    disp.setProperty("built_by_user", BUILT_BY_USER);
-                    disp.setProperty("build_key", BUILD_KEY);
-                    disp.setProperty("AppName", APP_NAME);
-                    disp.setProperty("AppVersion", APP_VERSION);
-                    instance = new Main();
-                    instance.start();
-                    //PhoneApplicationService.Current.Activated += Current_Activated;
-                    //PhoneApplicationService.Current.Deactivated += Current_Deactivated;
-
-                    bool firstTime = com.codename1.io.Preferences.get("cn1_first_time_req", true);
-                    if (firstTime)
-                    {
-                        com.codename1.io.Preferences.set("cn1_first_time_req", false);
-                        Request r = new Request();
-                        r.setPost(false);
-                        r.setFailSilently(true);
-                        r.setUrl("https://codename-one.appspot.com/registerDeviceServlet");
-                        r.addArgument("a",
-                            "HelloWorldWindows");
-                        r.addArgument("b",
-                            BUILD_KEY);
-                        r.addArgument("by",
-                            BUILT_BY_USER);
-                        r.addArgument("p",
-                            PACKAGE_NAME);
-                        string ver = disp.getProperty(
-                            "AppVersion",
-                            "1.0");
-                        r.addArgument("v", ver);
-                        r.addArgument("pl", disp.getPlatformName());
-                        r.addArgument("u", "");
-                        com.codename1.io.NetworkManager n = (com.codename1.io.NetworkManager)com.codename1.io.NetworkManager.getInstance();
-                        n.addToQueue(r);
                     }
-                         
-                 }
-                
+                    finally { System.Diagnostics.Debug.WriteLine("About to init"); }
+ SilverlightImplementation.screen.Loaded += delegate {
+                        com.codename1.ui.util.Resources.setFailOnMissingTruetype(false);
+                        System.Diagnostics.Debug.WriteLine("Display instance " + typeof(com.codename1.ui.Display));
+                        com.codename1.ui.Display.init(null);
+                        System.Diagnostics.Debug.WriteLine("after init");
+                        com.codename1.ui.Display disp = (com.codename1.ui.Display)com.codename1.ui.Display.getInstance();
+                        disp.setProperty("package_name", PACKAGE_NAME);
+                        disp.setProperty("built_by_user", BUILT_BY_USER);
+                        disp.setProperty("build_key", BUILD_KEY);
+                        disp.setProperty("AppName", APP_NAME);
+                        disp.setProperty("AppVersion", APP_VERSION);
+                        instance = new Main();
+                        instance.start();
+                    };
+                }
+
             };
             System.Diagnostics.Debug.WriteLine("About to init7");
         }
@@ -116,7 +89,7 @@ namespace UWPApp
         //    {
         //        instance.start();
         //    }
-       // }
+        // }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {

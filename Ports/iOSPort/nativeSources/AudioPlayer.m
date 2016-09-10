@@ -232,6 +232,19 @@ AudioPlayer* currentlyPlaying = nil;
     return false;
 }
 
+-(void) stop {
+    if (playerInstance != nil) {
+        if (playerInstance.isPlaying) {
+            [playerInstance stop];
+        }
+    }
+    if (avPlayerInstance != nil) {
+        
+        if ([avPlayerInstance rate] != 0.0) {
+            [avPlayerInstance pause];
+        }
+    }
+}
 -(void)dealloc {
     if(currentlyPlaying == self) {
         currentlyPlaying = nil;

@@ -1,20 +1,13 @@
 ﻿
-using java.lang;
-using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Windows.ApplicationModel.Store;
-using Windows.UI.Xaml;
-using Windows.UI.Xaml.Media.Imaging;
 
 namespace com.codename1.impl
 {
-    public class WindowsPurchase : com.codename1.payment.Purchase
+    public class WindowsPurchase : payment.Purchase
     {
         public static LicenseChangedEventHandler licenseChangeHandler = null;
         private static CanvasControl screen;
@@ -39,7 +32,7 @@ namespace com.codename1.impl
             return base.wasPurchased(n1);
         }
 
-        public override com.codename1.payment.Product[] getProducts(string[] n1)
+        public override payment.Product[] getProducts(string[] n1)
         {
             return base.getProducts(n1);
         }
@@ -51,8 +44,8 @@ namespace com.codename1.impl
 
         public override void purchase(string idProduct)
         {
-            string produto = idProduct;         
-           com.codename1.payment.PurchaseCallback pc = (com.codename1.payment.PurchaseCallback)SilverlightImplementation.getPurchaseCallback();
+            string produto = idProduct;
+            payment.PurchaseCallback pc = SilverlightImplementation.getPurchaseCallback();
             SilverlightImplementation.dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
             {
                 try

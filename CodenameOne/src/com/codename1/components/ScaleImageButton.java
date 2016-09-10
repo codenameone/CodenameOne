@@ -24,6 +24,8 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
@@ -93,8 +95,19 @@ public class ScaleImageButton extends Button {
         if(i == null) {
             return new Dimension();
         }
+        int dw = Display.getInstance().getDisplayWidth();
+        int iw = i.getWidth();
+        int ih = i.getHeight();
+        
+        // a huge preferred width might be requested that is bigger than screen size. Normally this isn't a problem but in
+        // a scrollable container the vertical height might be granted providing so much space as to make this unrealistic...
+        if(iw > dw) {
+            float ratio = ((float)iw) / ((float)dw);
+            iw = (int) (((float)iw) / ((float)ratio));
+            ih = (int) (((float)ih) / ((float)ratio));
+        }
         Style s = getStyle();
-        return new Dimension(i.getWidth() + s.getPaddingLeft(false) + s.getPaddingRight(false), i.getHeight() +
+        return new Dimension(iw + s.getPaddingLeft(false) + s.getPaddingRight(false), ih +
                 s.getPaddingTop() + s.getPaddingBottom());
     }
 
@@ -118,7 +131,35 @@ public class ScaleImageButton extends Button {
      * @param i the image
      */
     public void setIcon(Image i) {
+        setShouldCalcPreferredSize(true);
         getAllStyles().setBgImage(i);
+        if(i !=null && i.isAnimation()) {
+            checkAnimation(i);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * Overriden to support animations
+     */
+    @Override
+    protected void initComponent() {
+        super.initComponent(); 
+        checkAnimation(getIcon());
+    }
+    
+    
+    
+    void checkAnimation(Image icon) {
+        if(icon != null && icon.isAnimation()) {
+            Form parent = getComponentForm();
+            if(parent != null) {
+                // animations are always running so the internal animation isn't
+                // good enough. We never want to stop this sort of animation
+                parent.registerAnimated(this);
+            }
+        }
     }
     
     /**
@@ -142,7 +183,7 @@ public class ScaleImageButton extends Button {
      */
     @Override
     public Image getIconFromState() {
-        return getIcon();
+        return null;
     }
 
 }

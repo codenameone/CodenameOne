@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-
 using System.Threading.Tasks;
 using IKVM.Runtime;
 
 namespace com.codename1.impl
 {
 
-    public class NativeThreadHelperImpl : IKVM.Runtime.NativeThreadHelper
+    public class NativeThreadHelperImpl : NativeThreadHelper
     {
         public override NativeThread CurrentThread
         {
@@ -41,7 +40,7 @@ namespace com.codename1.impl
     }
 
     public class NativeThreadImpl : IKVM.Runtime.NativeThread
-   
+
     {
 
         private Task peerTask;
@@ -169,14 +168,6 @@ namespace com.codename1.impl
 
 
     }
-
-
-
-   
-
-
-   
-
 
     public class NativeThreadPoolImpl
     {

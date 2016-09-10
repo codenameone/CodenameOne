@@ -132,6 +132,8 @@ public class ConnectionRequest implements IOProgressListener {
     private EventDispatcher actionListeners;
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @return the defaultFollowRedirects
      */
     public static boolean isDefaultFollowRedirects() {
@@ -139,6 +141,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @param aDefaultFollowRedirects the defaultFollowRedirects to set
      */
     public static void setDefaultFollowRedirects(boolean aDefaultFollowRedirects) {
@@ -165,7 +169,7 @@ public class ConnectionRequest implements IOProgressListener {
     private OutputStream output;
     private int progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
     private int contentLength = -1;
-    private boolean duplicateSupported;
+    private boolean duplicateSupported = true;
     private EventDispatcher responseCodeListeners;
     private Hashtable userHeaders;
     private Dialog showOnInit;
@@ -376,7 +380,7 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             if(isWriteRequest()) {
-            	progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
+                progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
                 output = impl.openOutputStream(connection);
                 if(shouldStop()) {
                     return;
@@ -799,6 +803,8 @@ public class ConnectionRequest implements IOProgressListener {
 
     /**
      * This is a callback method that been called when there is a redirect.
+     * <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      *
      * @param url the url to be redirected
      * @return true if the implementation would like to handle this by itself
@@ -1058,6 +1064,10 @@ public class ConnectionRequest implements IOProgressListener {
         if(value == null || key == null){
             return;
         }
+        if(post) {
+            // this needs to be implicit for a post request with arguments
+            setWriteRequest(true);
+        }
         requestArguments.put(key, value);
     }
 
@@ -1104,6 +1114,40 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void addArgumentNoEncoding(String key, String value) {
         addArg(key, value);
+    }
+
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key, notice that this doesn't implicitly
+     * encode the value
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgumentNoEncoding(String key, String[] value) {
+        if(value == null || value.length == 0) {
+            return;
+        }
+        if(value.length == 1) {
+            addArgumentNoEncoding(key, value[0]);
+            return;
+        }
+        // copying the array to prevent mutation
+        String[] v = new String[value.length];
+        System.arraycopy(value, 0, v, 0, value.length);
+        addArg(key, v);
+    }
+    
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key, notice that this doesn't implicitly
+     * encode the value
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgumentNoEncodingArray(String key, String... value) {
+        addArgumentNoEncoding(key, (String[])value);
     }
 
     /**
@@ -1288,6 +1332,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @return the followRedirects
      */
     public boolean isFollowRedirects() {
@@ -1295,6 +1341,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @param followRedirects the followRedirects to set
      */
     public void setFollowRedirects(boolean followRedirects) {

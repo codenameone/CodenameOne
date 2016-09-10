@@ -118,7 +118,10 @@ public class InfiniteProgress extends Component {
         if(animation == null) {
             animation = UIManager.getInstance().getThemeImageConstant("infiniteImage");
         }
-        getComponentForm().registerAnimated(this);
+        Form f = getComponentForm();
+        if(f != null) {
+            f.registerAnimated(this);
+        }
     }
 
     /**
@@ -126,7 +129,11 @@ public class InfiniteProgress extends Component {
      */
     protected void deinitialize() {
         super.deinitialize();
-        getComponentForm().deregisterAnimated(this);
+        Form f = getComponentForm();
+        if(f == null) {
+            f = Display.getInstance().getCurrent();
+        } 
+        f.deregisterAnimated(this);
     }
     
     /**
@@ -157,8 +164,8 @@ public class InfiniteProgress extends Component {
                 }
                 FontImage fi = FontImage.createFixed("" + FontImage.MATERIAL_AUTORENEW, 
                         FontImage.getMaterialDesignFont(), 
-                        color, size, size);
-                fi.setPadding(0);
+                        color, size, size, 0);
+                
                 animation = fi.toImage();
             }
         }

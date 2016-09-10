@@ -59,7 +59,7 @@ import java.util.Vector;
 public class FaceBookAccess {
 
     private static String clientId = "132970916828080";
-    private static String redirectURI = "http://www.codenameone.com/";
+    private static String redirectURI = "https://www.codenameone.com/";
     private static String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
     private static String[] permissions = new String[]{"public_profile", "email", "user_friends"};
     private static FaceBookAccess instance = new FaceBookAccess();

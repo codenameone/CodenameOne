@@ -129,6 +129,9 @@ public abstract class TimeZone{
      * Gets the TimeZone for the given ID.
      */
     public static java.util.TimeZone getTimeZone(java.lang.String ID){
+        if(ID != null && ID.equalsIgnoreCase("gmt")) {
+            return GMT;
+        }
         // TODO
         return getDefault();
     }

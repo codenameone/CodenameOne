@@ -220,7 +220,13 @@ public class SideMenuBar extends MenuBar {
         if (i != null) {
             ob.setIcon(i);
         } else {
-            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU, 4.5f);
+            float size = 4.5f;
+            try {
+                size = Float.parseFloat(uim.getThemeConstant("menuImageSize", "4.5"));
+            } catch(Throwable t) {
+                t.printStackTrace();
+            }
+            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU, size);
         }
         Image p = (Image) uim.getThemeImageConstant("sideMenuPressImage");
         if (p != null) {
@@ -276,7 +282,7 @@ public class SideMenuBar extends MenuBar {
                     if (rightSideSwipePotential && (hasSideMenus[1] || (hasSideMenus[0] && isRTL()))) {
                         final int x = evt.getX();
                         final int y = evt.getY();
-                        if (Math.abs(y - initialDragY) > initialDragX - x) {
+                        if (x < 0 || Math.abs(y - initialDragY) > initialDragX - x) {
                             rightSideSwipePotential = false;
                             return;
                         }
@@ -1281,6 +1287,7 @@ public class SideMenuBar extends MenuBar {
                 }
                 super.keyReleased(keyCode);
             }
+
         };
 
         m.setScrollable(false);
@@ -1659,6 +1666,9 @@ public class SideMenuBar extends MenuBar {
 
         public CommandWrapper(Command cmd) {
             super(cmd.getCommandName(), cmd.getIcon(), cmd.getId());
+            super.setPressedIcon(cmd.getPressedIcon());
+            super.setRolloverIcon(cmd.getRolloverIcon());
+            super.setDisabledIcon(cmd.getDisabledIcon());
             this.cmd = cmd;
         }
 

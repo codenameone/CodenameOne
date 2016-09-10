@@ -110,7 +110,7 @@ public class NetworkManager {
     private Hashtable threadAssignements = new Hashtable();
     private Hashtable userHeaders;
     private boolean autoDetected;
-    private static String autoDetectURL = "http://www.google.com/";
+    private static String autoDetectURL = "https://www.google.com/";
     
     private NetworkManager() {
     }

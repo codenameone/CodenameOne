@@ -105,21 +105,32 @@ public class Util {
     }
 
     /**
+     * Copy the input stream into the output stream, without closing the streams when done
+     *
+     * @param i source
+     * @param o destination
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
+     */
+    public static void copyNoClose(InputStream i, OutputStream o, int bufferSize) throws IOException {
+        byte[] buffer = new byte[bufferSize];
+        int size = i.read(buffer);
+        while(size > -1) {
+            o.write(buffer, 0, size);
+            size = i.read(buffer);
+        }
+    }
+    
+    /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
      * a case of an exception
      *
      * @param i source
      * @param o destination
-     * @param bufferSize the size of the buffer, which should be a power of 2 large enoguh
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
      */
     public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
         try {
-            byte[] buffer = new byte[bufferSize];
-            int size = i.read(buffer);
-            while(size > -1) {
-                o.write(buffer, 0, size);
-                size = i.read(buffer);
-            }
+            copyNoClose(i, o, bufferSize);
         } finally {
             Util.getImplementation().cleanup(o);
             Util.getImplementation().cleanup(i);

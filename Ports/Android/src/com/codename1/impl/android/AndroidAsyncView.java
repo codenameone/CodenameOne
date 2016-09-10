@@ -114,7 +114,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
     private synchronized static Path createPathFromPool() {
         if (!pathPool.isEmpty()) {
-            return pathPool.remove(pathPool.size()-1);
+            Path out = pathPool.remove(pathPool.size()-1);
+            out.rewind();
+            return out;
         }
         return new Path();
     }
@@ -244,6 +246,15 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         if (!Display.isInitialized()) {
             return;
         }
+        //if the input is pan mode, there is no need to resize the screen
+        // It turns out that this was only necessary because the InPlaceEditView was causing
+        // an onSizeChanged event to be fired when its visibility was set to GONE.
+        // Removing that visibility setting removes the erroneous resize event.
+        // Keeping this was problematic because sometimes a resize event is correct even when
+        // the keyboard is showing, e.g. when the device is rotated.
+        //if((InPlaceEditView.isEditing() || InPlaceEditView.isKeyboardShowing()) && !InPlaceEditView.isInputResize()){
+        //    return;
+        //}
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 cn1View.handleSizeChange(w, h);
@@ -875,6 +886,12 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
         @Override
         public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height) {
+            fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);
+            
+        }
+        
+        @Override
+        public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
             if (alpha == 0) {
                 return;
             }
@@ -883,7 +900,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 @Override
                 public void execute(AndroidGraphics underlying) {
                     underlying.setAlpha(al);
-                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height);
+                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);
                 }
                 public String toString() {
                     return "fillRadialGradient";
@@ -1024,13 +1041,25 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 return;
             }
             
-            if(legacyPaintLogic) {
+            if(legacyPaintLogic || StyleAccessor.isRendererStyle(s)) {
                 final int al = alpha;
+                final byte backgroundType = s.getBackgroundType();
+                final Image bgImage = s.getBgImage();
+                final int bgColor = s.getBgColor();
+                final byte bgTransparency = s.getBgTransparency();
+                final int backgroundGradientStartColor = s.getBackgroundGradientStartColor();
+                final int backgroundGradientEndColor = s.getBackgroundGradientEndColor();
+                final float backgroundGradientRelativeX = s.getBackgroundGradientRelativeX();
+                final float backgroundGradientRelativeY = s.getBackgroundGradientRelativeY();
+                final float backgroundGradientRelativeSize = s.getBackgroundGradientRelativeSize();
                 pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
                     @Override
                     public void execute(AndroidGraphics underlying) {
                         underlying.setAlpha(al);
-                        underlying.paintComponentBackground(s.getBackgroundType(), s.getBgImage(), s.getBgColor(), s.getBgTransparency(), s.getBackgroundGradientStartColor(), s.getBackgroundGradientEndColor(), s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(), s.getBackgroundGradientRelativeSize(), x, y, width, height);
+                        underlying.paintComponentBackground(backgroundType, bgImage, bgColor, bgTransparency,
+                                backgroundGradientStartColor, backgroundGradientEndColor,
+                                backgroundGradientRelativeX, backgroundGradientRelativeY,
+                                backgroundGradientRelativeSize, x, y, width, height);
                     }
                     public String toString() {
                         return "paintComponentBackground - Legacy";
@@ -1454,8 +1483,10 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             }
 
             public boolean equals(Object o) {
-                // == is totally fine here for the text which should be interned, the font might be cloned though...
-                return font != null && o != null && text == ((DrawStringCache)o).text && fgColor == ((DrawStringCache)o).fgColor && font.equals(((DrawStringCache)o).font);
+                return font != null && o != null && text != null &&
+                        (text == ((DrawStringCache)o).text || text.equals(((DrawStringCache)o).text)) &&
+                        fgColor == ((DrawStringCache)o).fgColor &&
+                        (font == ((DrawStringCache)o).font || font.equals(((DrawStringCache)o).font));
             }
 
             public int hashCode() {
@@ -1989,7 +2020,12 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         @Override
         public void drawString(final String str, final int x, final int y) {
             final int col = this.color;
-            final CodenameOneTextPaint font = (CodenameOneTextPaint)getFont();
+            Paint fnt = getFont();
+            if(fnt == null) {
+                fnt = impl.defaultFont;
+            } 
+
+            final CodenameOneTextPaint font = (CodenameOneTextPaint)fnt;
             final int alph = this.alpha;
 
             Bitmap stringBmp = null;
@@ -2006,6 +2042,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                         Bitmap bitmap = Bitmap.createBitmap(stringWidth, font.fontHeight,
                                 Bitmap.Config.ARGB_8888);
                         Canvas cnv = new Canvas(bitmap);
+                        int c = 0xff000000 | color;
+                        font.setColor(c);
                         cnv.drawText(str, 0, font.getFontAscent() * -1, font);
                         stringBmp = bitmap;
                         drawStringCache.put(dc, stringBmp);

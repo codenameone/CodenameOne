@@ -681,9 +681,18 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             
             if(threadStateData->heapAllocationSize > 0) {
                 invokedGC = YES;
+                threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
+                threadStateData->nativeAllocationMode = JAVA_FALSE;
                 threadStateData->threadActive = JAVA_FALSE;
                 while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
+                    if (get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
+                        // For some reason the gcThread is dead
+                        threadStateData->nativeAllocationMode = JAVA_TRUE;
+                        java_lang_System_gc__(threadStateData);
+                        threadStateData->nativeAllocationMode = JAVA_FALSE;
+                        threadStateData->threadActive = JAVA_FALSE;
+                    }
                     usleep((JAVA_INT)(1000));
                 }
                 invokedGC = NO;

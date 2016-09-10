@@ -155,7 +155,7 @@ public class Preferences {
      * Sets a preference value
      * 
      * @param pref the key any unique none null value that doesn't start with cn1
-     * @param o a String 
+     * @param b the value
      */
     public static void set(String pref, boolean b) {
         if(b) {

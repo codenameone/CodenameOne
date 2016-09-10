@@ -44,7 +44,9 @@ import java.util.Vector;
 
 /**
  * <p>A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
- * and are extracted via the {@link com.codename1.ui.list.ListModel}.<br>
+ * and are extracted via the {@link com.codename1.ui.list.ListModel}, <b>notice</b> that 
+ * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
+ * discourage usage of lists</a>.<br>
  * A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
  * is made possible thanks to extensive use of Swing's style of MVC. Specifically a list
  * component is relatively simple, it invokes the model in order to extract the displayed/selected

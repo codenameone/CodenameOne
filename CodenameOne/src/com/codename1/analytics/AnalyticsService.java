@@ -198,7 +198,7 @@ public class AnalyticsService {
 
     private static ConnectionRequest GetGARequest() {
         ConnectionRequest req = new ConnectionRequest();
-        req.setUrl("http://www.google-analytics.com/collect");
+        req.setUrl("https://www.google-analytics.com/collect");
         req.setPost(true);
         req.setFailSilently(true);
         req.addArgument("v", "1");

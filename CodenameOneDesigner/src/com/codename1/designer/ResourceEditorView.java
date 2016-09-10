@@ -3104,7 +3104,7 @@ private boolean configureOptiPNG() {
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("optiPng", null);
     if(node == null || !new File(node).exists()) {
         JOptionPane.showMessageDialog(mainPanel, "Please select the OptiPng executable in the following dialog\nOptiPng can be downloaded from http://optipng.sourceforge.net/", "Select OptiPNG", JOptionPane.INFORMATION_MESSAGE);
-        File[] result = showOpenFileChooser("OptiPng Executable", "exe", "app");
+        File[] result = showOpenFileChooser("OptiPng Executable", "exe", "app", "");
         if(result != null) {
             Preferences.userNodeForPackage(ResourceEditorView.class).put("optiPng", result[0].getAbsolutePath());
             return true;
@@ -4173,7 +4173,8 @@ public static void openInIDE(File f, int lineNumber) {
                         InputStream i = new FileInputStream(codenameone_settings);
                         projectGeneratorSettings.load(i);
                         i.close();
-                        if(selection.getName().equals(projectGeneratorSettings.getProperty("guiResource", null))) {
+                        if(selection.getName().equals(projectGeneratorSettings.getProperty("guiResource", null)) &&
+                                projectGeneratorSettings.getProperty("userClass") != null) {
                             projectGeneratorSettings.put("userClassAbs",
                                     new File(codenameone_settings.getParentFile(), projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
                             if(projectGeneratorSettings.containsKey("netbeans")) {

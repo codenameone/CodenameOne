@@ -58,7 +58,7 @@ public class Picker extends Button {
     private Object value = new Date();
     private boolean showMeridiem;
     private Object metaData;
-    private Object renderingPrototype;
+    private Object renderingPrototype = "XXXXXXXXXXXXXX";
     private SimpleDateFormat formatter;
     private int preferredPopupWidth;
     private int preferredPopupHeight;
@@ -323,7 +323,7 @@ public class Picker extends Button {
                     } else {
                         text = "am";
                     }
-                    setText(twoDigits(hour % 13 + 1) + ":" + twoDigits(minute) + text);
+                    setText(twoDigits(hour <= 12 ? hour : hour - 12) + ":" + twoDigits(minute) + text);
                 } else {
                     setText(twoDigits(hour) + ":" + twoDigits(minute));
                 }

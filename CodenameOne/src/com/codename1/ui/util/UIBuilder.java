@@ -2157,10 +2157,14 @@ public class UIBuilder { //implements Externalizable {
      * @param backCommand the back command 
      */
     protected void setBackCommand(Form f, Command backCommand) {
-        if(shouldAddBackCommandToMenu()) {
-            f.addCommand(backCommand, f.getCommandCount());
+        if(f.getToolbar() != null) {
+            f.getToolbar().setBackCommand(backCommand);
+        } else {
+            if(shouldAddBackCommandToMenu()) {
+                f.addCommand(backCommand, f.getCommandCount());
+            }
+            f.setBackCommand(backCommand);
         }
-        f.setBackCommand(backCommand);
     }
     
     private void initBackForm(Form f) {

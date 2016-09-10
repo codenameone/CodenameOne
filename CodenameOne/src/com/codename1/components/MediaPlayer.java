@@ -28,6 +28,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -67,12 +68,17 @@ public class MediaPlayer extends Container {
      * Empty constructor
      */
     public MediaPlayer() {
+        playIcon = FontImage.createMaterial(FontImage.MATERIAL_PLAY_ARROW, "Button", 3);
+        pauseIcon = FontImage.createMaterial(FontImage.MATERIAL_PAUSE, "Button", 3);
+        fwdIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_FORWARD, "Button", 3);
+        backIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_REWIND, "Button", 3);
     }
-
+    
     /**
      * Empty constructor
      */
     public MediaPlayer(Media video) {
+        this();
         this.video = video;
         initUI();
     }
@@ -100,6 +106,19 @@ public class MediaPlayer extends Container {
             pendingDataURI = null;
         }
         initUI();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        if(autoplay) {
+            if(video != null && video.isPlaying()){
+                video.pause();
+            }
+        }
     }
     
     /**
@@ -254,12 +273,12 @@ public class MediaPlayer extends Container {
             play.setText("play");
         }
         if(autoplay) {
-            if (getPauseIcon() != null) {
-                play.setIcon(getPauseIcon());
-            } else {
-                play.setText("pause");
-            }
             if(video != null && !video.isPlaying()){
+                if (getPauseIcon() != null) {
+                    play.setIcon(getPauseIcon());
+                } else {
+                    play.setText("pause");
+                }
                 video.play();
             }
         }

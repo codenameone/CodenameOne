@@ -25,6 +25,7 @@ package com.codename1.ui.util;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.RGBImage;
 
@@ -202,5 +203,59 @@ public class Effects {
      */ 
     public static boolean isGaussianBlurSupported(){
         return Display.getInstance().isGaussianBlurSupported();        
+    }
+    
+    /**
+     * Generates a shadow for the source image and returns a new larger image containing the shadow
+     * 
+     * @param source the source image for whom the shadow should be generated
+     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+     * @param opacity the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @param xDistance the distance on the x axis from the main image body in pixels e.g. a negative value will represent a lightsource from the right (shadow on the left)
+     * @param yDistance the distance on the y axis from the main image body in pixels e.g. a negative value will represent a lightsource from the bottom (shadow on top)
+     * @return a new image whose size incorporates x/yDistance
+     */
+    public static Image dropshadow(Image source, int blurRadius, float opacity, int xDistance, int yDistance) {
+        Image s = dropshadow(source, blurRadius, opacity);
+        Image n = Image.createImage(source.getWidth() + Math.abs(xDistance), source.getHeight() + Math.abs(yDistance));
+        Graphics g = n.getGraphics();
+        int shadowX = 0, imageX = 0, shadowY = 0, imageY  = 0;
+        if(xDistance < 0) {
+            imageX = xDistance * -1;
+        } else {
+            shadowX = xDistance;
+        }
+        if(yDistance < 0) {
+            imageY = yDistance * -1;
+        } else {
+            shadowY = yDistance;
+        }
+        g.drawImage(s, shadowX, shadowY);
+        g.drawImage(source, imageX, imageY);
+        return n;
+    }
+
+    /**
+     * Generates a shadow for the source image and returns either the shadow itself or the image merged with the 
+     * shadow.
+     * 
+     * @param source the source image for whom the shadow should be generated
+     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+     * @param opacity the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @return an image containing the shadow for source
+     */
+    public static Image dropshadow(Image source, int blurRadius, float opacity) {
+        int[] rgb = source.getRGB();
+        for(int iter = 0 ; iter < rgb.length ; iter++) {
+            float f = rgb[iter] & 0xff000000;
+            f *= opacity;
+            rgb[iter] = (int)f;
+        }
+        Image shadow = Image.createImage(rgb, source.getWidth(), source.getHeight());
+        if(Display.getInstance().isGaussianBlurSupported()) {
+            shadow = Display.getInstance().gaussianBlurImage(shadow, blurRadius);
+        }
+        return shadow;
+                
     }
 }

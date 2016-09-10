@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
+import com.codename1.contacts.ContactsManager;
 import com.codename1.db.Database;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
@@ -1171,13 +1172,12 @@ public final class Display {
 
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
-     * edt it will still be blocked however a separate thread would be launched
-     * to perform the duties of the EDT while it is blocked. Once blocking is finished
-     * the EDT would be restored to its original position. This is very similar to the
-     * "foxtrot" Swing toolkit and allows coding "simpler" logic that requires blocking
-     * code in the middle of event sensitive areas.
-     *
-     * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
+     * EDT it will still be blocked in a way that doesn't break event dispatch .
+     * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
+     * See <a href="https://www.codenameone.com/manual/edt.html#_invoke_and_block">
+     * this section</a> in the developer guide for further information.
+     * 
+     * @param r runnable (NOT A THREAD!) that will be invoked synchronously by this method
      * @param dropEvents indicates if the display should drop all events
      * while this runnable is running
      */
@@ -1230,11 +1230,10 @@ public final class Display {
 
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
-     * edt it will still be blocked however a separate thread would be launched
-     * to perform the duties of the EDT while it is blocked. Once blocking is finished
-     * the EDT would be restored to its original position. This is very similar to the
-     * "foxtrot" Swing toolkit and allows coding "simpler" logic that requires blocking
-     * code in the middle of event sensitive areas.
+     * EDT it will still be blocked in a way that doesn't break event dispatch .
+     * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
+     * See <a href="https://www.codenameone.com/manual/edt.html#_invoke_and_block">
+     * this section</a> in the developer guide for further information.
      *
      * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
      */
@@ -1243,11 +1242,10 @@ public final class Display {
     }
 
     /**
-     * Indicates if this is a touch screen device that will return pen events,
-     * defaults to true if the device has pen events but can be overriden by
-     * the developer.
+     * The name of this method is misleading due to it's legacy. It will return true on the desktop too where
+     * the mouse sends pointer events.
      *
-     * @return true if this device supports touch events
+     * @return true if this device supports touch/pointer events
      */
     public boolean isTouchScreenDevice() {
         return touchScreen;
@@ -2154,7 +2152,7 @@ public final class Display {
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged ) || (isMinimized() && !hasNoSerialCallsPending());
+                && !longPointerCharged ) || (isMinimized() && hasNoSerialCallsPending());
     }
 
 
@@ -3429,6 +3427,25 @@ hi.show();}</pre></noscript>
     }
     
     /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     * @see ContactsManager#getLinkedContacts(com.codename1.contacts.Contact) 
+     */
+    //public Contact[] getLinkedContacts(Contact c) {
+    //    return impl.getLinkedContacts(c);
+    //}
+    
+    /**
+     * Gets IDs of all contacts that are linked to a given contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return IDs of linked contacts.
+     */
+    public String[] getLinkedContactIds(Contact c) {
+        return impl.getLinkedContactIds(c);
+    }
+    
+    /**
      * Get a Contact according to it's contact id.
      * @param id unique id of the Contact
      * @return a Contact Object
@@ -3930,6 +3947,47 @@ hi.show();}</pre></noscript>
      */
     public void cancelLocalNotification(String notificationId) {
         impl.cancelLocalNotification(notificationId);
+    }
+    
+    /**
+     * Sets the preferred time interval between background fetches.  This is only a
+     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign 
+     * control over when and if background fetches will be allowed. This number is used
+     * only as a guideline.
+     * 
+     * <p><strong>This method must be called in order to activate background fetch.</strong>></p>
+     * <p>Note: If the platform doesn't support background fetch (i.e. {@link #isBackgroundFetchSupported() } returns {@code false},
+     * then this method does nothing.</p>
+     * @param seconds The time interval in seconds.
+     * 
+     * @see #isBackgroundFetchSupported() 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     */
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        impl.setPreferredBackgroundFetchInterval(seconds);
+    }
+    
+    /**
+     * Gets the preferred time (in seconds) between background fetches.
+     * @return The time interval in seconds.
+     * @see #isBackgroundFetchSupported() 
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see com.codename1.background.BackgroundFetch
+     */
+    public int getPreferredBackgroundFetchInterval(int seconds) {
+        return impl.getPreferredBackgroundFetchInterval();
+    }
+    
+    /**
+     * Checks to see if the current platform supports background fetch.
+     * @return True if the current platform supports background fetch.
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     */
+    public boolean isBackgroundFetchSupported() {
+        return impl.isBackgroundFetchSupported();
     }
 
     /**

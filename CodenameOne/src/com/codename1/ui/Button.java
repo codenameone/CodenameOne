@@ -546,6 +546,41 @@ public class Button extends Label {
         repaint();
     }
 
+    @Override
+    void initComponentImpl() {
+        super.initComponentImpl(); 
+        if(pressedIcon != null) {
+            pressedIcon.lock();
+        }
+        if(rolloverIcon != null) {
+            rolloverIcon.lock();
+        }
+        if(rolloverPressedIcon != null) {
+            rolloverPressedIcon.lock();
+        }
+        if(disabledIcon != null) {
+            disabledIcon.lock();
+        }
+    }
+
+    @Override
+    void deinitializeImpl() {
+        super.deinitializeImpl(); 
+        if(pressedIcon != null) {
+            pressedIcon.unlock();
+        }
+        if(rolloverIcon != null) {
+            rolloverIcon.unlock();
+        }
+        if(rolloverPressedIcon != null) {
+            rolloverPressedIcon.unlock();
+        }
+        if(disabledIcon != null) {
+            disabledIcon.unlock();
+        }
+    }
+
+    
     /**
      * {@inheritDoc}
      */
@@ -706,4 +741,14 @@ public class Button extends Label {
     public void setAutoRelease(boolean autoRelease){
         this.autoRelease = autoRelease;
     }
+
+    @Override
+    public void paint(Graphics g) {
+        if(isLegacyRenderer()) {
+            getUIManager().getLookAndFeel().drawButton(g, this);
+            return;
+        }
+        super.paintImpl(g);
+    }
+
 }

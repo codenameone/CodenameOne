@@ -1097,15 +1097,17 @@ void* threadRunner(void *x)
     d->threadActive = JAVA_TRUE;
     d->currentThreadObject = t;
     
+    if(threadsToDelete == 0) {
+        threadsToDelete = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+        memset(threadsToDelete, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+    }
+    
     java_lang_Thread_runImpl___long(d, t, currentThreadId());
     
     // we remove the thread here since this is the only place we can do this
     // we add the thread in the getThreadLocalData() method to handle native threads
     // too. Hopefully we won't spawn too many of those...
-    if(threadsToDelete == 0) {
-        threadsToDelete = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-        memset(threadsToDelete, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-    }
+    
     lockCriticalSection();
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         if(allThreads[iter] == d) {

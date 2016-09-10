@@ -445,6 +445,9 @@ public class MenuBar extends Container implements ActionListener {
      */
     public void setBackCommand(Command backCommand) {
         this.backCommand = backCommand;
+        if(parent.getToolbar() != null) {
+            return;
+        }
         if(backCommand != null && UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
             removeCommand(backCommand);
         }
@@ -690,7 +693,11 @@ public class MenuBar extends Container implements ActionListener {
         final Dialog d = new Dialog("Menu", "");
         d.setDisposeWhenPointerOutOfBounds(true);
         d.setMenu(true);
-
+        d.addOrientationListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                d.dispose();
+            }
+        });
         d.setTransitionInAnimator(transitionIn);
         d.setTransitionOutAnimator(transitionOut);
         d.setLayout(new BorderLayout());

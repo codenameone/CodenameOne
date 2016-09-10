@@ -162,7 +162,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         });
     }
 
-    private Location convert(android.location.Location loc) {
+    public static Location convert(android.location.Location loc) {
         Location retVal = new Location();
         retVal.setAccuracy(loc.getAccuracy());
         retVal.setAltitude(loc.getAltitude());

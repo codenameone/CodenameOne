@@ -45,7 +45,7 @@ import java.util.Vector;
  */
 public class VServAds extends FullScreenAdService {
     boolean failed;
-    private static final String URL = "http://a.vserv.mobi/delivery/adapi.php";
+    private static final String URL = "https://a.vserv.mobi/delivery/adapi.php";
     private String zoneId = "6216";
     private String countryCode;
     private String networkCode;

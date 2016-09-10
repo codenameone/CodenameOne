@@ -322,6 +322,41 @@ public class UIManager {
         themeProps.put("dis#fgColor", disabledColor);
 
         // component specific settings
+        if (installedTheme == null || !installedTheme.containsKey("ToolbarSearch.derive")) {
+            themeProps.put("ToolbarSearch.derive", "Toolbar");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
+            themeProps.put("TextFieldSearch.derive", "Title");
+            themeProps.put("TextFieldSearch.align", leftAlign);
+            themeProps.put("TextFieldSearch.sel#align", leftAlign);
+            themeProps.put("TextFieldSearch.press#align", leftAlign);
+            themeProps.put("TextFieldSearch.dis#align", leftAlign);
+            themeProps.put("TextFieldSearch.sel#derive", "TextFieldSearch");
+            themeProps.put("TextFieldSearch.press#derive", "TextFieldSearch");
+            themeProps.put("TextFieldSearch.dis#derive", "TextFieldSearch");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("TextHintSearch.derive")) {
+            themeProps.put("TextHintSearch.derive", "TextHint");
+            themeProps.put("TextHintSearch.transparency", "0");            
+        }
+
+        if (installedTheme == null || !installedTheme.containsKey("AccordionItem.derive")) {
+            themeProps.put("AccordionItem.margin", "0,0,0,0");
+            themeProps.put("AccordionItem.padding", "1,1,1,1");
+            themeProps.put("AccordionItem.border", Border.createLineBorder(1));
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("AccordionHeader.derive")) {
+            themeProps.put("AccordionHeader.margin", "0,0,0,0");
+            themeProps.put("AccordionHeader.sel#margin", "0,0,0,0");
+            themeProps.put("AccordionHeader.press#margin", "0,0,0,0");
+            themeProps.put("AccordionHeader.padding", "0,0,0,0");
+            themeProps.put("AccordionHeader.sel#padding", "0,0,0,0");
+            themeProps.put("AccordionHeader.press#padding", "0,0,0,0");
+        }
+        
         if (installedTheme == null || !installedTheme.containsKey("SignatureButton.derive")) {
             themeProps.put("SignatureButton.align", centerAlign);
             themeProps.put("SignatureButton.sel#derive", "SignatureButton");
@@ -447,6 +482,7 @@ public class UIManager {
         }
         themeProps.put("Container.sel#derive", "Container");
         themeProps.put("Container.dis#derive", "Container");
+        themeProps.put("Container.press#derive", "Container");
 
         if(installedTheme == null || !installedTheme.containsKey("OnOffSwitch.derive")) {
             themeProps.put("OnOffSwitch.transparency", "255");
@@ -865,6 +901,30 @@ public class UIManager {
         if (installedTheme == null || !installedTheme.containsKey("Toolbar.derive")) {
             themeProps.put("Toolbar.derive", "TitleArea");
         }
+        if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {
+            themeProps.put("FloatingActionButton.fgColor", "ffffff");
+            themeProps.put("FloatingActionButton.bgColor", "d32f2f");
+            themeProps.put("FloatingActionButton.marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("FloatingActionButton.margin", "0,2,1,2");
+        }
+        if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.press#derive")) {
+            themeProps.put("FloatingActionButton.press#fgColor", "ffffff");
+            themeProps.put("FloatingActionButton.press#bgColor", "b71c1c");
+            themeProps.put("FloatingActionButton.press#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("FloatingActionButton.press#margin", "0,2,1,2");
+        }
+        if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.sel#derive")) {
+            themeProps.put("FloatingActionButton.sel#fgColor", "ffffff");
+            themeProps.put("FloatingActionButton.sel#bgColor", "b71c1c");
+            themeProps.put("FloatingActionButton.sel#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("FloatingActionButton.sel#margin", "0,2,1,2");
+        }
+        if(installedTheme == null || !installedTheme.containsKey("FloatingActionText.derive")) {
+            themeProps.put("FloatingActionText.bgColor", "ffffff");
+            themeProps.put("FloatingActionText.fgColor", "a0a0a0");
+            themeProps.put("FloatingActionText.align", rightAlign);
+        }
+        
         
     }
 

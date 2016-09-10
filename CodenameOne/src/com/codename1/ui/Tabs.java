@@ -23,7 +23,6 @@
  */
 package com.codename1.ui;
 
-import static com.codename1.ui.Container.enableLayoutOnPaint;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -187,8 +186,6 @@ public class Tabs extends Container {
             tabPlacement = tabPlace;
         }
     }
-
-
     
     /**
      * {@inheritDoc}
@@ -392,6 +389,54 @@ public class Tabs extends Container {
 
     /**
      * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title the title to be displayed in this tab
+     * @param icon the icon to be displayed in this tab
+     * @param pressedIcon the icon shown when the tab is selected
+     * @param component the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     *
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, Image icon, Image pressedIcon, Component component) {
+        int index = tabsContainer.getComponentCount();
+        insertTab(title, icon, component, index);
+        setTabSelectedIcon(index, pressedIcon);
+        return this;
+    }
+    
+    /**
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title the title to be displayed in this tab
+     * @param materialIcon one of the material design icon constants from {@link com.codename1.ui.FontImage}
+     * @param iconSize icon size in millimeters 
+     * @param component the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     *
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
+        int index = tabsContainer.getComponentCount();
+        FontImage i = FontImage.createMaterial(materialIcon, "Tab", iconSize);
+        insertTab(title, i, component, index);
+        Style sel = getUIManager().getComponentSelectedStyle("Tab");
+        i = FontImage.createMaterial(materialIcon, sel, iconSize);
+        setTabSelectedIcon(index, i);
+        return this;
+    }
+    
+
+    /**
+     * Adds a <code>component</code>
      * represented by a <code>title</code> and no <code>icon</code>.
      * Cover method for <code>insertTab</code>.
      *
@@ -510,8 +555,10 @@ public class Tabs extends Container {
                     if(tabUIID != null) {
                         selectedTab.setUIID(tabUIID);
                     }
-                    selectedTab.setShouldCalcPreferredSize(true);
-                    selectedTab.repaint();
+                    if(!animateTabSelection) {
+                        selectedTab.setShouldCalcPreferredSize(true);
+                        selectedTab.repaint();
+                    }
                     int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);
                     
                     // this might happen if a tab was removed
@@ -530,10 +577,11 @@ public class Tabs extends Container {
                 setSelectedIndex(active, animateTabSelection);
                 initTabsFocus();
                 selectedTab = b;
-                selectedTab.setShouldCalcPreferredSize(true);
-                tabsContainer.revalidate();
+                if(!animateTabSelection) {
+                    selectedTab.setShouldCalcPreferredSize(true);
+                    tabsContainer.revalidate();
+                }
                 tabsContainer.scrollComponentToVisible(selectedTab);
-                contentPane.revalidate();
             }
         });
 
@@ -1420,8 +1468,14 @@ public class Tabs extends Container {
         }
         if(name.equals("icons")) {
             Image[] t = (Image[])value;
-            for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
-                setTabTitle(getTabTitle(iter), t[iter], iter);
+            if(t == null) {
+                for(int iter = 0 ; iter < getTabCount() ; iter++) {
+                    setTabTitle(getTabTitle(iter), null, iter);
+                }
+            } else {
+                for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
+                    setTabTitle(getTabTitle(iter), t[iter], iter);
+                }
             }
             return null;
         }
