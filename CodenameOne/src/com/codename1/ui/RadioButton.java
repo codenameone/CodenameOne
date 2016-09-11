@@ -218,13 +218,36 @@ public class RadioButton extends Button {
         }
     }
     
+    //THJ: vvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+    private boolean unselectAllowed=false; //THJ
+
+    /**
+     * returns true if this RadioButton can be unselected
+     * @return 
+     */
+    public boolean isUnselectAllowed() {
+        return unselectAllowed;
+    }
+
+    /**
+     * allows unselecting a selected RadioButton.
+     * Useful for example to implement ButtonGroups that allow not to select any of the RadioButtons, 
+     * and to unselect a previously selected RadioButton
+     * @param unselectAllowed 
+     */
+    public void setUnselectAllowed(boolean unselectAllowed) {
+        this.unselectAllowed = unselectAllowed;
+    }
+    //THJ: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    
     /**
      * {@inheritDoc}
      */
     public void released(int x, int y) {
         // prevent the radio button from being "turned off"
-        if(!isSelected()) {
-            setSelected(true);
+        if(!isSelected() || unselectAllowed) { //THJ
+//            setSelected(true); 
+            setSelected(!isSelected()); //THJ
         }
         super.released(x, y);
     }
