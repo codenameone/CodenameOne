@@ -167,6 +167,14 @@ import java.util.*;
 //import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
+    public static final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
+        @Override
+        public void uncaughtException(Thread t, Throwable e) {
+            com.codename1.io.Log.p("Uncaught exception in thread " + t.getName());
+            com.codename1.io.Log.e(e);
+            com.codename1.io.Log.sendLog();
+        }
+    };
 
     /**
      * make sure these important keys have a negative value when passed to
@@ -2407,6 +2415,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                     }
                 };
+                thread.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
                 thread.start();
                 while (!flag[0]) {
                     synchronized (flag) {
@@ -4837,12 +4846,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
 
-    /**
-     * @inheritDoc
-     */
-    /*public void startThread(String name, Runnable r) {
-     new Thread(Thread.currentThread().getThreadGroup(), r, name, 64 * 1024).start();
-     }*/
+
     /**
      * @inheritDoc
      */
