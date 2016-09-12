@@ -1310,12 +1310,12 @@ public class Container extends Component implements Iterable<Component>{
         }
         g.translate(getX(), getY());
         int size = components.size();
-        int clipX1 = g.getClipX();
-        int clipX2 = g.getClipX() + g.getClipWidth();
-        int clipY1 = g.getClipY();
-        int clipY2 = g.getClipY() + g.getClipHeight();
         int startIter = 0;
         if (size >= 30) {
+            int clipX1 = g.getClipX();
+            int clipX2 = g.getClipX() + g.getClipWidth();
+            int clipY1 = g.getClipY();
+            int clipY2 = g.getClipY() + g.getClipHeight();
             startIter = calculateFirstPaintableOffset(clipX1, clipY1, clipX2, clipY2);
             if (startIter < 0) {
                 // There was no efficient way to calculate the offset
