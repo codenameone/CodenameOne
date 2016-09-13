@@ -272,11 +272,11 @@ public class RoundBorder extends Border {
             }
         } else {
             GeneralPath gp = new GeneralPath();
-            gp.moveTo(height / 2, 0);
-            gp.lineTo(width - (height / 2), 0);
-            gp.arcTo(width - (height / 2), height / 2, width - (height / 2), height, true);
-            gp.lineTo(height / 2, height);
-            gp.arcTo(height / 2, height / 2, height / 2, 0, true);
+            gp.moveTo(height / 2.0, 1);
+            gp.lineTo(width - (height / 2.0), 1);
+            gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height-1, true);
+            gp.lineTo(height / 2.0, height-1);
+            gp.arcTo(height / 2.0, height / 2.0, height / 2.0, 1, true);
             gp.closePath();
             g.fillShape(gp);
             if(stroke && this.stroke != null) {
