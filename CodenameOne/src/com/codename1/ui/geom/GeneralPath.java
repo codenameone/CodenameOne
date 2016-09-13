@@ -23,6 +23,7 @@
 package com.codename1.ui.geom;
 
 
+import com.codename1.io.Log;
 import com.codename1.ui.Transform;
 import com.codename1.util.MathUtil;
 import java.util.ArrayList;
@@ -726,6 +727,7 @@ public final class GeneralPath implements Shape {
      * @param sweepAngle Sweep angle in radians. Counter-clockwise.
      */
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle) {
+        
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
     
@@ -740,10 +742,12 @@ public final class GeneralPath implements Shape {
      * @param joinPath If true, then this will join the arc to the existing path with a line.
      */
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle, boolean joinPath) {
-        float cx = x+w/2;
-        float cy = y+h/2;
-        createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 8, false, this, joinPath);
+        
+        Ellipse e = new Ellipse();
+        Ellipse.initWithBounds(e, x, y, w, h);
+        e.addToPath(this, -startAngle, -sweepAngle, joinPath);
     }
+    
     
     /**
      * Draws an elliptical arc on the path given the provided bounds.
@@ -757,6 +761,8 @@ public final class GeneralPath implements Shape {
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle) {
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
+    
+    
     /**
      * Draws an elliptical arc on the path given the provided bounds.
      * @param x Left x coord of bounding rect.
@@ -768,9 +774,7 @@ public final class GeneralPath implements Shape {
      * @param joinPath If true then this will join the arc to the existing path with a line.
      */
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle, boolean joinPath) {
-        double cx = x+w/2;
-        double cy = y+h/2;
-        createBezierArcRadians((float)cx, (float)cy, (float)w/2, (float)h/2, -startAngle, -sweepAngle, 8, false, this, joinPath);
+        arc((float)x, (float)y, (float)w, (float)h, (float)startAngle, (float)sweepAngle, joinPath);
     }
     
     
@@ -780,7 +784,17 @@ public final class GeneralPath implements Shape {
     }
     
     
-    
+    /**
+     * 
+     * @param path
+     * @param cx
+     * @param cy
+     * @param startX
+     * @param startY
+     * @param endX
+     * @param endY
+     * @param clockwise 
+     */
     private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
                                           double startX, double startY, double endX, double endY, boolean clockwise) {
         if ( startX != endX || startY != endY ){
@@ -792,7 +806,7 @@ public final class GeneralPath implements Shape {
             final double r1s = ax * ax + ay * ay;
             final double r2s = bx * bx + by * by;
             double ellipseScaleY = 0;
-            if (Math.abs(r1s - r2s) > 1) {
+            if (Math.abs(r1s - r2s) > 2) {
                 // This is not a circle
                 // Let's get the arc for the circle
                 ellipseScaleY = Math.sqrt(((ax*ax) - (bx*bx)) / (by*by - ay*ay));
@@ -857,28 +871,174 @@ public final class GeneralPath implements Shape {
         } 
     }
     
+    
+    static class Ellipse {
+        private double a;
+        private double b;
+        private double cx;
+        private double cy;
+        private EPoint _tmp1=new EPoint();
+        
+        static void initWithBounds(Ellipse e, double x, double y, double w, double h) {
+            e.cx = x+w/2;
+            e.cy = y+h/2;
+            e.a = w/2;
+            e.b = h/2;
+        }
+        
+        static void initWithPerimeterPoints(Ellipse e, double cx, double cy, double p1x, double p1y, double p2x, double p2y) {
+
+            /*
+            e.cx = cx;
+            e.cy = cy;
+            double x1 = p1x-cx;
+            double y1 = p1y-cy;
+            double x2 = p2x-cx;
+            double y2 = p2y-cy;
+            double x1s = x1*x1;
+            double x2s = x2*x2;
+            double y1s = y1*y1;
+            double y2s = y2*y2;
+            if (Math.abs(x1s-x2s) < 0.001 ||Math.abs(y1s-y2s) < 0.001) {
+                a = b = Math.max(Math.sqrt(Math.abs(y2)));
+            }
+            if (Math.abs(x1s-x2s) > 0.001) {
+                e.b = Math.sqrt((x1s*y2s-x2s-y1s)/(x1s-x2s));
+                double bs = e.b*e.b;
+                e.a = Math.sqrt(x1s*bs/(bs-y1s));
+            } else {
+                e.a = Math.sqrt((y1s*x2s-y2s-x1s)/(y1s-y2s));
+                double as = e.a*e.a;
+                e.b = Math.sqrt(y1s*as/(as-x1s));
+            }
+            */
+            
+        }
+        
+        @Override
+        public String toString() {
+            
+            return "Ellipse center=("+cx+","+cy+") a="+a+", b="+b+")";
+        }
+        
+        void getPointAtAngle(double theta, EPoint out) {
+            double tanTheta = Math.tan(theta);
+            double tanThetas = tanTheta*tanTheta;
+            double bs = b*b;
+            double as = a*a;
+            double x = a*b/Math.sqrt(bs+as*tanThetas);
+            if (Math.cos(theta)<0) {
+                x = -x;
+            }
+            double y = a*b/Math.sqrt(as+bs/tanThetas);
+            if (Math.sin(theta)<0) {
+                y = -y;
+            }
+            out.x = x + cx;
+            out.y = y + cy;
+        }
+        
+        double getAngleAtPoint(double px, double py) {
+            px -= cx;
+            py -= cy;
+            
+            return MathUtil.atan2(py, px);
+        }
+        
+        void addToPath(GeneralPath p, double startAngle, double sweepAngle, boolean join) {
+            getPointAtAngle(startAngle, _tmp1);
+            if (join) {
+                
+                p.lineTo(_tmp1.x, _tmp1.y);
+            } else {
+                p.moveTo(_tmp1.x, _tmp1.y);
+            }
+            _addToPath(p, startAngle, sweepAngle);
+        }
+        
+        private void _addToPath(GeneralPath p, double startAngle, double sweepAngle) {
+            double _2pi = Math.PI*2;
+            
+            if (Math.abs(sweepAngle) > Math.PI/4) {
+                //double halfAngle = sweepAngle/2;
+                double diff = Math.PI/4;
+                if (sweepAngle < 0) {
+                    diff = -diff;
+                }
+                _addToPath(p, startAngle, diff);
+                _addToPath(p, startAngle+diff, sweepAngle-diff);
+            } else {
+                getPointAtAngle(startAngle+sweepAngle, _tmp1);
+                //System.out.println("Line to "+_tmp1.x+", "+_tmp1.y);
+                EPoint controlPoint = new EPoint();
+                calculateBezierControlPoint(startAngle, sweepAngle, controlPoint);
+                p.quadTo(controlPoint.x, controlPoint.y, _tmp1.x, _tmp1.y);
+                //p.lineTo(_tmp1.x, _tmp1.y);
+            }
+        }
+        
+        private void calculateBezierControlPoint(double startAngle, double sweepAngle, EPoint point) {
+            EPoint p1 = new EPoint();
+            
+            getPointAtAngle(startAngle, p1);
+            p1.x-= cx;
+            p1.y -= cy;
+            
+            EPoint p2 = new EPoint();
+            getPointAtAngle(startAngle+sweepAngle, p2);
+            p2.x -= cx;
+            p2.y -= cy;
+            
+            //System.out.println("p1: "+p1.x+", "+p1.y+", p2:"+p2.x+","+p2.y);
+            double x1s = p1.x*p1.x;
+            double y1s = p1.y*p1.y;
+            double x2s = p2.x*p2.x;
+            double y2s = p2.y*p2.y;
+            
+            double as = a*a;
+            double bs = b*b;
+            //point.x = (x2s*bs/(p2.y*as) + p2.y - x1s*bs/(p1.y*as) - p1.y) / (-p1.x*bs/(p1.y*as) + p2.x*bs/(p2.y*as));
+            //point.y = (-p1.x*bs/(p1.y*as))*point.x + x1s*bs/(p1.y*as) + p1.y;
+            
+            
+            point.x = -(p1.y*(-as*y2s-bs*x2s)+as*y1s*p2.y+bs*x1s*p2.y)/(bs*p2.x*p1.y-bs*p1.x*p2.y);
+            point.y = (p1.x*(-as*y2s-bs*x2s)+as*p2.x*y1s+bs*x1s*p2.x)/(as*p2.x*p1.y-as*p1.x*p2.y);
+            
+            point.x += cx;
+            point.y += cy;
+            //System.out.println("control: "+point.x+","+point.y);
+        }
+    
+        
+    }
+    
+    static class EPoint {
+        double x;
+        double y;
+    }
+    
     /**
-     * Adds a circular arc to the given path by approximating it through a cubic BÈzier curve, splitting it if
+     * Adds a circular arc to the given path by approximating it through a cubic B�zier curve, splitting it if
      * necessary. The precision of the approximation can be adjusted through {@code pointsOnCircle} and
      * {@code overlapPoints} parameters.
      * <p>
-     * <strong>Example:</strong> imagine an arc starting from 0∞ and sweeping 100∞ with a value of
-     * {@code pointsOnCircle} equal to 12 (threshold -> 360∞ / 12 = 30∞):
+     * <strong>Example:</strong> imagine an arc starting from 0? and sweeping 100? with a value of
+     * {@code pointsOnCircle} equal to 12 (threshold -> 360? / 12 = 30?):
      * <ul>
      * <li>if {@code overlapPoints} is {@code true}, it will be split as following:
      * <ul>
-     * <li>from 0∞ to 30∞ (sweep 30∞)</li>
-     * <li>from 30∞ to 60∞ (sweep 30∞)</li>
-     * <li>from 60∞ to 90∞ (sweep 30∞)</li>
-     * <li>from 90∞ to 100∞ (sweep 10∞)</li>
+     * <li>from 0? to 30? (sweep 30?)</li>
+     * <li>from 30? to 60? (sweep 30?)</li>
+     * <li>from 60? to 90? (sweep 30?)</li>
+     * <li>from 90? to 100? (sweep 10?)</li>
      * </ul>
      * </li>
      * <li>if {@code overlapPoints} is {@code false}, it will be split into 4 equal arcs:
      * <ul>
-     * <li>from 0∞ to 25∞ (sweep 25∞)</li>
-     * <li>from 25∞ to 50∞ (sweep 25∞)</li>
-     * <li>from 50∞ to 75∞ (sweep 25∞)</li>
-     * <li>from 75∞ to 100∞ (sweep 25∞)</li>
+     * <li>from 0? to 25? (sweep 25?)</li>
+     * <li>from 25? to 50? (sweep 25?)</li>
+     * <li>from 50? to 75? (sweep 25?)</li>
+     * <li>from 75? to 100? (sweep 25?)</li>
      * </ul>
      * </li>
      * </ul>
@@ -893,9 +1053,9 @@ public final class GeneralPath implements Shape {
      * @param radius            The radius of the circle.
      * @param startAngleRadians The starting angle on the circle (in radians).
      * @param sweepAngleRadians How long to make the total arc (in radians).
-     * @param pointsOnCircle    Defines a <i>threshold</i> (360∞ /{@code pointsOnCircle}) to split the BÈzier arc to
+     * @param pointsOnCircle    Defines a <i>threshold</i> (360? /{@code pointsOnCircle}) to split the B�zier arc to
      *                          better approximate a circular arc, depending also on the value of {@code overlapPoints}.
-     *                          The suggested number to have a reasonable approximation of a circle is at least 4 (90∞).
+     *                          The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
      *                          Less than 1 will be ignored (the arc will not be split).
      * @param overlapPoints     Given the <i>threshold</i> defined through {@code pointsOnCircle}:
      *                          <ul>
@@ -990,11 +1150,11 @@ public final class GeneralPath implements Shape {
     }
     
      /**
-     * Normalize the input radians in the range 360∞ > x >= 0∞.
+     * Normalize the input radians in the range 360? > x >= 0?.
      *
      * @param radians The angle to normalize (in radians).
      *
-     * @return The angle normalized in the range 360∞ > x >= 0∞.
+     * @return The angle normalized in the range 360? > x >= 0?.
      */
     private static double normalizeRadians(double radians)
     {
@@ -1037,7 +1197,29 @@ public final class GeneralPath implements Shape {
         }
         float startX = points[pointSize-2];
         float startY = points[pointSize-1];
-        addBezierArcToPath(this, cX, cY, startX, startY, endX, endY, clockwise);
+        
+        float dx = endX-cX;
+        float dy = endY-cY;
+        double r2 = Math.sqrt(dx*dx+dy*dy);
+        double dx1 = startX-cX;
+        double dy1 = startY-cY;
+        double r1 = Math.sqrt(dx1*dx1*dy1*dy1);
+        if (Math.abs(r1-r2) > 1) {
+            Log.p("arcTo() called with start and end points that don't lie on the same arc.", Log.WARNING);
+        }
+        Ellipse e = new Ellipse();
+        Ellipse.initWithBounds(e, cX-r2, cY-r2, r2*2, r2*2);
+        double startAngle = e.getAngleAtPoint(startX, startY);
+        double endAngle = e.getAngleAtPoint(endX, endY);
+        double sweepAngle = endAngle-startAngle;
+        if (clockwise && sweepAngle > 0) {
+            sweepAngle = -sweepAngle;
+        } else if (!clockwise && sweepAngle > 0) {
+            sweepAngle = 2*Math.PI-sweepAngle;
+        }
+        
+        arc(cX-r2, cY-r2, r2*2, r2*2, -startAngle, sweepAngle, true);
+        lineTo(endX, endY);
     }
     
     /**
