@@ -35,6 +35,7 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
@@ -99,6 +100,8 @@ public class Log {
     public static int REPORTING_PRODUCTION = 3; 
     
     private int reporting = REPORTING_NONE;
+
+    private static boolean initialized;
     
     /**
      * Indicates the level of log reporting, this allows developers to send device logs to the cloud
@@ -321,6 +324,18 @@ public class Log {
      * @param level one of DEBUG, INFO, WARNING, ERROR
      */
     protected void print(String text, int level) {
+        if(!initialized) {
+            initialized  = true;
+            try {
+                InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/cn1-version-numbers");
+                if(is != null) {
+                    print("Codename One revisions: " + Util.readToString(is), INFO);
+                }
+            } catch(IOException err) {
+                // shouldn't happen...
+                err.printStackTrace();
+            }
+        }
         if(this.level > level) {
             return;
         }

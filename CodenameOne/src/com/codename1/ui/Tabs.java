@@ -1468,8 +1468,14 @@ public class Tabs extends Container {
         }
         if(name.equals("icons")) {
             Image[] t = (Image[])value;
-            for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
-                setTabTitle(getTabTitle(iter), t[iter], iter);
+            if(t == null) {
+                for(int iter = 0 ; iter < getTabCount() ; iter++) {
+                    setTabTitle(getTabTitle(iter), null, iter);
+                }
+            } else {
+                for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
+                    setTabTitle(getTabTitle(iter), t[iter], iter);
+                }
             }
             return null;
         }

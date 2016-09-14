@@ -28,7 +28,9 @@ import com.codename1.ui.List;
 import java.util.Hashtable;
 
 /**
- * <p>A list with a {@link com.codename1.components.MultiButton} renderer. This simplifies the process of
+ * <p>A list with a {@link com.codename1.components.MultiButton} renderer, <b>notice</b> that 
+ * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
+ * discourage usage of lists</a>.. This simplifies the process of
  * working with the list and its model as the renderer comes pre-configured for common use cases.
  * </p>
  * 

@@ -797,18 +797,12 @@ public class ByteCodeClass {
         }
         
         // insert static initializer
+        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
         b.append("void __STATIC_INITIALIZER_");
         b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(class__");
-        b.append(clsName);
-        b.append(".initialized) return;\n\n    ");
+        b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__").append(clsName).append("_LOADED__) return;\n\n    ");
 
-        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
-            b.append("class_array1__");
-            b.append(clsName);
-            b.append(".vtable = initVtableForInterface();\n    ");
-        }
-
+        
         b.append("monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
         
         b.append(clsName);
@@ -817,6 +811,13 @@ public class ByteCodeClass {
         b.append(".initialized) {\n        monitorExit(threadStateData, (JAVA_OBJECT)&class__");
         b.append(clsName);
         b.append(");\n        return;\n    }\n\n");
+        
+        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+            b.append("class_array1__");
+            b.append(clsName);
+            b.append(".vtable = initVtableForInterface();\n    ");
+        }
+
         
         // create the vtable
         b.append("    class__");
@@ -879,16 +880,18 @@ public class ByteCodeClass {
         }
         b.append("    class__");
         b.append(clsName);
-        b.append(".initialized = JAVA_TRUE;\n    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
-        b.append(clsName);
-        b.append(");\n");
-
+        b.append(".initialized = JAVA_TRUE;\n");
         // init static fields and invoke the static initializer code block
         if(clInitMethod != null) {
             b.append("    ");
             b.append(clInitMethod);
             b.append("(threadStateData);\n");
         }
+        b.append("monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+        b.append(clsName);
+        b.append(");\n");
+
+        b.append("__").append(clsName).append("_LOADED__=1;\n");
         
         b.append("}\n\n");
         

@@ -36,6 +36,11 @@ import com.codename1.ui.layouts.FlowLayout;
  * indicator when reaching scroll end then allowing code to fetch additional components.</p>
  * 
  * <p>
+ * <strong>Warning:</strong> If you call {@link com.codename1.ui.Container#removeAll()}  on the container to which an InfiniteScrollAdapter is
+ * installed, it will disable the infinite scrolling behavior.  You can re-enable infinite scrolling by calling {@link #addMoreComponents(com.codename1.ui.Container, com.codename1.ui.Component[], boolean) }
+ * again.</p>
+ * 
+ * <p>
  * The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
  * </p>
  * <script src="https://gist.github.com/codenameone/af27af111ba766627363.js"></script>

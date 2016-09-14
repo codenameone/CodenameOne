@@ -242,7 +242,7 @@
         <copydir src="../../codenameone-demos/NativeDemo" dest="build/CodenameOneDist/CodenameOne/demos/NativeDemo" />
         <copydir src="../../CameraDemo" dest="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
         <copydir src="../../codenameone-demos/Tipster" dest="build/CodenameOneDist/CodenameOne/demos/Tipster" />
-        <copydir src="../../codenameone-demos/KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
+        <copydir src="../../KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
         <copydir src="../../codenameone-demos/MapsDemo" dest="build/CodenameOneDist/CodenameOne/demos/MapsDemo" />
         <copydir src="../../codenameone-demos/ZXing" dest="build/CodenameOneDist/CodenameOne/demos/ZXing" />
         <copydir src="../../codenameone-demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
@@ -529,7 +529,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/KitchenSink" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/kitchen/KitchenSinkProject.zip" compress="false">
+        <zip basedir="../../KitchenSink" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/kitchen/KitchenSinkProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>

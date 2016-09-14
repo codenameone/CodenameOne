@@ -58,7 +58,7 @@ import java.util.Vector;
  * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
  * 
  * <p>
- * The following code demonstrates also demonstrates search with a more custom UX where the title
+ * The following code also demonstrates search with a more custom UX where the title
  * area was replaced dynamically. This code predated the builtin search support above. 
  * Notice that the {@code TextField} and its hint are styled to look like the title.
  * </p>
@@ -205,7 +205,11 @@ public class Toolbar extends Container {
      * @param cent whether the title should be centered
      */
     public void setTitleCentered(boolean cent) {
-        ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        if(cent) {
+            ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        } else {
+            ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+        }
     } 
     
     /**
@@ -745,7 +749,9 @@ public class Toolbar extends Container {
     public Button findCommandComponent(Command c) {
         if(permanentSideMenu) {
             Button b = findCommandComponent(c, permanentSideMenuContainer);
-            return b;
+            if(b != null) {
+                return b;
+            }
         }
         Button b = sideMenu.findCommandComponent(c);
         if(b != null) {
@@ -1222,6 +1228,15 @@ public class Toolbar extends Container {
             return Toolbar.this.contains(x, y);
         }
 
+        /**
+         * Removes the given overflow menu command, notice that this has no effect on the menu that is currently
+         * showing (if it is currently showing) only on the upcoming iterations.
+         * @param cmd the command to remove from the overflow
+         */
+        public void removeOverflowCommand(Command cmd) {
+            overflowCommands.remove(cmd);
+        }
+        
         @Override
         public Component getComponentAt(int x, int y) {
             return Toolbar.this.getComponentAt(x, y);
@@ -1231,9 +1246,16 @@ public class Toolbar extends Container {
         void installRightCommands() {
             super.installRightCommands();
             if (overflowCommands != null && overflowCommands.size() > 0) {
-                Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
+                UIManager uim = UIManager.getInstance();
+                Image i = (Image) uim.getThemeImageConstant("menuImage");
                 if (i == null) { 
-                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), 4.5f);
+                    float size = 4.5f;
+                    try {
+                        size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
+                    } catch(Throwable t) {
+                        t.printStackTrace();
+                    }
+                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), size);
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 

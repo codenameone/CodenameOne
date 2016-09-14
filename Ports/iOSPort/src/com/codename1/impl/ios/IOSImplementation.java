@@ -124,6 +124,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static boolean minimized;
     private String userAgent;
     private TextureCache textureCache = new TextureCache();
+    private static boolean dropEvents;
     
     private NativePathRenderer globalPathRenderer;
     private NativePathStroker globalPathStroker;
@@ -900,14 +901,23 @@ public class IOSImplementation extends CodenameOneImplementation {
     private final static int[] singleDimensionX = new int[1];
     private final static int[] singleDimensionY = new int[1];
     public static void pointerPressedCallback(int x, int y) {
+        if(dropEvents) {
+            return;
+        }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerPressed(singleDimensionX, singleDimensionY);
     }
     public static void pointerReleasedCallback(int x, int y) {
+        if(dropEvents) {
+            return;
+        }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerReleased(singleDimensionX, singleDimensionY);
     }
     public static void pointerDraggedCallback(int x, int y) {
+        if(dropEvents) {
+            return;
+        }
         singleDimensionX[0] = x; singleDimensionY[0] = y;
         instance.pointerDragged(singleDimensionX, singleDimensionY);
     }
@@ -921,6 +931,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     protected void pointerDragged(final int[] x, final int[] y) {
+        if(dropEvents) {
+            return;
+        }
         super.pointerDragged(x, y);
     }
 
@@ -944,6 +957,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             offset = 0;
         }
         NativeImage nimg = (NativeImage)nativeImage;
+        if(nimg.scaled) {
+            Object mute = createMutableImage(nimg.width, nimg.height, 0);
+            Object graph = getNativeGraphics(mute);
+            drawImage(graph, nimg, 0, 0);
+            nimg = (NativeImage)mute;
+        }
         imageRgbToIntArray(nimg.peer, arr, x, y, width, height, nimg.width, nimg.height);
     }
 
@@ -1129,6 +1148,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object scale(Object nativeImage, int width, int height) {
         NativeImage original = (NativeImage)nativeImage;
         NativeImage n = new NativeImage("Scaled image from peer: " + original.peer + " width " + width + " height " + height);
+        n.scaled = true;
         n.peer = original.peer;
         n.width = width;
         n.height = height;
@@ -1542,6 +1562,27 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.nativeFillArc(ng.color, ng.alpha, x, y, width, height, startAngle, arcAngle);
     }
+
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        Paint oldPaint = ng.paint;
+        ng.paint = new RadialGradient(startColor, endColor, x, y, width, height);
+        ng.applyPaint();
+        ng.nativeFillArc(ng.color, ng.alpha, x, y, width, height, startAngle, arcAngle);
+        ng.unapplyPaint();
+        ng.paint = oldPaint;
+    }
+
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+        fillRadialGradient(graphics, startColor, endColor, x, y, width, height, 0, 360); 
+    }
+    
+    
 
     private static void nativeFillArcMutable(int color, int alpha, int x, int y, int width, int height, int startAngle, int arcAngle) {
         nativeInstance.nativeFillArcMutable(color, alpha, x, y, width, height, startAngle, arcAngle);
@@ -2690,6 +2731,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native layer
      */
     public static void capturePictureResult(String r) {
+        dropEvents = false;
         if(captureCallback != null) {
             if(r != null) {
                 if(r.startsWith("file:")) {
@@ -2706,6 +2748,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     public void captureAudio(ActionListener response) {
+        dropEvents = false;
         String p = FileSystemStorage.getInstance().getAppHomePath();
         if(!p.endsWith("/")) {
             p += "/";
@@ -2736,6 +2779,7 @@ public class IOSImplementation extends CodenameOneImplementation {
      * Callback for the native layer
      */
     public static void captureMovieResult(String r) {
+        dropEvents = false;
         capturePictureResult(r);
     }
     
@@ -2749,6 +2793,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false);
+        dropEvents = true;
     }
 
     @Override
@@ -2868,6 +2913,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(true);
+        dropEvents = true;
     }
 
     @Override
@@ -2880,7 +2926,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
-        
     }
     
     
@@ -3535,8 +3580,30 @@ public class IOSImplementation extends CodenameOneImplementation {
         
     }
     
+    abstract class Paint {
+        
+    }
+    
+    abstract class Gradient extends Paint {
+        int startColor;
+        int endColor;
+    }
+    
+    class RadialGradient extends Gradient {
+        int x, y, width, height;
+        
+        RadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.startColor = startColor;
+            this.endColor = endColor;
+        }
+    }
     
     class NativeGraphics {
+        Paint paint;
         final Rectangle reusableRect = new Rectangle();
         final Rectangle reusableRect2 = new Rectangle();
         NativeImage associatedImage;
@@ -4076,9 +4143,35 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean isShapeClipSupported() {
             return true;
         }
+        
+        public void applyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                RadialGradient g = (RadialGradient)paint;
+                nativeInstance.applyRadialGradientPaintMutable(g.startColor, g.endColor, g.x, g.y, g.width, g.height);
+            }
+        }
+        
+        public void unapplyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                nativeInstance.clearRadialGradientPaintMutable();
+            }
+        }
     }
 
     class GlobalGraphics extends NativeGraphics {
+        public void applyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                RadialGradient g = (RadialGradient)paint;
+                nativeInstance.applyRadialGradientPaintGlobal(g.startColor, g.endColor, g.x, g.y, g.width, g.height);
+            }
+        }
+        
+        public void unapplyPaint() {
+            if (paint != null && paint instanceof RadialGradient) {
+                nativeInstance.clearRadialGradientPaintGlobal();
+            }
+        }
+        
         public void checkControl() {
             if(currentlyDrawingOn != this) {
                 if(currentlyDrawingOn != null) {
@@ -4285,7 +4378,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                     p.getBounds(origBounds);
                     tmpDrawShape.setShape(shape, transform);
                     tmpDrawShape.getBounds(transformedBounds);
-                    float scale = Math.max(transformedBounds.getWidth()/(float)origBounds.getWidth(), transformedBounds.getHeight()/(float)origBounds.getHeight());
+                    
+                    double h1 = Math.sqrt(origBounds.getWidth() * origBounds.getWidth() + origBounds.getHeight() * origBounds.getHeight());
+                    double h2 = Math.sqrt(transformedBounds.getWidth() * transformedBounds.getWidth() + transformedBounds.getHeight() * transformedBounds.getHeight());
+                    if (h2 < 1) h2 = 1;
+                    if (h1 < 1) h1 = 1;
+                    
+                    
+                    float scale = (float)(h2/h1);
                     tmpTransform.setScale(scale, scale);
                     tmpDrawShape.setShape(shape, tmpTransform);
 
@@ -4312,6 +4412,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                             return;
                         }
                         //mask = (TextureAlphaMask)createAlphaMask(shape, stroke);
+                        if (paint != null && paint instanceof RadialGradient) {
+                            RadialGradient rgp = (RadialGradient)paint;
+                            rgp.x *= scale;
+                            rgp.y *= scale;
+                            rgp.width *= scale;
+                            rgp.height *= scale;
+                            applyPaint();
+                        }
                         nativeDrawAlphaMask(mask);
                     } finally {
                         setTransform(tmpTransform2);
@@ -4417,6 +4525,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     class NativeImage {
+        boolean scaled;
         NativeGraphics child;
         int width;
         int height;

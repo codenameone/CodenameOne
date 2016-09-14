@@ -29,6 +29,7 @@ import com.codename1.ui.EncodedImage;
 import com.codename1.ui.util.EditableResources;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.Transparency;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -216,8 +217,80 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
             }
         }
     }
+    
+    /**
+     * Adapted from http://stackoverflow.com/questions/7951290/re-sizing-an-image-without-losing-quality
+     * @param img The Image to scale
+     * @param targetWidth target width
+     * @param targetHeight target height
+     * @return A scaled image copy of the original image.
+     * @throws IllegalArgumentException
+     */
+    private static BufferedImage getScaledInstance(BufferedImage img,
+                                            int targetWidth,
+                                            int targetHeight) {
+        if (targetWidth < 0) {
+            throw new IllegalArgumentException(String.format("Negative target sizes not allowed: %d", targetWidth));
+        }
+        if (targetHeight < 0) {
+            throw new IllegalArgumentException(String.format("Negative target sizes not allowed: %d", targetHeight));
+        }
+        int type = (img.getTransparency() == Transparency.OPAQUE) ?
+                BufferedImage.TYPE_INT_RGB : BufferedImage.TYPE_INT_ARGB;
+        BufferedImage ret = img;
+        int w;
+        int h;
+        // Use multi-step technique: start with original size, then
+        // scale down in multiple passes with drawImage()
+        // until the target size is reached
+        w = img.getWidth();
+        h = img.getHeight();
+
+        int breakLoop = 0;
+        
+        do {
+            breakLoop++;
+            
+            w = reduce(w, targetWidth);
+            h = reduce(h, targetHeight);
+
+            BufferedImage tmp = new BufferedImage(w, h, type);
+            Graphics2D g2 = tmp.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g2.drawImage(ret, 0, 0, w, h, null);
+            g2.dispose();
+
+            ret = tmp;
+            if(breakLoop > 20) {
+                // damn infinite loop...
+                return null;
+            }
+        } while ((w != targetWidth) || (h != targetHeight));
+
+        return ret;
+    }
+
+    private static int reduce(int dimension, int targetDimension) {
+        if (dimension > targetDimension) {
+            dimension /= 2;
+            if (dimension < targetDimension) {
+                dimension = targetDimension;
+            }
+        } else if (dimension < targetDimension) {
+            dimension = targetDimension;
+        }
+        return dimension;
+    }    
 
     private static byte[] scale(BufferedImage bi, int w, int h) throws IOException {
+        BufferedImage newbi = getScaledInstance(bi, w, h);
+        if(newbi != null) {
+            // prevent infinite loop with the higher quality scaling code
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ImageIO.write(newbi, "png", output);
+            output.close();
+            return output.toByteArray();
+        }
         BufferedImage scaled = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2d = scaled.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);

@@ -61,6 +61,16 @@ public class WebBrowser extends Container {
     private Loading loading;
 
     /**
+     * Constructor with a URL
+     * 
+     * @param url the url
+     */
+    public WebBrowser(String url) {
+        this();
+        setURL(url);
+    }
+    
+    /**
      * Default constructor
      */
     public WebBrowser() {

@@ -239,9 +239,8 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        AndroidImplementation.activity = this;
+        AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
-        waitingForResult = false;
         background = false;
     }
 
@@ -283,7 +282,7 @@ public class CodenameOneActivity extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        AndroidImplementation.activity = this;
+        AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onCreate(savedInstanceState);
 
         if (android.os.Build.VERSION.SDK_INT >= 11) {
@@ -519,6 +518,10 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void setIntentResultListener(IntentResultListener l) {
+        //if the activity is waiting for result don't override the intent listener
+        if(waitingForResult){
+            return;
+        }
         this.intentResultListener = l;
     }
 
@@ -527,6 +530,7 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void restoreIntentResultListener() {
+        waitingForResult = false;
         setIntentResultListener(defaultResultListener);
     }
 
@@ -539,6 +543,9 @@ public class CodenameOneActivity extends Activity {
             waitingForResult = true;
         }
         intentResult = new Vector();
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
         super.startActivityForResult(intent, requestCode);
     }
 
@@ -549,6 +556,9 @@ public class CodenameOneActivity extends Activity {
             waitingForResult = false;            
         }else{
             waitingForResult = true;
+        }
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
         }
         super.startActivity(intent);
     }

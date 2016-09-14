@@ -64,7 +64,7 @@
 #import "com_codename1_ui_geom_Rectangle.h"
 #import <MobileCoreServices/MobileCoreServices.h>
 #include "com_codename1_ui_plaf_Style.h"
-
+#import "RadialGradientPaint.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
 
@@ -445,6 +445,12 @@ void com_codename1_impl_ios_IOSNative_setPreferredBackgroundFetchInterval___int(
     NSTimeInterval interval = seconds;
     if (interval < 0) {
         interval = UIApplicationBackgroundFetchIntervalNever;
+    }
+    if (interval < 3600) {
+        // Minimum fetch interval appears to be between 10 minutes and 35 minutes
+        // Setting custom intervals seem to give unpredictable results, so for low values (< 1 hour)
+        // it is best to just use minimum interval and let the system work it out.
+        interval = UIApplicationBackgroundFetchIntervalMinimum;
     }
     [[UIApplication sharedApplication] setMinimumBackgroundFetchInterval:interval];
 #endif
@@ -2048,6 +2054,60 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
     CGContextRestoreGState(UIGraphicsGetCurrentContext());
     CGColorSpaceRelease(colorSpace);
     POOL_END();
+}
+
+/*
+  native void applyRadialGradientPaintMutable(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintMutable();
+
+    native void applyRadialGradientPaintGlobal(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintGlobal();
+ */
+void com_codename1_impl_ios_IOSNative_applyRadialGradientPaintGlobal___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
+        JAVA_INT startColor,
+        JAVA_INT endColor,
+        JAVA_INT x,
+        JAVA_INT y,
+        JAVA_INT width,
+        JAVA_INT height)
+{
+    RadialGradientPaint *f = [[RadialGradientPaint alloc] initWithArgs:x y:y width:width height:height startColor:startColor endColor:endColor];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+
+void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintGlobal__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) 
+{
+    RadialGradientPaint *f = [[RadialGradientPaint alloc] initClear];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_applyRadialGradientPaintMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+        JAVA_INT startColor,
+        JAVA_INT endColor,
+        JAVA_INT x,
+        JAVA_INT y,
+        JAVA_INT width,
+        JAVA_INT height)
+{
+    RadialGradientPaint *f = [[RadialGradientPaint alloc] initWithArgs:x y:y width:width height:height startColor:startColor endColor:endColor];
+    [PaintOp setCurrentMutable:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintMutable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) 
+{
+    [PaintOp setCurrentMutable:NULL];
 }
 
 void com_codename1_impl_ios_IOSNative_releasePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {

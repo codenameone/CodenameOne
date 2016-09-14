@@ -26,6 +26,8 @@ import android.app.IntentService;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Display;
 import com.google.android.gms.location.FusedLocationProviderApi;
 
@@ -51,7 +53,12 @@ public class BackgroundLocationHandler extends IntentService {
         }
         //if the Display is not initialized we need to launch the CodenameOneBackgroundLocationActivity 
         //activity to handle this
-        if (!Display.isInitialized()) {            
+        boolean shouldStopWhenDone = false;
+        if (!Display.isInitialized()) {
+            shouldStopWhenDone = true;
+            AndroidImplementation.startContext(this);
+            //Display.init(this);
+            /*
             Intent bgIntent = new Intent(getBaseContext(), CodenameOneBackgroundLocationActivity.class);
             Bundle b = new Bundle();
             b.putString("backgroundLocation", params[1]);
@@ -59,15 +66,19 @@ public class BackgroundLocationHandler extends IntentService {
             bgIntent.putExtras(b); //Put your id to your next Intent
             bgIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getApplication().startActivity(bgIntent);
-        } else {
+                    */
+        } //else {
 
-            try {
-                //the 2nd parameter is the class name we need to create
-                LocationListener l = (LocationListener) Class.forName(params[1]).newInstance();
-                l.locationUpdated(AndroidLocationManager.convert(location));
-            } catch (Exception e) {
-                Log.e("Codename One", "background location error", e);
-            }
+        try {
+            //the 2nd parameter is the class name we need to create
+            LocationListener l = (LocationListener) Class.forName(params[1]).newInstance();
+            l.locationUpdated(AndroidLocationManager.convert(location));
+        } catch (Exception e) {
+            Log.e("Codename One", "background location error", e);
         }
+        if (shouldStopWhenDone) {
+            AndroidImplementation.stopContext(this);
+        }
+        //}
     }
 }

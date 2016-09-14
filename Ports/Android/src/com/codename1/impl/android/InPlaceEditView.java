@@ -132,11 +132,11 @@ public class InPlaceEditView extends FrameLayout{
      * @param impl The current running activity
      */
     private InPlaceEditView(final AndroidImplementation impl) {
-        super(impl.activity);
+        super(impl.getActivity());
         this.impl = impl;
-        mResources = impl.activity.getResources();
+        mResources = impl.getActivity().getResources();
         mResultReceiver = new DebugResultReceiver(getHandler());
-        mInputManager = (InputMethodManager) impl.activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+        mInputManager = (InputMethodManager) impl.getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
 
         // We place this view as an overlay that takes up the entire screen
         setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
@@ -246,7 +246,7 @@ public class InPlaceEditView extends FrameLayout{
                     final int cursorPos = ta.getCursorPosition();
                     // Now that we have our text from the CN1 text area, we need to be on the
                     // Android UI thread in order to set the text of the native text editor.
-                    impl.activity.runOnUiThread(new Runnable() {
+                    impl.getActivity().runOnUiThread(new Runnable() {
                         public void run() {
 
                             // Double check that the state is still correct.  I.e. we are editing
@@ -389,7 +389,7 @@ public class InPlaceEditView extends FrameLayout{
 
         // Since this may be called off the UI thread, we need to issue async request on UI thread
         // to hide the text area.
-        impl.activity.runOnUiThread(new Runnable() {
+        impl.getActivity().runOnUiThread(new Runnable() {
             public void run() {
                 if (mEditText != null && mEditText.mTextArea == ta) {
 
@@ -535,7 +535,7 @@ public class InPlaceEditView extends FrameLayout{
         final boolean showKeyboard = showVKB;
         final ActionListener listener = Display.getInstance().getVirtualKeyboardListener();
         if(listener != null){
-            new Thread(new Runnable() {
+            Thread t = new Thread(new Runnable() {
 
                 @Override
                 public void run() {
@@ -556,7 +556,9 @@ public class InPlaceEditView extends FrameLayout{
                         }
                     });
                 }
-            }).start();
+            });
+            t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+            t.start();
         }
         
         Log.d(TAG, "InputMethodManager returned " + Boolean.toString(result).toUpperCase());
@@ -869,7 +871,10 @@ public class InPlaceEditView extends FrameLayout{
         if (!mIsEditing || mEditText == null) {
             return;
         }
-        setVisibility(GONE);
+        // SJH: Setting visibility GONE causes a size change event to be fired even when the
+        // input mode is adjustPan.  This causes problems and glitches with the layout because we
+        // have to guess if a resize even is accurate or not.
+        //setVisibility(GONE);
         mLastEndEditReason = reason;
 
         // If the IME action is set to NEXT, do not hide the virtual keyboard
@@ -882,10 +887,12 @@ public class InPlaceEditView extends FrameLayout{
             showVirtualKeyboard(false);
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
-        if(reason == REASON_IME_ACTION &&
-            (EditorInfo.IME_ACTION_DONE == imo || EditorInfo.IME_ACTION_SEARCH == imo ||  EditorInfo.IME_ACTION_SEND == imo || EditorInfo.IME_ACTION_GO == imo) &&
-                mEditText.mTextArea instanceof TextField ){
-            ((TextField)mEditText.mTextArea).fireDoneEvent();
+        if (reason == REASON_IME_ACTION
+                && ((TextField) mEditText.mTextArea).getDoneListener() != null
+                && ((imo & EditorInfo.IME_ACTION_DONE) != 0 || (imo & EditorInfo.IME_ACTION_SEARCH) != 0 || (imo & EditorInfo.IME_ACTION_SEND) != 0 || (imo & EditorInfo.IME_ACTION_GO) != 0)
+                && mEditText.mTextArea instanceof TextField) {
+            ((TextField) mEditText.mTextArea).fireDoneEvent();
+            showVirtualKeyboard(false);
         }
 
         // Call this in onComplete instead
@@ -950,9 +957,9 @@ public class InPlaceEditView extends FrameLayout{
     private static void setEditMode(final boolean resize){
         resizeMode = resize;
         if (resize) {
-            sInstance.impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            sInstance.impl.getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         } else {
-            sInstance.impl.activity.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
+            sInstance.impl.getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         }
     }
 
@@ -1058,7 +1065,7 @@ public class InPlaceEditView extends FrameLayout{
                             final int h = lastTextAreaHeight = txt.getHeight();
 
 
-                            sInstance.impl.activity.runOnUiThread(new Runnable() {
+                            sInstance.impl.getActivity().runOnUiThread(new Runnable() {
                                 public void run() {
                                     if (mIsEditing && !isActiveTextEditorHidden() && sInstance != null && sInstance.mEditText != null) {
 
@@ -1086,7 +1093,7 @@ public class InPlaceEditView extends FrameLayout{
      * @param inputType One of the TextArea's input-type constants
      */
     public static void edit(final AndroidImplementation impl, final Component component, final int inputType) {
-        if (impl.activity == null) {
+        if (impl.getActivity() == null) {
             throw new IllegalArgumentException("activity is null");
         }
 
@@ -1181,7 +1188,7 @@ public class InPlaceEditView extends FrameLayout{
                 if (!isClosing && sInstance != null && sInstance.mEditText != null) {
                     isClosing = true;
 
-                    impl.activity.runOnUiThread(new Runnable() {
+                    impl.getActivity().runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
                             instance.endEditing(REASON_UNDEFINED, true);
@@ -1219,7 +1226,7 @@ public class InPlaceEditView extends FrameLayout{
         // android UI thread.
         final TextAreaData textAreaData = new TextAreaData(textArea);
         
-        impl.activity.runOnUiThread(new Runnable() {
+        impl.getActivity().runOnUiThread(new Runnable() {
 
             @Override
             public void run() {
@@ -1234,7 +1241,7 @@ public class InPlaceEditView extends FrameLayout{
                 }else{
                     setEditMode(false);
                 }
-                sInstance.startEditing(impl.activity, textAreaData, initialText, inputType);
+                sInstance.startEditing(impl.getActivity(), textAreaData, initialText, inputType);
             }
         });
 
@@ -1257,7 +1264,7 @@ public class InPlaceEditView extends FrameLayout{
 
                     if (!impl.isAsyncEditMode()) {
                         sInstance.mLastEditText = null;
-                        impl.activity.runOnUiThread(new Runnable() {
+                        impl.getActivity().runOnUiThread(new Runnable() {
 
                             public void run() {
                                 releaseEdit();

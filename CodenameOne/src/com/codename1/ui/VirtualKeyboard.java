@@ -41,6 +41,7 @@ import java.util.Vector;
  * This class represent the Codename One Light Weight Virtual Keyboard
  * 
  * @author Chen Fishbein
+ * @deprecated this is a part of legacy code, modern devices have the virtual keyboard bound to the native text field
  */
 public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
     private static final String MARKER_COMMIT_ON_DISPOSE = "$VKB_COM$";

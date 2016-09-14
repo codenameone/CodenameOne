@@ -2480,6 +2480,7 @@ public class Component implements Animation, StyleListener {
         return new ComponentAnimation() {
             private boolean finished;
             private boolean stepMode;
+            private boolean started;
             
             @Override
             public boolean isStepModeSupported() {
@@ -2535,6 +2536,9 @@ public class Component implements Animation, StyleListener {
             
             @Override
             public boolean isInProgress() {
+                if(!stepMode && !started) {
+                    return true;
+                }
                 return stepMode ||
                         !((bgMotion == null || bgMotion.isFinished()) && 
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&
@@ -2553,6 +2557,43 @@ public class Component implements Animation, StyleListener {
             protected void updateState() {
                 if(finished) {
                     return;
+                }
+                
+                if(!started && !stepMode) {
+                    started = true;
+                    if(bgMotion != null) {
+                        bgMotion.start();
+                    }
+                    if(fgColorMotion != null) {
+                        fgColorMotion.start();
+                    }
+                    if(fontMotion != null) {
+                        fontMotion.start();
+                    }
+                    if(paddingTop != null) {
+                        paddingTop.start();
+                    }
+                    if(paddingBottom != null) {
+                        paddingBottom.start();
+                    }
+                    if(paddingLeft != null) {
+                        paddingLeft.start();
+                    }
+                    if(paddingRight != null) {
+                        paddingRight.start();
+                    }
+                    if(marginTop != null) {
+                        marginTop.start();
+                    }
+                    if(marginBottom != null) {
+                        marginBottom.start();
+                    }
+                    if(marginLeft != null) {
+                        marginLeft.start();
+                    }
+                    if(marginRight != null) {
+                        marginRight.start();
+                    }
                 }
                                 
                 if(!isInProgress()) {
@@ -2682,7 +2723,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHover(int[] x, int[] y) {
-        pointerDragged(x, y);
     }
 
     void clearDrag() {
@@ -2744,8 +2784,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHoverPressed(int[] x, int[] y) {
-        dragActivated = false;
-        clearDrag();
     }
     
     /**

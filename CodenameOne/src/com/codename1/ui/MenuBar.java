@@ -693,7 +693,11 @@ public class MenuBar extends Container implements ActionListener {
         final Dialog d = new Dialog("Menu", "");
         d.setDisposeWhenPointerOutOfBounds(true);
         d.setMenu(true);
-
+        d.addOrientationListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                d.dispose();
+            }
+        });
         d.setTransitionInAnimator(transitionIn);
         d.setTransitionOutAnimator(transitionOut);
         d.setLayout(new BorderLayout());

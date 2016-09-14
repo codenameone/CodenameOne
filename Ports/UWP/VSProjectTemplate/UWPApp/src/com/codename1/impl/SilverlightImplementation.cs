@@ -1,4 +1,3 @@
-
 using System.IO;
 using System.Linq;
 using System;
@@ -43,6 +42,7 @@ using Windows.Devices.Input;
 using Windows.Graphics.Imaging;
 using Microsoft.Graphics.Canvas.Geometry;
 using java.io;
+using Windows.Foundation.Metadata;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -719,7 +719,7 @@ namespace com.codename1.impl
             using (var ds = cr.CreateDrawingSession())
             {
                 float angle = (float)Math.PI * degrees / 180;
-                ds.Transform = Matrix3x2.CreateRotation(angle, new Vector2(cr.SizeInPixels.Width / 2, cr.SizeInPixels.Height / 2));
+                ds.Transform = Matrix3x2.CreateRotation(angle, new Vector2((float)cn.image.Size.Width / 2, (float)cn.image.Size.Height / 2));
                 ds.DrawImage(cn.image);
                 ds.Dispose();
             }
@@ -1297,20 +1297,47 @@ namespace com.codename1.impl
             }).AsTask().GetAwaiter();
         }
 
-        public override void execute(string n1)
-        {
-            using (AutoResetEvent are = new AutoResetEvent(false))
-            {
-                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                {
-                    webView = new WebView();
-                    webView.Source = new Uri(n1, UriKind.RelativeOrAbsolute);
+        public override void execute(string n1) {
+            var uri = new Uri(n1, UriKind.RelativeOrAbsolute);
+            using (AutoResetEvent are = new AutoResetEvent(false)) {
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
+                    var result = Windows.System.Launcher.LaunchUriAsync(uri);
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
                 are.WaitOne();
             }
         }
 
+        /**
+        * Returns true if the underlying OS supports opening the native navigation
+        * application
+        * @return true if the underlying OS supports launch of native navigation app
+        */
+        public override bool isOpenNativeNavigationAppSupported(){
+            return true;
+        }
+
+       /**
+        * Opens the native navigation app in the given coordinate.
+        * @param latitude 
+        * @param longitude 
+        */ 
+        public override void openNativeNavigationApp(double latitude, double longitude){    
+            using (AutoResetEvent are = new AutoResetEvent(false)) {
+
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
+                    var uri = new Uri(@"bingmaps:?cp="+latitude+"~"+longitude);
+
+                    // Launch the Windows Maps app
+                    var launcherOptions = new Windows.System.LauncherOptions();
+                    launcherOptions.TargetApplicationPackageFamilyName = "Microsoft.WindowsMaps_8wekyb3d8bbwe";
+                    var result = Windows.System.Launcher.LaunchUriAsync(uri, launcherOptions);
+                    are.Set();
+                }).AsTask().GetAwaiter().GetResult();
+                are.WaitOne();
+            }
+        }
+        
         public override void browserExecute(PeerComponent n1, string n2)
         {
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
@@ -1416,6 +1443,22 @@ namespace com.codename1.impl
 #endif
         }
 
+        public override void dial(string phoneNumber) {
+            execute("tel:" + phoneNumber);/*
+            java.lang.System.@out.println("Trying to dial phone number "+phoneNumber);
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+                {
+                    if (ApiInformation.IsApiContractPresent("Windows.ApplicationModel.Calls.CallsPhoneContract", 1, 0))
+                    {
+                        Windows.ApplicationModel.Calls.PhoneCallStore phoneCallStore = await Windows.ApplicationModel.Calls.PhoneCallManager.RequestStoreAsync();
+                        Guid LineGuid = await phoneCallStore.GetDefaultLineAsync();
+
+                        Windows.ApplicationModel.Calls.PhoneLine phoneLine = await Windows.ApplicationModel.Calls.PhoneLine.FromIdAsync(LineGuid);
+                        phoneLine.Dial(phoneNumber, phoneNumber);
+                    }
+                }).AsTask().GetAwaiter().GetResult();*/
+        }
+
         public override object createMutableImage(int width, int height, int color)
         {
             CodenameOneImage ci = new CodenameOneImage();
@@ -1439,7 +1482,7 @@ namespace com.codename1.impl
 
         public override bool isAlphaMutableImageSupported()
         {
-            return false;
+            return true;
         }
 
         public override object scale(object sourceImage, int width, int height)
@@ -1827,23 +1870,128 @@ namespace com.codename1.impl
             return true;
         }
 
+        public override bool isNativeFontSchemeSupported()
+        {
+            return true;
+        }
+
         public override object loadTrueTypeFont(string fontName, string fileName)
         {
+            
+            
 
             NativeFont nf = new NativeFont(0, 0, 0, new CanvasTextFormat());
-            string file = nativePath(fileName);
+            string file = fileName != null ? nativePath(fileName) : null;
             string family = fontName;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    nf.font.FontFamily = @"res\" + file + "#" + family;
+                    if (fontName.StartsWith("native:"))
+                    {
+                        if ("native:MainThin".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Thin;
+
+                        }
+                        else if ("native:MainLight".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Light;
+                        }
+                        else if ("native:MainRegular".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                        }
+
+                        else if ("native:MainBold".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Bold;
+                        }
+
+                        else if ("native:MainBlack".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontWeight = FontWeights.Black;
+                        }
+
+                        else if ("native:ItalicThin".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Thin;
+
+                        }
+
+                        else if ("native:ItalicLight".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Light;
+                        }
+
+                        else if ("native:ItalicRegular".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                        }
+
+                        else if ("native:ItalicBold".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Bold;
+                        }
+
+                        else if ("native:ItalicBlack".Equals(fontName))
+                        {
+                            nf.font.FontFamily = "Segoe UI";
+                            nf.font.FontStyle = FontStyle.Italic;
+                            nf.font.FontWeight = FontWeights.Black;
+                        }
+                    }
+                    else
+                    {
+
+                        nf.font.FontFamily = generateFontFamilyFromFontName(family, fileName);
+                    }
                     nf.font.WordWrapping = CanvasWordWrapping.NoWrap;
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
                 are.WaitOne();
             }
             return nf;
+        }
+
+        private string generateFontFamilyFromFontName(string fontName, string fileName)
+        {
+            string file = nativePath(fileName);
+             Microsoft.Graphics.Canvas.Text.CanvasFontSet fontSet = new Microsoft.Graphics.Canvas.Text.CanvasFontSet(new Uri(@"ms-appx:///res/" + file));
+            string first = null;
+            foreach (var font in fontSet.Fonts)
+            {
+                foreach (var fam in font.FamilyNames)
+                {
+                    if (first == null)
+                    {
+                        first = @"res\" + file + "#" + fam.Value;
+                    }
+                    if (fam.Value.Equals(fontName))
+                    {
+                        return @"res\" + file + "#" + fam.Value;
+                    }
+                }
+            }
+
+            if (first != null)
+            {
+                return first;
+            }
+
+            return @"res\" + file + "#" + fontName;
+
         }
 
         public override object deriveTrueTypeFont(object font, float size, int weight)
@@ -1856,6 +2004,8 @@ namespace com.codename1.impl
                 {
                     n.font.FontFamily = fnt.font.FontFamily;
                     n.font.FontSize = size;
+                    n.font.FontStyle = fnt.font.FontStyle;
+                    n.font.FontWeight = fnt.font.FontWeight;
                     if ((weight & 1) != 0) // bold
                     {
                         n.font.FontWeight = FontWeights.Bold;

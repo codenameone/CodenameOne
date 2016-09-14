@@ -21,7 +21,12 @@
       An Assembly element with Name="*Application*" applies to all assemblies in
       the application package. The asterisks are not wildcards.
     -->
-    <Assembly Name="*Application*" Dynamic="Required All" />
+    <Assembly Name="*Application*" Dynamic="All"/>
+    <Assembly Name="IKVM.OpenJDK.Core" Dynamic="All" DoNotInline="true" DoNotOptimize="true"/>
+    <Assembly Name="IKVM.OpenJDK.Security" Dynamic="All" DoNotInline="true" DoNotOptimize="true"/>
+    <Assembly Name="IKVM.OpenJDK.Text" Dynamic="All" DoNotInline="true" DoNotOptimize="true"/>
+    <Assembly Name="IKVM.OpenJDK.Util" Dynamic="All" DoNotInline="true" DoNotOptimize="true"/>
+    <Assembly Name="IKVM.Runtime" Dynamic="All" DoNotInline="true" DoNotOptimize="true"/>
     
     
     <!-- Add your application specific runtime directives here. -->

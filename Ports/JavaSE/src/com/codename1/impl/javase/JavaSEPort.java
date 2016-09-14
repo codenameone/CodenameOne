@@ -175,6 +175,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    
+    /**
+     * When set to true pointer hover events will be called for mouse move events
+     */
+    private static boolean invokePointerHover;
+    
     static {
         String n = System.getProperty("os.name");
         if (n != null && n.startsWith("Mac")) {
@@ -191,6 +197,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             fontFaceSystem = "Arial";
         }
         
+    }
+
+    /**
+     * When set to true pointer hover events will be called for mouse move events
+     * @return the invokePointerHover
+     */
+    public static boolean isInvokePointerHover() {
+        return invokePointerHover;
+    }
+
+    /**
+     * When set to true pointer hover events will be called for mouse move events
+     * @param aInvokePointerHover the invokePointerHover to set
+     */
+    public static void setInvokePointerHover(boolean aInvokePointerHover) {
+        invokePointerHover = aInvokePointerHover;
     }
     
     private boolean minimized;
@@ -1111,6 +1133,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             e.consume();
             if (!isEnabled()) {
                 return;
+            }
+            if(invokePointerHover) {
+                int x = scaleCoordinateX(e.getX());
+                int y = scaleCoordinateY(e.getY());
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                    JavaSEPort.this.pointerHover(x, y);
+                } 
             }
             if (getSkinHotspots() != null) {
                 java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
@@ -2585,8 +2614,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
 
-                            URL u = new URL("https://codenameone.com/OTA/Skins.xml");
-                            URLConnection uc = u.openConnection();
+                            URL u = new URL("https://www.codenameone.com/OTA/Skins.xml");
+                            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+                            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
                             InputStream is = uc.getInputStream();
                             doc[0] = db.parse(is);
                             NodeList skins = doc[0].getElementsByTagName("Skin");
@@ -4355,6 +4385,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    @Override
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+        checkEDT();
+        Graphics2D nativeGraphics = (Graphics2D)getGraphics(graphics).create();
+        Paint p = new RadialGradientPaint(x+width/2, y+height/2, width/2, new float[]{0,1}, new Color[]{new Color(startColor), new Color(endColor)});
+        nativeGraphics.setPaint(p);
+        nativeGraphics.fillOval(x+1, y+1, width-2, height-2);
+    }
+
+    
+    
     /**
      * @inheritDoc
      */
@@ -5994,8 +6035,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             throw new IOException("Unreachable");
         }
         if(url.toLowerCase().startsWith("http:"))  {
-            System.out.print("WARNING: Apple will no longer accept http URL connections from applications you tried to connect to " + 
-                    url +"\nto learn more check out https://www.codenameone.com/blog/ios-http-urls.html" );
+            System.out.println("WARNING: Apple will no longer accept http URL connections from applications you tried to connect to " + 
+                    url +" to learn more check out https://www.codenameone.com/blog/ios-http-urls.html" );
         }
         URL u = new URL(url);        
 
@@ -6896,7 +6937,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(!exposeFilesystem) { 
                     if (selected != null) {
                         try {
-                            File tmp = File.createTempFile("temp", "." + imageTypes[0]);
+                            String ext = selected.getName();
+                            int idx = ext.lastIndexOf(".");
+                            if(idx > 0) {
+                                ext = ext.substring(idx);
+                            } else {
+                                ext= imageTypes[0];
+                            }
+                            File tmp = File.createTempFile("temp", "." + ext);
                             tmp.deleteOnExit();
                             copyFile(selected, tmp);
                             result = new com.codename1.ui.events.ActionEvent("file://" + tmp.getAbsolutePath().replace('\\', '/'));

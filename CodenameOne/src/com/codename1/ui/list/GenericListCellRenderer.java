@@ -50,7 +50,9 @@ import java.util.HashMap;
 
 /**
  * <p>The generic list cell renderer can display containers or arbitrary Codename One components
- * as items in a list. It relies on the source data being a {@code Map} object. It extracts values from 
+ * as items in a list, <b>notice</b> that 
+ * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
+ * discourage usage of lists</a>.. It relies on the source data being a {@code Map} object. It extracts values from 
  * the {@code Map} using the component name as an indication to the Map key lookup.<br>
  * This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.</p>
  * <p>
@@ -410,7 +412,9 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                         setComponentValue(entries[iter], h.getObject(currentName), list, cmp);
                     }
                 } else {
-                    setComponentValue(entries[0], value, list, cmp);
+                    if(entries.length > 0) {
+                        setComponentValue(entries[0], value, list, cmp);
+                    }
                 }
             }
             return cmp;
