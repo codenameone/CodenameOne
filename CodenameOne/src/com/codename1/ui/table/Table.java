@@ -745,7 +745,11 @@ public class Table extends Container {
      */
     public Object getPropertyValue(String name) {
         if(name.equals("data")) {
-            return ((DefaultTableModel)model).data;
+            Object[][] result = new Object[((DefaultTableModel)model).data.size()][];
+            for(int iter = 0 ; iter < result.length ; iter++) {
+                result[iter] = ((DefaultTableModel)model).data.get(iter);
+            }
+            return result;
         }
         if(name.equals("header")) {
             return ((DefaultTableModel)model).columnNames;
@@ -758,7 +762,7 @@ public class Table extends Container {
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("data")) {
-            setModel(new DefaultTableModel(((DefaultTableModel)model).columnNames, (String[][])value));
+            setModel(new DefaultTableModel(((DefaultTableModel)model).columnNames, (Object[][])value));
             return null;
         }
         if(name.equals("header")) {

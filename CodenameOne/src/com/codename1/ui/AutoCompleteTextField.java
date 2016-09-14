@@ -407,6 +407,10 @@ public class AutoCompleteTextField extends TextField {
         int popupHeight;
         int items = l.getModel().getSize();
         final Form f = getComponentForm();
+        if(f == null) {
+            // for some reason this happens in the GUI builder
+            return 10;
+        }
         if(l.getModel() instanceof FilterProxyListModel){
             items = ((FilterProxyListModel)l.getModel()).getUnderlying().getSize();
         }

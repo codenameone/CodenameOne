@@ -56,6 +56,8 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Shader;
+import android.view.View;
+
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
@@ -1407,6 +1409,9 @@ class AndroidGraphics {
         transformDirty = true;
         inverseTransformDirty = true;
         clipFresh = false;
+    }
+
+    public void drawView(final View v, AndroidAsyncView.LayoutParams lp) {
     }
 
     public void rotate(float angle, int x, int y) {
