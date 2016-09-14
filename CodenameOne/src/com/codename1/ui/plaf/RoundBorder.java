@@ -262,7 +262,7 @@ public class RoundBorder extends Border {
             }
             if(stroke && this.stroke != null) {
                 GeneralPath arc = new GeneralPath();
-                arc.arc(x, y, size, size, 0, 360);
+                arc.arc(x, y, size, size, 0, 2*Math.PI);
                 g.fillShape(arc);
                 g.setColor(strokeColor);
                 g.setAlpha(strokeOpacity);
