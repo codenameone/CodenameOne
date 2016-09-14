@@ -831,12 +831,15 @@ public class ToastBar {
                 }
             }
         };
-        cr.addResponseListener(evt -> {
-            NetworkManager.getInstance().removeErrorListener(errorListener);
-            NetworkManager.getInstance().removeProgressListener(progListener[0]);
-            s.clear();
-            if (onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
-                onSuccess.onSucess(evt);
+        cr.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                NetworkManager.getInstance().removeErrorListener(errorListener);
+                NetworkManager.getInstance().removeProgressListener(progListener[0]);
+                s.clear();
+                if (onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
+                    onSuccess.onSucess(evt);
+                }
             }
         });        
         NetworkManager.getInstance().addProgressListener(progListener[0]);
