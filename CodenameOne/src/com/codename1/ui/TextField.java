@@ -1729,6 +1729,26 @@ public class TextField extends TextArea {
             doneListener.actionPerformed(new ActionEvent(this,ActionEvent.Type.Done));
         }
     }
+
+    /**
+     * Adds a listener for data change events it will be invoked for every change
+     * made to the text field, notice most platforms will invoke only the 
+     * DataChangedListener.CHANGED event
+     * 
+     * @param d the listener
+     */
+    public void addDataChangedListener(DataChangedListener d) {
+        listeners.addListener(d);
+    }
+
+    /**
+     * Removes the listener for data change events 
+     * 
+     * @param d the listener
+     */
+    public void removeDataChangedListener(DataChangedListener d) {
+        listeners.removeListener(d);
+    }
     
     /**
      * Adds a listener for data change events it will be invoked for every change
@@ -1736,6 +1756,7 @@ public class TextField extends TextArea {
      * DataChangedListener.CHANGED event
      * 
      * @param d the listener
+     * @deprecated use #addDataChangedListener(DataChangedListener) instead
      */
     public void addDataChangeListener(DataChangedListener d) {
         listeners.addListener(d);
@@ -1745,6 +1766,7 @@ public class TextField extends TextArea {
      * Removes the listener for data change events 
      * 
      * @param d the listener
+     * @deprecated use #removeDataChangedListener(DataChangedListener) instead
      */
     public void removeDataChangeListener(DataChangedListener d) {
         listeners.removeListener(d);

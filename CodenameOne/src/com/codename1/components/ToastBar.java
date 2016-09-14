@@ -815,14 +815,6 @@ public class ToastBar {
             private int soFar;
             public void actionPerformed(NetworkEvent evt) {
                 switch(evt.getProgressType()) {
-                    case NetworkEvent.PROGRESS_TYPE_COMPLETED:
-                        NetworkManager.getInstance().removeErrorListener(errorListener);
-                        NetworkManager.getInstance().removeProgressListener(this);
-                        s.clear();
-                        if(onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
-                            onSuccess.onSucess(evt);
-                        }
-                        break;
                     case NetworkEvent.PROGRESS_TYPE_INITIALIZING:
                         s.setProgress(-1);
                         break;
@@ -839,6 +831,17 @@ public class ToastBar {
                 }
             }
         };
+        cr.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                NetworkManager.getInstance().removeErrorListener(errorListener);
+                NetworkManager.getInstance().removeProgressListener(progListener[0]);
+                s.clear();
+                if (onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
+                    onSuccess.onSucess(evt);
+                }
+            }
+        });        
         NetworkManager.getInstance().addProgressListener(progListener[0]);
     }
 }
