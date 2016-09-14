@@ -262,7 +262,7 @@ public class RoundBorder extends Border {
             }
             if(stroke && this.stroke != null) {
                 GeneralPath arc = new GeneralPath();
-                arc.arc(x, y, size, size, 0, 360);
+                arc.arc(x, y, size, size, 0, 2*Math.PI);
                 g.fillShape(arc);
                 g.setColor(strokeColor);
                 g.setAlpha(strokeOpacity);
@@ -272,11 +272,12 @@ public class RoundBorder extends Border {
             }
         } else {
             GeneralPath gp = new GeneralPath();
-            gp.moveTo(height / 2.0, 1);
-            gp.lineTo(width - (height / 2.0), 1);
-            gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height-1, true);
-            gp.lineTo(height / 2.0, height-1);
-            gp.arcTo(height / 2.0, height / 2.0, height / 2.0, 1, true);
+            float sw = (stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0;
+            gp.moveTo(height / 2.0, sw);
+            gp.lineTo(width - (height / 2.0), sw);
+            gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height-sw, true);
+            gp.lineTo(height / 2.0, height-sw);
+            gp.arcTo(height / 2.0, height / 2.0, height / 2.0, sw, true);
             gp.closePath();
             g.fillShape(gp);
             if(stroke && this.stroke != null) {

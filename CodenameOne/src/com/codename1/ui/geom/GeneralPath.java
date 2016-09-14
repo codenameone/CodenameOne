@@ -1203,9 +1203,10 @@ public final class GeneralPath implements Shape {
         double r2 = Math.sqrt(dx*dx+dy*dy);
         double dx1 = startX-cX;
         double dy1 = startY-cY;
-        double r1 = Math.sqrt(dx1*dx1*dy1*dy1);
+        double r1 = Math.sqrt(dx1*dx1+dy1*dy1);
         if (Math.abs(r1-r2) > 1) {
-            Log.p("arcTo() called with start and end points that don't lie on the same arc.", Log.WARNING);
+            Log.e(new RuntimeException("arcTo() called with start and end points that don't lie on the same arc r1="+r1+", r2="+r2));
+            
         }
         Ellipse e = new Ellipse();
         Ellipse.initWithBounds(e, cX-r2, cY-r2, r2*2, r2*2);
