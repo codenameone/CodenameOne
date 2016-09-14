@@ -396,6 +396,26 @@ public class Calendar extends Container {
      *
      * @param l listener to add
      */
+    public void addDataChangedListener(DataChangedListener l) {
+        mv.addDataChangeListener(l);
+    }
+
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to remove
+     */
+    public void removeDataChangedListener(DataChangedListener l) {
+        mv.removeDataChangeListener(l);
+    }
+    
+    
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to add 
+     * @deprecated use #addDataChangedListener(DataChangedListener) instead
+     */
     public void addDataChangeListener(DataChangedListener l) {
         mv.addDataChangeListener(l);
     }
@@ -404,6 +424,7 @@ public class Calendar extends Container {
      * Allows tracking selection changes in the calendar in real time
      *
      * @param l listener to remove
+     * @deprecated use #removeDataChangedListener(DataChangedListener) instead
      */
     public void removeDataChangeListener(DataChangedListener l) {
         mv.removeDataChangeListener(l);

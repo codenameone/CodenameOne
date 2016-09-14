@@ -333,7 +333,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
      * Installs a search field on a list making sure the filter method is invoked properly
      */
     public static void install(final TextField search, final List l) {
-        search.addDataChangeListener(new DataChangedListener() {
+        search.addDataChangedListener(new DataChangedListener() {
             public void dataChanged(int type, int index) {
                 FilterProxyListModel f;
                 if(l.getModel() instanceof FilterProxyListModel) {
@@ -358,7 +358,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
      * Installs a search field on a list making sure the filter method is invoked properly
      */
     public static void install(final TextField search, final ContainerList l) {
-        search.addDataChangeListener(new DataChangedListener() {
+        search.addDataChangedListener(new DataChangedListener() {
             public void dataChanged(int type, int index) {
                 FilterProxyListModel f;
                 if(l.getModel() instanceof FilterProxyListModel) {
