@@ -1756,8 +1756,7 @@ public class SideMenuBar extends MenuBar {
             closeMenu();
             clean();
             parent.addShowListener(pointerDragged);
-            new Thread(new ShowWaiter()).start();
-
+            Display.getInstance().startThread(new ShowWaiter(), "Show Waiter").start();
         }
     }
 

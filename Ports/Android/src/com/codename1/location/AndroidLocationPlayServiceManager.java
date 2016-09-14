@@ -29,6 +29,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.ui.Display;
@@ -89,7 +90,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     protected void bindListener() {
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
@@ -124,12 +125,14 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     @Override
     protected void clearListener() {
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
@@ -148,7 +151,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     @Override
@@ -157,7 +162,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         if (bgListenerClass == null) {
             return;
         }
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
@@ -195,7 +200,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     @Override
@@ -204,7 +211,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         if (bgListenerClass == null) {
             return;
         }
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
@@ -230,7 +237,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     @Override
@@ -293,7 +302,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
@@ -329,7 +338,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     /**
@@ -339,7 +350,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
      * @param id a Geofence id to stop tracking
      */
     public void removeGeoFencing(final String id) {
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
@@ -362,8 +373,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                     }
                 });
             }
-        }).start();
-
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     /**
