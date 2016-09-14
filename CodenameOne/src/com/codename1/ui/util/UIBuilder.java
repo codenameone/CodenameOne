@@ -648,7 +648,7 @@ public class UIBuilder { //implements Externalizable {
         }
         if(listener instanceof DataChangedListener) {
             if(cmp instanceof TextField) {
-                ((TextField)cmp).addDataChangeListener((DataChangedListener)listener);
+                ((TextField)cmp).addDataChangedListener((DataChangedListener)listener);
                 return;
             }
             ((Slider)cmp).addDataChangedListener((DataChangedListener)listener);

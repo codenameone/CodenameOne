@@ -443,7 +443,7 @@ public class Validator {
         }
         if(validateOnEveryKey) {
             if(cmp instanceof TextField) {
-                ((TextField)cmp).addDataChangeListener(new ComponentListener(cmp));
+                ((TextField)cmp).addDataChangedListener(new ComponentListener(cmp));
                 return;
             }
         }
