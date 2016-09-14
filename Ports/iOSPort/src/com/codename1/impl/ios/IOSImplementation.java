@@ -87,6 +87,7 @@ import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
@@ -5641,9 +5642,85 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public PeerComponent createNativePeer(Object nativeComponent) {
+        if(Display.getInstance().getProperty("ios.zpeer", null) != null) {
+            return new ZNativeIPhoneView(nativeComponent);
+        }
         return new NativeIPhoneView(nativeComponent);
     }
+
+    class ZNativeIPhoneView extends PeerComponent {
+        private long[] nativePeer;
+        private boolean lightweightMode; 
+       
+        public ZNativeIPhoneView(Object nativePeer) {
+            super(nativePeer);
+            this.nativePeer = (long[])nativePeer;
+            nativeInstance.retainPeer(this.nativePeer[0]);
+            nativeInstance.peerInitialized(this.nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+        }
         
+        public void finalize() {
+            if(nativePeer != null && nativePeer[0] != 0) {
+                nativeInstance.releasePeer(nativePeer[0]);            
+                nativePeer = null;
+            }
+        }
+        
+        public boolean isFocusable() {
+            return true;
+        }
+
+        public void setFocus(boolean b) {
+        }
+        
+        protected Dimension calcPreferredSize() {
+            if(nativePeer == null || nativePeer[0] == 0) {
+                return new Dimension();
+            }
+            int[] p = widthHeight;
+            nativeInstance.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
+            return new Dimension(p[0], p[1]);
+        }
+
+        
+        protected void setLightweightMode(boolean l) {
+            /*if(nativePeer != null && nativePeer[0] != 0) {
+                if(lightweightMode != l) {
+                    lightweightMode = l;
+                    nativeInstance.peerSetVisible(nativePeer[0], !lightweightMode);
+                    getComponentForm().repaint();
+                }
+            }*/
+        }
+        
+        protected Image generatePeerImage() {
+            int[] wh = widthHeight;
+            long imagePeer = nativeInstance.createPeerImage(this.nativePeer[0], wh);
+            if(imagePeer == 0) {
+                return null;
+            }
+            NativeImage ni = new NativeImage("PeerScreen");
+            ni.peer = imagePeer;
+            ni.width = wh[0];
+            ni.height = wh[1];
+            return Image.createImage(ni);
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            if(nativePeer != null && nativePeer[0] != 0) {
+                nativeInstance.updatePeerPositionSize(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+            }
+        }
+        
+        
+        
+        protected boolean shouldRenderPeerImage() {
+            return false;
+        }
+    }
+    
+    
     class NativeIPhoneView extends PeerComponent {
         private long[] nativePeer;
         private boolean lightweightMode; 

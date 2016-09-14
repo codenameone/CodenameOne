@@ -240,6 +240,7 @@ public class FloatingActionButton extends Button {
      * @param dialog the Dialog with all sub FAB's Components
      */
     protected void showPopupDialog(Dialog dialog) {
+        dialog.setPopupDirectionBiasPortrait(Boolean.TRUE);
         dialog.showPopupDialog(this);
     }
 
