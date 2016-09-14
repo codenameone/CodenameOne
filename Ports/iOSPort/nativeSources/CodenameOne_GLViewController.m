@@ -741,7 +741,7 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
         CGMutablePathRef path = CGPathCreateMutable();
         
         CGAffineTransform t = CGAffineTransformMakeTranslation(cx, cy);
-        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/width), t);
+        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/(float)width), t);
         
         CGFloat radius = width/2;
         if (fill){
