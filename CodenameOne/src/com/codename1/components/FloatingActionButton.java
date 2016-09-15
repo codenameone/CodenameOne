@@ -70,6 +70,7 @@ public class FloatingActionButton extends Button {
     private String text;
     private int shadowOpacity = 100;
     private Dialog current;
+    private boolean rectangle;
 
     /**
      * Constructor
@@ -89,16 +90,27 @@ public class FloatingActionButton extends Button {
         updateBorder();
     }
 
+    /**
+     * This constructor is used by text badges
+     */
+    private FloatingActionButton(String text) {
+        super.setText(text);
+        rectangle = true;
+        shadowOpacity = 0;
+        setUIID("Badge");
+        updateBorder();
+    }
+    
     private void updateBorder() {
         getUnselectedStyle().setBorder(RoundBorder.create().
                 color(getUnselectedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity));
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
         getSelectedStyle().setBorder(RoundBorder.create().
                 color(getSelectedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity));
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
         getPressedStyle().setBorder(RoundBorder.create().
                 color(getPressedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity));
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
     }
         
     /**
@@ -112,6 +124,15 @@ public class FloatingActionButton extends Button {
             updateBorder();
         }
     }    
+    
+    /**
+     * Creates a text badge
+     * @param text the text of the badge
+     * @return a badge component
+     */
+    static FloatingActionButton createBadge(String text) {
+        return new FloatingActionButton(text);
+    }
     
     /**
      * a factory method to create a FloatingActionButton.
@@ -143,9 +164,12 @@ public class FloatingActionButton extends Button {
 
     @Override
     protected Dimension calcPreferredSize() {
-        return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
+        if(getIcon() != null) {
+            return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
+        } 
+        return super.calcPreferredSize();
     }
-
+    
     /**
      * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
      * use the layered pane if the container is a content pane.
@@ -153,7 +177,7 @@ public class FloatingActionButton extends Button {
      * @param cnt the Container to add the FAB to
      * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
      */
-    public Container bindFabToContainer(Container cnt) {
+    public Container bindFabToContainer(Component cnt) {
         return bindFabToContainer(cnt, Component.RIGHT, Component.BOTTOM);
     }
 
@@ -167,7 +191,7 @@ public class FloatingActionButton extends Button {
      *
      * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
      */
-    public Container bindFabToContainer(Container cnt, int orientation, int valign) {
+    public Container bindFabToContainer(Component cnt, int orientation, int valign) {
         FlowLayout flow = new FlowLayout(orientation);
         flow.setValign(valign);
 
