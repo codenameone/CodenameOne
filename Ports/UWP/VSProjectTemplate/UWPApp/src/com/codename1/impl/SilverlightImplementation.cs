@@ -2769,7 +2769,7 @@ namespace com.codename1.impl
             bool fileExists;
             try
             {
-                StorageFile file = aStore.GetFileAsync(aFile).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+                IStorageItem file = aStore.TryGetItemAsync(aFile).AsTask().GetAwaiter().GetResult();
                 fileExists = file != null;
             }
             catch (Exception)
