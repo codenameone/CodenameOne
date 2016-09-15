@@ -289,6 +289,8 @@ public class ConnectionRequest implements IOProgressListener {
     void prepare() {
         timeSinceLastUpdate = System.currentTimeMillis();
     }
+    
+    
 
     /**
      * Invoked to initialize HTTP headers, cookies etc. 
@@ -304,8 +306,22 @@ public class ConnectionRequest implements IOProgressListener {
             impl.setHeader(connection, "User-Agent", getUserAgent());
         }
 
-        if(getContentType() != null) {
-            impl.setHeader(connection, "Content-Type", getContentType());
+        if (getContentType() != null) {
+            // UWP will automatically filter out the Content-Type header from GET requests
+            // Historically, CN1 has always included this header even though it has no meaning
+            // for GET requests.  it would be be better if CN1 did not include this header 
+            // with GET requests, but for backward compatibility, I'll leave it on as
+            // the default, and add a property to turn it off.
+            //  -- SJH Sept. 15, 2016
+            boolean shouldAddContentType = Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "false").equals("false");
+
+            if (isPost() || (getHttpMethod() != null && !"get".equals(getHttpMethod().toLowerCase()))) {
+                shouldAddContentType = true;
+            }
+
+            if(shouldAddContentType) {
+                impl.setHeader(connection, "Content-Type", getContentType());
+            }
         }
         
         if(chunkedStreamingLen > -1){
