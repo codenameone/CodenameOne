@@ -46,9 +46,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Floating action buttons are a material design element used to promote a special action in a Form.
+ * <p>Floating action buttons are a material design element used to promote a special action in a Form.
  * They are represented as a floating circle with a flat icon floating above the UI typically in the bottom right
- * area.
+ * area.</p>
+ * 
+ * <p>
+ * Simple use cases include just the button as a standalone:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/f6820a6b0c781e5bb5ffa8004c5b5f2e.js"></script>
+
+* <p>
+ * The button can also nest sub actions
+ * </p>
+ * <script src="https://gist.github.com/codenameone/aa4180054368f61176c55979010d757b.js"></script>
+ * <img src="http://www.codenameone.com/img/blog/floating-action.png" alt="Floating Button" />
  *
  * @author Chen
  */
