@@ -136,30 +136,41 @@ public class FloatingActionButton extends Button {
     }
 
     /**
-     * This is a utility method to bind the FAB to a given Container.
+     * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+     * use the layered pane if the container is a content pane.
      *
      * @param cnt the Container to add the FAB to
-     * @return a new Container that contains the cnt and the FAB on top
+     * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
      */
     public Container bindFabToContainer(Container cnt) {
         return bindFabToContainer(cnt, Component.RIGHT, Component.BOTTOM);
     }
 
     /**
-     * This is a utility method to bind the FAB to a given Container.
+     * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+     * use the layered pane if the container is a content pane.
      *
      * @param cnt the Container to add the FAB to
      * @param orientation one of Component.RIGHT/LEFT/CENTER
      * @param valign one of Component.TOP/BOTTOM/CENTER
      *
-     * @return a new Container that contains the cnt and the FAB on top
+     * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
      */
     public Container bindFabToContainer(Container cnt, int orientation, int valign) {
         FlowLayout flow = new FlowLayout(orientation);
         flow.setValign(valign);
+
+        Form f = cnt.getComponentForm();
+        if(f != null && f.getContentPane() == cnt) {
+            // special case for content pane installs the button directly on the content pane
+            Container layers = f.getLayeredPane(getClass(), true);
+            layers.setLayout(flow);
+            layers.add(this);
+            return null;
+        }
+        
         Container conUpper = new Container(flow);
-        conUpper.addComponent(FlowLayout.encloseCenter(this));
-        conUpper.setScrollable(false);
+        conUpper.add(this);
         return LayeredLayout.encloseIn(cnt, conUpper);
     }
 
