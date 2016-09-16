@@ -2638,8 +2638,10 @@ namespace com.codename1.impl
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
+        ///  THis method is an absolute mess.... needs to be simplified.
          private string nativePathStore(string s)
         {
+            
             string ss = s;
             if (ss.StartsWith("file:/"))
             {
@@ -2655,13 +2657,29 @@ namespace com.codename1.impl
             ss = ss.Replace('/', '\\');
             int pos = 0; //remove root name ex. intall: from /intall:/test.txt
             if (ss[0] == '/' || ss[0] == '\\') pos++;
+            if (pos >= ss.Length)
+            {
+                return "";
+            }
             pos = ss.IndexOfAny(new char[] { ':', '/', '\\' }, pos);
-            if (pos > 0 && ss[pos] == ':')
+            if (pos < 0)
+            {
+                return ss;
+            }
+            if (ss.Length <= pos)
+            {
+                return "";
+            }
+            if (ss.Length > pos && pos >= 0 && ss[pos] == ':')
             {
                 pos++;
-                while (ss.Length > pos && (ss[pos] == '/') || (ss[pos] == '\\'))
+                while (ss.Length > pos && ((ss[pos] == '/') || (ss[pos] == '\\')))
                 {
                     pos++;
+                }
+                if (pos >= ss.Length)
+                {
+                    return "";
                 }
                 ss = ss.Substring(pos);
             }
