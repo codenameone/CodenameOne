@@ -2167,6 +2167,7 @@ namespace com.codename1.impl
                 try
                 {
                     Stream s = Task.Run(() => store.OpenStreamForWriteAsync(nativePathStore((string)connection), CreationCollisionOption.OpenIfExists)).GetAwaiter().GetResult();
+                    s.Seek(0, SeekOrigin.Begin);
                     return new java.io.OutputStreamProxy(s);
                 }
                 catch (Exception e)
