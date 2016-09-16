@@ -191,6 +191,10 @@ public class ConnectionRequest implements IOProgressListener {
     private String destinationFile;
     private String destinationStorage;
     
+    // Flag to indicate if the contentType was explicitly set for this 
+    // request
+    private boolean contentTypeSetExplicitly;
+    
     /**
      * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
      * customize the name of the cookie header to Cookie
@@ -313,7 +317,8 @@ public class ConnectionRequest implements IOProgressListener {
             // with GET requests, but for backward compatibility, I'll leave it on as
             // the default, and add a property to turn it off.
             //  -- SJH Sept. 15, 2016
-            boolean shouldAddContentType = Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "false").equals("false");
+            boolean shouldAddContentType = contentTypeSetExplicitly || 
+                    Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "true").equals("false");
 
             if (isPost() || (getHttpMethod() != null && !"get".equals(getHttpMethod().toLowerCase()))) {
                 shouldAddContentType = true;
@@ -1242,6 +1247,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @param contentType the contentType to set
      */
     public void setContentType(String contentType) {
+        contentTypeSetExplicitly = true;
         this.contentType = contentType;
     }
 

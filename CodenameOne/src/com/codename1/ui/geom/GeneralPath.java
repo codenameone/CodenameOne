@@ -1018,7 +1018,7 @@ public final class GeneralPath implements Shape {
     }
     
     /**
-     * Adds a circular arc to the given path by approximating it through a cubic BÈzier curve, splitting it if
+     * Adds a circular arc to the given path by approximating it through a cubic Bezier curve, splitting it if
      * necessary. The precision of the approximation can be adjusted through {@code pointsOnCircle} and
      * {@code overlapPoints} parameters.
      * <p>
@@ -1053,7 +1053,7 @@ public final class GeneralPath implements Shape {
      * @param radius            The radius of the circle.
      * @param startAngleRadians The starting angle on the circle (in radians).
      * @param sweepAngleRadians How long to make the total arc (in radians).
-     * @param pointsOnCircle    Defines a <i>threshold</i> (360? /{@code pointsOnCircle}) to split the BÈzier arc to
+     * @param pointsOnCircle    Defines a <i>threshold</i> (360? /{@code pointsOnCircle}) to split the Bezier arc to
      *                          better approximate a circular arc, depending also on the value of {@code overlapPoints}.
      *                          The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
      *                          Less than 1 will be ignored (the arc will not be split).
