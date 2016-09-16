@@ -94,13 +94,23 @@ namespace com.codename1.impl
             alpha = (p & 0xff); 
         }
 
+        
         internal virtual void setColor(int p)
+        {
+            byte alpha = (byte)((p >> 24) & 0xff);
+            if (alpha == 0)
+            {
+                alpha = 0xff;
+            }
+            setColor(p, alpha);
+        }
+
+        internal void setColor(int p, byte alpha)
         {
             c.R = (byte)((p >> 16) & 0xff);
             c.G = (byte)((p >> 8) & 0xff);
             c.B = (byte)(p & 0xff);
-            if (c.A == 0) ///FA default alpha should be 0xff
-                c.A = 0xff; ///
+            c.A = alpha;
         }
 
         internal virtual void setFont(CanvasTextFormat font)

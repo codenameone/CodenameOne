@@ -1020,7 +1020,7 @@ namespace com.codename1.impl
                 StorageFolder folder = await photo.GetParentAsync();
                 string folderName = folder.Name.ToLower();
                 folderName = folderName.Replace(" ", "");
-                ActionEvent ac = new ActionEvent(folderName + ":/" + fileName);
+                ActionEvent ac = new ActionEvent("file:/"+folderName + ":/" + fileName);
                 fireCapture(ac);
 #endif
             }
@@ -1029,6 +1029,17 @@ namespace com.codename1.impl
 
             }
 
+        }
+
+
+        public override void openGallery(ActionListener response, int type)
+        {
+           if (type == Display.GALLERY_IMAGE)
+            {
+                openImageGallery(response);
+                return;
+            }
+            base.openGallery(response, type);
         }
 
         public override void openImageGallery(ActionListener response)
@@ -1445,7 +1456,7 @@ namespace com.codename1.impl
 
         public override void dial(string phoneNumber) {
             execute("tel:" + phoneNumber);/*
-            java.lang.System.@out.println("Trying to dial phone number "+phoneNumber);
+            //java.lang.System.@out.println("Trying to dial phone number "+phoneNumber);
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
                 {
                     if (ApiInformation.IsApiContractPresent("Windows.ApplicationModel.Calls.CallsPhoneContract", 1, 0))
@@ -1464,9 +1475,9 @@ namespace com.codename1.impl
             CodenameOneImage ci = new CodenameOneImage();
             ci.mutable = true;
             ci.image = new CanvasRenderTarget(screen, screen.ConvertPixelsToDips(width), screen.ConvertPixelsToDips(height));
-            ci.graphics.destination.setColor(color);
-            ci.graphics.destination.setAlpha((color >> 24) & 0xff);
-            //ci.graphics.destination.clear();
+            ci.graphics.destination.setColor(color, (byte)((color >> 24) & 0xff));
+            //ci.graphics.destination.setAlpha((color >> 24) & 0xff);
+            ci.graphics.destination.clear();
             return ci;
         }
 
@@ -2101,6 +2112,13 @@ namespace com.codename1.impl
             return n;
         }
 
+
+        public override void setHttpMethod(object connection, string method)
+        {
+            NetworkOperation n = (NetworkOperation)connection;
+            n.request.Method = method;
+        }
+
         public override void setHeader(object n1, string n2, string n3)
         {
             NetworkOperation n = (NetworkOperation)n1;
@@ -2189,8 +2207,42 @@ namespace com.codename1.impl
                 {
                     StorageFolder store = getStore((string)connection); //KnownFolders.CameraRoll
                     string file = nativePathStore((string)connection);
-                    Stream stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
-                    return new InputStreamProxy(stream);
+                    StorageFile sfile = store.CreateFileAsync((string)file, CreationCollisionOption.OpenIfExists)
+                        .AsTask()
+                        .ConfigureAwait(false)
+                        .GetAwaiter()
+                        .GetResult();
+                    Stream stream = null;
+                    try
+                    {
+                        stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
+                        return new InputStreamProxy(stream);
+                    }
+                    catch (Exception ex2)
+                    {
+                        java.lang.System.err.println("Failed to create file input stream by simply opening the file.  Trying to open a copy instead " + ex2.Message);
+                        // If it failed to create the input stream, it is possible that
+                        // it is because the file is already being used (e.g. an output stream is writing to it).
+                        // In this case, we'll create a copy to a temp file, and create an inputstream from that one.
+                        try
+                        {
+                            StorageFile tempFile = sfile.CopyAsync(ApplicationData.Current.TemporaryFolder, sfile.Name, NameCollisionOption.GenerateUniqueName)
+                                .AsTask()
+                                .ConfigureAwait(false)
+                                .GetAwaiter()
+                                .GetResult();
+                            return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                                .ConfigureAwait(false)
+                                .GetAwaiter()
+                                .GetResult());
+                        }
+                        catch (Exception e3)
+                        {
+                            java.lang.System.err.println("Failed to open storage file via copy " + e3.Message);
+                        }
+
+                    }
+
                 }
                 catch (Exception e)
                 {
@@ -2585,7 +2637,7 @@ namespace com.codename1.impl
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
-        private string nativePathStore(string s)
+         private string nativePathStore(string s)
         {
             string ss = s;
             if (ss.StartsWith("file:/"))
@@ -2606,7 +2658,10 @@ namespace com.codename1.impl
             if (pos > 0 && ss[pos] == ':')
             {
                 pos++;
-                if (ss.Length > pos) pos++;
+                while (ss.Length > pos && (ss[pos] == '/') || (ss[pos] == '\\'))
+                {
+                    pos++;
+                }
                 ss = ss.Substring(pos);
             }
             return ss;
