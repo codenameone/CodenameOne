@@ -430,7 +430,7 @@ public class Picker extends Button {
      * be used on devices where the popup width and height are configurable, such 
      * as the iPad or tablets.  On iPhone, the picker always spans the width of the 
      * screen along the bottom.
-     * @param width The preferred width of the popup.
+     * @param height The preferred height of the popup.
      */
     public void setPreferredPopupHeight(int height) {
         this.preferredPopupHeight = height;
