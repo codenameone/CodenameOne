@@ -69,6 +69,9 @@ namespace com.codename1.impl
         public static Page app;
         public static CanvasControl screen;
         public static double scaleFactor = 1;
+        public static double logicalDpi = -1;
+        public static ResolutionScale resolutionScale;
+        public static double? diagonalSizeInInches = -1;
         public static CoreDispatcher dispatcher;
         public static StorageFolder iDefaultStore;
         private static CoreApplicationView view;
@@ -99,6 +102,9 @@ namespace com.codename1.impl
             iDefaultStore = getStore(ss); // storeApplicationData.Current.CacheFolder; // Faster, avoid cloud backup. See https://www.suchan.cz/2014/07/file-io-best-practices-in-windows-and-phone-apps-part-1-available-apis-and-file-exists-checking/
             rawDpiy = DisplayInformation.GetForCurrentView().RawDpiY;
             rawDpix = DisplayInformation.GetForCurrentView().RawDpiX;
+            logicalDpi = DisplayInformation.GetForCurrentView().LogicalDpi;
+            diagonalSizeInInches = DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
+            resolutionScale = DisplayInformation.GetForCurrentView().ResolutionScale;
             screen = new CanvasControl();
             screen.Width = cl.ActualWidth * scaleFactor;
             screen.Height = cl.ActualHeight * scaleFactor;
@@ -290,6 +296,38 @@ namespace com.codename1.impl
             {
                 return "M";
             }
+            if (n1.Equals("windows.DisplayInformation.LogicalDpi"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().LogicalDpi;
+                return logicalDpi + "";
+
+            }
+            if (n1.Equals("windows.DisplayInformation.DiagonalSizeInInches"))
+            {
+                //return ""+DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
+                return diagonalSizeInInches + "";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiX"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiX;
+                return rawDpix+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiY"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiY;
+                return "" + rawDpiy;
+            }
+            if (n1.Equals("windows.DisplayInformation.RawPixelsPerViewPixel"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
+                return scaleFactor+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.ResolutionScale"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().ResolutionScale;
+                return resolutionScale + "";
+            }
+            
             return base.getProperty(n1, n2);
         }
         /// <summary>
