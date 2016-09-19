@@ -1265,6 +1265,12 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void setClip(Object graphics, int x, int y, int width, int height) {
+        if (width < 0) {
+            width = 0;
+        }
+        if (height < 0) {
+            height = 0;
+        }
         NativeGraphics ng = ((NativeGraphics)graphics);
         ng.checkControl();
         ng.setClip(x, y, width, height);
@@ -1312,6 +1318,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     
     public void clipRect(Object graphics, int x, int y, int width, int height) {
+        if (width < 0) {
+            width = 0;
+        }
+        if (height < 0) {
+            height = 0;
+        }
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
         ng.clipRect(x, y, width, height);
@@ -3681,6 +3693,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (transform == null || transform.isIdentity()) {
                 // Preliminary checks to see if clipping is unnecessary
                 clip.getBounds(reusableRect);
+                if (reusableRect.getWidth() <= 0 || reusableRect.getHeight() <= 0) {
+                    // The existing clip is null so we don't need to do anything here.
+                    return;
+                }
                 reusableRect2.setBounds(x, y, w, h);
                 
                 boolean clipIsRect = clip.isRect();
@@ -3692,7 +3708,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (!clipIsRect) {
                     reusableClipShape.setShape(clip, null);
                 }
-                clip.intersect(x, y, w, h);
+                if (!clip.intersect(x, y, w, h)) {
+                    clip.setBounds(0, 0, 0, 0);
+                }
                 if (!clipIsRect && clip.equals(reusableClipShape, null)) {
                     return;
                 }
@@ -3701,10 +3719,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                 inverseClipDirty = true;
                 applyClip();
             } else {
-                GeneralPath inverseClip = inverseClip();
-                inverseClip.intersect(x, y, w, h);
                 reusableClipShape.setShape(clip, null);
-                clip.setShape(inverseClip, transform);
+            
+                GeneralPath inverseClip = inverseClip();
+                if (!inverseClip.intersect(x, y, w, h)) {
+                    clip.setBounds(0,0,0,0);
+                } else {
+                    clip.setShape(inverseClip, transform);
+                }
                 if (clip.equals(reusableClipShape, null)) {
                     return;
                 }
