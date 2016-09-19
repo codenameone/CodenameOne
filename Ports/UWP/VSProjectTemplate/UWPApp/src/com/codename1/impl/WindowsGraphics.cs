@@ -94,13 +94,23 @@ namespace com.codename1.impl
             alpha = (p & 0xff); 
         }
 
+        
         internal virtual void setColor(int p)
+        {
+            byte alpha = (byte)((p >> 24) & 0xff);
+            if (alpha == 0)
+            {
+                alpha = 0xff;
+            }
+            setColor(p, alpha);
+        }
+
+        internal void setColor(int p, byte alpha)
         {
             c.R = (byte)((p >> 16) & 0xff);
             c.G = (byte)((p >> 8) & 0xff);
             c.B = (byte)(p & 0xff);
-            if (c.A == 0) ///FA default alpha should be 0xff
-                c.A = 0xff; ///
+            c.A = alpha;
         }
 
         internal virtual void setFont(CanvasTextFormat font)
@@ -270,6 +280,12 @@ namespace com.codename1.impl
         {
             using (createAlphaLayer())
             {
+                /*
+                // This implementation seemed to throw an argument exception if scaling too much
+                // Value does not fall within the expected range.
+                // Changing to just use DrawImage(bitmap, destrect) which doesn't have this
+                // problem... not completely removing this yet in case we hit performance
+                // issues with the new approach.  - SJH Sept. 16, 2016
                 ScaleEffect scale = new ScaleEffect()
                 {
                     Source = canvasBitmap,
@@ -287,6 +303,15 @@ namespace com.codename1.impl
                 {
                     graphics.DrawImage(scale, x, y);
                 }
+                */
+                Rect destRect = new Rect();
+                destRect.X = x;
+                destRect.Y = y;
+                destRect.Width = w;
+                destRect.Height = h;
+
+               
+                graphics.DrawImage(canvasBitmap, destRect);
             }
                 
         }
