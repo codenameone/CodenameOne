@@ -90,6 +90,42 @@ public class Border {
     @XmlAttribute
     private String i9;
 
+    @XmlAttribute
+    private int opacity = 255;
+    
+    @XmlAttribute
+    private int strokeColor;
+    
+    @XmlAttribute
+    private int strokeOpacity = 255;
+    
+    @XmlAttribute
+    private float strokeThickness;
+
+    @XmlAttribute
+    private boolean strokeMM;
+
+    @XmlAttribute
+    private int shadowSpread;
+
+    @XmlAttribute
+    private int shadowOpacity = 0;
+
+    @XmlAttribute
+    private float shadowX = 0.5f;
+
+    @XmlAttribute
+    private float shadowY = 0.5f;
+
+    @XmlAttribute
+    private float shadowBlur = 10;
+
+    @XmlAttribute
+    private boolean shadowMM;
+
+    @XmlAttribute
+    private boolean rectangle;
+        
     /**
      * @return the key
      */
@@ -214,5 +250,89 @@ public class Border {
      */
     public String getI9() {
         return i9;
+    }
+
+    /**
+     * @return the opacity
+     */
+    public int getOpacity() {
+        return opacity;
+    }
+
+    /**
+     * @return the strokeColor
+     */
+    public int getStrokeColor() {
+        return strokeColor;
+    }
+
+    /**
+     * @return the strokeOpacity
+     */
+    public int getStrokeOpacity() {
+        return strokeOpacity;
+    }
+
+    /**
+     * @return the strokeThickness
+     */
+    public float getStrokeThickness() {
+        return strokeThickness;
+    }
+
+    /**
+     * @return the strokeMM
+     */
+    public boolean isStrokeMM() {
+        return strokeMM;
+    }
+
+    /**
+     * @return the shadowSpread
+     */
+    public int getShadowSpread() {
+        return shadowSpread;
+    }
+
+    /**
+     * @return the shadowOpacity
+     */
+    public int getShadowOpacity() {
+        return shadowOpacity;
+    }
+
+    /**
+     * @return the shadowX
+     */
+    public float getShadowX() {
+        return shadowX;
+    }
+
+    /**
+     * @return the shadowY
+     */
+    public float getShadowY() {
+        return shadowY;
+    }
+
+    /**
+     * @return the shadowBlur
+     */
+    public float getShadowBlur() {
+        return shadowBlur;
+    }
+
+    /**
+     * @return the shadowMM
+     */
+    public boolean isShadowMM() {
+        return shadowMM;
+    }
+
+    /**
+     * @return the rectangle
+     */
+    public boolean isRectangle() {
+        return rectangle;
     }
 }

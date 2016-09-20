@@ -51,6 +51,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.designer.ResourceEditorApp;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.codename1.ui.Form;
+import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.util.xml.Data;
 import com.codename1.ui.util.xml.Entry;
 import com.codename1.ui.util.xml.L10n;
@@ -580,6 +581,23 @@ public class EditableResources extends Resources implements TreeModel {
                                             continue;
                                         }
 
+                                        if("round".equals(b.getType())) {
+                                            theme.put(b.getKey(), 
+                                                    RoundBorder.create().
+                                                            color(b.getColor()).
+                                                            rectangle(b.isRectangle()).
+                                                            shadowBlur(b.getShadowBlur()).
+                                                            shadowOpacity(b.getShadowOpacity()).
+                                                            shadowSpread(b.getShadowSpread(), b.isShadowMM()).
+                                                            shadowX(b.getShadowX()).
+                                                            shadowY(b.getShadowY()).
+                                                            stroke(b.getStrokeThickness(), b.isStrokeMM()).
+                                                            strokeColor(b.getStrokeColor()).
+                                                            strokeOpacity(b.getStrokeOpacity())
+                                                    );
+                                            continue;
+                                        }
+
                                         if("line".equals(b.getType())) {
                                             if(b.getColor() == null) {
                                                 theme.put(b.getKey(), Border.createLineBorder(b.getThickness().intValue()));
@@ -1030,6 +1048,24 @@ public class EditableResources extends Resources implements TreeModel {
 
                             if(key.endsWith("border")) {                                
                                 Border border = (Border)theme.get(key);
+                                if(border instanceof RoundBorder) {
+                                    RoundBorder rb = (RoundBorder)border;
+                                    bw.write("        <border key=\"" + key + "\" type=\"round\" "
+                                            + "opacity=\"" + rb.getOpacity() + "\" " 
+                                            + "strokeColor=\"" + rb.getStrokeColor()+ "\" " 
+                                            + "strokeOpacity=\"" + rb.getStrokeOpacity()+ "\" " 
+                                            + "strokeThickness=\"" + rb.getStrokeThickness()+ "\" " 
+                                            + "strokeMM=\"" + rb.isStrokeMM()+ "\" " 
+                                            + "shadowSpread=\"" + rb.getShadowSpread()+ "\" " 
+                                            + "shadowOpacity=\"" + rb.getShadowOpacity()+ "\" " 
+                                            + "shadowX=\"" + rb.getShadowX()+ "\" " 
+                                            + "shadowY=\"" + rb.getShadowY()+ "\" " 
+                                            + "shadowBlur=\"" + rb.getShadowBlur()+ "\" " 
+                                            + "shadowMM=\"" + rb.isShadowMM()+ "\" " 
+                                            + "rectangle=\"" + rb.isRectangle()+ "\" />\n");
+                            
+                                    continue;
+                                }
                                 int type = Accessor.getType(border);
                                 switch(type) {
                                     case BORDER_TYPE_EMPTY:
@@ -1955,6 +1991,24 @@ public class EditableResources extends Resources implements TreeModel {
     }
     
     private void writeBorder(DataOutputStream output, Border border, boolean newVersion) throws IOException {
+        if(border instanceof RoundBorder) {
+            output.writeShort(0xff12);
+            RoundBorder rb = (RoundBorder)border;
+            output.writeBoolean(rb.isRectangle());
+            output.writeInt(rb.getColor());
+            output.writeInt(rb.getOpacity());
+            output.writeFloat(rb.getStrokeThickness());
+            output.writeBoolean(rb.isStrokeMM());
+            output.writeInt(rb.getStrokeColor());
+            output.writeInt(rb.getStrokeOpacity());
+            output.writeFloat(rb.getShadowBlur());
+            output.writeInt(rb.getShadowOpacity());
+            output.writeInt(rb.getShadowSpread());
+            output.writeBoolean(rb.isShadowMM());
+            output.writeFloat(rb.getShadowX());
+            output.writeFloat(rb.getShadowY());
+            return;
+        }
         int type = Accessor.getType(border);
         switch(type) {
             case BORDER_TYPE_EMPTY:
