@@ -6026,6 +6026,14 @@ public abstract class CodenameOneImplementation {
      */ 
     public void openNativeNavigationApp(double latitude, double longitude){    
     }
+
+    /**
+     * Opens the native navigation app with the given search location
+     * @param location the location to search for in the native navigation map
+     */ 
+    public void openNativeNavigationApp(String location) {    
+        execute("http://maps.google.com/?q=" + Util.encodeUrl(location));
+    }
     
     /**
      * Returns the UDID for devices that support it

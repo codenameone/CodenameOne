@@ -1715,6 +1715,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public void openNativeNavigationApp(double latitude, double longitude){    
         execute("google.navigation:ll=" + latitude+ "," + longitude);
     }
+
+
+    @Override
+    public void openNativeNavigationApp(String location) {    
+        execute("google.navigation:q=" + Util.encodeUrl(location));
+    }
     
     @Override
     public Object createMutableImage(int width, int height, int fillColor) {

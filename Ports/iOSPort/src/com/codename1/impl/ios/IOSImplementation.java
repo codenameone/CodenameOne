@@ -5028,6 +5028,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     @Override
+    public void openNativeNavigationApp(String location) {    
+        execute("http://maps.apple.com/?q=" + Util.encodeUrl(location));
+    }
+
+    @Override
     public void flashBacklight(int duration) {
         nativeInstance.flashBacklight(duration);
     }
