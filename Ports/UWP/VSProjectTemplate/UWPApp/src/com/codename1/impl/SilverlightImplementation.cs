@@ -69,6 +69,9 @@ namespace com.codename1.impl
         public static Page app;
         public static CanvasControl screen;
         public static double scaleFactor = 1;
+        public static double logicalDpi = -1;
+        public static ResolutionScale resolutionScale;
+        public static double? diagonalSizeInInches = -1;
         public static CoreDispatcher dispatcher;
         public static StorageFolder iDefaultStore;
         private static CoreApplicationView view;
@@ -99,6 +102,9 @@ namespace com.codename1.impl
             iDefaultStore = getStore(ss); // storeApplicationData.Current.CacheFolder; // Faster, avoid cloud backup. See https://www.suchan.cz/2014/07/file-io-best-practices-in-windows-and-phone-apps-part-1-available-apis-and-file-exists-checking/
             rawDpiy = DisplayInformation.GetForCurrentView().RawDpiY;
             rawDpix = DisplayInformation.GetForCurrentView().RawDpiX;
+            logicalDpi = DisplayInformation.GetForCurrentView().LogicalDpi;
+            diagonalSizeInInches = DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
+            resolutionScale = DisplayInformation.GetForCurrentView().ResolutionScale;
             screen = new CanvasControl();
             screen.Width = cl.ActualWidth * scaleFactor;
             screen.Height = cl.ActualHeight * scaleFactor;
@@ -290,6 +296,38 @@ namespace com.codename1.impl
             {
                 return "M";
             }
+            if (n1.Equals("windows.DisplayInformation.LogicalDpi"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().LogicalDpi;
+                return logicalDpi + "";
+
+            }
+            if (n1.Equals("windows.DisplayInformation.DiagonalSizeInInches"))
+            {
+                //return ""+DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
+                return diagonalSizeInInches + "";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiX"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiX;
+                return rawDpix+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiY"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiY;
+                return "" + rawDpiy;
+            }
+            if (n1.Equals("windows.DisplayInformation.RawPixelsPerViewPixel"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
+                return scaleFactor+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.ResolutionScale"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().ResolutionScale;
+                return resolutionScale + "";
+            }
+            
             return base.getProperty(n1, n2);
         }
         /// <summary>
@@ -868,7 +906,7 @@ namespace com.codename1.impl
 
         public override object createImage(string path)
         {
-            if (path.StartsWith("file:"))
+            if (path.StartsWith("file:") || path.StartsWith("tmp://"))
             {
                 return createImage(openFileInputStream(path));
             }
@@ -1031,15 +1069,114 @@ namespace com.codename1.impl
 
         }
 
+        private List<StorageFile> tmpFiles = new List<StorageFile>();
+        private string addTempFile(StorageFile f)
+        {
+            int index = tmpFiles.Count;
+            tmpFiles.Insert(index, f);
+            return "tmp://" + index + "-" + f.Name;
+        }
+
+        private bool isTempFile(string path)
+        {
+            return path.StartsWith("tmp://");
+        }
+
+        private StorageFile getTempFile(string path)
+        {
+            if (!path.StartsWith("tmp://"))
+            {
+                return null;
+            }
+            path = path.Substring(6);
+            if (path.IndexOf("-") < 0)
+            {
+                return null;
+            }
+            int index = Convert.ToInt32(path.Substring(0, path.IndexOf("-")));
+            if (index < 0 || index >= tmpFiles.Count)
+            {
+                return null;
+            }
+            return tmpFiles.ElementAt(index);
+        }
+
+        private void removeTempFile(string path)
+        {
+            StorageFile f = getTempFile(path);
+            if (f != null)
+            {
+                tmpFiles.Remove(f);
+            }
+        }
+
+        public async void toSendFile(StorageFile file)
+        {
+            try
+            {
+                fileName = file.Name;
+#if WINDOWS_PHONE_APP
+              
+                ActionEvent ac = new ActionEvent("cameraroll:/" + fileName);
+                fireCapture(ac);
+#else
+                //tmpFiles.Add(file);
+                string tmpPath = addTempFile(file);
+                //StorageFolder folder = await file.GetParentAsync();
+                //string folderName = folder.Name.ToLower();
+                //folderName = folderName.Replace(" ", "");
+                ActionEvent ac = new ActionEvent(tmpPath);
+                fireCapture(ac);
+#endif
+            }
+            catch (Exception)
+            {
+
+            }
+
+        }
+
 
         public override void openGallery(ActionListener response, int type)
         {
-           if (type == Display.GALLERY_IMAGE)
+            exitLock = true;
+            pendingCaptureCallback = response;
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                openImageGallery(response);
-                return;
-            }
-            base.openGallery(response, type);
+                FileOpenPicker openPicker = new FileOpenPicker();
+                openPicker.ViewMode = PickerViewMode.Thumbnail;
+                openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
+                if (type == Display.GALLERY_IMAGE)
+                {
+                    openPicker.ViewMode = PickerViewMode.Thumbnail;
+                    openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
+                    openPicker.FileTypeFilter.Add(".jpg");
+                    openPicker.FileTypeFilter.Add(".jpeg");
+                    openPicker.FileTypeFilter.Add(".png");
+                } else if (type == Display.GALLERY_VIDEO)
+                {
+                    openPicker.FileTypeFilter.Add(".mp4");
+                    openPicker.FileTypeFilter.Add(".avi");
+                    openPicker.FileTypeFilter.Add(".mpg");
+                    openPicker.FileTypeFilter.Add(".mov");
+                    openPicker.FileTypeFilter.Add(".mpeg");
+                    openPicker.FileTypeFilter.Add(".wmv");
+                } else
+                {
+                    openPicker.FileTypeFilter.Add("*");
+                }
+#if WINDOWS_PHONE_APP
+                openPicker.PickSingleFileAndContinue();
+                view.Activated += view_Activated;
+#else
+                StorageFile file = await openPicker.PickSingleFileAsync();
+                if (file != null)
+                {
+                    toSendFile(file);
+                }
+#endif
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+            //base.openGallery(response, type);
         }
 
         public override void openImageGallery(ActionListener response)
@@ -2163,6 +2300,7 @@ namespace com.codename1.impl
         {
             if (connection is string)
             {
+
                 StorageFolder store = getStore((string)connection);
                 try
                 {
@@ -2206,6 +2344,14 @@ namespace com.codename1.impl
             {
                 try
                 {
+                    if (isTempFile((string)connection))
+                    {
+                        StorageFile tempFile = getTempFile((string)connection);
+                        return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                               .ConfigureAwait(false)
+                               .GetAwaiter()
+                               .GetResult());
+                    }
                     StorageFolder store = getStore((string)connection); //KnownFolders.CameraRoll
                     string file = nativePathStore((string)connection);
                     StorageFile sfile = store.CreateFileAsync((string)file, CreationCollisionOption.OpenIfExists)
@@ -2600,6 +2746,10 @@ namespace com.codename1.impl
         {
             try
             {
+                if (instance.isTempFile(aUrl))
+                {
+                    return instance.getTempFile(aUrl);
+                }
                 StorageFolder folder = getStore(aUrl);
                 int pos = 0; //remove root name ex. intall: from /intall:/test.txt
                 if (aUrl[0] == '/' || aUrl[0] == '\\') pos++;
@@ -2780,7 +2930,7 @@ namespace com.codename1.impl
 
         public override void setHidden(string n1, bool n2)
         {
-            StorageFolder store = getStore(n1);
+            //StorageFolder store = getStore(n1);
         }
 
         public override bool isTablet()
@@ -2795,6 +2945,27 @@ namespace com.codename1.impl
 
         public override long getFileLength(string aFile)
         {
+            if (isTempFile(aFile))
+            {
+                long l2;
+                try
+                {
+                    
+                    StorageFile tempFile = getTempFile(aFile);
+                    if (tempFile == null)
+                    {
+                        return -1;
+                    }
+                    Stream stream = tempFile.OpenReadAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult().AsStream();
+                    l2 = stream.Length;
+                    stream.Dispose();
+                }
+                catch (Exception)
+                {
+                    throw;
+                }
+                return l2;
+            }
             StorageFolder store = getStore(aFile);
             string name = nativePathStore(aFile);
             long l1;
@@ -2815,6 +2986,10 @@ namespace com.codename1.impl
 
         public override bool isDirectory(string file)
         {
+            if (isTempFile(file))
+            {
+                return false;
+            }
             StorageFolder store = getStore(file);
             var f = nativePathStore(file);
             try
@@ -2833,6 +3008,10 @@ namespace com.codename1.impl
 
         public override bool exists(string file)
         {
+            if (isTempFile(file))
+            {
+                return getTempFile(file) != null;
+            }
             StorageFolder store = getStore(file);
             string f = nativePathStore(file);
             return exists(store, f);

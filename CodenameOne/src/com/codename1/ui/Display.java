@@ -3385,6 +3385,13 @@ hi.show();}</pre></noscript>
         impl.openNativeNavigationApp(latitude, longitude);
     }
     
+    /**
+     * Opens the native navigation app with the given search location
+     * @param location the location to search for in the native navigation map
+     */ 
+    public void openNativeNavigationApp(String location) {    
+        impl.openNativeNavigationApp(location);
+    }
     
     /**
      * Gets all contacts from the address book of the device
