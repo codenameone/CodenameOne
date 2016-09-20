@@ -5383,17 +5383,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public int getTime() {
-            return nativeVideo.getCurrentPosition();
+            if(nativeVideo != null){
+                return nativeVideo.getCurrentPosition();
+            }
+            return -1;
         }
 
         @Override
         public void setTime(int time) {
-            nativeVideo.seekTo(time);
+            if(nativeVideo != null){
+                nativeVideo.seekTo(time);
+            }
         }
 
         @Override
         public int getDuration() {
-            return nativeVideo.getDuration();
+            if(nativeVideo != null){
+                return nativeVideo.getDuration();
+            }
+            return -1;
         }
 
         @Override
@@ -5447,7 +5455,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         protected Dimension calcPreferredSize() {
-            return new Dimension(nativeVideo.getWidth(), nativeVideo.getHeight());
+            if(nativeVideo != null){
+                return new Dimension(nativeVideo.getWidth(), nativeVideo.getHeight());
+            }
+            return new Dimension();
         }
         
         @Override
@@ -5498,7 +5509,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public boolean isPlaying() {
-            return nativeVideo.isPlaying();
+            if(nativeVideo != null){
+                return nativeVideo.isPlaying();
+            }
+            return false;
         }
 
         public void setVariable(String key, Object value) {
