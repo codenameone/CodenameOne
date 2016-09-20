@@ -1265,12 +1265,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void setClip(Object graphics, int x, int y, int width, int height) {
-        if (width < 0) {
-            width = 0;
-        }
-        if (height < 0) {
-            height = 0;
-        }
+        width = Math.max(0, width);
+        height = Math.max(0, height);
         NativeGraphics ng = ((NativeGraphics)graphics);
         ng.checkControl();
         ng.setClip(x, y, width, height);
@@ -1318,12 +1314,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     
     public void clipRect(Object graphics, int x, int y, int width, int height) {
-        if (width < 0) {
-            width = 0;
-        }
-        if (height < 0) {
-            height = 0;
-        }
+        width = Math.max(0, width);
+        height = Math.max(0, height);
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
         ng.clipRect(x, y, width, height);
