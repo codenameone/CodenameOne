@@ -23,6 +23,7 @@
 
 package com.codename1.charts.util;
 
+import com.codename1.io.Log;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.ParseException;
 import com.codename1.ui.Display;
@@ -31,6 +32,7 @@ import com.codename1.ui.Display;
 /**
  *
  * @author shannah
+ * @deprecated this is an internal implementation class
  */
 public class NumberFormat {
     
@@ -55,8 +57,23 @@ public class NumberFormat {
     
 
     public double parseDouble(String format) throws ParseException {
-        format = com.codename1.util.StringUtil.replaceAll(format, ",", "");
-        return Double.parseDouble(format);
+        try {
+            String t = com.codename1.util.StringUtil.replaceAll(format, ",", "");
+            return Double.parseDouble(t);
+        } catch(Exception err) {
+            try {
+                double val = L10NManager.getInstance().parseDouble(format);
+                return val;
+            } catch(Exception err2) {
+                try {
+                    double v2 = L10NManager.getInstance().parseCurrency(format);
+                    return v2;
+                } catch(Exception err3) {
+                    Log.e(err3);
+                    return 0;
+                }
+            }
+        }
     }
     
 }
