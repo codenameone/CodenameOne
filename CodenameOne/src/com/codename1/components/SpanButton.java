@@ -104,7 +104,7 @@ public class SpanButton extends Container {
      * Returns the Style proxy object for the text of this span button.
      * @return The Style object for the text of this span button.
      */
-    public Style getTextStyles() {
+    public Style getTextAllStyles() {
         return text.getAllStyles();
     }
     
