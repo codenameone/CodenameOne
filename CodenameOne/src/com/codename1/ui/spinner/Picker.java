@@ -105,7 +105,11 @@ public class Picker extends Button {
                             break;
                         case Display.PICKER_TYPE_DATE:
                             DateSpinner ds = new DateSpinner();
-                            cld.setTime((Date)value);
+                            if(value == null) {
+                                cld.setTime(new Date());
+                            } else {
+                                cld.setTime((Date)value);
+                            }
                             ds.setStartYear(1900);
                             ds.setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));
                             ds.setCurrentMonth(cld.get(Calendar.MONTH) + 1);
