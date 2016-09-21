@@ -59,6 +59,7 @@ public class NumberFormat {
     public double parseDouble(String format) throws ParseException {
         try {
             String t = com.codename1.util.StringUtil.replaceAll(format, ",", "");
+            t = com.codename1.util.StringUtil.replaceAll(t, " ", "");
             return Double.parseDouble(t);
         } catch(Exception err) {
             try {
