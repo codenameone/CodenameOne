@@ -26,6 +26,7 @@ namespace com.codename1.impl
         private CanvasActiveLayer layer;
         private bool disposed = false;
         private int alpha = 0xff;
+        private com.codename1.ui.Transform transform = com.codename1.ui.Transform.makeTranslation(0,0,0);
 
         public WindowsGraphics(CanvasDrawingSession graphics)
         {
@@ -37,6 +38,25 @@ namespace com.codename1.impl
         {
             this.graphics = graphics;
             this.graphics.Units = CanvasUnits.Pixels;
+        }
+
+        public virtual com.codename1.ui.Transform getTransform()
+        {
+            return transform.copy();
+            //return graphics.Transform;
+        }
+
+        public virtual void setTransform(com.codename1.ui.Transform transform)
+        {
+            this.transform.setTransform(transform);
+            if (!transform.isIdentity())
+            {
+                graphics.Transform = SilverlightImplementation.clamp(((SilverlightImplementation.NativeTransform)transform.getNativeTransform()).m);
+            } else
+            {
+                graphics.Transform = Matrix3x2.Identity;
+            }
+           
         }
 
         internal void removeClip()
@@ -75,12 +95,14 @@ namespace com.codename1.impl
                // System.Diagnostics.Debug.WriteLine("aaaaaaaaaaaaaaaaaaaa height");
                 clip.setHeight(1);
             }
+            
             layer = graphics.CreateLayer(1f, new Rect(
                 clip.getX(),
                 clip.getY(),
                 clip.getWidth(),
                 clip.getHeight()
             ));
+            
         }
 
         private CanvasActiveLayer createAlphaLayer()
@@ -131,53 +153,53 @@ namespace com.codename1.impl
 
         internal virtual void drawLine(int x1, int y1, int x2, int y2)
         {
-            using (createAlphaLayer())
-            {
-                graphics.DrawLine(x1, y1, x2, y2, c);
-            }
+            //using (createAlphaLayer())
+            //{
+                graphics.DrawLine(x1, y1, x2, y2, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+            //}
                 
         }
 
         internal virtual void fillRect(int x, int y, int w, int h)
         {
-            using (createAlphaLayer())
-            {
-                graphics.FillRectangle(x, y, w, h, c);
-            }
+            //using (createAlphaLayer())
+            //{
+                graphics.FillRectangle(x, y, w, h, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+            //}
                 
         }
 
         internal virtual void drawRect(int x, int y, int w, int h, int stroke)
         {
-            using (createAlphaLayer())
-            {
-                graphics.DrawRectangle(x, y, w, h, c, stroke);
-            }
+            //using (createAlphaLayer())
+            //{
+                graphics.DrawRectangle(x, y, w, h, Color.FromArgb((byte)alpha, c.R, c.G, c.B), stroke);
+            //}
                 
         }
 
         internal virtual void drawRoundRect(int x, int y, int w, int h, int arcW, int arcH)
         {
-            using (createAlphaLayer())
-            {
-                graphics.DrawRoundedRectangle(x, y, w, h, arcW, arcH, c);
-            }
+            //using (createAlphaLayer())
+            //{
+                graphics.DrawRoundedRectangle(x, y, w, h, arcW, arcH, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+            //}
                
         }
 
         internal virtual void fillRoundRect(int x, int y, int w, int h, int arcW, int arcH)
         {
-            using (createAlphaLayer())
-            {
-                graphics.FillRoundedRectangle(x, y, w, h, arcW, arcH, c);
-            }
+            //using (createAlphaLayer())
+            //{
+                graphics.FillRoundedRectangle(x, y, w, h, arcW, arcH, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+            //}
                 
         }
 
         internal virtual void fillPolygon(int[] p1, int[] p2)
         {
-            using (createAlphaLayer())
-            {
+            //using (createAlphaLayer())
+            //{
                 if (p1.Length < 3 || p2.Length < 3 || p1.Length != p2.Length)
                 {
                     return;
@@ -191,60 +213,60 @@ namespace com.codename1.impl
                     p.Y = p2[pos];
                     pointsList.Add(p);
                 }
-                graphics.FillGeometry(CanvasGeometry.CreatePolygon(graphics, pointsList.ToArray()), c);
-            }
+                graphics.FillGeometry(CanvasGeometry.CreatePolygon(graphics, pointsList.ToArray()), Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+            //}
         }
                
 
         internal virtual void fillArc(int x, int y, int w, int h, int startAngle, int arcAngle)
         {
-            using (createAlphaLayer())
-            {
+            //using (createAlphaLayer())
+            //{
                 Vector2 center = new Vector2();
                 center.X = x + w / 2;
                 center.Y = y + h / 2;
                 if (arcAngle == 360)
-                    graphics.FillEllipse(center, w / 2, h / 2, c);
+                    graphics.FillEllipse(center, w / 2, h / 2, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
                 else
                 {
                     CanvasPathBuilder builder = new CanvasPathBuilder(graphics);
                     builder.BeginFigure(center);
                     builder.AddArc(center, w / 2, h / 2, -(float)(2 * Math.PI * startAngle / 360), -(float)(2 * Math.PI * arcAngle / 360));
                     builder.EndFigure(CanvasFigureLoop.Closed);
-                    graphics.FillGeometry(CanvasGeometry.CreatePath(builder), c);
+                    graphics.FillGeometry(CanvasGeometry.CreatePath(builder), Color.FromArgb((byte)alpha, c.R, c.G, c.B));
                 }
-            }
+            //}
                
         }
 
         internal virtual void drawArc(int x, int y, int w, int h, int startAngle, int arcAngle)
         {
-            using (createAlphaLayer())
-            {
+            //using (createAlphaLayer())
+            //{
                 Vector2 center = new Vector2();
                 center.X = x + w / 2;
                 center.Y = y + h / 2;
                 if (arcAngle == 360)
-                    graphics.DrawEllipse(center, w / 2, h / 2, c);
+                    graphics.DrawEllipse(center, w / 2, h / 2, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
                 else
                 {
                     CanvasPathBuilder builder = new CanvasPathBuilder(graphics);
                     builder.BeginFigure(center);
                     builder.AddArc(center, w / 2, h / 2, -(float)(2 * Math.PI * startAngle / 360), -(float)(2 * Math.PI * arcAngle / 360));
                     builder.EndFigure(CanvasFigureLoop.Closed);
-                    graphics.DrawGeometry(CanvasGeometry.CreatePath(builder), c);
+                    graphics.DrawGeometry(CanvasGeometry.CreatePath(builder), Color.FromArgb((byte)alpha, c.R, c.G, c.B));
                 }
-            }
+            //}
                
         }
 
         internal virtual void drawString(string str, int x, int y)
         {
-            using (createAlphaLayer())
-            {
+            //using (createAlphaLayer())
+            //{
                 CanvasTextLayout l = new CanvasTextLayout(graphics, str, font, 0.0f, 0.0f);
-                graphics.DrawTextLayout(l, x, y, c);
-            }
+                graphics.DrawTextLayout(l, x, y, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+            //}
                 
         }
 
@@ -343,10 +365,10 @@ namespace com.codename1.impl
 
         internal virtual void fillLinearGradient( int startColor, int endColor, int x, int y, int width, int height, bool horizontal)
         {
-            using (createAlphaLayer())
-            {
-                var starcolor = new Color() { A = 0xff, B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
-                var endcolor = new Color() { A = 0xff, B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
+            //using (createAlphaLayer())
+            //{
+                var starcolor = new Color() { A = (byte)alpha, B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
+                var endcolor = new Color() { A = (byte)alpha, B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
 
                 CanvasLinearGradientBrush brush = new CanvasLinearGradientBrush(graphics, starcolor, endcolor);
                 brush.StartPoint = new Vector2()
@@ -371,16 +393,16 @@ namespace com.codename1.impl
                     };
                 }
                 graphics.FillRectangle(x, y, width, height, brush);
-            }
+            //}
                 
         }
 
         internal virtual void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height)
         {
-            using (createAlphaLayer())
-            {
-                var startcolor = new Color() { A = 0xff, B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
-                var endcolor = new Color() { A = 0xff, B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
+            //using (createAlphaLayer())
+            //{
+                var startcolor = new Color() { A =(byte)alpha, B = (byte)(startColor & 0xff), G = (byte)((startColor >> 8) & 0xff), R = (byte)((startColor >> 16) & 0xff) };
+                var endcolor = new Color() { A = (byte)alpha, B = (byte)(endColor & 0xff), G = (byte)((endColor >> 8) & 0xff), R = (byte)((endColor >> 16) & 0xff) };
 
                 CanvasRadialGradientBrush brush = new CanvasRadialGradientBrush(graphics, startcolor, endcolor);
                 brush.Center = new Vector2()
@@ -392,7 +414,7 @@ namespace com.codename1.impl
                 brush.RadiusY = height / 2;
 
                 graphics.FillRectangle(x, y, width, height, brush);
-            }
+            //}
                
             
         }
@@ -404,20 +426,24 @@ namespace com.codename1.impl
 
         internal virtual void fillPath(CanvasPathBuilder p)
         {
-            using (createAlphaLayer())
+            //using (createAlphaLayer())
+            //{
+            //    graphics.DrawGeometry(CanvasGeometry.CreatePath(p), c);
+            //}
+            using (p)
             {
-                graphics.DrawGeometry(CanvasGeometry.CreatePath(p), c);
+                graphics.FillGeometry(CanvasGeometry.CreatePath(p), Color.FromArgb((byte)alpha, c.R, c.G, c.B));
             }
                 
         }
 
         internal virtual void drawPath(CanvasPathBuilder p, Stroke stroke)
         {
-            using (createAlphaLayer())
+            using (p)
             {
-                graphics.DrawGeometry(CanvasGeometry.CreatePath(p), c, stroke.getLineWidth());
+                graphics.DrawGeometry(CanvasGeometry.CreatePath(p), Color.FromArgb((byte)alpha, c.R, c.G, c.B), stroke.getLineWidth());
             }
-                
+               
         }
     }
 }
