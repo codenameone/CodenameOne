@@ -26,6 +26,7 @@ package com.codename1.designer;
 
 import com.codename1.designer.ResourceEditorView;
 import com.codename1.ui.util.EditableResources;
+import java.awt.Dimension;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -128,6 +129,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("menuWidthPercent", "Allows positioning and sizing the menu");
         helpMap.put("minimizeOnBackBool", "Indicates whether the form should minimize the entire application when the physical back button is pressed (if available) and no command is defined as the back command. Defaults to true.");
         helpMap.put("onOffIOSModeBool","Indicates whether the on-off switch should use the iOS or Android mode");
+        helpMap.put("OverlayThemes", "Specify themes that should be loaded to override properties of this theme.  Themes must be located in same directory as this theme.  <br>Delimit multiple themes by commas.<br>E.g. If you want the theme files theme2.res and theme3.res to override the styles of this theme, and they are located in the same directory as this theme, then you would have 'theme2,theme3' for the value of this constant.");
         helpMap.put("otherPopupRendererBool","Indicates that a separate renderer UIID/instance should be used to the list within the combo box popup");
         helpMap.put("PackTouchMenuBool", "Enables preferred sized packing of the touch menu (true by default), when set to false this allows manually determining the touch menu size using percentages");
         helpMap.put("paintsTitleBarBool","Indicates that the StatusBar UIID should be added to the top of the form to space down the title area as is the case on iOS 7+ where the status bar is painted on top of the UI");
@@ -203,7 +205,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.keySet().toArray(arr);
         Arrays.sort(arr, String.CASE_INSENSITIVE_ORDER);
         constant.setModel(new javax.swing.DefaultComboBoxModel(arr));
-        
+        help.setPreferredSize(new Dimension(400, 200));
         help.setText("<html><body>" + helpMap.get("comboImage") + "</body></html>");
         if(key != null) {
             constant.setSelectedItem(key.substring(1, key.length()));

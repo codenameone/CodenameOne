@@ -555,7 +555,7 @@ public class Log {
                 if(consumeError) {
                     evt.consume();
                 }
-                p("Exception in AppName version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
+                p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
                 p("OS " + Display.getInstance().getPlatformName());
                 p("Error " + evt.getSource());
                 if(Display.getInstance().getCurrent() != null) {

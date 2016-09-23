@@ -3475,7 +3475,9 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
                 [zip release];
                 [country release];
                 CFRelease(dict);
-                CFRelease(typeTmp);
+                if(typeTmp != 0) {
+                    CFRelease(typeTmp);
+                }
                 CFRelease(labeltype);
                 java_util_Hashtable_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CN1_THREAD_STATE_PASS_ARG addressesHash, fromNSString(CN1_THREAD_STATE_PASS_ARG (NSString*)labeltype), addr);
             }

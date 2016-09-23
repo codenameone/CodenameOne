@@ -59,7 +59,7 @@ class SearchBar extends Toolbar {
         hint.setUIID("TextHintSearch");
         search.setHintLabelImpl(hint);
         
-        search.addDataChangeListener(new DataChangedListener() {
+        search.addDataChangedListener(new DataChangedListener() {
 
             public void dataChanged(int type, int index) {
                 onSearch(search.getText());

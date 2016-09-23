@@ -87,6 +87,7 @@ import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.Transform;
@@ -1264,6 +1265,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void setClip(Object graphics, int x, int y, int width, int height) {
+        width = Math.max(0, width);
+        height = Math.max(0, height);
         NativeGraphics ng = ((NativeGraphics)graphics);
         ng.checkControl();
         ng.setClip(x, y, width, height);
@@ -1311,6 +1314,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     
     public void clipRect(Object graphics, int x, int y, int width, int height) {
+        width = Math.max(0, width);
+        height = Math.max(0, height);
         NativeGraphics ng = (NativeGraphics)graphics;
         ng.checkControl();
         ng.clipRect(x, y, width, height);
@@ -3680,6 +3685,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (transform == null || transform.isIdentity()) {
                 // Preliminary checks to see if clipping is unnecessary
                 clip.getBounds(reusableRect);
+                if (reusableRect.getWidth() <= 0 || reusableRect.getHeight() <= 0) {
+                    // The existing clip is null so we don't need to do anything here.
+                    return;
+                }
                 reusableRect2.setBounds(x, y, w, h);
                 
                 boolean clipIsRect = clip.isRect();
@@ -3691,7 +3700,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if (!clipIsRect) {
                     reusableClipShape.setShape(clip, null);
                 }
-                clip.intersect(x, y, w, h);
+                if (!clip.intersect(x, y, w, h)) {
+                    clip.setBounds(0, 0, 0, 0);
+                }
                 if (!clipIsRect && clip.equals(reusableClipShape, null)) {
                     return;
                 }
@@ -3700,10 +3711,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                 inverseClipDirty = true;
                 applyClip();
             } else {
-                GeneralPath inverseClip = inverseClip();
-                inverseClip.intersect(x, y, w, h);
                 reusableClipShape.setShape(clip, null);
-                clip.setShape(inverseClip, transform);
+            
+                GeneralPath inverseClip = inverseClip();
+                if (!inverseClip.intersect(x, y, w, h)) {
+                    clip.setBounds(0,0,0,0);
+                } else {
+                    clip.setShape(inverseClip, transform);
+                }
                 if (clip.equals(reusableClipShape, null)) {
                     return;
                 }
@@ -5005,6 +5020,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     @Override
+    public void openNativeNavigationApp(String location) {    
+        execute("http://maps.apple.com/?q=" + Util.encodeUrl(location));
+    }
+
+    @Override
     public void flashBacklight(int duration) {
         nativeInstance.flashBacklight(duration);
     }
@@ -5641,9 +5661,85 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public PeerComponent createNativePeer(Object nativeComponent) {
+        if(Display.getInstance().getProperty("ios.zpeer", null) != null) {
+            return new ZNativeIPhoneView(nativeComponent);
+        }
         return new NativeIPhoneView(nativeComponent);
     }
+
+    class ZNativeIPhoneView extends PeerComponent {
+        private long[] nativePeer;
+        private boolean lightweightMode; 
+       
+        public ZNativeIPhoneView(Object nativePeer) {
+            super(nativePeer);
+            this.nativePeer = (long[])nativePeer;
+            nativeInstance.retainPeer(this.nativePeer[0]);
+            nativeInstance.peerInitialized(this.nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+        }
         
+        public void finalize() {
+            if(nativePeer != null && nativePeer[0] != 0) {
+                nativeInstance.releasePeer(nativePeer[0]);            
+                nativePeer = null;
+            }
+        }
+        
+        public boolean isFocusable() {
+            return true;
+        }
+
+        public void setFocus(boolean b) {
+        }
+        
+        protected Dimension calcPreferredSize() {
+            if(nativePeer == null || nativePeer[0] == 0) {
+                return new Dimension();
+            }
+            int[] p = widthHeight;
+            nativeInstance.calcPreferredSize(nativePeer[0], getDisplayWidth(), getDisplayHeight(), p);
+            return new Dimension(p[0], p[1]);
+        }
+
+        
+        protected void setLightweightMode(boolean l) {
+            /*if(nativePeer != null && nativePeer[0] != 0) {
+                if(lightweightMode != l) {
+                    lightweightMode = l;
+                    nativeInstance.peerSetVisible(nativePeer[0], !lightweightMode);
+                    getComponentForm().repaint();
+                }
+            }*/
+        }
+        
+        protected Image generatePeerImage() {
+            int[] wh = widthHeight;
+            long imagePeer = nativeInstance.createPeerImage(this.nativePeer[0], wh);
+            if(imagePeer == 0) {
+                return null;
+            }
+            NativeImage ni = new NativeImage("PeerScreen");
+            ni.peer = imagePeer;
+            ni.width = wh[0];
+            ni.height = wh[1];
+            return Image.createImage(ni);
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            if(nativePeer != null && nativePeer[0] != 0) {
+                nativeInstance.updatePeerPositionSize(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+            }
+        }
+        
+        
+        
+        protected boolean shouldRenderPeerImage() {
+            return false;
+        }
+    }
+    
+    
     class NativeIPhoneView extends PeerComponent {
         private long[] nativePeer;
         private boolean lightweightMode; 

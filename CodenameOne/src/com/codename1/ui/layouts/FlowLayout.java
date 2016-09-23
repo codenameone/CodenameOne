@@ -237,10 +237,6 @@ public class FlowLayout extends Layout{
         
     }
 
-    private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd){
-        moveComponents(target, x, y, width, height, rowStart, rowEnd, -1);
-    }
-            
     private void moveComponents(Container target, int x, int y, int width, int height, int rowStart, int rowEnd, int baseline ) {
         switch (orientation) {
             case Component.CENTER:
@@ -266,13 +262,13 @@ public class FlowLayout extends Layout{
             if(m.getWidth() + marginX < target.getWidth() - parentPadding){
                 m.setX(m.getX()+ x);
             }
-            int marginTop = m.getStyle().getMargin(false, Component.TOP);
+            int marginTop = style.getMargin(false, Component.TOP);
             switch(valign) {
                 case Component.BOTTOM:
                     if (vAlignByRow) {
-                        m.setY(y + Math.max(marginTop, height - m.getHeight()));
+                        m.setY(y + Math.max(marginTop, height - m.getHeight()) - style.getMarginBottom());
                     } else {
-                        m.setY(y + Math.max(marginTop, target.getHeight() - m.getHeight()));
+                        m.setY(y + Math.max(marginTop, target.getHeight() - m.getHeight()) - style.getMarginBottom());
                     }
                     break;
                 case Component.CENTER:

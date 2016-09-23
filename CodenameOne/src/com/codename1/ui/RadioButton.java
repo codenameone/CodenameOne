@@ -43,8 +43,9 @@ import com.codename1.ui.util.EventDispatcher;
  */
 public class RadioButton extends Button {
 
+    private boolean unselectAllowed; 
     
-    private boolean selected= false;
+    private boolean selected;
     
     /**
      * The group in which this button is a part
@@ -53,7 +54,7 @@ public class RadioButton extends Button {
 
     private boolean oppositeSide;
 
-    private EventDispatcher bindListeners = null;
+    private EventDispatcher bindListeners;
 
     /**
      * Constructs a radio with the given text
@@ -218,13 +219,31 @@ public class RadioButton extends Button {
         }
     }
     
+
+    /**
+     * Returns true if this RadioButton can be unselected
+     * @return true to allow deselection of radio buttons
+     */
+    public boolean isUnselectAllowed() {
+        return unselectAllowed;
+    }
+
+    /**
+     * Allows unselecting a selected RadioButton.
+     * This is useful for when implementing a ButtonGroup that allows no selection or a single selection., 
+     * @param unselectAllowed true to allow deselection of a radio button, false for the default behavior
+     */
+    public void setUnselectAllowed(boolean unselectAllowed) {
+        this.unselectAllowed = unselectAllowed;
+    }
+    
     /**
      * {@inheritDoc}
      */
     public void released(int x, int y) {
-        // prevent the radio button from being "turned off"
-        if(!isSelected()) {
-            setSelected(true);
+        // prevent the radio button from being "turned off" unless unselectAllowed
+        if(!isSelected() || unselectAllowed) { 
+            setSelected(!isSelected()); 
         }
         super.released(x, y);
     }

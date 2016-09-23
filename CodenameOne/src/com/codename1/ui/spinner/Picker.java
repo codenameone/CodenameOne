@@ -105,7 +105,11 @@ public class Picker extends Button {
                             break;
                         case Display.PICKER_TYPE_DATE:
                             DateSpinner ds = new DateSpinner();
-                            cld.setTime((Date)value);
+                            if(value == null) {
+                                cld.setTime(new Date());
+                            } else {
+                                cld.setTime((Date)value);
+                            }
                             ds.setStartYear(1900);
                             ds.setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));
                             ds.setCurrentMonth(cld.get(Calendar.MONTH) + 1);
@@ -430,7 +434,7 @@ public class Picker extends Button {
      * be used on devices where the popup width and height are configurable, such 
      * as the iPad or tablets.  On iPhone, the picker always spans the width of the 
      * screen along the bottom.
-     * @param width The preferred width of the popup.
+     * @param height The preferred height of the popup.
      */
     public void setPreferredPopupHeight(int height) {
         this.preferredPopupHeight = height;

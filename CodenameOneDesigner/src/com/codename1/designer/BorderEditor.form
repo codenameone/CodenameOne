@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.5" maxVersion="1.6" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <Properties>
@@ -116,33 +116,9 @@
                               <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
                                   <Group type="102" alignment="0" attributes="0">
-                                      <Component id="imageMode" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace min="235" pref="235" max="235" attributes="0"/>
-                                  </Group>
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="raisedBorder" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace min="307" pref="307" max="307" attributes="0"/>
-                                  </Group>
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="arcWidth" linkSize="1" pref="62" max="32767" attributes="1"/>
-                                      <EmptySpace min="-2" pref="56" max="-2" attributes="0"/>
-                                      <Component id="jLabel9" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="arcHeight" linkSize="1" pref="62" max="32767" attributes="1"/>
-                                      <EmptySpace min="-2" pref="126" max="-2" attributes="0"/>
-                                  </Group>
-                                  <Group type="102" alignment="0" attributes="0">
-                                      <Component id="lineColor" linkSize="1" max="32767" attributes="1"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="changeLineColor" linkSize="2" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="themeColors" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace min="-2" pref="113" max="-2" attributes="0"/>
-                                  </Group>
-                                  <Group type="102" alignment="0" attributes="0">
                                       <Group type="103" groupAlignment="1" attributes="0">
-                                          <Component id="borderType" alignment="0" pref="739" max="32767" attributes="2"/>
-                                          <Component id="thickness" alignment="0" pref="739" max="32767" attributes="2"/>
+                                          <Component id="borderType" alignment="0" max="32767" attributes="2"/>
+                                          <Component id="thickness" alignment="0" max="32767" attributes="2"/>
                                           <Group type="102" alignment="0" attributes="0">
                                               <Component id="highlightColor" linkSize="1" min="-2" max="-2" attributes="0"/>
                                               <EmptySpace max="-2" attributes="0"/>
@@ -159,7 +135,7 @@
                                   </Group>
                                   <Group type="102" alignment="0" attributes="0">
                                       <Group type="103" groupAlignment="1" attributes="0">
-                                          <Component id="jPanel4" alignment="0" pref="739" max="32767" attributes="2"/>
+                                          <Component id="jPanel4" alignment="0" max="32767" attributes="2"/>
                                           <Group type="102" alignment="0" attributes="0">
                                               <Component id="shadowColor" linkSize="1" min="-2" max="-2" attributes="0"/>
                                               <EmptySpace max="-2" attributes="0"/>
@@ -173,6 +149,27 @@
                                           </Group>
                                       </Group>
                                       <EmptySpace min="-2" pref="8" max="-2" attributes="0"/>
+                                  </Group>
+                                  <Group type="102" attributes="0">
+                                      <Group type="103" groupAlignment="0" attributes="0">
+                                          <Component id="imageMode" alignment="0" min="-2" max="-2" attributes="0"/>
+                                          <Component id="raisedBorder" alignment="0" min="-2" max="-2" attributes="0"/>
+                                          <Group type="102" alignment="0" attributes="0">
+                                              <Component id="arcWidth" linkSize="1" pref="62" max="32767" attributes="1"/>
+                                              <EmptySpace min="-2" pref="56" max="-2" attributes="0"/>
+                                              <Component id="jLabel9" min="-2" max="-2" attributes="0"/>
+                                              <EmptySpace max="-2" attributes="0"/>
+                                              <Component id="arcHeight" linkSize="1" pref="62" max="32767" attributes="1"/>
+                                          </Group>
+                                          <Group type="102" alignment="0" attributes="0">
+                                              <Component id="lineColor" linkSize="1" max="32767" attributes="1"/>
+                                              <EmptySpace max="-2" attributes="0"/>
+                                              <Component id="changeLineColor" linkSize="2" min="-2" max="-2" attributes="0"/>
+                                              <EmptySpace max="-2" attributes="0"/>
+                                              <Component id="themeColors" min="-2" max="-2" attributes="0"/>
+                                          </Group>
+                                      </Group>
+                                      <EmptySpace max="-2" attributes="0"/>
                                   </Group>
                               </Group>
                               <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
@@ -328,7 +325,7 @@
                     <StringItem index="2" value="Bevel"/>
                     <StringItem index="3" value="Etched"/>
                     <StringItem index="4" value="Line"/>
-                    <StringItem index="5" value="Round - Deprecated! (use image borders instead)"/>
+                    <StringItem index="5" value="Rounded"/>
                     <StringItem index="6" value="Image"/>
                     <StringItem index="7" value="Horizontal Image"/>
                     <StringItem index="8" value="Vertical Image"/>
@@ -598,7 +595,7 @@
           <SubComponents>
             <Component class="javax.swing.JTextPane" name="help">
               <Properties>
-                <Property name="contentType" type="java.lang.String" value="text/html"/>
+                <Property name="contentType" type="java.lang.String" value="text/html" noResource="true"/>
                 <Property name="editable" type="boolean" value="false"/>
                 <Property name="name" type="java.lang.String" value="help" noResource="true"/>
               </Properties>

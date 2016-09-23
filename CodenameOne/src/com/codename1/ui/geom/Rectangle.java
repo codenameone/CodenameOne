@@ -290,7 +290,8 @@ public class Rectangle implements Shape {
     }
 
     /**
-     * Returns a rectangle that intersects the given rectangle with this rectangle
+     * Returns a rectangle that intersects the given rectangle with this rectangle.  If they
+     * don't intersect, the resulting rectangle will have a negative width or height.
      *
      * @param rX rectangle to intersect with this rectangle
      * @param rY rectangle to intersect with this rectangle
@@ -331,6 +332,7 @@ public class Rectangle implements Shape {
         if (ty2 < Integer.MIN_VALUE) {
             ty2 = Integer.MIN_VALUE;
         }
+        
         return new Rectangle(tx1, ty1, tx2, ty2);
     }
     
