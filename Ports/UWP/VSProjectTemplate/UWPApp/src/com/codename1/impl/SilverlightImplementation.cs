@@ -766,6 +766,167 @@ namespace com.codename1.impl
             return ci;
         }
 
+
+        public static Matrix3x2 clamp(Matrix3x2 m)
+        {
+            if (m.IsIdentity)
+            {
+                return m;
+            }
+            m.M11 = clamp(m.M11);
+            m.M12 = clamp(m.M12);
+            m.M21 = clamp(m.M21);
+            m.M22 = clamp(m.M22);
+            m.M31 = clamp(m.M31);
+            m.M32 = clamp(m.M32);
+            return m;
+
+        }
+
+        public static double clamp(double d)
+        {
+            if (d > -0.0001 && d < 0.0001)
+            {
+                return 0;
+            } else if (d > 0.9999 && d < 1.0001)
+            {
+                return 1;
+            }
+            return d;
+        }
+
+        public static float clamp(float d)
+        {
+            if (d > -0.0001 && d < 0.0001)
+            {
+                return 0;
+            }
+            else if (d > 0.9999 && d < 1.0001)
+            {
+                return 1;
+            }
+            return d;
+        }
+
+        public override object makeTransformIdentity()
+        {
+            return new NativeTransform(Matrix3x2.Identity);
+        }
+
+
+
+        public override object makeTransformTranslation(float translateX, float translateY, float translateZ)
+        {
+            return new NativeTransform(Matrix3x2.CreateTranslation(new Vector2(translateX, translateY)));
+        }
+
+        public override object makeTransformScale(float scaleX, float scaleY, float scaleZ)
+        {
+            return new NativeTransform(Matrix3x2.CreateScale(new Vector2(scaleX, scaleY)));
+        }
+
+        public override object makeTransformRotation(float angle, float x, float y, float z)
+        {
+            return new NativeTransform(Matrix3x2.CreateRotation(angle, new Vector2(x, y)));
+        }
+
+        public override object makeTransformInverse(object nativeTransform)
+        {
+            NativeTransform nt = (NativeTransform)nativeTransform;
+            Matrix3x2 t = nt.m;
+            Matrix3x2 inv;
+            Matrix3x2.Invert(t, out inv);
+            return new NativeTransform(inv);
+        }
+
+        public override object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar)
+        {
+            //return Matrix4x4.CreatePerspectiveFieldOfView(fovy, aspect, zNear, zFar);
+            return base.makeTransformPerspective(fovy, aspect, zNear, zFar);
+        }
+
+        public override object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far)
+        {
+            //return Matrix4x4.CreateOrthographicOffCenter(left, right, bottom, top, near, far);
+            return base.makeTransformOrtho(left, right, bottom, top, near, far);
+        }
+
+        public override object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ)
+        {
+            //return Matrix4x4.CreateLookAt(new Vector3(eyeX, eyeY, eyeZ), new Vector3(centerX, centerY, centerZ), new Vector3(upX, upY, upZ));
+            return base.makeTransformCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+        }
+
+        private void copyMatrix4x4(Matrix4x4 src, Matrix4x4 dest)
+        {
+            dest.M11 = src.M11;
+            dest.M12 = src.M12;
+            dest.M13 = src.M13;
+            dest.M14 = src.M14;
+            dest.M21 = src.M21;
+            dest.M22 = src.M22;
+            dest.M23 = src.M23;
+            dest.M24 = src.M24;
+            dest.M31 = src.M31;
+            dest.M32 = src.M32;
+            dest.M33 = src.M33;
+            dest.M34 = src.M34;
+            dest.M41 = src.M41;
+            dest.M42 = src.M42;
+            dest.M43 = src.M43;
+            dest.M44 = src.M44;
+        }
+
+        private void copyMatrix3x2(Matrix3x2 src, Matrix3x2 dest)
+        {
+            dest.M11 = src.M11;
+            dest.M12 = src.M12;
+            //dest.M13 = src.M13;
+            //dest.M14 = src.M14;
+            dest.M21 = src.M21;
+            dest.M22 = src.M22;
+            //dest.M23 = src.M23;
+            //dest.M24 = src.M24;
+            dest.M31 = src.M31;
+            dest.M32 = src.M32;
+            
+            //dest.M33 = src.M33;
+            //dest.M34 = src.M34;
+            //dest.M41 = src.M41;
+            //dest.M42 = src.M42;
+            //dest.M43 = src.M43;
+            //dest.M44 = src.M44;
+        }
+
+        public override void concatenateTransform(object t1, object t2)
+        {
+            NativeTransform m1 = (NativeTransform)t1;
+            NativeTransform m2 = (NativeTransform)t2;
+            Matrix3x2 res = Matrix3x2.Multiply(m2.m, m1.m);
+            m1.m = res;
+        }
+
+        public override void copyTransform(object src, object dest)
+        {
+            NativeTransform m1 = (NativeTransform)src;
+            NativeTransform m2 = (NativeTransform)dest;
+            m2.m = m1.m;
+        }
+
+        public override bool isPerspectiveTransformSupported()
+        {
+            return false;
+        }
+
+        public override bool transformEqualsImpl(ui.Transform t1, ui.Transform t2)
+        {
+            NativeTransform m1 = (NativeTransform)t1.getNativeTransform();
+            NativeTransform m2 = (NativeTransform)t2.getNativeTransform();
+            return m1.m.Equals(m2.m);
+        }
+
+        
+
         protected override bool cacheLinearGradients()
         {
             return false;
@@ -836,12 +997,12 @@ namespace com.codename1.impl
 
         public override bool isTransformSupported()
         {
-            return base.isTransformSupported();  
+            return true;
         }
 
         public override bool isTransformSupported(object n1)
         {
-            return base.isTransformSupported(n1);
+            return true;
         }
 
         public override bool isTranslationSupported()
@@ -849,15 +1010,77 @@ namespace com.codename1.impl
             return base.isTranslationSupported();
         }
 
+
+        public override bool isAffineSupported()
+        {
+            return true;
+
+        }
+
+        public override bool isPerspectiveTransformSupported(object graphics)
+        {
+            return false;
+        }
+
+        public override bool isShapeSupported(object graphics)
+        {
+            return true;
+        }
+
         public override void rotate(object nativeGraphics, float angle)
         {
-            base.rotate(nativeGraphics, angle);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)nativeGraphics).destination;
+            ui.Transform t = g.getTransform();
+            t.rotate(angle, 0, 0);
+            g.setTransform(t);
+            
         }
 
         public override void rotate(object nativeGraphics, float angle, int x, int y)
         {
-            base.rotate(nativeGraphics, angle, x, y);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)nativeGraphics).destination;
+            ui.Transform t = g.getTransform();
+            t.rotate(angle, x, y);
+            g.setTransform(t);
         }
+
+        public override void resetAffine(object nativeGraphics)
+        {
+            WindowsGraphics g = ((NativeGraphics)nativeGraphics).destination;
+            g.setTransform(com.codename1.ui.Transform.makeTranslation(0, 0, 0));
+        }
+
+        public override ui.Transform getTransform(object graphics)
+        {
+            return ((WindowsGraphics)((NativeGraphics)graphics).destination).getTransform();
+        }
+
+        public override void getTransform(object nativeGraphics, ui.Transform t)
+        {
+            t.setTransform(((WindowsGraphics)((NativeGraphics)nativeGraphics).destination).getTransform());
+        }
+
+        public class NativeTransform
+        {
+
+            public NativeTransform(Matrix3x2 m)
+            {
+                this.m = m;
+            }
+            public Matrix3x2 m;
+        }
+
+        public override void transformPoint(object nativeTransform, float[] @in, float[] @out)
+        {
+            NativeTransform nt = (NativeTransform)nativeTransform;
+            Matrix3x2 t = nt.m;
+            Vector2 res = Vector2.Transform(new Vector2(@in[0], @in[1]), t);
+            @out[0] = res.X;
+            @out[1] = res.Y;
+            @out[2] = 0;
+        }
+
+        
 
         public override ui.Image rotate180Degrees(ui.Image image, bool maintainOpacity)
         {
@@ -876,12 +1099,17 @@ namespace com.codename1.impl
 
         public override void scale(object nativeGraphics, float x, float y)
         {
-           base.scale(nativeGraphics, x, y);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)nativeGraphics).destination;
+            ui.Transform t = g.getTransform();
+            t.scale(x, y);
+            g.setTransform(t);
+            setTransform(nativeGraphics, t);
         }
 
         public override void setTransform(object n1, ui.Transform n2)
         {
-            base.setTransform(n1, n2);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)n1).destination;
+            g.setTransform(n2);
         }
 
         public override void translate(object n1, int n2, int n3)
@@ -894,6 +1122,8 @@ namespace com.codename1.impl
             return false;
         }
        
+        
+
         public override object createImage(int[] n1, int n2, int n3)
         {
             CodenameOneImage ci = (CodenameOneImage)createMutableImage(n2, n3, 0);
@@ -3125,26 +3355,33 @@ namespace com.codename1.impl
         {
             return true;
         }
+
+
         public override void fillShape(object graphics, Shape shape)
         {
-            WindowsGraphics ag = (WindowsGraphics)graphics;
+            WindowsGraphics ag = ((NativeGraphics)graphics).destination;
             CanvasPathBuilder p = cn1ShapeToAndroidPath(shape);
             ag.fillPath(p);
         }
         public override void drawShape(object graphics, Shape shape, Stroke stroke)
         {
-            WindowsGraphics ag = (WindowsGraphics)graphics;
+           
+            WindowsGraphics ag = (WindowsGraphics)((NativeGraphics)graphics).destination;
             CanvasPathBuilder p = cn1ShapeToAndroidPath(shape);
             ag.drawPath(p, stroke);
+            
+                
         }
         private CanvasPathBuilder cn1ShapeToAndroidPath(Shape shape)
         {
             CanvasPathBuilder canvasPath = new CanvasPathBuilder(screen);
+            
 
             PathIterator it = shape.getPathIterator();
             //p.setWindingRule(it.getWindingRule() == com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
             float[] buf = new float[6];
-            
+            bool started = false;
+            int size = 0;
             while (!it.isDone())
             {
                 int type = it.currentSegment(buf);
@@ -3152,7 +3389,15 @@ namespace com.codename1.impl
                 {
                     case PathIterator.SEG_MOVETO:
                         // p.moveTo(buf[0], buf[1]);
+                        if (!started)
+                        {
+                            started = true;
+                        } else
+                        {
+                            canvasPath.EndFigure(CanvasFigureLoop.Open);
+                        }
                         canvasPath.BeginFigure(buf[0], buf[1]);
+                        
                         break;
                     case PathIterator.SEG_LINETO:
                         //  p.lineTo(buf[0], buf[1]);
@@ -3168,11 +3413,18 @@ namespace com.codename1.impl
                         break;
                     case PathIterator.SEG_CLOSE:
                         canvasPath.EndFigure(CanvasFigureLoop.Closed);
+                        started = false;
                        // p.close();
                         break;
 
                 }
+                size++;
                 it.next();
+            }
+
+            if (started && size > 0)
+            {
+                canvasPath.EndFigure(CanvasFigureLoop.Open);
             }
 
             return canvasPath;

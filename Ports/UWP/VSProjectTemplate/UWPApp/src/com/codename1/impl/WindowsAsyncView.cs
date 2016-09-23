@@ -1,10 +1,12 @@
-﻿using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas;
 using System.Collections.Generic;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.Graphics.Canvas.Text;
 using com.codename1.ui.geom;
 using System;
 using Microsoft.Graphics.Canvas.Geometry;
+using System.Numerics;
+using com.codename1.ui;
 
 namespace com.codename1.impl
 {
@@ -94,6 +96,7 @@ namespace com.codename1.impl
             private int color;
             private CanvasTextFormat font = new CanvasTextFormat();
             private WindowsGraphics internalGraphics;
+            private com.codename1.ui.Transform transform = com.codename1.ui.Transform.makeTranslation(0, 0, 0);
 
             public AsyncGraphics(CanvasDrawingSession graphics)
                 : base(graphics)
@@ -119,6 +122,17 @@ namespace com.codename1.impl
             internal override int getAlpha()
             {
                 return alpha;
+            }
+
+            public override void setTransform(com.codename1.ui.Transform transform)
+            {
+                this.transform.setTransform(transform);
+                pendingRenderingOperations.Add(new SetTransformOp(clip, transform));
+            }
+
+            public override com.codename1.ui.Transform getTransform()
+            {
+                return this.transform.copy();
             }
 
             internal override void setColor(int color)
@@ -218,6 +232,16 @@ namespace com.codename1.impl
             internal override void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height)
             {
                 pendingRenderingOperations.Add(new FillRadialGradientPainter(clip, startColor, endColor, x, y, width, height));
+            }
+
+            internal override void drawPath(CanvasPathBuilder p, Stroke stroke)
+            {
+                pendingRenderingOperations.Add(new DrawPathPainter(clip, color, alpha, p, stroke));
+            }
+
+            internal override void fillPath(CanvasPathBuilder p)
+            {
+                pendingRenderingOperations.Add(new FillPathPainter(clip, color, alpha, p));
             }
         }
     }
