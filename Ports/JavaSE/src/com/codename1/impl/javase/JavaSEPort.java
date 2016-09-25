@@ -3157,6 +3157,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void vibrate(int duration) {
+        System.out.println("vibrate(" + duration + ")");
     }
 
     /**
