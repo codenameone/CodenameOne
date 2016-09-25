@@ -428,6 +428,7 @@ public class Log {
      * the application any way it sees fit
      * 
      * @return string containing the whole log
+     * @deprecated this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
      */
     public static String getLogContent() {
         try {
