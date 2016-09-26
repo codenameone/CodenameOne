@@ -2251,9 +2251,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("cn1_push_prefix")) {
-            if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
+            /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
                 return "";
-            }
+            }*/
             boolean has = hasAndroidMarket();
             if(has) {
                 return "gcm";
