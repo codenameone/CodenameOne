@@ -1031,6 +1031,28 @@ public class UIManager {
         defaultStyle = createStyle("", "", false);
         defaultSelectedStyle = new Style(defaultStyle);
         defaultSelectedStyle = createStyle("", "sel#", true);
+        
+        String overlayThemes = (String)themeProps.get("@OverlayThemes");      
+        if (overlayThemes != null) {
+            java.util.List<String> overlayThemesArr = StringUtil.tokenize(overlayThemes, ',');
+            for (String th : overlayThemesArr) {
+                th = th.trim();
+                if (th.length() == 0) {
+                    continue;
+                }
+                try {
+                    Resources res = Resources.openLayered("/"+th);
+                    boolean a = accessible;
+                    accessible = true;
+                    addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
+                    accessible = a;
+                } catch (Exception ex) {
+                    System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: "+th);
+                    ex.printStackTrace();
+                }
+            }
+        }
+        
     }
     
     Style createStyle(String id, String prefix, boolean selected) {

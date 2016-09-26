@@ -555,7 +555,7 @@ public class JSONParser implements JSONParseCallback {
      */
     public void longToken(long tok) {
         if (isStackHash()) {
-            getStackHash().put(currentKey, new Double(tok));
+            getStackHash().put(currentKey, new Long(tok));
             currentKey = null;
         } else {
             getStackVec().add(new Long(tok));

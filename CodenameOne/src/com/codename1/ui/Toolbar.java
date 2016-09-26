@@ -1164,6 +1164,15 @@ public class Toolbar extends Container {
         return cmds;
     }
 
+    /**
+     * Removes the given overflow menu command, notice that this has no effect on the menu that is currently
+     * showing (if it is currently showing) only on the upcoming iterations.
+     * @param cmd the command to remove from the overflow
+     */
+    public void removeOverflowCommand(Command cmd) {
+        overflowCommands.remove(cmd);
+    }
+
     
 
     class ToolbarSideMenu extends SideMenuBar {
@@ -1228,15 +1237,6 @@ public class Toolbar extends Container {
             return Toolbar.this.contains(x, y);
         }
 
-        /**
-         * Removes the given overflow menu command, notice that this has no effect on the menu that is currently
-         * showing (if it is currently showing) only on the upcoming iterations.
-         * @param cmd the command to remove from the overflow
-         */
-        public void removeOverflowCommand(Command cmd) {
-            overflowCommands.remove(cmd);
-        }
-        
         @Override
         public Component getComponentAt(int x, int y) {
             return Toolbar.this.getComponentAt(x, y);
