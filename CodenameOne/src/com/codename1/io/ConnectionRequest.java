@@ -1944,7 +1944,7 @@ public class ConnectionRequest implements IOProgressListener {
                         FileSystemStorage fs = FileSystemStorage.getInstance();
                         if (fs.exists(file)) {
                             try {
-                                EncodedImage img = EncodedImage.create(fs.openInputStream(file));
+                                EncodedImage img = EncodedImage.create(fs.openInputStream(file), (int)fs.getLength(file));
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }
@@ -1960,7 +1960,7 @@ public class ConnectionRequest implements IOProgressListener {
                         Storage fs = Storage.getInstance();
                         if (fs.exists(file)) {
                             try {
-                                EncodedImage img = EncodedImage.create(fs.createInputStream(file));
+                                EncodedImage img = EncodedImage.create(fs.createInputStream(file), fs.entrySize(file));
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }

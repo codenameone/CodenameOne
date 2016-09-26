@@ -44,8 +44,19 @@ public class BackgroundLocationHandler extends IntentService {
     @Override
     protected void onHandleIntent(Intent intent) {
         //String className = intent.getStringExtra("backgroundClass");
-        String[] params = intent.getDataString().split("[?]");
         final android.location.Location location = intent.getParcelableExtra(FusedLocationProviderApi.KEY_LOCATION_CHANGED);
+        if (AndroidLocationPlayServiceManager.inMemoryBackgroundLocationListener != null) {
+            // This is basically just a short-term location request and we are using the in-memory listeners.
+            AndroidLocationPlayServiceManager mgr = AndroidLocationPlayServiceManager.inMemoryBackgroundLocationListener;
+            mgr.onLocationChanged(location);
+            return;
+        }
+        if (intent.getDataString() == null) {
+            System.out.println("BackgroundLocationHandler received update without data string.");
+            return;
+        }
+        String[] params = intent.getDataString().split("[?]");
+        
 
         //might happen on some occasions, no need to do anything.
         if (location == null) {
