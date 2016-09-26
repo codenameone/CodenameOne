@@ -43,6 +43,7 @@ using Windows.Graphics.Imaging;
 using Microsoft.Graphics.Canvas.Geometry;
 using java.io;
 using Windows.Foundation.Metadata;
+using Windows.ApplicationModel.DataTransfer;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -2570,17 +2571,30 @@ namespace com.codename1.impl
 
         public override java.io.InputStream openInputStream(object connection)
         {
-            if (connection is string)
+            StorageFile output;
+            return openInputStream(connection, false, out output);
+        }
+
+        private java.io.InputStream openInputStream(object connection, bool outputFile, out StorageFile outFile)
+        {
+           if (connection is string)
             {
                 try
                 {
                     if (isTempFile((string)connection))
                     {
                         StorageFile tempFile = getTempFile((string)connection);
-                        return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                        if (outputFile)
+                        {
+                            outFile = tempFile;
+                            return null;
+                        } else {
+                            outFile = null;
+                            return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
                                .ConfigureAwait(false)
                                .GetAwaiter()
                                .GetResult());
+                        }
                     }
                     StorageFolder store = getStore((string)connection); //KnownFolders.CameraRoll
                     string file = nativePathStore((string)connection);
@@ -2589,37 +2603,44 @@ namespace com.codename1.impl
                         .ConfigureAwait(false)
                         .GetAwaiter()
                         .GetResult();
-                    Stream stream = null;
-                    try
+                    if (outputFile)
                     {
-                        stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
-                        return new InputStreamProxy(stream);
-                    }
-                    catch (Exception ex2)
+                        outFile =  sfile;
+                        return null;
+                    } else
                     {
-                        java.lang.System.err.println("Failed to create file input stream by simply opening the file.  Trying to open a copy instead " + ex2.Message);
-                        // If it failed to create the input stream, it is possible that
-                        // it is because the file is already being used (e.g. an output stream is writing to it).
-                        // In this case, we'll create a copy to a temp file, and create an inputstream from that one.
+                        outFile = null;
+                        Stream stream = null;
                         try
                         {
-                            StorageFile tempFile = sfile.CopyAsync(ApplicationData.Current.TemporaryFolder, sfile.Name, NameCollisionOption.GenerateUniqueName)
-                                .AsTask()
-                                .ConfigureAwait(false)
-                                .GetAwaiter()
-                                .GetResult();
-                            return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
-                                .ConfigureAwait(false)
-                                .GetAwaiter()
-                                .GetResult());
+                            stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
+                            return new InputStreamProxy(stream);
                         }
-                        catch (Exception e3)
+                        catch (Exception ex2)
                         {
-                            java.lang.System.err.println("Failed to open storage file via copy " + e3.Message);
+                            java.lang.System.err.println("Failed to create file input stream by simply opening the file.  Trying to open a copy instead " + ex2.Message);
+                            // If it failed to create the input stream, it is possible that
+                            // it is because the file is already being used (e.g. an output stream is writing to it).
+                            // In this case, we'll create a copy to a temp file, and create an inputstream from that one.
+                            try
+                            {
+                                StorageFile tempFile = sfile.CopyAsync(ApplicationData.Current.TemporaryFolder, sfile.Name, NameCollisionOption.GenerateUniqueName)
+                                    .AsTask()
+                                    .ConfigureAwait(false)
+                                    .GetAwaiter()
+                                    .GetResult();
+                                return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                                    .ConfigureAwait(false)
+                                    .GetAwaiter()
+                                    .GetResult());
+                            }
+                            catch (Exception e3)
+                            {
+                                java.lang.System.err.println("Failed to open storage file via copy " + e3.Message);
+                            }
+
                         }
-
                     }
-
                 }
                 catch (Exception e)
                 {
@@ -2629,6 +2650,7 @@ namespace com.codename1.impl
             }
             //io.BufferedInputStream bo = new io.BufferedInputStream(new InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream()));
             //return bo;
+            outFile = null;
             return new java.io.InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream());
         }
 
@@ -3356,6 +3378,61 @@ namespace com.codename1.impl
             return true;
         }
 
+        public class ShareInfo
+        {
+            public string text;
+            public string image;
+            public string mimeType;
+
+            public ShareInfo(string text, string image, string mimeType)
+            {
+                this.text = text;
+                this.image = image;
+                this.mimeType = mimeType;
+            }
+        }
+
+        private ShareInfo shareInfo;
+
+        public override void share(string text, string image, string mimeType, Rectangle sourceRect)
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                DataTransferManager dtm = DataTransferManager.GetForCurrentView();
+                shareInfo = new ShareInfo(text, image, mimeType);
+                dtm.DataRequested += new TypedEventHandler<DataTransferManager, DataRequestedEventArgs>(this.DataRequested);
+                shareInfo = new ShareInfo(text, image, mimeType);
+                DataTransferManager.ShowShareUI();
+            });
+
+        }
+
+        private void DataRequested(DataTransferManager sender, DataRequestedEventArgs e)
+        {
+            DataRequest request = e.Request;
+            if (shareInfo == null)
+            {
+                return;
+            }
+
+            request.Data.Properties.Title = Display.getInstance().getProperty("windows.share.title", "Content from " + Display.getInstance().getProperty("AppName", "Codename One App"));
+            request.Data.Properties.Description = Display.getInstance().getProperty("windows.share.title","");
+            if (shareInfo.image == null)
+            {
+               request.Data.SetText(shareInfo.text);
+            }
+            else
+            {
+                if (shareInfo.text != null)
+                {
+                    request.Data.Properties.Title = shareInfo.text;
+                }
+                StorageFile f;
+                openInputStream(shareInfo.image, true, out f);
+                request.Data.SetBitmap(RandomAccessStreamReference.CreateFromFile(f));
+
+            }
+        }
 
         public override void fillShape(object graphics, Shape shape)
         {
