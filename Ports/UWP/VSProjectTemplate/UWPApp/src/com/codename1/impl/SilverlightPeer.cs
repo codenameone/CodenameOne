@@ -1,4 +1,4 @@
-﻿using com.codename1.ui;
+using com.codename1.ui;
 using Microsoft.Graphics.Canvas;
 using System;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -117,6 +117,10 @@ namespace com.codename1.impl
 
         protected override ui.Image generatePeerImage()
         {
+            if (element is MediaElement)
+            {
+                return null;
+            }
             int width = getWidth();
             int height = getHeight();
             if (width <= 0 || height <= 0)
@@ -142,10 +146,11 @@ namespace com.codename1.impl
                     RenderTargetBitmap renderTargetBitmap = new RenderTargetBitmap();
                     await renderTargetBitmap.RenderAsync(element);
                     byte[] buf = renderTargetBitmap.GetPixelsAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult().ToArray();
+                    
                     cb = CanvasBitmap.CreateFromBytes(SilverlightImplementation.screen, buf, width, height,
                     SilverlightImplementation.pixelFormat, SilverlightImplementation.screen.Dpi);
                 }
-                img.image = new CanvasRenderTarget(SilverlightImplementation.screen, cb.SizeInPixels.Width, cb.SizeInPixels.Height, cb.Dpi);
+                img.image = new CanvasRenderTarget(SilverlightImplementation.screen, (int)cb.SizeInPixels.Width, (int)cb.SizeInPixels.Height, cb.Dpi);
                 img.graphics.destination.drawImage(cb, 0, 0);
                 img.graphics.destination.dispose();
 
@@ -155,7 +160,9 @@ namespace com.codename1.impl
 
         protected override bool shouldRenderPeerImage()
         {
-            return lightweightMode || !isInitialized();
+            // You can't take a screenshot of a media element like you can with other 
+            // XAML elements. 
+            return lightweightMode || !(element is MediaElement) && !isInitialized();
         }
     }
 }

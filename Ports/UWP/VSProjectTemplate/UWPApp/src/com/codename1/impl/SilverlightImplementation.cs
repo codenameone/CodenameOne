@@ -358,6 +358,24 @@ namespace com.codename1.impl
             return new CN1Media(s, n2, n3, cl);
         }
 
+        public override media.Media createMedia(string uri, bool isVideo, java.lang.Runnable onCompletion)
+        {
+            if (isTempFile(uri))
+            {
+                StorageFile sf = getTempFile(uri);
+                uri = sf.Path;
+            }
+            else if (uri.StartsWith("file://"))
+            {
+                StorageFile sf;
+                openInputStream(uri, true, out sf);
+                uri = sf.Path;
+            }
+            return new CN1Media(uri, isVideo, onCompletion, cl);
+        }
+
+        
+
         public override void lockOrientation(bool portrait)
         {
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
