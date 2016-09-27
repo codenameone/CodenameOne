@@ -1257,8 +1257,17 @@ namespace com.codename1.impl
 
         public static bool exitLock;
         private ActionListener pendingCaptureCallback;
-
         public override void capturePhoto(ActionListener response)
+        {
+            capture(response, CameraCaptureUIMode.Photo);
+        }
+
+        public override void captureVideo(ActionListener response)
+        {
+            capture(response, CameraCaptureUIMode.Video);
+        }
+
+        private void capture(ActionListener response, CameraCaptureUIMode mode)
         {
 #if WINDOWS_PHONE_APP
             openGaleriaCamera();
@@ -1271,19 +1280,35 @@ namespace com.codename1.impl
                 {
                     // Using Windows.Media.Capture.CameraCaptureUI API to capture a photo
                     CameraCaptureUI dialog = new CameraCaptureUI();
-                    dialog.PhotoSettings.CroppedAspectRatio = new Size(16, 9);
-                    dialog.PhotoSettings.Format = CameraCaptureUIPhotoFormat.Jpeg;
-                    dialog.PhotoSettings.MaxResolution = CameraCaptureUIMaxPhotoResolution.HighestAvailable;
-                    StorageFile photo = await dialog.CaptureFileAsync(CameraCaptureUIMode.Photo);
+                    if (mode == CameraCaptureUIMode.Photo)
+                    {
+                        dialog.PhotoSettings.CroppedAspectRatio = new Size(16, 9);
+                        dialog.PhotoSettings.Format = CameraCaptureUIPhotoFormat.Jpeg;
+                        dialog.PhotoSettings.MaxResolution = CameraCaptureUIMaxPhotoResolution.HighestAvailable;
+                    }
+                    
+                    else if (mode == CameraCaptureUIMode.Video)
+                    {
+                        
+                        dialog.VideoSettings.Format = CameraCaptureUIVideoFormat.Mp4;
+                        dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                    }
+                    
+                    StorageFile photo = await dialog.CaptureFileAsync(mode);
                     if (photo != null)
                     {
-                        var foldersave = KnownFolders.CameraRoll;
-                        await photo.MoveAsync(foldersave);
+                        string tmpPath = addTempFile(photo);
+                        fireCapture(new ActionEvent(tmpPath));
+                        //var foldersave = KnownFolders.CameraRoll;
+                        //await photo.MoveAsync(foldersave);
 
-                        BitmapImage bitmapImage = new BitmapImage();
-                        Windows.UI.Xaml.Controls.Image Capturedphoto = new Windows.UI.Xaml.Controls.Image();
-                        Capturedphoto.Source = bitmapImage;
-                        toSendPhoto(photo);
+                        //BitmapImage bitmapImage = new BitmapImage();
+                        //Windows.UI.Xaml.Controls.Image Capturedphoto = new Windows.UI.Xaml.Controls.Image();
+                        //Capturedphoto.Source = bitmapImage;
+                        //toSendPhoto(photo);
+                    } else
+                    {
+                        fireCapture(new ActionEvent(null));
                     }
                 }
                 catch (Exception)
