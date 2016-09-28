@@ -291,8 +291,13 @@ public class Tree extends Container {
         return dest;
     }
     
-    private boolean isExpanded(Component c) {
-        Object e = c.getClientProperty(KEY_EXPANDED);
+    /**
+     * This method returns true if the given node is expanded.
+     * @param node a Component that represents a tree node.
+     * @return true if this tree node is expanded
+     */ 
+    protected boolean isExpanded(Component node) {
+        Object e = node.getClientProperty(KEY_EXPANDED);
         return e != null && e.equals("true");
     }
     
@@ -300,7 +305,8 @@ public class Tree extends Container {
         int cc = parent.getComponentCount();
         for(int iter = 0 ; iter < cc ; iter++) {
             Component current = parent.getComponentAt(iter);
-            if(current instanceof Container) {
+            if(!model.isLeaf(current)){
+            //if(current instanceof Container) {
                 BorderLayout bl = (BorderLayout)((Container)current).getLayout();
 
                 // the tree component is always at north expanded or otherwise
