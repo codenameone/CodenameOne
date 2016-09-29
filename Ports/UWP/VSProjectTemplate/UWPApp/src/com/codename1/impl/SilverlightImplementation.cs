@@ -2195,10 +2195,12 @@ namespace com.codename1.impl
 
         public override int stringWidth(object n1, string n2)
         {
-            int result = f(n1).getStringWidth(n2);
             StringFontPair sfp = new StringFontPair(n2, f(n1));
+            
+            
             if (!stringWidthCache.ContainsKey(sfp))
             {
+                int result = f(n1).getStringWidth(n2);
                 stringWidthCache.Add(sfp, result);
             }
             return stringWidthCache[sfp];
