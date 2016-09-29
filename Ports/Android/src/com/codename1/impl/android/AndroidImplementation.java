@@ -2251,9 +2251,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("cn1_push_prefix")) {
-            if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
+            /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
                 return "";
-            }
+            }*/
             boolean has = hasAndroidMarket();
             if(has) {
                 return "gcm";
@@ -7474,11 +7474,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final boolean[] complete = new boolean[1];
             final Object lock = new Object();
             final BackgroundFetch bgFetchListener = instance.getBackgroundFetchListener();
-
+            final long timeout = System.currentTimeMillis()+25000;
             if (bgFetchListener != null) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        bgFetchListener.performBackgroundFetch(System.currentTimeMillis()+25*60*1000, new Callback<Boolean>() {
+                        bgFetchListener.performBackgroundFetch(timeout, new Callback<Boolean>() {
 
                             @Override
                             public void onSucess(Boolean value) {
@@ -7514,6 +7514,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (!complete[0]) {
                     System.out.println("Waiting for background fetch to complete.  Make sure your background fetch handler calls onSuccess() or onError() in the callback when complete");
                 
+                }
+                if (System.currentTimeMillis() > timeout) {
+                    System.out.println("Background fetch exceeded time alotted.  Not waiting for its completion");
+                    break;
                 }
                 
             }

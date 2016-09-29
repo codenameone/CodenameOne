@@ -492,6 +492,64 @@ public class RoundBorder extends Border {
     public boolean isRectangle() {
         return rectangle;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 43 * hash + this.color;
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final RoundBorder other = (RoundBorder) obj;
+        if (this.color != other.color) {
+            return false;
+        }
+        if (this.opacity != other.opacity) {
+            return false;
+        }
+        if (this.strokeColor != other.strokeColor) {
+            return false;
+        }
+        if (this.strokeOpacity != other.strokeOpacity) {
+            return false;
+        }
+        if (this.strokeThickness != other.strokeThickness) {
+            return false;
+        }
+        if (this.strokeMM != other.strokeMM) {
+            return false;
+        }
+        if (this.shadowSpread != other.shadowSpread) {
+            return false;
+        }
+        if (this.shadowOpacity != other.shadowOpacity) {
+            return false;
+        }
+        if (this.shadowX != other.shadowX) {
+            return false;
+        }
+        if (this.shadowY != other.shadowY) {
+            return false;
+        }
+        if (this.shadowBlur != other.shadowBlur) {
+            return false;
+        }
+        if (this.shadowMM != other.shadowMM) {
+            return false;
+        }
+        if (this.rectangle != other.rectangle) {
+            return false;
+        }
+        return true;
+    }
     
     
 }
