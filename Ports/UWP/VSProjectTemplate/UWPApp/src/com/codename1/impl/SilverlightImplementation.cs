@@ -523,6 +523,19 @@ namespace com.codename1.impl
             return true;
         }
 
+        public override int getKeyboardType()
+        {
+            KeyboardCapabilities keyboardCapabilities = new Windows.Devices.Input.KeyboardCapabilities();
+            if (keyboardCapabilities.KeyboardPresent != 0)
+            {
+                return com.codename1.ui.Display.KEYBOARD_TYPE_QWERTY;
+            } else
+            {
+                return com.codename1.ui.Display.KEYBOARD_TYPE_VIRTUAL;
+            }
+            
+        }
+
         public static void commitEditing()
         {
             instance.currentlyEditing = null;
