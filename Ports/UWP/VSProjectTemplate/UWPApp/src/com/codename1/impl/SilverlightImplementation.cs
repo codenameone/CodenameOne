@@ -44,6 +44,7 @@ using Microsoft.Graphics.Canvas.Geometry;
 using java.io;
 using Windows.Foundation.Metadata;
 using Windows.ApplicationModel.DataTransfer;
+using com.codename1.db;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -2921,6 +2922,37 @@ namespace com.codename1.impl
             char[] buf = trace.ToCharArray();
             int len = buf.Length;
             o.write(buf, 0, len);
+        }
+
+        public override Database openOrCreateDB(string databaseName)
+        {
+            string path = Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path,
+            databaseName+".sqlite");
+            //return new WinDB(new SQLite.Net.SQLiteConnection(new
+            //SQLite.Net.Platform.WinRT.SQLitePlatformWinRT(), path));
+            return WinDBRaw.openOrCreate(path);
+            //return null;
+        }
+
+        public override void deleteDB(string databaseName)
+        {
+            string path = Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path,
+            databaseName + ".sqlite");
+            StorageFile filed = ApplicationData.Current.LocalFolder.GetFileAsync(databaseName + ".sqlite").AsTask().GetAwaiter().GetResult();
+            if (filed != null)
+            {
+                filed.DeleteAsync().AsTask().GetAwaiter().GetResult();
+
+
+            }
+            
+
+        }
+        public override bool existsDB(string databaseName)
+        {
+            string fileName = databaseName + ".sqlite";
+            var item = ApplicationData.Current.LocalFolder.TryGetItemAsync(fileName).AsTask().GetAwaiter().GetResult();
+            return item != null;
         }
 
         internal class CodenameOneUWPThread : com.codename1.impl.CodenameOneThread
