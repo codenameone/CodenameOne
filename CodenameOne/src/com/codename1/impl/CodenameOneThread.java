@@ -181,7 +181,9 @@ public class CodenameOneThread extends Thread {
     }
     
     public static void handleException(Throwable err) {
-        Log.e(err);
-        Log.sendLog();
+        if(Log.isCrashBound()) {
+            Log.e(err);
+            Log.sendLog();
+        }
     }
 }
