@@ -45,6 +45,7 @@ using java.io;
 using Windows.Foundation.Metadata;
 using Windows.ApplicationModel.DataTransfer;
 using com.codename1.db;
+using Windows.UI.ViewManagement;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -211,6 +212,8 @@ namespace com.codename1.impl
 
         public override void init(object n1)
         {
+
+           
             instance = this;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
           {
@@ -3495,6 +3498,51 @@ namespace com.codename1.impl
                 DataTransferManager.ShowShareUI();
             });
 
+        }
+
+        private Windows.UI.Color parseColor(int p)
+        
+        {
+            byte r = (byte)((p >> 16) & 0xff);
+            byte g = (byte)((p >> 8) & 0xff);
+            byte b = (byte)(p & 0xff);
+            return Windows.UI.Color.FromArgb((byte)255, r, g, b);
+        }
+    
+
+        private int getPropertyAsInt(string name, int defaultValue)
+        {
+            string val = Display.getInstance().getProperty(name, null);
+            if (val == null)
+            {
+                return defaultValue;
+            }
+            return int.Parse(val);
+        }
+
+        public override void onShow(Form f)
+        {
+            base.onShow(f);
+            int fgColor = getPropertyAsInt("windows.StatusBar.ForegroundColor", f.getUnselectedStyle().getFgColor());
+            int bgColor = getPropertyAsInt("windows.StatusBar.BackgroundColor", f.getUnselectedStyle().getBgColor());
+            int bgTransparency = getPropertyAsInt("windows.StatusBar.BackgroundOpacity", f.getUnselectedStyle().getBgTransparency());
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (ApiInformation.IsTypePresent("Windows.UI.ViewManagement.StatusBar"))
+                {
+
+                    var statusBar = StatusBar.GetForCurrentView();
+                    if (statusBar != null)
+                    {
+                        statusBar.BackgroundOpacity = bgTransparency / 255.0;
+                        statusBar.BackgroundColor = parseColor(bgColor);
+                        statusBar.ForegroundColor = parseColor(fgColor);
+                    }
+                }
+            });
+            //Mobile customization
+
+           
         }
 
         private void DataRequested(DataTransferManager sender, DataRequestedEventArgs e)
