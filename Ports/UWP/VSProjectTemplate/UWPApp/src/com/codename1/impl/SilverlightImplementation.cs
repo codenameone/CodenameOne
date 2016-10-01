@@ -43,6 +43,9 @@ using Windows.Graphics.Imaging;
 using Microsoft.Graphics.Canvas.Geometry;
 using java.io;
 using Windows.Foundation.Metadata;
+using Windows.ApplicationModel.DataTransfer;
+using com.codename1.db;
+using Windows.UI.ViewManagement;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -209,6 +212,8 @@ namespace com.codename1.impl
 
         public override void init(object n1)
         {
+
+           
             instance = this;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
           {
@@ -357,6 +362,24 @@ namespace com.codename1.impl
             return new CN1Media(s, n2, n3, cl);
         }
 
+        public override media.Media createMedia(string uri, bool isVideo, java.lang.Runnable onCompletion)
+        {
+            if (isTempFile(uri))
+            {
+                StorageFile sf = getTempFile(uri);
+                uri = sf.Path;
+            }
+            else if (uri.StartsWith("file://"))
+            {
+                StorageFile sf;
+                openInputStream(uri, true, out sf);
+                uri = sf.Path;
+            }
+            return new CN1Media(uri, isVideo, onCompletion, cl);
+        }
+
+        
+
         public override void lockOrientation(bool portrait)
         {
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
@@ -502,6 +525,19 @@ namespace com.codename1.impl
         public override bool isNativeInputImmediate()
         {
             return true;
+        }
+
+        public override int getKeyboardType()
+        {
+            KeyboardCapabilities keyboardCapabilities = new Windows.Devices.Input.KeyboardCapabilities();
+            if (keyboardCapabilities.KeyboardPresent != 0)
+            {
+                return com.codename1.ui.Display.KEYBOARD_TYPE_QWERTY;
+            } else
+            {
+                return com.codename1.ui.Display.KEYBOARD_TYPE_VIRTUAL;
+            }
+            
         }
 
         public static void commitEditing()
@@ -1238,8 +1274,17 @@ namespace com.codename1.impl
 
         public static bool exitLock;
         private ActionListener pendingCaptureCallback;
-
         public override void capturePhoto(ActionListener response)
+        {
+            capture(response, CameraCaptureUIMode.Photo);
+        }
+
+        public override void captureVideo(ActionListener response)
+        {
+            capture(response, CameraCaptureUIMode.Video);
+        }
+
+        private void capture(ActionListener response, CameraCaptureUIMode mode)
         {
 #if WINDOWS_PHONE_APP
             openGaleriaCamera();
@@ -1252,19 +1297,35 @@ namespace com.codename1.impl
                 {
                     // Using Windows.Media.Capture.CameraCaptureUI API to capture a photo
                     CameraCaptureUI dialog = new CameraCaptureUI();
-                    dialog.PhotoSettings.CroppedAspectRatio = new Size(16, 9);
-                    dialog.PhotoSettings.Format = CameraCaptureUIPhotoFormat.Jpeg;
-                    dialog.PhotoSettings.MaxResolution = CameraCaptureUIMaxPhotoResolution.HighestAvailable;
-                    StorageFile photo = await dialog.CaptureFileAsync(CameraCaptureUIMode.Photo);
+                    if (mode == CameraCaptureUIMode.Photo)
+                    {
+                        dialog.PhotoSettings.CroppedAspectRatio = new Size(16, 9);
+                        dialog.PhotoSettings.Format = CameraCaptureUIPhotoFormat.Jpeg;
+                        dialog.PhotoSettings.MaxResolution = CameraCaptureUIMaxPhotoResolution.HighestAvailable;
+                    }
+                    
+                    else if (mode == CameraCaptureUIMode.Video)
+                    {
+                        
+                        dialog.VideoSettings.Format = CameraCaptureUIVideoFormat.Mp4;
+                        dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                    }
+                    
+                    StorageFile photo = await dialog.CaptureFileAsync(mode);
                     if (photo != null)
                     {
-                        var foldersave = KnownFolders.CameraRoll;
-                        await photo.MoveAsync(foldersave);
+                        string tmpPath = addTempFile(photo);
+                        fireCapture(new ActionEvent(tmpPath));
+                        //var foldersave = KnownFolders.CameraRoll;
+                        //await photo.MoveAsync(foldersave);
 
-                        BitmapImage bitmapImage = new BitmapImage();
-                        Windows.UI.Xaml.Controls.Image Capturedphoto = new Windows.UI.Xaml.Controls.Image();
-                        Capturedphoto.Source = bitmapImage;
-                        toSendPhoto(photo);
+                        //BitmapImage bitmapImage = new BitmapImage();
+                        //Windows.UI.Xaml.Controls.Image Capturedphoto = new Windows.UI.Xaml.Controls.Image();
+                        //Capturedphoto.Source = bitmapImage;
+                        //toSendPhoto(photo);
+                    } else
+                    {
+                        fireCapture(new ActionEvent(null));
                     }
                 }
                 catch (Exception)
@@ -2151,10 +2212,12 @@ namespace com.codename1.impl
 
         public override int stringWidth(object n1, string n2)
         {
-            int result = f(n1).getStringWidth(n2);
             StringFontPair sfp = new StringFontPair(n2, f(n1));
+            
+            
             if (!stringWidthCache.ContainsKey(sfp))
             {
+                int result = f(n1).getStringWidth(n2);
                 stringWidthCache.Add(sfp, result);
             }
             return stringWidthCache[sfp];
@@ -2570,17 +2633,30 @@ namespace com.codename1.impl
 
         public override java.io.InputStream openInputStream(object connection)
         {
-            if (connection is string)
+            StorageFile output;
+            return openInputStream(connection, false, out output);
+        }
+
+        private java.io.InputStream openInputStream(object connection, bool outputFile, out StorageFile outFile)
+        {
+           if (connection is string)
             {
                 try
                 {
                     if (isTempFile((string)connection))
                     {
                         StorageFile tempFile = getTempFile((string)connection);
-                        return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                        if (outputFile)
+                        {
+                            outFile = tempFile;
+                            return null;
+                        } else {
+                            outFile = null;
+                            return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
                                .ConfigureAwait(false)
                                .GetAwaiter()
                                .GetResult());
+                        }
                     }
                     StorageFolder store = getStore((string)connection); //KnownFolders.CameraRoll
                     string file = nativePathStore((string)connection);
@@ -2589,37 +2665,44 @@ namespace com.codename1.impl
                         .ConfigureAwait(false)
                         .GetAwaiter()
                         .GetResult();
-                    Stream stream = null;
-                    try
+                    if (outputFile)
                     {
-                        stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
-                        return new InputStreamProxy(stream);
-                    }
-                    catch (Exception ex2)
+                        outFile =  sfile;
+                        return null;
+                    } else
                     {
-                        java.lang.System.err.println("Failed to create file input stream by simply opening the file.  Trying to open a copy instead " + ex2.Message);
-                        // If it failed to create the input stream, it is possible that
-                        // it is because the file is already being used (e.g. an output stream is writing to it).
-                        // In this case, we'll create a copy to a temp file, and create an inputstream from that one.
+                        outFile = null;
+                        Stream stream = null;
                         try
                         {
-                            StorageFile tempFile = sfile.CopyAsync(ApplicationData.Current.TemporaryFolder, sfile.Name, NameCollisionOption.GenerateUniqueName)
-                                .AsTask()
-                                .ConfigureAwait(false)
-                                .GetAwaiter()
-                                .GetResult();
-                            return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
-                                .ConfigureAwait(false)
-                                .GetAwaiter()
-                                .GetResult());
+                            stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
+                            return new InputStreamProxy(stream);
                         }
-                        catch (Exception e3)
+                        catch (Exception ex2)
                         {
-                            java.lang.System.err.println("Failed to open storage file via copy " + e3.Message);
+                            java.lang.System.err.println("Failed to create file input stream by simply opening the file.  Trying to open a copy instead " + ex2.Message);
+                            // If it failed to create the input stream, it is possible that
+                            // it is because the file is already being used (e.g. an output stream is writing to it).
+                            // In this case, we'll create a copy to a temp file, and create an inputstream from that one.
+                            try
+                            {
+                                StorageFile tempFile = sfile.CopyAsync(ApplicationData.Current.TemporaryFolder, sfile.Name, NameCollisionOption.GenerateUniqueName)
+                                    .AsTask()
+                                    .ConfigureAwait(false)
+                                    .GetAwaiter()
+                                    .GetResult();
+                                return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                                    .ConfigureAwait(false)
+                                    .GetAwaiter()
+                                    .GetResult());
+                            }
+                            catch (Exception e3)
+                            {
+                                java.lang.System.err.println("Failed to open storage file via copy " + e3.Message);
+                            }
+
                         }
-
                     }
-
                 }
                 catch (Exception e)
                 {
@@ -2629,6 +2712,7 @@ namespace com.codename1.impl
             }
             //io.BufferedInputStream bo = new io.BufferedInputStream(new InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream()));
             //return bo;
+            outFile = null;
             return new java.io.InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream());
         }
 
@@ -2841,6 +2925,37 @@ namespace com.codename1.impl
             char[] buf = trace.ToCharArray();
             int len = buf.Length;
             o.write(buf, 0, len);
+        }
+
+        public override Database openOrCreateDB(string databaseName)
+        {
+            string path = Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path,
+            databaseName+".sqlite");
+            //return new WinDB(new SQLite.Net.SQLiteConnection(new
+            //SQLite.Net.Platform.WinRT.SQLitePlatformWinRT(), path));
+            return WinDBRaw.openOrCreate(path);
+            //return null;
+        }
+
+        public override void deleteDB(string databaseName)
+        {
+            string path = Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path,
+            databaseName + ".sqlite");
+            StorageFile filed = ApplicationData.Current.LocalFolder.GetFileAsync(databaseName + ".sqlite").AsTask().GetAwaiter().GetResult();
+            if (filed != null)
+            {
+                filed.DeleteAsync().AsTask().GetAwaiter().GetResult();
+
+
+            }
+            
+
+        }
+        public override bool existsDB(string databaseName)
+        {
+            string fileName = databaseName + ".sqlite";
+            var item = ApplicationData.Current.LocalFolder.TryGetItemAsync(fileName).AsTask().GetAwaiter().GetResult();
+            return item != null;
         }
 
         internal class CodenameOneUWPThread : com.codename1.impl.CodenameOneThread
@@ -3356,6 +3471,106 @@ namespace com.codename1.impl
             return true;
         }
 
+        public class ShareInfo
+        {
+            public string text;
+            public string image;
+            public string mimeType;
+
+            public ShareInfo(string text, string image, string mimeType)
+            {
+                this.text = text;
+                this.image = image;
+                this.mimeType = mimeType;
+            }
+        }
+
+        private ShareInfo shareInfo;
+
+        public override void share(string text, string image, string mimeType, Rectangle sourceRect)
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                DataTransferManager dtm = DataTransferManager.GetForCurrentView();
+                shareInfo = new ShareInfo(text, image, mimeType);
+                dtm.DataRequested += new TypedEventHandler<DataTransferManager, DataRequestedEventArgs>(this.DataRequested);
+                shareInfo = new ShareInfo(text, image, mimeType);
+                DataTransferManager.ShowShareUI();
+            });
+
+        }
+
+        private Windows.UI.Color parseColor(int p)
+        
+        {
+            byte r = (byte)((p >> 16) & 0xff);
+            byte g = (byte)((p >> 8) & 0xff);
+            byte b = (byte)(p & 0xff);
+            return Windows.UI.Color.FromArgb((byte)255, r, g, b);
+        }
+    
+
+        private int getPropertyAsInt(string name, int defaultValue)
+        {
+            string val = Display.getInstance().getProperty(name, null);
+            if (val == null)
+            {
+                return defaultValue;
+            }
+            return int.Parse(val);
+        }
+
+        public override void onShow(Form f)
+        {
+            base.onShow(f);
+            int fgColor = getPropertyAsInt("windows.StatusBar.ForegroundColor", f.getUnselectedStyle().getFgColor());
+            int bgColor = getPropertyAsInt("windows.StatusBar.BackgroundColor", f.getUnselectedStyle().getBgColor());
+            int bgTransparency = getPropertyAsInt("windows.StatusBar.BackgroundOpacity", f.getUnselectedStyle().getBgTransparency());
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (ApiInformation.IsTypePresent("Windows.UI.ViewManagement.StatusBar"))
+                {
+
+                    var statusBar = StatusBar.GetForCurrentView();
+                    if (statusBar != null)
+                    {
+                        statusBar.BackgroundOpacity = bgTransparency / 255.0;
+                        statusBar.BackgroundColor = parseColor(bgColor);
+                        statusBar.ForegroundColor = parseColor(fgColor);
+                    }
+                }
+            });
+            //Mobile customization
+
+           
+        }
+
+        private void DataRequested(DataTransferManager sender, DataRequestedEventArgs e)
+        {
+            DataRequest request = e.Request;
+            if (shareInfo == null)
+            {
+                return;
+            }
+
+            request.Data.Properties.Title = Display.getInstance().getProperty("windows.share.title", "Content from " + Display.getInstance().getProperty("AppName", "Codename One App"));
+            request.Data.Properties.Description = Display.getInstance().getProperty("windows.share.title","");
+            if (shareInfo.image == null)
+            {
+               request.Data.SetText(shareInfo.text);
+            }
+            else
+            {
+                if (shareInfo.text != null)
+                {
+                    request.Data.Properties.Title = shareInfo.text;
+                }
+                StorageFile f;
+                openInputStream(shareInfo.image, true, out f);
+                request.Data.SetBitmap(RandomAccessStreamReference.CreateFromFile(f));
+
+            }
+        }
 
         public override void fillShape(object graphics, Shape shape)
         {

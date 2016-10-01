@@ -51,6 +51,7 @@ import java.io.Writer;
  * @author Shai Almog
  */
 public class Log {
+    private static boolean crashBound;
     /**
      * Constant indicating the logging level Debug is the default and the lowest level
      * followed by info, warning and error
@@ -428,6 +429,7 @@ public class Log {
      * the application any way it sees fit
      * 
      * @return string containing the whole log
+     * @deprecated this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
      */
     public static String getLogContent() {
         try {
@@ -567,6 +569,14 @@ public class Log {
                 sendLog();
             }
         });
-        
+        crashBound = true;
+    }
+    
+    /**
+     * Returns true if the user bound crash protection
+     * @return true if crash protection is bound
+     */
+    public static boolean isCrashBound() {
+        return crashBound;
     }
 }

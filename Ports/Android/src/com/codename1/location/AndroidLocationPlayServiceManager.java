@@ -220,11 +220,8 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
                     public void run() {
                         //don't be too aggressive for location updates in the background
-                        LocationRequest req = LocationRequest.create()
-                                .setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY)
-                                .setFastestInterval(5000L)
-                                .setInterval(10000L)
-                                .setSmallestDisplacement(50);
+                        LocationRequest req = LocationRequest.create();
+                        setupBackgroundLocationRequest(req);
 
                         Context context = AndroidNativeUtil.getContext();
 
@@ -246,6 +243,32 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         t.start();
     }
 
+    private void setupBackgroundLocationRequest(LocationRequest req) {
+        Display d = Display.getInstance();
+         String priorityStr = d.getProperty("android.backgroundLocation.priority", "PRIORITY_BALANCED_POWER_ACCURACY");
+         String fastestIntervalStr = d.getProperty("android.backgroundLocation.fastestInterval", "5000");
+         String intervalStr = d.getProperty("android.backgroundLocation.interval", "10000");
+         String smallestDisplacementStr = d.getProperty("android.backgroundLocation.smallestDisplacement", "50");
+         
+         int priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY;
+         if ("PRIORITY_HIGH_ACCURACY".equals(priorityStr)) {
+             priority = LocationRequest.PRIORITY_HIGH_ACCURACY;
+         } else if ("PRIORITY_LOW_POWER".equals(priorityStr)) {
+             priority = LocationRequest.PRIORITY_LOW_POWER;
+         } else if ("PRIORITY_NO_POWER".equals(priorityStr)) {
+             priority = LocationRequest.PRIORITY_NO_POWER;
+         }
+         
+         long interval = Long.parseLong(intervalStr);
+         long fastestInterval = Long.parseLong(fastestIntervalStr);
+         int smallestDisplacement = Integer.parseInt(smallestDisplacementStr);
+         
+         req.setPriority(priority)
+                 .setFastestInterval(fastestInterval)
+                 .setInterval(interval)
+                 .setSmallestDisplacement(smallestDisplacement);
+    }
+    
     @Override
     protected void clearBackgroundListener() {
         final Class bgListenerClass = getBackgroundLocationListener();

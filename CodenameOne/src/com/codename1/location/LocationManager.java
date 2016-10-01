@@ -190,6 +190,7 @@ public abstract class LocationManager {
             if (listener != null) {
                 clearListener();
                 request = null;
+                status = TEMPORARILY_UNAVAILABLE;
             }
             listener = l;
             if (l == null) {
