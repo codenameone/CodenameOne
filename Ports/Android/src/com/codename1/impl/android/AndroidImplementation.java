@@ -170,9 +170,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread t, Throwable e) {
-            com.codename1.io.Log.p("Uncaught exception in thread " + t.getName());
-            com.codename1.io.Log.e(e);
-            com.codename1.io.Log.sendLog();
+            if(com.codename1.io.Log.isCrashBound()) {
+                com.codename1.io.Log.p("Uncaught exception in thread " + t.getName());
+                com.codename1.io.Log.e(e);
+                com.codename1.io.Log.sendLog();
+            }
         }
     };
 
