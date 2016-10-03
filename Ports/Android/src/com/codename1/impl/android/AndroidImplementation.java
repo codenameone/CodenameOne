@@ -3044,6 +3044,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     nativePeers.remove(this);
                 }
                 deinit();
+            }else{
+                if(myView instanceof AndroidAsyncView){
+                    ((AndroidAsyncView)myView).removePeerView(v);
+                }
             }
         }
 
@@ -5298,8 +5302,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private Form curentForm;
 
         public Video(final VideoView nativeVideo, final Activity activity, final Runnable onCompletion) {
-            super(nativeVideo);
+            super(new RelativeLayout(activity));
             this.nativeVideo = nativeVideo;
+            RelativeLayout rl = (RelativeLayout)getNativePeer();
+
+            rl.addView(nativeVideo);
+            RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+            layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
+            layout.addRule(RelativeLayout.CENTER_VERTICAL);
+            rl.setLayoutParams(layout);
+            rl.requestLayout();
+            
             this.activity = activity;
             if (nativeController) {
                 MediaController mc = new AndroidImplementation.CN1MediaController();
@@ -5373,7 +5386,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void cleanup() {
-            nativeVideo.stopPlayback();
+            if(nativeVideo != null) {
+                nativeVideo.stopPlayback();
+            }
             nativeVideo = null;
             if (nativePlayer && curentForm != null) {
                 curentForm.showBack();
