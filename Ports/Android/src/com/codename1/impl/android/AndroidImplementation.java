@@ -5925,7 +5925,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((CodenameOneActivity) getActivity()).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(getActivity().getPackageName() + ".PushNotificationService", getActivity());
-            if(!registerServerPush(id, getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName())) {
+            if(!registerServerPush(id, getApplicationKey(), (byte)10, "", getPackageName())) {
                 sendPushRegistrationError("Server registration error", 1);
             } 
         }
