@@ -684,9 +684,10 @@ public final class Display {
     }
 
     /**
-     * Vibrates the device for the given length of time
+     * Vibrates the device for the given length of time, notice that this might ignore the time value completely 
+     * on some OS's where this level of control isn't supported e.g. iOS see: https://github.com/codenameone/CodenameOne/issues/1904
      *
-     * @param duration length of time to vibrate
+     * @param duration length of time to vibrate (might be ignored)
      */
     public void vibrate(int duration) {
         impl.vibrate(duration);
