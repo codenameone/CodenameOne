@@ -96,6 +96,7 @@ import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
+import android.support.v4.app.NotificationCompat;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -5106,8 +5107,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         notificationIntent.setComponent(getActivity().getComponentName());
         PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
 
-        
-        Notification.Builder builder = new Notification.Builder(getContext())
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext())
                 .setContentIntent(contentIntent)
                 .setSmallIcon(id)
                 .setContentTitle(contentTitle)
