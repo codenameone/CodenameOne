@@ -210,7 +210,10 @@ public class Form extends Container {
         initGlobalToolbar();
     }
     
-    void initGlobalToolbar() {
+    /**
+     * Allows subclasses to disable the global toolbar for a specific form by overriding this method
+     */
+    protected void initGlobalToolbar() {
         if(Toolbar.isGlobalToolbar()) {
             setToolbar(new Toolbar());
         }
