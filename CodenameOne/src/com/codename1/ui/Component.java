@@ -319,6 +319,16 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * This is identical to invoking {@link #sameWidth} followed by {@link #sameHeight}
+     * 
+     * @param c the components to group together, this will override all previous width/height grouping
+     */
+    public static void setSameSize(Component... c) {
+        setSameWidth(c);
+        setSameHeight(c);
+    }
+    
+    /**
      * Places all of these components in the same width group, to remove a component from
      * the group invoke this method with that component only.
      * 
