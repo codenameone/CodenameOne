@@ -249,6 +249,9 @@ public class Toolbar extends Container {
      */
     public void setTitleComponent(Component titleCmp) {
         checkIfInitialized();
+        if(titleComponent != null) {
+            titleComponent.remove();
+        }
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }
