@@ -977,21 +977,27 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             fontHeight = font.getHeight();
         }
         
+        int x = cmpX + leftPadding;
+        int y = cmpY + topPadding;
+        boolean opposite = false;
         if (stateIcon != null) {
             stateIconSize = stateIcon.getWidth(); //square image width == height
-            stateIconYPosition = cmpY + topPadding +
-                    (cmpHeight - topPadding -
-                    bottomPadding) / 2 - stateIconSize / 2;
+            preserveSpaceForState = stateIconSize + gap;
+            stateIconYPosition = cmpY + topPadding
+                    + (cmpHeight - topPadding
+                    - bottomPadding) / 2 - stateIconSize / 2;
             int tX = cmpX;
-            if(((Button)l).isOppositeSide()) {
-                    if (rtl) {
-                        tX += leftPadding;
-                    } else {
-                        tX = tX + cmpWidth - leftPadding - stateIconSize;
-                    }
-                    cmpWidth -= leftPadding - stateIconSize;
+            if (((Button) l).isOppositeSide()) {
+                if (rtl) {
+                    tX += leftPadding;
+                } else {
+                    tX = tX + cmpWidth - leftPadding - stateIconSize;
+                }
+                cmpWidth -= leftPadding - stateIconSize;
+                preserveSpaceForState = 0;
+                opposite = true;
             } else {
-                preserveSpaceForState = stateIconSize + gap;
+                x = cmpX + leftPadding + preserveSpaceForState;
                 if (rtl) {
                     tX = tX + cmpWidth - leftPadding - stateIconSize;
                 } else {
@@ -1003,9 +1009,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
 
         //default for bottom left alignment
-        int x = cmpX + leftPadding + preserveSpaceForState;
-        int y = cmpY + topPadding;
-
         int align = reverseAlignForBidi(l, style.getAlignment());
 
         int textPos= reverseAlignForBidi(l, l.getTextPosition());
@@ -1031,7 +1034,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             rightPadding +
                             ((icon != null) ? icon.getWidth() + l.getGap() : 0) +
                             l.getStringWidth(font))) / 2;
-                    x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    if(!opposite){
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    }else{
+                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                    
+                    }
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             Math.max(((icon != null) ? icon.getHeight() : 0),
@@ -1043,7 +1050,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             rightPadding +
                             Math.max(((icon != null) ? icon.getWidth() + l.getGap() : 0),
                             l.getStringWidth(font)))) / 2;
-                    x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    if(!opposite){
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    }else{
+                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                    
+                    }
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             ((icon != null) ? icon.getHeight() + gap : 0) +
@@ -1058,9 +1069,17 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             ( ((icon != null) ? (icon.getWidth() + gap) : 0) +
                             l.getStringWidth(font));
                     if(l.isRTL()) {
-                        x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);
+                        if(!opposite){
+                            x = Math.max(x - preserveSpaceForState, cmpX + leftPadding);
+                        }else{
+                            x = Math.min(x - preserveSpaceForState, cmpX + leftPadding);                        
+                        }
                     } else {
-                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                        if(!opposite){
+                            x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                        }else{
+                            x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                        
+                        }
                     }
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
@@ -1072,7 +1091,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     x = cmpX + cmpWidth - rightPadding -
                              (Math.max(((icon != null) ? (icon.getWidth()) : 0),
                             l.getStringWidth(font)));
-                    x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    if(!opposite){
+                        x = Math.max(x, cmpX + leftPadding + preserveSpaceForState);
+                    }else{
+                        x = Math.min(x, cmpX + leftPadding + preserveSpaceForState);                    
+                    }
+                    
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;
