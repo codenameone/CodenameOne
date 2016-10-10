@@ -90,7 +90,11 @@ public class AutoCompleteTextField extends TextField {
                 }
                 super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
             }
-        
+
+            @Override
+            public void refreshTheme(boolean merge) {
+            }
+            
         };
         filter = new FilterProxyListModel<String>(listModel);                
         popup.setScrollable(false);

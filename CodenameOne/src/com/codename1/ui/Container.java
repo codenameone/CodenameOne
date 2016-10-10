@@ -616,13 +616,13 @@ public class Container extends Component implements Iterable<Component>{
             cmp.setVisible(true);
             cmp.setPreferredSize(null);
         }
-        UIManager manger = getUIManager();
-        boolean refreshLaf = manger != cmp.getUIManager();
+        UIManager manager = getUIManager();
+        boolean refreshLaf = manager != cmp.getUIManager();
         cmp.setParent(this);
         if(refreshLaf){
            Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                               cmp.refreshTheme(false);
+                    cmp.refreshTheme(false);
                 }
             });
         }
