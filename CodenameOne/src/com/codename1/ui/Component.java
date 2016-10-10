@@ -2782,7 +2782,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        pointerReleaseImpl(x[0], y[0]);
     }
 
     /**
