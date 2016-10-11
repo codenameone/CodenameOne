@@ -239,6 +239,14 @@ public class Toolbar extends Container {
     public static boolean isPermanentSideMenu() {
         return permanentSideMenu;
     }
+
+    /**
+     * This is a convenience method to open the side menu bar. It's useful for cases where we want to place the 
+     * menu button in a "creative way" in which case we can bind the side menu to this
+     */
+    public void openSideMenu() {
+        ((SideMenuBar)getMenuBar()).openMenu(null);
+    }
     
     /**
      * Sets the Toolbar title component. This method allow placing any component
