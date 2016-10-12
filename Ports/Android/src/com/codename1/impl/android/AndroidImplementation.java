@@ -494,6 +494,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if(t != null && ("3".equals(t) || "6".equals(t))) {                               
                     String[] m = b.split(";");
                     v.add(m[0]);
+                } else if(t != null && "4".equals(t)){
+                    String[] m = b.split(";");
+                    v.add(m[1]);
                 } else if(t != null && "2".equals(t)){
                     continue;
                 }else{
