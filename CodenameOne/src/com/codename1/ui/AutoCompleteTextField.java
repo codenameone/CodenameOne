@@ -143,6 +143,17 @@ public class AutoCompleteTextField extends TextField {
         });
     }
 
+    /**
+     * Causes the popup UI to show
+     */
+    public void showPopup() {
+        requestFocus();
+        int m = minimumLength;
+        minimumLength = 0;
+        setText(getText());
+        minimumLength = m;
+    }
+    
     void setParentText(String text) {
         super.setText(text);
     }
