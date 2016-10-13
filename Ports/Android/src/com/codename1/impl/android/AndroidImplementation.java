@@ -96,6 +96,7 @@ import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
+import android.support.v4.app.NotificationCompat;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -493,6 +494,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if(t != null && ("3".equals(t) || "6".equals(t))) {                               
                     String[] m = b.split(";");
                     v.add(m[0]);
+                } else if(t != null && "4".equals(t)){
+                    String[] m = b.split(";");
+                    v.add(m[1]);
                 } else if(t != null && "2".equals(t)){
                     continue;
                 }else{
@@ -3046,6 +3050,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     nativePeers.remove(this);
                 }
                 deinit();
+            }else{
+                if(myView instanceof AndroidAsyncView){
+                    ((AndroidAsyncView)myView).removePeerView(v);
+                }
             }
         }
 
@@ -5102,8 +5110,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         notificationIntent.setComponent(getActivity().getComponentName());
         PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
 
-        
-        Notification.Builder builder = new Notification.Builder(getContext())
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext())
                 .setContentIntent(contentIntent)
                 .setSmallIcon(id)
                 .setContentTitle(contentTitle)
@@ -5300,8 +5308,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private Form curentForm;
 
         public Video(final VideoView nativeVideo, final Activity activity, final Runnable onCompletion) {
-            super(nativeVideo);
+            super(new RelativeLayout(activity));
             this.nativeVideo = nativeVideo;
+            RelativeLayout rl = (RelativeLayout)getNativePeer();
+
+            rl.addView(nativeVideo);
+            RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+            layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
+            layout.addRule(RelativeLayout.CENTER_VERTICAL);
+            rl.setLayoutParams(layout);
+            rl.requestLayout();
+            
             this.activity = activity;
             if (nativeController) {
                 MediaController mc = new AndroidImplementation.CN1MediaController();
@@ -5375,7 +5392,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void cleanup() {
-            nativeVideo.stopPlayback();
+            if(nativeVideo != null) {
+                nativeVideo.stopPlayback();
+            }
             nativeVideo = null;
             if (nativePlayer && curentForm != null) {
                 curentForm.showBack();
@@ -5925,7 +5944,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((CodenameOneActivity) getActivity()).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(getActivity().getPackageName() + ".PushNotificationService", getActivity());
-            if(!registerServerPush(id, getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName())) {
+            if(!registerServerPush(id, getApplicationKey(), (byte)10, "", getPackageName())) {
                 sendPushRegistrationError("Server registration error", 1);
             } 
         }

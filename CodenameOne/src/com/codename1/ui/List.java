@@ -1806,14 +1806,6 @@ public class List<T> extends Component {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-        clearDrag();
-        if(!isDragActivated()) {
-            int selection = pointerSelect(x[0], y[0]);
-            if (selection > -1) {
-                model.setSelectedIndex(selection);
-            }
-        }
-        pointerDraggedImpl(x[0], y[0]);
     }
 
     /**
@@ -1974,7 +1966,6 @@ public class List<T> extends Component {
      * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        pointerReleasedImpl(x[0], y[0], true, false);
     }
 
     

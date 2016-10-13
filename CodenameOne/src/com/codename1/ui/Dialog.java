@@ -261,8 +261,12 @@ public class Dialog extends Form {
         deregisterAnimated(this);
     }
 
+    /**
+     * Overriden to disable the toolbar in dialogs <br>
+     * {@inheritDoc}
+     */
     @Override
-    void initGlobalToolbar() {
+    protected final void initGlobalToolbar() {
     }
 
     public Container getContentPane() {

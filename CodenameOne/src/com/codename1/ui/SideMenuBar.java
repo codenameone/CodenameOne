@@ -778,10 +778,18 @@ public class SideMenuBar extends MenuBar {
             titleArea.addComponent(BorderLayout.CENTER, l);
             installRightCommands();
             installLeftCommands();
-            if(parent.getUIManager().isThemeConstant("leftAlignSideMenuBool", false)) {
-                ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+            if(parent.getToolbar() != null) {
+                if(parent.getToolbar().isTitleCentered()) {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);                
+                } else {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+                }
             } else {
-                ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);                
+                if(parent.getUIManager().isThemeConstant("leftAlignSideMenuBool", false)) {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+                } else {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);                
+                }
             }
         }
         if (cmd != null) {

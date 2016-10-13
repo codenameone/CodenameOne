@@ -2916,14 +2916,20 @@ private void trueTypeFontSizeValueStateChanged(javax.swing.event.ChangeEvent evt
         String selectedName = (String)componentName.getSelectedItem();
         if(!name.endsWith(selectedName)) {
             try {
-                Class cls = Class.forName("com.codename1.ui." + selectedName);
-                com.codename1.ui.Component c = (com.codename1.ui.Component)cls.newInstance();
-                if(c instanceof com.codename1.ui.Label) {
-                    ((com.codename1.ui.Label)c).setText("Preview");
+                com.codename1.ui.Component c;
+                if(selectedName.equals("BrowserComponent")) {
+                    // special case
+                    c = new com.codename1.ui.Label("Preview", "BrowserComponent");
                 } else {
-                    if(c instanceof com.codename1.ui.List) {
-                        ((com.codename1.ui.List)c).setModel(new
-                                com.codename1.ui.list.DefaultListModel(new Object[] {"Preview 1", "Preview 2", "Preview 3"}));
+                    Class cls = Class.forName("com.codename1.ui." + selectedName);
+                    c = (com.codename1.ui.Component)cls.newInstance();
+                    if(c instanceof com.codename1.ui.Label) {
+                        ((com.codename1.ui.Label)c).setText("Preview");
+                    } else {
+                        if(c instanceof com.codename1.ui.List) {
+                            ((com.codename1.ui.List)c).setModel(new
+                                    com.codename1.ui.list.DefaultListModel(new Object[] {"Preview 1", "Preview 2", "Preview 3"}));
+                        }
                     }
                 }
                 codenameOnePreview.removeAll();

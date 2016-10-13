@@ -239,16 +239,27 @@ public class Toolbar extends Container {
     public static boolean isPermanentSideMenu() {
         return permanentSideMenu;
     }
+
+    /**
+     * This is a convenience method to open the side menu bar. It's useful for cases where we want to place the 
+     * menu button in a "creative way" in which case we can bind the side menu to this
+     */
+    public void openSideMenu() {
+        ((SideMenuBar)getMenuBar()).openMenu(null);
+    }
     
     /**
      * Sets the Toolbar title component. This method allow placing any component
-     * in the Toolbar ceneter instead of the regular Label. Can be used to place
+     * in the Toolbar center instead of the regular Label. Can be used to place
      * a TextField to preform search operations
      *
-     * @param titleCmp Comoponent to place in the Toolbar center.
+     * @param titleCmp Component to place in the Toolbar center.
      */
     public void setTitleComponent(Component titleCmp) {
         checkIfInitialized();
+        if(titleComponent != null) {
+            titleComponent.remove();
+        }
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }

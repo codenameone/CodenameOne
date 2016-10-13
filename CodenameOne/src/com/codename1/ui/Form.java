@@ -210,7 +210,10 @@ public class Form extends Container {
         initGlobalToolbar();
     }
     
-    void initGlobalToolbar() {
+    /**
+     * Allows subclasses to disable the global toolbar for a specific form by overriding this method
+     */
+    protected void initGlobalToolbar() {
         if(Toolbar.isGlobalToolbar()) {
             setToolbar(new Toolbar());
         }
@@ -275,31 +278,51 @@ public class Form extends Container {
     }
     
     /**
+     * This method returns the value of the theme constant {@code paintsTitleBarBool} and it is
+     * invoked internally in the code. You can override this method to toggle the appearance of the status
+     * bar on a per-form basis
+     * @return the value of the {@code paintsTitleBarBool} theme constant
+     */
+    protected boolean shouldPaintStatusBar() {
+        return getUIManager().isThemeConstant("paintsTitleBarBool", false);
+    }
+    
+    /**
+     * Subclasses can override this method to control the creation of the status bar component.
+     * Notice that this method will only be invoked if the paintsTitleBarBool theme constant is true
+     * which it is on iOS by default
+     * @return a Component that represents the status bar if the OS requires status bar spacing
+     */
+    protected Component createStatusBar() {
+        if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+            Button bar = new Button();
+            bar.setShowEvenIfBlank(true);
+            bar.setUIID("StatusBar");
+            bar.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    Component c = findScrollableChild(getContentPane());
+                    if(c != null) {
+                        c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
+                    }
+                }
+            });
+            return bar;
+        } else {
+            Container bar = new Container();
+            bar.setUIID("StatusBar");
+            return bar;
+        }
+    }
+    
+    /**
      * Here so dialogs can disable this
      */
     void initTitleBarStatus() {
-        if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
+        if(shouldPaintStatusBar()) {
             // check if its already added:
             if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
-                if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
-                    Button bar = new Button();
-                    bar.setShowEvenIfBlank(true);
-                    bar.setUIID("StatusBar");
-                    titleArea.addComponent(BorderLayout.NORTH, bar);
-                    bar.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(ActionEvent evt) {
-                            Component c = findScrollableChild(getContentPane());
-                            if(c != null) {
-                                c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
-                            }
-                        }
-                    });
-                } else {
-                    Container bar = new Container();
-                    bar.setUIID("StatusBar");
-                    titleArea.addComponent(BorderLayout.NORTH, bar);
-                }
+                titleArea.addComponent(BorderLayout.NORTH, createStatusBar());
             }
         }
     }
