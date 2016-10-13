@@ -1,4 +1,4 @@
-﻿using IKVM.Attributes;
+using IKVM.Attributes;
 using IKVM.Internal;
 using System;
 using System.Linq;
@@ -40,13 +40,8 @@ namespace UWPApp
             this.InitializeComponent();
             this.Suspending += this.OnSuspending;
         }
-        /// <summary>
-        /// Invoked when the application is launched normally by the end user.  Other entry points
-        /// will be used when the application is launched to open a specific file, to display
-        /// search results, and so forth.
-        /// </summary>
-        /// <param name="e">Details about the launch request and process.</param>
-        protected override void OnLaunched(LaunchActivatedEventArgs e)
+
+        private void startCN1(string args)
         {
 #if DEBUG
             if (System.Diagnostics.Debugger.IsAttached)
@@ -56,28 +51,28 @@ namespace UWPApp
 #endif
 
             Frame rootFrame = Window.Current.Content as Frame;
-
             // Do not repeat app initialization when the Window already has content,
             // just ensure that the window is active
             if (rootFrame == null)
             {
+
                 // Create a Frame to act as the navigation context and navigate to the first page
                 rootFrame = new Frame();
 #if WINDOWS_UWP
-                   rootFrame.NavigationFailed += OnNavigationFailed;
+                rootFrame.NavigationFailed += OnNavigationFailed;
 #endif
-             //   rootFrame.Background = new ImageBrush
-            //    {
-            //        Stretch = Windows.UI.Xaml.Media.Stretch.UniformToFill,
-            //        ImageSource = new Windows.UI.Xaml.Media.Imaging.BitmapImage { UriSource = new Uri("ms-appx:///res/SplashScreen.png") },
-            //    };
+                //   rootFrame.Background = new ImageBrush
+                //    {
+                //        Stretch = Windows.UI.Xaml.Media.Stretch.UniformToFill,
+                //        ImageSource = new Windows.UI.Xaml.Media.Imaging.BitmapImage { UriSource = new Uri("ms-appx:///res/SplashScreen.png") },
+                //    };
                 // TODO: change this value to a cache size that is appropriate for your application
                 rootFrame.CacheSize = 1;
 
-                if (e.PreviousExecutionState == ApplicationExecutionState.Terminated)
-                {
-                    // TODO: Load state from previously suspended application
-                }
+                //if (e.PreviousExecutionState == ApplicationExecutionState.Terminated)
+                //{
+                //    // TODO: Load state from previously suspended application
+                //}
 
                 // Place the frame in the current Window
                 Window.Current.Content = rootFrame;
@@ -100,7 +95,7 @@ namespace UWPApp
                 rootFrame.Navigated += this.RootFrame_FirstNavigated;
 #endif
 #if WINDOWS_UWP
-                rootFrame.Navigate(typeof(MainPage), e.Arguments);
+                rootFrame.Navigate(typeof(MainPage), args);
 #else
                 // When the navigation stack isn't restored navigate to the first page,
                 // configuring the new page by passing required information as a navigation
@@ -115,10 +110,60 @@ namespace UWPApp
             // Ensure the current window is active
             Window.Current.Activate();
         }
+
+        /// <summary>
+        /// Invoked when the application is launched normally by the end user.  Other entry points
+        /// will be used when the application is launched to open a specific file, to display
+        /// search results, and so forth.
+        /// </summary>
+        /// <param name="e">Details about the launch request and process.</param>
+        protected override void OnLaunched(LaunchActivatedEventArgs e)
+        {
+            startCN1(e.Arguments);
+
+        }
 #if WINDOWS_UWP
          void OnNavigationFailed(object sender, NavigationFailedEventArgs e)
         {
             throw new Exception("Failed to load Page " + e.SourcePageType.FullName);
+        }
+
+        protected override void OnFileActivated(FileActivatedEventArgs args)
+        {
+            //int i = 0;
+            //i++;
+            //System.Diagnostics.Debug.WriteLine("On File Activated");
+            
+            
+            
+            if (args.PreviousExecutionState != ApplicationExecutionState.Running )
+            {
+                // TODO: Load state from previously suspended application
+                startCN1("");
+                Windows.Storage.IStorageItem item = args.Files.First();
+                //System.Diagnostics.Debug.WriteLine("Item is " + item);
+                if (item.IsOfType(Windows.Storage.StorageItemTypes.File))
+                {
+                    Main.appArg = item as Windows.Storage.StorageFile;
+                }
+            } else
+            {
+                Windows.Storage.IStorageItem item = args.Files.First();
+                //System.Diagnostics.Debug.WriteLine("Item is " + item);
+                if (item.IsOfType(Windows.Storage.StorageItemTypes.File))
+                {
+                    Main.appArg = item as Windows.Storage.StorageFile;
+                }
+                if (item.IsOfType(Windows.Storage.StorageItemTypes.File))
+                {
+                    
+                    Main.stopStatic();
+                    Main.appArg = item as Windows.Storage.StorageFile;
+                    Main.startStatic();
+                }
+            }
+            
+
         }
 #endif
 #if WINDOWS_PHONE_APP
@@ -162,7 +207,6 @@ namespace UWPApp
         private IKVMReflectionHelper()
         {
 
-            System.Diagnostics.Debug.WriteLine("In IKVMReflectionHelper 1");
             java.lang.System.setOut(new DebugPrintStream());
         }
 
@@ -244,7 +288,7 @@ namespace UWPApp
         public override Module[] GetModules(Assembly assembly)
 
         {
-            System.Diagnostics.Debug.WriteLine("In getModules 1");
+            //System.Diagnostics.Debug.WriteLine("In getModules 1");
 #if WINDOWS_UAP
             return assembly.GetModules();
 #else
@@ -274,20 +318,20 @@ namespace UWPApp
 
         public override Type GetModuleType(Module mod, string className)
         {
-            System.Diagnostics.Debug.WriteLine("In getModuleType 1");
+            //System.Diagnostics.Debug.WriteLine("In getModuleType 1");
             return mod.Assembly.GetType(className);
         }
 
         public override Assembly GetCoreAssembly()
         {
-            System.Diagnostics.Debug.WriteLine("In getCoreAssemblt 1");
+            //System.Diagnostics.Debug.WriteLine("In getCoreAssemblt 1");
             return typeof(java.lang.Object).GetTypeInfo().Assembly;
         }
 
         public override void Mark(object obj)
 
         {
-            System.Diagnostics.Debug.WriteLine("In Mark " + obj);
+            //System.Diagnostics.Debug.WriteLine("In Mark " + obj);
         }
 
         class DebugPrintStream : java.io.PrintStream
