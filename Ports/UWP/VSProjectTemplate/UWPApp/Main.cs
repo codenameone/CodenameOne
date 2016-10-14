@@ -12,6 +12,7 @@ namespace UWPApp
         public static global::com.codename1.tests.hellowin.HelloWindows i;
         public static bool running;
         public static Windows.Storage.StorageFile appArg;
+        public static string appArgStr;
         public Main()
         {
             //@this();
@@ -34,6 +35,7 @@ namespace UWPApp
         }
         static public void stopStatic() {
             appArg = null;
+            appArgStr = null;
             ((com.codename1.ui.Display)com.codename1.ui.Display.getInstance()).callSerially(new StopClass());
         }
 
@@ -50,6 +52,10 @@ Main.running = true;
                 string path = com.codename1.impl.SilverlightImplementation.instance.addTempFile(Main.appArg);
                 //java.lang.System.@out.println("Setting app arg to " + path + " just before calling start()");
                 com.codename1.impl.SilverlightImplementation.instance.setAppArg(path);
+            } else if (Main.appArgStr != null)
+            {
+                com.codename1.impl.SilverlightImplementation.instance.setAppArg(Main.appArgStr);
+            
             } else
             {
                 com.codename1.impl.SilverlightImplementation.instance.setAppArg(null);
