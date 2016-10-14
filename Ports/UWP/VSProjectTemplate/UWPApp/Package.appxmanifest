@@ -20,6 +20,7 @@
         </uap:DefaultTile>
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
+      <Extensions></Extensions>
     </Application>
   </Applications>
   <Capabilities></Capabilities>

@@ -27,6 +27,8 @@ import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
 import java.awt.Rectangle;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -43,6 +45,7 @@ import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
 
 /**
@@ -60,7 +63,9 @@ public class SEBrowserComponent extends PeerComponent {
     private JPanel cnt;
     private boolean lightweightMode;
     private boolean lightweightModeSet;
-    public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p) {
+    private final JScrollBar hSelector, vSelector;
+    private AdjustmentListener adjustmentListener;
+    public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p, final JScrollBar hSelector, JScrollBar vSelector) {
         super(null);
         this.web = web;
         this.instance = instance;
@@ -175,6 +180,25 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
         });
+        
+        adjustmentListener = new AdjustmentListener() {
+
+            @Override
+            public void adjustmentValueChanged(AdjustmentEvent e) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        onPositionSizeChange(); 
+                    }
+                });
+                
+            }
+            
+        };
+        
+        this.hSelector = hSelector;
+        this.vSelector = vSelector;
+
+        
     }
 
     /**
@@ -221,7 +245,7 @@ public class SEBrowserComponent extends PeerComponent {
             }
         });
     }
-        
+
     
     private static final Object DEINIT_LOCK = new Object();
     @Override
@@ -231,6 +255,8 @@ public class SEBrowserComponent extends PeerComponent {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
+                hSelector.removeAdjustmentListener(adjustmentListener);
+                vSelector.removeAdjustmentListener(adjustmentListener);
                 frm.remove(cnt);
                 frm.repaint();
                 init = false;
@@ -264,6 +290,8 @@ public class SEBrowserComponent extends PeerComponent {
                         cnt.setVisible(true);
                         frm.add(cnt, 0);
                         onPositionSizeChange();
+                        hSelector.addAdjustmentListener(adjustmentListener);
+                        vSelector.addAdjustmentListener(adjustmentListener);
                         frm.repaint();
                     } else {
                         cnt.setVisible(false);
