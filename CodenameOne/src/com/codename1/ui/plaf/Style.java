@@ -485,8 +485,8 @@ public class Style {
      * @param style the style to copy
      */
     public Style(Style style) {
-        this(style.getFgColor(), style.getBgColor(), 0, 0, style.getFont(), style.getBgTransparency(),
-                style.getBgImage(), true);
+        this(style.getFgColor(), style.getBgColor(), style.getFont(), style.getBgTransparency(),
+                style.getBgImage());
         setPadding(style.padding[Component.TOP],
                 style.padding[Component.BOTTOM],
                 style.padding[Component.LEFT],
