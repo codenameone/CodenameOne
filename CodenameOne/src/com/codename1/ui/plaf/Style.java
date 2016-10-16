@@ -527,14 +527,11 @@ public class Style {
      * 
      * @param fgColor foreground color
      * @param bgColor background color
-     * @param fgSelectionColor foreground selection color
-     * @param bgSelectionColor background selection color
      * @param f font
      * @param transparency transparency value
      * @param im background image
-     * @param scaledImage whether the image should be scaled or tiled
      */
-    private Style(int fgColor, int bgColor, int fgSelectionColor, int bgSelectionColor, Font f, byte transparency, Image im, boolean scaledImage) {
+    private Style(int fgColor, int bgColor, Font f, byte transparency, Image im) {
         this();
         this.fgColor = fgColor;
         this.bgColor = bgColor;
