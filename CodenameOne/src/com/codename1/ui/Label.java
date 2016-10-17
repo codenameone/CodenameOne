@@ -934,7 +934,7 @@ public class Label extends Component {
     public void styleChanged(String propertyName, Style source) {
         super.styleChanged(propertyName, source);
         // If we're using a custom font, we need to use the legacy renderer.
-        if (Style.FONT.equals(propertyName) || source.getFont() instanceof CustomFont) {
+        if (Style.FONT.equals(propertyName) && source.getFont() instanceof CustomFont) {
             setLegacyRenderer(true);
         }
     }
