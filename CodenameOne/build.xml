@@ -486,7 +486,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/CameraDemo" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/camera/CameraDemoProject.zip" compress="false">
+        <zip basedir="../../CameraDemo" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/camera/CameraDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>

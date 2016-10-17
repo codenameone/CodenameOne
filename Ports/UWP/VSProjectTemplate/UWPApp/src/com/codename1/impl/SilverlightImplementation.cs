@@ -1361,19 +1361,19 @@ namespace com.codename1.impl
         }
 
         private List<StorageFile> tmpFiles = new List<StorageFile>();
-        private string addTempFile(StorageFile f)
+        public string addTempFile(StorageFile f)
         {
             int index = tmpFiles.Count;
             tmpFiles.Insert(index, f);
             return "tmp://" + index + "-" + f.Name;
         }
 
-        private bool isTempFile(string path)
+        public bool isTempFile(string path)
         {
             return path.StartsWith("tmp://");
         }
 
-        private StorageFile getTempFile(string path)
+        public StorageFile getTempFile(string path)
         {
             if (!path.StartsWith("tmp://"))
             {
@@ -1392,7 +1392,7 @@ namespace com.codename1.impl
             return tmpFiles.ElementAt(index);
         }
 
-        private void removeTempFile(string path)
+        public void removeTempFile(string path)
         {
             StorageFile f = getTempFile(path);
             if (f != null)
