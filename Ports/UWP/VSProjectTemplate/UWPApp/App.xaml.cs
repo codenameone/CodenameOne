@@ -128,6 +128,75 @@ namespace UWPApp
             throw new Exception("Failed to load Page " + e.SourcePageType.FullName);
         }
 
+        protected override void OnActivated(IActivatedEventArgs args)
+        {
+            if (args.Kind == ActivationKind.Protocol)
+            {
+                ProtocolActivatedEventArgs eventArgs = args as ProtocolActivatedEventArgs;
+                // TODO: Handle URI activation
+                // The received URI is eventArgs.Uri.AbsoluteUri
+                if (args.PreviousExecutionState != ApplicationExecutionState.Running)
+                {
+                    startCN1("");
+                    Main.appArgStr = eventArgs.Uri.AbsoluteUri;
+                } else
+                {
+                    Main.stopStatic();
+                    Main.appArgStr = eventArgs.Uri.AbsoluteUri;
+                    Main.startStatic();
+                }
+            }
+
+        }
+
+        protected override async void OnShareTargetActivated(ShareTargetActivatedEventArgs args)
+        {
+            ShareTargetActivatedEventArgs shareArgs = args as ShareTargetActivatedEventArgs;
+            Windows.ApplicationModel.DataTransfer.ShareTarget.ShareOperation op = shareArgs.ShareOperation;
+            Windows.Storage.StorageFile storageArg = null;
+            string stringArg = null;
+            if (op.Data.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+            {
+                System.Collections.Generic.IReadOnlyList<Windows.Storage.IStorageItem> items = await op.Data.GetStorageItemsAsync();
+                Windows.Storage.IStorageItem item = items.First();
+                if (item.IsOfType(Windows.Storage.StorageItemTypes.File))
+                {
+                    storageArg = item as Windows.Storage.StorageFile;
+                }
+            } else if (op.Data.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Uri))
+            {
+                Uri uri = await op.Data.GetUriAsync();
+                stringArg = uri.AbsoluteUri;
+            }
+            
+            
+                if (args.PreviousExecutionState != ApplicationExecutionState.Running)
+            {
+                startCN1("");
+                if (storageArg != null)
+                {
+                    Main.appArg = storageArg;
+                } else if (stringArg != null)
+                {
+                    Main.appArgStr = stringArg;
+                }
+                
+            }
+            else
+            {
+                Main.stopStatic();
+                if (storageArg != null)
+                {
+                    Main.appArg = storageArg;
+                }
+                else if (stringArg != null)
+                {
+                    Main.appArgStr = stringArg;
+                }
+                Main.startStatic();
+            }
+        }
+
         protected override void OnFileActivated(FileActivatedEventArgs args)
         {
             //int i = 0;
