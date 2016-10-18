@@ -31,6 +31,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 
 import com.codename1.background.BackgroundFetch;
@@ -89,7 +90,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         int smallIcon = ctx.getResources().getIdentifier("ic_stat_notify", "drawable", ctx.getApplicationInfo().packageName);
         int icon = AndroidImplementation.getContext().getResources().getIdentifier("icon", "drawable", ctx.getApplicationInfo().packageName);
 
-        Notification.Builder builder = new Notification.Builder(ctx);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx);
         builder.setContentTitle(localNotif.getAlertTitle());
         builder.setContentText(localNotif.getAlertBody());
         builder.setAutoCancel(true);
@@ -107,7 +108,7 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
                 BitmapFactory.Options opts = new BitmapFactory.Options();
                 opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
                 Bitmap im = BitmapFactory.decodeStream(in, null, opts);
-                builder.setStyle(new Notification.BigPictureStyle().bigPicture(im));
+                builder.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(im));
             } catch (IOException ex) {
                 Logger.getLogger(LocalNotificationPublisher.class.getName()).log(Level.SEVERE, null, ex);
             }
