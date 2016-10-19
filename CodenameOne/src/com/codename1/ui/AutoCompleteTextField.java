@@ -466,7 +466,7 @@ public class AutoCompleteTextField extends TextField {
                 }
             }
             
-            if(!canOpenPopup){
+            if(!canOpenPopup || getText().length() < getMinimumLength()){
                 return;
             }
             

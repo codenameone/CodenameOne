@@ -5830,6 +5830,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             galleryIntent.setType("video/*");
         }else if(type == Display.GALLERY_IMAGE){
             galleryIntent.setType("image/*");
+        }else if (type == -9999) {
+            galleryIntent = new Intent();
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+                galleryIntent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+            } else {
+                galleryIntent.setAction(Intent.ACTION_GET_CONTENT);
+            }
+            galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
+
+            // set MIME type for image
+            galleryIntent.setType("*/*");
+            galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, Display.getInstance().getProperty("android.openGallery.accept", "*/*").split(","));
         }else{
             galleryIntent.setType("*/*");
         }

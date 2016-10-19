@@ -469,7 +469,11 @@ public final class Graphics {
         if(current != null) {
             nativeFont = current.getNativeFont();
         }
-        impl.drawString(nativeGraphics, nativeFont, str, x + xTranslate, y + yTranslate, textDecoration);
+        if (current instanceof CustomFont) {
+            current.drawString(this, str, x, y);
+        } else {
+            impl.drawString(nativeGraphics, nativeFont, str, x + xTranslate, y + yTranslate, textDecoration);
+        }
     }
     
     /**

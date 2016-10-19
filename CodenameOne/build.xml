@@ -245,7 +245,7 @@
         <copydir src="../../KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
         <copydir src="../../codenameone-demos/MapsDemo" dest="build/CodenameOneDist/CodenameOne/demos/MapsDemo" />
         <copydir src="../../codenameone-demos/ZXing" dest="build/CodenameOneDist/CodenameOne/demos/ZXing" />
-        <copydir src="../../codenameone-demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
+        <copydir src="../../SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
         <copydir src="../../codenameone-demos/FacebookDemo" dest="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
         <copydir src="../../Chrome" dest="build/CodenameOneDist/CodenameOne/demos/Chrome" />
         <copydir src="../../codenameone-demos/SocialBoo" dest="build/CodenameOneDist/CodenameOne/demos/SocialBoo" />
@@ -486,7 +486,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/CameraDemo" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/camera/CameraDemoProject.zip" compress="false">
+        <zip basedir="../../CameraDemo" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/camera/CameraDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
@@ -540,7 +540,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/SQLSample" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/sql/SQLSampleProject.zip" compress="false">
+        <zip basedir="../../SQLSample" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/sql/SQLSampleProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>

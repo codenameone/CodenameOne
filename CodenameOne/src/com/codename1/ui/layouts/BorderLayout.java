@@ -434,7 +434,7 @@ public class BorderLayout extends Layout {
 
     private boolean isLandscape() {
         Display d = Display.getInstance();
-        return d.getDisplayWidth() > d.getDisplayHeight();
+        return !d.isPortrait();
     }
 
     /**

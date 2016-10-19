@@ -582,19 +582,18 @@ public class EditableResources extends Resources implements TreeModel {
                                         }
 
                                         if("round".equals(b.getType())) {
-                                            theme.put(b.getKey(), 
-                                                    RoundBorder.create().
-                                                            color(b.getColor()).
-                                                            rectangle(b.isRectangle()).
-                                                            shadowBlur(b.getShadowBlur()).
-                                                            shadowOpacity(b.getShadowOpacity()).
-                                                            shadowSpread(b.getShadowSpread(), b.isShadowMM()).
-                                                            shadowX(b.getShadowX()).
-                                                            shadowY(b.getShadowY()).
-                                                            stroke(b.getStrokeThickness(), b.isStrokeMM()).
-                                                            strokeColor(b.getStrokeColor()).
-                                                            strokeOpacity(b.getStrokeOpacity())
-                                                    );
+                                            RoundBorder rb = RoundBorder.create();
+                                            rb = rb.color(b.getColor());
+                                            rb = rb.rectangle(b.isRectangle());
+                                            rb = rb.shadowBlur(b.getShadowBlur());
+                                            rb = rb.shadowOpacity(b.getShadowOpacity());
+                                            rb = rb.shadowSpread(b.getShadowSpread(), b.isShadowMM());
+                                            rb = rb.shadowX(b.getShadowX());
+                                            rb = rb.shadowY(b.getShadowY());
+                                            rb = rb.stroke(b.getStrokeThickness(), b.isStrokeMM());
+                                            rb = rb.strokeColor(b.getStrokeColor());
+                                            rb = rb.strokeOpacity(b.getStrokeOpacity());
+                                            theme.put(b.getKey(), rb);
                                             continue;
                                         }
 

@@ -6912,6 +6912,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
             capture(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
+        } else if (type==-9999) {
+            String[] exts = Display.getInstance().getProperty("javase.openGallery.accept", "").split(",");
+            
+            capture(response, exts, getGlobsForExtensions(exts, ";"));
         }else{
             String[] exts = new String[videoExtensions.length+imageExtensions.length];
             System.arraycopy(videoExtensions, 0, exts,0, videoExtensions.length);
