@@ -96,10 +96,23 @@ public class MediaPlayer extends Container {
      */
     protected void initComponent() {
         if(userSetIcons){
-            playIcon = UIManager.getInstance().getThemeImageConstant("mediaPlayImage");
-            pauseIcon = UIManager.getInstance().getThemeImageConstant("mediaPauseImage");
-            backIcon = UIManager.getInstance().getThemeImageConstant("mediaBackImage");
-            fwdIcon = UIManager.getInstance().getThemeImageConstant("mediaFwdImage");
+            Image play = UIManager.getInstance().getThemeImageConstant("mediaPlayImage");
+            if(play != null){
+                playIcon = play;
+            }
+            Image pause = UIManager.getInstance().getThemeImageConstant("mediaPauseImage");
+            if(pause != null){
+                pauseIcon = pause;
+            }            
+            Image back = UIManager.getInstance().getThemeImageConstant("mediaBackImage");
+            if(back != null){
+                backIcon = back;
+            }
+            Image fwd = UIManager.getInstance().getThemeImageConstant("mediaFwdImage");
+            if(fwd != null){
+                fwdIcon = fwd;
+            }
+            
         }
         if(pendingDataURI != null) {
             setDataSource(pendingDataURI);
@@ -212,6 +225,9 @@ public class MediaPlayer extends Container {
      * @return the data source uri
      */
     public String getDataSource() {
+        if(!isInitialized() && dataSource == null) {
+            return pendingDataURI;
+        }        
         return dataSource;
     }
     
