@@ -215,6 +215,17 @@ public class FloatingActionButton extends Button {
     }
 
     @Override
+    protected void fireActionEvent(int x, int y) {
+        Form current = Display.getInstance().getCurrent();
+        if(current instanceof Dialog) {
+            ((Dialog)current).dispose();
+        }
+        super.fireActionEvent(x, y);
+    }
+    
+    
+
+    @Override
     public void released(int x, int y) {
         super.released(x, y);
 

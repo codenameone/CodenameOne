@@ -394,9 +394,13 @@ public class Button extends Label {
     }
 
     /**
+     * Allows subclasses to override action event behavior 
      * {@inheritDoc}
+     * 
+     * @param x the x position of the click if applicable (can be 0 or -1 otherwise)
+     * @param y the y position of the click if applicable (can be 0 or -1 otherwise)
      */
-    void fireActionEvent(int x, int y){
+    protected void fireActionEvent(int x, int y){
         super.fireActionEvent();
         if(cmd != null) {
             ActionEvent ev = new ActionEvent(cmd, this, x, y);

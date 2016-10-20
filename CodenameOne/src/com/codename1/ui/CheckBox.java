@@ -113,7 +113,11 @@ public class CheckBox extends Button {
         super.released(x, y);
     }
 
-    void fireActionEvent(int x, int y) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void fireActionEvent(int x, int y) {
         super.fireActionEvent(x, y);
         if(bindListeners != null) {
             if(isSelected()) {
