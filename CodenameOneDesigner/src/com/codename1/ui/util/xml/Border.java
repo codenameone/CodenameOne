@@ -91,6 +91,9 @@ public class Border {
     private String i9;
 
     @XmlAttribute
+    private int roundBorderColor;
+
+    @XmlAttribute
     private int opacity = 255;
     
     @XmlAttribute
@@ -334,5 +337,19 @@ public class Border {
      */
     public boolean isRectangle() {
         return rectangle;
+    }
+
+    /**
+     * @return the roundBorderColor
+     */
+    public int getRoundBorderColor() {
+        return roundBorderColor;
+    }
+
+    /**
+     * @param roundBorderColor the roundBorderColor to set
+     */
+    public void setRoundBorderColor(int roundBorderColor) {
+        this.roundBorderColor = roundBorderColor;
     }
 }
