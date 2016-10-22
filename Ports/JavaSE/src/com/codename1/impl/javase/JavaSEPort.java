@@ -6958,7 +6958,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     } 
                 } else {
-                    result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                    if(selected != null) {
+                        result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                    }
                 }
                 final com.codename1.ui.events.ActionEvent finalResult = result;
                 Display.getInstance().callSerially(new Runnable() {
