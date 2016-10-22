@@ -6926,7 +6926,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     NumberPicker picker = new NumberPicker(getActivity());
-                    picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+                    if(source.getClientProperty("showKeyboard") == null) {
+                        picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+                    }
                     picker.setMinValue(0);
                     picker.setMaxValue(values.length - 1);
                     picker.setDisplayedValues(values);
