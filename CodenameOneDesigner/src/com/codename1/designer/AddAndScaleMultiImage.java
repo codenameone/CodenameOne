@@ -131,7 +131,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         };
         
         switch(sourceResolution) {
-            case com.codename1.ui.Display.DENSITY_560:
+            case 6: //com.codename1.ui.Display.DENSITY_560:
                 DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
                             com.codename1.ui.Display.DENSITY_LOW,
                             com.codename1.ui.Display.DENSITY_MEDIUM,
@@ -146,7 +146,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                     176, 240, 360, 480, 640, 1024, 1500, //2000, 2500
                 };
                 break;
-            case com.codename1.ui.Display.DENSITY_2HD:
+            case 7: //com.codename1.ui.Display.DENSITY_2HD:
                 DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
                             com.codename1.ui.Display.DENSITY_LOW,
                             com.codename1.ui.Display.DENSITY_MEDIUM,
@@ -161,7 +161,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                     176, 240, 360, 480, 640, 1024, 1500, 2000//, 2500
                 };
                 break;
-            case com.codename1.ui.Display.DENSITY_4K:
+            case 8:  //com.codename1.ui.Display.DENSITY_4K:
                 DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
                             com.codename1.ui.Display.DENSITY_LOW,
                             com.codename1.ui.Display.DENSITY_MEDIUM,

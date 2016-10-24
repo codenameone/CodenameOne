@@ -163,6 +163,8 @@
     </target>
             
     <target name="release" depends="stamp,jar">
+        <ant inheritall="false" antfile="${codenameone.dir}/BuildClient/build.xml" target="jar" />
+                
         <delete dir="build/CodenameOneDist" />        
         <mkdir dir="build/CodenameOneDist/CodenameOne" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/docs" />
@@ -409,8 +411,6 @@
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${nbplugin}/CodenameOne_Template/lib/" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${nbplugin}/LibraryProject/lib/" />
 
-        <ant inheritall="false" antfile="${codenameone.dir}/BuildClient/build.xml" target="jar" />
-                
         <copy file="${codenameone.dir}/BuildClient/dist/CodenameOneBuildClient.jar" todir="${nbplugin}/CodenameOne_Template/" />
         
         <copy file="${nbplugin}/CodenameOne_Template/build.xml" todir="${nbplugin}/CodenameOnePlugin/src/com/codename1" />

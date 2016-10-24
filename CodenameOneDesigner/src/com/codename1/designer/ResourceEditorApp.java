@@ -222,8 +222,11 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 File resourceFile = new File(args[1]);
                 res.openFileWithXMLSupport(resourceFile);
                 res.setImage(imageName, img);
-                res.save(new FileOutputStream(resourceFile));
+                try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
+                    res.save(fos);
+                }
                 res.saveXML(resourceFile);
+                System.exit(0);
                 return;
             }
             if(args[0].equalsIgnoreCase("-mimg")) {
@@ -242,22 +245,22 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 int dpiInt = -1;
                 switch(dpi.toLowerCase()) {
                     case "high": 
-                        dpiInt = Display.DENSITY_HIGH;
+                        dpiInt = 3;
                         break;
                     case "veryhigh": 
-                        dpiInt = Display.DENSITY_VERY_HIGH;
+                        dpiInt = 4;
                         break;
                     case "hd": 
-                        dpiInt = Display.DENSITY_HD;
+                        dpiInt = 5;
                         break;
                     case "560": 
-                        dpiInt = Display.DENSITY_HD;
+                        dpiInt = 6;
                         break;
                     case "2hd": 
-                        dpiInt = Display.DENSITY_HD;
+                        dpiInt = 7;
                         break;
                     case "4k": 
-                        dpiInt = Display.DENSITY_HD;
+                        dpiInt = 8;
                         break;
                     default:
                         System.out.println("dpi can be one of:  high, veryhigh, hd, 560, 2hd, 4k");
@@ -279,8 +282,11 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 res.openFileWithXMLSupport(resourceFile);
                 AddAndScaleMultiImage.generateImpl(new File[] {imageFile}, 
                         res, dpiInt);
-                res.save(new FileOutputStream(resourceFile));
+                try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
+                    res.save(fos);
+                }
                 res.saveXML(resourceFile);
+                System.exit(0);
                 return;
             }
             if(args[0].equalsIgnoreCase("gen")) {
