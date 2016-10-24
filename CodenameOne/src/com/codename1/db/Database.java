@@ -62,6 +62,8 @@ public abstract class Database {
     /**
      * Indicates weather a database exists
      * 
+     * <p><strong>NOTE:</strong> Not supported in the  Javascript port.  Will always return false.</p>
+     * 
      * @param databaseName the name of the database
      * @return true if database exists
      */
@@ -71,6 +73,8 @@ public abstract class Database {
     
     /**
      * Deletes database
+     * 
+     * <p><strong>NOTE:</strong> This method is not supported in the  Javascript port.  Will silently fail.</p>
      * 
      * @param databaseName the name of the database
      * @throws IOException if database cannot be deleted
@@ -82,6 +86,8 @@ public abstract class Database {
     /**
      * Returns the file path of the Database if exists and if supported on 
      * the platform.
+     * 
+     * <p><strong>NOTE:</strong> This method will return null in the Javascript port.</p>
      * @return the file path of the database
      */
     public static String getDatabasePath(String databaseName){
@@ -91,6 +97,7 @@ public abstract class Database {
     /**
      * Starts a transaction
      * 
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.  Will throw IOException.</p>
      * @throws IOException if database is not opened
      */
     public abstract void beginTransaction() throws IOException;
@@ -98,12 +105,16 @@ public abstract class Database {
     /**
      * Commits current transaction
      * 
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.  Will throw IOException.</p>
+     * 
      * @throws IOException if database is not opened or transaction was not started
      */
     public abstract void commitTransaction() throws IOException;
     
     /**
      * Rolls back current transaction 
+     * 
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.  Will throw IOException.</p>
      * 
      * @throws IOException if database is not opened or transaction was not started
      */
