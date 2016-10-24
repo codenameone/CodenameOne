@@ -7583,6 +7583,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
+        System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = new File(getStorageDir() + "/database/" + databaseName);
         if (f.exists()) {
             f.delete();
@@ -7591,6 +7592,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean existsDB(String databaseName) {
+        System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = new File(getStorageDir() + "/database/" + databaseName);
         return f.exists();
     }

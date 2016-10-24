@@ -47,6 +47,7 @@ public class SEDatabase extends Database{
     
     @Override
     public void beginTransaction() throws IOException {
+        System.out.println("**** Database.beginTransaction() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         try {
             conn.setAutoCommit(false);
         } catch (SQLException ex) {
@@ -57,6 +58,7 @@ public class SEDatabase extends Database{
 
     @Override
     public void commitTransaction() throws IOException {
+        System.out.println("**** Database.commitTransaction() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         try {
             conn.commit();
             conn.setAutoCommit(true);
@@ -177,6 +179,7 @@ public class SEDatabase extends Database{
 
     @Override
     public void rollbackTransaction() throws IOException {
+        System.out.println("**** Database.rollbackTransaction() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         try {
             conn.rollback();
         } catch (SQLException ex) {
