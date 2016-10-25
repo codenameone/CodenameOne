@@ -2190,8 +2190,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
             Uri u = intent.getData();
+            String scheme = intent.getScheme();
+            if (u == null && intent.getExtras() != null) {
+                if (intent.getExtras().keySet().contains("android.intent.extra.STREAM")) {
+                    try {
+                        u = (Uri)intent.getParcelableExtra("android.intent.extra.STREAM");
+                        scheme = u.getScheme();
+                        System.out.println("u="+u);
+                    } catch (Exception ex) {
+                        Log.d("Codename One", "Failed to load parcelable extra from intent: "+ex.getMessage());
+                    }
+                }
+
+            }
             if (u != null) {
-                String scheme = intent.getScheme();
+                //String scheme = intent.getScheme();
                 intent.setData(null);
                 if ("content".equals(scheme)) {
                     try {
@@ -2208,7 +2221,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     tmp.write(buffer);
                                 }
                                 tmp.close();
-                                attachment.close(); 
+                                attachment.close();
                                 setAppArg(filePath);
                                 return filePath;
                             }
@@ -2249,6 +2262,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
+    
     
     
 
