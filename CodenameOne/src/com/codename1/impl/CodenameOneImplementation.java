@@ -5624,7 +5624,7 @@ public abstract class CodenameOneImplementation {
     public void registerPush(Hashtable metaData, boolean noFallback) {
         if(!noFallback) {
             Preferences.set("PollingPush", true);
-            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
+            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, "", getPackageName());
 
             // Call pushCallback's registeredForPush
             Display.getInstance().callSerially(new RPush());

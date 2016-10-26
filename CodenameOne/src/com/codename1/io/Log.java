@@ -172,7 +172,7 @@ public class Log {
         r.addArgument("p", Display.getInstance().getProperty("package_name", ""));
         r.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
         r.addArgument("pl", Display.getInstance().getPlatformName());
-        r.addArgument("u", Display.getInstance().getProperty("udid", ""));
+        //r.addArgument("u", Display.getInstance().getProperty("udid", ""));
         com.codename1.io.NetworkManager.getInstance().addToQueueAndWait(r);
         return Preferences.get("UDeviceId__$", (long)-1);
     }
