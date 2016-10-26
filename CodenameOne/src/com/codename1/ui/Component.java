@@ -3881,7 +3881,9 @@ public class Component implements Animation, StyleListener {
             unSelectedStyle = getUnselectedStyle();
             selectedStyle = null;
             disabledStyle = null;
-            pressedStyle = null;        
+            pressedStyle = null;       
+            allStyles = null;
+            
         }
         checkAnimation();
         manager.getLookAndFeel().bind(this);
