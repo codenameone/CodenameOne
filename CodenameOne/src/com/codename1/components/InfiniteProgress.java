@@ -226,6 +226,7 @@ public class InfiniteProgress extends Component {
      */
     public void setAnimation(Image animation) {
         this.animation = animation;
+        cache.clear();
     }
 
     /**
@@ -258,6 +259,7 @@ public class InfiniteProgress extends Component {
     public String setPropertyValue(String name, Object value) {
         if(name.equals("animation")) {
             this.animation = (Image)value;
+            cache.clear();
             return null;
         }
         return super.setPropertyValue(name, value);
