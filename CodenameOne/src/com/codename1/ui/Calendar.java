@@ -61,7 +61,10 @@ import java.util.Vector;
  * @author Iddo Ari, Shai Almog
  */
 public class Calendar extends Container {
-
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding single digit days
+     */
+    private boolean twoDigitMode;
     private ComboBox month;
     private ComboBox year;
     private MonthView mv;
@@ -497,7 +500,31 @@ public class Calendar extends Container {
      * @param day the new button day
      */
     protected void updateButtonDayDate(Button dayButton, int currentMonth, int day) {
-        dayButton.setText("" + day);
+        if(twoDigitMode) {
+            if(day < 10) {
+                dayButton.setText("0" + day);
+            } else {
+                dayButton.setText("" + day);
+            }
+        } else {
+            dayButton.setText("" + day);
+        }
+    }
+
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding single digit days
+     * @return the twoDigitMode
+     */
+    public boolean isTwoDigitMode() {
+        return twoDigitMode;
+    }
+
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding single digit days
+     * @param twoDigitMode the twoDigitMode to set
+     */
+    public void setTwoDigitMode(boolean twoDigitMode) {
+        this.twoDigitMode = twoDigitMode;
     }
 
     class MonthView extends Container implements ActionListener{
