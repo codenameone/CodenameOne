@@ -133,9 +133,13 @@ public class RoundBorder extends Border {
     }
     
     /**
-     * Uses the style of the components UIID to draw the background of the border, this effectively overrides all
+     * <p>Uses the style of the components UIID to draw the background of the border, this effectively overrides all
      * other style settings but allows the full power of UIID drawing including gradients, background images 
-     * etc.
+     * etc.</p>
+     * <p><strong>Notice: </strong>this flag will only work when shaped clipping is supported. That feature
+     * isn't available in all platforms...</p>
+     * 
+     * 
      * @param uiid true to use the background of the component setting
      * @return border instance so these calls can be chained
      */
@@ -347,7 +351,7 @@ public class RoundBorder extends Border {
             }
         }
         tg.translate(shapeX, shapeY);
-        if(uiid) {
+        if(uiid && tg.isShapeClipSupported()) {
             c.getStyle().setBorder(Border.createEmpty());
             
             GeneralPath gp = new GeneralPath();
