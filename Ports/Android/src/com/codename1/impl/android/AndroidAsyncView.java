@@ -199,9 +199,12 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         // Commented out debuging code useful for hand tuning the drawing logic performance
         // **************************
         //long time = System.currentTimeMillis();
-        boolean paintOnBuffer = implementation.isEditingText() ||
-                InPlaceEditView.isKeyboardShowing();
-
+        
+        //boolean paintOnBuffer = implementation.isEditingText() ||
+        //        InPlaceEditView.isKeyboardShowing();
+        
+        boolean paintOnBuffer = false;
+        
         internalGraphics.setCanvasNoSave(c);
         AndroidGraphics g = internalGraphics;
         if (paintOnBuffer) {
