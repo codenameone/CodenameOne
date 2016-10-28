@@ -387,12 +387,12 @@ public class RoundBorder extends Border {
 
     @Override
     public int getMinimumHeight() {
-        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(2);
+        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(1);
     }
 
     @Override
     public int getMinimumWidth() {
-        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(2);
+        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(1);
     }
 
     
