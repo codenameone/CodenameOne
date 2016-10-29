@@ -97,7 +97,7 @@ public abstract class Database {
     /**
      * Starts a transaction
      * 
-     * <p><strong>NOTE:</strong> Not supported in Javascript port.  Will throw IOException.</p>
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.  This method will do nothing when running in Javascript.</p>
      * @throws IOException if database is not opened
      */
     public abstract void beginTransaction() throws IOException;
@@ -105,7 +105,7 @@ public abstract class Database {
     /**
      * Commits current transaction
      * 
-     * <p><strong>NOTE:</strong> Not supported in Javascript port.  Will throw IOException.</p>
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.   This method will do nothing when running in Javascript.</p>
      * 
      * @throws IOException if database is not opened or transaction was not started
      */
@@ -114,7 +114,7 @@ public abstract class Database {
     /**
      * Rolls back current transaction 
      * 
-     * <p><strong>NOTE:</strong> Not supported in Javascript port.  Will throw IOException.</p>
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.   This method will do nothing when running in Javascript.</p>
      * 
      * @throws IOException if database is not opened or transaction was not started
      */

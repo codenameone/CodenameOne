@@ -3065,6 +3065,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 deinit();
             }else{
+                if (peerImage == null) {
+                    peerImage = generatePeerImage();
+                }
                 if(myView instanceof AndroidAsyncView){
                     ((AndroidAsyncView)myView).removePeerView(v);
                 }
@@ -3074,6 +3077,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void deinit(){
             if (getActivity() == null) {
                 return;
+            }
+            if (peerImage == null) {
+                peerImage = generatePeerImage();
             }
             final boolean [] removed = new boolean[1];
             getActivity().runOnUiThread(new Runnable() {
@@ -3247,6 +3253,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 peerImage = null;
 
                 ((AndroidGraphics)nativeGraphics).drawView(v, lp);
+            } else {
+                super.paint(g);
             }
         }
 
