@@ -5499,7 +5499,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setWidth(int width) {
             super.setWidth(width);
-            if(nativeVideo != null && !superPeerMode){
+            if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
@@ -5507,6 +5507,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
+                        nativeVideo.requestLayout();
                         nativeVideo.getHolder().setSizeFromLayout();
                     }
                 });
@@ -5516,19 +5517,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setHeight(int height) {
             super.setHeight(height);
-            if(nativeVideo != null  && !superPeerMode){
+            if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
-                        //RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
                         RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
+                        nativeVideo.requestLayout();
                         nativeVideo.getHolder().setSizeFromLayout();
                     }
                 });
-                
             }
         }
 
