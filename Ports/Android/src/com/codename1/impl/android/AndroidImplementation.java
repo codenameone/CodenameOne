@@ -2190,8 +2190,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
             Uri u = intent.getData();
+            String scheme = intent.getScheme();
+            if (u == null && intent.getExtras() != null) {
+                if (intent.getExtras().keySet().contains("android.intent.extra.STREAM")) {
+                    try {
+                        u = (Uri)intent.getParcelableExtra("android.intent.extra.STREAM");
+                        scheme = u.getScheme();
+                        System.out.println("u="+u);
+                    } catch (Exception ex) {
+                        Log.d("Codename One", "Failed to load parcelable extra from intent: "+ex.getMessage());
+                    }
+                }
+
+            }
             if (u != null) {
-                String scheme = intent.getScheme();
+                //String scheme = intent.getScheme();
                 intent.setData(null);
                 if ("content".equals(scheme)) {
                     try {
@@ -2208,7 +2221,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     tmp.write(buffer);
                                 }
                                 tmp.close();
-                                attachment.close(); 
+                                attachment.close();
                                 setAppArg(filePath);
                                 return filePath;
                             }
@@ -2249,6 +2262,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
+    
     
     
 
@@ -3051,6 +3065,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 deinit();
             }else{
+                if (peerImage == null) {
+                    peerImage = generatePeerImage();
+                }
                 if(myView instanceof AndroidAsyncView){
                     ((AndroidAsyncView)myView).removePeerView(v);
                 }
@@ -3060,6 +3077,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public void deinit(){
             if (getActivity() == null) {
                 return;
+            }
+            if (peerImage == null) {
+                peerImage = generatePeerImage();
             }
             final boolean [] removed = new boolean[1];
             getActivity().runOnUiThread(new Runnable() {
@@ -3233,6 +3253,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 peerImage = null;
 
                 ((AndroidGraphics)nativeGraphics).drawView(v, lp);
+            } else {
+                super.paint(g);
             }
         }
 
@@ -5485,7 +5507,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setWidth(int width) {
             super.setWidth(width);
-            if(nativeVideo != null && !superPeerMode){
+            if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
@@ -5493,6 +5515,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
+                        nativeVideo.requestLayout();
                         nativeVideo.getHolder().setSizeFromLayout();
                     }
                 });
@@ -5502,19 +5525,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setHeight(int height) {
             super.setHeight(height);
-            if(nativeVideo != null  && !superPeerMode){
+            if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
-                        //RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
                         RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
+                        nativeVideo.requestLayout();
                         nativeVideo.getHolder().setSizeFromLayout();
                     }
                 });
-                
             }
         }
 
@@ -6926,7 +6948,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     NumberPicker picker = new NumberPicker(getActivity());
-                    picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+                    if(source.getClientProperty("showKeyboard") == null) {
+                        picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+                    }
                     picker.setMinValue(0);
                     picker.setMaxValue(values.length - 1);
                     picker.setDisplayedValues(values);

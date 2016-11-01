@@ -55,6 +55,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
+import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 import org.jdesktop.application.Application;
@@ -185,6 +186,106 @@ public class ResourceEditorApp extends SingleFrameApplication {
                     ex.printStackTrace();
                 }
                 System.out.println(p.getProperty("build", "1"));
+                System.exit(0);
+                return;
+            }
+            if(args[0].equalsIgnoreCase("-img")) {
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                String imageName;
+                String fileName;
+                if(args.length == 3) {
+                    imageName = args[2];
+                    fileName = args[2];
+                } else {
+                    if(args.length == 4) {
+                        imageName = args[3];
+                        fileName = args[2];
+                    } else {
+                        System.out.println("The img command works as: -img path_to_resourceFile.res pathToImageFile [image name]");
+                        System.exit(1);
+                        return;
+                    }
+                }
+                
+                File imageFile = new File(fileName);
+                if(!imageFile.exists()) {
+                    System.out.println("File not found: " + imageFile.getAbsolutePath());
+                    System.exit(1);
+                    return;
+                }
+                com.codename1.ui.Image img = ImageRGBEditor.createImageStatic(imageFile);
+                
+                boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
+                EditableResources.setXMLEnabled(isXMLEnabled);
+                EditableResources res = new EditableResources();
+                File resourceFile = new File(args[1]);
+                res.openFileWithXMLSupport(resourceFile);
+                res.setImage(imageName, img);
+                try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
+                    res.save(fos);
+                }
+                res.saveXML(resourceFile);
+                System.exit(0);
+                return;
+            }
+            if(args[0].equalsIgnoreCase("-mimg")) {
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                String fileName;
+                if(args.length == 4) {
+                    fileName = args[3];
+                } else {
+                    System.out.println("The mimg command works as: -img path_to_resourceFile.res dpi pathToImageFile");
+                    System.out.println("dpi can be one of:  high, veryhigh, hd, 560, 2hd, 4k");
+                    System.exit(1);
+                    return;
+                }
+                String dpi = args[2];
+                int dpiInt = -1;
+                switch(dpi.toLowerCase()) {
+                    case "high": 
+                        dpiInt = 3;
+                        break;
+                    case "veryhigh": 
+                        dpiInt = 4;
+                        break;
+                    case "hd": 
+                        dpiInt = 5;
+                        break;
+                    case "560": 
+                        dpiInt = 6;
+                        break;
+                    case "2hd": 
+                        dpiInt = 7;
+                        break;
+                    case "4k": 
+                        dpiInt = 8;
+                        break;
+                    default:
+                        System.out.println("dpi can be one of:  high, veryhigh, hd, 560, 2hd, 4k");
+                        System.exit(1);
+                        return;
+                }
+                
+                File imageFile = new File(fileName);
+                if(!imageFile.exists()) {
+                    System.out.println("File not found: " + imageFile.getAbsolutePath());
+                    System.exit(1);
+                    return;
+                }
+                
+                boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
+                EditableResources.setXMLEnabled(isXMLEnabled);
+                EditableResources res = new EditableResources();
+                File resourceFile = new File(args[1]);
+                res.openFileWithXMLSupport(resourceFile);
+                AddAndScaleMultiImage.generateImpl(new File[] {imageFile}, 
+                        res, dpiInt);
+                try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
+                    res.save(fos);
+                }
+                res.saveXML(resourceFile);
                 System.exit(0);
                 return;
             }

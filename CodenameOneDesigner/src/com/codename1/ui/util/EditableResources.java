@@ -583,7 +583,7 @@ public class EditableResources extends Resources implements TreeModel {
 
                                         if("round".equals(b.getType())) {
                                             RoundBorder rb = RoundBorder.create();
-                                            rb = rb.color(b.getColor());
+                                            rb = rb.color(b.getRoundBorderColor());
                                             rb = rb.rectangle(b.isRectangle());
                                             rb = rb.shadowBlur(b.getShadowBlur());
                                             rb = rb.shadowOpacity(b.getShadowOpacity());
@@ -1050,6 +1050,7 @@ public class EditableResources extends Resources implements TreeModel {
                                 if(border instanceof RoundBorder) {
                                     RoundBorder rb = (RoundBorder)border;
                                     bw.write("        <border key=\"" + key + "\" type=\"round\" "
+                                            + "roundBorderColor=\"" + rb.getColor()+ "\" " 
                                             + "opacity=\"" + rb.getOpacity() + "\" " 
                                             + "strokeColor=\"" + rb.getStrokeColor()+ "\" " 
                                             + "strokeOpacity=\"" + rb.getStrokeOpacity()+ "\" " 

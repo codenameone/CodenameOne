@@ -180,6 +180,8 @@ public class BorderEditor extends javax.swing.JPanel {
         new ButtonColorIcon(secondaryShadowColor, changeSecondaryShadowColor);
         new ButtonColorIcon(strokeColor, strokeColorPicker);
         new ButtonColorIcon(backgroundColor, backgroundColorPicker);
+        ((AbstractDocument)strokeColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
+        ((AbstractDocument)backgroundColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
 
         boolean fourColorBorder = false;
         if(border != null) {

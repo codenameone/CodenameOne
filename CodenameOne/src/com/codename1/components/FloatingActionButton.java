@@ -71,6 +71,7 @@ public class FloatingActionButton extends Button {
     private int shadowOpacity = 100;
     private Dialog current;
     private boolean rectangle;
+    private boolean isBadge;
 
     /**
      * Constructor
@@ -99,6 +100,7 @@ public class FloatingActionButton extends Button {
         shadowOpacity = 0;
         setUIID("Badge");
         updateBorder();
+        isBadge = true;
     }
     
     private void updateBorder() {
@@ -130,7 +132,7 @@ public class FloatingActionButton extends Button {
      * @param text the text of the badge
      * @return a badge component
      */
-    static FloatingActionButton createBadge(String text) {
+    public static FloatingActionButton createBadge(String text) {
         return new FloatingActionButton(text);
     }
     
@@ -211,8 +213,22 @@ public class FloatingActionButton extends Button {
 
     @Override
     public void setText(String text) {
+        if(isBadge) {
+            super.setText(text);
+        }
         this.text = text;
     }
+
+    @Override
+    protected void fireActionEvent(int x, int y) {
+        Form current = Display.getInstance().getCurrent();
+        if(current instanceof Dialog) {
+            ((Dialog)current).dispose();
+        }
+        super.fireActionEvent(x, y);
+    }
+    
+    
 
     @Override
     public void released(int x, int y) {

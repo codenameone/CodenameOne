@@ -94,6 +94,13 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         return null;
     }
 
+    public static void generateImpl(File[] files, EditableResources res, int sourceResolution) throws IOException {
+        for(File f : files) {
+            BufferedImage bi = ImageIO.read(f);
+            generateMulti(sourceResolution, bi, f.getName(), res);
+        }
+    }
+    
     public void generate(File[] files, EditableResources res, int sourceResolution) {
         for(File f : files) {
             try {
@@ -122,6 +129,57 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
         float[] WIDTHS = {
             176, 240, 360, 480, 640, 1024 //, 1500, 2000, 2500
         };
+        
+        switch(sourceResolution) {
+            case 6: //com.codename1.ui.Display.DENSITY_560:
+                DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
+                            com.codename1.ui.Display.DENSITY_LOW,
+                            com.codename1.ui.Display.DENSITY_MEDIUM,
+                            com.codename1.ui.Display.DENSITY_HIGH,
+                            com.codename1.ui.Display.DENSITY_VERY_HIGH,
+                            com.codename1.ui.Display.DENSITY_HD,
+                            com.codename1.ui.Display.DENSITY_560,
+                            //com.codename1.ui.Display.DENSITY_2HD,
+                            //com.codename1.ui.Display.DENSITY_4K
+                        };
+                WIDTHS = new float[] {
+                    176, 240, 360, 480, 640, 1024, 1500, //2000, 2500
+                };
+                break;
+            case 7: //com.codename1.ui.Display.DENSITY_2HD:
+                DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
+                            com.codename1.ui.Display.DENSITY_LOW,
+                            com.codename1.ui.Display.DENSITY_MEDIUM,
+                            com.codename1.ui.Display.DENSITY_HIGH,
+                            com.codename1.ui.Display.DENSITY_VERY_HIGH,
+                            com.codename1.ui.Display.DENSITY_HD,
+                            com.codename1.ui.Display.DENSITY_560,
+                            com.codename1.ui.Display.DENSITY_2HD,
+                            //com.codename1.ui.Display.DENSITY_4K
+                        };
+                WIDTHS = new float[] {
+                    176, 240, 360, 480, 640, 1024, 1500, 2000//, 2500
+                };
+                break;
+            case 8:  //com.codename1.ui.Display.DENSITY_4K:
+                DPIS = new int[] {com.codename1.ui.Display.DENSITY_VERY_LOW,
+                            com.codename1.ui.Display.DENSITY_LOW,
+                            com.codename1.ui.Display.DENSITY_MEDIUM,
+                            com.codename1.ui.Display.DENSITY_HIGH,
+                            com.codename1.ui.Display.DENSITY_VERY_HIGH,
+                            com.codename1.ui.Display.DENSITY_HD,
+                            com.codename1.ui.Display.DENSITY_560,
+                            com.codename1.ui.Display.DENSITY_2HD,
+                            com.codename1.ui.Display.DENSITY_4K
+                        };
+                WIDTHS = new float[] {
+                    176, 240, 360, 480, 640, 1024, 1500, 2000, 2500
+                };
+                break;
+            default:
+                break;
+        }
+        
         EncodedImage[] images = new EncodedImage[WIDTHS.length];
         int imageCount = WIDTHS.length;
         
