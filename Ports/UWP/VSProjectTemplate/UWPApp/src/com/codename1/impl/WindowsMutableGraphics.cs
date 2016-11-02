@@ -160,6 +160,7 @@ namespace com.codename1.impl
             base.setClip(clip);
             base.fillPath(p);
             base.removeClip();
+            dispose();
         }
         internal override void drawPath(CanvasPathBuilder p, Stroke stroke)
         {
@@ -167,6 +168,7 @@ namespace com.codename1.impl
             base.setClip(clip);
             base.drawPath(p, stroke);
             base.removeClip();
+            dispose();
         }
 
         #region nao implementar

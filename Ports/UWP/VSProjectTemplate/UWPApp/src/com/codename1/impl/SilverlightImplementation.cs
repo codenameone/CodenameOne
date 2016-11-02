@@ -1113,7 +1113,10 @@ namespace com.codename1.impl
             Vector2 res = Vector2.Transform(new Vector2(@in[0], @in[1]), t);
             @out[0] = res.X;
             @out[1] = res.Y;
-            @out[2] = 0;
+            if (@out.Length > 2) {
+                @out[2] = 0;
+            }
+            
         }
 
         
