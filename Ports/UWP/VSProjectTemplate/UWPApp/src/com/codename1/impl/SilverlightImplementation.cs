@@ -1113,7 +1113,10 @@ namespace com.codename1.impl
             Vector2 res = Vector2.Transform(new Vector2(@in[0], @in[1]), t);
             @out[0] = res.X;
             @out[1] = res.Y;
-            @out[2] = 0;
+            if (@out.Length > 2) {
+                @out[2] = 0;
+            }
+            
         }
 
         
@@ -1452,6 +1455,17 @@ namespace com.codename1.impl
                     openPicker.FileTypeFilter.Add(".mov");
                     openPicker.FileTypeFilter.Add(".mpeg");
                     openPicker.FileTypeFilter.Add(".wmv");
+                } else if (type == -9999)
+                {
+                    string typeStr = Display.getInstance().getProperty("windows.openGallery.accept", "*");
+                    string[] parts = typeStr.Split(',');
+                    foreach (string part in parts)
+                    {
+                        openPicker.FileTypeFilter.Add(part);
+                    }
+
+
+                
                 } else
                 {
                     openPicker.FileTypeFilter.Add("*");
@@ -1737,6 +1751,40 @@ namespace com.codename1.impl
         }
 
         public override void execute(string n1) {
+            try
+            {
+                if (exists(n1))
+                {
+                    IStorageItem storageItem = null;
+                    if (isTempFile(n1))
+                    {
+                        storageItem = getTempFile(n1);
+                        
+                    }
+                    else
+                    {
+                        StorageFolder store = getStore(n1);
+                        string f = nativePathStore(n1);
+                        storageItem = store.TryGetItemAsync(f).AsTask().GetAwaiter().GetResult();
+                        
+
+                    }
+                    if (storageItem != null && storageItem is StorageFile)
+                    {
+                        using (AutoResetEvent are = new AutoResetEvent(false))
+                        {
+                            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
+                                var result = Windows.System.Launcher.LaunchFileAsync((StorageFile)storageItem);
+                                are.Set();
+                            }).AsTask().GetAwaiter().GetResult();
+                            are.WaitOne();
+                        }
+                        return;
+                    }
+                    
+                }
+            }
+            catch (Exception ex) { }
             var uri = new Uri(n1, UriKind.RelativeOrAbsolute);
             using (AutoResetEvent are = new AutoResetEvent(false)) {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
