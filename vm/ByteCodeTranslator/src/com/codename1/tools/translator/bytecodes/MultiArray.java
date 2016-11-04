@@ -93,13 +93,13 @@ public class MultiArray extends Instruction {
         }*/
         switch(actualDim) {
             case 2:
-                b.append("    PUSH_OBJ(alloc2DArray(threadStateData, (*(--SP)).data.i, ");
+                b.append("    PUSH_OBJ(alloc2DArray(threadStateData, (*(SP-1)).data.i, ");
                 switch(dims) {
                     case 1:
                         b.append("-1");
                         break;
                     case 2:
-                        b.append("(*(--SP)).data.i");
+                        b.append("(*(SP-2)).data.i");
                         break;
                 }
                 b.append(", &class_array2__");
@@ -112,7 +112,7 @@ public class MultiArray extends Instruction {
                 } else {
                     b.append("JAVA_OBJECT");
                 }
-                b.append("))); /* MULTIANEWARRAY */\n");
+                b.append("))); SP -= ").append(dims).append("; /* MULTIANEWARRAY */\n");
                 break;
                 
             case 3:
