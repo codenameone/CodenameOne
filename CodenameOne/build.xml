@@ -528,6 +528,7 @@
         </zip>
         <zip basedir="../../PheonixUI" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/PhoenixDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
+            <exclude name="**/psd/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
             <exclude name="**/lib/CLDC11.jar"/>
@@ -538,6 +539,7 @@
         <zip basedir="../../CleanModernUIKit" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/CleanModernDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
             <exclude name="**/dist/"/>
             <exclude name="**/lib/CLDC11.jar"/>
             <exclude name="**/lib/CodenameOne.jar"/>
@@ -556,6 +558,7 @@
         <zip basedir="../../MaterialScreensUIKit" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/MaterialScreensDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
             <exclude name="**/dist/"/>
             <exclude name="**/lib/CLDC11.jar"/>
             <exclude name="**/lib/CodenameOne.jar"/>
@@ -565,6 +568,7 @@
         <zip basedir="../../PsdToAppTutorial" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/PsdToAppTutorialDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
             <exclude name="**/dist/"/>
             <exclude name="**/lib/CLDC11.jar"/>
             <exclude name="**/lib/CodenameOne.jar"/>
@@ -574,6 +578,7 @@
         <zip basedir="../../SwiftnotesCN1" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/SwiftnotesDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
             <exclude name="**/dist/"/>
             <exclude name="**/lib/CLDC11.jar"/>
             <exclude name="**/lib/CodenameOne.jar"/>
