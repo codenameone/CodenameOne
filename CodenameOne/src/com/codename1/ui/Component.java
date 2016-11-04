@@ -4011,6 +4011,8 @@ public class Component implements Animation, StyleListener {
                         startTensile(dragVal, getScrollDimension().getHeight() - getHeight() + iv, true);
                     } else {
                         if (snapToGrid && getScrollY() < edge && getScrollY() > 0) {
+                            boolean tVal = tensileDragEnabled;
+                            tensileDragEnabled = true;
                             int dest = getGridPosY();
                             int scroll = getScrollY();
                             if (dest != scroll) {
@@ -4018,6 +4020,7 @@ public class Component implements Animation, StyleListener {
                             } else {
                                 draggedMotionY = null;
                             }
+                            tensileDragEnabled = tVal;
                         } else {
                             draggedMotionY = null;
                         }
@@ -4052,6 +4055,8 @@ public class Component implements Animation, StyleListener {
                         startTensile(dragVal, getScrollDimension().getWidth() - getWidth(), false);
                     } else {
                         if (snapToGrid && getScrollX() < edge && getScrollX() > 0) {
+                            boolean tVal = tensileDragEnabled;
+                            tensileDragEnabled = true;
                             int dest = getGridPosX();
                             int scroll = getScrollX();
                             if (dest != scroll) {
@@ -4059,6 +4064,7 @@ public class Component implements Animation, StyleListener {
                             } else {
                                 draggedMotionX = null;
                             }
+                            tensileDragEnabled = tVal;
                         } else {
                             draggedMotionX = null;
                         }
