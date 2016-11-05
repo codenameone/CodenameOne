@@ -80,6 +80,12 @@ public class OnOffSwitch extends Container {
      */
     protected Dimension calcPreferredSize() {
         if(iosMode) {
+            if(switchMaskImage == null) {
+                switchMaskImage = UIManager.getInstance().getThemeImageConstant("switchMaskImage");
+                if(switchMaskImage == null) {
+                    return super.calcPreferredSize();
+                }
+            }
             return new Dimension(switchMaskImage.getWidth(), switchMaskImage.getHeight());
         }
         return super.calcPreferredSize();
