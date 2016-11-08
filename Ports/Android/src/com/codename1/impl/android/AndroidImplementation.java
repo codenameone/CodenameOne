@@ -7714,24 +7714,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return n;
     }
 
+    boolean brokenGaussian;
     public Image gaussianBlurImage(Image image, float radius) {
+        try {
+            Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
 
-        Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
+            RenderScript rs = RenderScript.create(getContext());
+            ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+            theIntrinsic.setRadius(radius);
+            theIntrinsic.setInput(tmpIn);
+            theIntrinsic.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
 
-        RenderScript rs = RenderScript.create(getContext());
-        ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-        Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
-        Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
-        theIntrinsic.setRadius(radius);
-        theIntrinsic.setInput(tmpIn);
-        theIntrinsic.forEach(tmpOut);
-        tmpOut.copyTo(outputBitmap);
-        
-        return new NativeImage(outputBitmap);
+            return new NativeImage(outputBitmap);
+        } catch(Throwable t) {
+            brokenGaussian = true;
+            return image;
+        }
     }
 
     public boolean isGaussianBlurSupported() {
-        return android.os.Build.VERSION.SDK_INT >= 11;
+        return (!brokenGaussian) && android.os.Build.VERSION.SDK_INT >= 11;
     }
     
     public static boolean checkForPermission(String permission, String description){
