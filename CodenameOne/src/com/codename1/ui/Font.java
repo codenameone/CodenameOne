@@ -567,7 +567,7 @@ public class Font {
     * {@inheritDoc}
     */
    public boolean equals(Object o) {
-       if(ttf) {
+       if(ttf && o != null) {
            return ((Font)o).font != null && ((Font)o).ttf && ((Font)o).font.equals(font);
        }
        if(o != null && o.getClass() == getClass()) {

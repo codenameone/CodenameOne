@@ -461,4 +461,47 @@ public class Picker extends Button {
     public int getPreferredPopupHeight() {
         return preferredPopupHeight;
     }
+    
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"Strings"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] { String[].class };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String []"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("Strings")) {
+            return getStrings();
+        }
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("Strings")) {
+            setStrings((String[])value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+    
 }
