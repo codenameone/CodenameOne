@@ -20,6 +20,8 @@ namespace UWPApp
         }
         public void run()
         {
+            // INJECT: beforeInit
+
         i = new global::com.codename1.tests.hellowin.HelloWindows();
             //i.@this();
             i.init(this);
