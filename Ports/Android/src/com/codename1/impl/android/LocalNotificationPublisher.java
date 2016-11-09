@@ -86,9 +86,9 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
     }
 
     private Notification createAndroidNotification(Context context, LocalNotification localNotif, PendingIntent content) {
-        Context ctx = AndroidImplementation.getContext();
+        Context ctx = context;
         int smallIcon = ctx.getResources().getIdentifier("ic_stat_notify", "drawable", ctx.getApplicationInfo().packageName);
-        int icon = AndroidImplementation.getContext().getResources().getIdentifier("icon", "drawable", ctx.getApplicationInfo().packageName);
+        int icon = ctx.getResources().getIdentifier("icon", "drawable", ctx.getApplicationInfo().packageName);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx);
         builder.setContentTitle(localNotif.getAlertTitle());
