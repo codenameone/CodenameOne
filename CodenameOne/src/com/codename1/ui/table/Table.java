@@ -779,6 +779,12 @@ public class Table extends Container {
          * {@inheritDoc}
          */
         public final void dataChanged(int row, int column) {
+            if(row == Integer.MIN_VALUE) {
+                // special case... Rebuild the table
+                updateModel();
+                revalidate();
+                return;
+            }
             // prevents the table from rebuilding on every text field edit which makes the table 
             // more usable on iOS devices with the VKB/Native editing
             if(editingColumn == column && editingRow == row) {
