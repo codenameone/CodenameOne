@@ -2596,10 +2596,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createBackgroundMedia(String uri) throws IOException {
 
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
-            return null;
-        }
-        
         Intent serviceIntent = new Intent(getContext(), AudioService.class);
         serviceIntent.putExtra("mediaLink", uri);
         
@@ -2647,9 +2643,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMedia(final String uri, boolean isVideo, final Runnable onCompletion) throws IOException {
         if (getActivity() == null) {
-            return null;
-        }
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
             return null;
         }
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
@@ -2718,9 +2711,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMedia(InputStream stream, String mimeType, final Runnable onCompletion) throws IOException {
         if (getActivity() == null) {
-            return null;
-        }
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
             return null;
         }
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
@@ -2803,9 +2793,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
         if (getActivity() == null) {
-            return null;
-        }
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to access the mic")){
             return null;
         }
         final AndroidRecorder[] record = new AndroidRecorder[1];
