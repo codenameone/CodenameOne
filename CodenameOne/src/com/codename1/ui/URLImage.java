@@ -103,13 +103,13 @@ public class URLImage extends EncodedImage {
                 Image tmp = downloadedImage.getInternal().scaledLargerRatio(placeholderImage.getWidth(), placeholderImage.getHeight());
                 Image i = Image.createImage(placeholderImage.getWidth(), placeholderImage.getHeight(), 0);
                 Graphics g = i.getGraphics();
-                if(tmp.getWidth() != placeholderImage.getWidth()) {
+                if(tmp.getWidth() > placeholderImage.getWidth()) {
                     int diff = tmp.getWidth() - placeholderImage.getWidth();
                     int x = diff / 2;
                     g.drawImage(tmp, -x, 0);
                     tmp = i;
                 } else {
-                    if(tmp.getHeight() != placeholderImage.getHeight()) {
+                    if(tmp.getHeight() > placeholderImage.getHeight()) {
                         int diff = tmp.getHeight() - placeholderImage.getHeight();
                         int y = diff / 2;
                         g.drawImage(tmp, 0, -y);
