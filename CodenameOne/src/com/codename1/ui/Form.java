@@ -2530,12 +2530,14 @@ public class Form extends Container {
         }
 
         Container actual = getActualPane();
-        Component cmp = actual.getComponentAt(x[0], y[0]);
-        if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
-                setFocused(cmp);
+        if(actual != null) {
+            Component cmp = actual.getComponentAt(x[0], y[0]);
+            if (cmp != null) {
+                if (cmp.isFocusable() && cmp.isEnabled()) {
+                    setFocused(cmp);
+                }
+                cmp.pointerHover(x, y);
             }
-            cmp.pointerHover(x, y);
         }
     }
 
