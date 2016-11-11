@@ -52,6 +52,7 @@ import java.util.ArrayList;
  * care of coordinates transformation.
  *
  * @author Roman Kamyk <roman.kamyk@itiner.pl>
+ * @deprecated we highly recommend migrating to the native maps cn1lib
  */
 public class MapComponent extends Container {
 
