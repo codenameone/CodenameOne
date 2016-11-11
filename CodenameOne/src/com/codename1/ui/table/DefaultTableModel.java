@@ -172,6 +172,6 @@ public class DefaultTableModel implements TableModel {
      */
     public void removeRow(int offset) {
        data.remove(offset);
-       dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, 0);
+       dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
     }
 }
