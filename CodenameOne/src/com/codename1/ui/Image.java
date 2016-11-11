@@ -899,9 +899,9 @@ public class Image {
         float hRatio = ((float)height) / ((float)getHeight());
         float wRatio = ((float)width) / ((float)getWidth());
         if(hRatio > wRatio) {
-            return scaled((int)(getWidth() * hRatio), height);
+            return scaled(Math.round(getWidth() * hRatio), height);
         } else {
-            return scaled(width, (int)(getHeight() * wRatio));
+            return scaled(width, Math.round(getHeight() * wRatio));
         }
     }
 
