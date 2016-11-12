@@ -220,17 +220,18 @@ public class BoxLayout extends Layout{
             Style stl = cmp.getStyle();
             
             if(axis == Y_AXIS){
-                int cmpH = cmp.getPreferredH() + stl.getMargin(false, Component.TOP) + stl.getMargin(false, Component.BOTTOM);
+                int cmpH = cmp.getPreferredH() + stl.getVerticalMargins();
                 height += cmpH;
-                width = Math.max(width , cmp.getPreferredW()+ stl.getMargin(false, Component.LEFT) + stl.getMargin(false, Component.RIGHT));
+                width = Math.max(width , cmp.getPreferredW()+ stl.getHorizontalMargins());
             }else{
-                int cmpW = cmp.getPreferredW() + stl.getMargin(false, Component.LEFT) + stl.getMargin(false, Component.RIGHT);
+                int cmpW = cmp.getPreferredW() + stl.getHorizontalMargins();
                 width += cmpW;
-                height = Math.max(height, cmp.getPreferredH() + stl.getMargin(false, Component.TOP) + stl.getMargin(false, Component.BOTTOM));
+                height = Math.max(height, cmp.getPreferredH() + stl.getVerticalMargins());
             }
         }
-        dim.setWidth(width + parent.getStyle().getPadding(false, Component.LEFT)+ parent.getStyle().getPadding(false, Component.RIGHT));
-        dim.setHeight(height + parent.getStyle().getPadding(false, Component.TOP)+ parent.getStyle().getPadding(false, Component.BOTTOM));
+        Style s = parent.getStyle();
+        dim.setWidth(width + s.getHorizontalPadding());
+        dim.setHeight(height + s.getHorizontalPadding());
         return dim;
     }  
 
