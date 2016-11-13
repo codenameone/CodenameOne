@@ -107,7 +107,7 @@ public class ScaleImageButton extends Button {
             ih = (int) (((float)ih) / ((float)ratio));
         }
         Style s = getStyle();
-        return new Dimension(iw + s.getPaddingLeft(false) + s.getPaddingRight(false), ih +
+        return new Dimension(iw + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(), ih +
                 s.getPaddingTop() + s.getPaddingBottom());
     }
 

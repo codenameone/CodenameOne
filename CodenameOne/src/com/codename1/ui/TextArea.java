@@ -732,7 +732,7 @@ public class TextArea extends Component {
     }
     
     private ArrayList getRowStrings() {
-        if(rowStrings == null || widthForRowCalculations != getWidth() - getUnselectedStyle().getPadding(false, RIGHT) - getUnselectedStyle().getPadding(false, LEFT)){
+        if(rowStrings == null || widthForRowCalculations != getWidth() - getUnselectedStyle().getHorizontalPadding()){
             initRowString();
             setShouldCalcPreferredSize(true);
         }
@@ -816,7 +816,7 @@ public class TextArea extends Component {
         }        
         Style style = getUnselectedStyle();
         rowStrings= new ArrayList();
-        widthForRowCalculations = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT);
+        widthForRowCalculations = getWidth() - style.getHorizontalPadding();
         // single line text area is essentially a text field, we call the method
         // to allow subclasses to override it
         if (isSingleLineTextArea()) {
@@ -862,7 +862,7 @@ public class TextArea extends Component {
             }
         }
         style = getStyle();
-        int tPadding = style.getPadding(false, RIGHT) + style.getPadding(false, LEFT);
+        int tPadding = style.getHorizontalPadding();
         int textAreaWidth = getWidth() - tPadding;
         /*if(textAreaWidth <= 0) {
             if(columns < 1) {

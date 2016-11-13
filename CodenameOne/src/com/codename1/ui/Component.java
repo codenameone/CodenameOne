@@ -730,7 +730,7 @@ public class Component implements Animation, StyleListener {
      * @return baseline value from the top of the component
      */
     public int getBaseline(int width, int height) {
-        return height - getStyle().getPadding(false, BOTTOM);
+        return height - getStyle().getPaddingBottom();
     }
 
     /**
@@ -785,7 +785,7 @@ public class Component implements Animation, StyleListener {
     Dimension getPreferredSizeWithMargin() {
         Dimension d = preferredSize();
         Style s = getStyle();
-        return new Dimension(d.getWidth() +s.getMargin(LEFT) + s.getMargin(RIGHT), d.getHeight() + s.getMargin(TOP) + s.getMargin(BOTTOM));
+        return new Dimension(d.getWidth() +s.getHorizontalMargins(), d.getHeight() + s.getVerticalMargins());
     }
 
     /**
@@ -2402,70 +2402,70 @@ public class Component implements Animation, StyleListener {
         final Motion fontMotion = m;
         m = null;
 
-        if(sourceStyle.getPadding(TOP) != destStyle.getPadding(TOP)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(TOP), destStyle.getPadding(TOP), d);
+        if(sourceStyle.getPaddingTop() != destStyle.getPaddingTop()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingTop(), destStyle.getPaddingTop(), d);
         }
         final Motion paddingTop = m;
         m = null;
 
-        if(sourceStyle.getPadding(BOTTOM) != destStyle.getPadding(BOTTOM)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(BOTTOM), destStyle.getPadding(BOTTOM), d);
+        if(sourceStyle.getPaddingBottom() != destStyle.getPaddingBottom()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingBottom(), destStyle.getPaddingBottom(), d);
         }
         final Motion paddingBottom = m;
         m = null;
 
-        if(sourceStyle.getPadding(LEFT) != destStyle.getPadding(LEFT)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(LEFT), destStyle.getPadding(LEFT), d);
+        if(sourceStyle.getPaddingLeftNoRTL()!= destStyle.getPaddingLeftNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingLeftNoRTL(), destStyle.getPaddingLeftNoRTL(), d);
         }
         final Motion paddingLeft = m;
         m = null;
 
-        if(sourceStyle.getPadding(RIGHT) != destStyle.getPadding(RIGHT)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(RIGHT), destStyle.getPadding(RIGHT), d);
+        if(sourceStyle.getPaddingRightNoRTL()!= destStyle.getPaddingRightNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingRightNoRTL(), destStyle.getPaddingRightNoRTL(), d);
         }
         final Motion paddingRight = m;
         m = null;
 
-        if(sourceStyle.getMargin(TOP) != destStyle.getMargin(TOP)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(TOP), destStyle.getMargin(TOP), d);
+        if(sourceStyle.getMarginTop()!= destStyle.getMarginTop()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginTop(), destStyle.getMarginTop(), d);
         }
         final Motion marginTop = m;
         m = null;
 
-        if(sourceStyle.getMargin(BOTTOM) != destStyle.getMargin(BOTTOM)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(BOTTOM), destStyle.getMargin(BOTTOM), d);
+        if(sourceStyle.getMarginBottom() != destStyle.getMarginBottom()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginBottom(), destStyle.getMarginBottom(), d);
         }
         final Motion marginBottom = m;
         m = null;
 
-        if(sourceStyle.getMargin(LEFT) != destStyle.getMargin(LEFT)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(LEFT), destStyle.getMargin(LEFT), d);
+        if(sourceStyle.getMarginLeftNoRTL()!= destStyle.getMarginLeftNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginLeftNoRTL(), destStyle.getMarginLeftNoRTL(), d);
         }
         final Motion marginLeft = m;
         m = null;
 
-        if(sourceStyle.getMargin(RIGHT) != destStyle.getMargin(RIGHT)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(RIGHT), destStyle.getMargin(RIGHT), d);
+        if(sourceStyle.getMarginRightNoRTL()!= destStyle.getMarginRightNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginRightNoRTL(), destStyle.getMarginRightNoRTL(), d);
         }
         final Motion marginRight = m;
         m = null;
 
         if(paddingLeft != null || paddingRight != null || paddingTop != null || paddingBottom != null) {
             // convert the padding to pixels for smooth animation
-            int left = sourceStyle.getPadding(LEFT);
-            int right = sourceStyle.getPadding(RIGHT);
-            int top = sourceStyle.getPadding(TOP);
-            int bottom = sourceStyle.getPadding(BOTTOM);
+            int left = sourceStyle.getPaddingLeftNoRTL();
+            int right = sourceStyle.getPaddingRightNoRTL();
+            int top = sourceStyle.getPaddingTop();
+            int bottom = sourceStyle.getPaddingBottom();
             sourceStyle.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
             sourceStyle.setPadding(top, bottom, left, right);
         }
         
         if(marginLeft != null || marginRight != null || marginTop != null || marginBottom != null) {
             // convert the margin to pixels for smooth animation
-            int left = sourceStyle.getMargin(LEFT);
-            int right = sourceStyle.getMargin(RIGHT);
-            int top = sourceStyle.getMargin(TOP);
-            int bottom = sourceStyle.getMargin(BOTTOM);
+            int left = sourceStyle.getMarginLeftNoRTL();
+            int right = sourceStyle.getMarginRightNoRTL();
+            int top = sourceStyle.getMarginTop();
+            int bottom = sourceStyle.getMarginBottom();
             sourceStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
             sourceStyle.setMargin(top, bottom, left, right);
         }
@@ -3040,8 +3040,8 @@ public class Component implements Animation, StyleListener {
             }
             if(scrollParent != null){
                 Style s = getStyle();
-                int w = getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT);
-                int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
+                int w = getWidth() - s.getHorizontalPadding();
+                int h = getHeight() - s.getVerticalPadding();
 
                 Rectangle view;
                 int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
@@ -4151,8 +4151,8 @@ public class Component implements Animation, StyleListener {
         if (isScrollable()) {
             int scrollPosition = getScrollY();
             Style s = getStyle();
-            int w = getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT);
-            int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
+            int w = getWidth() - s.getHorizontalPadding();
+            int h = getHeight() - s.getVerticalPadding();
 
             Rectangle view;
             int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
@@ -4195,7 +4195,7 @@ public class Component implements Animation, StyleListener {
                     setScrollX(relativeX);
                 }
                 int rightX = relativeX + width - 
-                        s.getPadding(LEFT) - s.getPadding(RIGHT);
+                        s.getHorizontalPadding();
                 if (getScrollX() + w < rightX) {
                     setScrollX(getScrollX() + (rightX - (getScrollX() + w)));
                 } else {
@@ -4210,7 +4210,7 @@ public class Component implements Animation, StyleListener {
                     scrollPosition = relativeY;
                 }
                 int bottomY = relativeY + height - 
-                        s.getPadding(TOP) - s.getPadding(BOTTOM);
+                        s.getVerticalPadding();
                 if (getScrollY() + h < bottomY + invisibleAreaUnderVKB) {
                     scrollPosition = getScrollY() + (bottomY - (getScrollY() + h)) + invisibleAreaUnderVKB;
                 } else {
@@ -5192,7 +5192,7 @@ public class Component implements Animation, StyleListener {
         } else {
             setPreferredSize(null);
             if(changeMargin) {
-                if(getUnselectedStyle().getMargin(LEFT) == 0) {
+                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
                     setUIID(getUIID());
                 }
             }

@@ -358,9 +358,9 @@ class MultiComboBox extends List {
             }
             if (bgColor!=-1) {
                 g.setColor(bgColor);
-                g.fillRect(getX()+getStyle().getPadding(Component.LEFT), getY()+getStyle().getPadding(Component.TOP),
-                        getWidth()-+getStyle().getPadding(Component.LEFT)-+getStyle().getPadding(Component.RIGHT),
-                        getHeight()-+getStyle().getPadding(Component.TOP)-+getStyle().getPadding(Component.BOTTOM));
+                g.fillRect(getX()+getStyle().getPaddingLeftNoRTL(), getY()+getStyle().getPaddingTop(),
+                        getWidth()-+getStyle().getPaddingLeftNoRTL()-+getStyle().getPaddingRightNoRTL(),
+                        getHeight()-+getStyle().getPaddingTop()-+getStyle().getPaddingBottom());
             }
             super.paint(g);
         }

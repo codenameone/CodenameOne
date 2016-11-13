@@ -266,8 +266,9 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper
 	public final int[] getVisualPadding()
 	{
                 // TOOD, optimize this
-		int[] padding = new int[] {c.getStyle().getMargin(Component.TOP), c.getStyle().getMargin(Component.LEFT), c.getStyle().getMargin(Component.BOTTOM), c.getStyle().getMargin(Component.RIGHT)};
-		return padding;
+                        int[] padding = new int[] {c.getStyle().getMarginTop(), c.getStyle().getMarginLeftNoRTL(), 
+                            c.getStyle().getMarginBottom(), c.getStyle().getMarginRightNoRTL()};
+                        return padding;
 	}
 
 	/**

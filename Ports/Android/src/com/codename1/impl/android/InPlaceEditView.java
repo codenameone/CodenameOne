@@ -663,10 +663,10 @@ public class InPlaceEditView extends FrameLayout{
             scrollX = ta.getScrollX();
             scrollY = ta.getScrollY();
             Style s = ta.getStyle();
-            paddingTop = s.getPadding(ta.isRTL(), Component.TOP);
-            paddingLeft = s.getPadding(ta.isRTL(), Component.LEFT);
-            paddingRight = s.getPadding(ta.isRTL(), Component.RIGHT);
-            paddingBottom = s.getPadding(Component.BOTTOM);
+            paddingTop = s.getPaddingTop();
+            paddingLeft = s.getPaddingLeft(ta.isRTL());
+            paddingRight = s.getPaddingRight(ta.isRTL());
+            paddingBottom = s.getPaddingBottom();
             isTextField = (ta instanceof TextField);
             verticalAlignment = ta.getVerticalAlignment();
             height = ta.getHeight();

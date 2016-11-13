@@ -912,8 +912,7 @@ public class Toolbar extends Container {
         int marginRight = 0;
         Container dialogContentPane = menu.getDialogComponent();
         marginLeft = parent.getWidth() - (dialogContentPane.getPreferredW()
-                + menu.getStyle().getPadding(LEFT)
-                + menu.getStyle().getPadding(RIGHT));
+                + menu.getStyle().getHorizontalPadding());
         marginLeft = Math.max(0, marginLeft);
         if (parent.getSoftButtonCount() > 1) {
             height = parent.getHeight() - parent.getSoftButton(0).getParent().getPreferredH() - dialogContentPane.getPreferredH();

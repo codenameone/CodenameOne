@@ -193,7 +193,7 @@ public class ComboBox<T> extends List<T> {
         } else {
             selected = getRenderer().getListCellRendererComponent(this, "XXXXXXXXXXX", 0, true);
         }
-        return getHeight() - getStyle().getPadding(false, BOTTOM) - selected.getStyle().getPadding(false, BOTTOM);
+        return getHeight() - getStyle().getPaddingBottom() - selected.getStyle().getPaddingBottom();
     }
 
     /**
@@ -341,13 +341,11 @@ public class ComboBox<T> extends List<T> {
             Style contentStyle = content.getStyle();
 
             int listH = content.getPreferredH()
-                    + contentStyle.getMargin(false, TOP)
-                    + contentStyle.getMargin(false, BOTTOM);
+                    + contentStyle.getVerticalMargins();
 
             Component title = popupDialog.getTitleArea();
             listH += title.getPreferredH()
-                    + title.getStyle().getMargin(false, TOP)
-                    + title.getStyle().getMargin(false, BOTTOM);
+                    + title.getStyle().getVerticalMargins();
 
             bottom = 0;
             top = getAbsoluteY();
@@ -356,7 +354,7 @@ public class ComboBox<T> extends List<T> {
                 Component c = parentForm.getSoftButton(0).getParent();
                 formHeight -= c.getHeight();
                 Style s = c.getStyle();
-                formHeight -= (s.getMargin(TOP) + s.getMargin(BOTTOM));
+                formHeight -= (s.getVerticalMargins());
             }
 
             if(listH < formHeight) {

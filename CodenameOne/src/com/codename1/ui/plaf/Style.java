@@ -1585,6 +1585,38 @@ public class Style {
     }
     
     /**
+     * Returns the right margin in pixels ignoring RTL
+     * @return the margin in pixels
+     */
+    public int getMarginRightNoRTL() {
+        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
+    }
+
+    /**
+     * Returns the left margin in pixels ignoring RTL
+     * @return the margin in pixels
+     */
+    public int getMarginLeftNoRTL() {
+        return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+    }
+    
+    /**
+     * Returns the right padding in pixels ignoring RTL
+     * @return the padding in pixels
+     */
+    public int getPaddingRightNoRTL() {
+        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
+    }
+
+    /**
+     * Returns the left padding in pixels ignoring RTL
+     * @return the padding in pixels
+     */
+    public int getPaddingLeftNoRTL() {
+        return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+    }
+    
+    /**
      * Returns the right margin in pixel or left margin in an RTL situation
      * @param rtl indicates a right to left language
      * @return the margin in pixels
