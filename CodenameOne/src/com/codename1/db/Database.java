@@ -162,7 +162,7 @@ public abstract class Database {
      * 
      * @throws IOException 
      */
-    public void execute(String sql, Object [] params) throws IOException{
+    public void execute(String sql, Object... params) throws IOException{
         if ( params == null) {
             execute(sql);
         } else {
@@ -196,6 +196,37 @@ public abstract class Database {
      * @throws IOException 
      */
     public abstract Cursor executeQuery(String sql, String [] params) throws IOException;
+    
+    /**
+     * This method should be called with SELECT type statements that return 
+     * row set it accepts object with params.
+     * 
+     * @param sql the sql to execute
+     * @param params to bind to the query where the '?' exists, supported object 
+     * types are String, byte[], Double, Long and null
+     * @return a cursor to iterate over the results
+     * 
+     * @throws IOException 
+     */
+    public Cursor executeQuery(String sql, Object... params) throws IOException{
+        if ( params == null || params.length == 0) {
+            return executeQuery(sql);
+        } else {
+            int len = params.length;
+            String[] strParams = new String[len];
+            for ( int i=0; i<len; i++) {
+                if (params[i] instanceof byte[]) {
+                    throw new RuntimeException("Blobs aren't supported on this platform");
+                }
+                if (params[i] == null) {
+                    strParams[i] = null;
+                } else {
+                    strParams[i] = params[i].toString();
+                }
+            }
+            return executeQuery(sql, strParams);
+        }
+    }
     
     /**
      * This method should be called with SELECT type statements that return 
