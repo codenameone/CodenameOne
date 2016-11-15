@@ -27,6 +27,7 @@ package com.codename1.properties;
  * Allows mapping properties generically
  *
  * @author Shai Almog
+ * @deprecated this API is experimental
  */
 public interface PropertyBusinessObject {
     PropertyIndex getPropertyIndex();

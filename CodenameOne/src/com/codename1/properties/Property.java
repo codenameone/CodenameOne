@@ -30,12 +30,10 @@ import java.util.ArrayList;
  * listeners
  *
  * @author Shai Almog
+ * @deprecated this API is experimental
  */
-public class Property<T> {
-    private final String name;
+public class Property<T, K> extends PropertyBase<T, K> {
     private T value;
-    private ArrayList<PropertyChangeListener> listeners;
-    PropertyIndex parent;
     
     /**
      * Constructs a property with the given name and value
@@ -43,24 +41,16 @@ public class Property<T> {
      * @param value the default value for the property
      */
     public Property(String name, T value) {
-        this.name = name;
+        super(name);
         this.value = value;
     }
-
+    
     /**
      * Constructs a property with null value
      * @param name the name of the property
      */
     public Property(String name) {
-        this.name = name;
-    }
-    
-    /**
-     * The property name is immutable and can't be changed after creation it should match the parent field name by convention
-     * @return the property name;
-     */
-    public String getName() {
-        return name;
+        super(name);
     }
     
     /**
@@ -75,56 +65,49 @@ public class Property<T> {
      * Sets the property value and potentially fires a change event
      * @param value the new value
      */
-    public void set(T value) {
+    public K set(T value) {
         if(this.value != value) { 
             this.value = value;
-            if(listeners != null) {
-                for(PropertyChangeListener pl : listeners) {
-                    pl.propertyChanged(this);
-                }
-            }
+            firePropertyChanged();
         }
+        return (K)parent.parent;
     }
-    
+        
     /**
-     * Fires a notification that a property value changed to the given listener
-     * @param pl the listener
+     * Compares this property to another property
+     * @param obj the other property
+     * @return true if they are equal in name and value
      */
-    public void addChangeListener(PropertyChangeListener pl) {
-        if(listeners == null) {
-            listeners = new ArrayList<PropertyChangeListener>();
+    @Override
+    public boolean equals(Object obj) {
+        if(!super.equals(obj)) {
+            return false;
         }
-        listeners.add(pl);
-    }
-    
-    /**
-     * Removes the property change listener from the list of listeners
-     * @param pl the change listener
-     */
-    public void removeChangeListener(PropertyChangeListener pl) {
-        if(listeners != null) {
-            listeners.remove(pl);
-            if(listeners.size() == 0) {
-                listeners = null;
-            }
+        Property other = (Property)obj;
+        Object otherval = other.get();
+        if(otherval == value) {
+            return true;
         }
+        return otherval != null && otherval.equals(value);
     }
-    
+
     /**
-     * Places a property that will apply statically to all instances of this property
-     * @param key the key to put
-     * @param o the value object
+     * Returns the internal hashcode or 0 for null property
+     * @return the hashcode value
      */
-    public void putClientProperty(String key, Object o) {
-        parent.putMetaDataOfClass("cn1$field" + name + "-" + key, o);
+    @Override
+    public int hashCode() {
+        if(value == null) return 0;
+        return value.hashCode();
     }
-    
-    /**
-     * Returns the client property set to this property name
-     * @param key the key of the property
-     * @return the value that was previously placed with put client property
-     */
-    public Object getClientProperty(String key) {
-        return parent.getMetaDataOfClass("cn1$field" + name + "-" + key);
+
+    @Override
+    public String toString() {
+        return "" + value;
+    }
+
+    @Override
+    void setImpl(Object val) {
+        set((T)val);
     }
 }

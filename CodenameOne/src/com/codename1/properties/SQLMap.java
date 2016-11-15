@@ -27,14 +27,14 @@ import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
 import com.codename1.io.Log;
-import com.codename1.util.BigDecimal;
-import com.codename1.util.BigInteger;
 import java.io.IOException;
 import java.util.ArrayList;
 
 /**
- * A simple ORM wrapper for property objects 
+ * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
+ * properly at this time. 
  *
+ * @deprecated this API is experimental
  * @author Shai Almog
  */
 public class SQLMap {
@@ -112,7 +112,7 @@ public class SQLMap {
      * @param p the property
      * @param type one of the enum values representing supported SQL data types
      */
-    public void setSqlType(Property p, SqlType type) {
+    public void setSqlType(PropertyBase p, SqlType type) {
         p.putClientProperty("cn1$colType", type);
     }
 
@@ -122,25 +122,27 @@ public class SQLMap {
      * @param p the property 
      * @return the sql data type
      */
-    public SqlType getSqlType(Property p) {
+    public SqlType getSqlType(PropertyBase p) {
         SqlType s = (SqlType)p.getClientProperty("cn1$colType");
         if(s == null) {
-            Object val = p.get();
-            if(val != null) {
-                if(val instanceof Long) {
-                    return SqlType.SQL_LONG;
-                }
-                if(val instanceof Integer) {
-                    return SqlType.SQL_INTEGER;
-                }
-                if(val instanceof Short) {
-                    return SqlType.SQL_SHORT;
-                }
-                if(val instanceof Float) {
-                    return SqlType.SQL_FLOAT;
-                }
-                if(val instanceof Double) {
-                    return SqlType.SQL_DOUBLE;
+            if(p instanceof Property) {
+                Object val = ((Property)p).get();
+                if(val != null) {
+                    if(val instanceof Long) {
+                        return SqlType.SQL_LONG;
+                    }
+                    if(val instanceof Integer) {
+                        return SqlType.SQL_INTEGER;
+                    }
+                    if(val instanceof Short) {
+                        return SqlType.SQL_SHORT;
+                    }
+                    if(val instanceof Float) {
+                        return SqlType.SQL_FLOAT;
+                    }
+                    if(val instanceof Double) {
+                        return SqlType.SQL_DOUBLE;
+                    }
                 }
             }
             return SqlType.SQL_TEXT;
@@ -175,7 +177,7 @@ public class SQLMap {
      * @param prop a property instance, this will apply to all the property instances for the type
      * @param name the name of the column
      */
-    public void setColumnName(Property prop, String name) {
+    public void setColumnName(PropertyBase prop, String name) {
         prop.putClientProperty("cn1$sqlColumn", name);
     }
     
@@ -184,7 +186,7 @@ public class SQLMap {
      * @param prop a property instance, this will apply to all the property instances for the type
      * @return the name of the property
      */
-    public String getColumnName(Property prop) {
+    public String getColumnName(PropertyBase prop) {
         String val = (String)prop.getClientProperty("cn1$sqlColumn");
         if(val == null) {
             return prop.getName();
@@ -218,7 +220,7 @@ public class SQLMap {
 
         String pkName = (String)cmp.getPropertyIndex().getMetaDataOfClass("cn1$pk");
         boolean first = true;
-        for(Property p : cmp.getPropertyIndex()) {
+        for(PropertyBase p : cmp.getPropertyIndex()) {
             if(!first) {
                 createStatement.append(",");
             }
@@ -259,11 +261,16 @@ public class SQLMap {
 
         int count = 0;
         Object[] values = new Object[cmp.getPropertyIndex().getSize()];
-        for(Property p : cmp.getPropertyIndex()) {
+        for(PropertyBase p : cmp.getPropertyIndex()) {
             if(count > 0) {
                 createStatement.append(",");
             }
-            values[count] = p.get();
+            if(p instanceof Property) {
+                values[count] = ((Property)p).get();
+            } else {
+                // TODO
+                values[count] = null;
+            }
             count++;
             String columnName = getColumnName(p);
             createStatement.append(columnName);
@@ -298,11 +305,16 @@ public class SQLMap {
         int count = 0;
         Object[] values;
         values = new Object[cmp.getPropertyIndex().getSize() + 1];
-        for(Property p : cmp.getPropertyIndex()) {
+        for(PropertyBase p : cmp.getPropertyIndex()) {
             if(count > 0) {
                 createStatement.append(",");
             }
-            values[count] = p.get();
+            if(p instanceof Property) {
+                values[count] = ((Property)p).get();
+            } else {
+                // TODO
+                values[count] = null;
+            }
             count++;
             String columnName = getColumnName(p);
             createStatement.append(columnName);
@@ -336,11 +348,16 @@ public class SQLMap {
         } else {
             int count = 0;
             Object[] values = new Object[cmp.getPropertyIndex().getSize()];
-            for(Property p : cmp.getPropertyIndex()) {
+            for(PropertyBase p : cmp.getPropertyIndex()) {
                 if(count == 0) {
                     createStatement.append(",");
                 }
-                values[count] = p.get();
+                if(p instanceof Property) {
+                    values[count] = ((Property)p).get();
+                } else {
+                    // TODO
+                    values[count] = null;
+                }
                 count++;
                 String columnName = getColumnName(p);
                 createStatement.append(columnName);
@@ -356,9 +373,11 @@ public class SQLMap {
      * @param cmp the component to match
      * @param orderBy the column to order by, can be null to ignore order
      * @param ascending true to indicate ascending order
+     * @param maxElements the maximum number of elements returned can be 0 or lower to ignore
+     * @param page  the page within the query to match the max elements value
      * @return the result of the query 
      */
-    public java.util.List<PropertyBusinessObject> select(PropertyBusinessObject cmp, Property orderBy, boolean ascending) throws IOException, InstantiationException {
+    public java.util.List<PropertyBusinessObject> select(PropertyBusinessObject cmp, Property orderBy, boolean ascending, int maxElements, int page) throws IOException, InstantiationException {
         String tableName = getTableName(cmp);
         StringBuilder createStatement = new StringBuilder("SELECT * FROM ");
         createStatement.append(tableName);
@@ -366,16 +385,18 @@ public class SQLMap {
         
         createStatement.append(" WHERE ");
         boolean found = false;
-        for(Property p : cmp.getPropertyIndex()) {
+        for(PropertyBase p : cmp.getPropertyIndex()) {
             createStatement.append(" WHERE ");
-            if(p.get() != null) {
-                if(found) {
-                    createStatement.append(", ");
+            if(p instanceof Property) {
+                if(((Property)p).get() != null) {
+                    if(found) {
+                        createStatement.append(", ");
+                    }
+                    found = true;
+                    params.add(((Property)p).get());
+                    createStatement.append(getColumnName(p));
+                    createStatement.append(" = ?");
                 }
-                found = true;
-                params.add(p.get());
-                createStatement.append(getColumnName(p));
-                createStatement.append(" = ?");
             }
         }
 
@@ -393,17 +414,28 @@ public class SQLMap {
             } 
         }
         
+        if(maxElements > 0) {
+            createStatement.append(" LIMIT ");
+            createStatement.append(maxElements);
+            if(page > 0) {
+                createStatement.append(" OFFSET ");
+                createStatement.append(page * maxElements);
+            }
+        }
+        
         Cursor c = null;
         try {
             ArrayList<PropertyBusinessObject> response = new ArrayList<PropertyBusinessObject>();
             c = db.executeQuery(createStatement.toString(), params.toArray());
             while(c.next()) {
                 PropertyBusinessObject pb = (PropertyBusinessObject)cmp.getClass().newInstance();
-                for(Property p : pb.getPropertyIndex()) {
+                for(PropertyBase p : pb.getPropertyIndex()) {
                     Row currentRow = c.getRow();
                     SqlType t = getSqlType(p);
                     Object value = t.getValue(currentRow, c.getColumnIndex(getColumnName(p)));
-                    p.set(value);
+                    if(p instanceof Property) {
+                        ((Property)p).set(value);
+                    } 
                 }
                 response.add(pb);
             }

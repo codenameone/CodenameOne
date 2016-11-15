@@ -23,8 +23,6 @@
 
 package com.codename1.properties;
 
-import com.codename1.io.CharArrayReader;
-import com.codename1.io.JSONParser;
 import com.codename1.processing.Result;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -35,12 +33,13 @@ import java.util.Map;
  * can implicitly access them for us. This class also holds the class level meta-data for a specific property
  * or class. It also provides utility level tools e.g. toString implementation etc.
  *
+ * @deprecated this API is experimental
  * @author Shai Almog
  */
-public class PropertyIndex implements Iterable<Property>{
-    private final Property[] properties;
+public class PropertyIndex implements Iterable<PropertyBase>{
+    private final PropertyBase[] properties;
     private static HashMap<String, HashMap<String, Object>> metadata = new HashMap<String, HashMap<String, Object>>();
-    private PropertyBusinessObject parent;
+    PropertyBusinessObject parent;
     private final String name;
     
     /**
@@ -50,11 +49,11 @@ public class PropertyIndex implements Iterable<Property>{
      * @param name the name of the parent class
      * @param properties the list of properties in the object
      */
-    public PropertyIndex(PropertyBusinessObject parent, String name, Property... properties) {
+    public PropertyIndex(PropertyBusinessObject parent, String name, PropertyBase... properties) {
         this.properties = properties;
         this.parent = parent;
         this.name = name;
-        for(Property p : properties) {
+        for(PropertyBase p : properties) {
             p.parent = this;
         }
     }
@@ -72,8 +71,8 @@ public class PropertyIndex implements Iterable<Property>{
      * @param name the name of the property (case sensitive)
      * @return the property or null
      */
-    public Property get(String name) {
-        for(Property p : properties) {
+    public PropertyBase get(String name) {
+        for(PropertyBase p : properties) {
             if(p.getName().equals(name)) {
                 return p;
             }
@@ -86,8 +85,8 @@ public class PropertyIndex implements Iterable<Property>{
      * @param name the name of the property (case insensitive)
      * @return the property or null
      */
-    public Property getIgnoreCase(String name) {
-        for(Property p : properties) {
+    public PropertyBase getIgnoreCase(String name) {
+        for(PropertyBase p : properties) {
             if(p.getName().equalsIgnoreCase(name)) {
                 return p;
             }
@@ -100,7 +99,7 @@ public class PropertyIndex implements Iterable<Property>{
      * @param i the index of the property
      * @return the property instance
      */
-    public Property get(int i) {
+    public PropertyBase get(int i) {
         return properties[i];
     }
     
@@ -116,8 +115,8 @@ public class PropertyIndex implements Iterable<Property>{
      * Allows us to traverse the properties with a for-each statement
      * @return an iterator instance
      */
-    public Iterator<Property> iterator() {
-        return new Iterator<Property>() {
+    public Iterator<PropertyBase> iterator() {
+        return new Iterator<PropertyBase>() {
             int off = 0;
             public boolean hasNext() {
                 return off < properties.length;
@@ -126,7 +125,7 @@ public class PropertyIndex implements Iterable<Property>{
             public void remove() {
             }
             
-            public Property next() {
+            public PropertyBase next() {
                 int i = off;
                 off++;
                 return properties[i];
@@ -174,10 +173,10 @@ public class PropertyIndex implements Iterable<Property>{
     public String toString() {
         StringBuilder b = new StringBuilder(name);
         b.append(" : {\n");
-        for(Property p : this) {
+        for(PropertyBase p : this) {
             b.append(p.getName());
             b.append(" = ");
-            b.append(p.get());
+            b.append(p.toString());
             b.append("\n");
         }
         b.append("}");
@@ -189,10 +188,10 @@ public class PropertyIndex implements Iterable<Property>{
      * @param m the map
      */
     public void populateFromMap(Map<String, Object> m) {
-        for(Property p : this) {
+        for(PropertyBase p : this) {
             Object val = m.get(p.getName());
             if(val != null) {
-                p.set(val);
+                p.setImpl(val);
             }
         }
     }
@@ -203,9 +202,12 @@ public class PropertyIndex implements Iterable<Property>{
      */
     public Map<String, Object> toMapRepresentation() {
         HashMap<String, Object> m = new HashMap<String, Object>();
-        for(Property p : this) {
-            if(p.get() != null) {
-                m.put(p.getName(), p.get());
+        for(PropertyBase p : this) {
+            if(p instanceof Property) {
+                Property pp = (Property)p;
+                if(pp.get() != null) {
+                    m.put(p.getName(), pp.get());
+                }
             }
         }
         return m;
@@ -218,4 +220,51 @@ public class PropertyIndex implements Iterable<Property>{
     public String toJSON() {
         return Result.fromContent(toMapRepresentation()).toString();
     }
+    
+    /**
+     * Returns true if the given object equals the property index
+     * @param o the object
+     * @return true if equals
+     */
+    public boolean equals(Object o) {
+        if(o instanceof PropertyIndex) {
+            PropertyIndex other = (PropertyIndex)o;
+            if(parent == other.parent) {
+                return true;
+            }
+            if(parent.getClass() != other.parent.getClass()) {
+                return false;
+            }
+            if(properties.length == other.properties.length) {
+                for(int iter = 0 ; iter < properties.length ; iter++) {
+                    if(!properties[iter].equals(other.properties[iter])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The hashcode of the object
+     * @return a composite of the hashcodes of the properties
+     */
+    @Override
+    public int hashCode() {
+        int value = 0;
+        for(int iter = 0 ; iter < properties.length ; iter++) {
+            if(properties[iter] instanceof Property) {
+                Object v = ((Property)properties[iter]).get();
+                if(v != null) {
+                    int b = v.hashCode();
+                    value = 31 * value + (int) (b ^ (b >>> 32));
+                }
+            }
+        }
+        return value;
+    }
+    
+    
 }
