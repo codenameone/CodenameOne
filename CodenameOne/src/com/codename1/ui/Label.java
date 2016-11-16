@@ -202,8 +202,8 @@ public class Label extends Component {
         Style s = getStyle();
         Font f = s.getFont();
         
-        int innerHeight = height-s.getPadding(TOP)-s.getPadding(BOTTOM);
-        return s.getPadding(TOP)+(innerHeight-f.getHeight())/2+f.getAscent();
+        int innerHeight = height-s.getVerticalPadding();
+        return s.getPaddingTop()+(innerHeight-f.getHeight())/2+f.getAscent();
     }
     
     
@@ -525,7 +525,7 @@ public class Label extends Component {
 
     int getAvaliableSpaceForText() {
         Style style = getStyle();
-        int textSpaceW = getWidth() - style.getPadding(isRTL(), Label.RIGHT) - style.getPadding(isRTL(), Label.LEFT);
+        int textSpaceW = getWidth() - style.getHorizontalPadding();
         Image icon = getIconFromState();
 
         if (icon != null && (getTextPosition() == Label.RIGHT || getTextPosition() == Label.LEFT)) {

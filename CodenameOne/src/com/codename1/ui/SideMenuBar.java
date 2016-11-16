@@ -1151,7 +1151,7 @@ public class SideMenuBar extends MenuBar {
 
             protected void sizeChanged(int w, int h) {
                 Style formStyle = getStyle();
-                int width = w - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
+                int width = w - (formStyle.getHorizontalMargins());
                 
                 parent.sizeChangedInternal(w, h);
                 //if the size changed event came from a keyboard open/close don't 

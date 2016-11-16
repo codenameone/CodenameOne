@@ -179,8 +179,8 @@ public class Form extends Container {
         setVisible(false);
         Style formStyle = getStyle();
         Display d = Display.getInstance();
-        int w = d.getDisplayWidth() - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
-        int h = d.getDisplayHeight() - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
+        int w = d.getDisplayWidth() - (formStyle.getHorizontalMargins());
+        int h = d.getDisplayHeight() - (formStyle.getVerticalMargins());
 
         setWidth(w);
         setHeight(h);
@@ -537,8 +537,8 @@ public class Form extends Container {
         int oldHeight = getHeight();        
         sizeChanged(w, h);
         Style formStyle = getStyle();
-        w = w - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
-        h = h - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
+        w = w - (formStyle.getHorizontalMargins());
+        h = h - (formStyle.getVerticalMargins());
         setSize(new Dimension(w, h));
         setShouldCalcPreferredSize(true);
         doLayout();
@@ -2021,14 +2021,14 @@ public class Form extends Container {
         //if selected style is different then unselected style there is a good 
         //chance we need to trigger a revalidate
         if (!selected.getFont().equals(unselected.getFont())
-                || selected.getPadding(false, Component.TOP) != unselected.getPadding(false, Component.TOP)
-                || selected.getPadding(false, Component.BOTTOM) != unselected.getPadding(false, Component.BOTTOM)
-                || selected.getPadding(isRTL(), Component.RIGHT) != unselected.getPadding(isRTL(), Component.RIGHT)
-                || selected.getPadding(isRTL(), Component.LEFT) != unselected.getPadding(isRTL(), Component.LEFT)
-                || selected.getMargin(false, Component.TOP) != unselected.getMargin(false, Component.TOP)
-                || selected.getMargin(false, Component.BOTTOM) != unselected.getMargin(false, Component.BOTTOM)
-                || selected.getMargin(isRTL(), Component.RIGHT) != unselected.getMargin(isRTL(), Component.RIGHT)
-                || selected.getMargin(isRTL(), Component.LEFT) != unselected.getMargin(isRTL(), Component.LEFT)) {
+                || selected.getPaddingTop() != unselected.getPaddingTop()
+                || selected.getPaddingBottom() != unselected.getPaddingBottom()
+                || selected.getPaddingRight(isRTL()) != unselected.getPaddingRight(isRTL())
+                || selected.getPaddingLeft(isRTL()) != unselected.getPaddingLeft(isRTL())
+                || selected.getMarginTop() != unselected.getMarginTop()
+                || selected.getMarginBottom() != unselected.getMarginBottom()
+                || selected.getMarginRight(isRTL()) != unselected.getMarginRight(isRTL())
+                || selected.getMarginLeft(isRTL()) != unselected.getMarginLeft(isRTL())) {
             trigger = true;
         }
         int prefW = 0;
@@ -2530,12 +2530,14 @@ public class Form extends Container {
         }
 
         Container actual = getActualPane();
-        Component cmp = actual.getComponentAt(x[0], y[0]);
-        if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
-                setFocused(cmp);
+        if(actual != null) {
+            Component cmp = actual.getComponentAt(x[0], y[0]);
+            if (cmp != null) {
+                if (cmp.isFocusable() && cmp.isEnabled()) {
+                    setFocused(cmp);
+                }
+                cmp.pointerHover(x, y);
             }
-            cmp.pointerHover(x, y);
         }
     }
 

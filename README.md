@@ -1,12 +1,12 @@
 # Codename One
 ## Write Once Run Anywhere Native Mobile Apps Using Java
 
-<img align="right" src="http://codenameone.com/img/phones.png" height="250">
+<img align="right" src="https://www.codenameone.com/img/phones.png" height="250">
 
-Codename One allows Java developers to write their app once and have it work on all mobile devices (iOS, Android etc.). 
+[Codename One](https://www.codenameone.com/) allows Java developers to write their app once and compile it to all mobile devices (iOS, Android etc.). 
 It features a simulator, designer (visual theme/builder) and ports to multiple OS's.
 
-Codename One is a mature open source project and its roots go back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. 
+[Codename One](https://www.codenameone.com/) is a mature open source project and its roots go back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. 
 
 This open source project includes the libraries, native OS ports, resource editor & native VM code for Codename One. It also includes themes and there are separate related projects containing [demos](https://github.com/codenameone/codenameone-demos/), [skins](https://github.com/codenameone/codenameone-skins) etc.
 

@@ -153,7 +153,7 @@ public class Tabs extends Container {
             for(int iter = 0 ; iter < getTabCount() ; iter++) {
                 Component c = getTabComponentAt(iter);
                 if(c.isScrollableY()) {
-                    if(c.getStyle().getPadding(BOTTOM) < tabsContainer.getPreferredH()) {
+                    if(c.getStyle().getPaddingBottom() < tabsContainer.getPreferredH()) {
                         c.getStyle().setPadding(BOTTOM, tabsContainer.getPreferredH());
                     }
                 }
@@ -1175,12 +1175,10 @@ public class Tabs extends Container {
                     xOffset -= (activeComponent * tabWidth);
                 }
                 Component component = parent.getComponentAt(i);
-                component.setX(component.getStyle().getMargin(Component.LEFT) + xOffset);
-                component.setY(component.getStyle().getMargin(Component.TOP));
-                component.setWidth(tabWidth - component.getStyle().getMargin(Component.LEFT)
-                        - component.getStyle().getMargin(Component.RIGHT));
-                component.setHeight(parent.getHeight() - component.getStyle().getMargin(Component.TOP)
-                        - component.getStyle().getMargin(Component.BOTTOM));
+                component.setX(component.getStyle().getMarginLeftNoRTL() + xOffset);
+                component.setY(component.getStyle().getMarginTop());
+                component.setWidth(tabWidth - component.getStyle().getHorizontalMargins());
+                component.setHeight(parent.getHeight() - component.getStyle().getVerticalMargins());
             }
 
         }
@@ -1188,10 +1186,10 @@ public class Tabs extends Container {
         public Dimension getPreferredSize(Container parent) {
             // fill
             Dimension dim = new Dimension(0, 0);
-            dim.setWidth(parent.getWidth() + parent.getStyle().getPadding(false, Component.LEFT)
-                    + parent.getStyle().getPadding(false, Component.RIGHT));
-            dim.setHeight(parent.getHeight() + parent.getStyle().getPadding(false, Component.TOP)
-                    + parent.getStyle().getPadding(false, Component.BOTTOM));
+            dim.setWidth(parent.getWidth() + parent.getStyle().getPaddingLeftNoRTL()
+                    + parent.getStyle().getPaddingRightNoRTL());
+            dim.setHeight(parent.getHeight() + parent.getStyle().getPaddingTop()
+                    + parent.getStyle().getPaddingBottom());
             int compCount = contentPane.getComponentCount();
             for(int iter = 0 ; iter < compCount ; iter++) {
                 Dimension d = contentPane.getComponentAt(iter).getPreferredSizeWithMargin();

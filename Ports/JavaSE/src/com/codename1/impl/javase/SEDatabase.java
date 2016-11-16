@@ -116,7 +116,7 @@ public class SEDatabase extends Database{
     }
     
     @Override
-    public void execute(String sql, Object[] params) throws IOException {
+    public void execute(String sql, Object... params) throws IOException {
         try {
             PreparedStatement s =  conn.prepareStatement(sql);  
             

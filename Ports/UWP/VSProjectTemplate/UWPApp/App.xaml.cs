@@ -288,6 +288,24 @@ namespace UWPApp
             return base.convertToStringImpl(obj);
         }
 
+        public override bool checkEqualsImpl(System.Object a, System.Object b)
+        {
+            if (a != null && a is java.lang.Object && b != null && b is java.lang.Object)
+            {
+                return ((java.lang.Object)a).equals((java.lang.Object)b);
+            }
+            return base.checkEqualsImpl(a, b);
+        }
+
+        public override int generateHashCodeImpl(System.Object a)
+        {
+            if (a != null && a is java.lang.Object)
+            {
+                return ((java.lang.Object)a).hashCode();
+            }
+            return base.generateHashCodeImpl(a);
+        }
+
         public override string getCurrentStackTrace()
         {
             return Environment.StackTrace;

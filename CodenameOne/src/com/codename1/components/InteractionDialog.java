@@ -345,8 +345,8 @@ public class InteractionDialog extends Container {
                 titleArea.setPreferredSize(new Dimension(0,0));
                 if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
                     getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
-                    int cpPaddingTop = getContentPane().getStyle().getPadding(TOP);
-                    int titlePT = getTitleComponent().getStyle().getPadding(TOP);
+                    int cpPaddingTop = getContentPane().getStyle().getPaddingTop();
+                    int titlePT = getTitleComponent().getStyle().getPaddingTop();
                     byte[] pu = getContentPane().getStyle().getPaddingUnit();
                     if(pu == null){
                         pu = new byte[4]; 

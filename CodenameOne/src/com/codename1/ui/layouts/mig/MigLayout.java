@@ -628,10 +628,10 @@ public final class MigLayout extends Layout {
 
         Style i = parent.getStyle();
         int[] b = new int[]{
-            i.getMargin(Component.LEFT),
-            i.getMargin(Component.TOP),
-            parent.getWidth() - i.getMargin(Component.LEFT) - i.getMargin(Component.RIGHT),
-            parent.getHeight() - i.getMargin(Component.TOP) - i.getMargin(Component.BOTTOM)
+            i.getMarginLeftNoRTL(),
+            i.getMarginTop(),
+            parent.getWidth() - i.getHorizontalMargins(),
+            parent.getHeight() - i.getVerticalMargins()
         };
 
         if (grid.layout(b, lc.getAlignX(), lc.getAlignY(), getDebug())) {
@@ -785,8 +785,8 @@ public final class MigLayout extends Layout {
 
         Style i = parent.getStyle();
 
-        int w = LayoutUtil.getSizeSafe(grid != null ? grid.getWidth() : null, sizeType) + i.getPadding(Component.LEFT) + i.getPadding(Component.RIGHT);
-        int h = LayoutUtil.getSizeSafe(grid != null ? grid.getHeight() : null, sizeType) + i.getPadding(Component.TOP) + i.getPadding(Component.BOTTOM);
+        int w = LayoutUtil.getSizeSafe(grid != null ? grid.getWidth() : null, sizeType) + i.getHorizontalPadding();
+        int h = LayoutUtil.getSizeSafe(grid != null ? grid.getHeight() : null, sizeType) + i.getVerticalPadding();
 
         return new Dimension(w, h);
     }

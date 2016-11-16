@@ -199,8 +199,8 @@ public class OnOffSwitch extends Container {
                 switchButtonPadInt *= 2;
             }
             Style s = getStyle();
-            int x = getX() + s.getPadding(LEFT);
-            int y = getY() + s.getPadding(TOP);
+            int x = getX() + s.getPaddingLeftNoRTL();
+            int y = getY() + s.getPaddingTop();
             if(!value) {
                 if(deltaX > 0) {
                     dragged = false;

@@ -1549,6 +1549,74 @@ public class Style {
     }
     
     /**
+     * The equivalent of getMarginLeft + getMarginRight
+     * @return the side margin
+     */
+    public int getHorizontalMargins() {
+        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT) +
+                convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+    }
+
+    /**
+     * The equivalent of getMarginTop + getMarginBottom
+     * @return the vertical margin
+     */
+    public int getVerticalMargins() {
+        return convertUnit(marginUnit, margin[Component.TOP], Component.TOP) +
+                convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);
+    }
+    
+    /**
+     * The equivalent of getPaddingLeft + getPaddingRight
+     * @return the side padding
+     */
+    public int getHorizontalPadding() {
+        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT) +
+                convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+    }
+
+    /**
+     * The equivalent of getPaddingTop + getPaddingBottom
+     * @return the vertical padding
+     */
+    public int getVerticalPadding() {
+        return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP) +
+                convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);
+    }
+    
+    /**
+     * Returns the right margin in pixels ignoring RTL
+     * @return the margin in pixels
+     */
+    public int getMarginRightNoRTL() {
+        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
+    }
+
+    /**
+     * Returns the left margin in pixels ignoring RTL
+     * @return the margin in pixels
+     */
+    public int getMarginLeftNoRTL() {
+        return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+    }
+    
+    /**
+     * Returns the right padding in pixels ignoring RTL
+     * @return the padding in pixels
+     */
+    public int getPaddingRightNoRTL() {
+        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
+    }
+
+    /**
+     * Returns the left padding in pixels ignoring RTL
+     * @return the padding in pixels
+     */
+    public int getPaddingLeftNoRTL() {
+        return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+    }
+    
+    /**
      * Returns the right margin in pixel or left margin in an RTL situation
      * @param rtl indicates a right to left language
      * @return the margin in pixels

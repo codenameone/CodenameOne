@@ -411,10 +411,18 @@ namespace com.codename1.impl
 
         public override void installNativeTheme()
         {
-            ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
+           ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
             ui.plaf.UIManager uim = ui.plaf.UIManager.getInstance();
             string[] themeNames = r.getThemeResourceNames();
-            uim.setThemeProps(r.getTheme((string)themeNames[0]));
+            java.util.Hashtable props = r.getTheme((string)themeNames[0]);
+            if (isDesktop() || isTablet())
+            {
+                props.put("hideBackCommandBool", false);
+            } else 
+            {
+                props.put("hideBackCommandBool", true);
+            } 
+            uim.setThemeProps(props);
             ui.plaf.DefaultLookAndFeel dl = (ui.plaf.DefaultLookAndFeel)uim.getLookAndFeel();
             dl.setDefaultEndsWith3Points(false);
         }
@@ -3327,6 +3335,11 @@ namespace com.codename1.impl
         }
 
         public override bool isTablet()
+        {
+            return isPhone;
+        }
+
+        public override bool isDesktop()
         {
             return isPhone;
         }

@@ -321,7 +321,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return;
         }
         Form current = getCurrentForm();
-        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && getRootPane(current).getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+        if(nativeInstance.isAsyncEditMode() && current.isFormBottomPaddingEditingMode() && getRootPane(current).getUnselectedStyle().getPaddingBottom()> 0) {
             getRootPane(current).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
             current.forceRevalidate();
         } 
@@ -367,7 +367,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(f == cmp.getComponentForm()) {
                             cmp.requestFocus();
                         }
-                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && getRootPane(f).getUnselectedStyle().getPadding(Component.BOTTOM) > 0) {
+                        if(nativeInstance.isAsyncEditMode() && f.isFormBottomPaddingEditingMode() && getRootPane(f).getUnselectedStyle().getPaddingBottom() > 0) {
                             getRootPane(f).getUnselectedStyle().setPadding(Component.BOTTOM, 0);
                             f.forceRevalidate();
                             return;
@@ -418,10 +418,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             int y = cmp.getAbsoluteY() + cmp.getScrollY();
             int w = cmp.getWidth();
             int h = cmp.getHeight();
-            int pt = stl.getPadding(false, Component.TOP);
-            int pb = stl.getPadding(false, Component.BOTTOM);
-            int pl = stl.getPadding(rtl, Component.LEFT);
-            int pr = stl.getPadding(rtl, Component.RIGHT);
+            int pt = stl.getPaddingTop();
+            int pb = stl.getPaddingBottom();
+            int pl = stl.getPaddingLeft(rtl);
+            int pr = stl.getPaddingRight(rtl);
             if(cmp.isSingleLineTextArea()) {
                 switch(cmp.getVerticalAlignment()) {
                     case TextArea.CENTER:
@@ -727,10 +727,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                     int y = cmp.getAbsoluteY() + cmp.getScrollY();
                     int w = cmp.getWidth();
                     int h = cmp.getHeight();
-                    int pt = stl.getPadding(false, Component.TOP);
-                    int pb = stl.getPadding(false, Component.BOTTOM);
-                    int pl = stl.getPadding(rtl, Component.LEFT);
-                    int pr = stl.getPadding(rtl, Component.RIGHT);
+                    int pt = stl.getPaddingTop();
+                    int pb = stl.getPaddingBottom();
+                    int pl = stl.getPaddingLeft(rtl);
+                    int pr = stl.getPaddingRight(rtl);
                     if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
                         switch(currentEditing.getVerticalAlignment()) {
                             case TextArea.CENTER:
