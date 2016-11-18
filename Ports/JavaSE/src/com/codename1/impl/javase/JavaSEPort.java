@@ -424,17 +424,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void startBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
             stopBackgroundFetchService();
-            backgroundFetchTimer = new java.util.Timer();
+            if (getPreferredBackgroundFetchInterval() > 0) {
+                backgroundFetchTimer = new java.util.Timer();
 
-            TimerTask tt = new TimerTask() {
+                TimerTask tt = new TimerTask() {
 
-                @Override
-                public void run() {
-                    performBackgroundFetch();
-                }
+                    @Override
+                    public void run() {
+                        performBackgroundFetch();
+                    }
 
-            };
-            backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+                };
+                backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+            }
         }
     }
     
@@ -8028,7 +8030,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public boolean accept(File dir, String name) {
                 name = name.toLowerCase();
                 for(String t : types) {
-                    if(name.endsWith(t)) {
+                    if(name.endsWith(t) || "*".equals(t)) {
                         return true;
                     }
                 }
