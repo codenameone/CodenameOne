@@ -658,6 +658,44 @@ public class BorderLayout extends Layout {
 
     /**
      * Convenience method that creates a border layout container and places the given component in the center
+     * east and west respectively
+     * @param center the center component
+     * @param east component or null to ignore
+     * @param west component or null to ignore
+     * @return the created component
+     */
+    public static Container centerEastWest(Component center, Component east, Component west) {
+        Container c = center(center);
+        if(east != null) {
+            c.add(BorderLayout.EAST, east);
+        }
+        if(west != null) {
+            c.add(BorderLayout.WEST, west);
+        }
+        return c;
+    }
+    
+    /**
+     * Convenience method that creates a border layout absolute center container and places the given component in the center
+     * east and west respectively
+     * @param center the center component
+     * @param east component or null to ignore
+     * @param west component or null to ignore
+     * @return the created component
+     */
+    public static Container centerAbsoluteEastWest(Component center, Component east, Component west) {
+        Container c = centerAbsolute(center);
+        if(east != null) {
+            c.add(BorderLayout.EAST, east);
+        }
+        if(west != null) {
+            c.add(BorderLayout.WEST, west);
+        }
+        return c;
+    }
+    
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
      * with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
      * @param center the center component
      * @return the created component
