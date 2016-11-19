@@ -232,7 +232,7 @@ public class BoxLayout extends Layout{
         }
         Style s = parent.getStyle();
         dim.setWidth(width + s.getHorizontalPadding());
-        dim.setHeight(height + s.getHorizontalPadding());
+        dim.setHeight(height + s.getVerticalPadding());
         return dim;
     }  
 
