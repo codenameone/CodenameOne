@@ -90,6 +90,10 @@ public class Executor {
                                 Display.deinitialize();
                             }
                             final Method m = c.getDeclaredMethod("init", Object.class);
+                            if(m.getExceptionTypes() != null && m.getExceptionTypes().length > 0) {
+                                System.err.println("ERROR: the init method can't declare a throws clause");
+                                System.exit(1);
+                            }
                             app = c.newInstance();
                             if(app instanceof PushCallback) {
                                 CodenameOneImplementation.setPushCallback((PushCallback)app);
@@ -104,6 +108,10 @@ public class Executor {
                                     try {
                                         m.invoke(app, new Object[]{null});
                                         Method start = c.getDeclaredMethod("start", new Class[0]);
+                                        if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
+                                            System.err.println("ERROR: the start method can't declare a throws clause");
+                                            System.exit(1);
+                                        }
                                         start.invoke(app, new Object[0]);
                                     } catch (NoSuchMethodException err) {
                                         System.out.println("Couldn't find a main or a startup in " + argv[0]);
@@ -130,6 +138,10 @@ public class Executor {
         if(c != null && app != null){
             try {
                 Method stop = c.getDeclaredMethod("stop", new Class[0]);
+                if(stop.getExceptionTypes() != null && stop.getExceptionTypes().length > 0) {
+                    System.err.println("ERROR: the stop method can't declare a throws clause");
+                    System.exit(1);
+                }
                 stop.invoke(app, new Object[0]);
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -152,6 +164,10 @@ public class Executor {
         if(c != null && app != null){
             try {
                 Method start = c.getDeclaredMethod("start", new Class[0]);
+                if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
+                    System.err.println("ERROR: the start method can't declare a throws clause");
+                    System.exit(1);
+                }
                 start.invoke(app, new Object[0]);
             } catch (Exception ex) {
                 ex.printStackTrace();
