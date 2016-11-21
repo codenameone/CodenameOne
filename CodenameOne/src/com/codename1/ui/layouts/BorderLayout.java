@@ -167,6 +167,29 @@ public class BorderLayout extends Layout {
             throw new IllegalArgumentException("Cannot add component to BorderLayout Container without constraint parameter");
         }
 
+        // allows us to work with Component constraints too which makes some code simpler
+        if(name instanceof Integer) {
+            switch(((Integer)name).intValue()) {
+                case Component.TOP:
+                    name = NORTH;
+                    break;
+                case Component.BOTTOM:
+                    name = SOUTH;
+                    break;
+                case Component.LEFT:
+                    name = WEST;
+                    break;
+                case Component.RIGHT:
+                    name = EAST;
+                    break;
+                case Component.CENTER:
+                    name = CENTER;
+                    break;
+                default:
+                    throw new IllegalArgumentException("BorderLayout Container expects one of the constraints BorderLayout.NORTH/SOUTH/EAST/WEST/CENTER");            
+            }
+        }
+        
         Component previous = null;
 
         /* Assign the component to one of the known regions of the layout.
