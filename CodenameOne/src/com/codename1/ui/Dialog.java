@@ -219,6 +219,18 @@ public class Dialog extends Form {
         this();
         setTitle(title);
     }
+
+    /**
+     * Constructs a Dialog with a title
+     * 
+     * @param title the title of the dialog
+     * @param lm the layout for the dialog
+     */
+    public Dialog(String title, Layout lm) {
+        this(lm);
+        setTitle(title);
+    }
+    
     
     /**
      * Disabling ad padding for dialogs
@@ -227,16 +239,33 @@ public class Dialog extends Form {
     }
 
     /**
-     * Constructs a Dialog with a title
+     * Constructs a Dialog 
      * 
      */
     public Dialog() {
         this("Dialog", "DialogTitle");
     }
 
+    /**
+     * Constructs a Dialog with a layout
+     * 
+     * @param lm the layout manager
+     */
+    public Dialog(Layout lm) {
+        this("Dialog", "DialogTitle", lm);
+    }
+    
     Dialog(String dialogUIID, String dialogTitleUIID) {
         super();
+        initImpl(dialogUIID, dialogTitleUIID, null);
+    }
 
+    Dialog(String dialogUIID, String dialogTitleUIID, Layout lm) {
+        super();
+        initImpl(dialogUIID, dialogTitleUIID, lm);
+    }
+
+    private void initImpl(String dialogUIID, String dialogTitleUIID, Layout lm) {
         super.getContentPane().setUIID(dialogUIID);
         super.getTitleComponent().setText("");
         super.getTitleComponent().setVisible(false);
@@ -245,7 +274,11 @@ public class Dialog extends Form {
         lockStyleImages(getUnselectedStyle());
         titleArea.setVisible(false);
 
-        dialogContentPane = new Container();
+        if(lm != null) {
+            dialogContentPane = new Container(lm);
+        } else {
+            dialogContentPane = new Container();
+        }
         dialogContentPane.setUIID("DialogContentPane");
         dialogTitle = new Label("", dialogTitleUIID);
         super.getContentPane().setLayout(new BorderLayout());
@@ -260,7 +293,7 @@ public class Dialog extends Form {
         setSmoothScrolling(false);
         deregisterAnimated(this);
     }
-
+    
     /**
      * Overriden to disable the toolbar in dialogs <br>
      * {@inheritDoc}
