@@ -2906,6 +2906,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             skinNames = f;
         }
         pref.put("skins", skinNames);
+        try {
+            pref.flush();
+        } catch(Throwable t) {
+            t.printStackTrace();
+        }
     }
 
     private void deepRevaliate(com.codename1.ui.Container c) {
