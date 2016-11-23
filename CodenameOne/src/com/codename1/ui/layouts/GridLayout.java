@@ -166,7 +166,7 @@ public class GridLayout extends Layout{
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
         int width = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();
-        int height = parent.getLayoutHeight() - parent.getBottomGap() - parent.getStyle().getPaddingTop();
+        int height = parent.getLayoutHeight() - parent.getBottomGap() - s.getVerticalPadding();
         int numOfcomponents = parent.getComponentCount();
 
         autoSizeCols(parent, width);
