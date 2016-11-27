@@ -778,10 +778,18 @@ public class SideMenuBar extends MenuBar {
             titleArea.addComponent(BorderLayout.CENTER, l);
             installRightCommands();
             installLeftCommands();
-            if(parent.getUIManager().isThemeConstant("leftAlignSideMenuBool", false)) {
-                ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+            if(parent.getToolbar() != null) {
+                if(parent.getToolbar().isTitleCentered()) {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);                
+                } else {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+                }
             } else {
-                ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);                
+                if(parent.getUIManager().isThemeConstant("leftAlignSideMenuBool", false)) {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+                } else {
+                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);                
+                }
             }
         }
         if (cmd != null) {
@@ -1143,7 +1151,7 @@ public class SideMenuBar extends MenuBar {
 
             protected void sizeChanged(int w, int h) {
                 Style formStyle = getStyle();
-                int width = w - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
+                int width = w - (formStyle.getHorizontalMargins());
                 
                 parent.sizeChangedInternal(w, h);
                 //if the size changed event came from a keyboard open/close don't 
@@ -1756,8 +1764,7 @@ public class SideMenuBar extends MenuBar {
             closeMenu();
             clean();
             parent.addShowListener(pointerDragged);
-            new Thread(new ShowWaiter()).start();
-
+            Display.getInstance().startThread(new ShowWaiter(), "Show Waiter").start();
         }
     }
 

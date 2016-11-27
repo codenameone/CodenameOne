@@ -283,10 +283,10 @@ public class LayoutStyle {
     }
 
     private int getInset(Component c, int position) {
-        int insetLeft = c.getStyle().getMargin(false, Component.LEFT);
-        int insetTop = c.getStyle().getMargin(false, Component.TOP);
-        int insetRight = c.getStyle().getMargin(false, Component.RIGHT);
-        int insetBottom = c.getStyle().getMargin(false, Component.BOTTOM);
+        int insetLeft = c.getStyle().getMarginLeftNoRTL();
+        int insetTop = c.getStyle().getMarginTop();
+        int insetRight = c.getStyle().getMarginRightNoRTL();
+        int insetBottom = c.getStyle().getMarginBottom();
         switch(position) {
         case GroupLayout.NORTH:
             return insetTop;

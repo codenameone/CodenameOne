@@ -51,6 +51,7 @@ import java.io.Writer;
  * @author Shai Almog
  */
 public class Log {
+    private static boolean crashBound;
     /**
      * Constant indicating the logging level Debug is the default and the lowest level
      * followed by info, warning and error
@@ -171,7 +172,7 @@ public class Log {
         r.addArgument("p", Display.getInstance().getProperty("package_name", ""));
         r.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
         r.addArgument("pl", Display.getInstance().getPlatformName());
-        r.addArgument("u", Display.getInstance().getProperty("udid", ""));
+        //r.addArgument("u", Display.getInstance().getProperty("udid", ""));
         com.codename1.io.NetworkManager.getInstance().addToQueueAndWait(r);
         return Preferences.get("UDeviceId__$", (long)-1);
     }
@@ -428,6 +429,7 @@ public class Log {
      * the application any way it sees fit
      * 
      * @return string containing the whole log
+     * @deprecated this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
      */
     public static String getLogContent() {
         try {
@@ -555,7 +557,7 @@ public class Log {
                 if(consumeError) {
                     evt.consume();
                 }
-                p("Exception in AppName version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
+                p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
                 p("OS " + Display.getInstance().getPlatformName());
                 p("Error " + evt.getSource());
                 if(Display.getInstance().getCurrent() != null) {
@@ -567,6 +569,14 @@ public class Log {
                 sendLog();
             }
         });
-        
+        crashBound = true;
+    }
+    
+    /**
+     * Returns true if the user bound crash protection
+     * @return true if crash protection is bound
+     */
+    public static boolean isCrashBound() {
+        return crashBound;
     }
 }

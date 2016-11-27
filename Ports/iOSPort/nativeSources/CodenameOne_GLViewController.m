@@ -61,6 +61,11 @@
 #import "GoogleOpenSource.h"
 #endif
 
+// Last touch positions.  Helpful to know on the iPad when some popover stuff
+// needs a source rect that the java API doesn't pass through.
+int CN1lastTouchX=0;
+int CN1lastTouchY=0;
+
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
 extern bool datepickerPopover;
@@ -741,7 +746,7 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
         CGMutablePathRef path = CGPathCreateMutable();
         
         CGAffineTransform t = CGAffineTransformMakeTranslation(cx, cy);
-        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/width), t);
+        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/(float)width), t);
         
         CGFloat radius = width/2;
         if (fill){
@@ -2676,10 +2681,14 @@ static BOOL skipNextTouch = NO;
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
             yArray[iter] = (int)currentPoint.y * scaleValue;
+            CN1lastTouchX = (int)currentPoint.x;
+            CN1lastTouchY = (int)currentPoint.y;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
+        CN1lastTouchX = (int)point.x;
+        CN1lastTouchY = (int)point.y;
     }
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();

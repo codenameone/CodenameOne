@@ -95,6 +95,14 @@ public class SpanLabel extends Container {
     }
     
     /**
+     * Returns the Style proxy object for the text of this span button.
+     * @return The Style object for the text of this span button.
+     */
+    public Style getTextAllStyles() {
+        return text.getAllStyles();
+    }
+    
+    /**
      * Returns the text elements style object
      * @return the style object
      */

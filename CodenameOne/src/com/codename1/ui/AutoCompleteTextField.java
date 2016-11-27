@@ -90,7 +90,11 @@ public class AutoCompleteTextField extends TextField {
                 }
                 super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
             }
-        
+
+            @Override
+            public void refreshTheme(boolean merge) {
+            }
+            
         };
         filter = new FilterProxyListModel<String>(listModel);                
         popup.setScrollable(false);
@@ -139,6 +143,17 @@ public class AutoCompleteTextField extends TextField {
         });
     }
 
+    /**
+     * Causes the popup UI to show
+     */
+    public void showPopup() {
+        requestFocus();
+        int m = minimumLength;
+        minimumLength = 0;
+        setText(getText());
+        minimumLength = m;
+    }
+    
     void setParentText(String text) {
         super.setText(text);
     }
@@ -407,6 +422,10 @@ public class AutoCompleteTextField extends TextField {
         int popupHeight;
         int items = l.getModel().getSize();
         final Form f = getComponentForm();
+        if(f == null) {
+            // for some reason this happens in the GUI builder
+            return 10;
+        }
         if(l.getModel() instanceof FilterProxyListModel){
             items = ((FilterProxyListModel)l.getModel()).getUnderlying().getSize();
         }
@@ -447,7 +466,7 @@ public class AutoCompleteTextField extends TextField {
                 }
             }
             
-            if(!canOpenPopup){
+            if(!canOpenPopup || getText().length() < getMinimumLength()){
                 return;
             }
             

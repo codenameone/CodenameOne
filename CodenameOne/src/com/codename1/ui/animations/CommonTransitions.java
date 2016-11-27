@@ -502,17 +502,17 @@ public final class CommonTransitions extends Transition {
                 if(destination instanceof Dialog) {
                     startOffset = w - getDialogParent(destination).getWidth();
                     if(direction) {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(destination.isRTL(), Component.LEFT);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginLeft(destination.isRTL());
                     } else {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(destination.isRTL(), Component.RIGHT);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginRight(destination.isRTL());
                     }
                 } else {
                     if(source instanceof Dialog) {
                         dest = getDialogParent(source).getWidth();
                         if(direction) {
-                            dest += getDialogParent(source).getStyle().getMargin(source.isRTL(), Component.LEFT);
+                            dest += getDialogParent(source).getStyle().getMarginLeft(source.isRTL());
                         } else {
-                            dest += getDialogParent(source).getStyle().getMargin(source.isRTL(), Component.RIGHT);
+                            dest += getDialogParent(source).getStyle().getMarginRight(source.isRTL());
                         }
                     }
                 }
@@ -522,10 +522,10 @@ public final class CommonTransitions extends Transition {
                     startOffset = h - getDialogParent(destination).getHeight() -
                         getDialogTitleHeight((Dialog)destination);
                     if(direction) {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(false, Component.BOTTOM);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginBottom();
                     } else {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(false, Component.TOP);
-                        startOffset -= ((Dialog)destination).getTitleStyle().getMargin(false, Component.TOP);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginTop();
+                        startOffset -= ((Dialog)destination).getTitleStyle().getMarginTop();
                         if(!drawDialogMenu && ((Dialog)destination).getCommandCount() > 0) {
                             Container p = ((Dialog)destination).getSoftButton(0).getParent();
                             if(p != null) {
@@ -538,10 +538,10 @@ public final class CommonTransitions extends Transition {
                         dest = getDialogParent(source).getHeight() +
                             getDialogTitleHeight((Dialog)source);
                         if(direction) {
-                            dest += getDialogParent(source).getStyle().getMargin(false, Component.BOTTOM);
+                            dest += getDialogParent(source).getStyle().getMarginBottom();
                         } else {
-                            dest += getDialogParent(source).getStyle().getMargin(false, Component.TOP);
-                            dest += ((Dialog)source).getTitleStyle().getMargin(false, Component.TOP);
+                            dest += getDialogParent(source).getStyle().getMarginTop();
+                            dest += ((Dialog)source).getTitleStyle().getMarginTop();
                             if(((Dialog)source).getCommandCount() > 0) {
                                 Container p = ((Dialog)source).getSoftButton(0).getParent();
                                 if(p != null) {

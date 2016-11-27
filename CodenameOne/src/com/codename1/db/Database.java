@@ -62,6 +62,8 @@ public abstract class Database {
     /**
      * Indicates weather a database exists
      * 
+     * <p><strong>NOTE:</strong> Not supported in the  Javascript port.  Will always return false.</p>
+     * 
      * @param databaseName the name of the database
      * @return true if database exists
      */
@@ -71,6 +73,8 @@ public abstract class Database {
     
     /**
      * Deletes database
+     * 
+     * <p><strong>NOTE:</strong> This method is not supported in the  Javascript port.  Will silently fail.</p>
      * 
      * @param databaseName the name of the database
      * @throws IOException if database cannot be deleted
@@ -82,6 +86,8 @@ public abstract class Database {
     /**
      * Returns the file path of the Database if exists and if supported on 
      * the platform.
+     * 
+     * <p><strong>NOTE:</strong> This method will return null in the Javascript port.</p>
      * @return the file path of the database
      */
     public static String getDatabasePath(String databaseName){
@@ -91,6 +97,7 @@ public abstract class Database {
     /**
      * Starts a transaction
      * 
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.  This method will do nothing when running in Javascript.</p>
      * @throws IOException if database is not opened
      */
     public abstract void beginTransaction() throws IOException;
@@ -98,12 +105,16 @@ public abstract class Database {
     /**
      * Commits current transaction
      * 
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.   This method will do nothing when running in Javascript.</p>
+     * 
      * @throws IOException if database is not opened or transaction was not started
      */
     public abstract void commitTransaction() throws IOException;
     
     /**
      * Rolls back current transaction 
+     * 
+     * <p><strong>NOTE:</strong> Not supported in Javascript port.   This method will do nothing when running in Javascript.</p>
      * 
      * @throws IOException if database is not opened or transaction was not started
      */
@@ -151,7 +162,7 @@ public abstract class Database {
      * 
      * @throws IOException 
      */
-    public void execute(String sql, Object [] params) throws IOException{
+    public void execute(String sql, Object... params) throws IOException{
         if ( params == null) {
             execute(sql);
         } else {
@@ -185,6 +196,37 @@ public abstract class Database {
      * @throws IOException 
      */
     public abstract Cursor executeQuery(String sql, String [] params) throws IOException;
+    
+    /**
+     * This method should be called with SELECT type statements that return 
+     * row set it accepts object with params.
+     * 
+     * @param sql the sql to execute
+     * @param params to bind to the query where the '?' exists, supported object 
+     * types are String, byte[], Double, Long and null
+     * @return a cursor to iterate over the results
+     * 
+     * @throws IOException 
+     */
+    public Cursor executeQuery(String sql, Object... params) throws IOException{
+        if ( params == null || params.length == 0) {
+            return executeQuery(sql);
+        } else {
+            int len = params.length;
+            String[] strParams = new String[len];
+            for ( int i=0; i<len; i++) {
+                if (params[i] instanceof byte[]) {
+                    throw new RuntimeException("Blobs aren't supported on this platform");
+                }
+                if (params[i] == null) {
+                    strParams[i] = null;
+                } else {
+                    strParams[i] = params[i].toString();
+                }
+            }
+            return executeQuery(sql, strParams);
+        }
+    }
     
     /**
      * This method should be called with SELECT type statements that return 

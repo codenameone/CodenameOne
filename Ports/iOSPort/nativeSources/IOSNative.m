@@ -3475,7 +3475,9 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
                 [zip release];
                 [country release];
                 CFRelease(dict);
-                CFRelease(typeTmp);
+                if(typeTmp != 0) {
+                    CFRelease(typeTmp);
+                }
                 CFRelease(labeltype);
                 java_util_Hashtable_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CN1_THREAD_STATE_PASS_ARG addressesHash, fromNSString(CN1_THREAD_STATE_PASS_ARG (NSString*)labeltype), addr);
             }
@@ -5079,10 +5081,28 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 }
 
 
-void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg) {
+    __block JAVA_INT preferredHeight = preferredHeightArg;
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
+    if (preferredWidth == 0) {
+        preferredWidth = 320 * scaleValue;
+    }
+
+    // There are only 3 valid heights for the picker in iPad
+    //http://stackoverflow.com/a/7672577/2935174
+    if (preferredHeight == 0) {
+        preferredHeight = 216 * scaleValue;
+    } else if (preferredHeight <= 162) {
+        preferredHeight = 162;
+    } else if (preferredHeight <= 180) {
+        preferredHeight = 180;
+    } else {
+        preferredHeight = 216;
+    }
+    
+    
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSDate* date = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
@@ -5128,6 +5148,8 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             [toolbar setBarStyle:UIBarStyleBlackTranslucent];
             [toolbar sizeToFit];
             
+            preferredHeight += (int)toolbar.frame.size.height;
+            
             //add a space filler to the left:
             UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
                                            UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
@@ -5161,6 +5183,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
+            uip.popoverContentSize = CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue);
             
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
@@ -5844,11 +5867,11 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
     JAVA_INT len = numPoints * pointSize;
     for (JAVA_INT i=0; i<len; i+=pointSize) {
         JAVA_INT s0 = srcPos + i;
-        GLKVector3 inputVector = GLKVector3Make(inData[s0], inData[s0+1], 0);
+        GLKVector4 inputVector = GLKVector4Make(inData[s0], inData[s0+1], 0, 1);
         if (pointSize==3) {
             inputVector.v[2]= inData[s0+2];
         }
-        GLKVector3 outputVector = GLKMatrix4MultiplyVector3(mMat, inputVector);
+        GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
         
         int d0 = destPos + i;
         outData[d0++] = outputVector.v[0];

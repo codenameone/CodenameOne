@@ -107,7 +107,7 @@ public class ScaleImageButton extends Button {
             ih = (int) (((float)ih) / ((float)ratio));
         }
         Style s = getStyle();
-        return new Dimension(iw + s.getPaddingLeft(false) + s.getPaddingRight(false), ih +
+        return new Dimension(iw + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(), ih +
                 s.getPaddingTop() + s.getPaddingBottom());
     }
 
@@ -125,6 +125,15 @@ public class ScaleImageButton extends Button {
         getAllStyles().setBgTransparency(255);
     }
 
+    @Override
+    protected void refreshTheme(String id, boolean merge) {
+        byte type = getBackgroundType();
+        Image icon = getIcon();
+        super.refreshTheme(id, merge);
+        setIcon(icon);
+        getAllStyles().setBackgroundType(type);
+        getAllStyles().setBgTransparency(255);
+    }
     
     /**
      * Instead of setting the icon sets the background image
@@ -186,4 +195,46 @@ public class ScaleImageButton extends Button {
         return null;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"backgroundType"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] { Byte.class };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"Byte"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("backgroundType")) {
+            return getBackgroundType();
+        }
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("backgroundType")) {
+            setBackgroundType(((Byte)value).byteValue());
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+    
 }

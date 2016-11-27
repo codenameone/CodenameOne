@@ -321,6 +321,17 @@ public class UIManager {
         themeProps.put("sel#transparency", "255");
         themeProps.put("dis#fgColor", disabledColor);
 
+        Font thinFont = Font.getDefaultFont();
+        Font lightFont = thinFont;
+        Font italic = Font.createSystemFont(Font.FACE_SYSTEM,
+                    Font.STYLE_ITALIC, Font.SIZE_MEDIUM);
+        if(Font.isNativeFontSchemeSupported()) {
+            int size = Display.getInstance().convertToPixels(2.5f);
+            thinFont = Font.createTrueTypeFont("native:MainThin", "native:MainThin").derive(size, Font.STYLE_PLAIN);
+            lightFont = Font.createTrueTypeFont("native:MainLight", "native:MainLight").derive(size, Font.STYLE_PLAIN);
+            italic = Font.createTrueTypeFont("native:ItalicLight", "native:ItalicLight").derive(size, Font.STYLE_ITALIC);
+        }
+        
         // component specific settings
         if (installedTheme == null || !installedTheme.containsKey("ToolbarSearch.derive")) {
             themeProps.put("ToolbarSearch.derive", "Toolbar");
@@ -377,7 +388,7 @@ public class UIManager {
         
         if (installedTheme == null || !installedTheme.containsKey("ToastBarMessage.derive")) {
             
-            themeProps.put("ToastBarMessage.font", Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL));
+            themeProps.put("ToastBarMessage.font", lightFont);
             themeProps.put("ToastBarMessage.transparency", "0");
             themeProps.put("ToastBarMessage.fgColor", "FFFFFF");
             themeProps.put("ToastBarMessage.bgType", new Byte(Style.BACKGROUND_NONE));
@@ -488,17 +499,13 @@ public class UIManager {
             themeProps.put("OnOffSwitch.transparency", "255");
             themeProps.put("OnOffSwitch.bgColor", "222222");
             themeProps.put("OnOffSwitch.padding", "0,0,0,0");
-            themeProps.put("OnOffSwitch.font",
-                    Font.createSystemFont(Font.FACE_SYSTEM,
-                    Font.STYLE_BOLD, Font.SIZE_MEDIUM));
+            themeProps.put("OnOffSwitch.font", lightFont);
         }
         if(installedTheme == null || !installedTheme.containsKey("OnOffSwitch.sel#derive")) {
             themeProps.put("OnOffSwitch.sel#transparency", "255");
             themeProps.put("OnOffSwitch.sel#bgColor", "222222");
             themeProps.put("OnOffSwitch.sel#padding", "0,0,0,0");
-            themeProps.put("OnOffSwitch.sel#font",
-                    Font.createSystemFont(Font.FACE_SYSTEM,
-                    Font.STYLE_BOLD, Font.SIZE_MEDIUM));
+            themeProps.put("OnOffSwitch.sel#font", lightFont);
         }
         
         if(installedTheme == null || !installedTheme.containsKey("ContentPane.derive")) {
@@ -696,9 +703,7 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("TextHint.derive")) {
             themeProps.put("TextHint.transparency", "0");
             themeProps.put("TextHint.fgColor", "cccccc");
-            themeProps.put("TextHint.font",
-                    Font.createSystemFont(Font.FACE_SYSTEM,
-                    Font.STYLE_ITALIC, Font.SIZE_MEDIUM));
+            themeProps.put("TextHint.font", italic);
         }
 
         if(installedTheme == null || !installedTheme.containsKey("Title.derive")) {
@@ -730,90 +735,6 @@ public class UIManager {
             themeProps.put("TouchCommand.dis#fgColor", disabledColor);
         }
 
-
-        if(installedTheme == null || !installedTheme.containsKey("VKB.derive")) {
-            themeProps.put("VKB.bgColor", "666666");
-            themeProps.put("VKB.padding", "1,1,1,1");
-            themeProps.put("VKB.transparency", "255");            
-        }
-
-        if(installedTheme == null || !installedTheme.containsKey("VKBtooltip.derive")) {
-            themeProps.put("VKBtooltip.padding", "8,8,8,8");
-            themeProps.put("VKBtooltip.font",
-                    Font.createSystemFont(Font.FACE_SYSTEM,
-                    Font.STYLE_BOLD, Font.SIZE_LARGE));
-            themeProps.put("VKBtooltip.bgColor", "FFFFFF");
-            themeProps.put("VKBtooltip.fgColor", "0");
-            themeProps.put("VKBtooltip.border", Border.createRoundBorder(8, 8));
-            themeProps.put("VKBtooltip.transparency", "255");            
-        }
-
-        if(installedTheme == null || !installedTheme.containsKey("VKBButton.derive")) {
-            themeProps.put("VKBButton.fgColor", "FFFFFF");
-            themeProps.put("VKBButton.bgColor", "0");
-            themeProps.put("VKBButton.border", Border.createRoundBorder(8, 8));
-            themeProps.put("VKBButton.margin", "2,2,1,1");
-            themeProps.put("VKBButton.padding", "8,8,4,4");
-            themeProps.put("VKBButton.font",
-                    Font.createSystemFont(Font.FACE_SYSTEM,
-                    Font.STYLE_BOLD, Font.SIZE_MEDIUM));
-            themeProps.put("VKBButton.transparency", "255");            
-        }
-        if(installedTheme == null || !installedTheme.containsKey("VKBButton.sel#derive")) {
-            themeProps.put("VKBButton.sel#derive", "VKBButton");
-            themeProps.put("VKBButton.sel#bgType", new Byte(Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL));
-            themeProps.put("VKBButton.sel#bgGradient", new Object[]{new Integer(0x666666),
-                        new Integer(0), new Float(0), new Float(0), new Float(0)
-                    });
-            themeProps.put("VKBButton.sel#transparency", "255");            
-        }
-
-        if(installedTheme == null || !installedTheme.containsKey("VKBButton.press#derive")) {
-            themeProps.put("VKBButton.press#derive", "VKBButton");
-            themeProps.put("VKBButton.press#bgType", new Byte(Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL));
-            themeProps.put("VKBButton.press#bgGradient", new Object[]{new Integer(0),
-                        new Integer(0x666666), new Float(0), new Float(0), new Float(0)
-                    });
-            themeProps.put("VKBButton.press#transparency", "255");            
-        }
-
-        if(installedTheme == null || !installedTheme.containsKey("VKBSpecialButton.derive")) {
-            themeProps.put("VKBSpecialButton.fgColor", "FFFFFF");
-            themeProps.put("VKBSpecialButton.bgColor", "0");
-            themeProps.put("VKBSpecialButton.border", Border.createRoundBorder(8, 8));
-            themeProps.put("VKBSpecialButton.bgType", new Byte(Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL));
-            themeProps.put("VKBSpecialButton.bgGradient", new Object[]{new Integer(0xcccccc),
-                        new Integer(0x666666), new Float(0), new Float(0), new Float(0)
-                    });
-            themeProps.put("VKBSpecialButton.margin", "2,2,1,1");
-            themeProps.put("VKBSpecialButton.padding", "6,6,4,4");
-            themeProps.put("VKBSpecialButton.font",
-                    Font.createSystemFont(Font.FACE_SYSTEM,
-                    Font.STYLE_BOLD, Font.SIZE_MEDIUM));
-        }
-
-        themeProps.put("VKBSpecialButton.sel#derive", "VKBSpecialButton");
-
-        if(installedTheme == null || !installedTheme.containsKey("VKBSpecialButton.press#derive")) {
-            themeProps.put("VKBSpecialButton.press#derive", "VKBSpecialButton");
-            themeProps.put("VKBSpecialButton.press#bgType", new Byte(Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL));
-            themeProps.put("VKBSpecialButton.press#bgGradient", new Object[]{new Integer(0x666666),
-                        new Integer(0xcccccc), new Float(0), new Float(0), new Float(0)
-                    });
-        }
-
-        if(installedTheme == null || !installedTheme.containsKey("VKBTextInput.derive")) {
-            themeProps.put("VKBTextInput.fgColor", "FFFFFF");
-            themeProps.put("VKBTextInput.bgColor", "0");
-            themeProps.put("VKBTextInput.font",
-                    Font.createSystemFont(Font.FACE_SYSTEM,
-                    Font.STYLE_BOLD, Font.SIZE_MEDIUM));
-            themeProps.put("VKBTextInput.border",
-                    Border.getDefaultBorder());
-            themeProps.put("VKBTextInput.transparency", "255");            
-        }
-
-        themeProps.put("VKBTextInput.sel#derive", "VKBTextInput");
 
 
         if(installedTheme == null || !installedTheme.containsKey("AdsComponent.sel#derive")) {
@@ -904,20 +825,41 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {
             themeProps.put("FloatingActionButton.fgColor", "ffffff");
             themeProps.put("FloatingActionButton.bgColor", "d32f2f");
+            themeProps.put("FloatingActionButton.transparency", "0");
             themeProps.put("FloatingActionButton.marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.margin", "0,2,1,2");
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.press#derive")) {
             themeProps.put("FloatingActionButton.press#fgColor", "ffffff");
             themeProps.put("FloatingActionButton.press#bgColor", "b71c1c");
+            themeProps.put("FloatingActionButton.sel#transparency", "0");
             themeProps.put("FloatingActionButton.press#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.press#margin", "0,2,1,2");
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.sel#derive")) {
             themeProps.put("FloatingActionButton.sel#fgColor", "ffffff");
+            themeProps.put("FloatingActionButton.sel#transparency", "0");
             themeProps.put("FloatingActionButton.sel#bgColor", "b71c1c");
             themeProps.put("FloatingActionButton.sel#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.sel#margin", "0,2,1,2");
+        }
+        if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {
+            themeProps.put("Badge.fgColor", "ffffff");
+            themeProps.put("Badge.bgColor", "d32f2f");
+            themeProps.put("Badge.press#fgColor", "ffffff");
+            themeProps.put("Badge.press#bgColor", "b71c1c");
+            themeProps.put("Badge.sel#fgColor", "ffffff");
+            themeProps.put("Badge.sel#bgColor", "b71c1c");
+            themeProps.put("Badge#padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("Badge#padding", "0,0,0,0");
+            themeProps.put("Badge.sel#padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("Badge.sel#padding", "0,0,0,0");
+            themeProps.put("Badge.press#padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("Badge.press#padding", "0,0,0,0");
+            if(Font.isNativeFontSchemeSupported()) {
+                themeProps.put("Badge.font", lightFont.derive(Display.getInstance().convertToPixels(1.5f), Font.STYLE_PLAIN));
+            }
+            themeProps.put("Badge.align", centerAlign);
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionText.derive")) {
             themeProps.put("FloatingActionText.bgColor", "ffffff");
@@ -1092,6 +1034,28 @@ public class UIManager {
         defaultStyle = createStyle("", "", false);
         defaultSelectedStyle = new Style(defaultStyle);
         defaultSelectedStyle = createStyle("", "sel#", true);
+        
+        String overlayThemes = (String)themeProps.get("@OverlayThemes");      
+        if (overlayThemes != null) {
+            java.util.List<String> overlayThemesArr = StringUtil.tokenize(overlayThemes, ',');
+            for (String th : overlayThemesArr) {
+                th = th.trim();
+                if (th.length() == 0) {
+                    continue;
+                }
+                try {
+                    Resources res = Resources.openLayered("/"+th);
+                    boolean a = accessible;
+                    accessible = true;
+                    addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));
+                    accessible = a;
+                } catch (Exception ex) {
+                    System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: "+th);
+                    ex.printStackTrace();
+                }
+            }
+        }
+        
     }
     
     Style createStyle(String id, String prefix, boolean selected) {

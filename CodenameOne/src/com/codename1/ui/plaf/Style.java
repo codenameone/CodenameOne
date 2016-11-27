@@ -485,8 +485,8 @@ public class Style {
      * @param style the style to copy
      */
     public Style(Style style) {
-        this(style.getFgColor(), style.getBgColor(), 0, 0, style.getFont(), style.getBgTransparency(),
-                style.getBgImage(), true);
+        this(style.getFgColor(), style.getBgColor(), style.getFont(), style.getBgTransparency(),
+                style.getBgImage());
         setPadding(style.padding[Component.TOP],
                 style.padding[Component.BOTTOM],
                 style.padding[Component.LEFT],
@@ -527,14 +527,11 @@ public class Style {
      * 
      * @param fgColor foreground color
      * @param bgColor background color
-     * @param fgSelectionColor foreground selection color
-     * @param bgSelectionColor background selection color
      * @param f font
      * @param transparency transparency value
      * @param im background image
-     * @param scaledImage whether the image should be scaled or tiled
      */
-    private Style(int fgColor, int bgColor, int fgSelectionColor, int bgSelectionColor, Font f, byte transparency, Image im, boolean scaledImage) {
+    private Style(int fgColor, int bgColor, Font f, byte transparency, Image im) {
         this();
         this.fgColor = fgColor;
         this.bgColor = bgColor;
@@ -1549,6 +1546,74 @@ public class Style {
      */
     public int getPaddingBottom() {
         return convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);
+    }
+    
+    /**
+     * The equivalent of getMarginLeft + getMarginRight
+     * @return the side margin
+     */
+    public int getHorizontalMargins() {
+        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT) +
+                convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+    }
+
+    /**
+     * The equivalent of getMarginTop + getMarginBottom
+     * @return the vertical margin
+     */
+    public int getVerticalMargins() {
+        return convertUnit(marginUnit, margin[Component.TOP], Component.TOP) +
+                convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);
+    }
+    
+    /**
+     * The equivalent of getPaddingLeft + getPaddingRight
+     * @return the side padding
+     */
+    public int getHorizontalPadding() {
+        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT) +
+                convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
+    }
+
+    /**
+     * The equivalent of getPaddingTop + getPaddingBottom
+     * @return the vertical padding
+     */
+    public int getVerticalPadding() {
+        return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP) +
+                convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);
+    }
+    
+    /**
+     * Returns the right margin in pixels ignoring RTL
+     * @return the margin in pixels
+     */
+    public int getMarginRightNoRTL() {
+        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);
+    }
+
+    /**
+     * Returns the left margin in pixels ignoring RTL
+     * @return the margin in pixels
+     */
+    public int getMarginLeftNoRTL() {
+        return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);
+    }
+    
+    /**
+     * Returns the right padding in pixels ignoring RTL
+     * @return the padding in pixels
+     */
+    public int getPaddingRightNoRTL() {
+        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);
+    }
+
+    /**
+     * Returns the left padding in pixels ignoring RTL
+     * @return the padding in pixels
+     */
+    public int getPaddingLeftNoRTL() {
+        return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);
     }
     
     /**

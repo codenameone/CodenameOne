@@ -39,6 +39,7 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.EventDispatcher;
 
 
@@ -83,9 +84,10 @@ public class SignatureComponent extends Container {
         @Override
         public boolean animate() {
             if (signatureImage != null && signatureImage.animate()) {
+                Style s = getStyle();
                 lead.setIcon(signatureImage.scaledSmallerRatio(
-                        getWidth() - getStyle().getPadding(Component.LEFT) - getStyle().getPadding(Component.RIGHT), 
-                        getHeight() - getStyle().getPadding(Component.TOP) - getStyle().getPadding(Component.BOTTOM)
+                        getWidth() - s.getHorizontalPadding(), 
+                        getHeight() - s.getVerticalPadding()
                 ));
                 repaint();
                 return true;
@@ -153,15 +155,16 @@ public class SignatureComponent extends Container {
             protected void paintBackground(Graphics g) {
                 super.paintBackground(g);
                 g.setColor(0x666666);
+                Style s = getStyle();
                 g.drawRect(
-                        getX()+getStyle().getPadding(false, Component.LEFT), 
-                        getY()+getStyle().getPadding(false, Component.TOP),
-                        getWidth()-getStyle().getPadding(false, Component.RIGHT)-getStyle().getPadding(false, Component.LEFT),
-                        getHeight()-getStyle().getPadding(false, Component.BOTTOM) - getStyle().getPadding(false, Component.TOP)
+                        getX()+s.getPaddingLeftNoRTL(), 
+                        getY()+s.getPaddingTop(),
+                        getWidth()-s.getPaddingRightNoRTL()-s.getPaddingLeftNoRTL(),
+                        getHeight()-s.getPaddingBottom() - s.getPaddingTop()
                 );
                 
                 g.setFont(xFont);
-                g.drawString("X", getX() + getStyle().getPadding(false, Component.LEFT) + Display.getInstance().convertToPixels(3, true), getY() + getHeight() / 2);
+                g.drawString("X", getX() + getStyle().getPaddingLeftNoRTL() + Display.getInstance().convertToPixels(3, true), getY() + getHeight() / 2);
             }
 
             
@@ -219,7 +222,7 @@ public class SignatureComponent extends Container {
             signatureImage = img;
             lead.setText("");
             if (img != null) {
-                Image icon = img.scaledSmallerRatio(lead.getWidth() - lead.getStyle().getPadding(false, Component.LEFT) - lead.getStyle().getPadding(false, Component.RIGHT), lead.getHeight() - lead.getStyle().getPadding(false, Component.TOP) - lead.getStyle().getPadding(false, Component.BOTTOM));
+                Image icon = img.scaledSmallerRatio(lead.getWidth() - lead.getStyle().getPaddingLeftNoRTL() - lead.getStyle().getPaddingRightNoRTL(), lead.getHeight() - lead.getStyle().getPaddingTop()- lead.getStyle().getPaddingBottom());
                 lead.setIcon(icon);
             }
         }

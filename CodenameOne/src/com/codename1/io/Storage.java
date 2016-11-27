@@ -223,7 +223,10 @@ public class Storage {
             d.close();
             return true;
         } catch(Exception err) {
-            err.printStackTrace();
+            Log.e(err);
+            if(Log.isCrashBound()) {
+                Log.sendLog();
+            }
             Util.getImplementation().deleteStorageFile(name);
             Util.getImplementation().cleanup(d);
             return false;
@@ -258,7 +261,10 @@ public class Storage {
             cache.put(name, o);
             return o;
         } catch(Exception err) {
-            err.printStackTrace();
+            Log.e(err);
+            if(Log.isCrashBound()) {
+                Log.sendLog();
+            }
             Util.getImplementation().cleanup(d);
             return null;
         }

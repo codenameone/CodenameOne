@@ -535,7 +535,7 @@ public class InPlaceEditView extends FrameLayout{
         final boolean showKeyboard = showVKB;
         final ActionListener listener = Display.getInstance().getVirtualKeyboardListener();
         if(listener != null){
-            new Thread(new Runnable() {
+            Thread t = new Thread(new Runnable() {
 
                 @Override
                 public void run() {
@@ -556,7 +556,9 @@ public class InPlaceEditView extends FrameLayout{
                         }
                     });
                 }
-            }).start();
+            });
+            t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+            t.start();
         }
         
         Log.d(TAG, "InputMethodManager returned " + Boolean.toString(result).toUpperCase());
@@ -661,10 +663,10 @@ public class InPlaceEditView extends FrameLayout{
             scrollX = ta.getScrollX();
             scrollY = ta.getScrollY();
             Style s = ta.getStyle();
-            paddingTop = s.getPadding(ta.isRTL(), Component.TOP);
-            paddingLeft = s.getPadding(ta.isRTL(), Component.LEFT);
-            paddingRight = s.getPadding(ta.isRTL(), Component.RIGHT);
-            paddingBottom = s.getPadding(Component.BOTTOM);
+            paddingTop = s.getPaddingTop();
+            paddingLeft = s.getPaddingLeft(ta.isRTL());
+            paddingRight = s.getPaddingRight(ta.isRTL());
+            paddingBottom = s.getPaddingBottom();
             isTextField = (ta instanceof TextField);
             verticalAlignment = ta.getVerticalAlignment();
             height = ta.getHeight();
@@ -886,9 +888,9 @@ public class InPlaceEditView extends FrameLayout{
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
         if (reason == REASON_IME_ACTION
+                && mEditText.mTextArea instanceof TextField 
                 && ((TextField) mEditText.mTextArea).getDoneListener() != null
-                && ((imo & EditorInfo.IME_ACTION_DONE) != 0 || (imo & EditorInfo.IME_ACTION_SEARCH) != 0 || (imo & EditorInfo.IME_ACTION_SEND) != 0 || (imo & EditorInfo.IME_ACTION_GO) != 0)
-                && mEditText.mTextArea instanceof TextField) {
+                && ((imo & EditorInfo.IME_ACTION_DONE) != 0 || (imo & EditorInfo.IME_ACTION_SEARCH) != 0 || (imo & EditorInfo.IME_ACTION_SEND) != 0 || (imo & EditorInfo.IME_ACTION_GO) != 0)) {
             ((TextField) mEditText.mTextArea).fireDoneEvent();
             showVirtualKeyboard(false);
         }

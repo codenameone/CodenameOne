@@ -29,30 +29,93 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
 
 /**
- * A border that can either be a circle or a circular rectangle which is a rectangle whose sides are circles.
- * This border can optionally have a drop shadow associated with it.
+ * <p>A border that can either be a circle or a circular rectangle which is a rectangle whose sides are circles.
+ * This border can optionally have a drop shadow associated with it.</p>
+ * <script src="https://gist.github.com/codenameone/3e91e5eab4e677e6b03962e78ae99e07.js"></script>
+ * <img src="https://www.codenameone.com/img/blog/round-border.png" alt="Round Border" />
+ * 
  *
  * @author Shai Almog
  */
 public class RoundBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rbcache";
+    
+    /**
+     * The color of the border background
+     */
     private int color = 0xd32f2f;
+    
+    /**
+     * The opacity (transparency) of the border background
+     */
     private int opacity = 255;
+    
+    /**
+     * The color of the edge of the border if applicable
+     */
     private int strokeColor;
+    
+    /**
+     * The opacity of the edge of the border if applicable
+     */
     private int strokeOpacity = 255;
+
     private Stroke stroke;
+
+    
+    /**
+     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
+     */
+    private float strokeThickness;
+
+    /**
+     * True if the thickness of the stroke is in millimeters
+     */
+    private boolean strokeMM;
+
+    /**
+     * The spread of the shadow in pixels of millimeters
+     */
     private int shadowSpread;
+
+    /**
+     * The opacity of the shadow between 0 and 255
+     */
     private int shadowOpacity = 0;
+
+    /**
+     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
+     */
     private float shadowX = 0.5f;
+
+    /**
+     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
+     */
     private float shadowY = 0.5f;
+
+    /**
+     * The Gaussian blur size
+     */
     private float shadowBlur = 10;
+
+    /**
+     * True if the shadow spread is in millimeters
+     */
+    private boolean shadowMM;
+
+    /**
+     * True if this border grows into a rectangle horizontally or keeps growing as a circle
+     */
     private boolean rectangle;
     
     // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
     private static int instanceCounter;
     private final int instanceVal;
+    
+    private boolean uiid;
     
     private RoundBorder() {
         shadowSpread = Display.getInstance().convertToPixels(2);
@@ -67,6 +130,30 @@ public class RoundBorder extends Border {
      */
     public static RoundBorder create() {
         return new RoundBorder();
+    }
+    
+    /**
+     * <p>Uses the style of the components UIID to draw the background of the border, this effectively overrides all
+     * other style settings but allows the full power of UIID drawing including gradients, background images 
+     * etc.</p>
+     * <p><strong>Notice: </strong>this flag will only work when shaped clipping is supported. That feature
+     * isn't available in all platforms...</p>
+     * 
+     * 
+     * @param uiid true to use the background of the component setting
+     * @return border instance so these calls can be chained
+     */
+    public RoundBorder uiid(boolean uiid) {
+        this.uiid = uiid;
+        return this;
+    }
+    
+    /**
+     * True is we use the background of the component setting to draw
+     * @return true if we draw based on the component UIID
+     */
+    public boolean getUIID() {
+        return uiid;
     }
     
     /**
@@ -116,6 +203,37 @@ public class RoundBorder extends Border {
      */
     public RoundBorder stroke(Stroke stroke) {
         this.stroke = stroke;
+        return this;
+    }
+
+    /**
+     * Sets the stroke of the circle/rectangle
+     * @param stroke the thickness of the stroke object
+     * @param mm set to true to indicate the value is in millimeters, false indicates pixels
+     * @return border instance so these calls can be chained
+     */
+    public RoundBorder stroke(float stroke, boolean mm) {
+        strokeThickness = stroke;
+        if(strokeThickness == 0) {
+            this.stroke = null;
+            return this;
+        }
+        strokeMM = mm;
+        if(mm) {
+            stroke = Display.getInstance().convertToPixels(stroke);
+        }
+        return stroke(new Stroke(stroke, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1));
+    }
+    
+    /**
+     * Sets the spread in pixels of the shadow i.e how much bigger is it than the actual circle/rectangle
+     * @param shadowSpread the amount in pixels representing the size of the shadow
+     * @param mm set to true to indicate the value is in millimeters, false indicates pixels
+     * @return border instance so these calls can be chained
+     */
+    public RoundBorder shadowSpread(int shadowSpread, boolean mm) {
+        this.shadowMM = mm;
+        this.shadowSpread = shadowSpread;
         return this;
     }
 
@@ -194,7 +312,7 @@ public class RoundBorder extends Border {
         } else {
             return;
         }
-        
+                
         Image target = Image.createImage(w, h, 0);
         
         int shapeX = 0;
@@ -205,18 +323,23 @@ public class RoundBorder extends Border {
         Graphics tg = target.getGraphics();
         tg.setAntiAliased(true);
                 
+        int shadowSpreadL =  shadowSpread;
+        if(shadowMM) {
+            shadowSpreadL = Display.getInstance().convertToPixels(shadowSpreadL);
+        }
+        
         if(shadowOpacity > 0) {
-            shapeW -= shadowSpread;
+            shapeW -= shadowSpreadL;
             shapeW -= (shadowBlur / 2);
-            shapeH -= shadowSpread;
+            shapeH -= shadowSpreadL;
             shapeH -= (shadowBlur / 2);
-            shapeX += Math.round((shadowSpread + (shadowBlur / 2)) * shadowX);
-            shapeY += Math.round((shadowSpread + (shadowBlur / 2)) * shadowY);
+            shapeX += Math.round((shadowSpreadL + (shadowBlur / 2)) * shadowX);
+            shapeY += Math.round((shadowSpreadL + (shadowBlur / 2)) * shadowY);
             
             // draw a gradient of sort for the shadow
-            for(int iter = shadowSpread - 1 ; iter >= 0 ; iter--) {            
+            for(int iter = shadowSpreadL - 1 ; iter >= 0 ; iter--) {            
                 tg.translate(iter, iter);
-                fillShape(tg, 0, shadowOpacity / shadowSpread, w - (iter * 2), h - (iter * 2), false);
+                fillShape(tg, 0, shadowOpacity / shadowSpreadL, w - (iter * 2), h - (iter * 2), false);
                 tg.translate(-iter, -iter);
             }
             if(Display.getInstance().isGaussianBlurSupported()) {
@@ -228,19 +351,52 @@ public class RoundBorder extends Border {
             }
         }
         tg.translate(shapeX, shapeY);
-        fillShape(tg, color, opacity, shapeW, shapeH, true);
+        if(uiid && tg.isShapeClipSupported()) {
+            c.getStyle().setBorder(Border.createEmpty());
+            
+            GeneralPath gp = new GeneralPath();
+            if(rectangle) {
+                float sw = this.stroke != null ? this.stroke.getLineWidth() : 0;
+                gp.moveTo(shapeH / 2.0, sw);
+                gp.lineTo(shapeW - (shapeH / 2.0), sw);
+                gp.arcTo(shapeW - (shapeH / 2.0), shapeH / 2.0, shapeW - (shapeH / 2.0), shapeH-sw, true);
+                gp.lineTo(shapeH / 2.0, shapeH-sw);
+                gp.arcTo(shapeH / 2.0, shapeH / 2.0, shapeH / 2.0, sw, true);
+                gp.closePath();
+            } else {
+                int size = shapeW;
+                int xPos = 0;
+                int yPos = 0;
+                if(shapeW != shapeH) {
+                    if(shapeW > shapeH) {
+                        size = shapeH;
+                        xPos = (shapeW - shapeH) / 2;
+                    } else {
+                        size = shapeW;
+                        yPos = (shapeH - shapeW) / 2;
+                    }
+                }
+                gp.arc(xPos, yPos, size, size, 0, 2*Math.PI);
+            }
+            
+            tg.setClip(gp);
+            c.getStyle().getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
+            c.getStyle().setBorder(this);
+        } else {
+            fillShape(tg, color, opacity, shapeW, shapeH, true);
+        }
         g.drawImage(target, x, y);
         c.putClientProperty(CACHE_KEY + instanceVal, target);
     }
 
     @Override
     public int getMinimumHeight() {
-        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(2);
+        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(1);
     }
 
     @Override
     public int getMinimumWidth() {
-        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(2);
+        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(1);
     }
 
     
@@ -262,7 +418,7 @@ public class RoundBorder extends Border {
             }
             if(stroke && this.stroke != null) {
                 GeneralPath arc = new GeneralPath();
-                arc.arc(x, y, size, size, 0, 360);
+                arc.arc(x, y, size, size, 0, 2*Math.PI);
                 g.fillShape(arc);
                 g.setColor(strokeColor);
                 g.setAlpha(strokeOpacity);
@@ -272,11 +428,12 @@ public class RoundBorder extends Border {
             }
         } else {
             GeneralPath gp = new GeneralPath();
-            gp.moveTo(height / 2, 0);
-            gp.lineTo(width - (height / 2), 0);
-            gp.arcTo(width - (height / 2), height / 2, width - (height / 2), height, true);
-            gp.lineTo(height / 2, height);
-            gp.arcTo(height / 2, height / 2, height / 2, 0, true);
+            float sw = (stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0;
+            gp.moveTo(height / 2.0, sw);
+            gp.lineTo(width - (height / 2.0), sw);
+            gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height-sw, true);
+            gp.lineTo(height / 2.0, height-sw);
+            gp.arcTo(height / 2.0, height / 2.0, height / 2.0, sw, true);
             gp.closePath();
             g.fillShape(gp);
             if(stroke && this.stroke != null) {
@@ -289,6 +446,168 @@ public class RoundBorder extends Border {
     
     @Override
     public boolean isBackgroundPainter() {
+        return true;
+    }
+
+    /**
+     * The color of the border background
+     * @return the color
+     */
+    public int getColor() {
+        return color;
+    }
+
+    /**
+     * The opacity (transparency) of the border background
+     * @return the opacity
+     */
+    public int getOpacity() {
+        return opacity;
+    }
+
+    /**
+     * The color of the edge of the border if applicable
+     * @return the strokeColor
+     */
+    public int getStrokeColor() {
+        return strokeColor;
+    }
+
+    /**
+     * The opacity of the edge of the border if applicable
+     * @return the strokeOpacity
+     */
+    public int getStrokeOpacity() {
+        return strokeOpacity;
+    }
+
+    /**
+     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
+     * @return the strokeThickness
+     */
+    public float getStrokeThickness() {
+        return strokeThickness;
+    }
+
+    /**
+     * True if the thickness of the stroke is in millimeters
+     * @return the strokeMM
+     */
+    public boolean isStrokeMM() {
+        return strokeMM;
+    }
+
+    /**
+     * The spread of the shadow in pixels of millimeters
+     * @return the shadowSpread
+     */
+    public int getShadowSpread() {
+        return shadowSpread;
+    }
+
+    /**
+     * The opacity of the shadow between 0 and 255
+     * @return the shadowOpacity
+     */
+    public int getShadowOpacity() {
+        return shadowOpacity;
+    }
+
+    /**
+     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
+     * @return the shadowX
+     */
+    public float getShadowX() {
+        return shadowX;
+    }
+
+    /**
+     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
+     * @return the shadowY
+     */
+    public float getShadowY() {
+        return shadowY;
+    }
+
+    /**
+     * The Gaussian blur size
+     * @return the shadowBlur
+     */
+    public float getShadowBlur() {
+        return shadowBlur;
+    }
+
+    /**
+     * True if the shadow spread is in millimeters
+     * @return the shadowMM
+     */
+    public boolean isShadowMM() {
+        return shadowMM;
+    }
+
+    /**
+     * True if this border grows into a rectangle horizontally or keeps growing as a circle
+     * @return the rectangle
+     */
+    public boolean isRectangle() {
+        return rectangle;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 43 * hash + this.color;
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final RoundBorder other = (RoundBorder) obj;
+        if (this.color != other.color) {
+            return false;
+        }
+        if (this.opacity != other.opacity) {
+            return false;
+        }
+        if (this.strokeColor != other.strokeColor) {
+            return false;
+        }
+        if (this.strokeOpacity != other.strokeOpacity) {
+            return false;
+        }
+        if (this.strokeThickness != other.strokeThickness) {
+            return false;
+        }
+        if (this.strokeMM != other.strokeMM) {
+            return false;
+        }
+        if (this.shadowSpread != other.shadowSpread) {
+            return false;
+        }
+        if (this.shadowOpacity != other.shadowOpacity) {
+            return false;
+        }
+        if (this.shadowX != other.shadowX) {
+            return false;
+        }
+        if (this.shadowY != other.shadowY) {
+            return false;
+        }
+        if (this.shadowBlur != other.shadowBlur) {
+            return false;
+        }
+        if (this.shadowMM != other.shadowMM) {
+            return false;
+        }
+        if (this.rectangle != other.rectangle) {
+            return false;
+        }
         return true;
     }
     

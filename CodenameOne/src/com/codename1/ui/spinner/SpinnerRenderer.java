@@ -102,7 +102,7 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T>{
                 return;
             }
             Style s = getStyle();
-            drawStringPerspectivePosition(g, getText(), getX() + s.getPadding(LEFT), getY() + s.getPadding(RIGHT));
+            drawStringPerspectivePosition(g, getText(), getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());
         }
     }
     

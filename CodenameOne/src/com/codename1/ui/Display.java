@@ -684,9 +684,10 @@ public final class Display {
     }
 
     /**
-     * Vibrates the device for the given length of time
+     * Vibrates the device for the given length of time, notice that this might ignore the time value completely 
+     * on some OS's where this level of control isn't supported e.g. iOS see: https://github.com/codenameone/CodenameOne/issues/1904
      *
-     * @param duration length of time to vibrate
+     * @param duration length of time to vibrate (might be ignored)
      */
     public void vibrate(int duration) {
         impl.vibrate(duration);
@@ -3385,6 +3386,13 @@ hi.show();}</pre></noscript>
         impl.openNativeNavigationApp(latitude, longitude);
     }
     
+    /**
+     * Opens the native navigation app with the given search location
+     * @param location the location to search for in the native navigation map
+     */ 
+    public void openNativeNavigationApp(String location) {    
+        impl.openNativeNavigationApp(location);
+    }
     
     /**
      * Gets all contacts from the address book of the device

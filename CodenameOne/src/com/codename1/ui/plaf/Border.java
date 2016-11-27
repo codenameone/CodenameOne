@@ -1354,7 +1354,7 @@ public class Border {
                 } else {
                     Font f=c.getStyle().getFont();
                     int titleW=f.stringWidth(borderTitle);
-                    int topPad=c.getStyle().getPadding(Component.TOP);
+                    int topPad=c.getStyle().getPaddingTop();
                     int topY=y+(topPad-thickness)/2;
                     if (c.isRTL()) {
                         g.fillRect(x+width-TITLE_MARGIN, topY, TITLE_MARGIN , thickness); //top (segment before the title)

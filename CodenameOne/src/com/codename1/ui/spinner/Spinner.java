@@ -267,8 +267,8 @@ class Spinner extends List {
      */
     protected Dimension calcPreferredSize() {
         int boxWidth = 0;
-        int verticalPadding = getStyle().getPadding(false, Component.TOP) + getStyle().getPadding(false, Component.BOTTOM);
-        int horizontalPadding = getStyle().getPadding(isRTL(), Component.RIGHT) + getStyle().getPadding(isRTL(), Component.LEFT);
+        int verticalPadding = getStyle().getVerticalPadding();
+        int horizontalPadding = getStyle().getHorizontalPadding();
         Object prototype = getRenderingPrototype();
         int selectedHeight;
         ListCellRenderer renderer = getRenderer();
@@ -522,8 +522,8 @@ class Spinner extends List {
         super.paint(g);
         if(spinnerHandle != null) {
             Style s = getStyle();
-            g.drawImage(spinnerHandle, getX() + getWidth() - spinnerHandle.getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT),
-                    getY() + s.getPadding(false, TOP));
+            g.drawImage(spinnerHandle, getX() + getWidth() - spinnerHandle.getWidth() - s.getHorizontalPadding(),
+                    getY() + s.getPaddingTop());
         }
         if (System.currentTimeMillis() - inputSkipDelay < lastKeyInteraction || quickType.isPendingCommit()) {
             quickType.setWidth(Math.min(getWidth(), quickType.getPreferredW()));
@@ -538,10 +538,10 @@ class Spinner extends List {
                         quickType.setX(getX());
                         break;
                     case RIGHT:
-                        quickType.setX(getX() + quickType.getStyle().getFont().charWidth(TextArea.getWidestChar()) * 4 + s.getMargin(false, RIGHT));
+                        quickType.setX(getX() + quickType.getStyle().getFont().charWidth(TextArea.getWidestChar()) * 4 + s.getMarginRightNoRTL());
                         break;
                     default:
-                        quickType.setX(getX() + quickType.getStyle().getFont().charWidth(TextArea.getWidestChar()) * 2 + s.getMargin(false, RIGHT));
+                        quickType.setX(getX() + quickType.getStyle().getFont().charWidth(TextArea.getWidestChar()) * 2 + s.getMarginLeftNoRTL());
                         break;
                 }
             } else {

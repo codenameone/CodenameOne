@@ -43,6 +43,9 @@ using Windows.Graphics.Imaging;
 using Microsoft.Graphics.Canvas.Geometry;
 using java.io;
 using Windows.Foundation.Metadata;
+using Windows.ApplicationModel.DataTransfer;
+using com.codename1.db;
+using Windows.UI.ViewManagement;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -69,6 +72,9 @@ namespace com.codename1.impl
         public static Page app;
         public static CanvasControl screen;
         public static double scaleFactor = 1;
+        public static double logicalDpi = -1;
+        public static ResolutionScale resolutionScale;
+        public static double? diagonalSizeInInches = -1;
         public static CoreDispatcher dispatcher;
         public static StorageFolder iDefaultStore;
         private static CoreApplicationView view;
@@ -99,6 +105,9 @@ namespace com.codename1.impl
             iDefaultStore = getStore(ss); // storeApplicationData.Current.CacheFolder; // Faster, avoid cloud backup. See https://www.suchan.cz/2014/07/file-io-best-practices-in-windows-and-phone-apps-part-1-available-apis-and-file-exists-checking/
             rawDpiy = DisplayInformation.GetForCurrentView().RawDpiY;
             rawDpix = DisplayInformation.GetForCurrentView().RawDpiX;
+            logicalDpi = DisplayInformation.GetForCurrentView().LogicalDpi;
+            diagonalSizeInInches = DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
+            resolutionScale = DisplayInformation.GetForCurrentView().ResolutionScale;
             screen = new CanvasControl();
             screen.Width = cl.ActualWidth * scaleFactor;
             screen.Height = cl.ActualHeight * scaleFactor;
@@ -203,6 +212,8 @@ namespace com.codename1.impl
 
         public override void init(object n1)
         {
+
+           
             instance = this;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
           {
@@ -290,6 +301,38 @@ namespace com.codename1.impl
             {
                 return "M";
             }
+            if (n1.Equals("windows.DisplayInformation.LogicalDpi"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().LogicalDpi;
+                return logicalDpi + "";
+
+            }
+            if (n1.Equals("windows.DisplayInformation.DiagonalSizeInInches"))
+            {
+                //return ""+DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
+                return diagonalSizeInInches + "";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiX"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiX;
+                return rawDpix+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiY"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiY;
+                return "" + rawDpiy;
+            }
+            if (n1.Equals("windows.DisplayInformation.RawPixelsPerViewPixel"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
+                return scaleFactor+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.ResolutionScale"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().ResolutionScale;
+                return resolutionScale + "";
+            }
+            
             return base.getProperty(n1, n2);
         }
         /// <summary>
@@ -318,6 +361,24 @@ namespace com.codename1.impl
             Stream s = streamTask.Result;
             return new CN1Media(s, n2, n3, cl);
         }
+
+        public override media.Media createMedia(string uri, bool isVideo, java.lang.Runnable onCompletion)
+        {
+            if (isTempFile(uri))
+            {
+                StorageFile sf = getTempFile(uri);
+                uri = sf.Path;
+            }
+            else if (uri.StartsWith("file://"))
+            {
+                StorageFile sf;
+                openInputStream(uri, true, out sf);
+                uri = sf.Path;
+            }
+            return new CN1Media(uri, isVideo, onCompletion, cl);
+        }
+
+        
 
         public override void lockOrientation(bool portrait)
         {
@@ -350,10 +411,18 @@ namespace com.codename1.impl
 
         public override void installNativeTheme()
         {
-            ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
+           ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
             ui.plaf.UIManager uim = ui.plaf.UIManager.getInstance();
             string[] themeNames = r.getThemeResourceNames();
-            uim.setThemeProps(r.getTheme((string)themeNames[0]));
+            java.util.Hashtable props = r.getTheme((string)themeNames[0]);
+            if (isDesktop() || isTablet())
+            {
+                props.put("hideBackCommandBool", false);
+            } else 
+            {
+                props.put("hideBackCommandBool", true);
+            } 
+            uim.setThemeProps(props);
             ui.plaf.DefaultLookAndFeel dl = (ui.plaf.DefaultLookAndFeel)uim.getLookAndFeel();
             dl.setDefaultEndsWith3Points(false);
         }
@@ -464,6 +533,19 @@ namespace com.codename1.impl
         public override bool isNativeInputImmediate()
         {
             return true;
+        }
+
+        public override int getKeyboardType()
+        {
+            KeyboardCapabilities keyboardCapabilities = new Windows.Devices.Input.KeyboardCapabilities();
+            if (keyboardCapabilities.KeyboardPresent != 0)
+            {
+                return com.codename1.ui.Display.KEYBOARD_TYPE_QWERTY;
+            } else
+            {
+                return com.codename1.ui.Display.KEYBOARD_TYPE_VIRTUAL;
+            }
+            
         }
 
         public static void commitEditing()
@@ -728,6 +810,167 @@ namespace com.codename1.impl
             return ci;
         }
 
+
+        public static Matrix3x2 clamp(Matrix3x2 m)
+        {
+            if (m.IsIdentity)
+            {
+                return m;
+            }
+            m.M11 = clamp(m.M11);
+            m.M12 = clamp(m.M12);
+            m.M21 = clamp(m.M21);
+            m.M22 = clamp(m.M22);
+            m.M31 = clamp(m.M31);
+            m.M32 = clamp(m.M32);
+            return m;
+
+        }
+
+        public static double clamp(double d)
+        {
+            if (d > -0.0001 && d < 0.0001)
+            {
+                return 0;
+            } else if (d > 0.9999 && d < 1.0001)
+            {
+                return 1;
+            }
+            return d;
+        }
+
+        public static float clamp(float d)
+        {
+            if (d > -0.0001 && d < 0.0001)
+            {
+                return 0;
+            }
+            else if (d > 0.9999 && d < 1.0001)
+            {
+                return 1;
+            }
+            return d;
+        }
+
+        public override object makeTransformIdentity()
+        {
+            return new NativeTransform(Matrix3x2.Identity);
+        }
+
+
+
+        public override object makeTransformTranslation(float translateX, float translateY, float translateZ)
+        {
+            return new NativeTransform(Matrix3x2.CreateTranslation(new Vector2(translateX, translateY)));
+        }
+
+        public override object makeTransformScale(float scaleX, float scaleY, float scaleZ)
+        {
+            return new NativeTransform(Matrix3x2.CreateScale(new Vector2(scaleX, scaleY)));
+        }
+
+        public override object makeTransformRotation(float angle, float x, float y, float z)
+        {
+            return new NativeTransform(Matrix3x2.CreateRotation(angle, new Vector2(x, y)));
+        }
+
+        public override object makeTransformInverse(object nativeTransform)
+        {
+            NativeTransform nt = (NativeTransform)nativeTransform;
+            Matrix3x2 t = nt.m;
+            Matrix3x2 inv;
+            Matrix3x2.Invert(t, out inv);
+            return new NativeTransform(inv);
+        }
+
+        public override object makeTransformPerspective(float fovy, float aspect, float zNear, float zFar)
+        {
+            //return Matrix4x4.CreatePerspectiveFieldOfView(fovy, aspect, zNear, zFar);
+            return base.makeTransformPerspective(fovy, aspect, zNear, zFar);
+        }
+
+        public override object makeTransformOrtho(float left, float right, float bottom, float top, float near, float far)
+        {
+            //return Matrix4x4.CreateOrthographicOffCenter(left, right, bottom, top, near, far);
+            return base.makeTransformOrtho(left, right, bottom, top, near, far);
+        }
+
+        public override object makeTransformCamera(float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ)
+        {
+            //return Matrix4x4.CreateLookAt(new Vector3(eyeX, eyeY, eyeZ), new Vector3(centerX, centerY, centerZ), new Vector3(upX, upY, upZ));
+            return base.makeTransformCamera(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ);
+        }
+
+        private void copyMatrix4x4(Matrix4x4 src, Matrix4x4 dest)
+        {
+            dest.M11 = src.M11;
+            dest.M12 = src.M12;
+            dest.M13 = src.M13;
+            dest.M14 = src.M14;
+            dest.M21 = src.M21;
+            dest.M22 = src.M22;
+            dest.M23 = src.M23;
+            dest.M24 = src.M24;
+            dest.M31 = src.M31;
+            dest.M32 = src.M32;
+            dest.M33 = src.M33;
+            dest.M34 = src.M34;
+            dest.M41 = src.M41;
+            dest.M42 = src.M42;
+            dest.M43 = src.M43;
+            dest.M44 = src.M44;
+        }
+
+        private void copyMatrix3x2(Matrix3x2 src, Matrix3x2 dest)
+        {
+            dest.M11 = src.M11;
+            dest.M12 = src.M12;
+            //dest.M13 = src.M13;
+            //dest.M14 = src.M14;
+            dest.M21 = src.M21;
+            dest.M22 = src.M22;
+            //dest.M23 = src.M23;
+            //dest.M24 = src.M24;
+            dest.M31 = src.M31;
+            dest.M32 = src.M32;
+            
+            //dest.M33 = src.M33;
+            //dest.M34 = src.M34;
+            //dest.M41 = src.M41;
+            //dest.M42 = src.M42;
+            //dest.M43 = src.M43;
+            //dest.M44 = src.M44;
+        }
+
+        public override void concatenateTransform(object t1, object t2)
+        {
+            NativeTransform m1 = (NativeTransform)t1;
+            NativeTransform m2 = (NativeTransform)t2;
+            Matrix3x2 res = Matrix3x2.Multiply(m2.m, m1.m);
+            m1.m = res;
+        }
+
+        public override void copyTransform(object src, object dest)
+        {
+            NativeTransform m1 = (NativeTransform)src;
+            NativeTransform m2 = (NativeTransform)dest;
+            m2.m = m1.m;
+        }
+
+        public override bool isPerspectiveTransformSupported()
+        {
+            return false;
+        }
+
+        public override bool transformEqualsImpl(ui.Transform t1, ui.Transform t2)
+        {
+            NativeTransform m1 = (NativeTransform)t1.getNativeTransform();
+            NativeTransform m2 = (NativeTransform)t2.getNativeTransform();
+            return m1.m.Equals(m2.m);
+        }
+
+        
+
         protected override bool cacheLinearGradients()
         {
             return false;
@@ -798,12 +1041,12 @@ namespace com.codename1.impl
 
         public override bool isTransformSupported()
         {
-            return base.isTransformSupported();  
+            return true;
         }
 
         public override bool isTransformSupported(object n1)
         {
-            return base.isTransformSupported(n1);
+            return true;
         }
 
         public override bool isTranslationSupported()
@@ -811,15 +1054,80 @@ namespace com.codename1.impl
             return base.isTranslationSupported();
         }
 
+
+        public override bool isAffineSupported()
+        {
+            return true;
+
+        }
+
+        public override bool isPerspectiveTransformSupported(object graphics)
+        {
+            return false;
+        }
+
+        public override bool isShapeSupported(object graphics)
+        {
+            return true;
+        }
+
         public override void rotate(object nativeGraphics, float angle)
         {
-            base.rotate(nativeGraphics, angle);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)nativeGraphics).destination;
+            ui.Transform t = g.getTransform();
+            t.rotate(angle, 0, 0);
+            g.setTransform(t);
+            
         }
 
         public override void rotate(object nativeGraphics, float angle, int x, int y)
         {
-            base.rotate(nativeGraphics, angle, x, y);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)nativeGraphics).destination;
+            ui.Transform t = g.getTransform();
+            t.rotate(angle, x, y);
+            g.setTransform(t);
         }
+
+        public override void resetAffine(object nativeGraphics)
+        {
+            WindowsGraphics g = ((NativeGraphics)nativeGraphics).destination;
+            g.setTransform(com.codename1.ui.Transform.makeTranslation(0, 0, 0));
+        }
+
+        public override ui.Transform getTransform(object graphics)
+        {
+            return ((WindowsGraphics)((NativeGraphics)graphics).destination).getTransform();
+        }
+
+        public override void getTransform(object nativeGraphics, ui.Transform t)
+        {
+            t.setTransform(((WindowsGraphics)((NativeGraphics)nativeGraphics).destination).getTransform());
+        }
+
+        public class NativeTransform
+        {
+
+            public NativeTransform(Matrix3x2 m)
+            {
+                this.m = m;
+            }
+            public Matrix3x2 m;
+        }
+
+        public override void transformPoint(object nativeTransform, float[] @in, float[] @out)
+        {
+            NativeTransform nt = (NativeTransform)nativeTransform;
+            Matrix3x2 t = nt.m;
+            Vector2 res = Vector2.Transform(new Vector2(@in[0], @in[1]), t);
+            @out[0] = res.X;
+            @out[1] = res.Y;
+            if (@out.Length > 2) {
+                @out[2] = 0;
+            }
+            
+        }
+
+        
 
         public override ui.Image rotate180Degrees(ui.Image image, bool maintainOpacity)
         {
@@ -838,12 +1146,17 @@ namespace com.codename1.impl
 
         public override void scale(object nativeGraphics, float x, float y)
         {
-           base.scale(nativeGraphics, x, y);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)nativeGraphics).destination;
+            ui.Transform t = g.getTransform();
+            t.scale(x, y);
+            g.setTransform(t);
+            setTransform(nativeGraphics, t);
         }
 
         public override void setTransform(object n1, ui.Transform n2)
         {
-            base.setTransform(n1, n2);
+            WindowsGraphics g = (WindowsGraphics)((NativeGraphics)n1).destination;
+            g.setTransform(n2);
         }
 
         public override void translate(object n1, int n2, int n3)
@@ -856,6 +1169,8 @@ namespace com.codename1.impl
             return false;
         }
        
+        
+
         public override object createImage(int[] n1, int n2, int n3)
         {
             CodenameOneImage ci = (CodenameOneImage)createMutableImage(n2, n3, 0);
@@ -868,7 +1183,7 @@ namespace com.codename1.impl
 
         public override object createImage(string path)
         {
-            if (path.StartsWith("file:"))
+            if (path.StartsWith("file:") || path.StartsWith("tmp://"))
             {
                 return createImage(openFileInputStream(path));
             }
@@ -970,8 +1285,17 @@ namespace com.codename1.impl
 
         public static bool exitLock;
         private ActionListener pendingCaptureCallback;
-
         public override void capturePhoto(ActionListener response)
+        {
+            capture(response, CameraCaptureUIMode.Photo);
+        }
+
+        public override void captureVideo(ActionListener response)
+        {
+            capture(response, CameraCaptureUIMode.Video);
+        }
+
+        private void capture(ActionListener response, CameraCaptureUIMode mode)
         {
 #if WINDOWS_PHONE_APP
             openGaleriaCamera();
@@ -984,19 +1308,35 @@ namespace com.codename1.impl
                 {
                     // Using Windows.Media.Capture.CameraCaptureUI API to capture a photo
                     CameraCaptureUI dialog = new CameraCaptureUI();
-                    dialog.PhotoSettings.CroppedAspectRatio = new Size(16, 9);
-                    dialog.PhotoSettings.Format = CameraCaptureUIPhotoFormat.Jpeg;
-                    dialog.PhotoSettings.MaxResolution = CameraCaptureUIMaxPhotoResolution.HighestAvailable;
-                    StorageFile photo = await dialog.CaptureFileAsync(CameraCaptureUIMode.Photo);
+                    if (mode == CameraCaptureUIMode.Photo)
+                    {
+                        dialog.PhotoSettings.CroppedAspectRatio = new Size(16, 9);
+                        dialog.PhotoSettings.Format = CameraCaptureUIPhotoFormat.Jpeg;
+                        dialog.PhotoSettings.MaxResolution = CameraCaptureUIMaxPhotoResolution.HighestAvailable;
+                    }
+                    
+                    else if (mode == CameraCaptureUIMode.Video)
+                    {
+                        
+                        dialog.VideoSettings.Format = CameraCaptureUIVideoFormat.Mp4;
+                        dialog.VideoSettings.MaxResolution = CameraCaptureUIMaxVideoResolution.HighestAvailable;
+                    }
+                    
+                    StorageFile photo = await dialog.CaptureFileAsync(mode);
                     if (photo != null)
                     {
-                        var foldersave = KnownFolders.CameraRoll;
-                        await photo.MoveAsync(foldersave);
+                        string tmpPath = addTempFile(photo);
+                        fireCapture(new ActionEvent(tmpPath));
+                        //var foldersave = KnownFolders.CameraRoll;
+                        //await photo.MoveAsync(foldersave);
 
-                        BitmapImage bitmapImage = new BitmapImage();
-                        Windows.UI.Xaml.Controls.Image Capturedphoto = new Windows.UI.Xaml.Controls.Image();
-                        Capturedphoto.Source = bitmapImage;
-                        toSendPhoto(photo);
+                        //BitmapImage bitmapImage = new BitmapImage();
+                        //Windows.UI.Xaml.Controls.Image Capturedphoto = new Windows.UI.Xaml.Controls.Image();
+                        //Capturedphoto.Source = bitmapImage;
+                        //toSendPhoto(photo);
+                    } else
+                    {
+                        fireCapture(new ActionEvent(null));
                     }
                 }
                 catch (Exception)
@@ -1020,7 +1360,7 @@ namespace com.codename1.impl
                 StorageFolder folder = await photo.GetParentAsync();
                 string folderName = folder.Name.ToLower();
                 folderName = folderName.Replace(" ", "");
-                ActionEvent ac = new ActionEvent(folderName + ":/" + fileName);
+                ActionEvent ac = new ActionEvent("file:/"+folderName + ":/" + fileName);
                 fireCapture(ac);
 #endif
             }
@@ -1029,6 +1369,127 @@ namespace com.codename1.impl
 
             }
 
+        }
+
+        private List<StorageFile> tmpFiles = new List<StorageFile>();
+        public string addTempFile(StorageFile f)
+        {
+            int index = tmpFiles.Count;
+            tmpFiles.Insert(index, f);
+            return "tmp://" + index + "-" + f.Name;
+        }
+
+        public bool isTempFile(string path)
+        {
+            return path.StartsWith("tmp://");
+        }
+
+        public StorageFile getTempFile(string path)
+        {
+            if (!path.StartsWith("tmp://"))
+            {
+                return null;
+            }
+            path = path.Substring(6);
+            if (path.IndexOf("-") < 0)
+            {
+                return null;
+            }
+            int index = Convert.ToInt32(path.Substring(0, path.IndexOf("-")));
+            if (index < 0 || index >= tmpFiles.Count)
+            {
+                return null;
+            }
+            return tmpFiles.ElementAt(index);
+        }
+
+        public void removeTempFile(string path)
+        {
+            StorageFile f = getTempFile(path);
+            if (f != null)
+            {
+                tmpFiles.Remove(f);
+            }
+        }
+
+        public async void toSendFile(StorageFile file)
+        {
+            try
+            {
+                fileName = file.Name;
+#if WINDOWS_PHONE_APP
+              
+                ActionEvent ac = new ActionEvent("cameraroll:/" + fileName);
+                fireCapture(ac);
+#else
+                //tmpFiles.Add(file);
+                string tmpPath = addTempFile(file);
+                //StorageFolder folder = await file.GetParentAsync();
+                //string folderName = folder.Name.ToLower();
+                //folderName = folderName.Replace(" ", "");
+                ActionEvent ac = new ActionEvent(tmpPath);
+                fireCapture(ac);
+#endif
+            }
+            catch (Exception)
+            {
+
+            }
+
+        }
+
+
+        public override void openGallery(ActionListener response, int type)
+        {
+            exitLock = true;
+            pendingCaptureCallback = response;
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                FileOpenPicker openPicker = new FileOpenPicker();
+                openPicker.ViewMode = PickerViewMode.Thumbnail;
+                openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
+                if (type == Display.GALLERY_IMAGE)
+                {
+                    openPicker.ViewMode = PickerViewMode.Thumbnail;
+                    openPicker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
+                    openPicker.FileTypeFilter.Add(".jpg");
+                    openPicker.FileTypeFilter.Add(".jpeg");
+                    openPicker.FileTypeFilter.Add(".png");
+                } else if (type == Display.GALLERY_VIDEO)
+                {
+                    openPicker.FileTypeFilter.Add(".mp4");
+                    openPicker.FileTypeFilter.Add(".avi");
+                    openPicker.FileTypeFilter.Add(".mpg");
+                    openPicker.FileTypeFilter.Add(".mov");
+                    openPicker.FileTypeFilter.Add(".mpeg");
+                    openPicker.FileTypeFilter.Add(".wmv");
+                } else if (type == -9999)
+                {
+                    string typeStr = Display.getInstance().getProperty("windows.openGallery.accept", "*");
+                    string[] parts = typeStr.Split(',');
+                    foreach (string part in parts)
+                    {
+                        openPicker.FileTypeFilter.Add(part);
+                    }
+
+
+                
+                } else
+                {
+                    openPicker.FileTypeFilter.Add("*");
+                }
+#if WINDOWS_PHONE_APP
+                openPicker.PickSingleFileAndContinue();
+                view.Activated += view_Activated;
+#else
+                StorageFile file = await openPicker.PickSingleFileAsync();
+                if (file != null)
+                {
+                    toSendFile(file);
+                }
+#endif
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+            //base.openGallery(response, type);
         }
 
         public override void openImageGallery(ActionListener response)
@@ -1298,6 +1759,40 @@ namespace com.codename1.impl
         }
 
         public override void execute(string n1) {
+            try
+            {
+                if (exists(n1))
+                {
+                    IStorageItem storageItem = null;
+                    if (isTempFile(n1))
+                    {
+                        storageItem = getTempFile(n1);
+                        
+                    }
+                    else
+                    {
+                        StorageFolder store = getStore(n1);
+                        string f = nativePathStore(n1);
+                        storageItem = store.TryGetItemAsync(f).AsTask().GetAwaiter().GetResult();
+                        
+
+                    }
+                    if (storageItem != null && storageItem is StorageFile)
+                    {
+                        using (AutoResetEvent are = new AutoResetEvent(false))
+                        {
+                            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
+                                var result = Windows.System.Launcher.LaunchFileAsync((StorageFile)storageItem);
+                                are.Set();
+                            }).AsTask().GetAwaiter().GetResult();
+                            are.WaitOne();
+                        }
+                        return;
+                    }
+                    
+                }
+            }
+            catch (Exception ex) { }
             var uri = new Uri(n1, UriKind.RelativeOrAbsolute);
             using (AutoResetEvent are = new AutoResetEvent(false)) {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
@@ -1445,7 +1940,7 @@ namespace com.codename1.impl
 
         public override void dial(string phoneNumber) {
             execute("tel:" + phoneNumber);/*
-            java.lang.System.@out.println("Trying to dial phone number "+phoneNumber);
+            //java.lang.System.@out.println("Trying to dial phone number "+phoneNumber);
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
                 {
                     if (ApiInformation.IsApiContractPresent("Windows.ApplicationModel.Calls.CallsPhoneContract", 1, 0))
@@ -1464,9 +1959,9 @@ namespace com.codename1.impl
             CodenameOneImage ci = new CodenameOneImage();
             ci.mutable = true;
             ci.image = new CanvasRenderTarget(screen, screen.ConvertPixelsToDips(width), screen.ConvertPixelsToDips(height));
-            ci.graphics.destination.setColor(color);
-            ci.graphics.destination.setAlpha((color >> 24) & 0xff);
-            //ci.graphics.destination.clear();
+            ci.graphics.destination.setColor(color, (byte)((color >> 24) & 0xff));
+            //ci.graphics.destination.setAlpha((color >> 24) & 0xff);
+            ci.graphics.destination.clear();
             return ci;
         }
 
@@ -1773,10 +2268,12 @@ namespace com.codename1.impl
 
         public override int stringWidth(object n1, string n2)
         {
-            int result = f(n1).getStringWidth(n2);
             StringFontPair sfp = new StringFontPair(n2, f(n1));
+            
+            
             if (!stringWidthCache.ContainsKey(sfp))
             {
+                int result = f(n1).getStringWidth(n2);
                 stringWidthCache.Add(sfp, result);
             }
             return stringWidthCache[sfp];
@@ -2101,6 +2598,13 @@ namespace com.codename1.impl
             return n;
         }
 
+
+        public override void setHttpMethod(object connection, string method)
+        {
+            NetworkOperation n = (NetworkOperation)connection;
+            n.request.Method = method;
+        }
+
         public override void setHeader(object n1, string n2, string n3)
         {
             NetworkOperation n = (NetworkOperation)n1;
@@ -2145,10 +2649,12 @@ namespace com.codename1.impl
         {
             if (connection is string)
             {
+
                 StorageFolder store = getStore((string)connection);
                 try
                 {
                     Stream s = Task.Run(() => store.OpenStreamForWriteAsync(nativePathStore((string)connection), CreationCollisionOption.OpenIfExists)).GetAwaiter().GetResult();
+                    s.Seek(0, SeekOrigin.Begin);
                     return new java.io.OutputStreamProxy(s);
                 }
                 catch (Exception e)
@@ -2183,14 +2689,76 @@ namespace com.codename1.impl
 
         public override java.io.InputStream openInputStream(object connection)
         {
-            if (connection is string)
+            StorageFile output;
+            return openInputStream(connection, false, out output);
+        }
+
+        private java.io.InputStream openInputStream(object connection, bool outputFile, out StorageFile outFile)
+        {
+           if (connection is string)
             {
                 try
                 {
+                    if (isTempFile((string)connection))
+                    {
+                        StorageFile tempFile = getTempFile((string)connection);
+                        if (outputFile)
+                        {
+                            outFile = tempFile;
+                            return null;
+                        } else {
+                            outFile = null;
+                            return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                               .ConfigureAwait(false)
+                               .GetAwaiter()
+                               .GetResult());
+                        }
+                    }
                     StorageFolder store = getStore((string)connection); //KnownFolders.CameraRoll
                     string file = nativePathStore((string)connection);
-                    Stream stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
-                    return new InputStreamProxy(stream);
+                    StorageFile sfile = store.CreateFileAsync((string)file, CreationCollisionOption.OpenIfExists)
+                        .AsTask()
+                        .ConfigureAwait(false)
+                        .GetAwaiter()
+                        .GetResult();
+                    if (outputFile)
+                    {
+                        outFile =  sfile;
+                        return null;
+                    } else
+                    {
+                        outFile = null;
+                        Stream stream = null;
+                        try
+                        {
+                            stream = Task.Run(() => store.OpenStreamForReadAsync(file)).ConfigureAwait(false).GetAwaiter().GetResult();
+                            return new InputStreamProxy(stream);
+                        }
+                        catch (Exception ex2)
+                        {
+                            java.lang.System.err.println("Failed to create file input stream by simply opening the file.  Trying to open a copy instead " + ex2.Message);
+                            // If it failed to create the input stream, it is possible that
+                            // it is because the file is already being used (e.g. an output stream is writing to it).
+                            // In this case, we'll create a copy to a temp file, and create an inputstream from that one.
+                            try
+                            {
+                                StorageFile tempFile = sfile.CopyAsync(ApplicationData.Current.TemporaryFolder, sfile.Name, NameCollisionOption.GenerateUniqueName)
+                                    .AsTask()
+                                    .ConfigureAwait(false)
+                                    .GetAwaiter()
+                                    .GetResult();
+                                return new InputStreamProxy(Task.Run(() => tempFile.OpenStreamForReadAsync())
+                                    .ConfigureAwait(false)
+                                    .GetAwaiter()
+                                    .GetResult());
+                            }
+                            catch (Exception e3)
+                            {
+                                java.lang.System.err.println("Failed to open storage file via copy " + e3.Message);
+                            }
+
+                        }
+                    }
                 }
                 catch (Exception e)
                 {
@@ -2200,6 +2768,7 @@ namespace com.codename1.impl
             }
             //io.BufferedInputStream bo = new io.BufferedInputStream(new InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream()));
             //return bo;
+            outFile = null;
             return new java.io.InputStreamProxy(((NetworkOperation)connection).response.GetResponseStream());
         }
 
@@ -2414,6 +2983,37 @@ namespace com.codename1.impl
             o.write(buf, 0, len);
         }
 
+        public override Database openOrCreateDB(string databaseName)
+        {
+            string path = Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path,
+            databaseName+".sqlite");
+            //return new WinDB(new SQLite.Net.SQLiteConnection(new
+            //SQLite.Net.Platform.WinRT.SQLitePlatformWinRT(), path));
+            return WinDBRaw.openOrCreate(path);
+            //return null;
+        }
+
+        public override void deleteDB(string databaseName)
+        {
+            string path = Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path,
+            databaseName + ".sqlite");
+            StorageFile filed = ApplicationData.Current.LocalFolder.GetFileAsync(databaseName + ".sqlite").AsTask().GetAwaiter().GetResult();
+            if (filed != null)
+            {
+                filed.DeleteAsync().AsTask().GetAwaiter().GetResult();
+
+
+            }
+            
+
+        }
+        public override bool existsDB(string databaseName)
+        {
+            string fileName = databaseName + ".sqlite";
+            var item = ApplicationData.Current.LocalFolder.TryGetItemAsync(fileName).AsTask().GetAwaiter().GetResult();
+            return item != null;
+        }
+
         internal class CodenameOneUWPThread : com.codename1.impl.CodenameOneThread
         {
             public CodenameOneUWPThread(java.lang.Runnable r, string name) : base(r, name)
@@ -2547,6 +3147,10 @@ namespace com.codename1.impl
         {
             try
             {
+                if (instance.isTempFile(aUrl))
+                {
+                    return instance.getTempFile(aUrl);
+                }
                 StorageFolder folder = getStore(aUrl);
                 int pos = 0; //remove root name ex. intall: from /intall:/test.txt
                 if (aUrl[0] == '/' || aUrl[0] == '\\') pos++;
@@ -2585,8 +3189,10 @@ namespace com.codename1.impl
         /// </summary>
         /// <param name="s"></param>
         /// <returns></returns>
-        private string nativePathStore(string s)
+        ///  THis method is an absolute mess.... needs to be simplified.
+         private string nativePathStore(string s)
         {
+            
             string ss = s;
             if (ss.StartsWith("file:/"))
             {
@@ -2602,11 +3208,30 @@ namespace com.codename1.impl
             ss = ss.Replace('/', '\\');
             int pos = 0; //remove root name ex. intall: from /intall:/test.txt
             if (ss[0] == '/' || ss[0] == '\\') pos++;
+            if (pos >= ss.Length)
+            {
+                return "";
+            }
             pos = ss.IndexOfAny(new char[] { ':', '/', '\\' }, pos);
-            if (pos > 0 && ss[pos] == ':')
+            if (pos < 0)
+            {
+                return ss;
+            }
+            if (ss.Length <= pos)
+            {
+                return "";
+            }
+            if (ss.Length > pos && pos >= 0 && ss[pos] == ':')
             {
                 pos++;
-                if (ss.Length > pos) pos++;
+                while (ss.Length > pos && ((ss[pos] == '/') || (ss[pos] == '\\')))
+                {
+                    pos++;
+                }
+                if (pos >= ss.Length)
+                {
+                    return "";
+                }
                 ss = ss.Substring(pos);
             }
             return ss;
@@ -2706,10 +3331,15 @@ namespace com.codename1.impl
 
         public override void setHidden(string n1, bool n2)
         {
-            StorageFolder store = getStore(n1);
+            //StorageFolder store = getStore(n1);
         }
 
         public override bool isTablet()
+        {
+            return isPhone;
+        }
+
+        public override bool isDesktop()
         {
             return isPhone;
         }
@@ -2721,6 +3351,27 @@ namespace com.codename1.impl
 
         public override long getFileLength(string aFile)
         {
+            if (isTempFile(aFile))
+            {
+                long l2;
+                try
+                {
+                    
+                    StorageFile tempFile = getTempFile(aFile);
+                    if (tempFile == null)
+                    {
+                        return -1;
+                    }
+                    Stream stream = tempFile.OpenReadAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult().AsStream();
+                    l2 = stream.Length;
+                    stream.Dispose();
+                }
+                catch (Exception)
+                {
+                    throw;
+                }
+                return l2;
+            }
             StorageFolder store = getStore(aFile);
             string name = nativePathStore(aFile);
             long l1;
@@ -2741,6 +3392,10 @@ namespace com.codename1.impl
 
         public override bool isDirectory(string file)
         {
+            if (isTempFile(file))
+            {
+                return false;
+            }
             StorageFolder store = getStore(file);
             var f = nativePathStore(file);
             try
@@ -2759,6 +3414,10 @@ namespace com.codename1.impl
 
         public override bool exists(string file)
         {
+            if (isTempFile(file))
+            {
+                return getTempFile(file) != null;
+            }
             StorageFolder store = getStore(file);
             string f = nativePathStore(file);
             return exists(store, f);
@@ -2769,7 +3428,7 @@ namespace com.codename1.impl
             bool fileExists;
             try
             {
-                StorageFile file = aStore.GetFileAsync(aFile).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+                IStorageItem file = aStore.TryGetItemAsync(aFile).AsTask().GetAwaiter().GetResult();
                 fileExists = file != null;
             }
             catch (Exception)
@@ -2872,26 +3531,133 @@ namespace com.codename1.impl
         {
             return true;
         }
+
+        public class ShareInfo
+        {
+            public string text;
+            public string image;
+            public string mimeType;
+
+            public ShareInfo(string text, string image, string mimeType)
+            {
+                this.text = text;
+                this.image = image;
+                this.mimeType = mimeType;
+            }
+        }
+
+        private ShareInfo shareInfo;
+
+        public override void share(string text, string image, string mimeType, Rectangle sourceRect)
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                DataTransferManager dtm = DataTransferManager.GetForCurrentView();
+                shareInfo = new ShareInfo(text, image, mimeType);
+                dtm.DataRequested += new TypedEventHandler<DataTransferManager, DataRequestedEventArgs>(this.DataRequested);
+                shareInfo = new ShareInfo(text, image, mimeType);
+                DataTransferManager.ShowShareUI();
+            });
+
+        }
+
+        private Windows.UI.Color parseColor(int p)
+        
+        {
+            byte r = (byte)((p >> 16) & 0xff);
+            byte g = (byte)((p >> 8) & 0xff);
+            byte b = (byte)(p & 0xff);
+            return Windows.UI.Color.FromArgb((byte)255, r, g, b);
+        }
+    
+
+        private int getPropertyAsInt(string name, int defaultValue)
+        {
+            string val = Display.getInstance().getProperty(name, null);
+            if (val == null)
+            {
+                return defaultValue;
+            }
+            return int.Parse(val);
+        }
+
+        public override void onShow(Form f)
+        {
+            base.onShow(f);
+            int fgColor = getPropertyAsInt("windows.StatusBar.ForegroundColor", f.getUnselectedStyle().getFgColor());
+            int bgColor = getPropertyAsInt("windows.StatusBar.BackgroundColor", f.getUnselectedStyle().getBgColor());
+            int bgTransparency = getPropertyAsInt("windows.StatusBar.BackgroundOpacity", f.getUnselectedStyle().getBgTransparency());
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (ApiInformation.IsTypePresent("Windows.UI.ViewManagement.StatusBar"))
+                {
+
+                    var statusBar = StatusBar.GetForCurrentView();
+                    if (statusBar != null)
+                    {
+                        statusBar.BackgroundOpacity = bgTransparency / 255.0;
+                        statusBar.BackgroundColor = parseColor(bgColor);
+                        statusBar.ForegroundColor = parseColor(fgColor);
+                    }
+                }
+            });
+            //Mobile customization
+
+           
+        }
+
+        private void DataRequested(DataTransferManager sender, DataRequestedEventArgs e)
+        {
+            DataRequest request = e.Request;
+            if (shareInfo == null)
+            {
+                return;
+            }
+
+            request.Data.Properties.Title = Display.getInstance().getProperty("windows.share.title", "Content from " + Display.getInstance().getProperty("AppName", "Codename One App"));
+            request.Data.Properties.Description = Display.getInstance().getProperty("windows.share.title","");
+            if (shareInfo.image == null)
+            {
+               request.Data.SetText(shareInfo.text);
+            }
+            else
+            {
+                if (shareInfo.text != null)
+                {
+                    request.Data.Properties.Title = shareInfo.text;
+                }
+                StorageFile f;
+                openInputStream(shareInfo.image, true, out f);
+                request.Data.SetBitmap(RandomAccessStreamReference.CreateFromFile(f));
+
+            }
+        }
+
         public override void fillShape(object graphics, Shape shape)
         {
-            WindowsGraphics ag = (WindowsGraphics)graphics;
+            WindowsGraphics ag = ((NativeGraphics)graphics).destination;
             CanvasPathBuilder p = cn1ShapeToAndroidPath(shape);
             ag.fillPath(p);
         }
         public override void drawShape(object graphics, Shape shape, Stroke stroke)
         {
-            WindowsGraphics ag = (WindowsGraphics)graphics;
+           
+            WindowsGraphics ag = (WindowsGraphics)((NativeGraphics)graphics).destination;
             CanvasPathBuilder p = cn1ShapeToAndroidPath(shape);
             ag.drawPath(p, stroke);
+            
+                
         }
         private CanvasPathBuilder cn1ShapeToAndroidPath(Shape shape)
         {
             CanvasPathBuilder canvasPath = new CanvasPathBuilder(screen);
+            
 
             PathIterator it = shape.getPathIterator();
             //p.setWindingRule(it.getWindingRule() == com.codename1.ui.geom.PathIterator.WIND_EVEN_ODD ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);
             float[] buf = new float[6];
-            
+            bool started = false;
+            int size = 0;
             while (!it.isDone())
             {
                 int type = it.currentSegment(buf);
@@ -2899,7 +3665,15 @@ namespace com.codename1.impl
                 {
                     case PathIterator.SEG_MOVETO:
                         // p.moveTo(buf[0], buf[1]);
+                        if (!started)
+                        {
+                            started = true;
+                        } else
+                        {
+                            canvasPath.EndFigure(CanvasFigureLoop.Open);
+                        }
                         canvasPath.BeginFigure(buf[0], buf[1]);
+                        
                         break;
                     case PathIterator.SEG_LINETO:
                         //  p.lineTo(buf[0], buf[1]);
@@ -2915,11 +3689,18 @@ namespace com.codename1.impl
                         break;
                     case PathIterator.SEG_CLOSE:
                         canvasPath.EndFigure(CanvasFigureLoop.Closed);
+                        started = false;
                        // p.close();
                         break;
 
                 }
+                size++;
                 it.next();
+            }
+
+            if (started && size > 0)
+            {
+                canvasPath.EndFigure(CanvasFigureLoop.Open);
             }
 
             return canvasPath;

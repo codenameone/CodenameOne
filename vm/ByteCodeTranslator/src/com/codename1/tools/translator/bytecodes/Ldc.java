@@ -140,7 +140,7 @@ public class Ldc extends Instruction {
             b.append("); /* LDC */\n");
         } else if (cst instanceof String) {
             b.append("/* LDC: '");
-            b.append(((String)cst).replace('\n', ' '));
+            b.append(((String)cst).replace('\n', ' ').replace("*/", "*\\/"));
             b.append("'*/\n    PUSH_POINTER(STRING_FROM_CONSTANT_POOL_OFFSET(");
             b.append(Parser.addToConstantPool((String)cst));
             b.append("));\n");

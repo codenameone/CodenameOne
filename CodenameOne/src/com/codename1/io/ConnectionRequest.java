@@ -191,6 +191,10 @@ public class ConnectionRequest implements IOProgressListener {
     private String destinationFile;
     private String destinationStorage;
     
+    // Flag to indicate if the contentType was explicitly set for this 
+    // request
+    private boolean contentTypeSetExplicitly;
+    
     /**
      * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
      * customize the name of the cookie header to Cookie
@@ -289,6 +293,8 @@ public class ConnectionRequest implements IOProgressListener {
     void prepare() {
         timeSinceLastUpdate = System.currentTimeMillis();
     }
+    
+    
 
     /**
      * Invoked to initialize HTTP headers, cookies etc. 
@@ -304,8 +310,23 @@ public class ConnectionRequest implements IOProgressListener {
             impl.setHeader(connection, "User-Agent", getUserAgent());
         }
 
-        if(getContentType() != null) {
-            impl.setHeader(connection, "Content-Type", getContentType());
+        if (getContentType() != null) {
+            // UWP will automatically filter out the Content-Type header from GET requests
+            // Historically, CN1 has always included this header even though it has no meaning
+            // for GET requests.  it would be be better if CN1 did not include this header 
+            // with GET requests, but for backward compatibility, I'll leave it on as
+            // the default, and add a property to turn it off.
+            //  -- SJH Sept. 15, 2016
+            boolean shouldAddContentType = contentTypeSetExplicitly || 
+                    Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "true").equals("false");
+
+            if (isPost() || (getHttpMethod() != null && !"get".equals(getHttpMethod().toLowerCase()))) {
+                shouldAddContentType = true;
+            }
+
+            if(shouldAddContentType) {
+                impl.setHeader(connection, "Content-Type", getContentType());
+            }
         }
         
         if(chunkedStreamingLen > -1){
@@ -1226,6 +1247,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @param contentType the contentType to set
      */
     public void setContentType(String contentType) {
+        contentTypeSetExplicitly = true;
         this.contentType = contentType;
     }
 
@@ -1922,7 +1944,7 @@ public class ConnectionRequest implements IOProgressListener {
                         FileSystemStorage fs = FileSystemStorage.getInstance();
                         if (fs.exists(file)) {
                             try {
-                                EncodedImage img = EncodedImage.create(fs.openInputStream(file));
+                                EncodedImage img = EncodedImage.create(fs.openInputStream(file), (int)fs.getLength(file));
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }
@@ -1938,7 +1960,7 @@ public class ConnectionRequest implements IOProgressListener {
                         Storage fs = Storage.getInstance();
                         if (fs.exists(file)) {
                             try {
-                                EncodedImage img = EncodedImage.create(fs.createInputStream(file));
+                                EncodedImage img = EncodedImage.create(fs.createInputStream(file), fs.entrySize(file));
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }

@@ -239,16 +239,27 @@ public class Toolbar extends Container {
     public static boolean isPermanentSideMenu() {
         return permanentSideMenu;
     }
+
+    /**
+     * This is a convenience method to open the side menu bar. It's useful for cases where we want to place the 
+     * menu button in a "creative way" in which case we can bind the side menu to this
+     */
+    public void openSideMenu() {
+        ((SideMenuBar)getMenuBar()).openMenu(null);
+    }
     
     /**
      * Sets the Toolbar title component. This method allow placing any component
-     * in the Toolbar ceneter instead of the regular Label. Can be used to place
+     * in the Toolbar center instead of the regular Label. Can be used to place
      * a TextField to preform search operations
      *
-     * @param titleCmp Comoponent to place in the Toolbar center.
+     * @param titleCmp Component to place in the Toolbar center.
      */
     public void setTitleComponent(Component titleCmp) {
         checkIfInitialized();
+        if(titleComponent != null) {
+            titleComponent.remove();
+        }
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }
@@ -901,8 +912,7 @@ public class Toolbar extends Container {
         int marginRight = 0;
         Container dialogContentPane = menu.getDialogComponent();
         marginLeft = parent.getWidth() - (dialogContentPane.getPreferredW()
-                + menu.getStyle().getPadding(LEFT)
-                + menu.getStyle().getPadding(RIGHT));
+                + menu.getStyle().getHorizontalPadding());
         marginLeft = Math.max(0, marginLeft);
         if (parent.getSoftButtonCount() > 1) {
             height = parent.getHeight() - parent.getSoftButton(0).getParent().getPreferredH() - dialogContentPane.getPreferredH();
@@ -1164,6 +1174,15 @@ public class Toolbar extends Container {
         return cmds;
     }
 
+    /**
+     * Removes the given overflow menu command, notice that this has no effect on the menu that is currently
+     * showing (if it is currently showing) only on the upcoming iterations.
+     * @param cmd the command to remove from the overflow
+     */
+    public void removeOverflowCommand(Command cmd) {
+        overflowCommands.remove(cmd);
+    }
+
     
 
     class ToolbarSideMenu extends SideMenuBar {
@@ -1228,15 +1247,6 @@ public class Toolbar extends Container {
             return Toolbar.this.contains(x, y);
         }
 
-        /**
-         * Removes the given overflow menu command, notice that this has no effect on the menu that is currently
-         * showing (if it is currently showing) only on the upcoming iterations.
-         * @param cmd the command to remove from the overflow
-         */
-        public void removeOverflowCommand(Command cmd) {
-            overflowCommands.remove(cmd);
-        }
-        
         @Override
         public Component getComponentAt(int x, int y) {
             return Toolbar.this.getComponentAt(x, y);

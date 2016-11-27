@@ -424,17 +424,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void startBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
             stopBackgroundFetchService();
-            backgroundFetchTimer = new java.util.Timer();
+            if (getPreferredBackgroundFetchInterval() > 0) {
+                backgroundFetchTimer = new java.util.Timer();
 
-            TimerTask tt = new TimerTask() {
+                TimerTask tt = new TimerTask() {
 
-                @Override
-                public void run() {
-                    performBackgroundFetch();
-                }
+                    @Override
+                    public void run() {
+                        performBackgroundFetch();
+                    }
 
-            };
-            backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+                };
+                backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+            }
         }
     }
     
@@ -2904,6 +2906,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             skinNames = f;
         }
         pref.put("skins", skinNames);
+        try {
+            pref.flush();
+        } catch(Throwable t) {
+            t.printStackTrace();
+        }
     }
 
     private void deepRevaliate(com.codename1.ui.Container c) {
@@ -3157,6 +3164,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void vibrate(int duration) {
+        System.out.println("vibrate(" + duration + ")");
     }
 
     /**
@@ -6911,6 +6919,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
             capture(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
+        } else if (type==-9999) {
+            String[] exts = Display.getInstance().getProperty("javase.openGallery.accept", "").split(",");
+            
+            capture(response, exts, getGlobsForExtensions(exts, ";"));
         }else{
             String[] exts = new String[videoExtensions.length+imageExtensions.length];
             System.arraycopy(videoExtensions, 0, exts,0, videoExtensions.length);
@@ -6953,7 +6965,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     } 
                 } else {
-                    result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                    if(selected != null) {
+                        result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                    }
                 }
                 final com.codename1.ui.events.ActionEvent finalResult = result;
                 Display.getInstance().callSerially(new Runnable() {
@@ -7216,6 +7230,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             this.vid = vid;
             this.frm = frm;
+            
         }
 
         @Override
@@ -7575,6 +7590,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
+        System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = new File(getStorageDir() + "/database/" + databaseName);
         if (f.exists()) {
             f.delete();
@@ -7583,6 +7599,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean existsDB(String databaseName) {
+        System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = new File(getStorageDir() + "/database/" + databaseName);
         return f.exists();
     }
@@ -7634,7 +7651,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 webContainer.setScene(new Scene(root));
                 
                 // now wait for the Swing side to finish initializing f'ing JavaFX is so broken its unbeliveable
-                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent);
+                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent, hSelector, vSelector);
                 SwingUtilities.invokeLater(new Runnable() {
                     public void run() {
                         bc[0] = bcc;
@@ -8018,7 +8035,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public boolean accept(File dir, String name) {
                 name = name.toLowerCase();
                 for(String t : types) {
-                    if(name.endsWith(t)) {
+                    if(name.endsWith(t) || "*".equals(t)) {
                         return true;
                     }
                 }

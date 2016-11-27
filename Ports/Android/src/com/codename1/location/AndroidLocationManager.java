@@ -31,6 +31,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.io.Log;
 import static com.codename1.location.LocationManager.AVAILABLE;
 import static com.codename1.location.LocationManager.OUT_OF_SERVICE;
@@ -43,7 +44,6 @@ import java.io.IOException;
  * @author Chen
  */
 public class AndroidLocationManager extends com.codename1.location.LocationManager implements android.location.LocationListener, GpsStatus.Listener {
-
     private LocationManager locationManager;
     private String bestProvider;
     private Context context;
@@ -118,7 +118,7 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
         } else {
             searchForProvider = true;
             setLocationManagerStatus(OUT_OF_SERVICE);
-            new Thread() {
+            Thread t = new Thread() {
                 public void run() {
                     while (searchForProvider) {
                         try {
@@ -135,7 +135,9 @@ public class AndroidLocationManager extends com.codename1.location.LocationManag
                         }
                     }
                 }
-            }.start();
+            };
+            t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+            t.start();
         }
     }
 

@@ -46,9 +46,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Floating action buttons are a material design element used to promote a special action in a Form.
+ * <p>Floating action buttons are a material design element used to promote a special action in a Form.
  * They are represented as a floating circle with a flat icon floating above the UI typically in the bottom right
- * area.
+ * area.</p>
+ * 
+ * <p>
+ * Simple use cases include just the button as a standalone:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/f6820a6b0c781e5bb5ffa8004c5b5f2e.js"></script>
+
+* <p>
+ * The button can also nest sub actions
+ * </p>
+ * <script src="https://gist.github.com/codenameone/aa4180054368f61176c55979010d757b.js"></script>
+ * <img src="http://www.codenameone.com/img/blog/floating-action.png" alt="Floating Button" />
  *
  * @author Chen
  */
@@ -59,6 +70,8 @@ public class FloatingActionButton extends Button {
     private String text;
     private int shadowOpacity = 100;
     private Dialog current;
+    private boolean rectangle;
+    private boolean isBadge;
 
     /**
      * Constructor
@@ -78,16 +91,28 @@ public class FloatingActionButton extends Button {
         updateBorder();
     }
 
+    /**
+     * This constructor is used by text badges
+     */
+    private FloatingActionButton(String text) {
+        super.setText(text);
+        rectangle = true;
+        shadowOpacity = 0;
+        setUIID("Badge");
+        updateBorder();
+        isBadge = true;
+    }
+    
     private void updateBorder() {
         getUnselectedStyle().setBorder(RoundBorder.create().
                 color(getUnselectedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity));
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
         getSelectedStyle().setBorder(RoundBorder.create().
                 color(getSelectedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity));
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
         getPressedStyle().setBorder(RoundBorder.create().
                 color(getPressedStyle().getBgColor()).
-                shadowOpacity(shadowOpacity));
+                shadowOpacity(shadowOpacity).rectangle(rectangle));
     }
         
     /**
@@ -101,6 +126,15 @@ public class FloatingActionButton extends Button {
             updateBorder();
         }
     }    
+    
+    /**
+     * Creates a text badge
+     * @param text the text of the badge
+     * @return a badge component
+     */
+    public static FloatingActionButton createBadge(String text) {
+        return new FloatingActionButton(text);
+    }
     
     /**
      * a factory method to create a FloatingActionButton.
@@ -132,41 +166,69 @@ public class FloatingActionButton extends Button {
 
     @Override
     protected Dimension calcPreferredSize() {
-        return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
+        if(getIcon() != null) {
+            return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
+        } 
+        return super.calcPreferredSize();
     }
-
+    
     /**
-     * This is a utility method to bind the FAB to a given Container.
+     * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+     * use the layered pane if the container is a content pane.
      *
      * @param cnt the Container to add the FAB to
-     * @return a new Container that contains the cnt and the FAB on top
+     * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
      */
-    public Container bindFabToContainer(Container cnt) {
+    public Container bindFabToContainer(Component cnt) {
         return bindFabToContainer(cnt, Component.RIGHT, Component.BOTTOM);
     }
 
     /**
-     * This is a utility method to bind the FAB to a given Container.
+     * This is a utility method to bind the FAB to a given Container, it will return a new container to add or will
+     * use the layered pane if the container is a content pane.
      *
      * @param cnt the Container to add the FAB to
      * @param orientation one of Component.RIGHT/LEFT/CENTER
      * @param valign one of Component.TOP/BOTTOM/CENTER
      *
-     * @return a new Container that contains the cnt and the FAB on top
+     * @return a new Container that contains the cnt and the FAB on top or null in the case of a content pane
      */
-    public Container bindFabToContainer(Container cnt, int orientation, int valign) {
+    public Container bindFabToContainer(Component cnt, int orientation, int valign) {
         FlowLayout flow = new FlowLayout(orientation);
         flow.setValign(valign);
+
+        Form f = cnt.getComponentForm();
+        if(f != null && f.getContentPane() == cnt) {
+            // special case for content pane installs the button directly on the content pane
+            Container layers = f.getLayeredPane(getClass(), true);
+            layers.setLayout(flow);
+            layers.add(this);
+            return null;
+        }
+        
         Container conUpper = new Container(flow);
-        conUpper.addComponent(FlowLayout.encloseCenter(this));
-        conUpper.setScrollable(false);
+        conUpper.add(this);
         return LayeredLayout.encloseIn(cnt, conUpper);
     }
 
     @Override
     public void setText(String text) {
+        if(isBadge) {
+            super.setText(text);
+        }
         this.text = text;
     }
+
+    @Override
+    protected void fireActionEvent(int x, int y) {
+        Form current = Display.getInstance().getCurrent();
+        if(current instanceof Dialog) {
+            ((Dialog)current).dispose();
+        }
+        super.fireActionEvent(x, y);
+    }
+    
+    
 
     @Override
     public void released(int x, int y) {
@@ -240,6 +302,7 @@ public class FloatingActionButton extends Button {
      * @param dialog the Dialog with all sub FAB's Components
      */
     protected void showPopupDialog(Dialog dialog) {
+        dialog.setPopupDirectionBiasPortrait(Boolean.TRUE);
         dialog.showPopupDialog(this);
     }
 
