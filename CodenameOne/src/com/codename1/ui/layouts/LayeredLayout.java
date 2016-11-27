@@ -83,10 +83,10 @@ public class LayeredLayout extends Layout {
      */
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
-        int top = s.getPadding(false, Component.TOP);
-        int bottom = parent.getLayoutHeight() - parent.getBottomGap() - s.getPadding(false, Component.BOTTOM);
-        int left = s.getPadding(parent.isRTL(), Component.LEFT);
-        int right = parent.getLayoutWidth() - parent.getSideGap() - s.getPadding(parent.isRTL(), Component.RIGHT);
+        int top = s.getPaddingTop();
+        int bottom = parent.getLayoutHeight() - parent.getBottomGap() - s.getPaddingBottom();
+        int left = s.getPaddingLeft(parent.isRTL());
+        int right = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL());
         
         int numOfcomponents = parent.getComponentCount();
 
@@ -94,10 +94,10 @@ public class LayeredLayout extends Layout {
             Component cmp = parent.getComponentAt(i);
             s = cmp.getStyle();
             
-            int x = left + s.getMargin(parent.isRTL(), Component.LEFT);
-            int y = top + s.getMargin(parent.isRTL(), Component.TOP);
-            int w = right - left - s.getMargin(parent.isRTL(), Component.LEFT) - s.getMargin(parent.isRTL(), Component.RIGHT);
-            int h = bottom - top - s.getMargin(parent.isRTL(), Component.TOP) - s.getMargin(parent.isRTL(), Component.BOTTOM);
+            int x = left + s.getMarginLeft(parent.isRTL());
+            int y = top + s.getMarginTop();
+            int w = right - left - s.getHorizontalMargins();
+            int h = bottom - top - s.getVerticalMargins();
             cmp.setX(x);
             cmp.setY(y);
             cmp.setWidth(w);
@@ -114,12 +114,12 @@ public class LayeredLayout extends Layout {
         int numOfcomponents = parent.getComponentCount();
         for (int i = 0; i < numOfcomponents; i++) {
             Component cmp = parent.getComponentAt(i);
-            maxHeight = Math.max(maxHeight, cmp.getPreferredH() + cmp.getStyle().getMargin(false, Component.TOP) + cmp.getStyle().getMargin(false, Component.BOTTOM));
-            maxWidth = Math.max(maxWidth, cmp.getPreferredW()+ cmp.getStyle().getMargin(false, Component.LEFT) + cmp.getStyle().getMargin(false, Component.RIGHT));
+            maxHeight = Math.max(maxHeight, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());
+            maxWidth = Math.max(maxWidth, cmp.getPreferredW()+ cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL());
         }
         Style s = parent.getStyle();
-        Dimension d = new Dimension(maxWidth + s.getPadding(false, Component.LEFT) + s.getPadding(false, Component.RIGHT),
-                maxHeight + s.getPadding(false, Component.TOP) + s.getPadding(false, Component.BOTTOM));
+        Dimension d = new Dimension(maxWidth + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(),
+                maxHeight + s.getPaddingTop() + s.getPaddingBottom());
         return d;
     }
 

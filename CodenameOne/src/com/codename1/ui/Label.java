@@ -202,8 +202,8 @@ public class Label extends Component {
         Style s = getStyle();
         Font f = s.getFont();
         
-        int innerHeight = height-s.getPadding(TOP)-s.getPadding(BOTTOM);
-        return s.getPadding(TOP)+(innerHeight-f.getHeight())/2+f.getAscent();
+        int innerHeight = height-s.getVerticalPadding();
+        return s.getPaddingTop()+(innerHeight-f.getHeight())/2+f.getAscent();
     }
     
     
@@ -525,7 +525,7 @@ public class Label extends Component {
 
     int getAvaliableSpaceForText() {
         Style style = getStyle();
-        int textSpaceW = getWidth() - style.getPadding(isRTL(), Label.RIGHT) - style.getPadding(isRTL(), Label.LEFT);
+        int textSpaceW = getWidth() - style.getHorizontalPadding();
         Image icon = getIconFromState();
 
         if (icon != null && (getTextPosition() == Label.RIGHT || getTextPosition() == Label.LEFT)) {
@@ -580,6 +580,10 @@ public class Label extends Component {
      * {@inheritDoc}
      */
     void tryDeregisterAnimated() {
+        if(tickerEnabled || tickerRunning) {
+            return;
+        }
+        super.tryDeregisterAnimated();
     }
 
     /**
@@ -925,4 +929,15 @@ public class Label extends Component {
     public void setLegacyRenderer(boolean legacyRenderer) {
         this.legacyRenderer = legacyRenderer;
     }
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        super.styleChanged(propertyName, source);
+        // If we're using a custom font, we need to use the legacy renderer.
+        if (Style.FONT.equals(propertyName) && source.getFont() instanceof CustomFont) {
+            setLegacyRenderer(true);
+        }
+    }
+    
+    
 }

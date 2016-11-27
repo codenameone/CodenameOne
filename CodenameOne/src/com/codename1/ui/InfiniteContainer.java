@@ -181,7 +181,7 @@ public abstract class InfiniteContainer extends Container {
      * @return this is set to true for compatibility with older versions of the infinite container
      */
     protected boolean isAsync() {
-        return true;
+        return false;
     }
     
     /**
@@ -198,7 +198,7 @@ public abstract class InfiniteContainer extends Container {
      * @param amount the size of components to bring
      * 
      * @return Components array of the returned data, size of the array can be the 
-     * size of the amount or smaller, if no data to fetch method can return null.
+     * size of the amount or smaller, if there is no more data to fetch the method should return null.
      */ 
     public abstract Component[] fetchComponents(int index, int amount);
 

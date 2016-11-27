@@ -369,10 +369,8 @@ public abstract class LookAndFeel {
                 // special case since when scrolling with the physical keys we leave
                 // the margin out of the equasion
                 int l = c.getScrollY() + c.getHeight() +
-                        c.getStyle().getMargin(Component.TOP) +
-                        c.getStyle().getMargin(Component.BOTTOM) +
-                        c.getStyle().getPadding(Component.TOP) +
-                        c.getStyle().getPadding(Component.BOTTOM);
+                        c.getStyle().getVerticalMargins() +
+                        c.getStyle().getVerticalPadding();
 
                 int totalScroll = c.getScrollDimension().getHeight();
                 if(l >= totalScroll) {
@@ -432,10 +430,8 @@ public abstract class LookAndFeel {
                 // special case since when scrolling with the physical keys we leave
                 // the margin out of the equasion
                 int l = c.getScrollX() + c.getWidth() +
-                        c.getStyle().getMargin(Component.LEFT) +
-                        c.getStyle().getMargin(Component.RIGHT) +
-                        c.getStyle().getPadding(Component.LEFT) +
-                        c.getStyle().getPadding(Component.RIGHT);
+                        c.getStyle().getHorizontalMargins() +
+                        c.getStyle().getHorizontalPadding();
                 int totalScroll = c.getScrollDimension().getWidth();
                 if(l >= totalScroll) {
                     return;
@@ -466,12 +462,12 @@ public abstract class LookAndFeel {
             g.setAlpha(c.getScrollOpacity());
         }
         // take margin into consideration when positioning the scroll
-        int marginLeft = scrollStyle.getMargin(c.isRTL(), Component.LEFT);
-        int marginTop = scrollStyle.getMargin(false, Component.TOP);
+        int marginLeft = scrollStyle.getMarginLeft(c.isRTL());
+        int marginTop = scrollStyle.getMarginTop();
         x += marginLeft;
-        width -= (marginLeft + scrollStyle.getMargin(c.isRTL(), Component.RIGHT));
+        width -= (marginLeft + scrollStyle.getMarginRight(c.isRTL()));
         y += marginTop;
-        height -= (marginTop + scrollStyle.getMargin(false, Component.BOTTOM));
+        height -= (marginTop + scrollStyle.getMarginBottom());
 
         scroll.setX(x);
         scroll.setY(y);
@@ -485,12 +481,12 @@ public abstract class LookAndFeel {
 
         scroll.paintComponent(g);
 
-        marginLeft = scrollThumbStyle.getMargin(c.isRTL(), Component.LEFT);
-        marginTop = scrollThumbStyle.getMargin(false, Component.TOP);
+        marginLeft = scrollThumbStyle.getMarginLeft(c.isRTL());
+        marginTop = scrollThumbStyle.getMarginTop();
         x += marginLeft;
-        width -= (marginLeft + scrollThumbStyle.getMargin(c.isRTL(), Component.RIGHT));
+        width -= (marginLeft + scrollThumbStyle.getMarginRight(c.isRTL()));
         y += marginTop;
-        height -= (marginTop + scrollThumbStyle.getMargin(false, Component.BOTTOM));
+        height -= (marginTop + scrollThumbStyle.getMarginBottom());
 
         int offset, blockSize;
 
@@ -550,8 +546,8 @@ public abstract class LookAndFeel {
         Style scrollStyle = verticalScroll.getStyle();
 
         // bidi doesn't matter for width calculations
-        return scrollStyle.getMargin(false, Component.LEFT) + scrollStyle.getMargin(false, Component.RIGHT) +
-                scrollStyle.getPadding(false, Component.LEFT) + scrollStyle.getPadding(false, Component.RIGHT);
+        return scrollStyle.getMarginLeftNoRTL() + scrollStyle.getMarginRightNoRTL() +
+                scrollStyle.getPaddingLeftNoRTL() + scrollStyle.getPaddingRightNoRTL();
     }
 
     /**
@@ -566,8 +562,8 @@ public abstract class LookAndFeel {
         Style scrollStyle = horizontalScroll.getStyle();
 
         // bidi doesn't matter for height calculations
-        return scrollStyle.getMargin(false, Component.TOP) + scrollStyle.getMargin(false, Component.BOTTOM) +
-                scrollStyle.getPadding(false, Component.TOP) + scrollStyle.getPadding(false, Component.BOTTOM);
+        return scrollStyle.getMarginTop() + scrollStyle.getMarginBottom() +
+                scrollStyle.getPaddingTop() + scrollStyle.getPaddingBottom();
     }
 
     /**

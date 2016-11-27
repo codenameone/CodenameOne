@@ -30,6 +30,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.vending.billing.IInAppBillingService;
+import com.codename1.impl.android.AndroidImplementation;
 
 import org.json.JSONException;
 
@@ -609,7 +610,7 @@ public class IabHelper {
         checkNotDisposed();
         checkSetupDone("queryInventory");
         flagStartAsync("refresh inventory");
-        (new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
             public void run() {
                 IabResult result = new IabResult(BILLING_RESPONSE_RESULT_OK, "Inventory refresh successful.");
                 Inventory inv = null;
@@ -632,7 +633,9 @@ public class IabHelper {
                     });
                 }
             }
-        })).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();        
     }
 
     public void queryInventoryAsync(QueryInventoryFinishedListener listener) {
@@ -945,7 +948,7 @@ public class IabHelper {
                               final OnConsumeMultiFinishedListener multiListener) {
         final Handler handler = new Handler();
         flagStartAsync("consume");
-        (new Thread(new Runnable() {
+        Thread t= new Thread(new Runnable() {
             public void run() {
                 final List<IabResult> results = new ArrayList<IabResult>();
                 for (Purchase purchase : purchases) {
@@ -974,7 +977,9 @@ public class IabHelper {
                     });
                 }
             }
-        })).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     void logDebug(String msg) {

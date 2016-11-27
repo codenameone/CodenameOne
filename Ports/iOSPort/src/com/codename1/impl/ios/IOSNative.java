@@ -600,6 +600,16 @@ public final class IOSNative {
 
     native void getLinkedContactIds(int num, int recId, int[] out);
 
+    native void fillRadialGradientMutable(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle);
+
+    native void applyRadialGradientPaintMutable(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintMutable();
+
+    native void applyRadialGradientPaintGlobal(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintGlobal();
+
    
 
 }

@@ -59,7 +59,7 @@ class SearchBar extends Toolbar {
         hint.setUIID("TextHintSearch");
         search.setHintLabelImpl(hint);
         
-        search.addDataChangeListener(new DataChangedListener() {
+        search.addDataChangedListener(new DataChangedListener() {
 
             public void dataChanged(int type, int index) {
                 onSearch(search.getText());
@@ -75,14 +75,19 @@ class SearchBar extends Toolbar {
 
             @Override
             public void actionPerformed(ActionEvent evt) {
-                onSearch("");
-                final Form f = (Form) SearchBar.this.getParent();
-                f.getAnimationManager().flushAnimation(new Runnable() {
+                search.stopEditing();
+                Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        f.removeComponentFromForm(SearchBar.this);
-                        f.setToolbar(parent);
-                        parent.setHidden(false);
-                        f.animateLayout(100);
+                        onSearch("");
+                        final Form f = (Form) SearchBar.this.getParent();
+                        f.getAnimationManager().flushAnimation(new Runnable() {
+                            public void run() {
+                                f.removeComponentFromForm(SearchBar.this);
+                                f.setToolbar(parent);
+                                parent.setHidden(false);
+                                f.animateLayout(100);
+                            }
+                        });
                     }
                 });
             }

@@ -41,6 +41,7 @@ import java.util.Vector;
  * This class represent the Codename One Light Weight Virtual Keyboard
  * 
  * @author Chen Fishbein
+ * @deprecated this is a part of legacy code, modern devices have the virtual keyboard bound to the native text field
  */
 public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
     private static final String MARKER_COMMIT_ON_DISPOSE = "$VKB_COM$";
@@ -330,14 +331,13 @@ public class VirtualKeyboard extends Dialog implements VirtualKeyboardInterface{
             return;
         }
         Button dummy = createButton(new Command("dummy"), 0);
-        int buttonMargins = dummy.getUnselectedStyle().getMargin(dummy.isRTL(), LEFT) +
-                dummy.getUnselectedStyle().getMargin(dummy.isRTL(), RIGHT);
+        int buttonMargins = dummy.getUnselectedStyle().getHorizontalMargins();
         Container row = null;
         int rowW = (Display.getInstance().getDisplayWidth() -
-                getDialogStyle().getPadding(false, LEFT) -
-                getDialogStyle().getPadding(false, RIGHT) -
-                getDialogStyle().getMargin(false, LEFT) -
-                getDialogStyle().getMargin(false, RIGHT));
+                getDialogStyle().getPaddingLeftNoRTL() -
+                getDialogStyle().getPaddingRightNoRTL() -
+                getDialogStyle().getMarginLeftNoRTL() -
+                getDialogStyle().getMarginLeftNoRTL());
         int availableSpace = rowW - length * buttonMargins;
         int buttonSpace = (availableSpace) / length;
         int clen = currentKeyboardChars.length;

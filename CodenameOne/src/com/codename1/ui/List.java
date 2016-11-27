@@ -44,7 +44,9 @@ import java.util.Vector;
 
 /**
  * <p>A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
- * and are extracted via the {@link com.codename1.ui.list.ListModel}.<br>
+ * and are extracted via the {@link com.codename1.ui.list.ListModel}, <b>notice</b> that 
+ * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
+ * discourage usage of lists</a>.<br>
  * A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
  * is made possible thanks to extensive use of Swing's style of MVC. Specifically a list
  * component is relatively simple, it invokes the model in order to extract the displayed/selected
@@ -492,7 +494,7 @@ public class List<T> extends Component {
         Rectangle pos = new Rectangle();
         Dimension rendererSize = getElementSize(false, true);
         Style style = getStyle();
-        int width = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         calculateComponentPosition(getCurrentSelected(), width, pos, rendererSize, getElementSize(true, true), true);
         pos.setX(pos.getX() + getX());
         pos.setY(pos.getY() + getY());
@@ -1081,8 +1083,8 @@ public class List<T> extends Component {
      */
     private void calculateComponentPosition(int index, int defaultWidth, Rectangle rect, Dimension rendererSize, Dimension selectedSize, boolean beforeSelected) {
         Style style = getStyle();
-        int initialY = style.getPadding(false, TOP);
-        int initialX = style.getPadding(false, LEFT);
+        int initialY = style.getPaddingTop();
+        int initialX = style.getPaddingLeftNoRTL();
 
         boolean rtl = isRTL();
         if (rtl) {
@@ -1106,7 +1108,7 @@ public class List<T> extends Component {
             d.setHeight(height);
             d.setWidth(defaultWidth);
             int y = 0;
-            int listHeight = getHeight() - style.getPadding(false, TOP) - style.getPadding(false, BOTTOM);
+            int listHeight = getHeight() - style.getVerticalPadding();
             int totalHeight = (height + itemGap) * getModel().getSize() + selectedDiff;
             switch (fixedSelection) {
                 case FIXED_CENTER:
@@ -1142,10 +1144,10 @@ public class List<T> extends Component {
             int width = rendererSize.getWidth();
             selectedDiff = selectedSize.getWidth() - width;
             rect.setY(initialY);
-            d.setHeight(getHeight() - style.getPadding(false, TOP) - style.getPadding(false, BOTTOM));
+            d.setHeight(getHeight() - style.getVerticalPadding());
             d.setWidth(width);
             int x = 0;
-            int listWidth = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT);
+            int listWidth = getWidth() - style.getHorizontalPadding();
             int totalWidth = (width + itemGap) * getModel().getSize() + selectedDiff;
             switch (fixedSelection) {
                 case FIXED_CENTER:
@@ -1226,9 +1228,9 @@ public class List<T> extends Component {
         getUIManager().getLookAndFeel().drawList(g, this);
 
         Style style = getStyle();
-        int width = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         if (isScrollableX()) {
-            width = Math.max(width, getScrollDimension().getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap());
+            width = Math.max(width, getScrollDimension().getWidth() - style.getHorizontalPadding() - getSideGap());
         }
         int numOfcomponents = model.getSize();
         if (numOfcomponents == 0) {
@@ -1443,10 +1445,10 @@ public class List<T> extends Component {
      */
     private void renderComponent(Graphics g, Component cmp, int x, int y, int width, int height) {
         Style s = cmp.getStyle();
-        int left = s.getMargin(isRTL(), LEFT);
-        int top =  s.getMargin(false, TOP);
-        cmp.setWidth(width - left - s.getMargin(isRTL(), RIGHT));
-        cmp.setHeight(height - top - s.getMargin(false, BOTTOM));
+        int left = s.getMarginLeft(isRTL());
+        int top =  s.getMarginTop();
+        cmp.setWidth(width - left - s.getMarginRight(isRTL()));
+        cmp.setHeight(height - top - s.getMarginBottom());
         cmp.setX(x + left);
         cmp.setY(y + top);
 
@@ -1468,10 +1470,10 @@ public class List<T> extends Component {
 
     private void renderComponentBackground(Graphics g, Component cmp, int x, int y, int width, int height) {
         Style s = cmp.getStyle();
-        int left = s.getMargin(isRTL(), LEFT);
-        int top =  s.getMargin(false, TOP);
-        cmp.setWidth(width - left - s.getMargin(isRTL(), RIGHT));
-        cmp.setHeight(height - top - s.getMargin(false, BOTTOM));
+        int left = s.getMarginLeft(isRTL());
+        int top =  s.getMarginTop();
+        cmp.setWidth(width - left - s.getMarginRight(isRTL()));
+        cmp.setHeight(height - top - s.getMarginBottom());
         cmp.setX(x + left);
         cmp.setY(y + top);
         int cX = g.getClipX();
@@ -1737,8 +1739,8 @@ public class List<T> extends Component {
             height = Math.max(height, d.getHeight());
             if(iter == 0) {
                 Style s = cmp.getStyle();
-                marginY = s.getMargin(TOP) + s.getMargin(BOTTOM);
-                marginX = s.getMargin(LEFT) + s.getMargin(RIGHT);
+                marginY = s.getVerticalMargins();
+                marginX = s.getHorizontalMargins();
             }
         }
         return new Dimension(width + marginX, height + marginY);
@@ -1804,14 +1806,6 @@ public class List<T> extends Component {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-        clearDrag();
-        if(!isDragActivated()) {
-            int selection = pointerSelect(x[0], y[0]);
-            if (selection > -1) {
-                model.setSelectedIndex(selection);
-            }
-        }
-        pointerDraggedImpl(x[0], y[0]);
     }
 
     /**
@@ -1872,7 +1866,7 @@ public class List<T> extends Component {
     public Rectangle getSelectedRect() {
         Style style = getStyle();
         Rectangle pos = new Rectangle();
-        int width = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         Dimension rendererSize = getElementSize(false, true);
         calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);
         pos.setX(pos.getX() + getParent().getAbsoluteX());
@@ -1889,9 +1883,9 @@ public class List<T> extends Component {
         Dimension selectedSize = getElementSize(true, true);
 
         Rectangle pos = new Rectangle();
-        int width = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         if (isScrollableX()) {
-            width = Math.max(width, getScrollDimension().getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT) - getSideGap());
+            width = Math.max(width, getScrollDimension().getWidth() - style.getHorizontalPadding() - getSideGap());
         }
         y = y - getAbsoluteY();
         x = x - getAbsoluteX();
@@ -1901,7 +1895,7 @@ public class List<T> extends Component {
 
             if (orientation != HORIZONTAL) {
                 if(y < pos.getY()){
-                    selectedIndex = (y - style.getPadding(false, TOP)) / (rendererSize.getHeight() + itemGap);
+                    selectedIndex = (y - style.getPaddingTop()) / (rendererSize.getHeight() + itemGap);
                 }else{
                     int current = getSelectedIndex();
                     if(y < pos.getY() + selectedSize.getHeight()){
@@ -1929,7 +1923,7 @@ public class List<T> extends Component {
                     }
                 } else {
                     if (x < pos.getX()) {
-                        selectedIndex = (x - style.getPadding(false, LEFT)) / (rendererSize.getWidth() + itemGap);
+                        selectedIndex = (x - style.getPaddingLeftNoRTL()) / (rendererSize.getWidth() + itemGap);
                     } else {
                         int current = getSelectedIndex();
                         if (x < pos.getX() + selectedSize.getWidth()) {
@@ -1972,7 +1966,6 @@ public class List<T> extends Component {
      * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        pointerReleasedImpl(x[0], y[0], true, false);
     }
 
     
@@ -2017,7 +2010,7 @@ public class List<T> extends Component {
                 Component selectionCmp = renderer.getListCellRendererComponent(this, getSelectedItem(), getSelectedIndex(), true);
 
                 Style style = getStyle();
-                int width = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap();
+                int width = getWidth() - style.getHorizontalPadding() - getSideGap();
                 Rectangle pos = new Rectangle();
                 Dimension rendererSize = getElementSize(false, true);
                 calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);

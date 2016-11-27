@@ -137,6 +137,8 @@ public class JSONParser implements JSONParseCallback {
         ReaderClass rc = new ReaderClass();
         rc.buffOffset = 0;
         rc.buffSize = -1;
+        int row = 1;
+        int column = 1;
         StringBuilder currentToken = new StringBuilder();
         KeyStack blocks = new KeyStack();
         String currentBlock = "";
@@ -148,7 +150,13 @@ public class JSONParser implements JSONParseCallback {
                     return;
                 }
                 char c = (char) currentChar;
-
+                if(c == '\n') { 
+                    row++;
+                    column = 0;
+                } else {
+                    column++;
+                }
+                
                 if (quoteMode) {
                     switch (c) {
                         case '"':
@@ -207,7 +215,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                System.out.println("Expected null for key value!");
+                                Log.p("Expected null for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
                             }
 
                             continue;
@@ -224,7 +232,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                System.out.println("Expected true for key value!");
+                                Log.p("Expected true for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
                             }
 
                             continue;
@@ -248,7 +256,7 @@ public class JSONParser implements JSONParseCallback {
                                 }
                             } else {
                                 // parsing error....
-                                System.out.println("Expected false for key value!");
+                                Log.p("Expected false for key value while parsing JSON token at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
                             }
 
                             continue;
@@ -382,7 +390,8 @@ public class JSONParser implements JSONParseCallback {
                 }
             }
         } catch (Exception err) {
-            err.printStackTrace();
+            Log.e(err);
+            Log.p("Exception during JSON parsing at row: " + row + " column: " + column + " buffer: " + currentToken.toString());
             /*System.out.println();
             int current = i.read();
             while(current >= 0) {
@@ -546,7 +555,7 @@ public class JSONParser implements JSONParseCallback {
      */
     public void longToken(long tok) {
         if (isStackHash()) {
-            getStackHash().put(currentKey, new Double(tok));
+            getStackHash().put(currentKey, new Long(tok));
             currentKey = null;
         } else {
             getStackVec().add(new Long(tok));

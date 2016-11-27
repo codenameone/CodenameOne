@@ -828,10 +828,10 @@ public class GroupLayout extends Layout {
     public void layoutContainer(Container parent) {
         // Step 1: Prepare for layout.
         prepare(SPECIFIC_SIZE);
-        int insetLeft = parent.getStyle().getMargin(false, Component.LEFT);
-        int insetTop = parent.getStyle().getMargin(false, Component.TOP);
-        int insetRight = parent.getStyle().getMargin(false, Component.RIGHT);
-        int insetBottom = parent.getStyle().getMargin(false, Component.BOTTOM);
+        int insetLeft = parent.getStyle().getMarginLeftNoRTL();
+        int insetTop = parent.getStyle().getMarginTop();
+        int insetRight = parent.getStyle().getMarginRightNoRTL();
+        int insetBottom = parent.getStyle().getMarginBottom();
         int width = parent.getWidth() - insetLeft - insetRight;
         int height = parent.getHeight() - insetTop - insetBottom;
         boolean ltr = isLeftToRight();
@@ -1019,10 +1019,10 @@ public class GroupLayout extends Layout {
     }
     
     private Dimension adjustSize(int width, int height) {
-        int insetLeft = host.getStyle().getMargin(false, Component.LEFT);
-        int insetTop = host.getStyle().getMargin(false, Component.TOP);
-        int insetRight = host.getStyle().getMargin(false, Component.RIGHT);
-        int insetBottom = host.getStyle().getMargin(false, Component.BOTTOM);
+        int insetLeft = host.getStyle().getMarginLeftNoRTL();
+        int insetTop = host.getStyle().getMarginTop();
+        int insetRight = host.getStyle().getMarginRightNoRTL();
+        int insetBottom = host.getStyle().getMarginBottom();
         return new Dimension(width + insetLeft + insetRight,
                 height + insetTop + insetBottom);
     }

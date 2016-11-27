@@ -29,6 +29,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.ui.Display;
@@ -50,6 +51,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
         com.google.android.gms.location.LocationListener,
         LifecycleListener {
 
+    
+    public static AndroidLocationPlayServiceManager inMemoryBackgroundLocationListener;
+    
     private GoogleApiClient mGoogleApiClient;
 
     private LocationRequest locationRequest;
@@ -74,7 +78,13 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public Location getLastKnownLocation() {
-        android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        while (!getmGoogleApiClient().isConnected()) {
+            try {
+                Thread.sleep(300);
+            } catch (Exception ex) {
+            }
+        }
+        android.location.Location location = LocationServices.FusedLocationApi.getLastLocation(getmGoogleApiClient());
         if (location != null) {
             return AndroidLocationManager.convert(location);
         }
@@ -83,13 +93,14 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     protected void bindListener() {
-        new Thread(new Runnable() {
+        final Class bgListenerClass = getBackgroundLocationListener();
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
-                while (!mGoogleApiClient.isConnected()) {
+                while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
@@ -114,22 +125,46 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                             lr.setInterval(request.getInterval());
                             r = lr;
                         }
-                        LocationServices.FusedLocationApi.requestLocationUpdates(
-                                mGoogleApiClient, r, AndroidLocationPlayServiceManager.this);
+                        if (AndroidImplementation.getActivity() == null) {
+                            // we are in the background
+                            // Sometimes using regular locations in the background causes a crash
+                            // so we need to use the pending intent version.
+                            Context context = AndroidNativeUtil.getContext();
+
+                            Intent intent = new Intent(context, BackgroundLocationHandler.class);
+                            //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
+                            //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
+                            //an ugly workaround to the putExtra bug 
+                            if (bgListenerClass != null) {
+                                intent.setData(Uri.parse("http://a.com/a?" + bgListenerClass.getName()));
+                            }
+                            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
+                                    intent,
+                                    PendingIntent.FLAG_UPDATE_CURRENT);
+                            inMemoryBackgroundLocationListener = AndroidLocationPlayServiceManager.this;
+                            
+
+                            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), r, pendingIntent);
+                        } else {
+                            LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), r, AndroidLocationPlayServiceManager.this);
+                        }
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     @Override
     protected void clearListener() {
-        new Thread(new Runnable() {
+        final Class bgListenerClass = getBackgroundLocationListener();
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //mGoogleApiClient must be connected
-                while (!mGoogleApiClient.isConnected()) {
+                while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
@@ -139,22 +174,42 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, AndroidLocationPlayServiceManager.this);
+                        if (inMemoryBackgroundLocationListener != null) {
+                            Context context = AndroidNativeUtil.getContext();
+                            Intent intent = new Intent(context, BackgroundLocationHandler.class);
+                            if (bgListenerClass != null) {
+                                intent.putExtra("backgroundClass", bgListenerClass.getName());
+                            }
+                            PendingIntent pendingIntent = PendingIntent.getService(context, 0,
+                                    intent,
+                                    PendingIntent.FLAG_UPDATE_CURRENT);
+
+                            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
+                            inMemoryBackgroundLocationListener = null;
+                        } else {
+                            LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), AndroidLocationPlayServiceManager.this);
+                        }
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     @Override
     protected void bindBackgroundListener() {
-        new Thread(new Runnable() {
+        final Class bgListenerClass = getBackgroundLocationListener();
+        if (bgListenerClass == null) {
+            return;
+        }
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
-                while (!mGoogleApiClient.isConnected()) {
+                while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
@@ -165,42 +220,67 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
                     public void run() {
                         //don't be too aggressive for location updates in the background
-                        LocationRequest req = LocationRequest.create()
-                                .setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY)
-                                .setFastestInterval(5000L)
-                                .setInterval(10000L)
-                                .setSmallestDisplacement(50);
+                        LocationRequest req = LocationRequest.create();
+                        setupBackgroundLocationRequest(req);
 
-                        Context context = AndroidNativeUtil.getActivity();
+                        Context context = AndroidNativeUtil.getContext();
 
                         Intent intent = new Intent(context, BackgroundLocationHandler.class);
                         //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
                         //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
                         //an ugly workaround to the putExtra bug 
-                        intent.setData(Uri.parse("http://a.com/a?" + getBackgroundLocationListener().getName()));
+                        intent.setData(Uri.parse("http://a.com/a?" + bgListenerClass.getName()));
                         PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                                 intent,
                                 PendingIntent.FLAG_UPDATE_CURRENT);
 
-                        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, req, pendingIntent);
+                        LocationServices.FusedLocationApi.requestLocationUpdates(getmGoogleApiClient(), req, pendingIntent);
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
+    private void setupBackgroundLocationRequest(LocationRequest req) {
+        Display d = Display.getInstance();
+         String priorityStr = d.getProperty("android.backgroundLocation.priority", "PRIORITY_BALANCED_POWER_ACCURACY");
+         String fastestIntervalStr = d.getProperty("android.backgroundLocation.fastestInterval", "5000");
+         String intervalStr = d.getProperty("android.backgroundLocation.interval", "10000");
+         String smallestDisplacementStr = d.getProperty("android.backgroundLocation.smallestDisplacement", "50");
+         
+         int priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY;
+         if ("PRIORITY_HIGH_ACCURACY".equals(priorityStr)) {
+             priority = LocationRequest.PRIORITY_HIGH_ACCURACY;
+         } else if ("PRIORITY_LOW_POWER".equals(priorityStr)) {
+             priority = LocationRequest.PRIORITY_LOW_POWER;
+         } else if ("PRIORITY_NO_POWER".equals(priorityStr)) {
+             priority = LocationRequest.PRIORITY_NO_POWER;
+         }
+         
+         long interval = Long.parseLong(intervalStr);
+         long fastestInterval = Long.parseLong(fastestIntervalStr);
+         int smallestDisplacement = Integer.parseInt(smallestDisplacementStr);
+         
+         req.setPriority(priority)
+                 .setFastestInterval(fastestInterval)
+                 .setInterval(interval)
+                 .setSmallestDisplacement(smallestDisplacement);
+    }
+    
     @Override
     protected void clearBackgroundListener() {
         final Class bgListenerClass = getBackgroundLocationListener();
         if (bgListenerClass == null) {
             return;
         }
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //mGoogleApiClient must be connected
-                while (!mGoogleApiClient.isConnected()) {
+                while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
@@ -210,18 +290,20 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        Context context = AndroidNativeUtil.getActivity();
+                        Context context = AndroidNativeUtil.getContext();
                         Intent intent = new Intent(context, BackgroundLocationHandler.class);
                         intent.putExtra("backgroundClass", bgListenerClass.getName());
                         PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                                 intent,
                                 PendingIntent.FLAG_UPDATE_CURRENT);
 
-                        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, pendingIntent);
+                        LocationServices.FusedLocationApi.removeLocationUpdates(getmGoogleApiClient(), pendingIntent);
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     @Override
@@ -284,13 +366,13 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
-                while (!mGoogleApiClient.isConnected()) {
+                while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
@@ -300,7 +382,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        Context context = AndroidNativeUtil.getActivity();
+                        Context context = AndroidNativeUtil.getContext();
 
                         Intent intent = new Intent(context, GeofenceHandler.class);
                         intent.putExtra("geofenceClass", GeofenceListenerClass.getName());
@@ -316,11 +398,13 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                                         | Geofence.GEOFENCE_TRANSITION_EXIT)
                                 .setExpirationDuration(gf.getExpiration())
                                 .build());
-                        LocationServices.GeofencingApi.addGeofences(mGoogleApiClient, geofences, pendingIntent);
+                        LocationServices.GeofencingApi.addGeofences(getmGoogleApiClient(), geofences, pendingIntent);
                     }
                 });
             }
-        }).start();
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     /**
@@ -330,13 +414,13 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
      * @param id a Geofence id to stop tracking
      */
     public void removeGeoFencing(final String id) {
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
-                while (!mGoogleApiClient.isConnected()) {
+                while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
@@ -349,12 +433,13 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
                         ArrayList<String> ids = new ArrayList<String>();
                         ids.add(id);
-                        LocationServices.GeofencingApi.removeGeofences(mGoogleApiClient, ids);
+                        LocationServices.GeofencingApi.removeGeofences(getmGoogleApiClient(), ids);
                     }
                 });
             }
-        }).start();
-
+        });
+        t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
+        t.start();
     }
 
     /**
@@ -367,18 +452,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public void onResume() {
-        Context context = AndroidNativeUtil.getActivity();
-        if (mGoogleApiClient == null) {
-            mGoogleApiClient = new GoogleApiClient.Builder(context)
-                    .addApi(LocationServices.API)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .build();
-        }
-
-        if (!mGoogleApiClient.isConnected()) {
-            mGoogleApiClient.connect();
-        }
+        getmGoogleApiClient(); // This should initialize it if it isn't already.
     }
 
     @Override
@@ -389,6 +463,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
     public void onDestroy() {
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
             mGoogleApiClient.disconnect();
+        }
+        if (mGoogleApiClient != null) {
+            mGoogleApiClient = null;
         }
     }
 
@@ -417,9 +494,34 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public boolean isGPSEnabled() {
-        Context context = AndroidNativeUtil.getActivity();
+        Context context = AndroidNativeUtil.getContext();
         android.location.LocationManager locationManager = (android.location.LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
         return locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+    }
+
+    /**
+     * @return the mGoogleApiClient
+     */
+    private GoogleApiClient getmGoogleApiClient() {
+        if (mGoogleApiClient == null) {
+            mGoogleApiClient = new GoogleApiClient.Builder(AndroidNativeUtil.getContext())
+                    .addApi(LocationServices.API)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .build();
+            if (!mGoogleApiClient.isConnected()) {
+                mGoogleApiClient.connect();
+            }
+        }
+        
+        return mGoogleApiClient;
+    }
+
+    /**
+     * @param mGoogleApiClient the mGoogleApiClient to set
+     */
+    private void setmGoogleApiClient(GoogleApiClient mGoogleApiClient) {
+        this.mGoogleApiClient = mGoogleApiClient;
     }
 
 }

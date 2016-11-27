@@ -56,6 +56,8 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.graphics.Shader;
+import android.view.View;
+
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
@@ -821,20 +823,27 @@ class AndroidGraphics {
         unapplyTransform();
         canvas.restore();
     }
-
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+        fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);
+    }
+    
+    public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         boolean antialias = paint.isAntiAlias();
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(false);
         paint.setAlpha(255);
-        paint.setShader(new RadialGradient(x, y, Math.max(width, height), 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+        paint.setShader(new RadialGradient(x+width/2, y+width/2, Math.max(width, height)/2, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         canvas.save();
         applyTransform();
-        canvas.drawRect(x, y, x + width, y + height, paint);
+        this.tmprectF.set(x, y, x + width, y + height);
+        canvas.drawArc(this.tmprectF, 360 - startAngle,
+                -arcAngle, true, paint);
+        //canvas.drawRect(x, y, x + width, y + height, paint);
         paint.setAntiAlias(antialias);
         paint.setShader(null);
         unapplyTransform();
         canvas.restore();
+        
     }
 
     public void drawLabelComponent(int cmpX, int cmpY, int cmpHeight, int cmpWidth, Style style, String text,
@@ -1402,6 +1411,9 @@ class AndroidGraphics {
         clipFresh = false;
     }
 
+    public void drawView(final View v, AndroidAsyncView.LayoutParams lp) {
+    }
+
     public void rotate(float angle, int x, int y) {
         getTransform().rotate(angle, x, y);
         transformDirty = true;
@@ -1429,15 +1441,20 @@ class AndroidGraphics {
             p.transform(getTransformMatrix(), p2);
             RectF bounds2 = new RectF();
             p2.computeBounds(bounds2, false);
-            float ratio = Math.max(bounds2.width()/bounds.width(), bounds2.height()/bounds.height());
+            float b2w = bounds2.width();
+            float bw = bounds.width();
+            float bw2 = Math.max(1, b2w) / Math.max(1, bw);
+            float bh2 = Math.max(1, bounds2.height())/Math.max(1, bounds.height());
+            float ratio = Math.max(bw2, bh2);
             if (ratio > 2 && !isMutableImageGraphics) {
                 // If the canvas is hardware accelerated, then it will rasterize the path
                 // first, then apply the transform which leads to blurry paths if the transform does
                 // significant scaling.
                 // In such cases, we
                 float strokeWidthUpperBound = ratio * stroke.getLineWidth();
-                Bitmap nativeBuffer = Bitmap.createBitmap(
-                        (int)(bounds2.width()+2*strokeWidthUpperBound), (int)(bounds2.height()+2*strokeWidthUpperBound), Bitmap.Config.ARGB_8888);
+                int ww = Math.max(1, (int)(bounds2.width()+2*strokeWidthUpperBound));
+                int hh = Math.max(1, (int)(bounds2.height()+2*strokeWidthUpperBound));
+                Bitmap nativeBuffer = Bitmap.createBitmap(ww, hh, Bitmap.Config.ARGB_8888);
                 //int restorePoint = canvas.saveLayer(bounds2, paint, Canvas.ALL_SAVE_FLAG);
                 Canvas c = new Canvas(nativeBuffer);
                 Matrix translateM = new Matrix();

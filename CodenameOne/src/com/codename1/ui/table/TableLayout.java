@@ -387,10 +387,10 @@ public class TableLayout extends Layout {
 
             // column and row size in pixels
             Style s = parent.getStyle();
-            int top = s.getPadding(false, Component.TOP);
-            int left = s.getPadding(parent.isRTL(), Component.LEFT);
-            int bottom = s.getPadding(false, Component.BOTTOM);
-            int right = s.getPadding(parent.isRTL(), Component.RIGHT);
+            int top = s.getPaddingTop();
+            int left = s.getPaddingLeft(parent.isRTL());
+            int bottom = s.getPaddingBottom();
+            int right = s.getPaddingRight(parent.isRTL());
 
             boolean rtl = parent.isRTL();
 
@@ -469,8 +469,8 @@ public class TableLayout extends Layout {
                     int conX, conY, conW, conH;
                     if(con != null && con != H_SPAN_CONSTRAINT && con != V_SPAN_CONSTRAINT && con != VH_SPAN_CONSTRAINT) {
                         Style componentStyle = con.parent.getStyle();
-                        int leftMargin = componentStyle.getMargin(parent.isRTL(), Component.LEFT);
-                        int topMargin = componentStyle.getMargin(false, Component.TOP);
+                        int leftMargin = componentStyle.getMarginLeft(parent.isRTL());
+                        int topMargin = componentStyle.getMarginTop();
     //                    conX = left + leftMargin + columnPositions[c]; // bugfix table with padding not drawn correctly
     //                    conY = top + topMargin + rowPositions[r]; // bugfix table with padding not drawn correctly
                         conX = leftMargin + columnPositions[c];
@@ -486,9 +486,9 @@ public class TableLayout extends Layout {
                             if(rtl) {
                                 conX = left + leftMargin + columnPositions[c + con.spanHorizontal - 1];
                             }
-                            conW = w - leftMargin - componentStyle.getMargin(parent.isRTL(), Component.RIGHT);
+                            conW = w - leftMargin - componentStyle.getMarginLeft(parent.isRTL());
                         } else {
-                            conW = columnSizes[c] - leftMargin - componentStyle.getMargin(parent.isRTL(), Component.RIGHT);
+                            conW = columnSizes[c] - leftMargin - componentStyle.getMarginRight(parent.isRTL());
                         }
                         if(con.spanVertical > 1) {
                             verticalSpanningExists = true;
@@ -496,9 +496,9 @@ public class TableLayout extends Layout {
                             for(int sv = 1 ; sv < con.spanVertical ; sv++) {
                                 h += rowSizes[Math.min(r + sv, rowSizes.length - 1)];
                             }
-                            conH = h - topMargin - componentStyle.getMargin(false, Component.BOTTOM);
+                            conH = h - topMargin - componentStyle.getMarginBottom();
                         } else {
-                            conH = rowSizes[r] - topMargin - componentStyle.getMargin(false, Component.BOTTOM);
+                            conH = rowSizes[r] - topMargin - componentStyle.getMarginBottom();
                         }
                         placeComponent(rtl, con, conX, conY, conW, conH);
                     }
@@ -623,7 +623,7 @@ public class TableLayout extends Layout {
                     return available;
                 }
                 Style s = c.parent.getStyle();
-                current = Math.max(current, c.parent.getPreferredW()  + s.getMargin(false, Component.LEFT) + s.getMargin(false, Component.RIGHT));
+                current = Math.max(current, c.parent.getPreferredW()  + s.getMarginLeftNoRTL() + s.getMarginRightNoRTL());
                 modifableColumnSize[column] = true;
             }
             if(available > -1) {
@@ -651,7 +651,7 @@ public class TableLayout extends Layout {
                 current = Math.max(current, c.height * percentageOf / 100);
             } else {
                 Style s = c.parent.getStyle();
-                current = Math.max(current, c.parent.getPreferredH() + s.getMargin(false, Component.TOP) + s.getMargin(false, Component.BOTTOM));
+                current = Math.max(current, c.parent.getPreferredH() + s.getMarginTop() + s.getMarginBottom());
             }
             if(available > -1) {
                 current = Math.min(available, current);
@@ -665,8 +665,8 @@ public class TableLayout extends Layout {
      */
     public Dimension getPreferredSize(Container parent) {
         Style s = parent.getStyle();
-        int w = s.getPadding(false, Component.LEFT) + s.getPadding(false, Component.RIGHT);
-        int h = s.getPadding(false, Component.TOP) + s.getPadding(false, Component.BOTTOM);
+        int w = s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL();
+        int h = s.getPaddingTop() + s.getPaddingBottom();
 
         int maxW = Display.getInstance().getDisplayWidth() * 2;
         int maxH = Display.getInstance().getDisplayHeight() * 2;

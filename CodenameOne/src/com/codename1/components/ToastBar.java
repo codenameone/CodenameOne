@@ -696,7 +696,7 @@ public class ToastBar {
         Form f = Display.getInstance().getCurrent();
         if (f != null && !(f instanceof Dialog)) {
             ToastBarComponent c = (ToastBarComponent)f.getClientProperty("ToastBarComponent");
-            if (c == null) {
+            if (c == null || c.getParent() == null) {
                 c = new ToastBarComponent();
                 c.hidden = true;
                 f.putClientProperty("ToastBarComponent", c);
@@ -797,7 +797,7 @@ public class ToastBar {
         s.setProgress(-1);
         s.setMessage(message);
         s.show();
-        final ActionListener[] progListener = new ActionListener[1];
+         final ActionListener[] progListener = new ActionListener[1];
         final ActionListener<NetworkEvent> errorListener = new ActionListener<NetworkEvent>() {
             public void actionPerformed(NetworkEvent evt) {
                 s.clear();
@@ -815,14 +815,6 @@ public class ToastBar {
             private int soFar;
             public void actionPerformed(NetworkEvent evt) {
                 switch(evt.getProgressType()) {
-                    case NetworkEvent.PROGRESS_TYPE_COMPLETED:
-                        NetworkManager.getInstance().removeErrorListener(errorListener);
-                        NetworkManager.getInstance().removeProgressListener(this);
-                        s.clear();
-                        if(onSuccess != null) {
-                            onSuccess.onSucess(evt);
-                        }
-                        break;
                     case NetworkEvent.PROGRESS_TYPE_INITIALIZING:
                         s.setProgress(-1);
                         break;
@@ -839,6 +831,17 @@ public class ToastBar {
                 }
             }
         };
+        cr.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+                NetworkManager.getInstance().removeErrorListener(errorListener);
+                NetworkManager.getInstance().removeProgressListener(progListener[0]);
+                s.clear();
+                if (onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
+                    onSuccess.onSucess(evt);
+                }
+            }
+        });        
         NetworkManager.getInstance().addProgressListener(progListener[0]);
     }
 }

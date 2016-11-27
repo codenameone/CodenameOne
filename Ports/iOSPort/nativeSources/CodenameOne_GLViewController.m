@@ -39,6 +39,8 @@
 #import "ResetAffine.h"
 #import "Scale.h"
 #import "Rotate.h"
+#import "PaintOp.h"
+#import "RadialGradientPaint.h"
 #import <AudioToolbox/AudioToolbox.h>
 #import "DrawGradientTextureCache.h"
 #import "DrawStringTextureCache.h"
@@ -58,6 +60,11 @@
 #ifdef INCLUDE_GOOGLE_CONNECT
 #import "GoogleOpenSource.h"
 #endif
+
+// Last touch positions.  Helpful to know on the iPad when some popover stuff
+// needs a source rect that the java API doesn't pass through.
+int CN1lastTouchX=0;
+int CN1lastTouchY=0;
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
@@ -739,7 +746,7 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
         CGMutablePathRef path = CGPathCreateMutable();
         
         CGAffineTransform t = CGAffineTransformMakeTranslation(cx, cy);
-        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/width), t);
+        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/(float)width), t);
         
         CGFloat radius = width/2;
         if (fill){
@@ -774,6 +781,35 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
     }
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl
+(CGContextRef context, RadialGradientPaint* gradient, int x, int y, int width, int height, int startAngle, int angle) {
+    if (angle < 0) {
+        startAngle += angle;
+        angle = -angle;
+    }
+    int scolor = gradient.startColor;
+    int ecolor = gradient.endColor;
+    CGFloat components[8] = {
+        ((float)((scolor >> 16) & 0xff))/255.0, \
+        ((float)((scolor >> 8) & 0xff))/255.0, ((float)(scolor & 0xff))/255.0, 1.0,
+        ((float)((ecolor >> 16) & 0xff))/255.0, \
+        ((float)((ecolor >> 8) & 0xff))/255.0, ((float)(ecolor & 0xff))/255.0, 1.0
+    };
+    size_t num_locations = 2;
+    CGFloat locations[2] = { 0.0, 1.0 };
+    
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGGradientRef myGradient = CGGradientCreateWithColorComponents (colorSpace, components, locations, num_locations);
+    CGColorSpaceRelease(colorSpace); colorSpace = NULL;
+    
+    CGContextSaveGState(context);
+    drawArc(context, gradient.startColor, 1.0, x, y, width, height, startAngle, angle, YES);
+    CGContextClip(context);
+    CGContextDrawRadialGradient(context, myGradient, CGPointMake(gradient.x+gradient.width/2, gradient.y+gradient.height/2), 0, CGPointMake(gradient.x+gradient.width/2, gradient.y+gradient.height/2), gradient.width/2, 0);
+    CGGradientRelease(myGradient), myGradient = NULL;
+    CGContextRestoreGState(context);
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -781,7 +817,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
-    CGContextFillPath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, YES));
+    if ([PaintOp getCurrentMutable] != NULL && [[PaintOp getCurrentMutable] isKindOfClass:[RadialGradientPaint class]]) {
+        Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl(
+            context, (RadialGradientPaint*)[PaintOp getCurrentMutable], x, y, width, height, startAngle, angle
+        );
+    } else {
+        CGContextFillPath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, YES));
+    }
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
@@ -1355,9 +1397,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     // set all pixels to transparent white to solve http://code.google.com/p/codenameone/issues/detail?id=923
-    for(int iter = 0 ; iter < width * height ; iter++) {
+    // This caused a regression in masking for some reason...
+    /*for(int iter = 0 ; iter < width * height ; iter++) {
         arr[iter] = 0xffffff;
-    }
+    }*/
     UIImage* img = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGColorSpaceRef coloSpaceRgb = CGColorSpaceCreateDeviceRGB();
     CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4,
@@ -2638,10 +2681,14 @@ static BOOL skipNextTouch = NO;
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
             yArray[iter] = (int)currentPoint.y * scaleValue;
+            CN1lastTouchX = (int)currentPoint.x;
+            CN1lastTouchY = (int)currentPoint.y;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
+        CN1lastTouchX = (int)point.x;
+        CN1lastTouchY = (int)point.y;
     }
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();

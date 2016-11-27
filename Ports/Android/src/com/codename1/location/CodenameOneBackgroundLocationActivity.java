@@ -5,17 +5,20 @@
  */
 package com.codename1.location;
 
+import android.app.Activity;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
-import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.ui.Display;
 
 /**
- *
+ * DEPRECATED!  We no longer use activities for performing background functions.  These 
+ * are now handled directly in services.
  * @author Chen
+ * @deprecated
+ * @see BackgroundLocationHandler
  */
-public class CodenameOneBackgroundLocationActivity extends CodenameOneActivity{
+public class CodenameOneBackgroundLocationActivity extends Activity {
 
     public CodenameOneBackgroundLocationActivity() {
     }
@@ -29,7 +32,13 @@ public class CodenameOneBackgroundLocationActivity extends CodenameOneActivity{
     protected void onStart() {
         super.onStart();
         if(!Display.isInitialized()) {
-            Display.init(this);
+            //Display.init(this);
+            // This should never happen because Android will load the main activity first
+            // automatically when we call startActivity()... and that will initialize the display
+            Log.d("CN1", "Display is not initialized.  Cannot deliver background location update");
+            finish();
+            
+            return;
         }
         Bundle b = getIntent().getExtras();
         if(b != null){
@@ -51,7 +60,7 @@ public class CodenameOneBackgroundLocationActivity extends CodenameOneActivity{
     protected void onDestroy() {
         Log.d("CN1", "end CodenameOneBackgroundLocationActivity");
         super.onDestroy();
-        Display.getInstance().callSerially(new Runnable() { public void run() { Display.deinitialize();} });
+        //Display.getInstance().callSerially(new Runnable() { public void run() { Display.deinitialize();} });
     }
 
     public boolean hasUI(){

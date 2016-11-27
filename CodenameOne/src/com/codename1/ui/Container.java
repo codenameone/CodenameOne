@@ -616,13 +616,13 @@ public class Container extends Component implements Iterable<Component>{
             cmp.setVisible(true);
             cmp.setPreferredSize(null);
         }
-        UIManager manger = getUIManager();
-        boolean refreshLaf = manger != cmp.getUIManager();
+        UIManager manager = getUIManager();
+        boolean refreshLaf = manager != cmp.getUIManager();
         cmp.setParent(this);
         if(refreshLaf){
            Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                               cmp.refreshTheme(false);
+                    cmp.refreshTheme(false);
                 }
             });
         }
@@ -1143,7 +1143,7 @@ public class Container extends Component implements Iterable<Component>{
             return false;
         }
         Style s = getStyle();
-        if(s.getPadding(TOP) != 0 || s.getPadding(LEFT) != 0 || s.getPadding(RIGHT) != 0 || s.getPadding(BOTTOM) != 0) {
+        if(s.getPaddingTop() != 0 || s.getPaddingLeftNoRTL()!= 0 || s.getPaddingRightNoRTL()!= 0 || s.getPaddingBottom() != 0) {
             return false;
         }
         
@@ -1159,14 +1159,14 @@ public class Container extends Component implements Iterable<Component>{
                 if(!((Container)cmp).getLayout().obscuresPotential(this)) {
                     return false;
                 }
-                if(s.getOpacity() != 0xff || s.getMargin(TOP) != 0 || s.getMargin(LEFT) != 0 || s.getMargin(RIGHT) != 0 || s.getMargin(BOTTOM) != 0) {
+                if(s.getOpacity() != 0xff || s.getMarginTop() != 0 || s.getMarginLeftNoRTL() != 0 || s.getMarginRightNoRTL() != 0 || s.getMarginBottom()!= 0) {
                     return false;
                 }
                 if((s.getBgTransparency() & 0xff) != 0xff && !((Container)cmp).isObscuredByChildren()) {
                     return false;
                 }
             } else {
-                if((s.getBgTransparency() & 0xff) != 0xff || s.getOpacity() != 0xff || s.getMargin(TOP) != 0 || s.getMargin(LEFT) != 0 || s.getMargin(RIGHT) != 0 || s.getMargin(BOTTOM) != 0) {
+                if((s.getBgTransparency() & 0xff) != 0xff || s.getOpacity() != 0xff || s.getMarginTop()!= 0 || s.getMarginLeftNoRTL()!= 0 || s.getMarginRightNoRTL()!= 0 || s.getMarginBottom()!= 0) {
                     return false;
                 }
             }
@@ -1310,12 +1310,12 @@ public class Container extends Component implements Iterable<Component>{
         }
         g.translate(getX(), getY());
         int size = components.size();
-        int clipX1 = g.getClipX();
-        int clipX2 = g.getClipX() + g.getClipWidth();
-        int clipY1 = g.getClipY();
-        int clipY2 = g.getClipY() + g.getClipHeight();
         int startIter = 0;
         if (size >= 30) {
+            int clipX1 = g.getClipX();
+            int clipX2 = g.getClipX() + g.getClipWidth();
+            int clipY1 = g.getClipY();
+            int clipY2 = g.getClipY() + g.getClipHeight();
             startIter = calculateFirstPaintableOffset(clipX1, clipY1, clipX2, clipY2);
             if (startIter < 0) {
                 // There was no efficient way to calculate the offset
@@ -1913,7 +1913,7 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     public boolean isScrollableX() {
-        return scrollableX && (getScrollDimension().getWidth() + getStyle().getPadding(RIGHT) + getStyle().getPadding(LEFT) > getWidth());
+        return scrollableX && (getScrollDimension().getWidth() + getStyle().getHorizontalPadding() > getWidth());
     }
 
     /**
@@ -1925,7 +1925,7 @@ public class Container extends Component implements Iterable<Component>{
         if(f != null) {
             v= f.getInvisibleAreaUnderVKB();
         }
-        return scrollableY && (getScrollDimension().getHeight() + getStyle().getPadding(TOP) + getStyle().getPadding(BOTTOM) > getHeight() -  v || isAlwaysTensile());
+        return scrollableY && (getScrollDimension().getHeight() + getStyle().getVerticalPadding() > getHeight() -  v || isAlwaysTensile());
     }
 
     /**
@@ -1985,6 +1985,8 @@ public class Container extends Component implements Iterable<Component>{
      * 
      * @param scrollable whether the component should/could scroll on the 
      * X and Y axis
+     * 
+     * @deprecated use setScrollableX and setScrollableY instead. This method is deprecated since it breeds confusion and is often misunderstood.
      */
     public void setScrollable(boolean scrollable) {
         setScrollableX(scrollable);
@@ -2290,9 +2292,10 @@ public class Container extends Component implements Iterable<Component>{
      * @param duration the duration in milliseconds for the animation
      * @param startingOpacity the initial opacity to give to the animated components
      * @return the animation object that should be added to the animation manager
+     * @deprecated this was added by mistake!
      */
     public ComponentAnimation createAnimateLayoutFadeAndWait(final int duration, int startingOpacity) {
-        return animateLayout(duration, true, startingOpacity, false);
+        return null;
     }
 
     /**
@@ -2791,7 +2794,7 @@ public class Container extends Component implements Iterable<Component>{
             thisContainer.replace(current, next, growSpeed > 0 || layoutAnimationSpeed > 0);
             //release the events blocking
             t.cleanup();
-            if(thisContainer.cmpTransitions.size() == 0 && growSpeed > -1){
+            if(thisContainer.cmpTransitions != null && thisContainer.cmpTransitions.size() == 0 && growSpeed > -1){
                 if(growSpeed > 0) {
                     current.growShrink(growSpeed);
                 } else {

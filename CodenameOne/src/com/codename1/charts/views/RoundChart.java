@@ -16,6 +16,8 @@
 package com.codename1.charts.views;
 
 import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.GradientDrawable;
+import com.codename1.charts.compat.GradientDrawable.Orientation;
 import com.codename1.charts.compat.Paint;
 import com.codename1.charts.models.CategorySeries;
 import com.codename1.charts.renderers.DefaultRenderer;
@@ -92,7 +94,13 @@ public abstract class RoundChart extends AbstractChart {
    */
   public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
       int seriesIndex, Paint paint) {
-    canvas.drawRect(x, y - SHAPE_WIDTH / 2, x + SHAPE_WIDTH, y + SHAPE_WIDTH / 2, paint);
+    if (renderer.isGradientEnabled() && canvas.isShapeClipSupported()) {
+        GradientDrawable gr = new GradientDrawable(Orientation.TOP_BOTTOM, new int[]{ renderer.getGradientStartColor(), renderer.getGradientStopColor()});
+        gr.setBounds((int)x, (int)(y - SHAPE_WIDTH / 2), (int)(x + SHAPE_WIDTH), (int)(y + SHAPE_WIDTH / 2));
+        gr.draw(canvas);
+    } else {
+        canvas.drawRect(x, y - SHAPE_WIDTH / 2, x + SHAPE_WIDTH, y + SHAPE_WIDTH / 2, paint);
+    }
   }
 
   /**

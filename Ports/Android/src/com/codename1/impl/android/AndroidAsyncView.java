@@ -37,13 +37,17 @@ import android.graphics.Shader;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+
+import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
+import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextField;
 import com.codename1.ui.geom.GeneralPath;
@@ -55,9 +59,54 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.StyleAccessor;
 import java.util.WeakHashMap;
 
-public class AndroidAsyncView extends View implements CodenameOneSurface {
+public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
+
 
     private RectF tmpRectf = new RectF();
+
+    public static class LayoutParams extends ViewGroup.MarginLayoutParams {
+        public PeerComponent pc;
+        public LayoutParams(int x, int y, int w, int h, PeerComponent pc) {
+            super(w, h);
+            this.pc = pc;
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+        }
+
+        public int x, y, w, h;
+        public boolean dirty;
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        final int count = getChildCount();
+        for(int iter = 0 ; iter < count ; iter++) {
+            View child = getChildAt(iter);
+            LayoutParams lp = (LayoutParams) child.getLayoutParams();
+            child.measure(View.MeasureSpec.makeMeasureSpec(lp.w, MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(lp.h, MeasureSpec.EXACTLY));
+        }
+        setMeasuredDimension(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        final int count = getChildCount();
+        for(int iter = 0 ; iter < count ; iter++) {
+            View child = getChildAt(iter);
+            LayoutParams lp = (LayoutParams) child.getLayoutParams();
+            child.layout(lp.x, lp.y, lp.x + lp.w, lp.y + lp.h);
+        }
+    }
+
+
+    @Override
+    public boolean shouldDelayChildPressedState() {
+        return false;
+    }
+
 
     abstract class AsyncOp {
 
@@ -104,17 +153,19 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     private static final Object RENDERING_OPERATIONS_LOCK = new Object();
     private ArrayList<AsyncOp> renderingOperations = new ArrayList<AsyncOp>();
     private ArrayList<AsyncOp> pendingRenderingOperations = new ArrayList<AsyncOp>();
+    private ArrayList<AsyncOp> currentlyRendering = new ArrayList<AsyncOp>();
     private final CodenameOneView cn1View;
     private final AndroidGraphics graphics;
     private final AndroidGraphics internalGraphics;
     private final AndroidImplementation implementation;
-    private boolean paintViewOnBuffer = false;
     static boolean legacyPaintLogic = true;
     private static ArrayList<Path> pathPool = new ArrayList<Path>();
 
     private synchronized static Path createPathFromPool() {
         if (!pathPool.isEmpty()) {
-            return pathPool.remove(pathPool.size()-1);
+            Path out = pathPool.remove(pathPool.size()-1);
+            out.rewind();
+            return out;
         }
         return new Path();
     }
@@ -134,22 +185,26 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         internalGraphics = new AndroidGraphics(implementation, null, false);
         cn1View = new CodenameOneView(activity, this, implementation, false);
         setWillNotCacheDrawing(true);
-        setWillNotDraw(false);
+        setWillNotDraw(true);
         setBackgroundDrawable(null);
-        paintViewOnBuffer = true;
+        this.setFocusable(true);
+        this.setFocusableInTouchMode(false);
+        this.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
     }
 
+
     @Override
-    protected void onDraw(Canvas c) {
+    protected void dispatchDraw(Canvas c) {
         // **************************
         // Commented out debuging code useful for hand tuning the drawing logic performance
         // **************************
         //long time = System.currentTimeMillis();
-        boolean paintOnBuffer = paintViewOnBuffer ||
-                implementation.isEditingText() ||
-                InPlaceEditView.isKeyboardShowing() ||
-                implementation.nativePeers.size() > 0;
-
+        
+        //boolean paintOnBuffer = implementation.isEditingText() ||
+        //        InPlaceEditView.isKeyboardShowing();
+        
+        boolean paintOnBuffer = false;
+        
         internalGraphics.setCanvasNoSave(c);
         AndroidGraphics g = internalGraphics;
         if (paintOnBuffer) {
@@ -158,9 +213,19 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
         //final HashMap<String, Long> slowest = new HashMap<>();
         //final HashMap<String, Long> counts = new HashMap<>();
+        int count = renderingOperations.size();
 
-        for (AsyncOp o : renderingOperations) {
-            //long ntime = System.nanoTime();
+        // this works around the case of a blank screen when an invalidate occurs out of nowhere
+        // and no operations are in the queue
+        if(count > 0) {
+            currentlyRendering.clear();
+            currentlyRendering.addAll(renderingOperations);
+        } else {
+            count = currentlyRendering.size();
+        }
+        int offset = 0;
+        for(; offset < count ; offset++) {
+            AsyncOp o = currentlyRendering.get(offset);
             o.executeWithClip(g);
             /*ntime = System.nanoTime() - ntime;
             String s = o.toString();
@@ -174,6 +239,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 counts.put(s, ll.longValue() + 1);
             }*/
         }
+        
         synchronized (RENDERING_OPERATIONS_LOCK) {
             renderingOperations.clear();
             RENDERING_OPERATIONS_LOCK.notify();
@@ -216,7 +282,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     }
 
     public void setPaintViewOnBuffer(boolean paintViewOnBuffer) {
-        this.paintViewOnBuffer = paintViewOnBuffer;
+        //this.paintViewOnBuffer = paintViewOnBuffer;
     }
 
     @Override
@@ -232,9 +298,9 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     protected void onWindowVisibilityChanged(int visibility) {
         super.onWindowVisibilityChanged(visibility);
         this.visibilityChangedTo(visibility == View.VISIBLE);
-        if(visibility != View.VISIBLE){
+        /*if(visibility != View.VISIBLE){
             paintViewOnBuffer = true;
-        }
+        }*/
     }
 
     @Override
@@ -258,6 +324,32 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 cn1View.handleSizeChange(w, h);
             }
         });
+    }
+
+    public void resizeViews() {
+        int children = getChildCount();
+        if(children > 0) {
+            for (int iter = 0; iter < children; iter++) {
+                final View v = getChildAt(iter);
+                final AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();
+                if (lp.dirty) {
+                    lp.dirty = false;
+                    v.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            v.requestLayout();
+
+                            Display.getInstance().getInstance().callSerially(new Runnable() {
+                                @Override
+                                public void run() {
+                                    Display.getInstance().getCurrent().repaint();
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        }
     }
 
     @Override
@@ -287,8 +379,50 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
         
         for (AsyncOp o : renderingOperations) {
             o.prepare();
-        }        
-        
+        }
+
+        int children = getChildCount();
+        if(children > 0) {
+            com.codename1.ui.Form c = Display.getInstance().getCurrent();
+            for (int iter = 0; iter < children; iter++) {
+                final View v = getChildAt(iter);
+                final AndroidAsyncView.LayoutParams lp = (AndroidAsyncView.LayoutParams) v.getLayoutParams();
+                //if (lp != null && c == lp.pc.getComponentForm()) {
+                    //v.postInvalidate();
+
+                    /*if(lp.dirty) {
+                        lp.dirty = false;
+                        v.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (v.getVisibility() == View.INVISIBLE) {
+                                    v.setVisibility(View.VISIBLE);
+                                }
+                                v.requestLayout();
+                            }
+                        });
+                    } else {
+                        if (v.getVisibility() == View.INVISIBLE) {
+                            v.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    v.setVisibility(View.VISIBLE);
+                                }
+                            });
+                        }
+                    }*/
+                //} else {
+                    /*if(v.getVisibility() == View.VISIBLE) {
+                        v.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                v.setVisibility(View.INVISIBLE);
+                            }
+                        });
+                    }*/
+                //}
+            }
+        }
         if (rect == null) {
             postInvalidate();
         } else {
@@ -326,7 +460,8 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        super.dispatchTouchEvent(event);
         return cn1View.onTouchEvent(event);
     }
 
@@ -370,6 +505,21 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
     public View getAndroidView() {
         return this;
     }
+    
+    public void removePeerView(final View v) {
+        if(v.getParent() != null) {
+            ((Activity)v.getContext()).runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    // this might happen twice if draw view is invoked twice before the screen has time to draw
+                    if(v.getParent() != null) {
+                        removeView(v);
+                    }
+                }
+            });
+        }
+    }
+    
 
     class AsyncGraphics extends AndroidGraphics {
 
@@ -458,6 +608,30 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             }
         }
 
+        @Override
+        public void drawView(final View v, final AndroidAsyncView.LayoutParams lp) {
+            if(v.getParent() == null) {
+                ((Activity)v.getContext()).runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        // this might happen twice if draw view is invoked twice before the screen has time to draw
+                        if(v.getParent() == null) {
+                            v.setLayoutParams(lp);
+                            addView(v);
+                        }
+                    }
+                });
+            }
+            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    drawChild(underlying.canvas, v, getDrawingTime());
+                }
+                public String toString() {
+                    return "drawView(PeerComponent)";
+                }
+            });
+        }
 
         @Override
         public void rotate(final float angle, final int x, final int y) {
@@ -884,6 +1058,12 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
 
         @Override
         public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height) {
+            fillRadialGradient(startColor, endColor, x, y, width, height, 0, 360);
+            
+        }
+        
+        @Override
+        public void fillRadialGradient(final int startColor, final int endColor, final int x, final int y, final int width, final int height, final int startAngle, final int arcAngle) {
             if (alpha == 0) {
                 return;
             }
@@ -892,7 +1072,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
                 @Override
                 public void execute(AndroidGraphics underlying) {
                     underlying.setAlpha(al);
-                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height);
+                    underlying.fillRadialGradient(startColor, endColor, x, y, width, height, startAngle, arcAngle);
                 }
                 public String toString() {
                     return "fillRadialGradient";
@@ -2015,7 +2195,7 @@ public class AndroidAsyncView extends View implements CodenameOneSurface {
             Paint fnt = getFont();
             if(fnt == null) {
                 fnt = impl.defaultFont;
-            } 
+            }
 
             final CodenameOneTextPaint font = (CodenameOneTextPaint)fnt;
             final int alph = this.alpha;

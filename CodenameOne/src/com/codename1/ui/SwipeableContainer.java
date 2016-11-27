@@ -146,6 +146,7 @@ public class SwipeableContainer extends Container {
         if(bottomRightWrapper.getComponentCount() > 0){
             bottomRightWrapper.setVisible(false);
         }
+        bottomLeftWrapper.setVisible(true);
         
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(topX, bottom.getWidth(), 300);
@@ -171,6 +172,7 @@ public class SwipeableContainer extends Container {
         if(bottomLeftWrapper.getComponentCount() > 0){
             bottomLeftWrapper.setVisible(false);
         }
+        bottomRightWrapper.setVisible(true);
         
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(-topX, bottom.getWidth(), 300);

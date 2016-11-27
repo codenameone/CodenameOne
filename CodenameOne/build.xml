@@ -163,6 +163,8 @@
     </target>
             
     <target name="release" depends="stamp,jar">
+        <ant inheritall="false" antfile="${codenameone.dir}/BuildClient/build.xml" target="jar" />
+                
         <delete dir="build/CodenameOneDist" />        
         <mkdir dir="build/CodenameOneDist/CodenameOne" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/docs" />
@@ -211,6 +213,27 @@
         <touch file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/override/.dummy" />
         <mkdir dir="build/CodenameOneDist/CodenameOne/demos/PushDemo/override" />
         <touch file="build/CodenameOneDist/CodenameOne/demos/PushDemo/override/.dummy" />
+
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/CleanModern" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/DeviceTester" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/MaterialScreens" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Phoenix" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/PsdToAppTutorial" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Swiftnotes" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/CleanModern/override" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/DeviceTester/override" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/MaterialScreens/override" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Phoenix/override" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/PsdToAppTutorial/override" />
+        <mkdir dir="build/CodenameOneDist/CodenameOne/demos/Swiftnotes/override" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/CleanModern/override/.dummy" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/DeviceTester/override/.dummy" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/MaterialScreens/override/.dummy" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/Phoenix/override/.dummy" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/PsdToAppTutorial/override/.dummy" />
+        <touch file="build/CodenameOneDist/CodenameOne/demos/Swiftnotes/override/.dummy" />
+
+
         <mkdir dir="../nightly_builds" />
         
         <ant inheritall="false" antfile="../Ports/Android/build.xml" target="clean" />
@@ -242,17 +265,24 @@
         <copydir src="../../codenameone-demos/NativeDemo" dest="build/CodenameOneDist/CodenameOne/demos/NativeDemo" />
         <copydir src="../../CameraDemo" dest="build/CodenameOneDist/CodenameOne/demos/CameraDemo" />
         <copydir src="../../codenameone-demos/Tipster" dest="build/CodenameOneDist/CodenameOne/demos/Tipster" />
-        <copydir src="../../codenameone-demos/KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
+        <copydir src="../../KitchenSink" dest="build/CodenameOneDist/CodenameOne/demos/KitchenSink" />
         <copydir src="../../codenameone-demos/MapsDemo" dest="build/CodenameOneDist/CodenameOne/demos/MapsDemo" />
         <copydir src="../../codenameone-demos/ZXing" dest="build/CodenameOneDist/CodenameOne/demos/ZXing" />
-        <copydir src="../../codenameone-demos/SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
+        <copydir src="../../SQLSample" dest="build/CodenameOneDist/CodenameOne/demos/SQLSample" />
         <copydir src="../../codenameone-demos/FacebookDemo" dest="build/CodenameOneDist/CodenameOne/demos/FacebookDemo" />
         <copydir src="../../Chrome" dest="build/CodenameOneDist/CodenameOne/demos/Chrome" />
         <copydir src="../../codenameone-demos/SocialBoo" dest="build/CodenameOneDist/CodenameOne/demos/SocialBoo" />
         <copydir src="../../codenameone-demos/Mapper" dest="build/CodenameOneDist/CodenameOne/demos/Mapper" />
         <copydir src="../../codenameone-demos/CN1Poker" dest="build/CodenameOneDist/CodenameOne/demos/CN1Poker" />
         <copydir src="../../codenameone-demos/PushDemo" dest="build/CodenameOneDist/CodenameOne/demos/PushDemo" />
-        
+
+        <copydir src="../../PheonixUI" dest="build/CodenameOneDist/CodenameOne/demos/Phoenix" />
+        <copydir src="../../CleanModernUIKit" dest="build/CodenameOneDist/CodenameOne/demos/CleanModern" />
+        <copydir src="../../DeviceTester" dest="build/CodenameOneDist/CodenameOne/demos/DeviceTester" />
+        <copydir src="../../MaterialScreensUIKit" dest="build/CodenameOneDist/CodenameOne/demos/MaterialScreens" />
+        <copydir src="../../PsdToAppTutorial" dest="build/CodenameOneDist/CodenameOne/demos/PsdToAppTutorial" />
+        <copydir src="../../SwiftnotesCN1" dest="build/CodenameOneDist/CodenameOne/demos/Swiftnotes" />        
+                
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
         <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
         
@@ -284,77 +314,10 @@
         <copy file="dist/CodenameOne.jar" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
         <copy file="${codenameone.dir}/BuildClient/dist/CodenameOneBuildClient.jar" tofile="${codenameone.dir}/IdeaPlugin/resources/dependencies/CodeNameOneBuildClient.jar" />
 
-        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/TZoneFriends/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/NativeDemo/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CameraDemo/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Tipster/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/KitchenSink/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/MapsDemo/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/ZXing/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SQLSample/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/FacebookDemo/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Chrome/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/SocialBoo/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/Mapper/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/CN1Poker/lib/CodenameOne_SRC.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/JavaSE.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/CLDC11.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/CodenameOne.jar" />
-        <delete file="build/CodenameOneDist/CodenameOne/demos/PushDemo/lib/CodenameOne_SRC.jar" />
-
+        <delete>
+            <fileset dir="build/CodenameOneDist/CodenameOne/demos" includes="**/*.jar" />
+        </delete>
+                
         <deltree dir="build/tmp"/>
         <mkdir dir="build/tmp"/>
         <copy file="dist/CodenameOne.jar" todir="build/tmp" />
@@ -393,6 +356,13 @@
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/PushDemo/build" />               
         <delete dir="build/CodenameOneDist/CodenameOne/Demos/PushDemo/dist" />               
         
+        <delete>
+            <fileset dir="build/CodenameOneDist/CodenameOne/demos" includes="**/dist" />
+        </delete>
+        <delete>
+            <fileset dir="build/CodenameOneDist/CodenameOne/demos" includes="**/build" />
+        </delete>
+
         <zip basedir="build/CodenameOneDist" file="../nightly_builds/CodenameOne_Docs_Demos_${tstamp}.zip" />
 
         <copy file="${codenameone.dir}/NBPlugin/CodenameOne_Template/build.xml" tofile="${codenameone.dir}/CodenameOneSettings/src/build.xml" />
@@ -408,7 +378,7 @@
 
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${nbplugin}/CodenameOne_Template/lib/" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${nbplugin}/LibraryProject/lib/" />
-        
+
         <copy file="${codenameone.dir}/BuildClient/dist/CodenameOneBuildClient.jar" todir="${nbplugin}/CodenameOne_Template/" />
         
         <copy file="${nbplugin}/CodenameOne_Template/build.xml" todir="${nbplugin}/CodenameOnePlugin/src/com/codename1" />
@@ -484,7 +454,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/CameraDemo" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/camera/CameraDemoProject.zip" compress="false">
+        <zip basedir="../../CameraDemo" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/camera/CameraDemoProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
@@ -529,7 +499,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/KitchenSink" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/kitchen/KitchenSinkProject.zip" compress="false">
+        <zip basedir="../../KitchenSink" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/kitchen/KitchenSinkProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
@@ -538,7 +508,7 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
-        <zip basedir="../../codenameone-demos/SQLSample" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/sql/SQLSampleProject.zip" compress="false">
+        <zip basedir="../../SQLSample" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/sql/SQLSampleProject.zip" compress="false">
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
@@ -556,6 +526,67 @@
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
             <exclude name="**/JavaSE.jar"/>
         </zip>
+        <zip basedir="../../PheonixUI" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/PhoenixDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/psd/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../../CleanModernUIKit" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/CleanModernDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../../DeviceTester" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/DeviceTesterDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../../MaterialScreensUIKit" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/MaterialScreensDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
+            <exclude name="**/psds/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../../PsdToAppTutorial" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/PsdToAppTutorialDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        <zip basedir="../../SwiftnotesCN1" destfile="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/SwiftnotesDemoProject.zip" compress="false">
+            <exclude name="**/build/"/>
+            <exclude name="**/bin/"/>
+            <exclude name="**/psd/"/>
+            <exclude name="**/dist/"/>
+            <exclude name="**/lib/CLDC11.jar"/>
+            <exclude name="**/lib/CodenameOne.jar"/>
+            <exclude name="**/lib/CodenameOne_SRC.zip"/>
+            <exclude name="**/JavaSE.jar"/>
+        </zip>
+        
 
         <!-- ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOnePlugin/build.xml" target="buildFullNBM" / -->
         <ant inheritall="false" antfile="${codenameone.dir}/NBPlugin/CodenameOneSuite/build.xml" target="nbms" />
@@ -596,7 +627,20 @@
             tofile="${ideaplugin}/files/SocialBooProject.zip" />
         <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/sql/SQLSampleProject.zip"
             tofile="${ideaplugin}/files/SQLSampleProject.zip" />
-                        
+
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/CleanModernDemoProject.zip"
+            todir="${ideaplugin}/files" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/DeviceTesterDemoProject.zip"
+            todir="${ideaplugin}/files" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/MaterialScreensDemoProject.zip"
+            todir="${ideaplugin}/files" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/PhoenixDemoProject.zip"
+            todir="${ideaplugin}/files" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/PsdToAppTutorialDemoProject.zip"
+            todir="${ideaplugin}/files" />
+        <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/demos/gendemo/SwiftnotesDemoProject.zip"
+            todir="${ideaplugin}/files" />
+                                        
         
         <copy file="${nbplugin}/CodenameOnePlugin/src/com/codename1/CodenameOneProject.zip"
             tofile="${ideaplugin}/templates/CodenameOneProject.zip" />

@@ -163,6 +163,9 @@ public class Thread implements java.lang.Runnable{
      * Subclasses of Thread should override this method.
      */
     public void run(){
+        if(!alive && target != null) {
+            target.run();
+        }
     }
 
     /**

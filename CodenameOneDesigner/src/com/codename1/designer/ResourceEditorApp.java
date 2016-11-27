@@ -35,8 +35,12 @@ import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UIBuilderOverride;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.Image;
 import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
@@ -55,8 +59,12 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
+import java.util.prefs.Preferences;
 import javax.imageio.ImageIO;
+import javax.swing.ButtonGroup;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import org.jdesktop.application.Application;
 import org.jdesktop.application.SingleFrameApplication;
 
@@ -188,6 +196,199 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 System.exit(0);
                 return;
             }
+            if(args[0].equalsIgnoreCase("-style")) {
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                final String uiid = args[2];
+                String themeName = args[3];
+                                
+                boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
+                EditableResources.setXMLEnabled(isXMLEnabled);
+                EditableResources res = new EditableResources();
+                File resourceFile = new File(args[1]);
+                res.openFileWithXMLSupport(resourceFile);
+                
+                Hashtable themeHash = res.getTheme(themeName);
+                
+                final AddThemeEntry entry = new AddThemeEntry(false, res, null,
+                        new Hashtable(themeHash), "",
+                        themeName);
+                
+                entry.setKeyValues(uiid, "");
+                entry.setPreferredSize(new Dimension(1000, 600));
+                JPanel wrapper = new JPanel(new BorderLayout());
+                wrapper.add(entry, BorderLayout.CENTER);
+                JPanel bottom = new JPanel();
+                ButtonGroup gr = new ButtonGroup();                
+                JRadioButton unsel= new JRadioButton("Unselected", true);                
+                gr.add(unsel);
+                unsel.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        entry.setPrefix("");                        
+                        entry.setKeyValues(uiid, "");
+                        
+                        entry.revalidate();
+                    }
+                });
+                bottom.add(unsel);
+                JRadioButton sel= new JRadioButton("Selected");
+                gr.add(sel);
+                sel.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        entry.setPrefix("sel#");                        
+                        entry.setKeyValues(uiid, "sel#");
+                        entry.revalidate();
+                    }
+                });
+                bottom.add(sel);
+                JRadioButton press = new JRadioButton("Pressed");
+                gr.add(press);
+                press.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        entry.setPrefix("press#");                        
+                        entry.setKeyValues(uiid, "press#");
+                        
+                        entry.revalidate();
+                    }
+                });
+                bottom.add(press);
+                JRadioButton dis= new JRadioButton("Disabled");
+                gr.add(dis);
+                dis.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        entry.setPrefix("dis#");                        
+                        entry.setKeyValues(uiid, "dis#");
+                        
+                        entry.revalidate();
+                    }
+                });
+                bottom.add(dis);
+                wrapper.add(bottom, BorderLayout.SOUTH);
+                
+                if (ModifiableJOptionPane.showConfirmDialog(null, wrapper, "Edit")
+                        == JOptionPane.OK_OPTION) {
+                    Hashtable tmp = new Hashtable(themeHash);
+                    entry.updateThemeHashtable(tmp);
+                    res.setTheme(themeName, tmp);
+                }
+                
+                        
+                try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
+                    res.save(fos);
+                }
+                res.saveXML(resourceFile);
+                System.exit(0);
+                return;
+            }
+            
+            if(args[0].equalsIgnoreCase("-img")) {
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                String imageName;
+                String fileName;
+                if(args.length == 3) {
+                    imageName = args[2];
+                    fileName = args[2];
+                } else {
+                    if(args.length == 4) {
+                        imageName = args[3];
+                        fileName = args[2];
+                    } else {
+                        System.out.println("The img command works as: -img path_to_resourceFile.res pathToImageFile [image name]");
+                        System.exit(1);
+                        return;
+                    }
+                }
+                
+                File imageFile = new File(fileName);
+                if(!imageFile.exists()) {
+                    System.out.println("File not found: " + imageFile.getAbsolutePath());
+                    System.exit(1);
+                    return;
+                }
+                com.codename1.ui.Image img = ImageRGBEditor.createImageStatic(imageFile);
+                
+                boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
+                EditableResources.setXMLEnabled(isXMLEnabled);
+                EditableResources res = new EditableResources();
+                File resourceFile = new File(args[1]);
+                res.openFileWithXMLSupport(resourceFile);
+                res.setImage(imageName, img);
+                try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
+                    res.save(fos);
+                }
+                res.saveXML(resourceFile);
+                System.exit(0);
+                return;
+            }
+            if(args[0].equalsIgnoreCase("-mimg")) {
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                String fileName;
+                if(args.length == 4) {
+                    fileName = args[3];
+                } else {
+                    System.out.println("The mimg command works as: -img path_to_resourceFile.res dpi pathToImageFile");
+                    System.out.println("dpi can be one of:  high, veryhigh, hd, 560, 2hd, 4k");
+                    System.exit(1);
+                    return;
+                }
+                String dpi = args[2];
+                int dpiInt = -1;
+                switch(dpi.toLowerCase()) {
+                    case "high": 
+                        dpiInt = 3;
+                        break;
+                    case "veryhigh": 
+                        dpiInt = 4;
+                        break;
+                    case "hd": 
+                        dpiInt = 5;
+                        break;
+                    case "560": 
+                        dpiInt = 6;
+                        break;
+                    case "2hd": 
+                        dpiInt = 7;
+                        break;
+                    case "4k": 
+                        dpiInt = 8;
+                        break;
+                    default:
+                        System.out.println("dpi can be one of:  high, veryhigh, hd, 560, 2hd, 4k");
+                        System.exit(1);
+                        return;
+                }
+                
+                File imageFile = new File(fileName);
+                if(!imageFile.exists()) {
+                    System.out.println("File not found: " + imageFile.getAbsolutePath());
+                    System.exit(1);
+                    return;
+                }
+                
+                boolean isXMLEnabled = Preferences.userNodeForPackage(ResourceEditorView.class).getBoolean("XMLFileMode", true);
+                EditableResources.setXMLEnabled(isXMLEnabled);
+                EditableResources res = new EditableResources();
+                File resourceFile = new File(args[1]);
+                res.openFileWithXMLSupport(resourceFile);
+                AddAndScaleMultiImage.generateImpl(new File[] {imageFile}, 
+                        res, dpiInt);
+                try(FileOutputStream fos = new FileOutputStream(resourceFile)) {
+                    res.save(fos);
+                }
+                res.saveXML(resourceFile);
+                System.exit(0);
+                return;
+            }
             if(args[0].equalsIgnoreCase("gen")) {
                 java.awt.Container cnt = new java.awt.Container();
                 com.codename1.ui.Display.init(cnt);
@@ -200,6 +401,7 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 java.awt.Container cnt = new java.awt.Container();
                 com.codename1.ui.Display.init(cnt);
                 File projectDir = new File(args[1]);
+                EditableResources.setXMLEnabled(true);
                 EditableResources res = new EditableResources();
                 res.openFileWithXMLSupport(new File(args[2]));
                 migrateGuiBuilder(projectDir, res, args[3]);

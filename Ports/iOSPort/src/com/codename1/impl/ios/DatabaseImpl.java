@@ -78,7 +78,8 @@ class DatabaseImpl extends Database {
         IOSImplementation.nativeInstance.sqlDbExec(peer, sql, params);
     }
 
-    public void execute(String sql, Object [] params) throws IOException{
+    @Override
+    public void execute(String sql, Object... params) throws IOException{
         // temporary workaround, this will probably fail with blobs
         String[] val = new String[params.length];
         for(int iter = 0 ; iter < val.length ; iter++) {

@@ -32,6 +32,7 @@ import com.codename1.ui.animations.AnimationObject;
 import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.Style;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -81,6 +82,12 @@ public class Resources {
     private static Resources globalResources;
     
     /**
+     * This variable is used to cache the system resources file CN1Resource.res
+     */
+    private static Resources systemResource;
+    
+    
+    /**
      * @return the failOnMissingTruetype
      */
     public static boolean isFailOnMissingTruetype() {
@@ -122,6 +129,7 @@ public class Resources {
     static final int BORDER_TYPE_INSET = 17;
     static final int BORDER_TYPE_OUTSET = 18;
     static final int BORDER_TYPE_IMAGE_SCALED = 19;
+    static final int BORDER_TYPE_IMAGE_ROUND = 20;
 
     // for use by the resource editor
     private static Class classLoader = Resources.class;
@@ -716,6 +724,9 @@ public class Resources {
      */
     public static Resources open(String resource, int dpi) throws IOException {
         try {
+            if (resource.equals(Resources.systemResourceLocation) && systemResource != null) {
+                return systemResource;
+            }
             if(lastLoadedName != null && lastLoadedName.equals(resource) && lastLoadedDPI == dpi) {
                 Resources r = (Resources)Display.getInstance().extractHardRef(cachedResource);
                 if(r != null) {
@@ -728,9 +739,9 @@ public class Resources {
             }
             Resources r = new Resources(is, dpi);
             is.close();
-            //no need to cache the system resource it is very small and we rather 
-            //keep the app resource in the cache 
+            
             if(resource.equals(Resources.systemResourceLocation)){
+                systemResource = r;
                 return r;
             }
             
@@ -878,12 +889,6 @@ public class Resources {
                 // been loaded yet when the border was created
                 if(key.endsWith("order")) {
                     Border b = confirmBorder(h, key);
-                    if(majorVersion == 0 && minorVersion == 0) {
-                        b.setPressedInstance(confirmBorder(h, key + "Pressed"));
-                        b.setFocusedInstance(confirmBorder(h, key + "Focused"));
-                        h.remove(key + "Pressed");
-                        h.remove(key + "Focused");
-                    }
                     h.put(key, b);
                 }
             }
@@ -1312,22 +1317,9 @@ public class Resources {
 
             // border
             if(key.endsWith("order")) {
-                if(majorVersion == 0 && minorVersion == 0) {
-                    theme.put(key, createBorder(input, newerVersion));
-
-                    if(newerVersion) {
-                        if(input.readBoolean()) {
-                            theme.put(key + "Pressed", createBorder(input, true));
-                        }
-                        if(input.readBoolean()) {
-                            theme.put(key + "Focused", createBorder(input, true));
-                        }
-                    }
-                } else {
-                    int borderType = input.readShort() & 0xffff;
-                    Object b = createBorder(input, borderType);
-                    theme.put(key, b);
-                }
+                int borderType = input.readShort() & 0xffff;
+                Object b = createBorder(input, borderType);
+                theme.put(key, b);
                 continue;
             }
 
@@ -1561,67 +1553,22 @@ public class Resources {
             // scaled Image border
             case 0xff11:
                 return readScaledImageBorder(input);
-        }
-        return null;
-    }
 
-    private Object createBorder(DataInputStream input, boolean newerVersion) throws IOException {
-        int type = input.readByte();
-        switch(type) {
-            case BORDER_TYPE_EMPTY:
-                return Border.getEmpty();
-            case BORDER_TYPE_LINE:
-                // use theme colors?
-                if(input.readBoolean()) {
-                    return Border.createLineBorder(input.readByte());
-                } else {
-                    return Border.createLineBorder(input.readByte(), input.readInt());
-                }
-            case BORDER_TYPE_ROUNDED:
-                // use theme colors?
-                if(input.readBoolean()) {
-                    return Border.createRoundBorder(input.readByte(), input.readByte());
-                } else {
-                    return Border.createRoundBorder(input.readByte(), input.readByte(), input.readInt());
-                }
-            case BORDER_TYPE_ETCHED_LOWERED:
-                // use theme colors?
-                if(input.readBoolean()) {
-                    return Border.createEtchedLowered();
-                } else {
-                    return Border.createEtchedLowered(input.readInt(), input.readInt());
-                }
-            case BORDER_TYPE_ETCHED_RAISED:
-                // use theme colors?
-                if(input.readBoolean()) {
-                    return Border.createEtchedRaised();
-                } else {
-                    return Border.createEtchedRaised(input.readInt(), input.readInt());
-                }
-            case BORDER_TYPE_BEVEL_RAISED:
-                // use theme colors?
-                if(input.readBoolean()) {
-                    return Border.createBevelRaised();
-                } else {
-                    return Border.createBevelRaised(input.readInt(), input.readInt(), input.readInt(), input.readInt());
-                }
-            case BORDER_TYPE_BEVEL_LOWERED:
-                // use theme colors?
-                if(input.readBoolean()) {
-                    return Border.createBevelLowered();
-                } else {
-                    return Border.createBevelLowered(input.readInt(), input.readInt(), input.readInt(), input.readInt());
-                }
-            case BORDER_TYPE_IMAGE:
-            case BORDER_TYPE_IMAGE_SCALED:
-                Object[] imageBorder = readImageBorder(input);
-                
-                if(!newerVersion) {
-                    // legacy issue...
-                    input.readBoolean();
-                }
-                
-                return imageBorder;
+            // round border
+            case 0xff12:                    
+                    return RoundBorder.create().
+                            rectangle(input.readBoolean()).
+                            color(input.readInt()).
+                            opacity(input.readInt()).
+                            stroke(input.readFloat(), input.readBoolean()).
+                            strokeColor(input.readInt()).
+                            strokeOpacity(input.readInt()).
+                            shadowBlur(input.readFloat()).
+                            shadowOpacity(input.readInt()).
+                            shadowSpread(input.readInt(), input.readBoolean()).
+                            shadowX(input.readFloat()).
+                            shadowY(input.readFloat());
+                            
         }
         return null;
     }

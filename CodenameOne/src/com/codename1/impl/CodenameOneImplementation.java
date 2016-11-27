@@ -2315,7 +2315,7 @@ public abstract class CodenameOneImplementation {
                 Object imageGraphics = getNativeGraphics(r);
                 setColor(imageGraphics, endColor);
                 fillRect(imageGraphics, 0, 0, width, height);
-                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size);
+                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size, 0, 360);
                 drawImage(graphics, r, x, y);
                 if(radialGradientCache == null) {
                     radialGradientCache = new Hashtable();
@@ -2326,7 +2326,7 @@ public abstract class CodenameOneImplementation {
             setColor(graphics, endColor);
             fillRect(graphics, x, y, width, height);
 
-            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size);
+            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size, 0, 360);
         }
         if(aa) {
             setAntiAliased(graphics, true);
@@ -2348,10 +2348,31 @@ public abstract class CodenameOneImplementation {
      * @param height the height of the region to be filled
      */
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
-        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height);
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, 0, 360);
+    }
+    
+    
+    /**
+     * Draws a radial gradient in the given coordinates with the given colors,
+     * doesn't take alpha into consideration when drawing the gradient.
+     * Notice that a radial gradient will result in a circular shape, to create
+     * a square use fillRect or draw a larger shape and clip to the appropriate size.
+     *
+     * @param graphics the graphics context
+     * @param startColor the starting RGB color
+     * @param endColor  the ending RGB color
+     * @param x the x coordinate
+     * @param y the y coordinate
+     * @param width the width of the region to be filled
+     * @param height the height of the region to be filled
+     * @param startAngle the beginning angle.  Zero is at 3 o'clock.  Positive angles are counter-clockwise.
+     * @param arcAngle the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
+     */
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, startAngle, arcAngle);
     }
 
-    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         boolean aa = isAntiAliased(graphics);
         setAntiAliased(graphics, false);
         int sourceR = startColor >> 16 & 0xff;
@@ -2362,14 +2383,22 @@ public abstract class CodenameOneImplementation {
         int destB = endColor & 0xff;
         int oldColor = getColor(graphics);
         int originalHeight = height;
+        boolean outermost = true;
         while (width > 0 && height > 0) {
+            if (outermost) {
+                setAntiAliased(graphics, true);
+            }
             updateGradientColor(graphics, sourceR, sourceG, sourceB, destR,
                     destG, destB, originalHeight, height);
-            fillArc(graphics, x, y, width, height, 0, 360);
+            fillArc(graphics, x, y, width, height, startAngle, arcAngle);
             x++;
             y++;
             width -= 2;
             height -= 2;
+            if (outermost) {
+                outermost = false;
+                setAntiAliased(graphics, false);
+            }
         }
         setColor(graphics, oldColor);
         if(aa) {
@@ -5036,6 +5065,9 @@ public abstract class CodenameOneImplementation {
      */
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         String[] arr = getAllContacts(withNumbers);
+        if(arr == null) {
+            return null;
+        }
         Contact[] retVal = new Contact[arr.length];
         int alen = arr.length;
         for(int iter = 0 ; iter  < alen ; iter++) {
@@ -5592,7 +5624,7 @@ public abstract class CodenameOneImplementation {
     public void registerPush(Hashtable metaData, boolean noFallback) {
         if(!noFallback) {
             Preferences.set("PollingPush", true);
-            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
+            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, "", getPackageName());
 
             // Call pushCallback's registeredForPush
             Display.getInstance().callSerially(new RPush());
@@ -5702,7 +5734,7 @@ public abstract class CodenameOneImplementation {
      * For use by implementations, stop receiving push notifications from the server
      */
     public static void deregisterPushFromServer() {
-        long i = Preferences.get("push_id", (long)-1);
+        /*long i = Preferences.get("push_id", (long)-1);
         if(i > -1) {
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
@@ -5712,7 +5744,7 @@ public abstract class CodenameOneImplementation {
             NetworkManager.getInstance().addToQueue(r);
             Preferences.delete("push_id");
             Preferences.delete("push_key");
-        }
+        }*/
     }
     
     /**
@@ -5993,6 +6025,14 @@ public abstract class CodenameOneImplementation {
      * @param longitude 
      */ 
     public void openNativeNavigationApp(double latitude, double longitude){    
+    }
+
+    /**
+     * Opens the native navigation app with the given search location
+     * @param location the location to search for in the native navigation map
+     */ 
+    public void openNativeNavigationApp(String location) {    
+        execute("http://maps.google.com/?q=" + Util.encodeUrl(location));
     }
     
     /**
