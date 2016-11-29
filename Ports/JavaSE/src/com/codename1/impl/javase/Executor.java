@@ -73,10 +73,18 @@ public class Executor {
                 try {
                     String packageName = p.getProperty("codename1.packageName");
                     String mainName = p.getProperty("codename1.mainName");
-                    if(packageName == null) {
-                        c = Class.forName(argv[0]);
+                    if(argv.length > 1) {
+                        if(argv[1].equalsIgnoreCase("-force") || packageName == null) {
+                            c = Class.forName(argv[0]);
+                        } else {
+                            c = Class.forName(packageName + "." + mainName);
+                        }
                     } else {
-                        c = Class.forName(packageName + "." + mainName);
+                        if(packageName == null || System.getenv("FORCE_CLASS") != null) {
+                            c = Class.forName(argv[0]);
+                        } else {
+                            c = Class.forName(packageName + "." + mainName);
+                        }
                     }
                     try {
                         Method m = c.getDeclaredMethod("main", String[].class);
