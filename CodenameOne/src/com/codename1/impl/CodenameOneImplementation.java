@@ -6089,6 +6089,23 @@ public abstract class CodenameOneImplementation {
         return home;
     }
 
+     /**
+      * Returns true if the device has a directory dedicated for "cache" files
+      * @return true if a caches style directory exists in this device type
+      */
+     public boolean hasCachesDir() {
+         return false;
+     }
+
+     /**
+      * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+      * is false
+      * @return file URL or null
+      */
+     public String getCachesDir() {
+         return null;
+     }
+    
     /**
      * Uses the native cookie store if applicable, this might break simulator compatibility
      * @return the useNativeCookieStore
