@@ -475,7 +475,7 @@ public class Properties extends HashMap<String, String> {
 
         StringBuilder sb = new StringBuilder(200);
         ArrayList<String> k = new ArrayList<String>(keySet());
-        k.sort(new CaseInsensitiveOrder());
+        Collections.sort(k, new CaseInsensitiveOrder());
         for (String key : k) {
             dumpString(sb, key, true);
             sb.append('=');
