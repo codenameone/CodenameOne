@@ -87,7 +87,9 @@ public class Storage {
      */
     private static void init(Object data) {
         Util.getImplementation().setStorageData(data);
-        INSTANCE = new Storage();
+        if(INSTANCE == null) {
+            INSTANCE = new Storage();
+        }
     }
 
     /**
@@ -286,5 +288,13 @@ public class Storage {
      */
     public void setNormalizeNames(boolean normalizeNames) {
         this.normalizeNames = normalizeNames;
+    }
+    
+    /**
+     * Allows installing a custom storage instance to provide functionality such as seamless encryption
+     * @param s the storage instance
+     */
+    public static void setStorageInstance(Storage s) {
+        INSTANCE = s;
     }
 }
