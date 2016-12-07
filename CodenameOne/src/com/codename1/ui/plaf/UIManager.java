@@ -680,6 +680,11 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("TextField.derive")) {
             themeProps.put("TextField.border", Border.getDefaultBorder());
         }
+        
+        themeProps.put("InvalidEmblem.derive", "Label");
+        themeProps.put("InvalidEmblem.fgColor", "ff0000");
+        themeProps.put("InvalidEmblem.transparency", "0");
+        
         themeProps.put("TextField.sel#derive", "TextField");
         themeProps.put("TextField.dis#derive", "TextField");
         if(installedTheme == null || !installedTheme.containsKey("TextFieldInvalid.derive")) {

@@ -27,6 +27,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -263,7 +264,7 @@ public class Validator {
     /**
      * Indicates the default mode in which validation failures are expressed
      */
-    private static HighlightMode defaultValidationFailureHighlightMode = HighlightMode.UIID;
+    private static HighlightMode defaultValidationFailureHighlightMode = HighlightMode.EMBLEM;
 
     /**
      * Indicates the mode in which validation failures are expressed
@@ -320,6 +321,17 @@ public class Validator {
      * Indicates whether an error message should be shown for the focused component
      */
     private boolean showErrorMessageForFocusedComponent;
+
+    /**
+     * Default constructor
+     */
+    public Validator() {
+        if(defaultValidationFailedEmblem == null) {
+            // initialize the default emblem
+            defaultValidationFailedEmblem = FontImage.createMaterial(FontImage.MATERIAL_CANCEL, "InvalidEmblem", 3);
+            validationFailedEmblem = defaultValidationFailedEmblem;
+        }
+    }
     
     /**
      * Places a constraint on the validator, returns this object so constraint additions can be chained. 
