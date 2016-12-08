@@ -440,8 +440,10 @@ public class Validator {
                                 float height = cmp.getHeight();
                                 xpos += Math.round(width * validationEmblemPositionX);
                                 ypos += Math.round(height * validationEmblemPositionY);
-                                message.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(), 
-                                        validationFailedEmblem.getHeight()));
+                                if(message != null) {
+                                    message.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(), 
+                                            validationFailedEmblem.getHeight()));
+                                }
                             } else {
                                 message.showPopupDialog(cmp);
                             }
