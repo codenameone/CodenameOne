@@ -65,6 +65,22 @@ import java.util.List;
  */
 public class FloatingActionButton extends Button {
 
+    /**
+     * The default icon size for the fab icon in millimeters 
+     * @return the fabDefaultSize
+     */
+    public static float getIconDefaultSize() {
+        return fabDefaultSize;
+    }
+
+    /**
+     * The default icon size for the fab icon in millimeters 
+     * @param aFabDefaultSize the fabDefaultSize to set
+     */
+    public static void setIconDefaultSize(float aFabDefaultSize) {
+        fabDefaultSize = aFabDefaultSize;
+    }
+
     private List<FloatingActionButton> subMenu;
 
     private String text;
@@ -72,6 +88,11 @@ public class FloatingActionButton extends Button {
     private Dialog current;
     private boolean rectangle;
     private boolean isBadge;
+    
+    /**
+     * The default icon size for the fab
+     */
+    private static float fabDefaultSize = 3.8f;
 
     /**
      * Constructor
@@ -143,7 +164,7 @@ public class FloatingActionButton extends Button {
      * @return a FloatingActionButton instance
      */
     public static FloatingActionButton createFAB(char icon) {
-        return new FloatingActionButton(icon, null, 3.8f);
+        return new FloatingActionButton(icon, null, fabDefaultSize);
     }
 
     /**
