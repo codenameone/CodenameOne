@@ -22,7 +22,9 @@
  */
 package com.codename1.io;
 
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.ArrayList;
 
 /**
  * <p>Simple map like class to store application and Codename One preference 
@@ -41,24 +43,25 @@ import java.util.Hashtable;
  * </p>
  *
  * @author Shai Almog
+ * @author Miguel Mu\u00f1oz
  */
 public class Preferences {
-    private static Hashtable p;
+    private static Hashtable<String, Object> p;
+    private static final HashMap<String, ArrayList<PreferenceListener>> listenerMap
+        = new HashMap<String, ArrayList<PreferenceListener>>();
     
     /**
      * Block instantiation of preferences 
      */
     Preferences() {}
     
-    private static Hashtable get() {
+    private static Hashtable<String, Object> get() {
         if(p == null) {
             if(Storage.getInstance().exists("CN1Preferences")) {
-                p = (Hashtable)Storage.getInstance().readObject("CN1Preferences");
-                if(p == null) {
-                    p = new Hashtable();                    
-                }
-            } else {
-                p = new Hashtable();
+                p = (Hashtable<String, Object>)Storage.getInstance().readObject("CN1Preferences");
+            }
+            if(p == null) {
+                p = new Hashtable<String, Object>();
             }
         }
         return p;
@@ -75,12 +78,14 @@ public class Preferences {
      * @param o a String a number or boolean
      */
     private static void set(String pref, Object o) {
+        Object prior = get(pref, null);
         if(o == null) {
             get().remove(pref);
         } else {
             get().put(pref, o);
         }
         save();
+        fireChange(pref, prior, o);
     }
 
     /**
@@ -139,16 +144,38 @@ public class Preferences {
      * @param pref the preference value
      */
     public static void delete(String pref) {
+        Object prior = get(pref, null);
         get().remove(pref);
         save();        
+        fireChange(pref, prior, null);
     }
 
     /**
      * Remove all preferences
      */
     public static void clearAll() {
+        // We only need to save prior values for Preferences that actually have listeners.
+        Hashtable<String, Object> priorValues = null;
+        if (!listenerMap.keySet().isEmpty()) {
+
+            // Save all the Preferences for which there are registered listeners.
+            priorValues = new Hashtable<String, Object>();
+            for (String key : listenerMap.keySet()) {
+                final Object currentValue = get().get(key);
+                // We can't put null values in the hashtable. But we don't need to, because if we could we'd just be calling 
+                // fireChange(Pref, null, null) and fireChange would do nothing.
+                if (currentValue != null) {
+                    priorValues.put(key, currentValue);
+                }
+            }
+        }
         get().clear();
         save();        
+        if (priorValues != null) {
+            for (String key : listenerMap.keySet()) {
+                fireChange(key, priorValues.get(key), null);
+            }
+        }
     }
 
     /**
@@ -247,5 +274,64 @@ public class Preferences {
             return def;
         }
         return t.booleanValue();
+    }
+
+    /**
+     * Fires the PreferenceListeners if priorValue and value are not equal.
+     *
+     * @param pref       The preference name
+     * @param priorValue The prior value, which may be null
+     * @param value      The new value, which may be null
+     */
+    private static void fireChange(final String pref, final Object priorValue, final Object value) {
+        //noinspection EqualsReplaceableByObjectsCall,ObjectEquality
+        boolean valueChanged = (priorValue != value) && ((priorValue == null) || !priorValue.equals(value));
+        if(valueChanged) {
+            ArrayList<PreferenceListener> listenerList = listenerMap.get(pref);
+            if(listenerList != null) {
+                // Loop backwards, in case the listener removes itself.
+                for(int i = listenerList.size() - 1; i >= 0; --i) {
+                    // either value could be null
+                    PreferenceListener listener = listenerList.get(i);
+                    listener.preferenceChanged(pref, priorValue, value);
+                }
+            }
+        }
+    }
+
+    /**
+     * Adds a preference listener for the specified property to the list of listeners. When calling this method, it is
+     * advisable to also read the current value and set it, since the value may have changed since the last time the
+     * listener was removed. (Should this return the current value of the preference?)
+     *
+     * @param pref     The preference to listen to
+     * @param listener The listener to add, which cannot be null.
+     */
+    public static void addPreferenceListener(String pref, PreferenceListener listener) {
+        if(listener == null) {
+            // fail fast. Without this, it will fail when the listener is fired, when it's harder to trace back.
+            throw new NullPointerException("Null PreferenceListener not allowed");
+        }
+        ArrayList<PreferenceListener> listenerList = listenerMap.get(pref);
+        if(listenerList == null) {
+            listenerList = new ArrayList<PreferenceListener>();
+            listenerMap.put(pref, listenerList);
+        }
+        listenerList.add(listener);
+    }
+
+    /**
+     * Remove the listener for the specified preference.
+     *
+     * @param pref     The preference that the listener listens to
+     * @param listener The listener to remove
+     * @return true if the listener was removed, false if it was not found.
+     */
+    public static boolean removePreferenceListener(String pref, PreferenceListener listener) {
+        ArrayList<PreferenceListener> listenerList = listenerMap.get(pref);
+        if(listenerList != null) {
+            return listenerList.remove(listener);
+        }
+        return false;
     }
 }
