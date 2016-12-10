@@ -5167,6 +5167,7 @@ public class FontImage extends Image {
     public Image rotate(int degrees) {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;
+        f.opacity = opacity;
         return f;
     }
 
