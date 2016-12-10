@@ -191,6 +191,12 @@ public class ConnectionRequest implements IOProgressListener {
     private String destinationFile;
     private String destinationStorage;
     
+    /**
+     * The request body can be used instead of arguments to pass JSON data to a restful request,
+     * it can't be used in a get request and will fail if you have arguments
+     */
+    private String requestBody;
+    
     // Flag to indicate if the contentType was explicitly set for this 
     // request
     private boolean contentTypeSetExplicitly;
@@ -409,7 +415,16 @@ public class ConnectionRequest implements IOProgressListener {
                 if(NetworkManager.getInstance().hasProgressListeners() && output instanceof BufferedOutputStream) {
                     ((BufferedOutputStream)output).setProgressListener(this);
                 }
-                buildRequestBody(output);
+                if(requestBody != null) {
+                    if(shouldWriteUTFAsGetBytes()) {
+                        output.write(requestBody.getBytes("UTF-8"));
+                    } else {
+                        OutputStreamWriter w = new OutputStreamWriter(output, "UTF-8");
+                        w.write(requestBody);
+                    }
+                } else {
+                    buildRequestBody(output);
+                }
                 if(shouldStop()) {
                     return;
                 }
@@ -1079,6 +1094,9 @@ public class ConnectionRequest implements IOProgressListener {
      * @param value the value for the argument
      */
     private void addArg(String key, Object value) {
+        if(requestBody != null) {
+            throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
+        }
         if(requestArguments == null) {
             requestArguments = new Hashtable();
         }
@@ -1996,5 +2014,28 @@ public class ConnectionRequest implements IOProgressListener {
             NetworkManager.getInstance().addToQueue(this);
         }
         
+    }
+
+    /**
+     * The request body can be used instead of arguments to pass JSON data to a restful request,
+     * it can't be used in a get request and will fail if you have arguments
+     * @return the requestBody
+     */
+    public String getRequestBody() {
+        return requestBody;
+    }
+
+    /**
+     * <p>The request body can be used instead of arguments to pass JSON data to a restful request,
+     * it can't be used in a get request and will fail if you have arguments.</p>
+     * <p>Notice that invoking this method blocks the {@link #buildRequestBody(java.io.OutputStream)} method
+     * callback.</p>
+     * @param requestBody a string to pass in the post body
+     */
+    public void setRequestBody(String requestBody) {
+        if(requestArguments != null) {
+            throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
+        }
+        this.requestBody = requestBody;
     }
 }

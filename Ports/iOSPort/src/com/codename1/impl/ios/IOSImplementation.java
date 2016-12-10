@@ -6545,6 +6545,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         return roots;
     }
 
+    @Override
+    public boolean hasCachesDir() {
+        return true;
+    }
+
+    @Override
+    public String getCachesDir() {
+        return listFilesystemRoots()[1];
+    }
+
     /**
      * @inheritDoc
      */

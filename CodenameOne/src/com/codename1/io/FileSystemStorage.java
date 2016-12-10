@@ -308,4 +308,21 @@ public class FileSystemStorage {
      public String getAppHomePath(){
          return Util.getImplementation().getAppHomePath();
     }
+     
+     /**
+      * Returns true if the device has a directory dedicated for "cache" files
+      * @return true if a caches style directory exists in this device type
+      */
+     public boolean hasCachesDir() {
+         return Util.getImplementation().hasCachesDir();
+     }
+
+     /**
+      * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+      * is false
+      * @return file URL or null
+      */
+     public String getCachesDir() {
+         return Util.getImplementation().getCachesDir();
+     }
 }

@@ -4611,6 +4611,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return new String[]{Environment.getRootDirectory().getAbsolutePath()};
     }
+
+    @Override
+    public boolean hasCachesDir() {
+        return true;
+    }
+
+    @Override
+    public String getCachesDir() {
+        return getContext().getCacheDir().getAbsolutePath();
+    }
+    
+    
     
     private String[] getStorageDirectories() {
         String [] storageDirs = null;
