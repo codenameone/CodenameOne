@@ -38,6 +38,7 @@ import android.view.Window;
 import android.widget.Toast;
 import com.codename1.payment.Product;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.payment.Receipt;
 import com.codename1.payments.v3.IabException;
 import com.codename1.payments.v3.IabHelper;
 import com.codename1.payments.v3.IabResult;
@@ -98,7 +99,7 @@ public class CodenameOneActivity extends Activity {
         }
     };
     IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {
-        public void onIabPurchaseFinished(final IabResult result, final String sku, Purchase purchase) {
+        public void onIabPurchaseFinished(final IabResult result, final String sku, final Purchase purchase) {
             // if we were disposed of in the meantime, quit.
             if (mHelper == null) {
                 return;
@@ -128,6 +129,10 @@ public class CodenameOneActivity extends Activity {
 
                         @Override
                         public void run() {
+                            // Order ID will be null for test purchases, so we use the purchase token in that case
+                            // as the transaction ID.
+                            String transactionId = purchase.getOrderId() == null ? purchase.getToken() : purchase.getOrderId();
+                            com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_PLAY, sku, transactionId, purchase.getPurchaseTime(), purchase.getOriginalJson());
                             pc.itemPurchased(sku);     
                         }
                     });

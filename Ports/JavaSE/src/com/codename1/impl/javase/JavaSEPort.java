@@ -102,6 +102,7 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
+import com.codename1.payment.Receipt;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
@@ -7940,6 +7941,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                                 public void run() {
                                     if (res == JOptionPane.YES_OPTION) {
+                                        com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_SIMULATOR, sku, "cn1-iap-sim-"+UUID.randomUUID().toString(), System.currentTimeMillis(), "");
                                         getPurchaseCallback().itemPurchased(sku);
                                         getPurchases().addElement(sku);
                                         savePurchases();
@@ -8020,7 +8022,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             public boolean wasPurchased(String sku) {
                 return getPurchases().contains(sku);
-            }
+            } 
         };
     }
 

@@ -610,6 +610,6 @@ public final class IOSNative {
 
     native void clearRadialGradientPaintGlobal();
 
-   
 
+   
 }
