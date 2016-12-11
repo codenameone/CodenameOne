@@ -4076,7 +4076,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 final Bitmap nativeBuffer = Bitmap.createBitmap(
                         getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
                 Image image = new AndroidImplementation.NativeImage(nativeBuffer);
-                getActivity().runOnUiThread(new Runnable() {
+                runOnUiThreadAndBlock(new Runnable() {
                     @Override
                     public void run() {
                         try {
