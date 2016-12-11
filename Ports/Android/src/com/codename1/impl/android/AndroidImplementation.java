@@ -3873,6 +3873,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private boolean lightweightMode = false;        
         private ProgressDialog progressBar;
         private boolean hideProgress;
+        private int layerType;
         
         
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
@@ -3882,6 +3883,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             parent = (BrowserComponent) p;
             this.web = web;
+            layerType = web.getLayerType();
             web.getSettings().setJavaScriptEnabled(true);
             web.getSettings().setSupportZoom(parent.isPinchToZoomEnabled());
             this.act = act;
@@ -4054,6 +4056,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         protected void initComponent() {
+            if(android.os.Build.VERSION.SDK_INT == 21 && web.getLayerType() != layerType){
+                    act.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            web.setLayerType(layerType, null); //setting layer type to original state
+                        }
+                    });
+            }
             super.initComponent();
             blockNativeFocus(false);
             setPeerImage(null);
@@ -4319,6 +4329,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     web.getSettings().setBuiltInZoomControls(e);
                 }
             });
+        }
+
+        @Override
+        protected void deinitialize() {
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if(android.os.Build.VERSION.SDK_INT == 21) { // bugfix for Android 5.0.x
+                        web.setLayerType(View.LAYER_TYPE_SOFTWARE, null); //setting layer type to software to prevent the sigseg 11 crash
+                    }
+                }
+            });
+            super.deinitialize();
         }
     }
 
