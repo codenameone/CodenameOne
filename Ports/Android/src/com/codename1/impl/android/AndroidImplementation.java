@@ -5257,9 +5257,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){   
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
+        /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
             return;
-        }
+        }*/
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         if(image == null){
             shareIntent.setType("text/plain");
