@@ -25,6 +25,8 @@ package com.codename1.io;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Set;
 
 /**
  * <p>Simple map like class to store application and Codename One preference 
@@ -178,6 +180,10 @@ public class Preferences {
         }
     }
 
+    static Set<String> keySet() {
+        return p.keySet();
+    }
+    
     /**
      * Sets a preference value
      * 
