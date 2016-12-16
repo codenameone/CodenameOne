@@ -1852,8 +1852,12 @@ public class Component implements Animation, StyleListener {
     protected void setScrollY(int scrollY) {
         if(this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
+            
             if(ci.isAsyncEditMode() && ci.isEditingText()) {
-                ci.hideTextEditor();
+                Component editingText = ci.getEditingText();
+                if (editingText != null && this instanceof Container && ((Container)this).contains(editingText)) {
+                    ci.hideTextEditor();
+                }
             }
         }
         // the setter must always update the value regardless... 

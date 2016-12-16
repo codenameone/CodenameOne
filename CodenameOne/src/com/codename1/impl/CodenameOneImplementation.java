@@ -408,6 +408,14 @@ public abstract class CodenameOneImplementation {
     public boolean isEditingText(Component c) {
         return editingText == c;
     }
+    
+    /**
+     * Gets the component that is currently editing text
+     * @return 
+     */
+    public Component getEditingText() {
+        return editingText;
+    }
 
     /**
      * Returns true if edit string will return immediately and broadcast editing events directly to the text field
