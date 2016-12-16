@@ -49,18 +49,38 @@ import java.util.Set;
  */
 public class Preferences {
     private static Hashtable<String, Object> p;
-    private static final HashMap<String, ArrayList<PreferenceListener>> listenerMap
-        = new HashMap<String, ArrayList<PreferenceListener>>();
-    
+    private static final HashMap<String, ArrayList<PreferenceListener>> listenerMap = new HashMap<String, ArrayList<PreferenceListener>>();
+    private static String preferencesLocation = "CN1Preferences";
+            
     /**
      * Block instantiation of preferences 
      */
     Preferences() {}
     
+    /**
+     * Sets the location within the storage of the preferences file to an arbitrary name. This is useful in a case
+     * of encryption where we would want preferences to use a different file name.
+     * 
+     * @param storageFileName the name of the preferences file
+     */
+    public static void setPreferencesLocation(String storageFileName) {
+        preferencesLocation = storageFileName;
+        p = null;
+    }
+    
+    /**
+     * Returns the location within the storage of the preferences file to an arbitrary name. This is useful in a case
+     * of encryption where we would want preferences to use a different file name.
+     * @return the storage file name
+     */
+    public static String getPreferencesLocation() {
+        return preferencesLocation;
+    }
+    
     private static Hashtable<String, Object> get() {
         if(p == null) {
-            if(Storage.getInstance().exists("CN1Preferences")) {
-                p = (Hashtable<String, Object>)Storage.getInstance().readObject("CN1Preferences");
+            if(Storage.getInstance().exists(preferencesLocation)) {
+                p = (Hashtable<String, Object>)Storage.getInstance().readObject(preferencesLocation);
             }
             if(p == null) {
                 p = new Hashtable<String, Object>();
@@ -70,7 +90,7 @@ public class Preferences {
     }
     
     private static void save() {
-        Storage.getInstance().writeObject("CN1Preferences", p);
+        Storage.getInstance().writeObject(preferencesLocation, p);
     }
     
     /**
