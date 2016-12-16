@@ -72,7 +72,7 @@ public class LocationSimulation extends javax.swing.JFrame {
         initComponents();
         pack();
         setLocationByPlatform(true);
-        setVisible(true);
+        //setVisible(true);
 
         final String htmlPage = "<!DOCTYPE html>\n"
                 + "<html>\n"
