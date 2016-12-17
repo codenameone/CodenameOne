@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
@@ -227,7 +228,7 @@ public class ConnectionRequest implements IOProgressListener {
 
     private byte priority = PRIORITY_NORMAL;
     private long timeSinceLastUpdate;
-    private Hashtable requestArguments;
+    private LinkedHashMap requestArguments;
 
     private boolean post = true;
     private String contentType = "application/x-www-form-urlencoded; charset=UTF-8";
@@ -1120,19 +1121,19 @@ public class ConnectionRequest implements IOProgressListener {
     protected String createRequestURL() {
         if(!post && requestArguments != null) {
             StringBuilder b = new StringBuilder(url);
-            Enumeration e = requestArguments.keys();
-            if(e.hasMoreElements()) {
+            Iterator e = requestArguments.keySet().iterator();
+            if(e.hasNext()) {
                 b.append("?");
             }
-            while(e.hasMoreElements()) {
-                String key = (String)e.nextElement();
+            while(e.hasNext()) {
+                String key = (String)e.next();
                 Object requestVal = requestArguments.get(key);
                 if(requestVal instanceof String) {
                     String value = (String)requestVal;
                     b.append(key);
                     b.append("=");
                     b.append(value);
-                    if(e.hasMoreElements()) {
+                    if(e.hasNext()) {
                         b.append("&");
                     }
                     continue;
@@ -1148,7 +1149,7 @@ public class ConnectionRequest implements IOProgressListener {
                 b.append(key);
                 b.append("=");
                 b.append(val[vlen - 1]);
-                if(e.hasMoreElements()) {
+                if(e.hasNext()) {
                     b.append("&");
                 }
             }
@@ -1166,16 +1167,16 @@ public class ConnectionRequest implements IOProgressListener {
     protected void buildRequestBody(OutputStream os) throws IOException {
         if(post && requestArguments != null) {
             StringBuilder val = new StringBuilder();
-            Enumeration e = requestArguments.keys();
-            while(e.hasMoreElements()) {
-                String key = (String)e.nextElement();
+            Iterator e = requestArguments.keySet().iterator();
+            while(e.hasNext()) {
+                String key = (String)e.next();
                 Object requestVal = requestArguments.get(key);
                 if(requestVal instanceof String) {
                     String value = (String)requestVal;
                     val.append(key);
                     val.append("=");
                     val.append(value);
-                    if(e.hasMoreElements()) {
+                    if(e.hasNext()) {
                         val.append("&");
                     }
                     continue;
@@ -1191,7 +1192,7 @@ public class ConnectionRequest implements IOProgressListener {
                 val.append(key);
                 val.append("=");
                 val.append(valArray[vlen - 1]);
-                if(e.hasMoreElements()) {
+                if(e.hasNext()) {
                     val.append("&");
                 }
             }
@@ -1312,7 +1313,7 @@ public class ConnectionRequest implements IOProgressListener {
             throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
         }
         if(requestArguments == null) {
-            requestArguments = new Hashtable();
+            requestArguments = new LinkedHashMap();
         }
         if(value == null || key == null){
             return;
@@ -1808,9 +1809,9 @@ public class ConnectionRequest implements IOProgressListener {
             if(r.url == url) {
                 if(requestArguments != null) {
                     if(r.requestArguments != null && requestArguments.size() == r.requestArguments.size()) {
-                        Enumeration e = requestArguments.keys();
-                        while(e.hasMoreElements()) {
-                            Object key = e.nextElement();
+                        Iterator e = requestArguments.keySet().iterator();
+                        while(e.hasNext()) {
+                            Object key = e.next();
                             Object value = requestArguments.get(key);
                             Object otherValue = r.requestArguments.get(key);
                             if(otherValue == null || !value.equals(otherValue)) {
