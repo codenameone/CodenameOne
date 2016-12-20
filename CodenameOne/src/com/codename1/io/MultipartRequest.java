@@ -31,6 +31,8 @@ import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Vector;
 
 /**
@@ -52,7 +54,7 @@ import java.util.Vector;
  */
 public class MultipartRequest extends ConnectionRequest {
     private String boundary;
-    private Hashtable args = new Hashtable();
+    private LinkedHashMap args = new LinkedHashMap();
     private Hashtable filenames = new Hashtable();
     private Hashtable filesizes = new Hashtable();
     private Hashtable mimeTypes = new Hashtable();
@@ -207,7 +209,7 @@ public class MultipartRequest extends ConnectionRequest {
 
     protected long calculateContentLength() {
         long length = 0L;
-        Enumeration e = args.keys();
+        Iterator e = args.keySet().iterator();
         
         long dLength = "Content-Disposition: form-data; name=\"\"; filename=\"\"".length() + 2; // 2 = CRLF
         long ctLength = "Content-Type: ".length() + 2; // 2 = CRLF
@@ -218,8 +220,8 @@ public class MultipartRequest extends ConnectionRequest {
         ctLength = "Content-Type: text/plain; charset=UTF-8".length() + 4; // 4 = 2 * CRLF
         long baseTextLength = dLength + ctLength + bLength + 2;  // 2 = CRLF at end of part
         
-        while(e.hasMoreElements()) {
-                String key = (String)e.nextElement();
+        while(e.hasNext()) {
+                String key = (String)e.next();
             Object value = args.get(key);
             if(value instanceof String) {
                 length += baseTextLength;
@@ -267,12 +269,12 @@ public class MultipartRequest extends ConnectionRequest {
     protected void buildRequestBody(OutputStream os) throws IOException {
         Writer writer = null;
         writer = new OutputStreamWriter(os, "UTF-8"); 
-        Enumeration e = args.keys();
-        while(e.hasMoreElements()) {
+        Iterator e = args.keySet().iterator();
+        while(e.hasNext()) {
             if (shouldStop()) {
                     break;
             }
-            String key = (String)e.nextElement();
+            String key = (String)e.next();
             Object value = args.get(key);
             
             writer.write("--");
