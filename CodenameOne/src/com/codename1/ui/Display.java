@@ -2756,6 +2756,8 @@ public final class Display {
      * in this class
      *
      * @return the commandBehavior
+     * @deprecated we recommend migrating to the {@link Toolbar} API. When using the toolbar the command
+     * behavior can't be manipulated
      */
     public int getCommandBehavior() {
         return impl.getCommandBehavior();
@@ -2766,6 +2768,8 @@ public final class Display {
      * in this class
      *
      * @param commandBehavior the commandBehavior to set
+     * @deprecated we recommend migrating to the {@link Toolbar} API. When using the toolbar the command
+     * behavior can't be manipulated
      */
     public void setCommandBehavior(int commandBehavior) {
         impl.setCommandBehavior(commandBehavior);
