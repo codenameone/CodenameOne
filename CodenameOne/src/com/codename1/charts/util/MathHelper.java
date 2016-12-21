@@ -26,7 +26,7 @@ import com.codename1.util.MathUtil;
  */
 public class MathHelper {
   /** A value that is used a null value. */
-  public static final double NULL_VALUE = Double.MIN_VALUE;
+  public static final double NULL_VALUE = -Double.MAX_VALUE+1;
   /**
    * A number formatter to be used to make sure we have a maximum number of
    * fraction digits in the labels.
