@@ -506,6 +506,9 @@ public class Button extends Label {
     public void pointerPressed(int x, int y) {
         clearDrag();
         setDragActivated(false);
+        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
+        }
         pressed();
         Form f = getComponentForm();
         // might happen when programmatically triggering press
@@ -521,6 +524,13 @@ public class Button extends Label {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
+            pointerReleasedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {
