@@ -614,7 +614,7 @@ public class TableLayout extends Layout {
             if(c.width > 0 && available > -1) {
                 current = Math.max(current, c.width * percentageOf / 100);
                 modifableColumnSize[column] = false;
-            } else {
+            } else if (modifableColumnSize[column]) {
                 // special case, width -2 gives the column the rest of the available space
                 if(c.width == -2 || (growHorizontally && column == columns - 1)) {
                     if(available < 0) {
