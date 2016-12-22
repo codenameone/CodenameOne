@@ -4474,18 +4474,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         // the latter indicates mutable image graphics
-        if (zoomLevel != 1 && nativeGraphics  != graphics) {
-            nativeGraphics = (Graphics2D) nativeGraphics.create();
-            nativeGraphics.setTransform(AffineTransform.getTranslateInstance(0, 0));
-            java.awt.Font currentFont = nativeGraphics.getFont();
-            float fontSize = currentFont.getSize2D();
-            fontSize *= zoomLevel;
-            int ascent = nativeGraphics.getFontMetrics().getAscent();
-            nativeGraphics.setFont(currentFont.deriveFont(fontSize));
-            nativeGraphics.drawString(str, x * zoomLevel, (y + ascent) * zoomLevel);
-        } else {
-            nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
-        }
+        nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
         if (perfMonitor != null) {
             perfMonitor.drawString(str, x, y);
         }
@@ -5383,7 +5372,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setTransform(Object graphics, Transform transform) {
         checkEDT();
         Graphics2D g = getGraphics(graphics);
-        AffineTransform t = AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
+        AffineTransform t = (graphics == g) ? new AffineTransform() :
+                AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
         t.concatenate((AffineTransform)transform.getNativeTransform());
         clamp(t);
         g.setTransform(t);
@@ -5924,7 +5914,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.setTransform(new AffineTransform());
-        if (zoomLevel != 1) {
+        if (zoomLevel != 1 && g != nativeGraphics) {
             g.setTransform(AffineTransform.getScaleInstance(zoomLevel, zoomLevel));
         }
     }
