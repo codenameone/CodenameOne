@@ -181,6 +181,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      * When set to true pointer hover events will be called for mouse move events
      */
     private static boolean invokePointerHover;
+
+    private static String defaultCodenameOneComProtocol = "https";
     
     static {
         String n = System.getProperty("os.name");
@@ -2255,7 +2257,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/javadoc/"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/javadoc/"));
                     } catch (Exception ex) {
                         
                     }
@@ -2268,7 +2270,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/how-do-i.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/how-do-i.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2280,7 +2282,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/discussion-forum.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/discussion-forum.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2292,7 +2294,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/build-server.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/build-server.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2334,7 +2336,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                         public void actionPerformed(ActionEvent e) {
                             try {
-                                Desktop.getDesktop().browse(new URI("http://www.codenameone.com"));
+                                Desktop.getDesktop().browse(new URI("https://www.codenameone.com"));
                             } catch (Exception ex) {                        
                             }
                         }
@@ -2617,10 +2619,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
 
-                            URL u = new URL("https://www.codenameone.com/OTA/Skins.xml");
-                            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
-                            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
-                            InputStream is = uc.getInputStream();
+                            InputStream is = openSkinsURL();
                             doc[0] = db.parse(is);
                             NodeList skins = doc[0].getElementsByTagName("Skin");
 
@@ -2637,7 +2636,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 if (!(exists) || Integer.parseInt(pref.get(url, "0")) < ver) { 
                                     Vector row = new Vector();
                                     row.add(new Boolean(false));
-                                    row.add(new ImageIcon(new URL("http://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
+                                    row.add(new ImageIcon(new URL(defaultCodenameOneComProtocol + "://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
                                     row.add(attr.getNamedItem("name").getNodeValue());
                                     if(exists){
                                         row.add("Update");                                                        
@@ -2704,7 +2703,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                             if(attr.getNamedItem("name").getNodeValue().equals(tableModel.getValueAt(i, 2))){
                                                 String url = attr.getNamedItem("url").getNodeValue();
                                                 String [] data = new String[2];
-                                                data[0] = "http://www.codenameone.com/OTA" + url;
+                                                data[0] = defaultCodenameOneComProtocol + "://www.codenameone.com/OTA" + url;
                                                 data[1] = attr.getNamedItem("version").getNodeValue();                                        
                                                 toDowload.add(data);
                                                 break;
@@ -2863,6 +2862,28 @@ public class JavaSEPort extends CodenameOneImplementation {
         return skinMenu;
     }
 
+    InputStream openSkinsURL() throws IOException {
+        try {
+            URL u = new URL(defaultCodenameOneComProtocol + "://www.codenameone.com/OTA/Skins.xml");
+            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
+            InputStream is = uc.getInputStream();
+            return is;
+        } catch(IOException err) {
+            if(defaultCodenameOneComProtocol.equals("https")) {
+                defaultCodenameOneComProtocol = "http";
+            } else {
+                throw err;
+            }
+            System.out.println("Failed to connect thru secure socket, trying http instead");
+            URL u = new URL("http://www.codenameone.com/OTA/Skins.xml");
+            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
+            InputStream is = uc.getInputStream();
+            return is;
+        }
+    }
+    
     private void showTestRecorder() {
         if (testRecorder == null) {
             testRecorder = new TestRecorder();
