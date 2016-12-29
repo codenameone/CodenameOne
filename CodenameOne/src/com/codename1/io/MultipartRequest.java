@@ -365,7 +365,7 @@ public class MultipartRequest extends ConnectionRequest {
                     if (!(value instanceof InputStream)) {
                             Util.cleanup(i);
                     }
-                    args.remove(key);
+                    //args.remove(key);
                     value = null;
                     if(canFlushStream){
                         writer.flush();
