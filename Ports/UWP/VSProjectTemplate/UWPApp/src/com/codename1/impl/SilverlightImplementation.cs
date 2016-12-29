@@ -605,11 +605,8 @@ namespace com.codename1.impl
                        ((TextBox)textInputInstance).Text = n4;
                        ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
                        ((TextBox)textInputInstance).MaxLength = n2;
+                       ((TextBox)textInputInstance).IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
 
-                       if ((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE)
-                       {
-                           ((TextBox)textInputInstance).InputScope = new InputScope();
-                       }
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
