@@ -147,6 +147,10 @@ public class InPlaceEditView extends FrameLayout{
     }
 
 
+
+
+
+
     /**
      * Prepare an int-to-int map that maps Codename One input-types to
      * Android input types
@@ -531,7 +535,7 @@ public class InPlaceEditView extends FrameLayout{
             closedTime = System.currentTimeMillis();
         }
         showVKB = show;
-        
+
         final boolean showKeyboard = showVKB;
         final ActionListener listener = Display.getInstance().getVirtualKeyboardListener();
         if(listener != null){
@@ -539,14 +543,14 @@ public class InPlaceEditView extends FrameLayout{
 
                 @Override
                 public void run() {
-                    
-                    //this is ugly but there is no real API to know if the 
+
+                    //this is ugly but there is no real API to know if the
                     //keyboard is opened or closed
                     try {
                         Thread.sleep(600);
                     } catch (InterruptedException ex) {
                     }
-                    
+
                     Display.getInstance().callSerially(new Runnable() {
 
                         @Override
@@ -560,16 +564,16 @@ public class InPlaceEditView extends FrameLayout{
             t.setUncaughtExceptionHandler(AndroidImplementation.exceptionHandler);
             t.start();
         }
-        
+
         Log.d(TAG, "InputMethodManager returned " + Boolean.toString(result).toUpperCase());
     }
 
     /**
      * Returns true if the keyboard is currently on screen.
-     */ 
+     */
     public static boolean isKeyboardShowing(){
         //There is no android API to know if the keyboard is currently showing
-        //This method will return false after 2 seconds since the keyboard was 
+        //This method will return false after 2 seconds since the keyboard was
         //requested to be closed
         return showVKB || (System.currentTimeMillis() - closedTime) < 2000;
     }
@@ -596,68 +600,68 @@ public class InPlaceEditView extends FrameLayout{
         final Object nativeFont;
         final int fgColor;
         final int maxSize;
-       
+
         final boolean isTextField;
-        
+
         int getAbsoluteY() {
             return absoluteY;
         }
-        
+
         int getAbsoluteX() {
             return absoluteX;
         }
-        
+
         int getScrollX() {
             return scrollX;
         }
-        
+
         int getScrollY() {
             return scrollY;
         }
-        
+
         int getHeight() {
             return height;
         }
-        
+
         int getWidth() {
             return width;
         }
-        
+
         int getVerticalAlignment() {
             return verticalAlignment;
         }
-        
+
         boolean isRTL() {
             return isRTL;
         }
-        
+
         boolean isSingleLineTextArea() {
             return isSingleLineTextArea;
         }
-        
+
         Object getClientProperty(String key) {
             return textArea.getClientProperty(key);
         }
-        
+
         void putClientProperty(String key, Object value) {
             textArea.putClientProperty(key, value);
         }
-        
+
         Object getDoneListener() {
             if (isTextField) {
                 return ((TextField)textArea).getDoneListener();
             }
             return null;
         }
-        
+
         String getHint() {
             return hint;
         }
-        
-        
-        
+
+
+
         TextAreaData(TextArea ta) {
-            
+
             absoluteX = ta.getAbsoluteX();
             absoluteY = ta.getAbsoluteY();
             scrollX = ta.getScrollX();
@@ -682,9 +686,9 @@ public class InPlaceEditView extends FrameLayout{
             fgColor = s.getFgColor();
             maxSize = ta.getMaxSize();
         }
-        
+
     }
-    
+
     /**
      * Start editing the given text-area
      * This method is executed on the UI thread, so UI manipulation is safe here.
@@ -724,7 +728,7 @@ public class InPlaceEditView extends FrameLayout{
         mEditText = new EditView(activity, textArea.textArea, this, id);
         mEditText.addTextChangedListener(mEditText.mTextWatcher);
         mEditText.setBackgroundDrawable(null);
-        
+
         mEditText.setFocusableInTouchMode(true);
         mEditLayoutParams = new FrameLayout.LayoutParams(0, 0);
         // Set the appropriate gravity so that the left and top margins will be
@@ -737,11 +741,11 @@ public class InPlaceEditView extends FrameLayout{
         mEditText.setLayoutParams(mEditLayoutParams);
 
         if(textArea.isRTL()){
-            mEditText.setGravity(Gravity.RIGHT | Gravity.TOP);        
+            mEditText.setGravity(Gravity.RIGHT | Gravity.TOP);
         }else{
             mEditText.setGravity(Gravity.LEFT | Gravity.TOP);
         }
-        
+
         mEditText.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
 
         Component nextDown = textArea.nextDown;
@@ -776,7 +780,7 @@ public class InPlaceEditView extends FrameLayout{
         if(!textArea.isSingleLineTextArea() && textArea.textArea.isGrowByContent() && textArea.textArea.getGrowLimit() > -1){
             mEditText.setMaxLines(textArea.textArea.getGrowLimit());
         }
-        
+
         if(textArea.nativeHintBool && textArea.getHint() != null) {
             mEditText.setHint(textArea.getHint());
         }
@@ -803,14 +807,14 @@ public class InPlaceEditView extends FrameLayout{
             codenameOneInputType = codenameOneInputType ^ TextArea.PASSWORD;
             password = true;
         }
-        
+
         if (textArea.isSingleLineTextArea()) {
             mEditText.setInputType(getAndroidInputType(codenameOneInputType));
             //if not ime was explicity requested and this is a single line textfield of type ANY add the emoji keyboard.
             if(!imeOptionTaken && codenameOneInputType == TextArea.ANY){
-                mEditText.setInputType(getAndroidInputType(codenameOneInputType) | InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE);                
+                mEditText.setInputType(getAndroidInputType(codenameOneInputType) | InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE);
             }
-            if(Display.getInstance().getProperty("andAddComma", "false").equals("true") && 
+            if(Display.getInstance().getProperty("andAddComma", "false").equals("true") &&
                     (codenameOneInputType & TextArea.DECIMAL) == TextArea.DECIMAL) {
                 mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
             }
@@ -824,7 +828,7 @@ public class InPlaceEditView extends FrameLayout{
             mEditText.setInputType(type | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
             mEditText.setTransformationMethod(new MyPasswordTransformationMethod());
         }
-        
+
         int maxLength = textArea.maxSize;
         InputFilter[] FilterArray = new InputFilter[1];
         FilterArray[0] = new InputFilter.LengthFilter(maxLength);
@@ -862,7 +866,7 @@ public class InPlaceEditView extends FrameLayout{
     private synchronized void endEditing(int reason, boolean forceVKBOpen) {
         endEditing(reason, forceVKBOpen, false);
     }
-    
+
     /**
      * Finish the in-place editing of the given text area, release the edit lock, and allow the synchronous call
      * to 'edit' to return.
@@ -888,7 +892,7 @@ public class InPlaceEditView extends FrameLayout{
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
         if (reason == REASON_IME_ACTION
-                && mEditText.mTextArea instanceof TextField 
+                && mEditText.mTextArea instanceof TextField
                 && ((TextField) mEditText.mTextArea).getDoneListener() != null
                 && ((imo & EditorInfo.IME_ACTION_DONE) != 0 || (imo & EditorInfo.IME_ACTION_SEARCH) != 0 || (imo & EditorInfo.IME_ACTION_SEND) != 0 || (imo & EditorInfo.IME_ACTION_GO) != 0)) {
             ((TextField) mEditText.mTextArea).fireDoneEvent();
@@ -902,7 +906,7 @@ public class InPlaceEditView extends FrameLayout{
         Component editingComponent = mEditText.mTextArea;
         mEditText.removeTextChangedListener(mEditText.mTextWatcher);
         mEditText = null;
-        
+
         if (impl.isAsyncEditMode()) {
             Runnable onComplete = (Runnable)editingComponent.getClientProperty("android.onAsyncEditingComplete");
             editingComponent.putClientProperty("android.onAsyncEditingComplete", null);
@@ -924,7 +928,7 @@ public class InPlaceEditView extends FrameLayout{
             public void run() {
                 while (waitingForSynchronousEditingCompletion){
                     try {
-                        Thread.sleep(50);                        
+                        Thread.sleep(50);
                     } catch (Throwable e) {
                     }
                 };
@@ -953,6 +957,76 @@ public class InPlaceEditView extends FrameLayout{
         }
         endEditing(REASON_IME_ACTION, false);
     }
+
+    private static int trySetEditModeCount=0;
+
+    /**
+     * Wrap the setEditMode method so that it is "safe" to set to resize edit mode.
+     * This will try to set to the "resize" edit mode, and will spawn a thread
+     * to check 200 ms later to make sure that the text area is not covered by the
+     * keyboard.  If it is covered by the keyboard, it will switch to pan edit mode.
+     * This is preferable since resize edit mode works better in general so we'd like
+     * to use resize whenever possible.
+     *
+     * This change is to minimize the number of occurrences of this bug:
+     * https://github.com/codenameone/CodenameOne/issues/1827
+     *
+     * Some attempts were made to fix this bug directly by wrapping the textarea
+     * inside a ScrollView, but it caused some issues when the user tries to make text selections
+     * on the textview content - which causes Android to implicitly *change* to resize edit mode
+     * without actually letting us know.  This gist shows that attempt:
+     * https://gist.github.com/shannah/471033878e53c1fc297680fa85f6fd20
+     *
+     *
+     * @param resize
+     */
+    private static void trySetEditMode(final boolean resize) {
+        if (trySetEditModeCount > 100) {
+            trySetEditModeCount = 0;
+        }
+        final int thisCount = trySetEditModeCount++;
+        setEditMode(resize);
+        if (resize) {
+            // We would like to set pan mode, but we must do this with some protections
+            // since pan mode might cover the text area
+
+            new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        Thread.sleep(200);
+
+                    } catch (Exception ex){}
+                    if (thisCount != trySetEditModeCount-1) {
+                        return;
+                    }
+                    AndroidNativeUtil.getActivity().runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (thisCount != trySetEditModeCount-1) {
+                                return;
+                            }
+                            if (sInstance == null || sInstance.mEditText == null || sInstance.mEditText.mTextArea == null) {
+                                return;
+                            }
+                            Rect r = new Rect();
+                            AndroidImplementation.getInstance().relativeLayout.getGlobalVisibleRect(r);
+                            int rootViewHeight = r.height();
+                            int txtY = sInstance.mEditText.mTextArea.getAbsoluteY() + sInstance.mEditText.mTextArea.getScrollY();
+                            if (txtY > rootViewHeight - 20) {
+                                // We're off the page
+                                //System.out.println("SETTING TO PAN MODE_______");
+                                setEditMode(false);
+
+                            }
+                        }
+
+                    });
+
+                }
+            }).start();
+        }
+    }
+
+
 
     private static void setEditMode(final boolean resize){
         resizeMode = resize;
@@ -998,7 +1072,7 @@ public class InPlaceEditView extends FrameLayout{
     public static void stopEdit() {
         stopEdit(false);
     }
-    
+
     public static void stopEdit(boolean forceVKBClose) {
         if (sInstance != null) {
             sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose);
@@ -1104,8 +1178,8 @@ public class InPlaceEditView extends FrameLayout{
         if (!(component instanceof TextArea)) {
             throw new IllegalArgumentException("component must be instance of TextArea");
         }
-        
-        
+
+
 
         final TextArea textArea = (TextArea) component;
         final String initialText = textArea.getText();
@@ -1215,7 +1289,7 @@ public class InPlaceEditView extends FrameLayout{
         }
 
         impl.setAsyncEditMode(asyncEdit);
-       
+
         //textArea.setPreferredSize(prefSize);
         if (!impl.isAsyncEditMode() && textArea instanceof TextField) {
             ((TextField) textArea).setEditable(false);
@@ -1225,7 +1299,7 @@ public class InPlaceEditView extends FrameLayout{
         // We wrap the text area so that we can safely pass data across to the
         // android UI thread.
         final TextAreaData textAreaData = new TextAreaData(textArea);
-        
+
         impl.getActivity().runOnUiThread(new Runnable() {
 
             @Override
@@ -1236,11 +1310,18 @@ public class InPlaceEditView extends FrameLayout{
                     sInstance = new InPlaceEditView(impl);
                     impl.relativeLayout.addView(sInstance);
                 }
-                if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
-                    setEditMode(true);
-                }else{
-                    setEditMode(false);
-                }
+
+                // Let's try something new here
+                // We'll ALWAYS try resize edit mode (since it just works better)
+                // But we'll detect whether the field is still covered by the keyboard
+                // and switch to pan mode if necessary.
+
+                trySetEditMode(true);
+                //if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
+                //    setEditMode(true);
+                //}else{
+                //    setEditMode(false);
+                //}
                 sInstance.startEditing(impl.getActivity(), textAreaData, initialText, inputType);
             }
         });
@@ -1275,7 +1356,7 @@ public class InPlaceEditView extends FrameLayout{
                 }else{
                     out[0] = initialText;
                 }
-                
+
                 Display.getInstance().onEditingComplete(component, out[0]);
                 if (impl.isAsyncEditMode()) {
                     impl.callHideTextEditor();
@@ -1332,14 +1413,14 @@ public class InPlaceEditView extends FrameLayout{
             component.putClientProperty("android.onAsyncEditingComplete", onComplete);
             return;
         }
-        
+
         // Make this call synchronous
         // We set this flag so that waitForEditCompletion can block on it.
         // The flag will be released inside the endEditing method which will
         // allow the method to proceed.
         waitingForSynchronousEditingCompletion = true;
         waitForEditCompletion();
-        
+
         onComplete.run();
     }
 
@@ -1387,13 +1468,13 @@ public class InPlaceEditView extends FrameLayout{
         private InPlaceEditView mInPlaceEditView;
         private TextArea mTextArea = null;
         private TextWatcher mTextWatcher = new TextWatcher() {
-            
+
             private boolean started = false;
             private TextChange currChange;
             private int lastInsertStartPos;
             private int lastInsertBeforeCount;
             private int lastInsertAfterCount;
-            
+
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
             }
@@ -1422,7 +1503,7 @@ public class InPlaceEditView extends FrameLayout{
                 if (isEditing() && mTextArea != null) {
                     try {
                         final String actualString = s.toString();
-                        //make sure to start send events to the cn1 textfield only 
+                        //make sure to start send events to the cn1 textfield only
                         //when the first string equals to the initial text
                         if (!started) {
                             if (mTextArea.getText().equals(actualString)) {
@@ -1457,7 +1538,7 @@ public class InPlaceEditView extends FrameLayout{
                             @Override
                             public void run() {
                                 if (!actualString.equals(mTextArea.getText())) {
-                                   mTextArea.setText(actualString);
+                                    mTextArea.setText(actualString);
                                 }
                             }
                         });
@@ -1474,7 +1555,7 @@ public class InPlaceEditView extends FrameLayout{
          * @param inPlaceEditView
          */
         public EditView(Context context, TextArea textArea, InPlaceEditView inPlaceEditView, int style) {
-            super(context, null, style);    
+            super(context, null, style);
             mInPlaceEditView = inPlaceEditView;
             mTextArea = textArea;
             setBackgroundColor(Color.TRANSPARENT);
@@ -1496,7 +1577,7 @@ public class InPlaceEditView extends FrameLayout{
             return super.onKeyPreIme(keyCode, event);
         }
 
-        
+
         @Override
         public boolean onKeyDown(int keyCode, KeyEvent event) {
             // If the user presses the back button, or the menu button
