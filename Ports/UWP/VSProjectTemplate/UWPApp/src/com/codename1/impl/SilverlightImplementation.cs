@@ -221,10 +221,10 @@ namespace com.codename1.impl
               Windows.Phone.UI.Input.HardwareButtons.BackPressed += page_BackKeyPress;
                isPhone = false;
 #elif WINDOWS_UWP
+              Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
               if (Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons"))
               {
-                  isPhone = false;
-                  Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
+                  isPhone = false; 
               }
 #endif
               cl.SizeChanged += cl_SizeChanged;
