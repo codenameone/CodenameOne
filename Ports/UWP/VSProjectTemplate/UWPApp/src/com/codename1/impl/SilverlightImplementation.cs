@@ -221,10 +221,10 @@ namespace com.codename1.impl
               Windows.Phone.UI.Input.HardwareButtons.BackPressed += page_BackKeyPress;
                isPhone = false;
 #elif WINDOWS_UWP
+              Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
               if (Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons"))
               {
-                  isPhone = false;
-                  Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
+                  isPhone = false; 
               }
 #endif
               cl.SizeChanged += cl_SizeChanged;
@@ -605,11 +605,8 @@ namespace com.codename1.impl
                        ((TextBox)textInputInstance).Text = n4;
                        ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
                        ((TextBox)textInputInstance).MaxLength = n2;
+                       ((TextBox)textInputInstance).IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
 
-                       if ((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE)
-                       {
-                           ((TextBox)textInputInstance).InputScope = new InputScope();
-                       }
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
