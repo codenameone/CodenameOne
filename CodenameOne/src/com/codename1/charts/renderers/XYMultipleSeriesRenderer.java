@@ -165,9 +165,9 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
 
   public void initAxesRangeForScale(int i) {
     mMinX[i] = MathHelper.NULL_VALUE;
-    mMaxX[i] = -MathHelper.NULL_VALUE;
+    mMaxX[i] = MathHelper.NULL_VALUE;
     mMinY[i] = MathHelper.NULL_VALUE;
-    mMaxY[i] = -MathHelper.NULL_VALUE;
+    mMaxY[i] = MathHelper.NULL_VALUE;
     double[] range = new double[] { mMinX[i], mMaxX[i], mMinY[i], mMaxY[i] };
     initialRange.put(i, range);
     mYTitle[i] = "";
@@ -455,7 +455,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    * @return the maxX was set or not
    */
   public boolean isMaxXSet(int scale) {
-    return mMaxX[scale] != -MathHelper.NULL_VALUE;
+    return mMaxX[scale] != MathHelper.NULL_VALUE;
   }
 
   /**
@@ -521,7 +521,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    * @return the maxY was set or not
    */
   public boolean isMaxYSet(int scale) {
-    return mMaxY[scale] != -MathHelper.NULL_VALUE;
+    return mMaxY[scale] != MathHelper.NULL_VALUE;
   }
 
   /**

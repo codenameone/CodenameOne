@@ -195,23 +195,44 @@ public abstract class XYChart extends AbstractChart {
       }
       if (!isMinXSet[scale]) {
         double minimumX = series.getMinX();
-        minX[scale] = Math.min(minX[scale], minimumX);
-        mCalcRange.get(scale)[0] = minX[scale];
+        if (minimumX != MathHelper.NULL_VALUE) {
+            minX[scale] = minX[scale] == MathHelper.NULL_VALUE ? minimumX : Math.min(minX[scale], minimumX);
+            mCalcRange.get(scale)[0] = minX[scale];
+        } else {
+            minX[scale] = 0;
+            mCalcRange.get(scale)[0] = 0;
+        }
       }
       if (!isMaxXSet[scale]) {
         double maximumX = series.getMaxX();
-        maxX[scale] = Math.max(maxX[scale], maximumX);
-        mCalcRange.get(scale)[1] = maxX[scale];
+        if (maximumX != MathHelper.NULL_VALUE) {
+            maxX[scale] = maxX[scale] == MathHelper.NULL_VALUE ? maximumX : Math.max(maxX[scale], maximumX);
+            mCalcRange.get(scale)[1] = maxX[scale];
+        } else {
+            maxX[scale] = minX[scale] + 1;
+            mCalcRange.get(scale)[1] = maxX[scale];
+        }
       }
       if (!isMinYSet[scale]) {
         double minimumY = series.getMinY();
-        minY[scale] = Math.min(minY[scale], (float) minimumY);
-        mCalcRange.get(scale)[2] = minY[scale];
+        if (minimumY != MathHelper.NULL_VALUE) {
+            minY[scale] = minY[scale] == MathHelper.NULL_VALUE ? minimumY : Math.min(minY[scale], (float) minimumY);
+            mCalcRange.get(scale)[2] = minY[scale];
+        } else {
+            minY[scale] = 0;
+            mCalcRange.get(scale)[2] = 0;
+        }
       }
       if (!isMaxYSet[scale]) {
         double maximumY = series.getMaxY();
-        maxY[scale] = Math.max(maxY[scale], (float) maximumY);
-        mCalcRange.get(scale)[3] = maxY[scale];
+        if (maximumY != MathHelper.NULL_VALUE) {
+            maxY[scale] = maxY[scale] == MathHelper.NULL_VALUE ? maximumY : Math.max(maxY[scale], (float) maximumY);
+            mCalcRange.get(scale)[3] = maxY[scale];
+        } else {
+            maxY[scale] = minY[scale] + 1;
+            mCalcRange.get(scale)[3] = maxY[scale];
+        }
+        
       }
     }
     for (int i = 0; i < maxScaleNumber; i++) {

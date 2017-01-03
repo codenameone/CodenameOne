@@ -99,10 +99,10 @@ public class DialChart extends RoundChart {
       for (int i = 0; i < count; i++) {
         double value = mDataset.getValue(i);
         if (!mRenderer.isMinValueSet()) {
-          min = Math.min(min, value);
+          min = min == MathHelper.NULL_VALUE ? value : Math.min(min, value);
         }
         if (!mRenderer.isMaxValueSet()) {
-          max = Math.max(max, value);
+          max = max == MathHelper.NULL_VALUE ? value : Math.max(max, value);
         }
       }
     }
