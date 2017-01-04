@@ -544,6 +544,9 @@ public class CodenameOneActivity extends Activity {
             return;
         }
         this.intentResultListener = l;
+        if (l != null && l != defaultResultListener) {
+            waitingForResult = true;
+        }
     }
 
     public void setDefaultIntentResultListener(IntentResultListener l) {
