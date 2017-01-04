@@ -474,7 +474,7 @@ public class BytecodeMethod {
                         case 'd' :
                             b.append("JAVA_DOUBLE"); break;
                     }
-                    b.append(" ").append(lv.getQualifier()).append("locals_").append(lv.getIndex()).append("_; /* ").append(lv.getOrigName()).append(" */\n");
+                    b.append(" ").append(lv.getQualifier()).append("locals_").append(lv.getIndex()).append("_ = 0; /* ").append(lv.getOrigName()).append(" */\n");
                 }
             }
             
