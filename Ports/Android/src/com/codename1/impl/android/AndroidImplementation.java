@@ -5046,7 +5046,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "&body=" + Uri.encode(msg.getContent())));        
         }else{
             if (hasAttachment) {
-                if(msg.getAttachments().size() > 0) {
+                if(msg.getAttachments().size() > 1) {
                     emailIntent = new Intent(android.content.Intent.ACTION_SEND_MULTIPLE);
                     emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
                     emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
@@ -5078,7 +5078,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (msg.getMimeType().equals(Message.MIME_HTML)) {
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));                                
             }else{
-                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
+                /*
+                // Attempted this workaround to fix the ClassCastException that occurs on android when
+                // there are multiple attachments.  Unfortunately, this fixes the stack trace, but 
+                // has the unwanted side-effect of producing a blank message body.
+                // Same workaround for HTML mimetype also fails the same way.
+                // Conclusion, Just live with the stack trace.  It doesn't seem to affect the 
+                // execution of the program... treat it as a warning.
+                // See https://github.com/codenameone/CodenameOne/issues/1782
+                if (msg.getAttachments().size() > 1) {
+                    ArrayList<String> contentArr = new ArrayList<String>();
+                    contentArr.add(msg.getContent());
+                    emailIntent.putStringArrayListExtra(android.content.Intent.EXTRA_TEXT, contentArr);
+                } else {
+                    emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
+                    
+                }*/
+                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
             }
             
         }
