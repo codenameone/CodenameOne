@@ -33,7 +33,6 @@ import com.codename1.ui.events.ActionListener;
  * capabilities. 
  *
  * @author Shai Almog
- * @deprecated this API is experimental
  */
 public class UiBinding {
     /**

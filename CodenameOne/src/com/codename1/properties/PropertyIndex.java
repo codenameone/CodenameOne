@@ -33,7 +33,6 @@ import java.util.Map;
  * can implicitly access them for us. This class also holds the class level meta-data for a specific property
  * or class. It also provides utility level tools e.g. toString implementation etc.
  *
- * @deprecated this API is experimental
  * @author Shai Almog
  */
 public class PropertyIndex implements Iterable<PropertyBase>{
