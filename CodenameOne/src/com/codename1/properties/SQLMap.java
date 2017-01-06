@@ -34,7 +34,6 @@ import java.util.ArrayList;
  * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
  * properly at this time. 
  *
- * @deprecated this API is experimental
  * @author Shai Almog
  */
 public class SQLMap {
