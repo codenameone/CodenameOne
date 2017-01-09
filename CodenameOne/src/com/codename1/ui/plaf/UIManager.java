@@ -680,6 +680,11 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("TextField.derive")) {
             themeProps.put("TextField.border", Border.getDefaultBorder());
         }
+        
+        themeProps.put("InvalidEmblem.derive", "Label");
+        themeProps.put("InvalidEmblem.fgColor", "ff0000");
+        themeProps.put("InvalidEmblem.transparency", "0");
+        
         themeProps.put("TextField.sel#derive", "TextField");
         themeProps.put("TextField.dis#derive", "TextField");
         if(installedTheme == null || !installedTheme.containsKey("TextFieldInvalid.derive")) {
@@ -825,17 +830,20 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {
             themeProps.put("FloatingActionButton.fgColor", "ffffff");
             themeProps.put("FloatingActionButton.bgColor", "d32f2f");
+            themeProps.put("FloatingActionButton.transparency", "0");
             themeProps.put("FloatingActionButton.marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.margin", "0,2,1,2");
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.press#derive")) {
             themeProps.put("FloatingActionButton.press#fgColor", "ffffff");
             themeProps.put("FloatingActionButton.press#bgColor", "b71c1c");
+            themeProps.put("FloatingActionButton.sel#transparency", "0");
             themeProps.put("FloatingActionButton.press#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.press#margin", "0,2,1,2");
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.sel#derive")) {
             themeProps.put("FloatingActionButton.sel#fgColor", "ffffff");
+            themeProps.put("FloatingActionButton.sel#transparency", "0");
             themeProps.put("FloatingActionButton.sel#bgColor", "b71c1c");
             themeProps.put("FloatingActionButton.sel#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.sel#margin", "0,2,1,2");

@@ -24,6 +24,7 @@ package com.codename1.ui;
 
 import com.codename1.components.MultiButton;
 import com.codename1.components.SpanButton;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
@@ -4711,6 +4712,33 @@ public class FontImage extends Image {
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanLabel
+     * @param icon one of the MATERIAL_* icons
+     */
+    public static void setMaterialIcon(SpanLabel l, char icon) {
+        setMaterialIcon(l, icon, -1);
+    }    
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanLabel
+     * @param icon one of the MATERIAL_* icons
+     * @param size the size of the icon in millimeters
+     */
+    public static void setMaterialIcon(SpanLabel l, char icon, float size) {
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
+    }
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * @param l a SpanButton
      * @param icon one of the MATERIAL_* icons
      */
@@ -5139,6 +5167,7 @@ public class FontImage extends Image {
     public Image rotate(int degrees) {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;
+        f.opacity = opacity;
         return f;
     }
 

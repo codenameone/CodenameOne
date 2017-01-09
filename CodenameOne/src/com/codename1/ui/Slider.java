@@ -349,10 +349,10 @@ public class Slider extends Label {
             }
         }
         if (prefH != 0) {
-            prefH += (style.getPadding(false, Component.TOP) + style.getPadding(false, Component.BOTTOM));
+            prefH += style.getVerticalPadding();
         }
         if (prefW != 0) {
-            prefW += (style.getPadding(isRTL(), Component.RIGHT) + style.getPadding(isRTL(), Component.LEFT));
+            prefW += style.getHorizontalPadding();
         }
         return new Dimension(prefW, prefH);
     }

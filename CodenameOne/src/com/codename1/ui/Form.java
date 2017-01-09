@@ -179,8 +179,8 @@ public class Form extends Container {
         setVisible(false);
         Style formStyle = getStyle();
         Display d = Display.getInstance();
-        int w = d.getDisplayWidth() - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
-        int h = d.getDisplayHeight() - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
+        int w = d.getDisplayWidth() - (formStyle.getHorizontalMargins());
+        int h = d.getDisplayHeight() - (formStyle.getVerticalMargins());
 
         setWidth(w);
         setHeight(h);
@@ -210,7 +210,10 @@ public class Form extends Container {
         initGlobalToolbar();
     }
     
-    void initGlobalToolbar() {
+    /**
+     * Allows subclasses to disable the global toolbar for a specific form by overriding this method
+     */
+    protected void initGlobalToolbar() {
         if(Toolbar.isGlobalToolbar()) {
             setToolbar(new Toolbar());
         }
@@ -275,31 +278,51 @@ public class Form extends Container {
     }
     
     /**
+     * This method returns the value of the theme constant {@code paintsTitleBarBool} and it is
+     * invoked internally in the code. You can override this method to toggle the appearance of the status
+     * bar on a per-form basis
+     * @return the value of the {@code paintsTitleBarBool} theme constant
+     */
+    protected boolean shouldPaintStatusBar() {
+        return getUIManager().isThemeConstant("paintsTitleBarBool", false);
+    }
+    
+    /**
+     * Subclasses can override this method to control the creation of the status bar component.
+     * Notice that this method will only be invoked if the paintsTitleBarBool theme constant is true
+     * which it is on iOS by default
+     * @return a Component that represents the status bar if the OS requires status bar spacing
+     */
+    protected Component createStatusBar() {
+        if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+            Button bar = new Button();
+            bar.setShowEvenIfBlank(true);
+            bar.setUIID("StatusBar");
+            bar.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    Component c = findScrollableChild(getContentPane());
+                    if(c != null) {
+                        c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
+                    }
+                }
+            });
+            return bar;
+        } else {
+            Container bar = new Container();
+            bar.setUIID("StatusBar");
+            return bar;
+        }
+    }
+    
+    /**
      * Here so dialogs can disable this
      */
     void initTitleBarStatus() {
-        if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
+        if(shouldPaintStatusBar()) {
             // check if its already added:
             if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
-                if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
-                    Button bar = new Button();
-                    bar.setShowEvenIfBlank(true);
-                    bar.setUIID("StatusBar");
-                    titleArea.addComponent(BorderLayout.NORTH, bar);
-                    bar.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(ActionEvent evt) {
-                            Component c = findScrollableChild(getContentPane());
-                            if(c != null) {
-                                c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
-                            }
-                        }
-                    });
-                } else {
-                    Container bar = new Container();
-                    bar.setUIID("StatusBar");
-                    titleArea.addComponent(BorderLayout.NORTH, bar);
-                }
+                titleArea.addComponent(BorderLayout.NORTH, createStatusBar());
             }
         }
     }
@@ -514,8 +537,8 @@ public class Form extends Container {
         int oldHeight = getHeight();        
         sizeChanged(w, h);
         Style formStyle = getStyle();
-        w = w - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
-        h = h - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
+        w = w - (formStyle.getHorizontalMargins());
+        h = h - (formStyle.getVerticalMargins());
         setSize(new Dimension(w, h));
         setShouldCalcPreferredSize(true);
         doLayout();
@@ -1998,14 +2021,14 @@ public class Form extends Container {
         //if selected style is different then unselected style there is a good 
         //chance we need to trigger a revalidate
         if (!selected.getFont().equals(unselected.getFont())
-                || selected.getPadding(false, Component.TOP) != unselected.getPadding(false, Component.TOP)
-                || selected.getPadding(false, Component.BOTTOM) != unselected.getPadding(false, Component.BOTTOM)
-                || selected.getPadding(isRTL(), Component.RIGHT) != unselected.getPadding(isRTL(), Component.RIGHT)
-                || selected.getPadding(isRTL(), Component.LEFT) != unselected.getPadding(isRTL(), Component.LEFT)
-                || selected.getMargin(false, Component.TOP) != unselected.getMargin(false, Component.TOP)
-                || selected.getMargin(false, Component.BOTTOM) != unselected.getMargin(false, Component.BOTTOM)
-                || selected.getMargin(isRTL(), Component.RIGHT) != unselected.getMargin(isRTL(), Component.RIGHT)
-                || selected.getMargin(isRTL(), Component.LEFT) != unselected.getMargin(isRTL(), Component.LEFT)) {
+                || selected.getPaddingTop() != unselected.getPaddingTop()
+                || selected.getPaddingBottom() != unselected.getPaddingBottom()
+                || selected.getPaddingRight(isRTL()) != unselected.getPaddingRight(isRTL())
+                || selected.getPaddingLeft(isRTL()) != unselected.getPaddingLeft(isRTL())
+                || selected.getMarginTop() != unselected.getMarginTop()
+                || selected.getMarginBottom() != unselected.getMarginBottom()
+                || selected.getMarginRight(isRTL()) != unselected.getMarginRight(isRTL())
+                || selected.getMarginLeft(isRTL()) != unselected.getMarginLeft(isRTL())) {
             trigger = true;
         }
         int prefW = 0;
@@ -2232,6 +2255,7 @@ public class Form extends Container {
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
         dragStopFlag = false;
+        dragged = null;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
@@ -2507,12 +2531,14 @@ public class Form extends Container {
         }
 
         Container actual = getActualPane();
-        Component cmp = actual.getComponentAt(x[0], y[0]);
-        if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
-                setFocused(cmp);
+        if(actual != null) {
+            Component cmp = actual.getComponentAt(x[0], y[0]);
+            if (cmp != null) {
+                if (cmp.isFocusable() && cmp.isEnabled()) {
+                    setFocused(cmp);
+                }
+                cmp.pointerHover(x, y);
             }
-            cmp.pointerHover(x, y);
         }
     }
 

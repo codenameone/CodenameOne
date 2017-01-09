@@ -239,7 +239,9 @@ public class URLImage extends EncodedImage {
     /**
      * Images are normally fetched from storage or network only as needed, 
      * however if the download must start before the image is drawn this method
-     * can be invoked.
+     * can be invoked. Notice that "immediately" doesn't mean synchronously, it just
+     * means that the image will be added to the queue right away but probably won't be
+     * available by the time the method completes.
      */
     public void fetch() {
         if(fetching || imageData != null) {

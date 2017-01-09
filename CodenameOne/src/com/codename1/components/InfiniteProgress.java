@@ -173,8 +173,8 @@ public class InfiniteProgress extends Component {
             return new Dimension(100, 100);
         }
         Style s = getStyle();
-        return new Dimension(s.getPadding(LEFT) + s.getPadding(RIGHT) + animation.getWidth(), 
-                s.getPadding(TOP) + s.getPadding(BOTTOM) + animation.getHeight());
+        return new Dimension(s.getHorizontalPadding() + animation.getWidth(), 
+                s.getVerticalPadding() + animation.getHeight());
     }
 
     /**
@@ -209,7 +209,7 @@ public class InfiniteProgress extends Component {
                 cache.put(v, rotated);
             }
         }
-        g.drawImage(rotated, getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));            
+        g.drawImage(rotated, getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());            
         //}
     }
     
@@ -226,6 +226,7 @@ public class InfiniteProgress extends Component {
      */
     public void setAnimation(Image animation) {
         this.animation = animation;
+        cache.clear();
     }
 
     /**
@@ -258,6 +259,7 @@ public class InfiniteProgress extends Component {
     public String setPropertyValue(String name, Object value) {
         if(name.equals("animation")) {
             this.animation = (Image)value;
+            cache.clear();
             return null;
         }
         return super.setPropertyValue(name, value);

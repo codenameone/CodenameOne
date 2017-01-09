@@ -394,9 +394,13 @@ public class Button extends Label {
     }
 
     /**
+     * Allows subclasses to override action event behavior 
      * {@inheritDoc}
+     * 
+     * @param x the x position of the click if applicable (can be 0 or -1 otherwise)
+     * @param y the y position of the click if applicable (can be 0 or -1 otherwise)
      */
-    void fireActionEvent(int x, int y){
+    protected void fireActionEvent(int x, int y){
         super.fireActionEvent();
         if(cmd != null) {
             ActionEvent ev = new ActionEvent(cmd, this, x, y);
@@ -502,6 +506,9 @@ public class Button extends Label {
     public void pointerPressed(int x, int y) {
         clearDrag();
         setDragActivated(false);
+        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
+        }
         pressed();
         Form f = getComponentForm();
         // might happen when programmatically triggering press
@@ -517,6 +524,13 @@ public class Button extends Label {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
+            pointerReleasedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {

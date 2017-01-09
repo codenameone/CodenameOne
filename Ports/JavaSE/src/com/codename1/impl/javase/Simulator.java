@@ -56,7 +56,9 @@ public class Simulator {
             }
         }
         StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
-        System.setProperty("MainClass", argv[0]);
+        if(argv.length > 0) {
+            System.setProperty("MainClass", argv[0]);
+        }
         File[] files = new File[t.countTokens()];
         for (int iter = 0; iter < files.length; iter++) {
             files[iter] = new File(t.nextToken());

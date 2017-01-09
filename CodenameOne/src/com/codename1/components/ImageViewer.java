@@ -448,8 +448,8 @@ public class ImageViewer extends Component {
         int iW = img.getWidth();
         int iH = img.getHeight();
         Style s = getStyle();
-        int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
-        int height = getHeight() - s.getPadding(TOP) - s.getPadding(BOTTOM);
+        int width = getWidth() - s.getHorizontalPadding();
+        int height = getHeight() - s.getVerticalPadding();
         float r2; 
         if(imageInitialPosition == IMAGE_FIT){
             r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
@@ -460,8 +460,8 @@ public class ImageViewer extends Component {
         // calculate the image position to fit
         prefW = (int)(((float)iW) * r2);
         prefH = (int)(((float)iH) * r2);
-        prefX = s.getPadding(LEFT) + (width - prefW) / 2;
-        prefY = s.getPadding(TOP) + (height - prefH) / 2;
+        prefX = s.getPaddingLeftNoRTL() + (width - prefW) / 2;
+        prefY = s.getPaddingTop() + (height - prefH) / 2;
     }
     
     private void updatePositions() {
@@ -476,8 +476,8 @@ public class ImageViewer extends Component {
         int iW = image.getWidth();
         int iH = image.getHeight();
         Style s = getStyle();
-        int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
-        int height = getHeight() - s.getPadding(TOP) - s.getPadding(BOTTOM);
+        int width = getWidth() - s.getHorizontalPadding();
+        int height = getHeight() - s.getVerticalPadding();
         float r2;
         if(imageInitialPosition == IMAGE_FIT){
             r2 = Math.min(((float)width) / ((float)iW), ((float)height) / ((float)iH));
@@ -486,8 +486,8 @@ public class ImageViewer extends Component {
         }
         imageDrawWidth = (int)(((float)iW) * r2 * zoom);
         imageDrawHeight = (int)(((float)iH) * r2 * zoom);
-        imageX = (int)(s.getPadding(LEFT) + (width - imageDrawWidth) * panPositionX);
-        imageY = (int)(s.getPadding(TOP) + (height - imageDrawHeight) * panPositionY);
+        imageX = (int)(s.getPaddingLeftNoRTL()+ (width - imageDrawWidth) * panPositionX);
+        imageY = (int)(s.getPaddingTop() + (height - imageDrawHeight) * panPositionY);
     }
     
     /**
@@ -525,7 +525,7 @@ public class ImageViewer extends Component {
     public void paint(Graphics g) {
         if(panPositionX < 0) {
             Style s = getStyle();
-            int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
+            int width = getWidth() - s.getHorizontalPadding();
             float ratio = ((float)width) * (panPositionX * -1);
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
             if (cycleLeft || swipeableImages.getSelectedIndex() > getImageLeftPos()) {
@@ -543,7 +543,7 @@ public class ImageViewer extends Component {
         }
         if(panPositionX > 1) {
             Style s = getStyle();
-            int width = getWidth() - s.getPadding(LEFT) - s.getPadding(RIGHT);
+            int width = getWidth() - s.getHorizontalPadding();
             float ratio = ((float)width) * (1 - panPositionX);
             g.drawImage(image, ((int)ratio) + getX() + imageX, getY() + imageY, imageDrawWidth, imageDrawHeight);
             if (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos()) {

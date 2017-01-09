@@ -408,6 +408,14 @@ public abstract class CodenameOneImplementation {
     public boolean isEditingText(Component c) {
         return editingText == c;
     }
+    
+    /**
+     * Gets the component that is currently editing text
+     * @return 
+     */
+    public Component getEditingText() {
+        return editingText;
+    }
 
     /**
      * Returns true if edit string will return immediately and broadcast editing events directly to the text field
@@ -5624,7 +5632,7 @@ public abstract class CodenameOneImplementation {
     public void registerPush(Hashtable metaData, boolean noFallback) {
         if(!noFallback) {
             Preferences.set("PollingPush", true);
-            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
+            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, "", getPackageName());
 
             // Call pushCallback's registeredForPush
             Display.getInstance().callSerially(new RPush());
@@ -6089,6 +6097,23 @@ public abstract class CodenameOneImplementation {
         return home;
     }
 
+     /**
+      * Returns true if the device has a directory dedicated for "cache" files
+      * @return true if a caches style directory exists in this device type
+      */
+     public boolean hasCachesDir() {
+         return false;
+     }
+
+     /**
+      * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+      * is false
+      * @return file URL or null
+      */
+     public String getCachesDir() {
+         return null;
+     }
+    
     /**
      * Uses the native cookie store if applicable, this might break simulator compatibility
      * @return the useNativeCookieStore

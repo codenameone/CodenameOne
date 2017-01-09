@@ -38,6 +38,7 @@ import android.view.Window;
 import android.widget.Toast;
 import com.codename1.payment.Product;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.payment.Receipt;
 import com.codename1.payments.v3.IabException;
 import com.codename1.payments.v3.IabHelper;
 import com.codename1.payments.v3.IabResult;
@@ -52,9 +53,12 @@ import com.codename1.ui.events.ActionEvent;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class CodenameOneActivity extends Activity {
 
@@ -98,7 +102,7 @@ public class CodenameOneActivity extends Activity {
         }
     };
     IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {
-        public void onIabPurchaseFinished(final IabResult result, final String sku, Purchase purchase) {
+        public void onIabPurchaseFinished(final IabResult result, final String sku, final Purchase purchase) {
             // if we were disposed of in the meantime, quit.
             if (mHelper == null) {
                 return;
@@ -128,6 +132,24 @@ public class CodenameOneActivity extends Activity {
 
                         @Override
                         public void run() {
+                            // Sandbox transactions have no order ID, so we'll make a dummy transaction ID
+                            // in this case.
+                            String transactionId = (purchase.getOrderId() == null || purchase.getOrderId().isEmpty()) ? 
+                                    "play-sandbox-"+UUID.randomUUID().toString() : purchase.getOrderId();
+                            String purchaseJsonStr = purchase.getOriginalJson();
+                            try {
+                                // In order to verify receipts, we'll need both the order data and the signature
+                                // so we'll pack it all into a single JSON string.
+                                JSONObject purchaseJson = new JSONObject(purchaseJsonStr);
+                                JSONObject rootJson = new JSONObject();
+                                rootJson.put("data", purchaseJson);
+                                rootJson.put("signature", purchase.getSignature());
+                                purchaseJsonStr = rootJson.toString();
+                                
+                            } catch (JSONException ex) {
+                                Logger.getLogger(CodenameOneActivity.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                            com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_PLAY, sku, transactionId, purchase.getPurchaseTime(), purchaseJsonStr);
                             pc.itemPurchased(sku);     
                         }
                     });
@@ -142,7 +164,6 @@ public class CodenameOneActivity extends Activity {
             if (!isConsumable(sku)) {
                 return;
             }
-
             if(purchase.getItemType().equals(IabHelper.ITEM_TYPE_INAPP)){
                 mHelper.consumeAsync(purchase, mConsumeFinishedListener);                
             }
@@ -523,6 +544,9 @@ public class CodenameOneActivity extends Activity {
             return;
         }
         this.intentResultListener = l;
+        if (l != null && l != defaultResultListener) {
+            waitingForResult = true;
+        }
     }
 
     public void setDefaultIntentResultListener(IntentResultListener l) {

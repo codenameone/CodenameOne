@@ -109,6 +109,14 @@ public class SpanButton extends Container {
     }
     
     /**
+     * Returns the Style object for the text of this span button.
+     * @return The Style object for the text of this span button.
+     */
+    public Style getTextStyle() {
+        return text.getStyle();
+    }
+    
+    /**
      * Sets the uiid for the icon if present
      * @param uiid the uiid for the icon
      */

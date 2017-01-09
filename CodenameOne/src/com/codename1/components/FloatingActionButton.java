@@ -65,12 +65,34 @@ import java.util.List;
  */
 public class FloatingActionButton extends Button {
 
+    /**
+     * The default icon size for the fab icon in millimeters 
+     * @return the fabDefaultSize
+     */
+    public static float getIconDefaultSize() {
+        return fabDefaultSize;
+    }
+
+    /**
+     * The default icon size for the fab icon in millimeters 
+     * @param aFabDefaultSize the fabDefaultSize to set
+     */
+    public static void setIconDefaultSize(float aFabDefaultSize) {
+        fabDefaultSize = aFabDefaultSize;
+    }
+
     private List<FloatingActionButton> subMenu;
 
     private String text;
     private int shadowOpacity = 100;
     private Dialog current;
     private boolean rectangle;
+    private boolean isBadge;
+    
+    /**
+     * The default icon size for the fab
+     */
+    private static float fabDefaultSize = 3.8f;
 
     /**
      * Constructor
@@ -99,6 +121,7 @@ public class FloatingActionButton extends Button {
         shadowOpacity = 0;
         setUIID("Badge");
         updateBorder();
+        isBadge = true;
     }
     
     private void updateBorder() {
@@ -130,7 +153,7 @@ public class FloatingActionButton extends Button {
      * @param text the text of the badge
      * @return a badge component
      */
-    static FloatingActionButton createBadge(String text) {
+    public static FloatingActionButton createBadge(String text) {
         return new FloatingActionButton(text);
     }
     
@@ -141,7 +164,7 @@ public class FloatingActionButton extends Button {
      * @return a FloatingActionButton instance
      */
     public static FloatingActionButton createFAB(char icon) {
-        return new FloatingActionButton(icon, null, 3.8f);
+        return new FloatingActionButton(icon, null, fabDefaultSize);
     }
 
     /**
@@ -211,8 +234,22 @@ public class FloatingActionButton extends Button {
 
     @Override
     public void setText(String text) {
+        if(isBadge) {
+            super.setText(text);
+        }
         this.text = text;
     }
+
+    @Override
+    protected void fireActionEvent(int x, int y) {
+        Form current = Display.getInstance().getCurrent();
+        if(current instanceof Dialog) {
+            ((Dialog)current).dispose();
+        }
+        super.fireActionEvent(x, y);
+    }
+    
+    
 
     @Override
     public void released(int x, int y) {

@@ -29,6 +29,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
 
 /**
  * <p>A border that can either be a circle or a circular rectangle which is a rectangle whose sides are circles.
@@ -114,6 +115,8 @@ public class RoundBorder extends Border {
     private static int instanceCounter;
     private final int instanceVal;
     
+    private boolean uiid;
+    
     private RoundBorder() {
         shadowSpread = Display.getInstance().convertToPixels(2);
         instanceCounter++;
@@ -127,6 +130,30 @@ public class RoundBorder extends Border {
      */
     public static RoundBorder create() {
         return new RoundBorder();
+    }
+    
+    /**
+     * <p>Uses the style of the components UIID to draw the background of the border, this effectively overrides all
+     * other style settings but allows the full power of UIID drawing including gradients, background images 
+     * etc.</p>
+     * <p><strong>Notice: </strong>this flag will only work when shaped clipping is supported. That feature
+     * isn't available in all platforms...</p>
+     * 
+     * 
+     * @param uiid true to use the background of the component setting
+     * @return border instance so these calls can be chained
+     */
+    public RoundBorder uiid(boolean uiid) {
+        this.uiid = uiid;
+        return this;
+    }
+    
+    /**
+     * True is we use the background of the component setting to draw
+     * @return true if we draw based on the component UIID
+     */
+    public boolean getUIID() {
+        return uiid;
     }
     
     /**
@@ -285,7 +312,7 @@ public class RoundBorder extends Border {
         } else {
             return;
         }
-        
+                
         Image target = Image.createImage(w, h, 0);
         
         int shapeX = 0;
@@ -324,19 +351,52 @@ public class RoundBorder extends Border {
             }
         }
         tg.translate(shapeX, shapeY);
-        fillShape(tg, color, opacity, shapeW, shapeH, true);
+        if(uiid && tg.isShapeClipSupported()) {
+            c.getStyle().setBorder(Border.createEmpty());
+            
+            GeneralPath gp = new GeneralPath();
+            if(rectangle) {
+                float sw = this.stroke != null ? this.stroke.getLineWidth() : 0;
+                gp.moveTo(shapeH / 2.0, sw);
+                gp.lineTo(shapeW - (shapeH / 2.0), sw);
+                gp.arcTo(shapeW - (shapeH / 2.0), shapeH / 2.0, shapeW - (shapeH / 2.0), shapeH-sw, true);
+                gp.lineTo(shapeH / 2.0, shapeH-sw);
+                gp.arcTo(shapeH / 2.0, shapeH / 2.0, shapeH / 2.0, sw, true);
+                gp.closePath();
+            } else {
+                int size = shapeW;
+                int xPos = 0;
+                int yPos = 0;
+                if(shapeW != shapeH) {
+                    if(shapeW > shapeH) {
+                        size = shapeH;
+                        xPos = (shapeW - shapeH) / 2;
+                    } else {
+                        size = shapeW;
+                        yPos = (shapeH - shapeW) / 2;
+                    }
+                }
+                gp.arc(xPos, yPos, size, size, 0, 2*Math.PI);
+            }
+            
+            tg.setClip(gp);
+            c.getStyle().getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
+            c.getStyle().setBorder(this);
+        } else {
+            fillShape(tg, color, opacity, shapeW, shapeH, true);
+        }
         g.drawImage(target, x, y);
         c.putClientProperty(CACHE_KEY + instanceVal, target);
     }
 
     @Override
     public int getMinimumHeight() {
-        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(2);
+        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(1);
     }
 
     @Override
     public int getMinimumWidth() {
-        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(2);
+        return shadowSpread + Math.round(shadowBlur) + Display.getInstance().convertToPixels(1);
     }
 
     

@@ -60,6 +60,12 @@
 #ifdef INCLUDE_GOOGLE_CONNECT
 #import "GoogleOpenSource.h"
 #endif
+#import "com_codename1_payment_Purchase.h"
+
+// Last touch positions.  Helpful to know on the iPad when some popover stuff
+// needs a source rect that the java API doesn't pass through.
+int CN1lastTouchX=0;
+int CN1lastTouchY=0;
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
@@ -2676,10 +2682,14 @@ static BOOL skipNextTouch = NO;
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
             yArray[iter] = (int)currentPoint.y * scaleValue;
+            CN1lastTouchX = (int)currentPoint.x;
+            CN1lastTouchY = (int)currentPoint.y;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
+        CN1lastTouchX = (int)point.x;
+        CN1lastTouchY = (int)point.y;
     }
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();
@@ -2958,6 +2968,23 @@ extern SKPayment *paymentInstance;
             case SKPaymentTransactionStatePurchased:
                 
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                NSData *receipt = nil;
+                if (isIOS7()) {
+                    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+                    receipt = [NSData dataWithContentsOfURL : receiptURL];
+                } else {
+                    receipt = transaction.transactionReceipt;
+                }
+                
+                // Post the receipt
+                com_codename1_payment_Purchase_postReceipt___java_lang_String_java_lang_String_java_lang_String_long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG
+                    get_static_com_codename1_payment_Receipt_STORE_CODE_ITUNES(),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.transactionIdentifier),
+                    (JAVA_LONG)[transaction.transactionDate timeIntervalSince1970] * 1000,
+                    receipt ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [receipt base64EncodedStringWithOptions:0]) : JAVA_NULL
+                );
+                    
                 com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
                 continue;
             case SKPaymentTransactionStateFailed:

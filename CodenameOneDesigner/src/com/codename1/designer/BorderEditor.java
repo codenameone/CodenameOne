@@ -159,13 +159,13 @@ public class BorderEditor extends javax.swing.JPanel {
         arcHeight.setModel(new SpinnerNumberModel(1, 1, 100, 1));
         thickness.setModel(new SpinnerNumberModel(1, 1, 100, 1));
         opacity.setModel(new SpinnerNumberModel(255, 0, 255, 1));
-        shadowBlur.setModel(new SpinnerNumberModel(10.0, 1, 100, 1));
+        shadowBlur.setModel(new SpinnerNumberModelThatWorks(10.0, 1, 100, 1));
         shadowOpacity.setModel(new SpinnerNumberModel(0, 0, 255, 1));;
         shadowSpread.setModel(new SpinnerNumberModel(10, 0, 255, 1));;
-        shadowX.setModel(new SpinnerNumberModel(0.5, 0, 1, 0.01));;
-        shadowY.setModel(new SpinnerNumberModel(0.5, 0, 1, 0.01));;
+        shadowX.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));;
+        shadowY.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));;
         strokeOpacity.setModel(new SpinnerNumberModel(255, 0, 255, 1));
-        strokeThickness.setModel(new SpinnerNumberModel(0.0, 0, 30, 0.5));
+        strokeThickness.setModel(new SpinnerNumberModelThatWorks(0.0, 0, 30, 0.5));
         
         okButton.setPreferredSize(cancelButton.getPreferredSize());
         ((AbstractDocument)highlightColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
@@ -180,6 +180,8 @@ public class BorderEditor extends javax.swing.JPanel {
         new ButtonColorIcon(secondaryShadowColor, changeSecondaryShadowColor);
         new ButtonColorIcon(strokeColor, strokeColorPicker);
         new ButtonColorIcon(backgroundColor, backgroundColorPicker);
+        ((AbstractDocument)strokeColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
+        ((AbstractDocument)backgroundColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
 
         boolean fourColorBorder = false;
         if(border != null) {

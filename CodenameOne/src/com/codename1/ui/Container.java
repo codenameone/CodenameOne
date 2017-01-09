@@ -616,13 +616,13 @@ public class Container extends Component implements Iterable<Component>{
             cmp.setVisible(true);
             cmp.setPreferredSize(null);
         }
-        UIManager manger = getUIManager();
-        boolean refreshLaf = manger != cmp.getUIManager();
+        UIManager manager = getUIManager();
+        boolean refreshLaf = manager != cmp.getUIManager();
         cmp.setParent(this);
         if(refreshLaf){
            Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                               cmp.refreshTheme(false);
+                    cmp.refreshTheme(false);
                 }
             });
         }
@@ -1143,7 +1143,7 @@ public class Container extends Component implements Iterable<Component>{
             return false;
         }
         Style s = getStyle();
-        if(s.getPadding(TOP) != 0 || s.getPadding(LEFT) != 0 || s.getPadding(RIGHT) != 0 || s.getPadding(BOTTOM) != 0) {
+        if(s.getPaddingTop() != 0 || s.getPaddingLeftNoRTL()!= 0 || s.getPaddingRightNoRTL()!= 0 || s.getPaddingBottom() != 0) {
             return false;
         }
         
@@ -1159,14 +1159,14 @@ public class Container extends Component implements Iterable<Component>{
                 if(!((Container)cmp).getLayout().obscuresPotential(this)) {
                     return false;
                 }
-                if(s.getOpacity() != 0xff || s.getMargin(TOP) != 0 || s.getMargin(LEFT) != 0 || s.getMargin(RIGHT) != 0 || s.getMargin(BOTTOM) != 0) {
+                if(s.getOpacity() != 0xff || s.getMarginTop() != 0 || s.getMarginLeftNoRTL() != 0 || s.getMarginRightNoRTL() != 0 || s.getMarginBottom()!= 0) {
                     return false;
                 }
                 if((s.getBgTransparency() & 0xff) != 0xff && !((Container)cmp).isObscuredByChildren()) {
                     return false;
                 }
             } else {
-                if((s.getBgTransparency() & 0xff) != 0xff || s.getOpacity() != 0xff || s.getMargin(TOP) != 0 || s.getMargin(LEFT) != 0 || s.getMargin(RIGHT) != 0 || s.getMargin(BOTTOM) != 0) {
+                if((s.getBgTransparency() & 0xff) != 0xff || s.getOpacity() != 0xff || s.getMarginTop()!= 0 || s.getMarginLeftNoRTL()!= 0 || s.getMarginRightNoRTL()!= 0 || s.getMarginBottom()!= 0) {
                     return false;
                 }
             }
@@ -1913,7 +1913,7 @@ public class Container extends Component implements Iterable<Component>{
      * {@inheritDoc}
      */
     public boolean isScrollableX() {
-        return scrollableX && (getScrollDimension().getWidth() + getStyle().getPadding(RIGHT) + getStyle().getPadding(LEFT) > getWidth());
+        return scrollableX && (getScrollDimension().getWidth() + getStyle().getHorizontalPadding() > getWidth());
     }
 
     /**
@@ -1925,7 +1925,7 @@ public class Container extends Component implements Iterable<Component>{
         if(f != null) {
             v= f.getInvisibleAreaUnderVKB();
         }
-        return scrollableY && (getScrollDimension().getHeight() + getStyle().getPadding(TOP) + getStyle().getPadding(BOTTOM) > getHeight() -  v || isAlwaysTensile());
+        return scrollableY && (getScrollDimension().getHeight() + getStyle().getVerticalPadding() > getHeight() -  v || isAlwaysTensile());
     }
 
     /**
@@ -2794,7 +2794,7 @@ public class Container extends Component implements Iterable<Component>{
             thisContainer.replace(current, next, growSpeed > 0 || layoutAnimationSpeed > 0);
             //release the events blocking
             t.cleanup();
-            if(thisContainer.cmpTransitions.size() == 0 && growSpeed > -1){
+            if(thisContainer.cmpTransitions != null && thisContainer.cmpTransitions.size() == 0 && growSpeed > -1){
                 if(growSpeed > 0) {
                     current.growShrink(growSpeed);
                 } else {

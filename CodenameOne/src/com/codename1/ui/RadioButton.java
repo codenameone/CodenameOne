@@ -159,7 +159,11 @@ public class RadioButton extends Button {
 
     }
     
-    void fireActionEvent(int x, int y) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void fireActionEvent(int x, int y) {
         super.fireActionEvent(x, y);
         if(bindListeners != null) {
             if(isSelected()) {

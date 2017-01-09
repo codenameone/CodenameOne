@@ -344,6 +344,8 @@ public class BubbleTransition extends Transition {
      */
     @Override
     public Transition copy(boolean reverse) {
-        return new BubbleTransition(duration, componentName);
+        BubbleTransition bt = new BubbleTransition(duration, componentName);
+        bt.roundBubble = roundBubble;
+        return bt;
     }
 }

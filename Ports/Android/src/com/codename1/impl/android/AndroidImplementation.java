@@ -96,6 +96,7 @@ import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
+import android.support.v4.app.NotificationCompat;
 import android.telephony.SmsManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.text.Html;
@@ -493,6 +494,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if(t != null && ("3".equals(t) || "6".equals(t))) {                               
                     String[] m = b.split(";");
                     v.add(m[0]);
+                } else if(t != null && "4".equals(t)){
+                    String[] m = b.split(";");
+                    v.add(m[1]);
                 } else if(t != null && "2".equals(t)){
                     continue;
                 }else{
@@ -2186,8 +2190,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         android.content.Intent intent = getActivity().getIntent();
         if (intent != null) {
             Uri u = intent.getData();
+            String scheme = intent.getScheme();
+            if (u == null && intent.getExtras() != null) {
+                if (intent.getExtras().keySet().contains("android.intent.extra.STREAM")) {
+                    try {
+                        u = (Uri)intent.getParcelableExtra("android.intent.extra.STREAM");
+                        scheme = u.getScheme();
+                        System.out.println("u="+u);
+                    } catch (Exception ex) {
+                        Log.d("Codename One", "Failed to load parcelable extra from intent: "+ex.getMessage());
+                    }
+                }
+
+            }
             if (u != null) {
-                String scheme = intent.getScheme();
+                //String scheme = intent.getScheme();
                 intent.setData(null);
                 if ("content".equals(scheme)) {
                     try {
@@ -2204,7 +2221,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                     tmp.write(buffer);
                                 }
                                 tmp.close();
-                                attachment.close(); 
+                                attachment.close();
                                 setAppArg(filePath);
                                 return filePath;
                             }
@@ -2245,6 +2262,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return null;
     }
+    
     
     
 
@@ -2578,10 +2596,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createBackgroundMedia(String uri) throws IOException {
 
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
-            return null;
-        }
-        
         Intent serviceIntent = new Intent(getContext(), AudioService.class);
         serviceIntent.putExtra("mediaLink", uri);
         
@@ -2629,9 +2643,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMedia(final String uri, boolean isVideo, final Runnable onCompletion) throws IOException {
         if (getActivity() == null) {
-            return null;
-        }
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
             return null;
         }
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
@@ -2700,9 +2711,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMedia(InputStream stream, String mimeType, final Runnable onCompletion) throws IOException {
         if (getActivity() == null) {
-            return null;
-        }
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to play media")){
             return null;
         }
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
@@ -2785,9 +2793,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
         if (getActivity() == null) {
-            return null;
-        }
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to access the mic")){
             return null;
         }
         final AndroidRecorder[] record = new AndroidRecorder[1];
@@ -3046,12 +3051,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     nativePeers.remove(this);
                 }
                 deinit();
+            }else{
+                if (peerImage == null) {
+                    peerImage = generatePeerImage();
+                }
+                if(myView instanceof AndroidAsyncView){
+                    ((AndroidAsyncView)myView).removePeerView(v);
+                }
             }
         }
 
         public void deinit(){
             if (getActivity() == null) {
                 return;
+            }
+            if (peerImage == null) {
+                peerImage = generatePeerImage();
             }
             final boolean [] removed = new boolean[1];
             getActivity().runOnUiThread(new Runnable() {
@@ -3225,6 +3240,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 peerImage = null;
 
                 ((AndroidGraphics)nativeGraphics).drawView(v, lp);
+            } else {
+                super.paint(g);
             }
         }
 
@@ -3523,72 +3540,81 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         final AndroidImplementation.AndroidBrowserComponent[] bc = new AndroidImplementation.AndroidBrowserComponent[1];
 
         final Object lock = new Object();
-        synchronized (lock) {
-            getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    synchronized (lock) {
-                        WebView wv = new WebView(getActivity()) {
-                            
-                            public boolean onKeyDown(int keyCode, KeyEvent event) {
-                                switch (keyCode) {
-                                    case KeyEvent.KEYCODE_BACK:
-                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                        return true;
-                                    case KeyEvent.KEYCODE_MENU:
-                                        //if the native commands are used don't handle the keycode
-                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                            return true;
-                                        }
-                                }
-                                return super.onKeyDown(keyCode, event);
-                            }
 
-                            public boolean onKeyUp(int keyCode, KeyEvent event) {
-                                switch (keyCode) {
-                                    case KeyEvent.KEYCODE_BACK:
-                                        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                        return true;
-                                    case KeyEvent.KEYCODE_MENU:
-                                        //if the native commands are used don't handle the keycode
-                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                            return true;
-                                        }
-                                }
-                                return super.onKeyUp(keyCode, event);
-                            }
-                        };
-                        wv.setOnTouchListener(new View.OnTouchListener() {
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    WebView wv = new WebView(getActivity()) {
 
-                            @Override
-                            public boolean onTouch(View v, MotionEvent event) {
-                                switch (event.getAction()) {
-                                    case MotionEvent.ACTION_DOWN:
-                                    case MotionEvent.ACTION_UP:
-                                        if (!v.hasFocus()) {
-                                            v.requestFocus();
-                                        }
-                                        break;
-                                }
-                                return false;
+                        public boolean onKeyDown(int keyCode, KeyEvent event) {
+                            switch (keyCode) {
+                                case KeyEvent.KEYCODE_BACK:
+                                    Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
+                                    return true;
+                                case KeyEvent.KEYCODE_MENU:
+                                    //if the native commands are used don't handle the keycode
+                                    if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                        return true;
+                                    }
                             }
-                        });
-                        wv.getSettings().setDomStorageEnabled(true);
-                        wv.requestFocus(View.FOCUS_DOWN);
-                        wv.setFocusableInTouchMode(true);
-                        bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
-                        lock.notify();
+                            return super.onKeyDown(keyCode, event);
+                        }
+
+                        public boolean onKeyUp(int keyCode, KeyEvent event) {
+                            switch (keyCode) {
+                                case KeyEvent.KEYCODE_BACK:
+                                    Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
+                                    return true;
+                                case KeyEvent.KEYCODE_MENU:
+                                    //if the native commands are used don't handle the keycode
+                                    if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                        return true;
+                                    }
+                            }
+                            return super.onKeyUp(keyCode, event);
+                        }
+                    };
+                    wv.setOnTouchListener(new View.OnTouchListener() {
+
+                        @Override
+                        public boolean onTouch(View v, MotionEvent event) {
+                            switch (event.getAction()) {
+                                case MotionEvent.ACTION_DOWN:
+                                case MotionEvent.ACTION_UP:
+                                    if (!v.hasFocus()) {
+                                        v.requestFocus();
+                                    }
+                                    break;
+                            }
+                            return false;
+                        }
+                    });
+                    wv.getSettings().setDomStorageEnabled(true);
+                    wv.requestFocus(View.FOCUS_DOWN);
+                    wv.setFocusableInTouchMode(true);
+                    bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
+                    lock.notify();
+                }
+            }
+        });
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                synchronized (lock) {
+                    while (bc[0] == null) {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
                     }
                 }
-            });
-            try {
-                lock.wait();
-            } catch (InterruptedException ex) {
-                ex.printStackTrace();
             }
-        }
+
+        });
+
         return bc[0];
     }
 
@@ -3856,6 +3882,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private boolean lightweightMode = false;        
         private ProgressDialog progressBar;
         private boolean hideProgress;
+        private int layerType;
         
         
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
@@ -3865,6 +3892,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             parent = (BrowserComponent) p;
             this.web = web;
+            layerType = web.getLayerType();
             web.getSettings().setJavaScriptEnabled(true);
             web.getSettings().setSupportZoom(parent.isPinchToZoomEnabled());
             this.act = act;
@@ -3875,36 +3903,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             web.setWebViewClient(new WebViewClient() {
                 public void onLoadResource(WebView view, String url) {
-                    try {
-                        URI uri = new URI(url);
-                        CookieManager mgr = CookieManager.getInstance();
-                        String cookieStr = mgr.getCookie(url);
-                        if (cookieStr!=null){
-                            String[] cookies = cookieStr.split(";");
-                            int len = cookies.length;
-                            Vector out = new Vector();
-                            String domain = uri.getHost();
-                            for ( int i=0; i<len; i++){
-                                Cookie c = new Cookie();
-                                String[] parts = cookies[i].split("=");
-                                c.setName(parts[0].trim());
-                                if(parts.length > 1){
-                                    c.setValue(parts[1].trim());
-                                }else{
-                                    c.setValue("");                                
+                    if (Display.getInstance().getProperty("syncNativeCookies", "true").equals("true")) {
+                        try {
+                            URI uri = new URI(url);
+                            CookieManager mgr = CookieManager.getInstance();
+                            String cookieStr = mgr.getCookie(url);
+                            if (cookieStr != null) {
+                                String[] cookies = cookieStr.split(";");
+                                int len = cookies.length;
+                                Vector out = new Vector();
+                                String domain = uri.getHost();
+                                for (int i = 0; i < len; i++) {
+                                    Cookie c = new Cookie();
+                                    String[] parts = cookies[i].split("=");
+                                    c.setName(parts[0].trim());
+                                    if (parts.length > 1) {
+                                        c.setValue(parts[1].trim());
+                                    } else {
+                                        c.setValue("");
+                                    }
+                                    c.setDomain(domain);
+                                    out.add(c);
                                 }
-                                c.setDomain(domain);
-                                out.add(c);
+                                Cookie[] cookiesArr = new Cookie[out.size()];
+                                out.toArray(cookiesArr);
+                                AndroidImplementation.this.addCookie(cookiesArr, false);
                             }
-                            Cookie[] cookiesArr = new Cookie[out.size()];
-                            out.toArray(cookiesArr);
-                            AndroidImplementation.this.addCookie(cookiesArr, false);
+
+                        } catch (URISyntaxException ex) {
+
                         }
-
-                    } catch (URISyntaxException ex) {
-
                     }
-                    
                     parent.fireWebEvent("onLoadResource", new ActionEvent(url));
                     super.onLoadResource(view, url);
                     setShouldCalcPreferredSize(true);
@@ -4037,6 +4066,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         protected void initComponent() {
+            if(android.os.Build.VERSION.SDK_INT == 21 && web.getLayerType() != layerType){
+                    act.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            web.setLayerType(layerType, null); //setting layer type to original state
+                        }
+                    });
+            }
             super.initComponent();
             blockNativeFocus(false);
             setPeerImage(null);
@@ -4302,6 +4339,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     web.getSettings().setBuiltInZoomControls(e);
                 }
             });
+        }
+
+        @Override
+        protected void deinitialize() {
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if(android.os.Build.VERSION.SDK_INT == 21) { // bugfix for Android 5.0.x
+                        web.setLayerType(View.LAYER_TYPE_SOFTWARE, null); //setting layer type to software to prevent the sigseg 11 crash
+                    }
+                }
+            });
+            super.deinitialize();
         }
     }
 
@@ -4594,6 +4644,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return new String[]{Environment.getRootDirectory().getAbsolutePath()};
     }
+
+    @Override
+    public boolean hasCachesDir() {
+        return true;
+    }
+
+    @Override
+    public String getCachesDir() {
+        return getContext().getCacheDir().getAbsolutePath();
+    }
+    
+    
     
     private String[] getStorageDirectories() {
         String [] storageDirs = null;
@@ -4984,7 +5046,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "&body=" + Uri.encode(msg.getContent())));        
         }else{
             if (hasAttachment) {
-                if(msg.getAttachments().size() > 0) {
+                if(msg.getAttachments().size() > 1) {
                     emailIntent = new Intent(android.content.Intent.ACTION_SEND_MULTIPLE);
                     emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
                     emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
@@ -5016,7 +5078,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (msg.getMimeType().equals(Message.MIME_HTML)) {
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));                                
             }else{
-                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
+                /*
+                // Attempted this workaround to fix the ClassCastException that occurs on android when
+                // there are multiple attachments.  Unfortunately, this fixes the stack trace, but 
+                // has the unwanted side-effect of producing a blank message body.
+                // Same workaround for HTML mimetype also fails the same way.
+                // Conclusion, Just live with the stack trace.  It doesn't seem to affect the 
+                // execution of the program... treat it as a warning.
+                // See https://github.com/codenameone/CodenameOne/issues/1782
+                if (msg.getAttachments().size() > 1) {
+                    ArrayList<String> contentArr = new ArrayList<String>();
+                    contentArr.add(msg.getContent());
+                    emailIntent.putStringArrayListExtra(android.content.Intent.EXTRA_TEXT, contentArr);
+                } else {
+                    emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
+                    
+                }*/
+                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
             }
             
         }
@@ -5102,8 +5180,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         notificationIntent.setComponent(getActivity().getComponentName());
         PendingIntent contentIntent = PendingIntent.getActivity(getContext(), 0, notificationIntent, 0);
 
-        
-        Notification.Builder builder = new Notification.Builder(getContext())
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext())
                 .setContentIntent(contentIntent)
                 .setSmallIcon(id)
                 .setContentTitle(contentTitle)
@@ -5205,9 +5283,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){   
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
+        /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
             return;
-        }
+        }*/
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         if(image == null){
             shareIntent.setType("text/plain");
@@ -5300,8 +5378,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private Form curentForm;
 
         public Video(final VideoView nativeVideo, final Activity activity, final Runnable onCompletion) {
-            super(nativeVideo);
+            super(new RelativeLayout(activity));
             this.nativeVideo = nativeVideo;
+            RelativeLayout rl = (RelativeLayout)getNativePeer();
+
+            rl.addView(nativeVideo);
+            RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+            layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
+            layout.addRule(RelativeLayout.CENTER_VERTICAL);
+            rl.setLayoutParams(layout);
+            rl.requestLayout();
+            
             this.activity = activity;
             if (nativeController) {
                 MediaController mc = new AndroidImplementation.CN1MediaController();
@@ -5375,7 +5462,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void cleanup() {
-            nativeVideo.stopPlayback();
+            if(nativeVideo != null) {
+                nativeVideo.stopPlayback();
+            }
             nativeVideo = null;
             if (nativePlayer && curentForm != null) {
                 curentForm.showBack();
@@ -5466,7 +5555,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setWidth(int width) {
             super.setWidth(width);
-            if(nativeVideo != null && !superPeerMode){
+            if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
@@ -5474,6 +5563,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
+                        nativeVideo.requestLayout();
                         nativeVideo.getHolder().setSizeFromLayout();
                     }
                 });
@@ -5483,19 +5573,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         @Override
         public void setHeight(int height) {
             super.setHeight(height);
-            if(nativeVideo != null  && !superPeerMode){
+            if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
-                        //RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
                         RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
+                        nativeVideo.requestLayout();
                         nativeVideo.getHolder().setSizeFromLayout();
                     }
                 });
-                
             }
         }
 
@@ -5811,6 +5900,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             galleryIntent.setType("video/*");
         }else if(type == Display.GALLERY_IMAGE){
             galleryIntent.setType("image/*");
+        }else if (type == -9999) {
+            galleryIntent = new Intent();
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+                galleryIntent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+            } else {
+                galleryIntent.setAction(Intent.ACTION_GET_CONTENT);
+            }
+            galleryIntent.addCategory(Intent.CATEGORY_OPENABLE);
+
+            // set MIME type for image
+            galleryIntent.setType("*/*");
+            galleryIntent.putExtra(Intent.EXTRA_MIME_TYPES, Display.getInstance().getProperty("android.openGallery.accept", "*/*").split(","));
         }else{
             galleryIntent.setType("*/*");
         }
@@ -5925,7 +6026,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             ((CodenameOneActivity) getActivity()).registerForPush(id);
         } else {
             PushNotificationService.forceStartService(getActivity().getPackageName() + ".PushNotificationService", getActivity());
-            if(!registerServerPush(id, getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName())) {
+            if(!registerServerPush(id, getApplicationKey(), (byte)10, "", getPackageName())) {
                 sendPushRegistrationError("Server registration error", 1);
             } 
         }
@@ -6379,6 +6480,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
     }
 
+    public void addCookie(Cookie[] cs, boolean addToWebViewCookieManager, boolean sync) {
+        if(addToWebViewCookieManager) {
+            CookieManager mgr;
+            CookieSyncManager syncer;
+            try {
+                syncer = CookieSyncManager.getInstance();
+                mgr = CookieManager.getInstance();
+            } catch(IllegalStateException ex) {
+                syncer = CookieSyncManager.createInstance(this.getContext());
+                mgr = CookieManager.getInstance();
+            }
+            for (Cookie c : cs) {
+                String cookieString = c.getName() + "=" + c.getValue() +
+                        "; Domain=" + c.getDomain() +
+                        "; Path=" + c.getPath() +
+                        "; " + (c.isSecure() ? "Secure;" : "")
+                        + (c.isHttpOnly() ? "httpOnly;" : "");
+                mgr.setCookie("http" +
+                        (c.isSecure() ? "s" : "") + "://" +
+                        c.getDomain() +
+                        c.getPath(), cookieString);
+            }
+            if(sync) {
+                syncer.sync();
+            }
+        }
+        super.addCookie(cs);
+
+
+
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {
@@ -6400,17 +6533,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public void addCookie(Cookie[] cookiesArray, boolean addToWebViewCookieManager){
-        int len = cookiesArray.length;
-        for ( int i=0; i< len; i++){
-            this.addCookie(cookiesArray[i], addToWebViewCookieManager, false);
-        }
-        if(addToWebViewCookieManager) {
-            try {
-                CookieSyncManager.getInstance().sync();
-            } catch (IllegalStateException ex) {
-                CookieSyncManager.createInstance(getContext()).sync();
-            }
-        }
+        addCookie(cookiesArray, addToWebViewCookieManager, false);
+
     }
     
     
@@ -6895,7 +7019,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
                     NumberPicker picker = new NumberPicker(getActivity());
-                    picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+                    if(source.getClientProperty("showKeyboard") == null) {
+                        picker.setDescendantFocusability(NumberPicker.FOCUS_BLOCK_DESCENDANTS);
+                    }
                     picker.setMinValue(0);
                     picker.setMaxValue(values.length - 1);
                     picker.setDisplayedValues(values);
@@ -7672,24 +7798,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return n;
     }
 
+    boolean brokenGaussian;
     public Image gaussianBlurImage(Image image, float radius) {
+        try {
+            Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
 
-        Bitmap outputBitmap = Bitmap.createBitmap((Bitmap)image.getImage());
+            RenderScript rs = RenderScript.create(getContext());
+            ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+            theIntrinsic.setRadius(radius);
+            theIntrinsic.setInput(tmpIn);
+            theIntrinsic.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
 
-        RenderScript rs = RenderScript.create(getContext());
-        ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-        Allocation tmpIn = Allocation.createFromBitmap(rs, (Bitmap)image.getImage());
-        Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
-        theIntrinsic.setRadius(radius);
-        theIntrinsic.setInput(tmpIn);
-        theIntrinsic.forEach(tmpOut);
-        tmpOut.copyTo(outputBitmap);
-        
-        return new NativeImage(outputBitmap);
+            return new NativeImage(outputBitmap);
+        } catch(Throwable t) {
+            brokenGaussian = true;
+            return image;
+        }
     }
 
     public boolean isGaussianBlurSupported() {
-        return android.os.Build.VERSION.SDK_INT >= 11;
+        return (!brokenGaussian) && android.os.Build.VERSION.SDK_INT >= 11;
     }
     
     public static boolean checkForPermission(String permission, String description){

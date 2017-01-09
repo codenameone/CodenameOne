@@ -102,6 +102,7 @@ import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
+import com.codename1.payment.Receipt;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
@@ -180,6 +181,8 @@ public class JavaSEPort extends CodenameOneImplementation {
      * When set to true pointer hover events will be called for mouse move events
      */
     private static boolean invokePointerHover;
+
+    private static String defaultCodenameOneComProtocol = "https";
     
     static {
         String n = System.getProperty("os.name");
@@ -424,17 +427,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     private void startBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
             stopBackgroundFetchService();
-            backgroundFetchTimer = new java.util.Timer();
+            if (getPreferredBackgroundFetchInterval() > 0) {
+                backgroundFetchTimer = new java.util.Timer();
 
-            TimerTask tt = new TimerTask() {
+                TimerTask tt = new TimerTask() {
 
-                @Override
-                public void run() {
-                    performBackgroundFetch();
-                }
+                    @Override
+                    public void run() {
+                        performBackgroundFetch();
+                    }
 
-            };
-            backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+                };
+                backgroundFetchTimer.schedule(tt, getPreferredBackgroundFetchInterval() * 1000, getPreferredBackgroundFetchInterval() * 1000);
+            }
         }
     }
     
@@ -2252,7 +2257,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/javadoc/"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/javadoc/"));
                     } catch (Exception ex) {
                         
                     }
@@ -2265,7 +2270,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/how-do-i.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/how-do-i.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2277,7 +2282,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/discussion-forum.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/discussion-forum.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2289,7 +2294,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/build-server.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/build-server.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2331,7 +2336,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                         public void actionPerformed(ActionEvent e) {
                             try {
-                                Desktop.getDesktop().browse(new URI("http://www.codenameone.com"));
+                                Desktop.getDesktop().browse(new URI("https://www.codenameone.com"));
                             } catch (Exception ex) {                        
                             }
                         }
@@ -2614,10 +2619,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
 
-                            URL u = new URL("https://www.codenameone.com/OTA/Skins.xml");
-                            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
-                            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
-                            InputStream is = uc.getInputStream();
+                            InputStream is = openSkinsURL();
                             doc[0] = db.parse(is);
                             NodeList skins = doc[0].getElementsByTagName("Skin");
 
@@ -2634,7 +2636,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 if (!(exists) || Integer.parseInt(pref.get(url, "0")) < ver) { 
                                     Vector row = new Vector();
                                     row.add(new Boolean(false));
-                                    row.add(new ImageIcon(new URL("http://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
+                                    row.add(new ImageIcon(new URL(defaultCodenameOneComProtocol + "://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
                                     row.add(attr.getNamedItem("name").getNodeValue());
                                     if(exists){
                                         row.add("Update");                                                        
@@ -2701,7 +2703,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                             if(attr.getNamedItem("name").getNodeValue().equals(tableModel.getValueAt(i, 2))){
                                                 String url = attr.getNamedItem("url").getNodeValue();
                                                 String [] data = new String[2];
-                                                data[0] = "http://www.codenameone.com/OTA" + url;
+                                                data[0] = defaultCodenameOneComProtocol + "://www.codenameone.com/OTA" + url;
                                                 data[1] = attr.getNamedItem("version").getNodeValue();                                        
                                                 toDowload.add(data);
                                                 break;
@@ -2860,6 +2862,28 @@ public class JavaSEPort extends CodenameOneImplementation {
         return skinMenu;
     }
 
+    InputStream openSkinsURL() throws IOException {
+        try {
+            URL u = new URL(defaultCodenameOneComProtocol + "://www.codenameone.com/OTA/Skins.xml");
+            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
+            InputStream is = uc.getInputStream();
+            return is;
+        } catch(IOException err) {
+            if(defaultCodenameOneComProtocol.equals("https")) {
+                defaultCodenameOneComProtocol = "http";
+            } else {
+                throw err;
+            }
+            System.out.println("Failed to connect thru secure socket, trying http instead");
+            URL u = new URL("http://www.codenameone.com/OTA/Skins.xml");
+            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
+            InputStream is = uc.getInputStream();
+            return is;
+        }
+    }
+    
     private void showTestRecorder() {
         if (testRecorder == null) {
             testRecorder = new TestRecorder();
@@ -2904,6 +2928,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             skinNames = f;
         }
         pref.put("skins", skinNames);
+        try {
+            pref.flush();
+        } catch(Throwable t) {
+            t.printStackTrace();
+        }
     }
 
     private void deepRevaliate(com.codename1.ui.Container c) {
@@ -4466,18 +4495,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         // the latter indicates mutable image graphics
-        if (zoomLevel != 1 && nativeGraphics  != graphics) {
-            nativeGraphics = (Graphics2D) nativeGraphics.create();
-            nativeGraphics.setTransform(AffineTransform.getTranslateInstance(0, 0));
-            java.awt.Font currentFont = nativeGraphics.getFont();
-            float fontSize = currentFont.getSize2D();
-            fontSize *= zoomLevel;
-            int ascent = nativeGraphics.getFontMetrics().getAscent();
-            nativeGraphics.setFont(currentFont.deriveFont(fontSize));
-            nativeGraphics.drawString(str, x * zoomLevel, (y + ascent) * zoomLevel);
-        } else {
-            nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
-        }
+        nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
         if (perfMonitor != null) {
             perfMonitor.drawString(str, x, y);
         }
@@ -5375,7 +5393,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setTransform(Object graphics, Transform transform) {
         checkEDT();
         Graphics2D g = getGraphics(graphics);
-        AffineTransform t = AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
+        AffineTransform t = (graphics == g) ? new AffineTransform() :
+                AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
         t.concatenate((AffineTransform)transform.getNativeTransform());
         clamp(t);
         g.setTransform(t);
@@ -5916,7 +5935,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.setTransform(new AffineTransform());
-        if (zoomLevel != 1) {
+        if (zoomLevel != 1 && g != nativeGraphics) {
             g.setTransform(AffineTransform.getScaleInstance(zoomLevel, zoomLevel));
         }
     }
@@ -6912,6 +6931,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
             capture(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
+        } else if (type==-9999) {
+            String[] exts = Display.getInstance().getProperty("javase.openGallery.accept", "").split(",");
+            
+            capture(response, exts, getGlobsForExtensions(exts, ";"));
         }else{
             String[] exts = new String[videoExtensions.length+imageExtensions.length];
             System.arraycopy(videoExtensions, 0, exts,0, videoExtensions.length);
@@ -6954,7 +6977,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     } 
                 } else {
-                    result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                    if(selected != null) {
+                        result = new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/'));
+                    }
                 }
                 final com.codename1.ui.events.ActionEvent finalResult = result;
                 Display.getInstance().callSerially(new Runnable() {
@@ -7217,6 +7242,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             this.vid = vid;
             this.frm = frm;
+            
         }
 
         @Override
@@ -7576,6 +7602,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
+        System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = new File(getStorageDir() + "/database/" + databaseName);
         if (f.exists()) {
             f.delete();
@@ -7584,6 +7611,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean existsDB(String databaseName) {
+        System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = new File(getStorageDir() + "/database/" + databaseName);
         return f.exists();
     }
@@ -7635,7 +7663,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 webContainer.setScene(new Scene(root));
                 
                 // now wait for the Swing side to finish initializing f'ing JavaFX is so broken its unbeliveable
-                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent);
+                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent, hSelector, vSelector);
                 SwingUtilities.invokeLater(new Runnable() {
                     public void run() {
                         bc[0] = bcc;
@@ -7924,6 +7952,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                                 public void run() {
                                     if (res == JOptionPane.YES_OPTION) {
+                                        com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_SIMULATOR, sku, "cn1-iap-sim-"+UUID.randomUUID().toString(), System.currentTimeMillis(), "");
                                         getPurchaseCallback().itemPurchased(sku);
                                         getPurchases().addElement(sku);
                                         savePurchases();
@@ -8004,7 +8033,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             public boolean wasPurchased(String sku) {
                 return getPurchases().contains(sku);
-            }
+            } 
         };
     }
 
@@ -8019,7 +8048,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             public boolean accept(File dir, String name) {
                 name = name.toLowerCase();
                 for(String t : types) {
-                    if(name.endsWith(t)) {
+                    if(name.endsWith(t) || "*".equals(t)) {
                         return true;
                     }
                 }

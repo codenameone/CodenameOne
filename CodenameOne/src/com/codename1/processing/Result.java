@@ -426,7 +426,7 @@ public class Result {
         if (s == null) {
             return 0;
         }
-        return Long.parseLong(s);
+        return new Double(Double.parseDouble(s)).longValue();
     }
 
     /**

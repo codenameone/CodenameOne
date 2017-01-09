@@ -147,7 +147,7 @@ public class GridBagLayout extends Layout {
         Style s = parent.getStyle();
         ParentInfo info = lastParentInfo = getParentInfo(parent);
         if (getComponentsNumber(parent) == 0) {
-            return new Dimension(s.getPadding(Component.LEFT) + s.getPadding(Component.RIGHT), s.getPadding(Component.TOP) + s.getPadding(Component.BOTTOM));
+            return new Dimension(s.getHorizontalPadding(), s.getVerticalPadding());
         }
         try {
             validate(parent, info);
@@ -157,8 +157,8 @@ public class GridBagLayout extends Layout {
             throw new IllegalArgumentException("PreferredLayoutSize: " + e.getMessage()); //$NON-NLS-1$
         }
         Dimension d = info.grid.preferredSize();
-        d.setWidth(d.getWidth() + s.getPadding(Component.LEFT) + s.getPadding(Component.RIGHT));
-        d.setHeight(d.getHeight() + s.getPadding(Component.TOP) + s.getPadding(Component.BOTTOM));
+        d.setWidth(d.getWidth() + s.getHorizontalPadding());
+        d.setHeight(d.getHeight() + s.getVerticalPadding());
         return d;
         //return addInsets(grid.preferredSize(), parent);
     }

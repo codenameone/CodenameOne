@@ -87,7 +87,9 @@ public class Storage {
      */
     private static void init(Object data) {
         Util.getImplementation().setStorageData(data);
-        INSTANCE = new Storage();
+        if(INSTANCE == null) {
+            INSTANCE = new Storage();
+        }
     }
 
     /**
@@ -223,7 +225,10 @@ public class Storage {
             d.close();
             return true;
         } catch(Exception err) {
-            err.printStackTrace();
+            Log.e(err);
+            if(Log.isCrashBound()) {
+                Log.sendLog();
+            }
             Util.getImplementation().deleteStorageFile(name);
             Util.getImplementation().cleanup(d);
             return false;
@@ -258,7 +263,10 @@ public class Storage {
             cache.put(name, o);
             return o;
         } catch(Exception err) {
-            err.printStackTrace();
+            Log.e(err);
+            if(Log.isCrashBound()) {
+                Log.sendLog();
+            }
             Util.getImplementation().cleanup(d);
             return null;
         }
@@ -280,5 +288,13 @@ public class Storage {
      */
     public void setNormalizeNames(boolean normalizeNames) {
         this.normalizeNames = normalizeNames;
+    }
+    
+    /**
+     * Allows installing a custom storage instance to provide functionality such as seamless encryption
+     * @param s the storage instance
+     */
+    public static void setStorageInstance(Storage s) {
+        INSTANCE = s;
     }
 }

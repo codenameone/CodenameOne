@@ -221,10 +221,10 @@ namespace com.codename1.impl
               Windows.Phone.UI.Input.HardwareButtons.BackPressed += page_BackKeyPress;
                isPhone = false;
 #elif WINDOWS_UWP
+              Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
               if (Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons"))
               {
-                  isPhone = false;
-                  Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
+                  isPhone = false; 
               }
 #endif
               cl.SizeChanged += cl_SizeChanged;
@@ -411,10 +411,18 @@ namespace com.codename1.impl
 
         public override void installNativeTheme()
         {
-            ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
+           ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
             ui.plaf.UIManager uim = ui.plaf.UIManager.getInstance();
             string[] themeNames = r.getThemeResourceNames();
-            uim.setThemeProps(r.getTheme((string)themeNames[0]));
+            java.util.Hashtable props = r.getTheme((string)themeNames[0]);
+            if (isDesktop() || isTablet())
+            {
+                props.put("hideBackCommandBool", false);
+            } else 
+            {
+                props.put("hideBackCommandBool", true);
+            } 
+            uim.setThemeProps(props);
             ui.plaf.DefaultLookAndFeel dl = (ui.plaf.DefaultLookAndFeel)uim.getLookAndFeel();
             dl.setDefaultEndsWith3Points(false);
         }
@@ -597,11 +605,8 @@ namespace com.codename1.impl
                        ((TextBox)textInputInstance).Text = n4;
                        ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
                        ((TextBox)textInputInstance).MaxLength = n2;
+                       ((TextBox)textInputInstance).IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
 
-                       if ((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE)
-                       {
-                           ((TextBox)textInputInstance).InputScope = new InputScope();
-                       }
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
@@ -1113,7 +1118,10 @@ namespace com.codename1.impl
             Vector2 res = Vector2.Transform(new Vector2(@in[0], @in[1]), t);
             @out[0] = res.X;
             @out[1] = res.Y;
-            @out[2] = 0;
+            if (@out.Length > 2) {
+                @out[2] = 0;
+            }
+            
         }
 
         
@@ -1361,19 +1369,19 @@ namespace com.codename1.impl
         }
 
         private List<StorageFile> tmpFiles = new List<StorageFile>();
-        private string addTempFile(StorageFile f)
+        public string addTempFile(StorageFile f)
         {
             int index = tmpFiles.Count;
             tmpFiles.Insert(index, f);
             return "tmp://" + index + "-" + f.Name;
         }
 
-        private bool isTempFile(string path)
+        public bool isTempFile(string path)
         {
             return path.StartsWith("tmp://");
         }
 
-        private StorageFile getTempFile(string path)
+        public StorageFile getTempFile(string path)
         {
             if (!path.StartsWith("tmp://"))
             {
@@ -1392,7 +1400,7 @@ namespace com.codename1.impl
             return tmpFiles.ElementAt(index);
         }
 
-        private void removeTempFile(string path)
+        public void removeTempFile(string path)
         {
             StorageFile f = getTempFile(path);
             if (f != null)
@@ -1452,6 +1460,17 @@ namespace com.codename1.impl
                     openPicker.FileTypeFilter.Add(".mov");
                     openPicker.FileTypeFilter.Add(".mpeg");
                     openPicker.FileTypeFilter.Add(".wmv");
+                } else if (type == -9999)
+                {
+                    string typeStr = Display.getInstance().getProperty("windows.openGallery.accept", "*");
+                    string[] parts = typeStr.Split(',');
+                    foreach (string part in parts)
+                    {
+                        openPicker.FileTypeFilter.Add(part);
+                    }
+
+
+                
                 } else
                 {
                     openPicker.FileTypeFilter.Add("*");
@@ -1737,6 +1756,40 @@ namespace com.codename1.impl
         }
 
         public override void execute(string n1) {
+            try
+            {
+                if (exists(n1))
+                {
+                    IStorageItem storageItem = null;
+                    if (isTempFile(n1))
+                    {
+                        storageItem = getTempFile(n1);
+                        
+                    }
+                    else
+                    {
+                        StorageFolder store = getStore(n1);
+                        string f = nativePathStore(n1);
+                        storageItem = store.TryGetItemAsync(f).AsTask().GetAwaiter().GetResult();
+                        
+
+                    }
+                    if (storageItem != null && storageItem is StorageFile)
+                    {
+                        using (AutoResetEvent are = new AutoResetEvent(false))
+                        {
+                            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
+                                var result = Windows.System.Launcher.LaunchFileAsync((StorageFile)storageItem);
+                                are.Set();
+                            }).AsTask().GetAwaiter().GetResult();
+                            are.WaitOne();
+                        }
+                        return;
+                    }
+                    
+                }
+            }
+            catch (Exception ex) { }
             var uri = new Uri(n1, UriKind.RelativeOrAbsolute);
             using (AutoResetEvent are = new AutoResetEvent(false)) {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
@@ -3279,6 +3332,11 @@ namespace com.codename1.impl
         }
 
         public override bool isTablet()
+        {
+            return isPhone;
+        }
+
+        public override bool isDesktop()
         {
             return isPhone;
         }

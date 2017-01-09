@@ -132,6 +132,8 @@ public class Toolbar extends Container {
      * Indicates whether the toolbar should be properly centered by default
      */
     private static boolean centeredDefault = true;
+
+    private Command searchCommand;
     
     /**
      * Empty Constructor
@@ -239,16 +241,27 @@ public class Toolbar extends Container {
     public static boolean isPermanentSideMenu() {
         return permanentSideMenu;
     }
+
+    /**
+     * This is a convenience method to open the side menu bar. It's useful for cases where we want to place the 
+     * menu button in a "creative way" in which case we can bind the side menu to this
+     */
+    public void openSideMenu() {
+        ((SideMenuBar)getMenuBar()).openMenu(null);
+    }
     
     /**
      * Sets the Toolbar title component. This method allow placing any component
-     * in the Toolbar ceneter instead of the regular Label. Can be used to place
+     * in the Toolbar center instead of the regular Label. Can be used to place
      * a TextField to preform search operations
      *
-     * @param titleCmp Comoponent to place in the Toolbar center.
+     * @param titleCmp Component to place in the Toolbar center.
      */
     public void setTitleComponent(Component titleCmp) {
         checkIfInitialized();
+        if(titleComponent != null) {
+            titleComponent.remove();
+        }
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }
@@ -422,7 +435,7 @@ public class Toolbar extends Container {
      * @param iconSize indicates the size of the icons used in the search/back in millimeters
      */ 
     public void addSearchCommand(final ActionListener callback, final float iconSize){
-        Command search = new Command(""){
+        searchCommand = new Command(""){
 
             @Override
             public void actionPerformed(ActionEvent evt) {
@@ -449,9 +462,19 @@ public class Toolbar extends Container {
         } else {
             img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"));
         }
-        search.setIcon(img);
-        addCommandToRightBar(search);
+        searchCommand.setIcon(img);
+        addCommandToRightBar(searchCommand);
     }    
+    
+    /**
+     * Removes a previously installed search command
+     */
+    public void removeSearchCommand() {
+        if(searchCommand != null) {
+            sideMenu.removeCommand(searchCommand);
+            searchCommand = null;
+        }
+    }
     
     /**
      * <p>This method add a search Command on the right bar of the {@code Toolbar}.
@@ -901,8 +924,7 @@ public class Toolbar extends Container {
         int marginRight = 0;
         Container dialogContentPane = menu.getDialogComponent();
         marginLeft = parent.getWidth() - (dialogContentPane.getPreferredW()
-                + menu.getStyle().getPadding(LEFT)
-                + menu.getStyle().getPadding(RIGHT));
+                + menu.getStyle().getHorizontalPadding());
         marginLeft = Math.max(0, marginLeft);
         if (parent.getSoftButtonCount() > 1) {
             height = parent.getHeight() - parent.getSoftButton(0).getParent().getPreferredH() - dialogContentPane.getPreferredH();

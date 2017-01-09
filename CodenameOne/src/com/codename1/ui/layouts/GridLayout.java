@@ -142,7 +142,7 @@ public class GridLayout extends Layout{
             for(int iter = 0 ; iter < numOfcomponents ; iter++) {
                 Component cmp = parent.getComponentAt(iter);
                 Style s = cmp.getStyle();
-                maxWidth = Math.max(cmp.getPreferredW() + s.getMargin(Component.LEFT) + s.getMargin(Component.RIGHT), maxWidth);
+                maxWidth = Math.max(cmp.getPreferredW() + s.getHorizontalMargins(), maxWidth);
             }
             if(width < maxWidth) {
                 width = Display.getInstance().getDisplayWidth();
@@ -164,14 +164,15 @@ public class GridLayout extends Layout{
      * {@inheritDoc}
      */    
     public void layoutContainer(Container parent) {
-        int width = parent.getLayoutWidth() - parent.getSideGap() - parent.getStyle().getPadding(false, Component.RIGHT) - parent.getStyle().getPadding(false, Component.LEFT);
-        int height = parent.getLayoutHeight() - parent.getBottomGap() - parent.getStyle().getPadding(false, Component.BOTTOM) - parent.getStyle().getPadding(false, Component.TOP);
+        Style s = parent.getStyle();
+        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();
+        int height = parent.getLayoutHeight() - parent.getBottomGap() - s.getVerticalPadding();
         int numOfcomponents = parent.getComponentCount();
 
         autoSizeCols(parent, width);
 
-        int x = parent.getStyle().getPadding(parent.isRTL(), Component.LEFT);
-        int y = parent.getStyle().getPadding(false, Component.TOP);
+        int x = s.getPaddingLeft(parent.isRTL());
+        int y = s.getPaddingTop();
 
         boolean rtl = parent.isRTL();
         if (rtl) {
@@ -192,15 +193,15 @@ public class GridLayout extends Layout{
         for(int iter = 0 ; iter < numOfcomponents ; iter++){
             Component cmp = parent.getComponentAt(iter);
             Style cmpStyle = cmp.getStyle();
-            int marginLeft = cmpStyle.getMargin(parent.isRTL(), Component.LEFT);
-            int marginTop = cmpStyle.getMargin(false, Component.TOP);
+            int marginLeft = cmpStyle.getMarginLeft(parent.isRTL());
+            int marginTop = cmpStyle.getMarginTop();
             if(hideZeroSized) {
                 if(cmp.isHidden()) {
                     continue;
                 }
             }
-            cmp.setWidth(cmpWidth - marginLeft - cmpStyle.getMargin(parent.isRTL(), Component.RIGHT));
-            cmp.setHeight(cmpHeight - marginTop - cmpStyle.getMargin(false, Component.BOTTOM));
+            cmp.setWidth(cmpWidth - marginLeft - cmpStyle.getMarginRight(parent.isRTL()));
+            cmp.setHeight(cmpHeight - marginTop - cmpStyle.getMarginBottom());
             if (rtl) {
             	cmp.setX(x + (localColumns - 1 - (offset % localColumns)) * cmpWidth + marginLeft);
             } else {
@@ -233,8 +234,8 @@ public class GridLayout extends Layout{
         int numOfcomponents = parent.getComponentCount();
         for(int i=0; i< numOfcomponents; i++){
             Component cmp = parent.getComponentAt(i);
-            width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMargin(false, Component.LEFT)+ cmp.getStyle().getMargin(false, Component.RIGHT));
-            height = Math.max(height, cmp.getPreferredH()+ cmp.getStyle().getMargin(false, Component.TOP)+ cmp.getStyle().getMargin(false, Component.BOTTOM));
+            width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL()+ cmp.getStyle().getMarginRightNoRTL());
+            height = Math.max(height, cmp.getPreferredH()+ cmp.getStyle().getMarginTop()+ cmp.getStyle().getMarginBottom());
         }
 
         autoSizeCols(parent, parent.getWidth());
@@ -251,8 +252,9 @@ public class GridLayout extends Layout{
             }
         }
         
-        return new Dimension(width + parent.getStyle().getPadding(false, Component.LEFT)+ parent.getStyle().getPadding(false, Component.RIGHT),
-            height + parent.getStyle().getPadding(false, Component.TOP)+ parent.getStyle().getPadding(false, Component.BOTTOM));
+        Style s = parent.getStyle();
+        return new Dimension(width + s.getHorizontalPadding(),
+            height + s.getVerticalPadding());
     }
     
     /**
