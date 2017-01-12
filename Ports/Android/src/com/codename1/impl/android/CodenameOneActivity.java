@@ -401,6 +401,9 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
         super.onPause();
         AndroidNativeUtil.onPause();
     }
