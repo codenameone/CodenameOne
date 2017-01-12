@@ -5610,6 +5610,10 @@ public abstract class CodenameOneImplementation {
         t.setIdentity();
     }
 
+    public boolean isScrollWheeling() {
+        return false;
+    }
+
 
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
