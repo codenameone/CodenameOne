@@ -29,6 +29,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -442,9 +443,7 @@ public class Button extends Label {
      */
     public void released(int x, int y) {
         state=STATE_ROLLOVER;
-        if (!Display.impl.isScrollWheeling()) {
-            fireActionEvent(x, y);
-        }
+        fireActionEvent(x, y);
         repaint();
     }
     

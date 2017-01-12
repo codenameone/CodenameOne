@@ -442,13 +442,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
-
-    @Override
-    public boolean isScrollWheeling() {
-        return scrollWheeling;
-    }
-    
-    
     
     private void stopBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
