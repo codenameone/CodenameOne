@@ -503,6 +503,7 @@
             <exclude name="**/build/"/>
             <exclude name="**/bin/"/>
             <exclude name="**/dist/"/>
+            <exclude name="**/*.psd"/>
             <exclude name="**/lib/CLDC11.jar"/>
             <exclude name="**/lib/CodenameOne.jar"/>
             <exclude name="**/lib/CodenameOne_SRC.zip"/>
