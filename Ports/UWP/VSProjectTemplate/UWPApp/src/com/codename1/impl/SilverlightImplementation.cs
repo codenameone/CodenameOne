@@ -600,13 +600,15 @@ namespace com.codename1.impl
                    else
                    {
                        textInputInstance = new TextBox();
+                       TextBox tb = (TextBox)textInputInstance;
                        ((TextBox)textInputInstance).IsTextPredictionEnabled = true;
                        ((TextBox)textInputInstance).TextChanged += textChangedEvent;
-                       ((TextBox)textInputInstance).Text = n4;
+                       
                        ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
                        ((TextBox)textInputInstance).MaxLength = n2;
                        ((TextBox)textInputInstance).IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
-
+                       tb.TextWrapping = currentlyEditing.isSingleLineTextArea() ? TextWrapping.NoWrap : TextWrapping.Wrap;
+                       ((TextBox)textInputInstance).Text = n4;
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
@@ -655,7 +657,7 @@ namespace com.codename1.impl
                    textInputInstance.FontSize = (font.font.FontSize / scaleFactor);
                    int h = Convert.ToInt32((textInputInstance.Height - textInputInstance.FontSize) / 3);
                    textInputInstance.Margin = new Thickness();
-                   textInputInstance.Padding = new Thickness(10, h, 0, 0);
+                   //textInputInstance.Padding = new Thickness(10, h, 0, 0);
                    textInputInstance.Clip = null;
                    textInputInstance.Focus(FocusState.Programmatic);
                    are.Set();
