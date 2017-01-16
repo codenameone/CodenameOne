@@ -52,8 +52,8 @@ public class MathHelper {
     int length = values.size();
     for (int i = 1; i < length; i++) {
       double value = values.get(i);
-      min = Math.min(min, value);
-      max = Math.max(max, value);
+      min = min == NULL_VALUE ? value : Math.min(min, value);
+      max = max == NULL_VALUE ? value : Math.max(max, value);
     }
     return new double[] { min, max };
   }

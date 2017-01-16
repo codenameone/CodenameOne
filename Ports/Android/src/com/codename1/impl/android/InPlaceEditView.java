@@ -30,6 +30,7 @@ import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
@@ -70,6 +71,8 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -688,6 +691,10 @@ public class InPlaceEditView extends FrameLayout{
         }
 
     }
+    
+    // Timers for manually blinking cursor on Android 4.4
+    private Timer cursorTimer;
+    private TimerTask cursorTimerTask;
 
     /**
      * Start editing the given text-area
@@ -835,6 +842,33 @@ public class InPlaceEditView extends FrameLayout{
         mEditText.setFilters(FilterArray);
         mEditText.setSelection(mEditText.getText().length());
         showVirtualKeyboard(true);
+        if (Build.VERSION.SDK_INT < 21) {
+            // HACK!!!  On Android 4.4, it seems that the natural blinking cursor
+            // causes text to disappear when it blinks.  Manually blinking the
+            // cursor seems to work around this issue, so that's what we do here.
+            // This issue is described here: http://stackoverflow.com/questions/41305052/textfields-content-disappears-during-typing?noredirect=1#comment69977316_41305052
+            mEditText.setCursorVisible(false);
+            final boolean[] cursorVisible = new boolean[]{false};
+            if (cursorTimer != null) {
+                cursorTimer.cancel();
+            }
+            cursorTimer = new Timer();
+            cursorTimerTask = new TimerTask() {
+                public void run() {
+                    AndroidNativeUtil.getActivity().runOnUiThread(new Runnable() {
+                        public void run() {
+                            EditView v = mEditText;
+                            if (v != null) {
+                                cursorVisible[0] = !cursorVisible[0];
+                                v.setCursorVisible(cursorVisible[0]);
+                            }
+                        }
+                    });
+
+                }
+            };
+            cursorTimer.schedule(cursorTimerTask, 100, 500);
+        }
     }
 
     /**
@@ -872,6 +906,9 @@ public class InPlaceEditView extends FrameLayout{
      * to 'edit' to return.
      */
     private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose) {
+        if (cursorTimer != null) {
+            cursorTimer.cancel();
+        }
         if (!mIsEditing || mEditText == null) {
             return;
         }
@@ -960,6 +997,9 @@ public class InPlaceEditView extends FrameLayout{
 
     private static int trySetEditModeCount=0;
 
+    private static void trySetEditMode(final boolean resize) {
+        trySetEditMode(resize, 10);
+    }
     /**
      * Wrap the setEditMode method so that it is "safe" to set to resize edit mode.
      * This will try to set to the "resize" edit mode, and will spawn a thread
@@ -980,12 +1020,14 @@ public class InPlaceEditView extends FrameLayout{
      *
      * @param resize
      */
-    private static void trySetEditMode(final boolean resize) {
+    private static void trySetEditMode(final boolean resize, final int retriesRemaining) {
         if (trySetEditModeCount > 100) {
             trySetEditModeCount = 0;
         }
         final int thisCount = trySetEditModeCount++;
-        setEditMode(resize);
+        if (resize != resizeMode) {
+            setEditMode(resize);
+        }
         if (resize) {
             // We would like to set pan mode, but we must do this with some protections
             // since pan mode might cover the text area
@@ -993,7 +1035,7 @@ public class InPlaceEditView extends FrameLayout{
             new Thread(new Runnable() {
                 public void run() {
                     try {
-                        Thread.sleep(200);
+                        Thread.sleep(100);
 
                     } catch (Exception ex){}
                     if (thisCount != trySetEditModeCount-1) {
@@ -1016,6 +1058,10 @@ public class InPlaceEditView extends FrameLayout{
                                 //System.out.println("SETTING TO PAN MODE_______");
                                 setEditMode(false);
 
+                            } else {
+                                if (retriesRemaining > 0) {
+                                    trySetEditMode(resize, retriesRemaining-1);
+                                }
                             }
                         }
 
@@ -1316,12 +1362,12 @@ public class InPlaceEditView extends FrameLayout{
                 // But we'll detect whether the field is still covered by the keyboard
                 // and switch to pan mode if necessary.
 
-                trySetEditMode(true);
-                //if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
-                //    setEditMode(true);
-                //}else{
-                //    setEditMode(false);
-                //}
+
+                if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
+                    setEditMode(true);
+                }else{
+                    trySetEditMode(true);
+                }
                 sInstance.startEditing(impl.getActivity(), textAreaData, initialText, inputType);
             }
         });

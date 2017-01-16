@@ -745,9 +745,21 @@ public class Table extends Container {
      */
     public Object getPropertyValue(String name) {
         if(name.equals("data")) {
-            Object[][] result = new Object[((DefaultTableModel)model).data.size()][];
+            String[][] result = new String[((DefaultTableModel)model).data.size()][];
             for(int iter = 0 ; iter < result.length ; iter++) {
-                result[iter] = ((DefaultTableModel)model).data.get(iter);
+                Object[] o = ((DefaultTableModel)model).data.get(iter);
+                String[] arr = new String[o.length];
+                result[iter] = arr;
+                for(int ai = 0 ; ai < arr.length ; ai++) {
+                    Object current = o[ai];
+                    if(current instanceof String) {
+                        arr[ai] = (String)current;
+                    } else {
+                        if(current != null) {
+                            arr[iter] = current.toString();
+                        }
+                    }
+                }
             }
             return result;
         }

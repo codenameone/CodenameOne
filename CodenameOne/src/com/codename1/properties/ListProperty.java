@@ -33,7 +33,6 @@ import java.util.List;
  * Base class for a property as a list which can contain multiple elements within
  *
  * @author Shai Almog
- * @deprecated this API is experimental
  */
 public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T> {
     private ArrayList<T> value = new ArrayList<T>();
