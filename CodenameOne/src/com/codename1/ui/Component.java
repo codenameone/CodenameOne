@@ -3395,7 +3395,7 @@ public class Component implements Animation, StyleListener {
             }
             if(dropTargetComponent != null) {
                 p.repaint(x, y, getWidth(), getHeight());
-                getParent().scrollRectToVisible(x, y, getWidth(), getHeight(), getParent());
+                getParent().scrollRectToVisible(getX(), getY(), getWidth(), getHeight(), getParent());
                 if(dropListener != null) {
                     ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
                     dropListener.fireActionEvent(ev);
