@@ -91,7 +91,6 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
-import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
@@ -103,6 +102,7 @@ import com.codename1.media.Media;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
+import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
@@ -122,9 +122,6 @@ import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
-import java.awt.image.BufferedImageOp;
-import java.awt.image.ConvolveOp;
-import java.awt.image.Kernel;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
@@ -154,7 +151,6 @@ import javax.swing.event.DocumentListener;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
@@ -442,13 +438,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
-
-    @Override
-    public boolean isScrollWheeling() {
-        return scrollWheeling;
-    }
-    
-    
     
     private void stopBackgroundFetchService() {
         if (isBackgroundFetchSupported()) {
@@ -704,7 +693,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             setFocusable(true);
             requestFocus();
         }
-
+        
         public void setForcedSize(Dimension d) {
             forcedSize = d;
         }
@@ -755,28 +744,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                     Graphics2D g2d = (Graphics2D) g;
                                     g2d.setTransform(AffineTransform.getScaleInstance(1, 1));
                                 }
-
-                                int count = window.getContentPane().getComponentCount();
-                                boolean nativeCmp = false;
-                                if (scrollableSkin) {
-                                    if (count > 3) {
-                                        nativeCmp = true;
-                                    }
-                                } else {
-                                    if (count > 1) {
-                                        nativeCmp = true;
-                                    }
-                                }
-                                if (nativeCmp) {
-                                    java.awt.Component c = window.getContentPane().getComponent(0);
-                                    if (c.isVisible()) {
-                                        g.translate(c.getX(), c.getY());
-                                        c.update(g);
-                                        g.translate(-c.getX(), -c.getY());
-                                    }
-                                }
-
-
+                                
                                 if (window.getJMenuBar() != null) {
                                     for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
                                         JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
@@ -813,6 +781,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
+            AffineTransform t = ((Graphics2D)g).getTransform();
             boolean painted = false;
             Rectangle screenCoord = getScreenCoordinates();
             if (screenCoord != null) {
@@ -850,6 +819,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 updateGraphicsScale(g);
                 g.drawImage(getSkin(), x, y, this);
+                ((Graphics2D)g).setTransform(t);
             } else {
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
@@ -878,14 +848,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (f != null) {
                         f.repaint();
                     }
-                }
+                }    
             }
         }
 
         private void updateGraphicsScale(java.awt.Graphics g) {
             if (zoomLevel != 1) {
                 Graphics2D g2d = (Graphics2D) g;
-                g2d.setTransform(AffineTransform.getScaleInstance(zoomLevel, zoomLevel));
+                AffineTransform t= g2d.getTransform();
+                t.scale(1/t.getScaleX(), 1/t.getScaleY());
+                t.scale(zoomLevel, zoomLevel);
+                g2d.setTransform(t);
             }
         }
 
@@ -1060,7 +1033,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 requestFocus();
-            }
+            } 
         }
 
         public void mouseReleased(MouseEvent e) {
@@ -1087,7 +1060,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.keyReleased(code);
                     triggeredKeyCode = null;
                 }
-            }
+            } 
         }
 
         public void mouseEntered(MouseEvent e) {
@@ -1136,7 +1109,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 } 
                 return;
-            }
+            }  
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
         private Cursor defaultCursor = Cursor.getDefaultCursor();
@@ -1151,7 +1124,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     JavaSEPort.this.pointerHover(x, y);
-                } 
+                }  
             }
             if (getSkinHotspots() != null) {
                 java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
@@ -1160,7 +1133,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 } else {
                     setCursor(defaultCursor);
                 }
-            }
+            } 
         }
 
         public void ancestorMoved(HierarchyEvent e) {
@@ -4353,6 +4326,29 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.drawLine(x1, y1, x2, y2);
         }
     }
+    
+    boolean drawingNativePeer;
+    public void drawNativePeer(final Object graphics, final PeerComponent cmp, final JComponent jcmp) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        nativeGraphics.translate(cmp.getAbsoluteX(), cmp.getAbsoluteY());
+        try {
+            drawingNativePeer = true;
+            if (zoomLevel != 1) {
+                nativeGraphics.scale(1/zoomLevel, 1/zoomLevel);
+            }
+            jcmp.paint(nativeGraphics);
+            if (zoomLevel != 1) {
+                nativeGraphics.scale(zoomLevel, zoomLevel);
+            }
+        } catch (Exception ex){}
+        finally {
+            drawingNativePeer = false;
+            nativeGraphics.translate(-cmp.getAbsoluteX(), -cmp.getAbsoluteY());
+        }
+        
+        
+    }
 
     /**
      * @inheritDoc
@@ -5724,6 +5720,115 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     
+    
+    class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
+        private void sendToCn1(MouseEvent e) {
+            int cn1X = getCN1X(e);
+            int cn1Y = getCN1Y(e);
+            if (Display.isInitialized()) {
+                Form f = Display.getInstance().getCurrent();
+                if (f != null) {
+                    Component cmp = f.getComponentAt(cn1X, cn1Y);
+                    if (cmp != null && !(cmp instanceof PeerComponent)) {
+                        // It's not a peer component, so we should pass the event to the canvas
+                        e = SwingUtilities.convertMouseEvent(this, e, canvas);
+                        switch (e.getID()) {
+                            case MouseEvent.MOUSE_CLICKED:
+                                canvas.mouseClicked(e);
+                                break;
+                            case MouseEvent.MOUSE_DRAGGED:
+                                canvas.mouseDragged(e);
+                                break;
+                            case MouseEvent.MOUSE_MOVED:
+                                canvas.mouseMoved(e);
+                                break;
+                            case MouseEvent.MOUSE_PRESSED:
+                                canvas.mousePressed(e);
+                                break;
+                            case MouseEvent.MOUSE_RELEASED:
+                                canvas.mouseReleased(e);
+                                break;
+                            case MouseEvent.MOUSE_WHEEL:
+                                canvas.mouseWheelMoved((MouseWheelEvent)e);
+                                break;
+                                
+                        }
+                        //canvas.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, canvas));
+                    }
+                }
+            }
+        }
+        
+        private int getCN1X(MouseEvent e) {
+            return (int)((e.getXOnScreen() - canvas.getLocationOnScreen().x - (canvas.x + getScreenCoordinates().x) * zoomLevel) / zoomLevel);
+        }
+
+        private int getCN1Y(MouseEvent e) {
+            return (int)((e.getYOnScreen() - canvas.getLocationOnScreen().y - (canvas.y + getScreenCoordinates().y) * zoomLevel) / zoomLevel);
+        }
+        
+        public CN1JFXPanel() {
+            final CN1JFXPanel panel = this;
+            
+            
+            panel.addMouseListener(new MouseListener() {
+                
+                
+
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    //SEBrowserComponent.this.instance.canvas.mouseE
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                }
+            });
+
+            panel.addMouseMotionListener(new MouseMotionListener() {
+
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+            });
+
+            panel.addMouseWheelListener(new MouseWheelListener() {
+
+                @Override
+                public void mouseWheelMoved(MouseWheelEvent e) {
+                    sendToCn1(e);
+                }
+
+            });
+            
+        }
+
+        
+    }
+    
     /**
      * Plays the sound in the given URI which is partially platform specific.
      *
@@ -5763,7 +5868,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
         mediaContainer = m;
         Platform.runLater(new Runnable() {
 
@@ -5836,7 +5941,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
         mediaContainer = m;
 
         Platform.runLater(new Runnable() {
@@ -7236,6 +7341,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    cnt = new JPanel() {
+                        public void paint(java.awt.Graphics g) {
+                            if (drawingNativePeer) {
+                                super.paint(g);
+                            } else {
+                                
+                            }
+                        }
+                    };
+
+                    cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, vid);
                     cnt.setVisible(false);
@@ -7311,6 +7427,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void paint(Graphics g) {
             if (init) {
                 onPositionSizeChange();
+                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
@@ -7657,7 +7774,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         final java.awt.Container c = cnt;
 
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel webContainer = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel webContainer = new CN1JFXPanel();
         final SEBrowserComponent[] bc = new SEBrowserComponent[1];
 
         Platform.runLater(new Runnable() {
@@ -8638,7 +8755,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
-                    //cmp.setPreferredSize(cmp.getPreferredSize());
+                    cnt = new JPanel() {
+                        public void paint(java.awt.Graphics g) {
+                            if (drawingNativePeer) {
+                                super.paint(g);
+                            } else {
+                                
+                            }
+                        }
+                    };
+
+                    cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, cmp);
                     cnt.setVisible(false);
@@ -8700,10 +8827,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int)cmp.getPreferredSize().getHeight());
         }
 
+        
         @Override
         public void paint(Graphics g) {
             if (init) {
                 onPositionSizeChange();
+                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
@@ -8789,4 +8918,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                 JOptionPane.YES_NO_OPTION);
         return selectedOption == JOptionPane.YES_OPTION;
     }
+
+    @Override
+    public boolean isScrollWheeling() {
+        return scrollWheeling;
+    }
+    
+    
+    
+    
 }
