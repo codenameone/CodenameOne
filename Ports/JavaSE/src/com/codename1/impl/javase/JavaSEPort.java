@@ -8941,6 +8941,30 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     @Override
+    public Boolean canExecute(String url) {
+        if(!url.startsWith("http")) {
+            int pos = url.indexOf(":");
+            if(pos > -1) {
+                String prefix = url.substring(0, pos);
+                Map<String, String> m = getProjectBuildHints();
+                if(m != null) {
+                    String s = m.get("ios.applicationQueriesSchemes");
+                    if(s == null || s.length() == 0) {
+                        setProjectBuildHint("ios.applicationQueriesSchemes", prefix);
+                    } else {
+                        if(s.indexOf("cydia") < 0) {
+                            setProjectBuildHint("ios.applicationQueriesSchemes", s + "," + prefix);
+                        }
+                    }
+                }
+            }
+        }
+        return super.canExecute(url);
+    }
+
+    
+    
+    @Override
     public Map<String, String> getProjectBuildHints() {
         File cnopFile = new File("codenameone_settings.properties");
         if(cnopFile.exists()) {
