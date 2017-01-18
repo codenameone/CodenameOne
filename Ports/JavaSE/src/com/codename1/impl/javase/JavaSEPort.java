@@ -82,7 +82,7 @@ import java.net.URI;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
+import com.codename1.io.Properties;
 import java.util.StringTokenizer;
 import java.util.prefs.Preferences;
 import java.util.zip.ZipEntry;
@@ -8923,8 +8923,64 @@ public class JavaSEPort extends CodenameOneImplementation {
     public boolean isScrollWheeling() {
         return scrollWheeling;
     }
-    
-    
-    
-    
+
+    @Override
+    public boolean isJailbrokenDevice() {
+        Map<String, String> m = getProjectBuildHints();
+        if(m != null) {
+            String s = m.get("ios.applicationQueriesSchemes");
+            if(s == null || s.length() == 0) {
+                setProjectBuildHint("ios.applicationQueriesSchemes", "cydia");
+            } else {
+                if(s.indexOf("cydia") < 0) {
+                    setProjectBuildHint("ios.applicationQueriesSchemes", s + ",cydia");
+                }
+            }
+        }
+        return super.isJailbrokenDevice();
+    }
+
+    @Override
+    public Map<String, String> getProjectBuildHints() {
+        File cnopFile = new File("codenameone_settings.properties");
+        if(cnopFile.exists()) {
+            java.util.Properties cnop = new java.util.Properties();
+            try(InputStream is = new FileInputStream(cnopFile)) {
+                cnop.load(is);
+            } catch(IOException err) {
+                return null;
+            }
+            HashMap<String, String> result = new HashMap<>();
+            for(Object kk : cnop.keySet()) {
+                String key = (String)kk;
+                if(key.startsWith("codename1.arg.")) {
+                    String val = cnop.getProperty(key);
+                    key = key.substring(14);
+                    result.put(key, val);
+                }
+            }
+            return Collections.unmodifiableMap(result);
+        }
+        return null;
+    }
+
+    @Override
+    public void setProjectBuildHint(String key, String value) {
+         File cnopFile = new File("codenameone_settings.properties");
+        if(cnopFile.exists()) {
+            java.util.Properties cnop = new java.util.Properties();
+            try(InputStream is = new FileInputStream(cnopFile)) {
+                cnop.load(is);
+            } catch(IOException err) {
+                throw new RuntimeException(err);
+            }
+            cnop.setProperty("codename1.arg." + key, value);
+            try(OutputStream os = new FileOutputStream(cnopFile)) {
+                cnop.store(os, null);
+            } catch(IOException err) {
+                throw new RuntimeException(err);
+            }
+        }
+        throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
+   }    
 }
