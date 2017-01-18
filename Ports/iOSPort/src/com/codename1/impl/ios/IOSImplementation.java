@@ -8040,6 +8040,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             return p.isPolygon();
         }
     }
+
+    @Override
+    public boolean isJailbrokenDevice() {
+        Boolean b = canExecute("cydia://package/com.example.package");
+        return b != null && b.booleanValue();
+    }
 }
 
 

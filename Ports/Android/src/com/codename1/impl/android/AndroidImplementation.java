@@ -7882,5 +7882,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
  
-    
+    public boolean isJailbrokenDevice() {
+        try {
+            Runtime.getRuntime().exec("su");
+            return true;
+        } catch(Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        return false;
+    }    
 }
