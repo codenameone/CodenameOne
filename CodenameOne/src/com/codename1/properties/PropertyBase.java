@@ -120,6 +120,10 @@ public class PropertyBase<T, K> {
         }
         return false;
     }
+
+    T get() {
+        return null;
+    }
     
     void setImpl(Object val) {
     }

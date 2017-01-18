@@ -23,7 +23,11 @@
 
 package com.codename1.properties;
 
+import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.processing.Result;
+import com.codename1.ui.List;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -187,10 +191,64 @@ public class PropertyIndex implements Iterable<PropertyBase>{
      * @param m the map
      */
     public void populateFromMap(Map<String, Object> m) {
+        populateFromMap(m, null);
+    }
+
+    /**
+     * This is useful for JSON parsing, it allows converting JSON map data to objects
+     * @param m the map
+     * @param recursiveType when running into map types we create this object type
+     */
+    public void populateFromMap(Map<String, Object> m, Class<? extends PropertyBusinessObject>recursiveType) {
         for(PropertyBase p : this) {
             Object val = m.get(p.getName());
             if(val != null) {
-                p.setImpl(val);
+                if(val instanceof List) {
+                    if(p instanceof ListProperty) {
+                        ((ListProperty)p).setList((Collection)val);
+                    }
+                } else {
+                    if(val instanceof Map) {
+                        if(p instanceof MapProperty) {
+                            ((MapProperty)p).setMap((Map)val);
+                        } else {
+                            if(p.get() instanceof PropertyBusinessObject) {
+                                PropertyBusinessObject po = (PropertyBusinessObject)p.get();
+                                po.getPropertyIndex().populateFromMap((Map<String, Object>)val, recursiveType);
+                            } else {
+                                if(recursiveType != null) {
+                                    try {
+                                        PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
+                                        po.getPropertyIndex().populateFromMap((Map<String, Object>)val, recursiveType);
+                                        p.setImpl(po);
+                                    } catch(InstantiationException err) {
+                                        Log.e(err);
+                                    } catch(IllegalAccessException err) {
+                                        Log.e(err);
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        if(p instanceof IntProperty) {
+                            p.setImpl(Util.toIntValue(val));
+                            continue;
+                        } 
+                        if(p instanceof LongProperty) {
+                            p.setImpl(Util.toLongValue(val));
+                            continue;
+                        } 
+                        if(p instanceof FloatProperty) {
+                            p.setImpl(Util.toFloatValue(val));
+                            continue;
+                        } 
+                        if(p instanceof DoubleProperty) {
+                            p.setImpl(Util.toDoubleValue(val));
+                            continue;
+                        } 
+                        p.setImpl(val);
+                    }
+                }
             }
         }
     }
