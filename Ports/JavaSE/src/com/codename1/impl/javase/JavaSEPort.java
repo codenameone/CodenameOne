@@ -172,6 +172,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    private boolean takingScreenshot;
+    private float screenshotActualZoomLevel;
     
     /**
      * When set to true pointer hover events will be called for mouse move events
@@ -1674,6 +1676,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void actionPerformed(ActionEvent ae) {
                     final float zoom = zoomLevel;
                     zoomLevel = 1;
+                    
                     final Form frm = Display.getInstance().getCurrent();
                     BufferedImage headerImageTmp;
                     if (isPortrait()) {
@@ -1695,7 +1698,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                         public void run() {
                             final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
                             com.codename1.ui.Graphics gr = img.getGraphics();
-                            frm.paint(gr);
+                            takingScreenshot = true;
+                            screenshotActualZoomLevel = zoom;
+                            try {
+                                frm.paint(gr);
+                            } finally {
+                                takingScreenshot = false;
+                            }
                             final int imageWidth = img.getWidth();
                             final int imageHeight = img.getHeight();
                             final int[] imageRGB = img.getRGB();
@@ -4331,20 +4340,27 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void drawNativePeer(final Object graphics, final PeerComponent cmp, final JComponent jcmp) {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
+        nativeGraphics = (Graphics2D)nativeGraphics.create();
         nativeGraphics.translate(cmp.getAbsoluteX(), cmp.getAbsoluteY());
         try {
             drawingNativePeer = true;
             if (zoomLevel != 1) {
                 nativeGraphics.scale(1/zoomLevel, 1/zoomLevel);
+            } else if (takingScreenshot && screenshotActualZoomLevel != 1) {
+                nativeGraphics.scale(1/screenshotActualZoomLevel, 1/screenshotActualZoomLevel);
             }
             jcmp.paint(nativeGraphics);
-            if (zoomLevel != 1) {
-                nativeGraphics.scale(zoomLevel, zoomLevel);
-            }
+            //if (zoomLevel != 1 && graphics != nativeGraphics) {
+            //    nativeGraphics.scale(zoomLevel, zoomLevel);
+            //    if (nativeGraphics == graphics) {
+            //        nativeGraphics.scale(zoomLevel, zoomLevel);
+            //    }
+            //}
         } catch (Exception ex){}
         finally {
             drawingNativePeer = false;
-            nativeGraphics.translate(-cmp.getAbsoluteX(), -cmp.getAbsoluteY());
+            //nativeGraphics.translate(-cmp.getAbsoluteX(), -cmp.getAbsoluteY());
+            nativeGraphics.dispose();
         }
         
         
@@ -5681,7 +5697,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         return g2d;
     }
-
+    
     /**
      * @inheritDoc
      */
