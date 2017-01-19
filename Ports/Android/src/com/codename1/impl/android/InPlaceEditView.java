@@ -88,6 +88,32 @@ public class InPlaceEditView extends FrameLayout{
     public static final int REASON_IME_ACTION = 1;
     public static final int REASON_TOUCH_OUTSIDE = 2;
     public static final int REASON_SYSTEM_KEY = 3;
+
+    static void scrollActiveTextfieldToVisible() {
+        if (isEditing() && sInstance != null) {
+            Runnable r = new Runnable() {
+
+                @Override
+                public void run() {
+                    if (sInstance != null && sInstance.mEditText != null && sInstance.mEditText.mTextArea != null) {
+                        TextArea ta = sInstance.mEditText.mTextArea;
+                        if (isScrollableParent(ta)) {
+                            ta.scrollRectToVisible(0, 0, ta.getWidth(), ta.getHeight(), ta);
+                            ta.getComponentForm().getAnimationManager().flushAnimation(new Runnable() {
+
+                                @Override
+                                public void run() {
+                                    reLayoutEdit();
+                                }
+                                
+                            });
+                        }
+                    }
+                }
+                
+            };
+        }
+    }
     // The native Android edit-box to place over Codename One's edit-component
     private EditView mEditText = null;
     private EditView mLastEditText = null;
