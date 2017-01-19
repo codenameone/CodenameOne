@@ -922,15 +922,17 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * changes the component index of a child component
+     * Changes the component index of a child component without revalidating or animating. This is useful 
+     * for complex animations or z-order manipulation but might collide with ongoing animations hence the 
+     * package protected nature.
      * @param cmp The component to be moved
      * @param location The new component index
      */
-    public void moveComponent(Component cmp, int location) {
-    	if (location < components.size()) {
-        	components.remove(cmp);
-        	components.add(location, cmp);
-    	}
+    void setComponentIndex(Component cmp, int location) {
+        if (location < components.size()) {
+            components.remove(cmp);
+            components.add(location, cmp);
+        }
     }
 
     void removeComponentImpl(final Component cmp) {
@@ -2380,7 +2382,7 @@ public class Container extends Component implements Iterable<Component>{
             if(dest != dragged) {
                 int destIndex = getComponentIndex(dest);
                 if(destIndex > -1 && destIndex != i) {
-                	moveComponent(dragged,destIndex);
+                	setComponentIndex(dragged,destIndex);
                 }
             }
             animateLayout(400);
