@@ -920,6 +920,18 @@ public class Container extends Component implements Iterable<Component>{
     public void removeComponent(Component cmp) {
         removeComponentImpl(cmp);
     }
+    
+    /**
+     * changes the component index of a child component
+     * @param cmp The component to be moved
+     * @param location The new component index
+     */
+    public void moveComponent(Component cmp, int location) {
+    	if (location < components.size()) {
+        	components.remove(cmp);
+        	components.add(location, cmp);
+    	}
+    }
 
     void removeComponentImpl(final Component cmp) {
         AnimationManager a = getAnimationManager();
@@ -2368,13 +2380,7 @@ public class Container extends Component implements Iterable<Component>{
             if(dest != dragged) {
                 int destIndex = getComponentIndex(dest);
                 if(destIndex > -1 && destIndex != i) {
-                    removeComponent(dragged);
-                    Object con = getLayout().getComponentConstraint(dragged);
-                    if(con != null) {
-                        addComponent(destIndex, con, dragged);
-                    } else {
-                        addComponent(destIndex, dragged);
-                    }
+                	moveComponent(dragged,destIndex);
                 }
             }
             animateLayout(400);
