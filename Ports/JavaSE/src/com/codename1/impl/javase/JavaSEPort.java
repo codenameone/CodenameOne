@@ -6175,6 +6175,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         timeout = t;
     }
 
+    boolean warnAboutHttpChecked;
+    boolean warnAboutHttp = true;
+    
     /**
      * @inheritDoc
      */
@@ -6183,8 +6186,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             throw new IOException("Unreachable");
         }
         if(url.toLowerCase().startsWith("http:"))  {
-            System.out.println("WARNING: Apple will no longer accept http URL connections from applications you tried to connect to " + 
-                    url +" to learn more check out https://www.codenameone.com/blog/ios-http-urls.html" );
+            if(!warnAboutHttpChecked) {
+                warnAboutHttpChecked = true;
+                Map<String, String> m = getProjectBuildHints();
+                if(m != null) {
+                    String s = m.get("ios.plistInject");
+                    if(s != null && s.contains("NSAppTransportSecurity")) {
+                        warnAboutHttp = false;
+                    }
+                }
+            }
+            if(warnAboutHttp) {
+                System.out.println("WARNING: Apple will no longer accept http URL connections from applications you tried to connect to " + 
+                        url +" to learn more check out https://www.codenameone.com/blog/ios-http-urls.html" );
+            }
         }
         URL u = new URL(url);        
 
