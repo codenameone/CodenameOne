@@ -82,7 +82,7 @@ import java.net.URI;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
+import com.codename1.io.Properties;
 import java.util.StringTokenizer;
 import java.util.prefs.Preferences;
 import java.util.zip.ZipEntry;
@@ -91,7 +91,6 @@ import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import com.codename1.io.BufferedInputStream;
 import com.codename1.io.BufferedOutputStream;
-import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
@@ -103,6 +102,7 @@ import com.codename1.media.Media;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
+import com.codename1.ui.Accessor;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Label;
@@ -122,9 +122,6 @@ import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
-import java.awt.image.BufferedImageOp;
-import java.awt.image.ConvolveOp;
-import java.awt.image.Kernel;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
@@ -154,7 +151,6 @@ import javax.swing.event.DocumentListener;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
@@ -176,11 +172,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
+    private boolean takingScreenshot;
+    private float screenshotActualZoomLevel;
     
     /**
      * When set to true pointer hover events will be called for mouse move events
      */
     private static boolean invokePointerHover;
+
+    private static String defaultCodenameOneComProtocol = "https";
     
     static {
         String n = System.getProperty("os.name");
@@ -695,7 +695,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             setFocusable(true);
             requestFocus();
         }
-
+        
         public void setForcedSize(Dimension d) {
             forcedSize = d;
         }
@@ -746,28 +746,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                     Graphics2D g2d = (Graphics2D) g;
                                     g2d.setTransform(AffineTransform.getScaleInstance(1, 1));
                                 }
-
-                                int count = window.getContentPane().getComponentCount();
-                                boolean nativeCmp = false;
-                                if (scrollableSkin) {
-                                    if (count > 3) {
-                                        nativeCmp = true;
-                                    }
-                                } else {
-                                    if (count > 1) {
-                                        nativeCmp = true;
-                                    }
-                                }
-                                if (nativeCmp) {
-                                    java.awt.Component c = window.getContentPane().getComponent(0);
-                                    if (c.isVisible()) {
-                                        g.translate(c.getX(), c.getY());
-                                        c.update(g);
-                                        g.translate(-c.getX(), -c.getY());
-                                    }
-                                }
-
-
+                                
                                 if (window.getJMenuBar() != null) {
                                     for (int i = 0; i < window.getJMenuBar().getComponentCount(); i++) {
                                         JMenu m = (JMenu) window.getJMenuBar().getComponent(i);
@@ -804,6 +783,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
+            AffineTransform t = ((Graphics2D)g).getTransform();
             boolean painted = false;
             Rectangle screenCoord = getScreenCoordinates();
             if (screenCoord != null) {
@@ -841,6 +821,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 updateGraphicsScale(g);
                 g.drawImage(getSkin(), x, y, this);
+                ((Graphics2D)g).setTransform(t);
             } else {
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
@@ -869,14 +850,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (f != null) {
                         f.repaint();
                     }
-                }
+                }    
             }
         }
 
         private void updateGraphicsScale(java.awt.Graphics g) {
             if (zoomLevel != 1) {
                 Graphics2D g2d = (Graphics2D) g;
-                g2d.setTransform(AffineTransform.getScaleInstance(zoomLevel, zoomLevel));
+                AffineTransform t= g2d.getTransform();
+                t.scale(1/t.getScaleX(), 1/t.getScaleY());
+                t.scale(zoomLevel, zoomLevel);
+                g2d.setTransform(t);
             }
         }
 
@@ -1051,7 +1035,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 requestFocus();
-            }
+            } 
         }
 
         public void mouseReleased(MouseEvent e) {
@@ -1078,7 +1062,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.keyReleased(code);
                     triggeredKeyCode = null;
                 }
-            }
+            } 
         }
 
         public void mouseEntered(MouseEvent e) {
@@ -1127,7 +1111,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 } 
                 return;
-            }
+            }  
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
         private Cursor defaultCursor = Cursor.getDefaultCursor();
@@ -1142,7 +1126,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     JavaSEPort.this.pointerHover(x, y);
-                } 
+                }  
             }
             if (getSkinHotspots() != null) {
                 java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
@@ -1151,7 +1135,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 } else {
                     setCursor(defaultCursor);
                 }
-            }
+            } 
         }
 
         public void ancestorMoved(HierarchyEvent e) {
@@ -1692,6 +1676,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void actionPerformed(ActionEvent ae) {
                     final float zoom = zoomLevel;
                     zoomLevel = 1;
+                    
                     final Form frm = Display.getInstance().getCurrent();
                     BufferedImage headerImageTmp;
                     if (isPortrait()) {
@@ -1713,7 +1698,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                         public void run() {
                             final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
                             com.codename1.ui.Graphics gr = img.getGraphics();
-                            frm.paint(gr);
+                            takingScreenshot = true;
+                            screenshotActualZoomLevel = zoom;
+                            try {
+                                frm.paint(gr);
+                            } finally {
+                                takingScreenshot = false;
+                            }
                             final int imageWidth = img.getWidth();
                             final int imageHeight = img.getHeight();
                             final int[] imageRGB = img.getRGB();
@@ -2255,7 +2246,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/javadoc/"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/javadoc/"));
                     } catch (Exception ex) {
                         
                     }
@@ -2268,7 +2259,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/how-do-i.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/how-do-i.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2280,7 +2271,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/discussion-forum.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/discussion-forum.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2292,7 +2283,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
                 public void actionPerformed(ActionEvent e) {
                     try {
-                        Desktop.getDesktop().browse(new URI("http://www.codenameone.com/build-server.html"));
+                        Desktop.getDesktop().browse(new URI("https://www.codenameone.com/build-server.html"));
                     } catch (Exception ex) {                        
                     }
                 }
@@ -2334,7 +2325,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                         public void actionPerformed(ActionEvent e) {
                             try {
-                                Desktop.getDesktop().browse(new URI("http://www.codenameone.com"));
+                                Desktop.getDesktop().browse(new URI("https://www.codenameone.com"));
                             } catch (Exception ex) {                        
                             }
                         }
@@ -2617,10 +2608,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
 
-                            URL u = new URL("https://www.codenameone.com/OTA/Skins.xml");
-                            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
-                            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
-                            InputStream is = uc.getInputStream();
+                            InputStream is = openSkinsURL();
                             doc[0] = db.parse(is);
                             NodeList skins = doc[0].getElementsByTagName("Skin");
 
@@ -2637,7 +2625,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 if (!(exists) || Integer.parseInt(pref.get(url, "0")) < ver) { 
                                     Vector row = new Vector();
                                     row.add(new Boolean(false));
-                                    row.add(new ImageIcon(new URL("http://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
+                                    row.add(new ImageIcon(new URL(defaultCodenameOneComProtocol + "://www.codenameone.com/OTA" + attr.getNamedItem("icon").getNodeValue())));
                                     row.add(attr.getNamedItem("name").getNodeValue());
                                     if(exists){
                                         row.add("Update");                                                        
@@ -2704,7 +2692,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                             if(attr.getNamedItem("name").getNodeValue().equals(tableModel.getValueAt(i, 2))){
                                                 String url = attr.getNamedItem("url").getNodeValue();
                                                 String [] data = new String[2];
-                                                data[0] = "http://www.codenameone.com/OTA" + url;
+                                                data[0] = defaultCodenameOneComProtocol + "://www.codenameone.com/OTA" + url;
                                                 data[1] = attr.getNamedItem("version").getNodeValue();                                        
                                                 toDowload.add(data);
                                                 break;
@@ -2863,6 +2851,28 @@ public class JavaSEPort extends CodenameOneImplementation {
         return skinMenu;
     }
 
+    InputStream openSkinsURL() throws IOException {
+        try {
+            URL u = new URL(defaultCodenameOneComProtocol + "://www.codenameone.com/OTA/Skins.xml");
+            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
+            InputStream is = uc.getInputStream();
+            return is;
+        } catch(IOException err) {
+            if(defaultCodenameOneComProtocol.equals("https")) {
+                defaultCodenameOneComProtocol = "http";
+            } else {
+                throw err;
+            }
+            System.out.println("Failed to connect thru secure socket, trying http instead");
+            URL u = new URL("http://www.codenameone.com/OTA/Skins.xml");
+            HttpURLConnection uc = (HttpURLConnection)u.openConnection();
+            uc.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.2; en-us; Nexus One Build/FRF91) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1");
+            InputStream is = uc.getInputStream();
+            return is;
+        }
+    }
+    
     private void showTestRecorder() {
         if (testRecorder == null) {
             testRecorder = new TestRecorder();
@@ -4325,6 +4335,36 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.drawLine(x1, y1, x2, y2);
         }
     }
+    
+    boolean drawingNativePeer;
+    public void drawNativePeer(final Object graphics, final PeerComponent cmp, final JComponent jcmp) {
+        checkEDT();
+        Graphics2D nativeGraphics = getGraphics(graphics);
+        nativeGraphics = (Graphics2D)nativeGraphics.create();
+        nativeGraphics.translate(cmp.getAbsoluteX(), cmp.getAbsoluteY());
+        try {
+            drawingNativePeer = true;
+            if (zoomLevel != 1) {
+                nativeGraphics.scale(1/zoomLevel, 1/zoomLevel);
+            } else if (takingScreenshot && screenshotActualZoomLevel != 1) {
+                nativeGraphics.scale(1/screenshotActualZoomLevel, 1/screenshotActualZoomLevel);
+            }
+            jcmp.paint(nativeGraphics);
+            //if (zoomLevel != 1 && graphics != nativeGraphics) {
+            //    nativeGraphics.scale(zoomLevel, zoomLevel);
+            //    if (nativeGraphics == graphics) {
+            //        nativeGraphics.scale(zoomLevel, zoomLevel);
+            //    }
+            //}
+        } catch (Exception ex){}
+        finally {
+            drawingNativePeer = false;
+            //nativeGraphics.translate(-cmp.getAbsoluteX(), -cmp.getAbsoluteY());
+            nativeGraphics.dispose();
+        }
+        
+        
+    }
 
     /**
      * @inheritDoc
@@ -4474,18 +4514,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         // the latter indicates mutable image graphics
-        if (zoomLevel != 1 && nativeGraphics  != graphics) {
-            nativeGraphics = (Graphics2D) nativeGraphics.create();
-            nativeGraphics.setTransform(AffineTransform.getTranslateInstance(0, 0));
-            java.awt.Font currentFont = nativeGraphics.getFont();
-            float fontSize = currentFont.getSize2D();
-            fontSize *= zoomLevel;
-            int ascent = nativeGraphics.getFontMetrics().getAscent();
-            nativeGraphics.setFont(currentFont.deriveFont(fontSize));
-            nativeGraphics.drawString(str, x * zoomLevel, (y + ascent) * zoomLevel);
-        } else {
-            nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
-        }
+        nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
         if (perfMonitor != null) {
             perfMonitor.drawString(str, x, y);
         }
@@ -5383,7 +5412,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setTransform(Object graphics, Transform transform) {
         checkEDT();
         Graphics2D g = getGraphics(graphics);
-        AffineTransform t = AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
+        AffineTransform t = (graphics == g) ? new AffineTransform() :
+                AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
         t.concatenate((AffineTransform)transform.getNativeTransform());
         clamp(t);
         g.setTransform(t);
@@ -5667,7 +5697,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         return g2d;
     }
-
+    
     /**
      * @inheritDoc
      */
@@ -5705,6 +5735,115 @@ public class JavaSEPort extends CodenameOneImplementation {
         return super.createBackgroundMedia(uri);
     }
     
+    
+    
+    class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
+        private void sendToCn1(MouseEvent e) {
+            int cn1X = getCN1X(e);
+            int cn1Y = getCN1Y(e);
+            if (Display.isInitialized()) {
+                Form f = Display.getInstance().getCurrent();
+                if (f != null) {
+                    Component cmp = f.getComponentAt(cn1X, cn1Y);
+                    if (cmp != null && !(cmp instanceof PeerComponent)) {
+                        // It's not a peer component, so we should pass the event to the canvas
+                        e = SwingUtilities.convertMouseEvent(this, e, canvas);
+                        switch (e.getID()) {
+                            case MouseEvent.MOUSE_CLICKED:
+                                canvas.mouseClicked(e);
+                                break;
+                            case MouseEvent.MOUSE_DRAGGED:
+                                canvas.mouseDragged(e);
+                                break;
+                            case MouseEvent.MOUSE_MOVED:
+                                canvas.mouseMoved(e);
+                                break;
+                            case MouseEvent.MOUSE_PRESSED:
+                                canvas.mousePressed(e);
+                                break;
+                            case MouseEvent.MOUSE_RELEASED:
+                                canvas.mouseReleased(e);
+                                break;
+                            case MouseEvent.MOUSE_WHEEL:
+                                canvas.mouseWheelMoved((MouseWheelEvent)e);
+                                break;
+                                
+                        }
+                        //canvas.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, canvas));
+                    }
+                }
+            }
+        }
+        
+        private int getCN1X(MouseEvent e) {
+            return (int)((e.getXOnScreen() - canvas.getLocationOnScreen().x - (canvas.x + getScreenCoordinates().x) * zoomLevel) / zoomLevel);
+        }
+
+        private int getCN1Y(MouseEvent e) {
+            return (int)((e.getYOnScreen() - canvas.getLocationOnScreen().y - (canvas.y + getScreenCoordinates().y) * zoomLevel) / zoomLevel);
+        }
+        
+        public CN1JFXPanel() {
+            final CN1JFXPanel panel = this;
+            
+            
+            panel.addMouseListener(new MouseListener() {
+                
+                
+
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    //SEBrowserComponent.this.instance.canvas.mouseE
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                }
+            });
+
+            panel.addMouseMotionListener(new MouseMotionListener() {
+
+                @Override
+                public void mouseDragged(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    sendToCn1(e);
+                }
+
+            });
+
+            panel.addMouseWheelListener(new MouseWheelListener() {
+
+                @Override
+                public void mouseWheelMoved(MouseWheelEvent e) {
+                    sendToCn1(e);
+                }
+
+            });
+            
+        }
+
+        
+    }
     
     /**
      * Plays the sound in the given URI which is partially platform specific.
@@ -5745,7 +5884,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
         mediaContainer = m;
         Platform.runLater(new Runnable() {
 
@@ -5818,7 +5957,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel m = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
         mediaContainer = m;
 
         Platform.runLater(new Runnable() {
@@ -5924,7 +6063,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D g = getGraphics(nativeGraphics);
         g.setTransform(new AffineTransform());
-        if (zoomLevel != 1) {
+        if (zoomLevel != 1 && g != nativeGraphics) {
             g.setTransform(AffineTransform.getScaleInstance(zoomLevel, zoomLevel));
         }
     }
@@ -7218,6 +7357,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    cnt = new JPanel() {
+                        public void paint(java.awt.Graphics g) {
+                            if (drawingNativePeer) {
+                                super.paint(g);
+                            } else {
+                                
+                            }
+                        }
+                    };
+
+                    cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, vid);
                     cnt.setVisible(false);
@@ -7293,6 +7443,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void paint(Graphics g) {
             if (init) {
                 onPositionSizeChange();
+                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
@@ -7639,7 +7790,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         final java.awt.Container c = cnt;
 
         final Exception[] err = new Exception[1];
-        final javafx.embed.swing.JFXPanel webContainer = new javafx.embed.swing.JFXPanel();
+        final javafx.embed.swing.JFXPanel webContainer = new CN1JFXPanel();
         final SEBrowserComponent[] bc = new SEBrowserComponent[1];
 
         Platform.runLater(new Runnable() {
@@ -8620,7 +8771,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
-                    //cmp.setPreferredSize(cmp.getPreferredSize());
+                    cnt = new JPanel() {
+                        public void paint(java.awt.Graphics g) {
+                            if (drawingNativePeer) {
+                                super.paint(g);
+                            } else {
+                                
+                            }
+                        }
+                    };
+
+                    cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, cmp);
                     cnt.setVisible(false);
@@ -8682,10 +8843,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int)cmp.getPreferredSize().getHeight());
         }
 
+        
         @Override
         public void paint(Graphics g) {
             if (init) {
                 onPositionSizeChange();
+                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
@@ -8771,4 +8934,93 @@ public class JavaSEPort extends CodenameOneImplementation {
                 JOptionPane.YES_NO_OPTION);
         return selectedOption == JOptionPane.YES_OPTION;
     }
+
+    @Override
+    public boolean isScrollWheeling() {
+        return scrollWheeling;
+    }
+
+    @Override
+    public boolean isJailbrokenDevice() {
+        Map<String, String> m = getProjectBuildHints();
+        if(m != null) {
+            String s = m.get("ios.applicationQueriesSchemes");
+            if(s == null || s.length() == 0) {
+                setProjectBuildHint("ios.applicationQueriesSchemes", "cydia");
+            } else {
+                if(s.indexOf("cydia") < 0) {
+                    setProjectBuildHint("ios.applicationQueriesSchemes", s + ",cydia");
+                }
+            }
+        }
+        return super.isJailbrokenDevice();
+    }
+
+    @Override
+    public Boolean canExecute(String url) {
+        if(!url.startsWith("http")) {
+            int pos = url.indexOf(":");
+            if(pos > -1) {
+                String prefix = url.substring(0, pos);
+                Map<String, String> m = getProjectBuildHints();
+                if(m != null) {
+                    String s = m.get("ios.applicationQueriesSchemes");
+                    if(s == null || s.length() == 0) {
+                        setProjectBuildHint("ios.applicationQueriesSchemes", prefix);
+                    } else {
+                        if(s.indexOf("cydia") < 0) {
+                            setProjectBuildHint("ios.applicationQueriesSchemes", s + "," + prefix);
+                        }
+                    }
+                }
+            }
+        }
+        return super.canExecute(url);
+    }
+
+    
+    
+    @Override
+    public Map<String, String> getProjectBuildHints() {
+        File cnopFile = new File("codenameone_settings.properties");
+        if(cnopFile.exists()) {
+            java.util.Properties cnop = new java.util.Properties();
+            try(InputStream is = new FileInputStream(cnopFile)) {
+                cnop.load(is);
+            } catch(IOException err) {
+                return null;
+            }
+            HashMap<String, String> result = new HashMap<>();
+            for(Object kk : cnop.keySet()) {
+                String key = (String)kk;
+                if(key.startsWith("codename1.arg.")) {
+                    String val = cnop.getProperty(key);
+                    key = key.substring(14);
+                    result.put(key, val);
+                }
+            }
+            return Collections.unmodifiableMap(result);
+        }
+        return null;
+    }
+
+    @Override
+    public void setProjectBuildHint(String key, String value) {
+         File cnopFile = new File("codenameone_settings.properties");
+        if(cnopFile.exists()) {
+            java.util.Properties cnop = new java.util.Properties();
+            try(InputStream is = new FileInputStream(cnopFile)) {
+                cnop.load(is);
+            } catch(IOException err) {
+                throw new RuntimeException(err);
+            }
+            cnop.setProperty("codename1.arg." + key, value);
+            try(OutputStream os = new FileOutputStream(cnopFile)) {
+                cnop.store(os, null);
+            } catch(IOException err) {
+                throw new RuntimeException(err);
+            }
+        }
+        throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
+   }    
 }

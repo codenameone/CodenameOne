@@ -24,14 +24,32 @@
 package com.codename1.properties;
 
 /**
- * Event callback interface, invoked when a property changed its value
+ * This is the long specific version of numeric property
  *
  * @author Shai Almog
  */
-public interface PropertyChangeListener<T, K> {
+public class LongProperty<K> extends NumericProperty<Long, K>{
+
     /**
-     * Event callback for the property change event
-     * @param p the property
+     * {@inheritDoc}
      */
-    public void propertyChanged(PropertyBase<T, K> p);
+    public LongProperty(String name) {
+        super(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public LongProperty(String name, Long value) {
+        super(name, value);
+    }    
+
+    
+    /**
+     * Returns the value as a primitive, if the value is null/nullable this will fail...
+     * @return the numeric value
+     */
+    public long getLong() {
+        return get().longValue();
+    }
 }

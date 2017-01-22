@@ -24,14 +24,32 @@
 package com.codename1.properties;
 
 /**
- * Event callback interface, invoked when a property changed its value
+ * This is the float specific version of numeric property
  *
  * @author Shai Almog
  */
-public interface PropertyChangeListener<T, K> {
+public class FloatProperty<K> extends NumericProperty<Float, K>{
+
     /**
-     * Event callback for the property change event
-     * @param p the property
+     * {@inheritDoc}
      */
-    public void propertyChanged(PropertyBase<T, K> p);
+    public FloatProperty(String name) {
+        super(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public FloatProperty(String name, Float value) {
+        super(name, value);
+    }    
+
+    
+    /**
+     * Returns the value as a primitive, if the value is null/nullable this will fail...
+     * @return the numeric value
+     */
+    public float getFloat() {
+        return get().floatValue();
+    }
 }

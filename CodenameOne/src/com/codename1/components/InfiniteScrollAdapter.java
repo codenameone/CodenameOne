@@ -86,7 +86,7 @@ public class InfiniteScrollAdapter {
         infiniteContainer.removeComponent(endMarker);
         infiniteContainer.addComponent(ip);
         infiniteContainer.revalidate();
-        fetchMore.run();
+        Display.getInstance().callSerially(fetchMore);
     }
     
     /**

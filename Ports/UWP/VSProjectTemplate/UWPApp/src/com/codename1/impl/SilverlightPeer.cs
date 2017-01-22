@@ -8,6 +8,7 @@ using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Imaging;
+using System.Threading.Tasks;
 
 namespace com.codename1.impl
 {
@@ -100,10 +101,20 @@ namespace com.codename1.impl
             if (lightweightMode != l)
             {
                 lightweightMode = l;
-                SilverlightImplementation.dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                SilverlightImplementation.dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
                 {
                     if (l)
                     {
+                        if (element is WebView && element.Visibility == Visibility.Visible && element.RenderSize.Width > 0 && element.RenderSize.Height > 0)
+                        {
+                            IRandomAccessStream stream = new InMemoryRandomAccessStream();
+                            CanvasBitmap cb = null;
+                            await ((WebView)element).CapturePreviewToStreamAsync(stream);
+                            await stream.FlushAsync();
+                            stream.Seek(0);
+                            lastWebViewPeerImage = await CanvasBitmap.LoadAsync(SilverlightImplementation.screen, stream);
+
+                        }
                         element.Visibility = Visibility.Collapsed;
                     }
                     else
@@ -115,12 +126,15 @@ namespace com.codename1.impl
             }
         }
 
+        private CanvasBitmap lastWebViewPeerImage;
+
         protected override ui.Image generatePeerImage()
         {
             if (element is MediaElement)
             {
                 return null;
             }
+            
             int width = getWidth();
             int height = getHeight();
             if (width <= 0 || height <= 0)
@@ -136,17 +150,27 @@ namespace com.codename1.impl
             {
                 if (element is WebView)
                 {
-                    await ((WebView)element).CapturePreviewToStreamAsync(stream);
-                    await stream.FlushAsync();
-                    stream.Seek(0);
-                    cb = await CanvasBitmap.LoadAsync(SilverlightImplementation.screen, stream);
+                    if (lastWebViewPeerImage != null)
+                    {
+                        cb = lastWebViewPeerImage;
+                    }
+                    else if (element.Visibility == Visibility.Visible && element.RenderSize.Width > 0 && element.RenderSize.Height > 0)
+                    {
+                        await ((WebView)element).CapturePreviewToStreamAsync(stream);
+                        await stream.FlushAsync();
+                        stream.Seek(0);
+                        cb = await CanvasBitmap.LoadAsync(SilverlightImplementation.screen, stream);
+                    } else
+                    {
+                        return;
+                    }
                 }
                 else
                 {
                     RenderTargetBitmap renderTargetBitmap = new RenderTargetBitmap();
                     await renderTargetBitmap.RenderAsync(element);
                     byte[] buf = renderTargetBitmap.GetPixelsAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult().ToArray();
-                    
+
                     cb = CanvasBitmap.CreateFromBytes(SilverlightImplementation.screen, buf, width, height,
                     SilverlightImplementation.pixelFormat, SilverlightImplementation.screen.Dpi);
                 }
@@ -155,6 +179,10 @@ namespace com.codename1.impl
                 img.graphics.destination.dispose();
 
             }).AsTask().GetAwaiter().GetResult();
+            if (cb == null)
+            {
+                return null;
+            }
             return ui.Image.createImage(img);
         }
 

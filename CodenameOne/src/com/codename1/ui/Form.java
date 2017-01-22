@@ -2255,6 +2255,7 @@ public class Form extends Container {
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
         dragStopFlag = false;
+        dragged = null;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }

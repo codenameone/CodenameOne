@@ -474,7 +474,6 @@ public class JavascriptContext  {
     public synchronized void set(String key, Object value){
         String lhs = key;
         String rhs = "undefined";
-      
         if ( String.class.isInstance(value)){
             String escaped = StringUtil.replaceAll((String)value, "\\", "\\\\");
             escaped = StringUtil.replaceAll(escaped, "'", "\\'");
@@ -708,7 +707,7 @@ public class JavascriptContext  {
                     "url += encodeURIComponent(typeof(val))+'='+encodeURIComponent(strval);"+
                     "if (i < len-1){ url += '&';}"+
                 //"} var iframe=document.createElement('iframe');iframe.src=url;document.body.appendChild(iframe)"+
-                "} window.location.href=url;"+
+                "} if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else {window.location.href=url}"+
                 //"} return 56;"+
                 //"console.log('About to try to load '+url); var el = document.createElement('iframe'); el.setAttribute('src', url); document.body.appendChild(el); el.parentNode.removeChild(el); console.log(el); el = null"+
             "}";

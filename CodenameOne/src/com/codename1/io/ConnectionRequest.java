@@ -32,6 +32,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.CallbackDispatcher;
@@ -44,9 +45,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -94,6 +99,78 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public static final byte PRIORITY_REDUNDANT = (byte)0;
 
+    /**
+     * The default value for the cacheMode property see {@link #getCacheMode()}
+     * @return the defaultCacheMode
+     */
+    public static CachingMode getDefaultCacheMode() {
+        return defaultCacheMode;
+    }
+
+    /**
+     * The default value for the cacheMode property see {@link #getCacheMode()}
+     * @param aDefaultCacheMode the defaultCacheMode to set
+     */
+    public static void setDefaultCacheMode(CachingMode aDefaultCacheMode) {
+        defaultCacheMode = aDefaultCacheMode;
+    }
+
+    /**
+     * There are 4 caching modes: OFF is the default  meaning no caching.
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     * @return the cacheMode
+     */
+    public CachingMode getCacheMode() {
+        return cacheMode;
+    }
+
+    /**
+     * There are 4 caching modes: OFF is the default meaning no caching.
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     * @param cacheMode the cacheMode to set
+     */
+    public void setCacheMode(CachingMode cacheMode) {
+        this.cacheMode = cacheMode;
+    }
+
+    /**
+     * There are 4 caching modes: OFF is the default meaning no caching. 
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     */
+    public static enum CachingMode {
+        OFF,
+        MANUAL,
+        SMART,
+        OFFLINE
+    }
+    
+    /**
+     * The default value for the cacheMode property see {@link #getCacheMode()}
+     */
+    private static CachingMode defaultCacheMode = CachingMode.OFF;
+    
+    /**
+     * There are 4 caching modes: OFF is the default meaning no caching. 
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     */
+    private CachingMode cacheMode = defaultCacheMode;
+    
     /**
      * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
      * customize the name of the cookie header to Cookie
@@ -151,7 +228,7 @@ public class ConnectionRequest implements IOProgressListener {
 
     private byte priority = PRIORITY_NORMAL;
     private long timeSinceLastUpdate;
-    private Hashtable requestArguments;
+    private LinkedHashMap requestArguments;
 
     private boolean post = true;
     private String contentType = "application/x-www-form-urlencoded; charset=UTF-8";
@@ -301,7 +378,6 @@ public class ConnectionRequest implements IOProgressListener {
     }
     
     
-
     /**
      * Invoked to initialize HTTP headers, cookies etc. 
      * 
@@ -338,6 +414,18 @@ public class ConnectionRequest implements IOProgressListener {
         if(chunkedStreamingLen > -1){
             impl.setChunkedStreamingMode(connection, chunkedStreamingLen);
         }
+        
+        if(!post && (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART)) {
+            String msince = Preferences.get("cn1MSince" + createRequestURL(), null);
+            if(msince != null) {
+                impl.setHeader(connection, "If-Modified-Since", msince);
+            } else {
+                String etag = Preferences.get("cn1Etag" + createRequestURL(), null);
+                if(etag != null) {
+                    impl.setHeader(connection, "If-None-Match", etag);
+                } 
+            }
+        }
 
         if(userHeaders != null) {
             Enumeration e = userHeaders.keys();
@@ -350,10 +438,117 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * This method should be overriden in CacheMode.MANUAL to provide offline caching. The default
+     * implementation will work as expected in the CacheMode.SMART mode.
+     * @return the offline cached data or null/exception if unavailable
+     */
+    protected InputStream getCachedData() throws IOException{
+        if(destinationFile != null) {
+            if(FileSystemStorage.getInstance().exists(destinationFile)) {
+                return FileSystemStorage.getInstance().openInputStream(destinationFile);
+            }
+            return null;
+        } 
+        
+        if(destinationStorage != null) {
+            if(Storage.getInstance().exists(destinationFile)) {
+                return Storage.getInstance().createInputStream(destinationFile);
+            }
+            return null;
+        } 
+        
+        String s = getCacheFileName();
+        if(FileSystemStorage.getInstance().exists(s)) {
+            return FileSystemStorage.getInstance().openInputStream(s);
+        }
+        return null;
+    }
+    
+    /**
+     * Deletes the cache file if it exists, notice that this will not work for download files 
+     */
+    public void purgeCache() {
+        FileSystemStorage.getInstance().delete(getCacheFileName());
+    }
+    
+    /**
+     * This callback is invoked on a 304 server response indicating the data in the server matches the result
+     * we currently have in the cache. This method can be overriden to detect this case 
+     */
+    protected void cacheUnmodified() throws IOException {
+        if(destinationFile != null || destinationStorage != null) {
+            if(hasResponseListeners() && !isKilled()) {
+                if(destinationFile != null) {
+                    data = Util.readInputStream(FileSystemStorage.getInstance().openInputStream(destinationFile));
+                } else {
+                    data = Util.readInputStream(Storage.getInstance().createInputStream(destinationStorage));
+                }
+                fireResponseListener(new NetworkEvent(this, data));
+            }
+            return;
+        }
+        InputStream is = FileSystemStorage.getInstance().openInputStream(getCacheFileName());
+        readResponse(is);
+        Util.cleanup(is);
+        
+    }
+    
+    /**
+     * Purges all locally cached files
+     */
+    public static void purgeCacheDirectory() throws IOException {
+        Set<String> s = Preferences.keySet();
+        Iterator<String> i = s.iterator();
+        ArrayList<String> remove = new ArrayList<String>();
+        while(i.hasNext()) {
+            String ss = i.next();
+            if(ss.startsWith("cn1MSince") || ss.startsWith("cn1Etag")) {
+                remove.add(ss);
+            }
+        }
+        for(String ss : remove) {
+            Preferences.set(ss, null);
+        }
+        String root;
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        if(fs.hasCachesDir()) {
+            root = fs.getCachesDir() + "cn1ConCache/";
+        } else {
+            root = fs.getAppHomePath()+ "cn1ConCache/";
+        }
+
+        for(String ss : fs.listFiles(root)) {
+            fs.delete(ss);
+        }
+    }
+    
+    private String getCacheFileName() {
+        String root;
+        if(FileSystemStorage.getInstance().hasCachesDir()) {
+            root = FileSystemStorage.getInstance().getCachesDir() + "cn1ConCache/";
+        } else {
+            root = FileSystemStorage.getInstance().getAppHomePath()+ "cn1ConCache/";
+        }
+        FileSystemStorage.getInstance().mkdir(root);
+        return root + Base64.encodeNoNewline(createRequestURL().getBytes()).replace('/', '-').replace('+', '_');
+    }
+    
+    /**
      * Performs the actual network request on behalf of the network manager
      */
     void performOperation() throws IOException {
         if(shouldStop()) {
+            return;
+        }
+        if(cacheMode == CachingMode.OFFLINE) {
+            InputStream is = getCachedData();
+            if(is != null) {
+                readResponse(is);
+                Util.cleanup(is);
+            } else {
+                responseCode = 404;
+                throw new IOException("File unavilable in cache");
+            }
             return;
         }
         CodenameOneImplementation impl = Util.getImplementation();
@@ -459,6 +654,11 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             
+            if(responseCode == 304 && cacheMode != CachingMode.OFF) {
+                cacheUnmodified();
+                return;
+            }
+            
             if(responseCode - 200 < 0 || responseCode - 200 > 100) {
                 readErrorCodeHeaders(connection);
                 // redirect to new location
@@ -500,6 +700,13 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             responseContentType = getHeader(connection, "Content-Type");
+            
+            if(cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL) {
+                String last = getHeader(connection, "Last-Modified");
+                String etag = getHeader(connection, "ETag");
+                Preferences.set("cn1MSince" + createRequestURL(), last);
+                Preferences.set("cn1Etag" + createRequestURL(), etag);
+            }
             readHeaders(connection);
             contentLength = impl.getContentLength(connection);
             timeSinceLastUpdate = System.currentTimeMillis();
@@ -516,7 +723,15 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                     ((BufferedInputStream)input).setYield(getYield());
                 }
-                readResponse(input);
+                if(!post && cacheMode == CachingMode.SMART && destinationFile == null && destinationStorage == null) {
+                    byte[] d = Util.readInputStream(input);
+                    OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
+                    os.write(d);
+                    os.close();
+                    readResponse(new ByteArrayInputStream(d));
+                } else {
+                    readResponse(input);
+                }
                 if(shouldAutoCloseResponse()) {
                     input.close();
                 }
@@ -906,19 +1121,19 @@ public class ConnectionRequest implements IOProgressListener {
     protected String createRequestURL() {
         if(!post && requestArguments != null) {
             StringBuilder b = new StringBuilder(url);
-            Enumeration e = requestArguments.keys();
-            if(e.hasMoreElements()) {
+            Iterator e = requestArguments.keySet().iterator();
+            if(e.hasNext()) {
                 b.append("?");
             }
-            while(e.hasMoreElements()) {
-                String key = (String)e.nextElement();
+            while(e.hasNext()) {
+                String key = (String)e.next();
                 Object requestVal = requestArguments.get(key);
                 if(requestVal instanceof String) {
                     String value = (String)requestVal;
                     b.append(key);
                     b.append("=");
                     b.append(value);
-                    if(e.hasMoreElements()) {
+                    if(e.hasNext()) {
                         b.append("&");
                     }
                     continue;
@@ -934,7 +1149,7 @@ public class ConnectionRequest implements IOProgressListener {
                 b.append(key);
                 b.append("=");
                 b.append(val[vlen - 1]);
-                if(e.hasMoreElements()) {
+                if(e.hasNext()) {
                     b.append("&");
                 }
             }
@@ -952,16 +1167,16 @@ public class ConnectionRequest implements IOProgressListener {
     protected void buildRequestBody(OutputStream os) throws IOException {
         if(post && requestArguments != null) {
             StringBuilder val = new StringBuilder();
-            Enumeration e = requestArguments.keys();
-            while(e.hasMoreElements()) {
-                String key = (String)e.nextElement();
+            Iterator e = requestArguments.keySet().iterator();
+            while(e.hasNext()) {
+                String key = (String)e.next();
                 Object requestVal = requestArguments.get(key);
                 if(requestVal instanceof String) {
                     String value = (String)requestVal;
                     val.append(key);
                     val.append("=");
                     val.append(value);
-                    if(e.hasMoreElements()) {
+                    if(e.hasNext()) {
                         val.append("&");
                     }
                     continue;
@@ -977,7 +1192,7 @@ public class ConnectionRequest implements IOProgressListener {
                 val.append(key);
                 val.append("=");
                 val.append(valArray[vlen - 1]);
-                if(e.hasMoreElements()) {
+                if(e.hasNext()) {
                     val.append("&");
                 }
             }
@@ -1098,7 +1313,7 @@ public class ConnectionRequest implements IOProgressListener {
             throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
         }
         if(requestArguments == null) {
-            requestArguments = new Hashtable();
+            requestArguments = new LinkedHashMap();
         }
         if(value == null || key == null){
             return;
@@ -1594,9 +1809,9 @@ public class ConnectionRequest implements IOProgressListener {
             if(r.url == url) {
                 if(requestArguments != null) {
                     if(r.requestArguments != null && requestArguments.size() == r.requestArguments.size()) {
-                        Enumeration e = requestArguments.keys();
-                        while(e.hasMoreElements()) {
-                            Object key = e.nextElement();
+                        Iterator e = requestArguments.keySet().iterator();
+                        while(e.hasNext()) {
+                            Object key = e.next();
                             Object value = requestArguments.get(key);
                             Object otherValue = r.requestArguments.get(key);
                             if(otherValue == null || !value.equals(otherValue)) {

@@ -221,10 +221,10 @@ namespace com.codename1.impl
               Windows.Phone.UI.Input.HardwareButtons.BackPressed += page_BackKeyPress;
                isPhone = false;
 #elif WINDOWS_UWP
+              Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
               if (Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons"))
               {
-                  isPhone = false;
-                  Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
+                  isPhone = false; 
               }
 #endif
               cl.SizeChanged += cl_SizeChanged;
@@ -600,16 +600,15 @@ namespace com.codename1.impl
                    else
                    {
                        textInputInstance = new TextBox();
+                       TextBox tb = (TextBox)textInputInstance;
                        ((TextBox)textInputInstance).IsTextPredictionEnabled = true;
                        ((TextBox)textInputInstance).TextChanged += textChangedEvent;
-                       ((TextBox)textInputInstance).Text = n4;
+                       
                        ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
                        ((TextBox)textInputInstance).MaxLength = n2;
-
-                       if ((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE)
-                       {
-                           ((TextBox)textInputInstance).InputScope = new InputScope();
-                       }
+                       ((TextBox)textInputInstance).IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
+                       tb.TextWrapping = currentlyEditing.isSingleLineTextArea() ? TextWrapping.NoWrap : TextWrapping.Wrap;
+                       ((TextBox)textInputInstance).Text = n4;
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
@@ -658,7 +657,7 @@ namespace com.codename1.impl
                    textInputInstance.FontSize = (font.font.FontSize / scaleFactor);
                    int h = Convert.ToInt32((textInputInstance.Height - textInputInstance.FontSize) / 3);
                    textInputInstance.Margin = new Thickness();
-                   textInputInstance.Padding = new Thickness(10, h, 0, 0);
+                   //textInputInstance.Padding = new Thickness(10, h, 0, 0);
                    textInputInstance.Clip = null;
                    textInputInstance.Focus(FocusState.Programmatic);
                    are.Set();
@@ -1877,50 +1876,22 @@ namespace com.codename1.impl
 
         public override void sendMessage(string[] n1, string n2, messaging.Message n3)
         {
-
-            string subject = n2;
-            var contactPicker = new ContactPicker();
-            contactPicker.DesiredFieldsWithContactFieldType.Add(ContactFieldType.Email);
-            Contact recipient = contactPicker.PickContactAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-            if (recipient != null)
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                IList<ContactEmail> fields = recipient.Emails;
+                string subject = n2;
+                Windows.ApplicationModel.Email.EmailMessage emailMessage = new Windows.ApplicationModel.Email.EmailMessage();
+                emailMessage.Body = n3.getContent();
+                emailMessage.Subject = subject;
+                foreach (string addr in n1)
+                {
+                    var emailRecipient = new Windows.ApplicationModel.Email.EmailRecipient(addr);
+                    emailMessage.To.Add(emailRecipient);
+                }
 
-                if (fields.Count > 0)
-                {
-                    if (fields[0].GetType() == typeof(ContactEmail))
-                    {
-                        foreach (ContactEmail email in fields as IList<ContactEmail>)
-                        {
-#if WINDOWS_PHONE_APP
-                            Windows.ApplicationModel.Email.EmailMessage emailMessage = new Windows.ApplicationModel.Email.EmailMessage();
-                             emailMessage.Body = n3.getContent();
-                            emailMessage.Subject = subject;
-                            var emailRecipient = new Windows.ApplicationModel.Email.EmailRecipient(email.Address);
-                            emailMessage.To.Add(emailRecipient);
-                            Windows.ApplicationModel.Email.EmailManager.ShowComposeNewEmailAsync(emailMessage).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                            break;
-#elif WINDOWS_UWP
-                            Windows.ApplicationModel.Email.EmailMessage emailMessage = new Windows.ApplicationModel.Email.EmailMessage();
-                            emailMessage.Body = n3.getContent(); 
-                            emailMessage.Subject = subject;
-                            var emailRecipient = new Windows.ApplicationModel.Email.EmailRecipient(email.Address);
-                            emailMessage.To.Add(emailRecipient);
-                            Windows.ApplicationModel.Email.EmailManager.ShowComposeNewEmailAsync(emailMessage).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                            break;
-#endif
-                        }
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine("No recipient emailid Contact found");
-                }
-            }
-            else
-            {
-                Debug.WriteLine("No recipient emailid Contact found");
-            }
+                // Todo Add support for attachments
+
+                await Windows.ApplicationModel.Email.EmailManager.ShowComposeNewEmailAsync(emailMessage);
+            }).AsTask().GetAwaiter().GetResult();
         }
 
         public override void sendSMS(string n1, string n2, bool n)

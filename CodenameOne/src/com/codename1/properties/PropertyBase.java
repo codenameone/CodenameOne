@@ -29,7 +29,6 @@ import java.util.ArrayList;
  * Base class for property types
  *
  * @author Shai Almog
- * @deprecated this API is experimental
  */
 public class PropertyBase<T, K> {
     private final String name;
@@ -120,6 +119,10 @@ public class PropertyBase<T, K> {
             }
         }
         return false;
+    }
+
+    T get() {
+        return null;
     }
     
     void setImpl(Object val) {

@@ -24,14 +24,32 @@
 package com.codename1.properties;
 
 /**
- * Event callback interface, invoked when a property changed its value
+ * This is the double specific version of numeric property
  *
  * @author Shai Almog
  */
-public interface PropertyChangeListener<T, K> {
+public class DoubleProperty<K> extends NumericProperty<Double, K>{
+
     /**
-     * Event callback for the property change event
-     * @param p the property
+     * {@inheritDoc}
      */
-    public void propertyChanged(PropertyBase<T, K> p);
+    public DoubleProperty(String name) {
+        super(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public DoubleProperty(String name, Double value) {
+        super(name, value);
+    }    
+
+    
+    /**
+     * Returns the value as a primitive, if the value is null/nullable this will fail...
+     * @return the numeric value
+     */
+    public double getDouble() {
+        return get().doubleValue();
+    }
 }

@@ -24,14 +24,31 @@
 package com.codename1.properties;
 
 /**
- * Event callback interface, invoked when a property changed its value
+ * This is the integer specific version of numeric property
  *
  * @author Shai Almog
  */
-public interface PropertyChangeListener<T, K> {
+public class IntProperty<K> extends NumericProperty<Integer, K>{
+
     /**
-     * Event callback for the property change event
-     * @param p the property
+     * {@inheritDoc}
      */
-    public void propertyChanged(PropertyBase<T, K> p);
+    public IntProperty(String name) {
+        super(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public IntProperty(String name, Integer value) {
+        super(name, value);
+    }    
+    
+    /**
+     * Returns the value as a primitive, if the value is null/nullable this will fail...
+     * @return the numeric value
+     */
+    public int getInt() {
+        return get().intValue();
+    }
 }

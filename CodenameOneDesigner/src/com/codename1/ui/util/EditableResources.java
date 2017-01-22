@@ -536,8 +536,10 @@ public class EditableResources extends Resources implements TreeModel {
                                 for(Lang l : d.getLang()) {
                                     Hashtable<String, String> language = new Hashtable<String, String>();
                                     
-                                    for(Entry e : l.getEntry()) {
-                                        language.put(e.getKey(), e.getValue());
+                                    if(l != null && l.getEntry() != null) {
+                                        for(Entry e : l.getEntry()) {
+                                            language.put(e.getKey(), e.getValue());
+                                        }
                                     }
                                     
                                     l10n.put(l.getName(), language);

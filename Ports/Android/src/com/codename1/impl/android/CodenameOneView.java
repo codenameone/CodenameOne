@@ -181,6 +181,8 @@ public class CodenameOneView {
                         @Override
                         public void run() {
                             InPlaceEditView.reLayoutEdit();
+                            InPlaceEditView.scrollActiveTextfieldToVisible();
+                            
                         }
                     });
                     f.removeSizeChangedListener(this);

@@ -1182,6 +1182,8 @@ public class Dialog extends Form {
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
         
+        prefWidth += getUIManager().getLookAndFeel().getVerticalScrollWidth();
+        
         int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight  - title.getPreferredH();
         int availableWidth = Display.getInstance().getDisplayWidth();
         int width = Math.min(availableWidth, prefWidth);

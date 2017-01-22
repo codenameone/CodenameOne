@@ -21,17 +21,15 @@
  * need additional information or have any questions.
  */
 
-package com.codename1.properties;
+package com.codename1.ui;
 
 /**
- * Event callback interface, invoked when a property changed its value
- *
+ * Allows access to package protected methods without exposing them thru official API
+ * 
  * @author Shai Almog
  */
-public interface PropertyChangeListener<T, K> {
-    /**
-     * Event callback for the property change event
-     * @param p the property
-     */
-    public void propertyChanged(PropertyBase<T, K> p);
+public class Accessor {
+    public static Object getNativeGraphics(Graphics g) {
+        return g.getGraphics();
+    }
 }

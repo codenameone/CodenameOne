@@ -24,14 +24,54 @@
 package com.codename1.properties;
 
 /**
- * Event callback interface, invoked when a property changed its value
+ * This is the base class to all number properties, it introduces nullability and the ability to convert to all 
+ * number types. 
+ * 
  *
  * @author Shai Almog
  */
-public interface PropertyChangeListener<T, K> {
+public abstract class NumericProperty<T, K> extends Property<T, K> {
+    private boolean nullable;
+    
     /**
-     * Event callback for the property change event
-     * @param p the property
+     * {@inheritDoc}
      */
-    public void propertyChanged(PropertyBase<T, K> p);
+    public NumericProperty(String name) {
+        super(name);
+        nullable = true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public NumericProperty(String name, T value) {
+        super(name, value);
+        nullable = value == null;
+    }
+
+    /**
+     * If the field is nullable {@code set(null)} will fail
+     * @return the nullable
+     */
+    public boolean isNullable() {
+        return nullable;
+    }
+
+    /**
+     * If the field is nullable {@code set(null)} will fail
+     * @param nullable the nullable to set
+     */
+    public void setNullable(boolean nullable) {
+        this.nullable = nullable;
+    }
+
+    @Override
+    public K set(T value) {
+        if(nullable && value == null) {
+            throw new NullPointerException(getName() + " can't be null");
+        }
+        return super.set(value);
+    }
+
+    
 }

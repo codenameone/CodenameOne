@@ -134,8 +134,18 @@ public class Picker extends Button {
                             }
                             ts.setCurrentMinute(minute);
                             showDialog(pickerDlg, ts);
-                            if(isShowMeridiem() && ts.isCurrentMeridiem()) {
-                                hour = ts.getCurrentHour() + 12;
+                            if(isShowMeridiem()) {
+                                int offset = 0;
+                                if(ts.getCurrentHour() == 12) {
+                                    if(!ts.isCurrentMeridiem()) {
+                                        offset = 12;
+                                    }
+                                } else {
+                                    if(ts.isCurrentMeridiem()) {
+                                        offset = 12;
+                                    }
+                                }
+                                hour = ts.getCurrentHour() + offset;
                             } else {
                                 hour = ts.getCurrentHour();
                             }

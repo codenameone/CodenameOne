@@ -463,7 +463,7 @@ public class BytecodeMethod {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
                 if (!added.contains(variableName) && lv.getQualifier() != 'o') {
                     added.add(variableName);
-                    b.append("    ");
+                    b.append("    volatile ");
                     switch (lv.getQualifier()) {
                         case 'i' :
                             b.append("JAVA_INT"); break;
@@ -474,7 +474,7 @@ public class BytecodeMethod {
                         case 'd' :
                             b.append("JAVA_DOUBLE"); break;
                     }
-                    b.append(" ").append(lv.getQualifier()).append("locals_").append(lv.getIndex()).append("_; /* ").append(lv.getOrigName()).append(" */\n");
+                    b.append(" ").append(lv.getQualifier()).append("locals_").append(lv.getIndex()).append("_ = 0; /* ").append(lv.getOrigName()).append(" */\n");
                 }
             }
             
