@@ -2796,6 +2796,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
+        if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record audio")){
+            return null;
+        }
         final AndroidRecorder[] record = new AndroidRecorder[1];
         final IOException[] error = new IOException[1];
 
