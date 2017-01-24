@@ -475,7 +475,7 @@ public class Container extends Component implements Iterable<Component>{
 
     /**
      * Returns the height for layout manager purposes, this takes scrolling
-     * into consideration unlike the getWidth method.
+     * into consideration unlike the getHeight method.
      * 
      * @return the layout height
      */
