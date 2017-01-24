@@ -167,4 +167,31 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
     public List<T> asList() {
         return new ArrayList<T>(value);
     }
+    
+    /**
+     * Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will 
+     * be converted to a Map 
+     * @return a list
+     */
+    public List<Object> asExplodedList() {
+        ArrayList<Object> aa = new ArrayList<Object>();
+        for(T t : value) {
+            if(t instanceof PropertyBusinessObject) {
+                aa.add(((PropertyBusinessObject)t).getPropertyIndex().toMapRepresentation());
+            } else {
+                aa.add(t);
+            }
+        }
+        return aa;
+    }
+
+    /**
+     * Remove all the elements from the list
+     */
+    public void clear() {
+        if(value.size() > 0) {
+            value.clear();
+            firePropertyChanged();
+        }
+    }
 }

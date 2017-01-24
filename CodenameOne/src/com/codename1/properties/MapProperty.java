@@ -77,7 +77,16 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
         return (K)parent.parent;
     }
 
-
+    /**
+     * Same as {@link #set(java.lang.Object, java.lang.Object)} here for coding convention convenience 
+     * with map code
+     * @param key the key to set
+     * @param v the new value
+     */
+    public K put(T1 key, T2 v) {
+        return set(key, v);
+    }
+    
     /**
      * Removes the item matching the given key
      * @param key the key
@@ -135,13 +144,31 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
     }
     
     /**
-     * Returns a copy of the content as a new list
-     * @return a list
+     * Returns a copy of the content as a new map
+     * @return a map
      */
     public Map<T1, T2> asMap() {
         return new LinkedHashMap<T1, T2>(value);
     }
 
+    /**
+     * Returns a copy of the content as a new map but if the value is a PropertyBusinessObject it will 
+     * be converted to a Map 
+     * @return a map
+     */
+    public Map<T1, Object> asExplodedMap() {
+        Map<T1, Object> m = new LinkedHashMap<T1, Object>();
+        for(T1 k : value.keySet()) {
+            T2 v = value.get(k);
+            if(v instanceof PropertyBusinessObject) {
+                m.put(k, ((PropertyBusinessObject)v).getPropertyIndex().toMapRepresentation());
+            } else {
+                m.put(k, v);
+            }
+        }
+        return m;
+    }
+    
     /**
      * Sets the entire content of the property
      * @param t the map of elements to set
@@ -153,4 +180,11 @@ public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> i
         firePropertyChanged();        
         return (K)parent.parent;
     } 
+    
+    /**
+     * Remove all the elements from the map
+     */
+    public void clear() {
+        value.clear();
+    }
 }
