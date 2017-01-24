@@ -7730,7 +7730,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
             //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
             //an ugly workaround to the putExtra bug 
-            intent.setData(Uri.parse("http://a.com/a?" + getBackgroundFetchListener().getClass().getName()));
+            intent.setData(Uri.parse("http://codenameone.com/a?" + getBackgroundFetchListener().getClass().getName()));
             PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT);
