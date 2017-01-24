@@ -325,4 +325,54 @@ public class SpanButton extends Container {
     public void setShouldLocalize(boolean shouldLocalize) {
         this.shouldLocalize = shouldLocalize;
     }
+
+    /**
+     * Sets the pressed icon for the button
+     * @param i the icon
+     */
+    public void setPressedIcon(Image i) {
+        actualButton.setPressedIcon(i);
+    }
+    
+    /**
+     * Returns the pressed icon of the button
+     * @return the pressed icon
+     */
+    public Image getPressedIcon() {
+        return actualButton.getPressedIcon();
+    }
+
+
+    /**
+     * Sets the rollover icon for the button
+     * @param i the icon
+     */
+    public void setRolloverIcon(Image i) {
+        actualButton.setRolloverIcon(i);
+    }
+    
+    /**
+     * Returns the rollover icon of the button
+     * @return the pressed icon
+     */
+    public Image getRolloverIcon() {
+        return actualButton.getRolloverIcon();
+    }
+
+
+    /**
+     * Sets the disabled icon for the button
+     * @param i the icon
+     */
+    public void setDisabledIcon(Image i) {
+        actualButton.setDisabledIcon(i);
+    }
+    
+    /**
+     * Returns the disabled icon of the button
+     * @return the pressed icon
+     */
+    public Image getDisabledIcon() {
+        return actualButton.getDisabledIcon();
+    }
 }
