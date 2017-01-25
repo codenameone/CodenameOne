@@ -862,9 +862,14 @@ public class UIManager {
             themeProps.put("Badge.press#padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("Badge.press#padding", "0,0,0,0");
             if(Font.isNativeFontSchemeSupported()) {
-                themeProps.put("Badge.font", lightFont.derive(Display.getInstance().convertToPixels(1.5f), Font.STYLE_PLAIN));
+                Font fnt = lightFont.derive(Display.getInstance().convertToPixels(1.5f), Font.STYLE_PLAIN);
+                themeProps.put("Badge.font", fnt);
+                themeProps.put("Badge.sel#font", fnt);
+                themeProps.put("Badge.press#font", fnt);
             }
             themeProps.put("Badge.align", centerAlign);
+            themeProps.put("Badge.sel#align", centerAlign);
+            themeProps.put("Badge.press#align", centerAlign);
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionText.derive")) {
             themeProps.put("FloatingActionText.bgColor", "ffffff");

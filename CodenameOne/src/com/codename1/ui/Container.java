@@ -475,7 +475,7 @@ public class Container extends Component implements Iterable<Component>{
 
     /**
      * Returns the height for layout manager purposes, this takes scrolling
-     * into consideration unlike the getWidth method.
+     * into consideration unlike the getHeight method.
      * 
      * @return the layout height
      */
@@ -919,6 +919,20 @@ public class Container extends Component implements Iterable<Component>{
      */
     public void removeComponent(Component cmp) {
         removeComponentImpl(cmp);
+    }
+    
+    /**
+     * Changes the component index of a child component without revalidating or animating. This is useful 
+     * for complex animations or z-order manipulation but might collide with ongoing animations hence the 
+     * package protected nature.
+     * @param cmp The component to be moved
+     * @param location The new component index
+     */
+    void setComponentIndex(Component cmp, int location) {
+        if (location < components.size()) {
+            components.remove(cmp);
+            components.add(location, cmp);
+        }
     }
 
     void removeComponentImpl(final Component cmp) {
@@ -2368,13 +2382,7 @@ public class Container extends Component implements Iterable<Component>{
             if(dest != dragged) {
                 int destIndex = getComponentIndex(dest);
                 if(destIndex > -1 && destIndex != i) {
-                    removeComponent(dragged);
-                    Object con = getLayout().getComponentConstraint(dragged);
-                    if(con != null) {
-                        addComponent(destIndex, con, dragged);
-                    } else {
-                        addComponent(destIndex, dragged);
-                    }
+                	setComponentIndex(dragged,destIndex);
                 }
             }
             animateLayout(400);

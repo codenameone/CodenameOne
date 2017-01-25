@@ -74,6 +74,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.Vector;
@@ -7169,8 +7170,6 @@ public abstract class CodenameOneImplementation {
         return false;
     }
     
-    
-    //METHODS FOR Imgae blur
     public Image gaussianBlurImage(Image image, float radius) {
         return image;
     }
@@ -7178,6 +7177,33 @@ public abstract class CodenameOneImplementation {
     public boolean isGaussianBlurSupported() {
         return false;
     }
-    //ENDS METHODS FOR Imgae blur
     
+    /**
+     * Returns true if this device is jailbroken or rooted, false if not or unknown. Notice that this method isn't
+     * accurate and can't detect all jailbreak/rooting cases
+     * @return true if this device is jailbroken or rooted, false if not or unknown. 
+     */
+    public boolean isJailbrokenDevice() {
+        return false;
+    }
+    
+    /**
+     * Returns the build hints for the simulator, this will only work in the debug environment and it's 
+     * designed to allow extensions/API's to verify user settings/build hints exist
+     * @return map of the build hints that isn't modified without the codename1.arg. prefix
+     */
+    public Map<String, String> getProjectBuildHints() {
+        return null;
+    }
+
+    /**
+     * Sets a build hint into the settings while overwriting any previous value. This will only work in the 
+     * debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
+     * Important: this will throw an exception outside of the simulator!
+     * @param key the build hint without the codename1.arg. prefix
+     * @param value the value for the hint
+     */
+    public void setProjectBuildHint(String key, String value) {
+        throw new RuntimeException();
+    }
 }

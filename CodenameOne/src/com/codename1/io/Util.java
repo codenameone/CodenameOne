@@ -1368,4 +1368,156 @@ public class Util {
             }
         }
     }    
+    
+    /**
+     * Returns the number object as an int
+     * @param number this can be a String or any number type
+     * @return an int value or an exception
+     */
+    public static int toIntValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Integer) {
+            return ((Integer)number).intValue();
+        }
+        if(number instanceof String) {
+            return Integer.parseInt((String)number);
+        }
+        if(number instanceof Double) {
+            return ((Double)number).intValue();
+        }
+        if(number instanceof Float) {
+            return ((Float)number).intValue();
+        }
+        if(number instanceof Long) {
+            return ((Long)number).intValue();
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).intValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).intValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
+
+    /**
+     * Returns the number object as a long
+     * @param number this can be a String or any number type
+     * @return a long value or an exception
+     */
+    public static long toLongValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Long) {
+            return ((Long)number).longValue();
+        }
+        if(number instanceof Integer) {
+            return ((Integer)number).longValue();
+        }
+        if(number instanceof String) {
+            return Long.parseLong((String)number);
+        }
+        if(number instanceof Double) {
+            return ((Double)number).longValue();
+        }
+        if(number instanceof Float) {
+            return ((Float)number).longValue();
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).longValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).longValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
+
+    /**
+     * Returns the number object as a float
+     * @param number this can be a String or any number type
+     * @return a float value or an exception
+     */
+    public static float toFloatValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Float) {
+            return ((Float)number).floatValue();
+        }
+        if(number instanceof Long) {
+            return ((Long)number).floatValue();
+        }
+        if(number instanceof Integer) {
+            return ((Integer)number).floatValue();
+        }
+        if(number instanceof String) {
+            return Float.parseFloat((String)number);
+        }
+        if(number instanceof Double) {
+            return ((Double)number).floatValue();
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).floatValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).floatValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
+
+    /**
+     * Returns the number object as a double
+     * @param number this can be a String or any number type
+     * @return a double value or an exception
+     */
+    public static double toDoubleValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Double) {
+            return ((Double)number).doubleValue();
+        }
+        if(number instanceof Float) {
+            return ((Float)number).doubleValue();
+        }
+        if(number instanceof Long) {
+            return ((Long)number).doubleValue();
+        }
+        if(number instanceof Integer) {
+            return ((Integer)number).doubleValue();
+        }
+        if(number instanceof String) {
+            return Double.parseDouble((String)number);
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).doubleValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).doubleValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
 }

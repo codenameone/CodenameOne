@@ -24,45 +24,38 @@
 package com.codename1.properties;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Base class for a property as a list which can contain multiple elements within
+ * Base class for a property as a Map which can contain multiple elements within it
  *
  * @author Shai Almog
  */
-public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T> {
-    private ArrayList<T> value = new ArrayList<T>();
+public class MapProperty<T1, T2, K> extends PropertyBase<Map.Entry<T1, T2>, K> implements Iterable<Map.Entry<T1, T2>> {
+    private LinkedHashMap<T1, T2> value = new LinkedHashMap<T1, T2>();
     
     /**
-     * Constructs a property with the given name and value
-     * @param name the name of the property
-     * @param values default values for the property
-     */
-    public ListProperty(String name, T... values) {
-        super(name);
-        for(T t : values) {
-            value.add(t);
-        }
-    }
-    
-    /**
-     * Constructs a property with null value
+     * Constructs a property with the given name 
      * @param name the name of the property
      */
-    public ListProperty(String name) {
+    public MapProperty(String name) {
         super(name);
     }
     
     /**
      * Gets the property value
-     * @param offset the offset within the list
+     * @param key the map key
      * @return the property value
      */
-    public T get(int offset) {
-        return value.get(offset);
+    public T2 get(T1 key) {
+        return value.get(key);
     }
     
     /**
@@ -75,57 +68,31 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
     
     /**
      * Sets the property value and potentially fires a change event
-     * @param offset the position for the new value
+     * @param key the key to set
      * @param v the new value
-     * @return the parent object for chaining
      */
-    public K set(int offset, T v) {
-        value.set(offset, v);
+    public K set(T1 key, T2 v) {
+        value.put(key, v);
         firePropertyChanged();
         return (K)parent.parent;
     }
 
     /**
-     * Sets the entire content of the property
-     * @param t the collection of elements to set
-     * @return the parent object for chaining
+     * Same as {@link #set(java.lang.Object, java.lang.Object)} here for coding convention convenience 
+     * with map code
+     * @param key the key to set
+     * @param v the new value
      */
-    public K setList(Collection<T> t) {
-        value.clear();
-        value.addAll(t);
-        firePropertyChanged();        
-        return (K)parent.parent;
-    } 
+    public K put(T1 key, T2 v) {
+        return set(key, v);
+    }
     
     /**
-     * Adds a property value and fires a change event
-     * @param offset the position for the new value
-     * @param v the new value
+     * Removes the item matching the given key
+     * @param key the key
      */
-    public K add(int offset, T v) {
-        value.add(offset, v);
-        firePropertyChanged();
-        return (K)parent.parent;
-    }
-
-
-    /**
-     * Adds a property value to the end of the list and fires a change event
-     * @param v the new value
-     */
-    public K add(T v) {
-        value.add(v);
-        firePropertyChanged();
-        return (K)parent.parent;
-    }
-
-
-    /**
-     * Removes the item at the given offset
-     * @param offset the offset
-     */
-    public K remove(int offset) {
-        value.remove(offset);
+    public K remove(T1 key) {
+        value.remove(key);
         return (K)parent.parent;
     }
     
@@ -139,7 +106,7 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
         if(!super.equals(obj)) {
             return false;
         }
-        ListProperty other = (ListProperty)obj;
+        MapProperty other = (MapProperty)obj;
         return other.value.equals(value);
     }
 
@@ -156,42 +123,68 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      * Iterate over the elements of the property
      * @return an iterator
      */
-    public Iterator<T> iterator() {
-        return value.iterator();
+    public Iterator<Map.Entry<T1, T2>> iterator() {
+        return value.entrySet().iterator();
     }
     
     /**
-     * Returns a copy of the content as a new list
-     * @return a list
+     * Returns the set of keys in the map property
+     * @return the keys
      */
-    public List<T> asList() {
-        return new ArrayList<T>(value);
-    }
-    
-    /**
-     * Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will 
-     * be converted to a Map 
-     * @return a list
-     */
-    public List<Object> asExplodedList() {
-        ArrayList<Object> aa = new ArrayList<Object>();
-        for(T t : value) {
-            if(t instanceof PropertyBusinessObject) {
-                aa.add(((PropertyBusinessObject)t).getPropertyIndex().toMapRepresentation());
-            } else {
-                aa.add(t);
-            }
-        }
-        return aa;
+    public Set<T1> keySet() {
+        return value.keySet();
     }
 
     /**
-     * Remove all the elements from the list
+     * Returns the set of values in the map property
+     * @return the values
+     */
+    public Collection<T2> valueSet() {
+        return value.values();
+    }
+    
+    /**
+     * Returns a copy of the content as a new map
+     * @return a map
+     */
+    public Map<T1, T2> asMap() {
+        return new LinkedHashMap<T1, T2>(value);
+    }
+
+    /**
+     * Returns a copy of the content as a new map but if the value is a PropertyBusinessObject it will 
+     * be converted to a Map 
+     * @return a map
+     */
+    public Map<T1, Object> asExplodedMap() {
+        Map<T1, Object> m = new LinkedHashMap<T1, Object>();
+        for(T1 k : value.keySet()) {
+            T2 v = value.get(k);
+            if(v instanceof PropertyBusinessObject) {
+                m.put(k, ((PropertyBusinessObject)v).getPropertyIndex().toMapRepresentation());
+            } else {
+                m.put(k, v);
+            }
+        }
+        return m;
+    }
+    
+    /**
+     * Sets the entire content of the property
+     * @param t the map of elements to set
+     * @return the parent object for chaining
+     */
+    public K setMap(Map<T1, T2> t) {
+        value.clear();
+        value.putAll(t);
+        firePropertyChanged();        
+        return (K)parent.parent;
+    } 
+    
+    /**
+     * Remove all the elements from the map
      */
     public void clear() {
-        if(value.size() > 0) {
-            value.clear();
-            firePropertyChanged();
-        }
+        value.clear();
     }
 }

@@ -2380,9 +2380,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         //these keys/values are from the Application Resources (strings values)
         try {
             int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
-            String val = getContext().getResources().getString(id);
-            return val;
-
+            if (id != 0) {
+                String val = getContext().getResources().getString(id);
+                return val;
+            }
         } catch (Exception e) {
         }
         return System.getProperty(key, super.getProperty(key, defaultValue));
@@ -2793,6 +2794,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
         if (getActivity() == null) {
+            return null;
+        }
+        if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record audio")){
             return null;
         }
         final AndroidRecorder[] record = new AndroidRecorder[1];
@@ -7882,5 +7886,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
  
-    
+    public boolean isJailbrokenDevice() {
+        try {
+            Runtime.getRuntime().exec("su");
+            return true;
+        } catch(Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        return false;
+    }    
 }
