@@ -85,6 +85,7 @@ import com.codename1.media.MediaManager;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
+import com.codename1.ui.Accessor;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Graphics;
@@ -861,14 +862,59 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
-    
-
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
             ((NativeImage)image).deleteImage();
         }
     }
 
+    //private Graphics frontGraphics;
+    private Image frontGraphicsMutableImage;
+    
+    
+    @Override
+    public Graphics getFrontGraphics() {
+        Display d = Display.getInstance();
+        if (frontGraphicsMutableImage == null || frontGraphicsMutableImage.getWidth() != d.getDisplayWidth()|| frontGraphicsMutableImage.getHeight() != d.getDisplayHeight()) {
+            frontGraphicsMutableImage = Image.createImage(d.getDisplayWidth(), d.getDisplayHeight(), 0x0);
+        }
+        
+        return frontGraphicsMutableImage.getGraphics();
+    }
+
+    
+    @Override
+    public void flushFrontGraphics(int x, int y, int width, int height) {
+        if (frontGraphicsMutableImage != null) {
+            globalGraphics.checkControl();
+            NativeImage nm = (NativeImage)frontGraphicsMutableImage.getImage();
+            nativeInstance.drawTopLayer(nm.peer, x, y, width, height);
+        }
+    }
+    
+    public void clearFrontGraphics() {
+        frontGraphicsMutableImage = null;
+    }
+
+    private boolean frontGraphicsVisible;
+    
+    @Override
+    public void setFrontGraphicsVisible(boolean visible) {
+        if (visible != frontGraphicsVisible) {
+            frontGraphicsVisible = visible;
+            if (visible) {
+                nativeInstance.showFrontGraphics();
+            } else {
+                nativeInstance.hideFrontGraphics();
+            }
+        }
+    }
+    
+    @Override
+    public boolean isFrontGraphicsSupported() {
+        return true;
+    }
+    
     public void flushGraphics(int x, int y, int width, int height) {
         /*if(currentlyDrawingOn != null && backBuffer == currentlyDrawingOn.associatedImage) {
             backBuffer.peer = finishDrawingOnImage();
@@ -877,6 +923,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             flushBuffer(backBuffer.peer, x, y, width, height);
         }*/
+        Graphics g = getCodenameOneGraphics();
+        if (Accessor.isFrontGraphicsEnabled(g)) {
+            
+            Accessor.flush(g, x, y, width, height);
+        }
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
 
@@ -1494,6 +1545,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.nativeDrawLine(ng.color, ng.alpha, x1, y1, x2, y2);
     }
+    
 
     static void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height) {
         nativeInstance.nativeFillRectMutable(color, alpha, x, y, width, height);
@@ -1512,6 +1564,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyTransform();
         ng.applyClip();
         ng.nativeFillRect(ng.color, ng.alpha, x, y, width, height);
+    }
+    
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        ng.nativeClearRect(x, y, width, height);
     }
 
     private static void nativeDrawRectMutable(int color, int alpha, int x, int y, int width, int height) {
@@ -4171,6 +4231,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 nativeInstance.clearRadialGradientPaintMutable();
             }
         }
+
+        public void nativeClearRect(int x, int y, int width, int height) {
+            nativeInstance.clearRectMutable(x, y, width, height);
+        }
     }
 
     class GlobalGraphics extends NativeGraphics {
@@ -4266,6 +4330,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         void nativeFillRect(int color, int alpha, int x, int y, int width, int height) {
             nativeFillRectGlobal(color, alpha, x, y, width, height);
         }
+
+        @Override
+        public void nativeClearRect(int x, int y, int width, int height) {
+            System.out.println("nativeClearRect() not yet supported in Global Graphics");
+            // We don't support this yet in the global graphics.
+            // we only added it for 
+        }
+        
+        
 
         void nativeDrawRect(int color, int alpha, int x, int y, int width, int height) {
             nativeDrawRectGlobal(color, alpha, x, y, width, height);
@@ -4484,6 +4557,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
             nativeInstance.fillLinearGradientGlobal(startColor, endColor, x, y, width, height, horizontal);
         }
+        
     }
 
     class NativeFont {
@@ -5818,6 +5892,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected boolean shouldRenderPeerImage() {
             return lightweightMode || !isInitialized();
         }
+
     }
 
     public boolean areMutableImagesFast() {

@@ -1264,6 +1264,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
 }
 
+//Java_com_codename1_impl_ios_IOSImplementation_drawTopLayerImpl(peer, x, y, w, h);
+void Java_com_codename1_impl_ios_IOSImplementation_drawTopLayerImpl(JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    
+    [[CodenameOne_GLViewController instance].view setTopLayer:(GLUIImage*)peer x:x y:y w:w h:h];
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 (float angle, int x, int y) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
@@ -1289,6 +1295,19 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
         CGContextRestoreGState(context);
     }
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+    CGContextClearRect(context, CGRectMake(x, y, w, h));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
+    
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl

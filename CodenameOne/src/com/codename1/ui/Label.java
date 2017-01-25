@@ -443,7 +443,7 @@ public class Label extends Component {
      * {@inheritDoc}
      */
     public void paint(Graphics g) {
-        if(legacyRenderer) {
+        if(legacyRenderer || g.isDrawingToFrontBuffer()) {
             getUIManager().getLookAndFeel().drawLabel(g, this);
             return;
         }

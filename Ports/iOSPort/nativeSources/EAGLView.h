@@ -26,6 +26,7 @@
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
+#import "GLUIImage.h"
 
 @class EAGLContext;
 
@@ -40,9 +41,12 @@
     
     // The OpenGL ES names for the framebuffer and renderbuffer used to render to this view.
     GLuint defaultFramebuffer, colorRenderbuffer;
+    
 }
 
 @property (nonatomic, retain) EAGLContext *context;
+@property (nonatomic, retain) UIImageView* topLayerView;
+@property (nonatomic, retain) UIView* peerComponentsLayer;
 
 -(void)textViewDidChange:(UITextView *)textView;
 -(void)deleteFramebuffer;
@@ -52,4 +56,9 @@
 -(void)textFieldDidChange;
 -(void) keyboardDoneClicked;
 -(void) keyboardNextClicked;
+-(void) setTopLayer:(GLUIImage*)img x:(int)x y:(int)y w:(int)w h:(int)h;
+-(void) showFrontGraphics;
+-(void) hideFrontGraphics;
+-(void) addPeerComponent:(UIView*) view;
+-(void) removePeerComponent:(UIView*) view;
 @end

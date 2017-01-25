@@ -544,7 +544,7 @@ public final class Display {
      */
     private Display() {
     }
-
+    
     /**
      * This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
      * This method must be called before any Form is shown
@@ -567,6 +567,7 @@ public final class Display {
             INSTANCE.impl.setDisplayLock(lock);
             INSTANCE.impl.initImpl(m);
             INSTANCE.codenameOneGraphics = new Graphics(INSTANCE.impl.getNativeGraphics());
+            INSTANCE.codenameOneGraphics.enableFrontGraphics = INSTANCE.impl.isFrontGraphicsSupported();
             INSTANCE.impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
             // only enable but never disable the third softbutton
@@ -2799,6 +2800,12 @@ public final class Display {
             String out = impl.getAppArg();
             return out == null ? defaultValue : out;
         }
+        if ("useFrontGraphics".equals(key)) {
+            return codenameOneGraphics.enableFrontGraphics ? "true":"false";
+        }
+        if ("frontGraphicsSupported".equals(key)) {
+            return impl.isFrontGraphicsSupported() ? "true":"false";
+        }
         if(localProperties != null) {
             String v = (String)localProperties.get(key);
             if(v != null) {
@@ -2825,11 +2832,16 @@ public final class Display {
             Container.blockOverdraw = true;
             return;
         }
+        if("useFrontGraphics".equals(key)) {
+            if (impl.isFrontGraphicsSupported()) {
+                codenameOneGraphics.enableFrontGraphics = value.equals("true");
+                impl.setFrontGraphicsVisible(codenameOneGraphics.enableFrontGraphics);
+            }
+        }
         if(key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
             return;
         }
-        
         if(localProperties == null) {
             localProperties = new HashMap<String, String>();
         }
