@@ -136,7 +136,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                             //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
                             //an ugly workaround to the putExtra bug 
                             if (bgListenerClass != null) {
-                                intent.setData(Uri.parse("http://a.com/a?" + bgListenerClass.getName()));
+                                intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
                             }
                             PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                                     intent,
@@ -229,7 +229,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
                         //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
                         //an ugly workaround to the putExtra bug 
-                        intent.setData(Uri.parse("http://a.com/a?" + bgListenerClass.getName()));
+                        intent.setData(Uri.parse("http://codenameone.com/a?" + bgListenerClass.getName()));
                         PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                                 intent,
                                 PendingIntent.FLAG_UPDATE_CURRENT);
