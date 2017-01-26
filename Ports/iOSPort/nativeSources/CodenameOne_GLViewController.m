@@ -1265,12 +1265,6 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
 }
 
-//Java_com_codename1_impl_ios_IOSImplementation_drawTopLayerImpl(peer, x, y, w, h);
-void Java_com_codename1_impl_ios_IOSImplementation_drawTopLayerImpl(JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
-    
-    [[CodenameOne_GLViewController instance].view setTopLayer:(GLUIImage*)peer x:x y:y w:w h:h];
-}
-
 void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 (float angle, int x, int y) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");

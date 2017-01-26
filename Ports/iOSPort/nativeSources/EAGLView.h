@@ -45,7 +45,6 @@
 }
 
 @property (nonatomic, retain) EAGLContext *context;
-@property (nonatomic, retain) UIImageView* topLayerView;
 @property (nonatomic, retain) UIView* peerComponentsLayer;
 
 -(void)textViewDidChange:(UITextView *)textView;
@@ -56,9 +55,6 @@
 -(void)textFieldDidChange;
 -(void) keyboardDoneClicked;
 -(void) keyboardNextClicked;
--(void) setTopLayer:(GLUIImage*)img x:(int)x y:(int)y w:(int)w h:(int)h;
--(void) showFrontGraphics;
--(void) hideFrontGraphics;
 -(void) addPeerComponent:(UIView*) view;
 -(void) removePeerComponent:(UIView*) view;
 @end

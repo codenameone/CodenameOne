@@ -33,14 +33,6 @@ public class Accessor {
         return g.getGraphics();
     }
     
-    public static void flush(Graphics g, int x, int y, int width, int height) {
-        g.flush(x, y, width, height);
-    }
-    
-    public static boolean isFrontGraphicsEnabled(Graphics g) {
-        return g.enableFrontGraphics;
-    }
-    
     public static boolean isPaintPeersBehindEnabled(Graphics g) {
         return g.paintPeersBehind;
     }

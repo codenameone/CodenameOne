@@ -610,12 +610,6 @@ public final class IOSNative {
 
     native void clearRadialGradientPaintGlobal();
 
-    native void drawTopLayer(long peer, int x, int y, int width, int height);
-
-    native void showFrontGraphics();
-
-    native void hideFrontGraphics();
-
     native void clearRectMutable(int x, int y, int width, int height);
 
     native void nativeClearRectGlobal(int x, int y, int width, int height);

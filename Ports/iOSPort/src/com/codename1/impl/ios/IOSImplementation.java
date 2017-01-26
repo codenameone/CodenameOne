@@ -867,67 +867,24 @@ public class IOSImplementation extends CodenameOneImplementation {
             ((NativeImage)image).deleteImage();
         }
     }
-
-    //private Graphics frontGraphics;
-    private Image frontGraphicsMutableImage;
-    
-    
-    @Override
-    public Graphics getFrontGraphics() {
-        Display d = Display.getInstance();
-        if (frontGraphicsMutableImage == null || frontGraphicsMutableImage.getWidth() != d.getDisplayWidth()|| frontGraphicsMutableImage.getHeight() != d.getDisplayHeight()) {
-            frontGraphicsMutableImage = Image.createImage(d.getDisplayWidth(), d.getDisplayHeight(), 0x0);
-        }
-        
-        return frontGraphicsMutableImage.getGraphics();
-    }
-
-    
-    @Override
-    public void flushFrontGraphics(int x, int y, int width, int height) {
-        if (frontGraphicsMutableImage != null) {
-            globalGraphics.checkControl();
-            NativeImage nm = (NativeImage)frontGraphicsMutableImage.getImage();
-            nativeInstance.drawTopLayer(nm.peer, x, y, width, height);
-        }
-    }
-    
-    public void clearFrontGraphics() {
-        frontGraphicsMutableImage = null;
-    }
-
-    private boolean frontGraphicsVisible;
-    
-    @Override
-    public void setFrontGraphicsVisible(boolean visible) {
-        if (visible != frontGraphicsVisible) {
-            frontGraphicsVisible = visible;
-            if (visible) {
-                nativeInstance.showFrontGraphics();
-            } else {
-                nativeInstance.hideFrontGraphics();
-            }
-        }
-    }
-    
-    @Override
-    public boolean isFrontGraphicsSupported() {
-        return false;
-    }
     
     @Override
     public boolean paintNativePeersBehind() {
         return true;
     }
     
-    static boolean isFrontGraphicsEnabled() {
-        return Accessor.isFrontGraphicsEnabled(instance.getCodenameOneGraphics());
-    }
-    
     static boolean isPaintPeersBehindEnabled() {
         return instance.paintNativePeersBehind();
     }
     
+    /**
+     * Checks to see if a given coordinate is contained by a CN1 light-weight component.
+     * This is used by native code to determine if a touch event should be passed through
+     * to the peer component layer. (TRUE = don't pass to native peer layer, FALSE - do pass to native peer layer)
+     * @param x x-coordinate to test (screen coordinates)
+     * @param y y-coordinate to test (screen coordinates)
+     * @return true if events should be handed by CN1 and not passed to the native layer.
+     */
     static boolean hitTest(int x, int y) {
         Form f = Display.getInstance().getCurrent();
         if (f != null) {
@@ -938,38 +895,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public void flushGraphics(int x, int y, int width, int height) {
-        /*if(currentlyDrawingOn != null && backBuffer == currentlyDrawingOn.associatedImage) {
-            backBuffer.peer = finishDrawingOnImage();
-            flushBuffer(backBuffer.peer, x, y, width, height);
-            startDrawingOnImage(backBuffer.width, backBuffer.height, backBuffer.peer);
-        } else {
-            flushBuffer(backBuffer.peer, x, y, width, height);
-        }*/
-        Graphics g = getCodenameOneGraphics();
-        if (Accessor.isFrontGraphicsEnabled(g)) {
-            
-            Accessor.flush(g, x, y, width, height);
-        }
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
-
-        /*if(Display.getInstance().isEdt()) {
-            Object lock = getDisplayLock();
-            int count = 3;
-            while(!isPainted()) {
-                synchronized(lock) {
-                    try {
-                        lock.wait(10);
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-                if(count == 0) {
-                    break;
-                }
-                count--;
-            }
-        }*/
     }
 
     private final static int[] singleDimensionX = new int[1];

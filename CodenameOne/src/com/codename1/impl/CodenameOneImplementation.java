@@ -613,38 +613,6 @@ public abstract class CodenameOneImplementation {
      * Flush the currently painted drawing onto the screen if using a double buffer
      */
     public abstract void flushGraphics();
-
-    /**
-     * Shows or hides the front graphics layer.  If the platform doesn't support
-     * front graphics, then this does nothing.
-     * <p>Front graphics can be enabled/disabled at runtime using:
-     * {@code Display.getInstance().setProperty("useFrontGraphics", "true") // or false}
-     * </p>
-     * @param visible True to make the front graphics layer visible.  False to make it invisible.
-     */
-    public void setFrontGraphicsVisible(boolean visible) {
-        
-    }
-    
-    /**
-     * Flush the currently painted front graphics layer.  This will only be used if
-     * {@link #isFrontGraphicsSupported() } is on and the codename one graphics
-     * object has front graphics enabled.
-     * @param x The top-left x point of the bounds to be flushed (screen coordindate)
-     * @param y The top-left y point of the bounds to be flushed (screen coordinate)
-     * @param width The width of the bounds to be flushed
-     * @param height The height of the bounds to be flushed.
-     */
-    public void flushFrontGraphics(int x, int y, int width, int height) {
-        
-    }
-    
-    /**
-     * Clears the front graphics layer.  This will be called when flushing graphics
-     * and there is no front graphics layer to render.  It will ensure that the next
-     * time the front graphics is drawn to, it will have a clean slate.
-     */
-    public void clearFrontGraphics(){}
     
     /**
      * Returns a graphics object for use by the painting
@@ -665,31 +633,17 @@ public abstract class CodenameOneImplementation {
         codenameOneGraphics = g;
     }
 
+    /**
+     * A flag that can be overridden by a platform to indicate that native 
+     * peers are rendered behind the main codename one graphics layer.  The main
+     * effect of this is that Graphics will call clearRect() any time a native
+     * component is "painted" to poke a hole through the CN1 layer.
+     * @return 
+     */
     public boolean paintNativePeersBehind() {
         return false;
     }
     
-    /**
-     * This will return true on platforms that support a "front" graphics layer.  
-     * The Front graphics layer is a layer that is rendered in front of native peer components.
-     * 
-     * <p>This is a lowest common denominator approach to z-ordering of peer components as it only 
-     *  allows for 3 layers: The main layer, the peer component layer, and the front layer. 
-     * </p>
-     * @return True if the platform supports a front graphics layer.
-     */
-    public boolean isFrontGraphicsSupported() {
-        return false;
-    }
-    
-    /**
-     * Gets the graphics context for the "Front" layer.
-     * @return The graphics object to be used on the "Front" layer.  If the {@link #isFrontGraphicsSupported() } is false
-     * then this will return null.
-     */
-    public Graphics getFrontGraphics() {
-        return null;
-    }
     
     /**
      * Installs the display lock allowing implementors to synchronize against the 

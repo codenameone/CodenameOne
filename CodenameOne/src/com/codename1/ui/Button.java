@@ -759,7 +759,7 @@ public class Button extends Label {
 
     @Override
     public void paint(Graphics g) {
-        if(isLegacyRenderer() || g.isDrawingToFrontBuffer()) {
+        if(isLegacyRenderer()) {
             getUIManager().getLookAndFeel().drawButton(g, this);
             return;
         }

@@ -636,28 +636,6 @@ void com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-//native void drawTopLayer(long peer, int x, int y, int width, int height);
-extern void Java_com_codename1_impl_ios_IOSImplementation_drawTopLayerImpl(JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h);
-void com_codename1_impl_ios_IOSNative_drawTopLayer___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
-    POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_drawTopLayerImpl(peer, x, y, w, h);
-    POOL_END();
-}
-
-//native void showFrontGraphics();
-//native void hideFrontGraphics();
-void com_codename1_impl_ios_IOSNative_showFrontGraphics__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[CodenameOne_GLViewController instance].view showFrontGraphics];
-    });
-}
-
-void com_codename1_impl_ios_IOSNative_hideFrontGraphics__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [[CodenameOne_GLViewController instance].view hideFrontGraphics];
-    });
-}
-
 void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int]

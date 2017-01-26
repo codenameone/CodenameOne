@@ -36,61 +36,6 @@ extern UIView *editingComponent;
 extern BOOL isVKBAlwaysOpen();
 extern void repaintUI();
 
-// A view to store all peer components.
-@interface CN1PeerWrapper : UIView {
-    
-}
-
-@end
-
-@implementation CN1PeerWrapper
-
-// Override pointInside so that events that occur on the front buffer are not blocked
-// by the native peers that are rendered underneath it
--(BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event
-{
-    //Using code from http://stackoverflow.com/questions/1042830/retrieving-a-pixel-alpha-value-for-a-uiimage
-    BOOL inSubView = NO;
-    for (UIView *subview in self.subviews)
-    {
-        inSubView = [subview pointInside:point withEvent:event];
-        if (inSubView) {
-            break;
-        }
-    }
-    
-    if (!inSubView) {
-        return NO;
-    }
-    
-    UIImageView* v = ((EAGLView*)[CodenameOne_GLViewController instance].view).topLayerView;
-    if (v == nil || v.isHidden) {
-        return inSubView;
-    }
-    
-    
-    
-    unsigned char pixel[1] = {0};
-    CGContextRef context = CGBitmapContextCreate(pixel,
-                                                 1, 1, 8, 1, NULL,
-                                                 kCGImageAlphaOnly);
-    
-    UIImage* image = v.image;
-    if (image == nil) {
-        return inSubView;
-    }
-    
-    UIGraphicsPushContext(context);
-    [image drawAtPoint:CGPointMake(-point.x * scaleValue, -point.y * scaleValue)];
-    UIGraphicsPopContext();
-    CGContextRelease(context);
-    CGFloat alpha = pixel[0]/255.0f;
-    BOOL transparent = alpha < 0.01f;
-    
-    return transparent && inSubView;
-}
-@end
-
 @interface EAGLView (PrivateMethods)
 - (void)createFramebuffer;
 - (void)deleteFramebuffer;
@@ -99,7 +44,6 @@ extern void repaintUI();
 @implementation EAGLView
 
 @synthesize context;
-@synthesize topLayerView;
 @synthesize peerComponentsLayer;
 
 // You must implement this method
@@ -111,80 +55,19 @@ extern void repaintUI();
 extern BOOL isRetina();
 extern BOOL isRetinaBug();
 
-// Initializes the UIImageView that is used to display the front graphics
--(void) initTopLayerView {
-    self.topLayerView = [[UIImageView alloc] initWithFrame:self.bounds];
-    self.topLayerView.hidden = FALSE;
-    self.topLayerView.opaque = FALSE;
-    
-    //self.topLayerView.backgroundColor = [UIColor blueColor];
-    self.topLayerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    self.topLayerView.userInteractionEnabled = FALSE;
-    [self addSubview:self.topLayerView];
-    [self bringSubviewToFront:self.topLayerView];
-    self.topLayerView.clearsContextBeforeDrawing = NO;
-}
-
-// Shows the front graphics layer.  This is only used
-// when setting display property useFrontGraphics to "true"
--(void) showFrontGraphics {
-    
-    if (self.topLayerView == nil) {
-        [self initTopLayerView];
-    }
-    self.topLayerView.hidden = FALSE;
-}
-
-// Hides front graphics layer.  This is only used when setting display property
-// useFrontGraphics to "false"
--(void) hideFrontGraphics {
-    if (self.topLayerView != nil) {
-        self.topLayerView.hidden = TRUE;
-    }
-}
-
-// Sets the image that should be shown in the Front graphics.
--(void) setTopLayer:(GLUIImage*)img x:(int)x y:(int)y w:(int)w h:(int)h {
-    UIImage* newImage = [img getImage];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (self.topLayerView == nil) {
-            [self initTopLayerView];
-        }
-        self.topLayerView.image = newImage;
-    });
-    
-}
-
--(BOOL)isFrontGraphicsEnabled {
-    
-    return com_codename1_impl_ios_IOSImplementation_isFrontGraphicsEnabled___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
-}
-
 -(BOOL)isPaintPeersBehindEnabled {
     return com_codename1_impl_ios_IOSImplementation_isPaintPeersBehindEnabled___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 // Adds a peer component to the view.  Peer components are added to the peerComponentsLayer subview
 -(void) addPeerComponent:(UIView*) view {
-    if ([self isFrontGraphicsEnabled]) {
-        if (self.peerComponentsLayer == nil) {
-            self.peerComponentsLayer = [[CN1PeerWrapper alloc] initWithFrame:self.bounds];
-            self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            self.peerComponentsLayer.opaque = FALSE;
-            self.peerComponentsLayer.userInteractionEnabled = TRUE;
-            //self.peerComponentsLayer.backgroundColor = [UIColor blueColor];
-            
-            [self addSubview:self.peerComponentsLayer];
-        }
-        [self.peerComponentsLayer addSubview:view];
-    } else if ([self isPaintPeersBehindEnabled]) {
+    if ([self isPaintPeersBehindEnabled]) {
         if (self.peerComponentsLayer == nil) {
             
             self.peerComponentsLayer = [[UIView alloc] initWithFrame:self.bounds];
             self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             self.peerComponentsLayer.opaque = TRUE;
             self.peerComponentsLayer.userInteractionEnabled = TRUE;
-            //self.peerComponentsLayer.backgroundColor = [UIColor blueColor];
             CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
             eaglLayer.opaque = FALSE;
             self.opaque = FALSE;
@@ -196,8 +79,6 @@ extern BOOL isRetinaBug();
     } else {
         [self addSubview:view];
     }
-    
-    //[self addSubview:view];
     
 }
 
