@@ -618,6 +618,8 @@ public final class IOSNative {
 
     native void clearRectMutable(int x, int y, int width, int height);
 
+    native void nativeClearRectGlobal(int x, int y, int width, int height);
+
 
    
 }

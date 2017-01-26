@@ -39,6 +39,9 @@ import java.util.ArrayList;
  * object directly.
  */
 public final class Graphics {
+    
+    boolean paintPeersBehind;
+    
     /**
      * Flag that indicates that this graphics object should buffer all operations
      * that occur after a peer component is drawn to the front graphics buffer so that
@@ -2319,7 +2322,7 @@ public final class Graphics {
             o.antialiasText = isAntiAliasedText();
             frontBuffer.add(o);
         }
-        if (frontBufferActive) {
+        if (frontBufferActive || paintPeersBehind) {
             // If we are drawing to the front buffer, we need to clear the pixels 
             // from whatever was underneath the peer component so that the front 
             // graphics layer doesn't get artifacts from previous frames.

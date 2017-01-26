@@ -665,6 +665,9 @@ public abstract class CodenameOneImplementation {
         codenameOneGraphics = g;
     }
 
+    public boolean paintNativePeersBehind() {
+        return false;
+    }
     
     /**
      * This will return true on platforms that support a "front" graphics layer.  

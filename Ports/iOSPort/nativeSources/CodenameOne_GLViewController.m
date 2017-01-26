@@ -28,6 +28,7 @@
 #import "ClipRect.h"
 #import "DrawLine.h"
 #import "DrawRect.h"
+#import "ClearRect.h"
 #import "FillPolygon.h"
 #import "DrawString.h"
 #import "DrawPath.h"
@@ -1308,6 +1309,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y
         CGContextRestoreGState(context);
     }
     
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
+    ClearRect* f = [[ClearRect alloc] initWithArgs:x ypos:y w:w h:h];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl

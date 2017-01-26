@@ -912,6 +912,28 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public boolean isFrontGraphicsSupported() {
+        return false;
+    }
+    
+    @Override
+    public boolean paintNativePeersBehind() {
+        return true;
+    }
+    
+    static boolean isFrontGraphicsEnabled() {
+        return Accessor.isFrontGraphicsEnabled(instance.getCodenameOneGraphics());
+    }
+    
+    static boolean isPaintPeersBehindEnabled() {
+        return instance.paintNativePeersBehind();
+    }
+    
+    static boolean hitTest(int x, int y) {
+        Form f = Display.getInstance().getCurrent();
+        if (f != null) {
+            Component cmp = f.getComponentAt(x, y);
+            return cmp == null || !(cmp instanceof PeerComponent);
+        }
         return true;
     }
     
@@ -1553,6 +1575,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height) {
         nativeInstance.nativeFillRectGlobal(color, alpha, x, y, width, height);
+    }
+    
+    static void nativeClearRectGlobal(int x, int y, int width, int height) {
+        nativeInstance.nativeClearRectGlobal(x, y, width, height);
     }
 
     public void fillRect(Object graphics, int x, int y, int width, int height) {
@@ -4333,9 +4359,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         @Override
         public void nativeClearRect(int x, int y, int width, int height) {
-            System.out.println("nativeClearRect() not yet supported in Global Graphics");
-            // We don't support this yet in the global graphics.
-            // we only added it for 
+            nativeClearRectGlobal(x, y, width, height);
+            
         }
         
         

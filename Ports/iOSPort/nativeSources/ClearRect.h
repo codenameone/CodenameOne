@@ -20,28 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
+#import <Foundation/Foundation.h>
+#import "ExecutableOp.h"
 
-package com.codename1.ui;
-
-/**
- * Allows access to package protected methods without exposing them thru official API
- * 
- * @author Shai Almog
- */
-public class Accessor {
-    public static Object getNativeGraphics(Graphics g) {
-        return g.getGraphics();
-    }
-    
-    public static void flush(Graphics g, int x, int y, int width, int height) {
-        g.flush(x, y, width, height);
-    }
-    
-    public static boolean isFrontGraphicsEnabled(Graphics g) {
-        return g.enableFrontGraphics;
-    }
-    
-    public static boolean isPaintPeersBehindEnabled(Graphics g) {
-        return g.paintPeersBehind;
-    }
+@interface ClearRect : ExecutableOp {
+    int x;
+    int y;
+    int width;
+    int height;
 }
+-(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h;
+-(void)execute;
+
+@end

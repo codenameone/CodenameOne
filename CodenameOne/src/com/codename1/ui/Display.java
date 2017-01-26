@@ -568,6 +568,7 @@ public final class Display {
             INSTANCE.impl.setDisplayLock(lock);
             INSTANCE.impl.initImpl(m);
             INSTANCE.codenameOneGraphics = new Graphics(INSTANCE.impl.getNativeGraphics());
+            INSTANCE.codenameOneGraphics.paintPeersBehind = INSTANCE.impl.paintNativePeersBehind();
             INSTANCE.codenameOneGraphics.enableFrontGraphics = INSTANCE.impl.isFrontGraphicsSupported();
             INSTANCE.impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 

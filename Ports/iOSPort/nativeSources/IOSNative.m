@@ -675,6 +675,14 @@ void com_codename1_impl_ios_IOSNative_clearRectMutable___int_int_int_int(CN1_THR
     
 }
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h);
+//native void nativeClearRectGlobal(int x, int y, int width, int height);
+void com_codename1_impl_ios_IOSNative_nativeClearRectGlobal___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(x, y, w, h);
+    POOL_END();
+    
+}
 void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int]

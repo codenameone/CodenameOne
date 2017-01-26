@@ -36,7 +36,7 @@ extern UIView *editingComponent;
 extern BOOL isVKBAlwaysOpen();
 extern void repaintUI();
 
-// A view to store all peer components.  
+// A view to store all peer components.
 @interface CN1PeerWrapper : UIView {
     
 }
@@ -116,7 +116,7 @@ extern BOOL isRetinaBug();
     self.topLayerView = [[UIImageView alloc] initWithFrame:self.bounds];
     self.topLayerView.hidden = FALSE;
     self.topLayerView.opaque = FALSE;
-
+    
     //self.topLayerView.backgroundColor = [UIColor blueColor];
     self.topLayerView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.topLayerView.userInteractionEnabled = FALSE;
@@ -128,7 +128,7 @@ extern BOOL isRetinaBug();
 // Shows the front graphics layer.  This is only used
 // when setting display property useFrontGraphics to "true"
 -(void) showFrontGraphics {
-   
+    
     if (self.topLayerView == nil) {
         [self initTopLayerView];
     }
@@ -155,27 +155,66 @@ extern BOOL isRetinaBug();
     
 }
 
+-(BOOL)isFrontGraphicsEnabled {
+    
+    return com_codename1_impl_ios_IOSImplementation_isFrontGraphicsEnabled___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+-(BOOL)isPaintPeersBehindEnabled {
+    return com_codename1_impl_ios_IOSImplementation_isPaintPeersBehindEnabled___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
 // Adds a peer component to the view.  Peer components are added to the peerComponentsLayer subview
 -(void) addPeerComponent:(UIView*) view {
-    if (self.peerComponentsLayer == nil) {
-        self.peerComponentsLayer = [[CN1PeerWrapper alloc] initWithFrame:self.bounds];
-        self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        self.peerComponentsLayer.opaque = FALSE;
-        self.peerComponentsLayer.userInteractionEnabled = TRUE;
-        //self.peerComponentsLayer.backgroundColor = [UIColor blueColor];
-        [self addSubview:self.peerComponentsLayer];
+    if ([self isFrontGraphicsEnabled]) {
+        if (self.peerComponentsLayer == nil) {
+            self.peerComponentsLayer = [[CN1PeerWrapper alloc] initWithFrame:self.bounds];
+            self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            self.peerComponentsLayer.opaque = FALSE;
+            self.peerComponentsLayer.userInteractionEnabled = TRUE;
+            //self.peerComponentsLayer.backgroundColor = [UIColor blueColor];
+            
+            [self addSubview:self.peerComponentsLayer];
+        }
+        [self.peerComponentsLayer addSubview:view];
+    } else if ([self isPaintPeersBehindEnabled]) {
+        if (self.peerComponentsLayer == nil) {
+            
+            self.peerComponentsLayer = [[UIView alloc] initWithFrame:self.bounds];
+            self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            self.peerComponentsLayer.opaque = TRUE;
+            self.peerComponentsLayer.userInteractionEnabled = TRUE;
+            //self.peerComponentsLayer.backgroundColor = [UIColor blueColor];
+            CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
+            eaglLayer.opaque = FALSE;
+            self.opaque = FALSE;
+            self.backgroundColor = [UIColor clearColor];
+            UIView* parent = [self superview];
+            [parent insertSubview: self.peerComponentsLayer belowSubview:self];
+        }
+        [self.peerComponentsLayer addSubview:view];
+    } else {
+        [self addSubview:view];
     }
-    [self.peerComponentsLayer addSubview:view];
-     
+    
     //[self addSubview:view];
     
+}
+
+-(BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event
+{
+    if ([self isPaintPeersBehindEnabled]) {
+        return com_codename1_impl_ios_IOSImplementation_hitTest___int_int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG point.x * scaleValue, point.y * scaleValue);
+    } else {
+        return YES;
+    }
 }
 
 //The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
 - (id)initWithCoder:(NSCoder*)coder
 {
     self = [super initWithCoder:coder];
-	if (self) {
+    if (self) {
         self.clearsContextBeforeDrawing = NO;
         if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
             if(isRetinaBug()) {
@@ -202,7 +241,7 @@ extern BOOL isRetinaBug();
 #ifndef CN1_USE_ARC
     [context release];
     [super dealloc];
-#endif    
+#endif
 }
 
 - (void)setContext:(EAGLContext *)newContext
@@ -236,7 +275,7 @@ extern BOOL isRetinaBug();
         GLErrorLog;
         glBindRenderbuffer(GL_RENDERBUFFER, colorRenderbuffer);
         GLErrorLog;
-
+        
         [context renderbufferStorage:GL_RENDERBUFFER fromDrawable:(CAEAGLLayer *)self.layer];
         GLErrorLog;
         glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &framebufferWidth);
@@ -265,20 +304,20 @@ extern BOOL isRetinaBug();
                                      GL_RENDERBUFFER_OES, stencil);
         GLErrorLog;
         /*
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, framebufferWidth, framebufferHeight);
-        GLErrorLog;
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
-        GLErrorLog;
-
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
-        */
-         glClearStencil(0x0);
+         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, framebufferWidth, framebufferHeight);
+         GLErrorLog;
+         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
+         GLErrorLog;
+         
+         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
+         */
+        glClearStencil(0x0);
         GLErrorLog;
         glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
         GLErrorLog;
         //glClearStencil(0x1);
         //GLErrorLog;
-         
+        
         
         
         
