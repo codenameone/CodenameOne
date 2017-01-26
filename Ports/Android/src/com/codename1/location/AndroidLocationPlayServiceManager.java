@@ -223,7 +223,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                         LocationRequest req = LocationRequest.create();
                         setupBackgroundLocationRequest(req);
 
-                        Context context = AndroidNativeUtil.getContext();
+                        Context context = AndroidNativeUtil.getContext().getApplicationContext();
 
                         Intent intent = new Intent(context, BackgroundLocationHandler.class);
                         //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
@@ -290,7 +290,7 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                 mHandler.post(new Runnable() {
 
                     public void run() {
-                        Context context = AndroidNativeUtil.getContext();
+                        Context context = AndroidNativeUtil.getContext().getApplicationContext();
                         Intent intent = new Intent(context, BackgroundLocationHandler.class);
                         intent.putExtra("backgroundClass", bgListenerClass.getName());
                         PendingIntent pendingIntent = PendingIntent.getService(context, 0,
