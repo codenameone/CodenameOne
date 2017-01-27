@@ -35,6 +35,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import java.util.Collections;
@@ -178,6 +179,76 @@ public class Container extends Component implements Iterable<Component>{
         return super.getUIManager();
     }
 
+    /**
+     * An atomic operation that wraps the current component in a Container with
+     * a layered layout.  This prevents us from having to initialize and deinitialize
+     * all of the components in a sub-tree because we want to re-root it.  In particular
+     * Form.getLayeredPane() re-roots the entire content pane the first time it is 
+     * called on a form.  If the form contains native peers there is a flicker which
+     * is quite annoying.  Providing a way to do this atomically results in a better 
+     * user experience.
+     * @return The Container that is the new parent of this component.
+     */
+    Container wrapInLayeredPane() {
+        final Container oldParent = getParent();
+        final Container newParent = new Container(new LayeredLayout());
+        final Layout parentLayout = oldParent != null && oldParent.layout != null ? oldParent.layout : null;
+        final Object constraint = parentLayout != null ? parentLayout.getComponentConstraint(this) : null;
+        newParent.setParent(oldParent);
+        newParent.components.add(this);
+        
+        final Runnable r = new Runnable() {
+            public void run() {
+                if (parentLayout != null) {
+                    parentLayout.removeLayoutComponent(Container.this);
+                    parentLayout.addLayoutComponent(constraint, newParent, oldParent);
+                }
+
+                newParent.initComponentImpl();
+                if (oldParent != null) {
+                    int cmpIndex = -1;
+                    for (int i=0; i<oldParent.getComponentCount(); i++) {
+                        Component c = oldParent.getComponentAt(i);
+                        if (c.equals(Container.this)) {
+                            cmpIndex = i;
+                            break;
+                        }
+                    }
+                    //int cmpIndex = oldParent.getComponentIndex(Container.this);  <---  WTF... this always returns -1!!
+                    if (cmpIndex == -1) {
+                        throw new RuntimeException("WTF we have parent but no index!!!!");
+                    }
+                    oldParent.components.set(cmpIndex, newParent);
+                }
+
+                Container.this.setParent(newParent);
+
+                newParent.revalidate();
+            }
+        };
+        AnimationManager a = getAnimationManager();
+        if(a != null && a.isAnimating()) {
+            
+            a.addAnimation(new ComponentAnimation() {
+                @Override
+                public boolean isInProgress() {
+                    return false;
+                }
+
+                @Override
+                protected void updateState() {
+                    r.run();
+                }
+            });
+            return newParent;
+        } else {
+            r.run();
+            return newParent;
+        }
+        
+    }
+    
+    
     /**
      * Simpler version of addComponent that allows chaining the calls for shorter syntax
      * @param cmp the component to add
