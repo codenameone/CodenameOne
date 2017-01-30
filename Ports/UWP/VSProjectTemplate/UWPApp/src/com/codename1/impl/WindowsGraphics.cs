@@ -169,6 +169,18 @@ namespace com.codename1.impl
                 
         }
 
+        internal virtual void clearRect(int x, int y, int w, int h)
+        {
+            CanvasBlend oldBlend = graphics.Blend;
+            graphics.Blend = CanvasBlend.Copy;
+            CanvasSolidColorBrush brush = new CanvasSolidColorBrush(graphics, Colors.Transparent);
+            
+            brush.Color = Colors.Transparent;
+            brush.Opacity = 1;
+            graphics.FillRectangle(x, y, w, h, brush);
+            graphics.Blend = oldBlend;
+        }
+
         internal virtual void drawRect(int x, int y, int w, int h, int stroke)
         {
             //using (createAlphaLayer())

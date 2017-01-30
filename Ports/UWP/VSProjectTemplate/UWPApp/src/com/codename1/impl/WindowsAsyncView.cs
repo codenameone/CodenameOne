@@ -169,6 +169,11 @@ namespace com.codename1.impl
                 pendingRenderingOperations.Add(new FillRectPainter(clip, x, y, w, h, color, alpha));
             }
 
+            internal override void clearRect(int x, int y, int w, int h)
+            {
+                pendingRenderingOperations.Add(new ClearRectPainter(clip, x, y, w, h));
+            }
+
             internal override void drawRoundRect(int x, int y, int w, int h, int arcW, int arcH)
             {
                 pendingRenderingOperations.Add(new DrawRoundRectPainter(clip, x, y, w, h, color, alpha, arcW, arcH));
