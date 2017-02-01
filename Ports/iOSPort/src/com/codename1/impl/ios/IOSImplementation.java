@@ -772,7 +772,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 pt,
                                 pb,
                                 pl,
-                                pr, hint, showToolbar);
+                                pr, hint, showToolbar, Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")));
                     }
                 }
             });
@@ -6774,6 +6774,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.deregisterPush();
     }
 
+    @Override
+    public void blockCopyPaste(boolean blockCopyPaste) {
+        nativeInstance.blockCopyPaste(blockCopyPaste);
+    }
+
+    
+    
     private static PushCallback pushCallback;
     
     public static void pushReceived(final String message, final String type) {

@@ -5631,6 +5631,14 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /**
+     * Blocks or enables copy and paste in the entire app.
+     * @param blockCopyPaste True to block copy and paste.  False to enable it.
+     */
+    public void blockCopyPaste(boolean blockCopyPaste) {
+        
+    }
+
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {

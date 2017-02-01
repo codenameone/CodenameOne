@@ -42,6 +42,8 @@
 #import "Rotate.h"
 #import "PaintOp.h"
 #import "RadialGradientPaint.h"
+#import "CN1UITextView.h"
+#import "CN1UITextField.h"
 #import <AudioToolbox/AudioToolbox.h>
 #import "DrawGradientTextureCache.h"
 #import "DrawStringTextureCache.h"
@@ -96,6 +98,10 @@ int nextPowerOf2(int val) {
 
 int displayWidth = -1;
 int displayHeight = -1;
+BOOL CN1_blockPaste=NO;
+BOOL CN1_blockCut=NO;
+BOOL CN1_blockCopy=NO;
+
 UIView *editingComponent;
 
 // Currently used only for datepicker but could be used for
@@ -219,7 +225,7 @@ BOOL isVKBAlwaysOpen() {
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste) {
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
@@ -253,7 +259,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
         forceSlideUpField = forceSlideUp;
         CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
         if(isSingleLine) {
-            UITextField* utf = [[UITextField alloc] initWithFrame:rect];
+            CN1UITextField* utf = [[CN1UITextField alloc] initWithFrame:rect];
+            utf.blockPaste = CN1_blockPaste || blockCopyPaste;
+            utf.blockCopy = CN1_blockCopy || blockCopyPaste;
+            utf.blockCut = CN1_blockCut || blockCopyPaste;
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
             
@@ -420,7 +429,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 }
             }
         } else {
-            UITextView* utv = [[UITextView alloc] initWithFrame:rect];
+            CN1UITextView* utv = [[CN1UITextView alloc] initWithFrame:rect];
+            utv.blockPaste = CN1_blockPaste || blockCopyPaste;
+            utv.blockCopy = CN1_blockCopy || blockCopyPaste;
+            utv.blockCut = CN1_blockCut || blockCopyPaste;
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];

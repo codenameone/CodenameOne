@@ -2827,6 +2827,9 @@ public final class Display {
             Container.blockOverdraw = true;
             return;
         }
+        if ("blockCopyPaste".equals(key)) {
+            impl.blockCopyPaste("true".equals(value));
+        }
         if(key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
             return;
