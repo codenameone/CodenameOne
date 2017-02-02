@@ -3654,6 +3654,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         
         void setClip(Shape newClip) {
+            if ( clip == null) {
+                clip = new ClipShape();
+            }
             if (!clip.equals(newClip, transform)) { 
                 clip.setShape(newClip, transform);
                 clipDirty = true;
