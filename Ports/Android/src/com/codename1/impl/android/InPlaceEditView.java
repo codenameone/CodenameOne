@@ -44,8 +44,13 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.util.TypedValue;
+import android.view.ActionMode;
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -759,6 +764,38 @@ public class InPlaceEditView extends FrameLayout{
         }
         int id = activity.getResources().getIdentifier("cn1Style", "attr", activity.getApplicationInfo().packageName);
         mEditText = new EditView(activity, textArea.textArea, this, id);
+    
+        if(textArea.getClientProperty("blockCopyPaste") != null || Display.getInstance().getProperty("blockCopyPaste", "false").equals("true")) {
+            // The code below is taken from this stackoverflow answer: http://stackoverflow.com/a/22756538/756809
+            if (android.os.Build.VERSION.SDK_INT < 11) {
+                mEditText.setOnCreateContextMenuListener(new OnCreateContextMenuListener() {
+                    @Override
+                    public void onCreateContextMenu(ContextMenu menu, View v,
+                            ContextMenuInfo menuInfo) {
+                        menu.clear();
+                    }
+                });
+            } else {
+                mEditText.setCustomSelectionActionModeCallback(new ActionMode.Callback() {
+                    public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                        return false;
+                    }
+
+                    public void onDestroyActionMode(ActionMode mode) {
+                    }
+
+                    public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                        return false;
+                    }
+
+                    public boolean onActionItemClicked(ActionMode mode,
+                            MenuItem item) {
+                        return false;
+                    }
+                });
+            }            
+        }
+        
         mEditText.addTextChangedListener(mEditText.mTextWatcher);
         mEditText.setBackgroundDrawable(null);
 
