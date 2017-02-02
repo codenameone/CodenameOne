@@ -1068,6 +1068,24 @@ public class BytecodeMethod {
         
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
+        
+        for (int iter=0; iter < instructionCount - 1; iter++) {
+            Instruction current = instructions.get(iter);
+            if (current.isOptimized()) {
+                continue;
+            }
+            int currentOpcode = current.getOpcode();
+            switch(currentOpcode) {
+                case Opcodes.CHECKCAST: {
+                    // Remove the check cast for now as it gets in the way of other optimizations
+                    instructions.remove(iter);
+                    iter--;
+                    instructionCount--;
+                    break;
+                }
+            }
+        }
+        
         for(int iter = 0 ; iter < instructionCount - 1 ; iter++) {
             Instruction current = instructions.get(iter);
             if (current.isOptimized()) {
@@ -1189,7 +1207,6 @@ public class BytecodeMethod {
                 }
             }
             switch(currentOpcode) {
-                
                 case Opcodes.ASTORE:
                 case Opcodes.ISTORE:
                 case Opcodes.DSTORE:
@@ -1475,6 +1492,7 @@ public class BytecodeMethod {
                         Invoke inv = (Invoke)current;
                         List<ByteCodeMethodArg> invocationArgs = inv.getArgs();
                         int numArgs = invocationArgs.size();
+                        
                         //if (current.getOpcode() != Opcodes.INVOKESTATIC) {
                         //    numArgs++;
                         //}
@@ -1482,6 +1500,7 @@ public class BytecodeMethod {
                             String[] argLiterals = new String[numArgs];
                             for (int i=0; i<numArgs; i++) {
                                 Instruction instr = instructions.get(iter-numArgs+i);
+                                
                                 if (instr instanceof VarOp) {
                                     VarOp var = (VarOp)instr;
                                     switch (instr.getOpcode()) {
@@ -1545,8 +1564,6 @@ public class BytecodeMethod {
                                             argLiterals[i] = "(JAVA_LONG)1";
                                             break;
                                         }
-
-
                                     }
                                 } else {
                                     switch (instr.getOpcode()) {
@@ -1592,6 +1609,13 @@ public class BytecodeMethod {
                                             argLiterals[i] = "(JAVA_LONG)1";
                                             break;
                                         }
+                                        case Opcodes.LDC : {
+                                            if (instr instanceof Ldc) {
+                                                Ldc ldc = (Ldc)instr;
+                                                argLiterals[i] = ldc.getValueAsString();
+                                                break;
+                                            }
+                                        }
 
 
                                     }
@@ -1619,10 +1643,23 @@ public class BytecodeMethod {
                                     instructions.remove(iter-numArgs);
                                     newInvoke.setLiteralArg(i, argLiterals[i]);
                                 }
+                                if (inv.getOpcode() != Opcodes.INVOKESTATIC) {
+                                    Instruction ldTarget = instructions.get(iter-numArgs-1);
+                                    switch (ldTarget.getOpcode()) {
+                                        case Opcodes.ALOAD: {
+                                            VarOp v = (VarOp)ldTarget;
+                                            newInvoke.setTargetObjectLiteral("locals["+v.getIndex()+"].data.o");
+                                            instructions.remove(iter-numArgs-1);
+                                            break;
+                                        }
+                                    }
+                                }
                                 
                                 newInvoke.setOptimized(true);
                                 iter = 0;
                                 instructionCount = instructions.size();
+                                
+                                
                             }
                         }
                     }

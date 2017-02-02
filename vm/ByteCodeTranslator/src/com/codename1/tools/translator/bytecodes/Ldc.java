@@ -88,6 +88,132 @@ public class Ldc extends Instruction {
         }
     }
 
+    public String getValueAsString() {
+        StringBuilder b = new StringBuilder();
+        if (cst instanceof Integer) {
+            //b.append("PUSH_INT(");
+            b.append(((Number)cst).intValue());
+            //b.append("); /* LDC */\n");
+        } else if (cst instanceof Float) {
+            Float f = (Float)cst;
+            //b.append("PUSH_FLOAT(");
+            if(f.isInfinite()) {
+                if(f.floatValue() > 0) {
+                    b.append("1.0f / 0.0f");
+                } else {
+                    b.append("-1.0f / 0.0f");
+                }
+            } else {
+                if(f.isNaN()) {
+                    b.append("0.0/0.0");
+                } else {
+                    b.append(f.floatValue());
+                }
+            }
+            //b.append("); /* LDC */\n");
+        } else if (cst instanceof Long) {
+            //b.append("PUSH_LONG(");
+            if(((Number)cst).longValue() == Long.MIN_VALUE) {
+                // min value in C is 1 less (more really)
+                b.append(((Number)cst).longValue() + 1);
+            } else {
+                b.append(((Number)cst).longValue());
+            }
+            //b.append("LL); /* LDC */\n");
+        } else if (cst instanceof Double) {
+            Double d = (Double)cst;
+            //b.append("PUSH_DOUBLE(");
+            if(d.isInfinite()) {
+                if(d.floatValue() > 0) {
+                    b.append("1.0 / 0.0");
+                } else {
+                    b.append("-1.0 / 0.0");
+                }
+            } else {
+                if(d.isNaN()) {
+                    b.append("0.0/0.0");
+                } else {
+                    b.append(d.doubleValue());
+                }
+            }
+            //b.append("); /* LDC */\n");
+        } else if (cst instanceof String) {
+            //b.append("/* LDC: '");
+            //b.append(((String)cst).replace('\n', ' ').replace("*/", "*\\/"));
+            //b.append("'*/\n    PUSH_POINTER(STRING_FROM_CONSTANT_POOL_OFFSET(");
+            b.append("STRING_FROM_CONSTANT_POOL_OFFSET(");
+            b.append(Parser.addToConstantPool((String)cst));
+            b.append(")");
+            //b.append("));\n");
+            
+        } else if (cst instanceof Type) {
+            // TODO...
+            int sort = ((Type) cst).getSort();
+            Type tp = (Type) cst;
+            if (sort == Type.OBJECT) {
+                //b.append("/* LDC: '");
+                //b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                //b.append("'*/\n    PUSH_POINTER((JAVA_OBJECT)&class__");
+                //b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                //b.append(");\n");
+                b.append("(JAVA_OBJECT)&class__");
+                b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+            } else if (sort == Type.ARRAY) {
+                //b.append("/* LDC Array: '");
+                //b.append(tp.getInternalName().replace('/', '_').replace('$', '_'));
+                //b.append("'*/\n    PUSH_POINTER((JAVA_OBJECT)&class_array");
+                b.append("(JAVA_OBJECT)&class_array");
+                b.append(tp.getDimensions());
+                b.append("__");
+                Type ttt = tp.getElementType();
+                switch(ttt.getSort()) {
+                    case Type.BOOLEAN:
+                        b.append("JAVA_BOOLEAN");
+                        break;
+                    case Type.BYTE:
+                        b.append("JAVA_BYTE");
+                        break;
+                    case Type.CHAR:
+                        b.append("JAVA_CHAR");
+                        break;
+                    case Type.DOUBLE:
+                        b.append("JAVA_DOUBLE");
+                        break;
+                    case Type.FLOAT:
+                        b.append("JAVA_FLOAT");
+                        break;
+                    case Type.INT:
+                        b.append("JAVA_INT");
+                        break;
+                    case Type.LONG:
+                        b.append("JAVA_LONG");
+                        break;
+                    case Type.SHORT:
+                        b.append("JAVA_SHORT");
+                        break;
+                    default:
+                        b.append(ttt.getInternalName().replace('/', '_').replace('$', '_'));
+                        break;
+                }
+                //b.append(");\n");
+            } else if (sort == Type.METHOD) {
+                b.append("/* UNKNOWN CST type internal: ");
+                b.append(tp.getInternalName());
+                b.append(" */");
+            } else {
+                b.append("/* UNKNOWN CST type internal: ");
+                b.append(tp.getInternalName());
+                b.append(" */");
+            }
+        } else if (cst instanceof Handle) {
+            //((Handle)cst).
+            b.append("/* UNKNOWN CST type: ");
+            b.append(cst.getClass().getName());
+            b.append(" */");
+        }
+        return b.toString();
+    }
+    
     @Override
     public void appendInstruction(StringBuilder b) {
         b.append("    ");
