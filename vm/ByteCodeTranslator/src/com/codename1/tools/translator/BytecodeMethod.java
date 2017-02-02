@@ -1564,6 +1564,12 @@ public class BytecodeMethod {
                                             argLiterals[i] = "(JAVA_LONG)1";
                                             break;
                                         }
+                                        case Opcodes.BIPUSH: 
+                                        case Opcodes.SIPUSH: {
+                                            argLiterals[i] = String.valueOf(var.getIndex());
+                                            
+                                            break;
+                                        }
                                     }
                                 } else {
                                     switch (instr.getOpcode()) {
@@ -1609,12 +1615,19 @@ public class BytecodeMethod {
                                             argLiterals[i] = "(JAVA_LONG)1";
                                             break;
                                         }
+                                        case Opcodes.BIPUSH: {
+                                            if (instr instanceof BasicInstruction) {
+                                                argLiterals[i] = String.valueOf(((BasicInstruction)instr).getValue());
+                                            }
+                                            break;
+                                        }
                                         case Opcodes.LDC : {
                                             if (instr instanceof Ldc) {
                                                 Ldc ldc = (Ldc)instr;
                                                 argLiterals[i] = ldc.getValueAsString();
-                                                break;
+                                                
                                             }
+                                            break;
                                         }
 
 

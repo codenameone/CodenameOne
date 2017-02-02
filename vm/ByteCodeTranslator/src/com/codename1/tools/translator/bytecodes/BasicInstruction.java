@@ -43,6 +43,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
         this.value = value;
     }
     
+    public int getValue() {
+        return value;
+    }
+    
     public static void setSynchronizedMethod(boolean b, boolean stat, String cls) {
         synchronizedMethod = b;
         staticMethod = stat;
