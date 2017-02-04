@@ -146,7 +146,7 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
         if (instr instanceof AssignableExpression) {
             StringBuilder dummy = new StringBuilder();
             
-            if (((AssignableExpression)instr).assignTo(null, null, dummy)) {
+            if (((AssignableExpression)instr).assignTo(null, dummy)) {
                 return true;
             }
         }
@@ -175,7 +175,12 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
 
     public static boolean isBinaryOp(Instruction instr) {
         switch (instr.getOpcode()) {
-
+            case Opcodes.IOR:
+            case Opcodes.LOR:
+            case Opcodes.IXOR:
+            case Opcodes.LXOR:
+            case Opcodes.IAND:
+            case Opcodes.LAND:
             case Opcodes.FADD:
             case Opcodes.DADD:
             case Opcodes.IADD:
@@ -224,6 +229,12 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
             case Opcodes.I2D:
             case Opcodes.I2F:
             case Opcodes.I2S:
+            case Opcodes.IOR:
+            case Opcodes.LOR:
+            case Opcodes.IXOR:
+            case Opcodes.LXOR:
+            case Opcodes.IAND:
+            case Opcodes.LAND:
             case Opcodes.FADD:
             case Opcodes.DADD:
             case Opcodes.IADD:
@@ -256,7 +267,7 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
             // This is the root of it... probably an FLOAD
             if (lastInstruction instanceof AssignableExpression && !(lastInstruction instanceof ArithmeticExpression)) {
                 StringBuilder out = new StringBuilder();
-                if (((AssignableExpression)lastInstruction).assignTo(null, null, out)) {
+                if (((AssignableExpression)lastInstruction).assignTo(null, out)) {
                     String strOut = out.toString();
                     if (strOut.trim().isEmpty()) {
                         throw new RuntimeException("Instruction produces blank string output: "+lastInstruction);
@@ -397,81 +408,95 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
 
             switch (opcode) {
                 case Opcodes.D2F: {
-                    return "((JAVA_FLOAT)" + subExpression.getExpressionAsString() + ")";
+                    return "((JAVA_FLOAT)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.F2D: {
-                    return subExpression.getExpressionAsString();
+                    return subExpression.getExpressionAsString().trim();
                 }
                 case Opcodes.F2I: {
-                    return "((JAVA_INT)" + subExpression.getExpressionAsString() + ")";
+                    return "((JAVA_INT)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.F2L: {
-                    return "((JAVA_LONG)" + subExpression.getExpressionAsString() + ")";
+                    return "((JAVA_LONG)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.D2I: {
-                    return "((JAVA_INT)" + subExpression.getExpressionAsString() + ")";
+                    return "((JAVA_INT)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.D2L: {
-                    return "((JAVA_LONG)" + subExpression.getExpressionAsString() + ")";
+                    return "((JAVA_LONG)" + subExpression.getExpressionAsString().trim() + ")";
                 }
                 case Opcodes.I2B: {
                     return "(("+subExpression.getExpressionAsString()+" << 24) >> 24)";
                 }
                 case Opcodes.I2C: {
-                    return "("+subExpression.getExpressionAsString()+" & 0xffff)";
+                    return "("+subExpression.getExpressionAsString().trim()+" & 0xffff)";
                 }
                 case Opcodes.I2D: {
-                    return "((JAVA_DOUBLE)"+subExpression.getExpressionAsString()+")";
+                    return "((JAVA_DOUBLE)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.I2F: {
-                    return "((JAVA_FLOAT)"+subExpression.getExpressionAsString()+")";
+                    return "((JAVA_FLOAT)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.I2L: {
-                    return "((JAVA_LONG)"+subExpression.getExpressionAsString()+")";
+                    return "((JAVA_LONG)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.I2S: {
-                    return "(("+subExpression.getExpressionAsString()+" << 16)";
+                    return "(("+subExpression.getExpressionAsString().trim()+" << 16)";
                 }
                 case Opcodes.L2D: {
-                    return "((JAVA_DOUBLE)"+subExpression.getExpressionAsString()+")";
+                    return "((JAVA_DOUBLE)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.L2F: {
-                    return "((JAVA_FLOAT)"+subExpression.getExpressionAsString()+")";
+                    return "((JAVA_FLOAT)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.L2I: {
-                    return "((JAVA_INT)"+subExpression.getExpressionAsString()+")";
+                    return "((JAVA_INT)"+subExpression.getExpressionAsString().trim()+")";
+                }
+                case Opcodes.IAND:
+                case Opcodes.LAND: {
+                    return "(" + subExpression.getExpressionAsString().trim() + " & " + subExpression2.getExpressionAsString().trim() + ")";
+                    
+                }
+                case Opcodes.IOR:
+                case Opcodes.LOR: {
+                    return "(" + subExpression.getExpressionAsString().trim() + " | " + subExpression2.getExpressionAsString().trim() + ")";
+                }
+                case Opcodes.IXOR:
+                case Opcodes.LXOR: {
+                    return "(" + subExpression.getExpressionAsString().trim() + " ^ " + subExpression2.getExpressionAsString().trim() + ")";
+
                 }
                 case Opcodes.DADD:
                 case Opcodes.IADD:
                 case Opcodes.LADD:
                 case Opcodes.FADD: {
-                    return "(" + subExpression.getExpressionAsString() + "+" + subExpression2.getExpressionAsString() + ")";
+                    return "(" + subExpression.getExpressionAsString().trim() + " + " + subExpression2.getExpressionAsString().trim() + ")";
                 }
 
                 case Opcodes.DSUB:
                 case Opcodes.ISUB:
                 case Opcodes.LSUB:
                 case Opcodes.FSUB: {
-                    return "(" + subExpression.getExpressionAsString() + "-" + subExpression2.getExpressionAsString() + ")";
+                    return "(" + subExpression.getExpressionAsString().trim() + " - " + subExpression2.getExpressionAsString().trim() + ")";
                 }
 
                 case Opcodes.DMUL:
                 case Opcodes.IMUL:
                 case Opcodes.LMUL:
                 case Opcodes.FMUL: {
-                    return "("+subExpression.getExpressionAsString() + "*" + subExpression2.getExpressionAsString()+")";
+                    return "("+subExpression.getExpressionAsString().trim() + " * " + subExpression2.getExpressionAsString().trim()+")";
                 }
 
                 case Opcodes.DDIV:
                 case Opcodes.IDIV:
                 case Opcodes.LDIV:
                 case Opcodes.FDIV: {
-                    return "("+subExpression.getExpressionAsString() + "/" + subExpression2.getExpressionAsString()+")";
+                    return "("+subExpression.getExpressionAsString().trim() + " / " + subExpression2.getExpressionAsString().trim()+")";
                 }
 
                 case Opcodes.FREM:
                 case Opcodes.DREM: {
-                    return "fmod("+subExpression.getExpressionAsString() + ", "+subExpression2.getExpressionAsString()+")";
+                    return "fmod("+subExpression.getExpressionAsString().trim() + ", "+subExpression2.getExpressionAsString().trim()+")";
                 }
 
                 case Opcodes.LREM:
@@ -479,14 +504,14 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                     if (subExpression2.getExpressionAsString() == null || "null".equals(subExpression2.getExpressionAsString())) {
                         throw new RuntimeException("2nd param of REM is null.  Should never happen.  Expression is "+subExpression2+" with last instruction "+subExpression2.lastInstruction);
                     }
-                    return "("+subExpression.getExpressionAsString() + " % "+subExpression2.getExpressionAsString()+")";
+                    return "("+subExpression.getExpressionAsString().trim() + " % "+subExpression2.getExpressionAsString().trim()+")";
                 }
 
                 case Opcodes.FNEG:
                 case Opcodes.INEG:
                 case Opcodes.LNEG:
                 case Opcodes.DNEG:
-                    return "(-"+subExpression.getExpressionAsString()+")";
+                    return "(-("+subExpression.getExpressionAsString().trim()+"))";
                     
                 default: {
                     throw new RuntimeException("Unsupported Opcode in ArithmeticExpression: "+opcode+" "+instr);
@@ -498,7 +523,7 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
     }
 
     @Override
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+    public boolean assignTo(String varName, StringBuilder sb) {
         if (varName != null) {
             sb.append(varName).append("=");
         }

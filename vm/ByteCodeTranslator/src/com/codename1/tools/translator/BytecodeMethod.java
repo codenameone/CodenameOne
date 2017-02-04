@@ -1158,8 +1158,8 @@ public class BytecodeMethod {
                                     instructions.add(iter, new CustomIntruction(s, s, dependentClasses, new AssignableExpression() {
 
                                         @Override
-                                        public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
-                                            return finalNext.assignTo(varName, typeVarName, sb);
+                                        public boolean assignTo(String varName, StringBuilder sb) {
+                                            return finalNext.assignTo(varName, sb);
                                         }
                                         
                                     }));
@@ -1298,13 +1298,13 @@ public class BytecodeMethod {
                         
                         if (leftArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
-                            if (((AssignableExpression)leftArg).assignTo(null, null, sb)) {
+                            if (((AssignableExpression)leftArg).assignTo(null, sb)) {
                                 leftLiteral = sb.toString();
                             }
                         }
                         if (rightArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
-                            if (((AssignableExpression)rightArg).assignTo(null, null, sb)) {
+                            if (((AssignableExpression)rightArg).assignTo(null, sb)) {
                                 rightLiteral = sb.toString();
                             }
                         }
@@ -1375,7 +1375,7 @@ public class BytecodeMethod {
                         
                         if (leftArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
-                            if (((AssignableExpression)leftArg).assignTo(null, null, sb)) {
+                            if (((AssignableExpression)leftArg).assignTo(null, sb)) {
                                 leftLiteral = sb.toString();
                             }
                         }

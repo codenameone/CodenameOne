@@ -78,7 +78,7 @@ public class ArrayLengthExpression extends Instruction implements AssignableExpr
     }
 
     @Override
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+    public boolean assignTo(String varName, StringBuilder sb) {
         
         StringBuilder b = new StringBuilder();
         if (varName != null) {
@@ -89,13 +89,13 @@ public class ArrayLengthExpression extends Instruction implements AssignableExpr
             case Opcodes.ALOAD: {
                 if (target instanceof AssignableExpression) {
                     StringBuilder b2 = new StringBuilder();
-                    boolean res = ((AssignableExpression)target).assignTo(null, null, b2);
+                    boolean res = ((AssignableExpression)target).assignTo(null, b2);
                     if (!res) {
                         return false;
                     }
                     //SP[-1].data.o == JAVA_NULL ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)SP[-1].data.o)).length;
-                    b.append("((").append(b2).append(" == JAVA_NULL) ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)").append(b2).append(")).length)");
-                       
+                    //b.append("((").append(b2).append(" == JAVA_NULL) ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)").append(b2).append(")).length)");
+                    b.append("CN1_ARRAY_LENGTH(").append(b2.toString().trim()).append(")");
                 }
                 break;
             }

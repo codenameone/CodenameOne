@@ -72,9 +72,9 @@ public class CustomIntruction extends Instruction implements AssignableExpressio
     }
 
     @Override
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+    public boolean assignTo(String varName, StringBuilder sb) {
         if (assignableExpression != null) {
-            return assignableExpression.assignTo(varName, typeVarName, sb);
+            return assignableExpression.assignTo(varName, sb);
         }
         return false;
     }

@@ -114,7 +114,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
     }
 
     @Override
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+    public boolean assignTo(String varName, StringBuilder sb) {
         StringBuilder b = new StringBuilder();
         if (varName != null) {
             b.append(varName).append("=");
@@ -122,7 +122,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
         
         b.append("(CHECK_ARRAY_ACCESS_EXPR(");
         if (targetArrayInstruction instanceof AssignableExpression) {
-            boolean res = ((AssignableExpression)targetArrayInstruction).assignTo(null, null, b);
+            boolean res = ((AssignableExpression)targetArrayInstruction).assignTo(null, b);
             if (!res) {
                 return false;
             }
@@ -131,7 +131,7 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
         }
         b.append(",");
         if (indexInstruction instanceof AssignableExpression) {
-            boolean res = ((AssignableExpression)indexInstruction).assignTo(null, null, b);
+            boolean res = ((AssignableExpression)indexInstruction).assignTo(null, b);
             if (!res) {
                 return false;
             }
@@ -172,9 +172,9 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
                 
         }
         b.append("((").append(arrayType).append("*)").append(" (*(JAVA_ARRAY)");
-        ((AssignableExpression)targetArrayInstruction).assignTo(null, null, b);
+        ((AssignableExpression)targetArrayInstruction).assignTo(null, b);
         b.append(").data)[");
-        ((AssignableExpression)indexInstruction).assignTo(null, null, b);
+        ((AssignableExpression)indexInstruction).assignTo(null, b);
         b.append("] : 0)");
         
         if (varName != null) {
