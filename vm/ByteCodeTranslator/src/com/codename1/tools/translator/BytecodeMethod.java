@@ -23,6 +23,9 @@
 
 package com.codename1.tools.translator;
  
+import com.codename1.tools.translator.bytecodes.ArithmeticExpression;
+import com.codename1.tools.translator.bytecodes.ArrayLengthExpression;
+import com.codename1.tools.translator.bytecodes.ArrayLoadExpression;
 import com.codename1.tools.translator.bytecodes.AssignableExpression;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.CustomIntruction;
@@ -1206,7 +1209,30 @@ public class BytecodeMethod {
                     }
                 }
             }
+            
+            if (ArithmeticExpression.isArithmeticOp(current)) {
+                int addedIndex = ArithmeticExpression.tryReduce(instructions, iter);
+                if (addedIndex >= 0) {
+                    iter = addedIndex;
+                    instructionCount = instructions.size();
+                    continue;
+                }
+            }
+            
             switch(currentOpcode) {
+                
+                case Opcodes.ARRAYLENGTH: {
+                    int newIter = ArrayLengthExpression.tryReduce(instructions, iter);
+                    if (newIter >= 0) {
+                        instructionCount = instructions.size();
+                        iter = newIter;
+                        continue;
+                    }
+                    break;
+                }
+                    
+                
+                
                 case Opcodes.ASTORE:
                 case Opcodes.ISTORE:
                 case Opcodes.DSTORE:
@@ -1231,12 +1257,31 @@ public class BytecodeMethod {
                     
                     break;
                 }
-                    
+                
+                case Opcodes.FALOAD:
+                case Opcodes.BALOAD:
+                case Opcodes.IALOAD:
+                case Opcodes.LALOAD:
+                case Opcodes.DALOAD:
+                case Opcodes.AALOAD:
+                case Opcodes.SALOAD:
+                case Opcodes.CALOAD: {
+                    int newIter = ArrayLoadExpression.tryReduce(instructions, iter);
+                    if (newIter >= 0) {
+                        iter = newIter;
+                        instructionCount = instructions.size();
+                        continue;
+                    }
+                    break;
+                }
+                
                 
                 /* Try to optimize if statements that just use constants
                    and local variables so that they don't need the intermediate
                    push and pop from the stack.
                 */
+                case Opcodes.IF_ACMPEQ:
+                case Opcodes.IF_ACMPNE:
                 case Opcodes.IF_ICMPLE:
                 case Opcodes.IF_ICMPLT:
                 case Opcodes.IF_ICMPNE:
@@ -1263,53 +1308,7 @@ public class BytecodeMethod {
                                 rightLiteral = sb.toString();
                             }
                         }
-                        /*
-                        switch (leftArg.getOpcode()) {
-                            case Opcodes.ICONST_0:
-                                leftLiteral = "0"; break;
-                            case Opcodes.ICONST_1:
-                                leftLiteral = "1"; break;
-                            case Opcodes.ICONST_2:
-                                leftLiteral = "2"; break;
-                            case Opcodes.ICONST_3:
-                                leftLiteral = "3"; break;
-                            case Opcodes.ICONST_4:
-                                leftLiteral = "4"; break;
-                            case Opcodes.ICONST_5:
-                                leftLiteral = "5"; break;
-                            case Opcodes.ICONST_M1:
-                                leftLiteral = "-1"; break;
-                            case Opcodes.ILOAD: {
-                                VarOp varLeft = (VarOp)leftArg;
-                                leftLiteral = "ilocals_"+varLeft.getIndex()+"_";
-                                break;
-                            }
-                                
-                        }
                         
-                        switch (rightArg.getOpcode()) {
-                            case Opcodes.ICONST_0:
-                                rightLiteral = "0"; break;
-                            case Opcodes.ICONST_1:
-                                rightLiteral = "1"; break;
-                            case Opcodes.ICONST_2:
-                                rightLiteral = "2"; break;
-                            case Opcodes.ICONST_3:
-                                rightLiteral = "3"; break;
-                            case Opcodes.ICONST_4:
-                                rightLiteral = "4"; break;
-                            case Opcodes.ICONST_5:
-                                rightLiteral = "5"; break;
-                            case Opcodes.ICONST_M1:
-                                rightLiteral = "-1"; break;
-                            case Opcodes.ILOAD: {
-                                VarOp varRight = (VarOp)rightArg;
-                                rightLiteral = "ilocals_"+varRight.getIndex()+"_";
-                                break;
-                            }
-                                
-                        }
-                        */
                         if (rightLiteral != null && leftLiteral != null) {
                             Jump jmp = (Jump)current;
                             instructions.remove(iter-2);
@@ -1334,12 +1333,87 @@ public class BytecodeMethod {
                                     operator = ">="; opName = "IF_ICMPGE"; break;
                                 case Opcodes.IF_ICMPEQ:
                                     operator = "=="; opName = "IF_ICMPEQ"; break;
+                                case Opcodes.IF_ACMPEQ:
+                                    operator = "=="; opName = "IF_ACMPEQ"; break;
+                                case Opcodes.IF_ACMPNE:
+                                    operator = "!="; opName = "IF_ACMPNE"; break;
                                 default :
                                     throw new RuntimeException("Invalid operator during optimization of integer comparison");
                             }
                                     
                             
                             sb.append("if (").append(leftLiteral).append(operator).append(rightLiteral).append(") /* ").append(opName).append(" CustomJump */ ");
+                            CustomJump newJump = CustomJump.create(jmp, sb.toString());
+                            //jmp.setCustomCompareCode(sb.toString());
+                            newJump.setOptimized(true);
+                            instructions.add(iter, newJump);
+                            instructionCount = instructions.size();
+                            
+                        }
+                        
+                    }
+                break;
+                }   
+                case Opcodes.IFNONNULL:
+                case Opcodes.IFNULL:
+                
+                case Opcodes.IFLE:
+                case Opcodes.IFLT:
+                case Opcodes.IFNE:
+                case Opcodes.IFGT:
+                case Opcodes.IFEQ:
+                case Opcodes.IFGE: {
+                    String rightArg = "0";
+                    if (currentOpcode == Opcodes.IFNONNULL || currentOpcode == Opcodes.IFNULL) {
+                        rightArg = "JAVA_NULL";
+                    }
+                    if (iter > 0) {
+                        Instruction leftArg = instructions.get(iter-1);
+                        
+                        String leftLiteral = null;
+                        
+                        
+                        if (leftArg instanceof AssignableExpression) {
+                            StringBuilder sb = new StringBuilder();
+                            if (((AssignableExpression)leftArg).assignTo(null, null, sb)) {
+                                leftLiteral = sb.toString();
+                            }
+                        }
+                        
+                        
+                        if (leftLiteral != null) {
+                            Jump jmp = (Jump)current;
+                            instructions.remove(iter-1);
+                            instructions.remove(iter-1);
+                            //instructions.remove(iter-2);
+                            iter-=1;
+                            //instructionCount -= 2;
+                            StringBuilder sb = new StringBuilder();
+                            String operator = null;
+                            String opName = null;
+                            switch (currentOpcode) {
+                                case Opcodes.IFLE:
+                                    operator = "<="; opName = "IFLE"; break;
+                                case Opcodes.IFLT:
+                                    operator = "<"; opName = "IFLT"; break;
+                                case Opcodes.IFNE:
+                                    operator = "!="; opName = "IFNE"; break;
+                                case Opcodes.IFGT:
+                                    operator = ">"; opName = "IFGT"; break;
+                                case Opcodes.IFGE:
+                                    operator = ">="; opName = "IFGE"; break;
+                                case Opcodes.IFEQ:
+                                    operator = "=="; opName = "IFEQ"; break;
+                                case Opcodes.IFNULL:
+                                    operator = "=="; opName = "IFNULL"; break;
+                                case Opcodes.IFNONNULL:
+                                    operator = "!="; opName = "IFNONNULL"; break;
+                                default :
+                                    throw new RuntimeException("Invalid operator during optimization of integer comparison");
+                            }
+                                    
+                            
+                            sb.append("if (").append(leftLiteral).append(operator).append(rightArg).append(") /* ").append(opName).append(" CustomJump */ ");
                             CustomJump newJump = CustomJump.create(jmp, sb.toString());
                             //jmp.setCustomCompareCode(sb.toString());
                             newJump.setOptimized(true);
@@ -1500,8 +1574,9 @@ public class BytecodeMethod {
                             String[] argLiterals = new String[numArgs];
                             for (int i=0; i<numArgs; i++) {
                                 Instruction instr = instructions.get(iter-numArgs+i);
-                                
-                                if (instr instanceof VarOp) {
+                                if (instr instanceof ArithmeticExpression) {
+                                    argLiterals[i] = ((ArithmeticExpression)instr).getExpressionAsString();
+                                } else if (instr instanceof VarOp) {
                                     VarOp var = (VarOp)instr;
                                     switch (instr.getOpcode()) {
                                         case Opcodes.ALOAD: {
@@ -1669,7 +1744,7 @@ public class BytecodeMethod {
                                 }
                                 
                                 newInvoke.setOptimized(true);
-                                iter = 0;
+                                //iter = 0;
                                 instructionCount = instructions.size();
                                 
                                 

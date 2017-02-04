@@ -722,8 +722,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 b.append(value);
                 b.append("/* SIPUSH */");
                 b2.append("CN1_TYPE_INT");
-                break;                
+                break;   
                 
+            
+            
             default:
                 return false;
         }
