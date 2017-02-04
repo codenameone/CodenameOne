@@ -851,6 +851,14 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
 
 #define CN1_ARRAY_LENGTH(array) ((array == JAVA_NULL) ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)array)).length)
 
+#define CN1_ARRAY_ELEMENT_INT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_BYTE(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_FLOAT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_DOUBLE(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_LONG(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_OBJECT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_SHORT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_CHAR(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] : 0)
 extern JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 extern JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 

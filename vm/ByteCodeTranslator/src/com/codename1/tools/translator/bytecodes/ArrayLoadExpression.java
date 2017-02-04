@@ -120,66 +120,63 @@ public class ArrayLoadExpression extends Instruction implements AssignableExpres
             b.append(varName).append("=");
         }
         
-        b.append("(CHECK_ARRAY_ACCESS_EXPR(");
-        if (targetArrayInstruction instanceof AssignableExpression) {
-            boolean res = ((AssignableExpression)targetArrayInstruction).assignTo(null, b);
-            if (!res) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-        b.append(",");
-        if (indexInstruction instanceof AssignableExpression) {
-            boolean res = ((AssignableExpression)indexInstruction).assignTo(null, b);
-            if (!res) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-        b.append(") ? ");
-        
+        b.append("CN1_ARRAY_ELEMENT_");
         String arrayType = null;
-        
-        //((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)SP[-1].data.o).data)[(*SP).data.i];
-        
         switch (loadInstruction.getOpcode()) {
             case Opcodes.FALOAD:
-                arrayType = "JAVA_ARRAY_FLOAT";
+                arrayType = "FLOAT";
                 break;
             case Opcodes.DALOAD:
-                arrayType = "JAVA_ARRAY_DOUBLE";
+                arrayType = "DOUBLE";
                 break;
             case Opcodes.LALOAD:
-                arrayType = "JAVA_ARRAY_LONG";
+                arrayType = "LONG";
                 break;
             case Opcodes.IALOAD:
-                arrayType = "JAVA_ARRAY_INT";
+                arrayType = "INT";
                 break;
             case Opcodes.BALOAD:
-                arrayType = "JAVA_ARRAY_BYTE";
+                arrayType = "BYTE";
                 break;
             case Opcodes.CALOAD:
-                arrayType = "JAVA_ARRAY_CHAR";
+                arrayType = "CHAR";
                 break;
             case Opcodes.AALOAD:
-                arrayType = "JAVA_ARRAY_OBJECT";
+                arrayType = "OBJECT";
                 break;
             case Opcodes.SALOAD:
-                arrayType = "JAVA_ARRAY_SHORT";
+                arrayType = "SHORT";
                 break;
                 
         }
-        b.append("((").append(arrayType).append("*)").append(" (*(JAVA_ARRAY)");
-        ((AssignableExpression)targetArrayInstruction).assignTo(null, b);
-        b.append(").data)[");
-        ((AssignableExpression)indexInstruction).assignTo(null, b);
-        b.append("] : 0)");
-        
+        b.append(arrayType).append("(");
+        if (targetArrayInstruction instanceof AssignableExpression) {
+            StringBuilder sb2 = new StringBuilder();
+            boolean res = ((AssignableExpression)targetArrayInstruction).assignTo(null, sb2);
+            if (!res) {
+                return false;
+            }
+            b.append(sb2.toString().trim());
+        } else {
+            return false;
+        }
+        b.append(", ");
+        if (indexInstruction instanceof AssignableExpression) {
+            StringBuilder sb2 = new StringBuilder();
+            
+            boolean res = ((AssignableExpression)indexInstruction).assignTo(null, sb2);
+            if (!res) {
+                return false;
+            }
+            b.append(sb2.toString().trim());
+        } else {
+            return false;
+        }
+        b.append(")");
         if (varName != null) {
             b.append(";\n");
         }
+        
         sb.append(b);
         return true;
     }
