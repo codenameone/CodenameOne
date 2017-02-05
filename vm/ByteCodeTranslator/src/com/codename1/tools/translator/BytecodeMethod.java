@@ -1751,13 +1751,25 @@ public class BytecodeMethod {
                                 }
                                 if (inv.getOpcode() != Opcodes.INVOKESTATIC) {
                                     Instruction ldTarget = instructions.get(iter-numArgs-1);
-                                    switch (ldTarget.getOpcode()) {
-                                        case Opcodes.ALOAD: {
-                                            VarOp v = (VarOp)ldTarget;
-                                            newInvoke.setTargetObjectLiteral("locals["+v.getIndex()+"].data.o");
+                                    if (ldTarget instanceof AssignableExpression) {
+                                        StringBuilder targetExprStr = new StringBuilder();
+                                        if (((AssignableExpression)ldTarget).assignTo(null, targetExprStr)) {
+                                            newInvoke.setTargetObjectLiteral(targetExprStr.toString().trim());
                                             instructions.remove(iter-numArgs-1);
                                             newIter--;
-                                            break;
+                                            
+                                        }
+                                        
+                                        
+                                    } else {
+                                        switch (ldTarget.getOpcode()) {
+                                            case Opcodes.ALOAD: {
+                                                VarOp v = (VarOp)ldTarget;
+                                                newInvoke.setTargetObjectLiteral("locals["+v.getIndex()+"].data.o");
+                                                instructions.remove(iter-numArgs-1);
+                                                newIter--;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
