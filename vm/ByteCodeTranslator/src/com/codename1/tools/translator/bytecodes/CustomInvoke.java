@@ -43,6 +43,7 @@ public class CustomInvoke extends Instruction {
     private String[] literalArgs;
     private int origOpcode;
     private String targetObjectLiteral;
+    private boolean noReturn;
     
     
     public CustomInvoke(int opcode, String owner, String name, String desc, boolean itf) {
@@ -121,6 +122,10 @@ public class CustomInvoke extends Instruction {
         return findActualOwner(bc.getBaseClassObject());
     }
     
+    public boolean methodHasReturnValue() {
+        return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>()) != null;
+    }
+    
     @Override
     public void appendInstruction(StringBuilder b) {
         // special case for clone on an array which isn't a real method invocation
@@ -164,7 +169,7 @@ public class CustomInvoke extends Instruction {
             b.append("/* CustomInvoke */");
         }
         boolean noPop = false;
-        if(returnVal == null) {
+        if(returnVal == null || noReturn) {
             b.append(bld);
         } else {
             if(args.size() - numLiteralArgs == 0 && origOpcode == Opcodes.INVOKESTATIC) {
@@ -237,7 +242,7 @@ public class CustomInvoke extends Instruction {
             b.append("));\n");
             return;
         }
-        if(returnVal != null) {
+        if(returnVal != null && !noReturn) {
             b.append(");\n");
             if(origOpcode != Opcodes.INVOKESTATIC) {
                 if(args.size() - numLiteralArgs > 0) {
@@ -343,6 +348,20 @@ public class CustomInvoke extends Instruction {
             }
         }
         return count;
+    }
+
+    /**
+     * @return the noReturn
+     */
+    public boolean isNoReturn() {
+        return noReturn;
+    }
+
+    /**
+     * @param noReturn the noReturn to set
+     */
+    public void setNoReturn(boolean noReturn) {
+        this.noReturn = noReturn;
     }
 
     

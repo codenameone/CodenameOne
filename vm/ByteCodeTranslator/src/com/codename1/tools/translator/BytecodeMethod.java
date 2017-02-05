@@ -1230,8 +1230,24 @@ public class BytecodeMethod {
                     }
                     break;
                 }
-                    
+                   
                 
+                case Opcodes.POP: {
+                    if (iter > 0) {
+                        Instruction prev = instructions.get(iter-1);
+                        if (prev instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)prev;
+                            if (inv.methodHasReturnValue()) {
+                                inv.setNoReturn(true);
+                                instructions.remove(iter);
+                                iter--;
+                                instructionCount--;
+                                continue;
+                            }
+                        }
+                    }
+                    break;
+                }
                 
                 case Opcodes.ASTORE:
                 case Opcodes.ISTORE:
@@ -1727,8 +1743,10 @@ public class BytecodeMethod {
                                 CustomInvoke newInvoke = CustomInvoke.create(inv);
                                 instructions.remove(iter);
                                 instructions.add(iter, newInvoke);
+                                int newIter = iter;
                                 for (int i=0; i< numArgs; i++) {
                                     instructions.remove(iter-numArgs);
+                                    newIter--;
                                     newInvoke.setLiteralArg(i, argLiterals[i]);
                                 }
                                 if (inv.getOpcode() != Opcodes.INVOKESTATIC) {
@@ -1738,6 +1756,7 @@ public class BytecodeMethod {
                                             VarOp v = (VarOp)ldTarget;
                                             newInvoke.setTargetObjectLiteral("locals["+v.getIndex()+"].data.o");
                                             instructions.remove(iter-numArgs-1);
+                                            newIter--;
                                             break;
                                         }
                                     }
@@ -1746,6 +1765,7 @@ public class BytecodeMethod {
                                 newInvoke.setOptimized(true);
                                 //iter = 0;
                                 instructionCount = instructions.size();
+                                iter = newIter;
                                 
                                 
                             }
