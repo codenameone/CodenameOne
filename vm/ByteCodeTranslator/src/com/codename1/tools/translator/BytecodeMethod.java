@@ -1760,7 +1760,8 @@ public class BytecodeMethod {
                                             
                                         }
                                         
-                                        
+                                    } else if (ldTarget instanceof CustomInvoke) {
+                                        // TODO
                                     } else {
                                         switch (ldTarget.getOpcode()) {
                                             case Opcodes.ALOAD: {

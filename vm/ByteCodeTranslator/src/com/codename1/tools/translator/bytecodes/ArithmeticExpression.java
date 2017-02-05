@@ -441,7 +441,7 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                     return "((JAVA_LONG)"+subExpression.getExpressionAsString().trim()+")";
                 }
                 case Opcodes.I2S: {
-                    return "(("+subExpression.getExpressionAsString().trim()+" << 16)";
+                    return "(("+subExpression.getExpressionAsString().trim()+" << 16) >> 16)";
                 }
                 case Opcodes.L2D: {
                     return "((JAVA_DOUBLE)"+subExpression.getExpressionAsString().trim()+")";
