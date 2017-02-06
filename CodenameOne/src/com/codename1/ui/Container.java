@@ -258,6 +258,18 @@ public class Container extends Component implements Iterable<Component>{
         addComponent(cmp);
         return this;
     }
+
+    /**
+     * Identical to add(x).add(y) only with a shorter syntax
+     * @param cmps the other components to add
+     * @return this for call chaining
+     */
+    public Container addAll(Component... cmps) {
+        for(Component c : cmps) {
+            addComponent(c);
+        }
+        return this;
+    }
     
     /**
      * Simpler version of addComponent that allows chaining the calls for shorter syntax
