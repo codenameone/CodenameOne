@@ -1078,14 +1078,10 @@ public class Form extends Container {
      */ 
     private Container getLayeredPaneImpl() {
         if(layeredPane == null){
-            Container parent = new Container(new LayeredLayout());
+            Container parent = contentPane.wrapInLayeredPane();
             layeredPane = new Container(new LayeredLayout());
-            
             // adds the global layered pane
             layeredPane.add(new Container());
-            removeComponentFromForm(contentPane);
-            addComponentToForm(BorderLayout.CENTER, parent);
-            parent.addComponent(contentPane);
             parent.addComponent(layeredPane);
             revalidate();
         }

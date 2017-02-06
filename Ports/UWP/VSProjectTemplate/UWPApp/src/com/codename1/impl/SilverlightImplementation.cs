@@ -350,6 +350,11 @@ namespace com.codename1.impl
             Application.Current.Exit();
         }
 
+        public override bool paintNativePeersBehind()
+        {
+            return false;
+        }
+
         public override media.Media createMedia(java.io.InputStream n1, string n2, java.lang.Runnable n3)
         {
             object ss = createStorageOutputStream("CN1TempVideodu73aFljhuiw3yrindo87.mp4");
@@ -1563,66 +1568,106 @@ namespace com.codename1.impl
             return true;
         }
 
-        BrowserComponent currentBrowser;
-        public WebView webView;
-        public override PeerComponent createBrowserComponent(object n1)
+        public class SilverlightBrowserComponent : SilverlightPeer
         {
-            SilverlightPeer sp = null;
-            using (AutoResetEvent are = new AutoResetEvent(false))
+            private BrowserComponent bc;
+            private WebView webView;
+
+            public SilverlightBrowserComponent(WebView element, BrowserComponent bc) : base(element)
             {
+                webView = element;
+                this.bc = bc;
+                
+
+            }
+
+            protected override void initComponent()
+            {
+                base.initComponent();
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    webView = new WebView();
-                    currentBrowser = (BrowserComponent)n1;
                     webView.DOMContentLoaded += webview_DOMContentLoaded;
                     webView.NavigationStarting += webview_Navigating;
                     webView.ContentLoading += webview_ContentLoading;
                     webView.IsTapEnabled = true;
                     webView.NavigationCompleted += webview_NavigationCompleted;
-                    sp = new SilverlightPeer(webView);
+                });
+
+            }
+
+            protected override void deinitialize()
+            {
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    webView.DOMContentLoaded -= webview_DOMContentLoaded;
+                    webView.NavigationStarting -= webview_Navigating;
+                    webView.ContentLoading -= webview_ContentLoading;
+                    webView.NavigationCompleted -= webview_NavigationCompleted;
+                });
+
+                base.deinitialize();
+            }
+
+            void webview_DOMContentLoaded(WebView sender, WebViewDOMContentLoadedEventArgs e)
+            {
+                ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
+                bc.fireWebEvent("onLoadResource", ev);
+
+            }
+
+            void webview_NavigationCompleted(WebView sender, WebViewNavigationCompletedEventArgs e)
+            {
+                if (e.IsSuccess == false)
+                {
+                    ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
+                    bc.fireWebEvent("onError", ev);
+                }
+            }
+
+            void webview_ContentLoading(WebView sender, WebViewContentLoadingEventArgs e)
+            {
+                ActionEvent ev = new ActionEvent(e == null ? null : e.Uri.OriginalString);
+                bc.fireWebEvent("onLoad", ev);
+            }
+
+            void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
+            {
+                BrowserNavigationCallback bn = bc.getBrowserNavigationCallback();
+                if (bn != null && e.Uri != null && !bn.shouldNavigate(e.Uri.ToString()))
+                {
+                    e.Cancel = true;
+                }
+                ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
+                bc.fireWebEvent("onStart", ev);
+            }
+        }
+
+        //BrowserComponent currentBrowser;
+        //public WebView webView;
+        public override PeerComponent createBrowserComponent(object n1)
+        {
+            //SilverlightBrowserComponent sp = null;
+            WebView webView = null;
+            using (AutoResetEvent are = new AutoResetEvent(false))
+            {
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    webView = new WebView();
+                    
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
                 are.WaitOne();
             }
+            BrowserComponent currentBrowser = (BrowserComponent)n1;
+
+            SilverlightBrowserComponent sp = new SilverlightBrowserComponent(webView, currentBrowser);
             return sp;
         }
+        
 
-        void webview_DOMContentLoaded(WebView sender, WebViewDOMContentLoadedEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-            ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-            currentBrowser.fireWebEvent("onLoadResource", ev);
+        
 
-        }
-
-        void webview_NavigationCompleted(WebView sender, WebViewNavigationCompletedEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-           
-            if (e.IsSuccess == false)
-            {
-                ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-                currentBrowser.fireWebEvent("onError", ev);
-            }
-        }
-
-        void webview_ContentLoading(WebView sender, WebViewContentLoadingEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-            ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-            currentBrowser.fireWebEvent("onLoad", ev);
-        }
-
-        void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-            if (!bn.shouldNavigate(e.Uri.ToString()))
-            {
-                e.Cancel = true;
-            }
-            ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-            currentBrowser.fireWebEvent("onStart", ev);
-        }
+        
 
         public override string getBrowserTitle(PeerComponent n1)
         {
@@ -1631,7 +1676,7 @@ namespace com.codename1.impl
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
                 {
-                    webView = (WebView)((SilverlightPeer)n1).element;
+                    WebView webView = (WebView)((SilverlightPeer)n1).element;
                     st = await webView.InvokeScriptAsync("eval", new string[] { "document.title.toString()" });
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
@@ -1642,9 +1687,10 @@ namespace com.codename1.impl
 
         public override string getBrowserURL(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
-            webView = (WebView)((SilverlightPeer)n1).element;
+                webView = (WebView)((SilverlightPeer)n1).element;
            
            }).AsTask().GetAwaiter().GetResult();
             return webView.Source.OriginalString;
@@ -1652,6 +1698,7 @@ namespace com.codename1.impl
 
         public override void setBrowserURL(PeerComponent browserPeer, string url)
         {
+            WebView webView = null; ;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
                webView = (WebView)((SilverlightPeer)browserPeer).element;
@@ -1673,6 +1720,7 @@ namespace com.codename1.impl
  
         public override void browserReload(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1685,6 +1733,7 @@ namespace com.codename1.impl
             bool ret = false;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
+                WebView webView = null;
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                {
                    webView = (WebView)((SilverlightPeer)n1).element;
@@ -1699,6 +1748,7 @@ namespace com.codename1.impl
         public override bool browserHasForward(PeerComponent n1)
         {
             bool ret = false;
+            WebView webView = null;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
@@ -1714,6 +1764,7 @@ namespace com.codename1.impl
 
         public override void browserBack(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1723,6 +1774,7 @@ namespace com.codename1.impl
 
         public override void browserStop(PeerComponent n1)
         {
+            WebView webView = null;
           dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
          {
              webView = (WebView)((SilverlightPeer)n1).element;
@@ -1732,6 +1784,7 @@ namespace com.codename1.impl
 
         public override void browserForward(PeerComponent n1)
         {
+            WebView webView = null;
               dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
          {
             webView = (WebView)((SilverlightPeer)n1).element;
@@ -1741,6 +1794,7 @@ namespace com.codename1.impl
 
         public override void setBrowserPage(PeerComponent n1, string n2, string n3)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
                webView = (WebView)((SilverlightPeer)n1).element;
@@ -1748,8 +1802,10 @@ namespace com.codename1.impl
            }).AsTask().GetAwaiter();
         }
 
+
         public override void browserDestroy(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1834,6 +1890,7 @@ namespace com.codename1.impl
         
         public override void browserExecute(PeerComponent n1, string n2)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1844,6 +1901,7 @@ namespace com.codename1.impl
         public override string browserExecuteAndReturnString(PeerComponent n1, string n2)
         {
             string st = null;
+            WebView webView = null;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
@@ -2134,6 +2192,11 @@ namespace com.codename1.impl
         public override void fillRect(object graphics, int x, int y, int w, int h)
         {
             ((NativeGraphics)graphics).destination.fillRect(x, y, w, h);
+        }
+
+        public override void clearRect(object graphics, int x, int y, int width, int height)
+        {
+            ((NativeGraphics)graphics).destination.clearRect(x, y, width, height);
         }
 
         public override void drawRect(object graphics, int x, int y, int w, int h)

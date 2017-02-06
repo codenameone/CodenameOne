@@ -85,6 +85,7 @@ import com.codename1.media.MediaManager;
 import com.codename1.notifications.LocalNotification;
 import com.codename1.notifications.LocalNotificationCallback;
 import com.codename1.payment.RestoreCallback;
+import com.codename1.ui.Accessor;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Graphics;
@@ -771,7 +772,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 pt,
                                 pb,
                                 pl,
-                                pr, hint, showToolbar);
+                                pr, hint, showToolbar, Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")));
                     }
                 }
             });
@@ -861,42 +862,41 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
     
-    
-
     public void releaseImage(Object image) {
         if(image instanceof NativeImage) {
             ((NativeImage)image).deleteImage();
         }
     }
-
+    
+    @Override
+    public boolean paintNativePeersBehind() {
+        return true;
+    }
+    
+    static boolean isPaintPeersBehindEnabled() {
+        return instance.paintNativePeersBehind();
+    }
+    
+    /**
+     * Checks to see if a given coordinate is contained by a CN1 light-weight component.
+     * This is used by native code to determine if a touch event should be passed through
+     * to the peer component layer. (TRUE = don't pass to native peer layer, FALSE - do pass to native peer layer)
+     * @param x x-coordinate to test (screen coordinates)
+     * @param y y-coordinate to test (screen coordinates)
+     * @return true if events should be handed by CN1 and not passed to the native layer.
+     */
+    static boolean hitTest(int x, int y) {
+        Form f = Display.getInstance().getCurrent();
+        if (f != null) {
+            Component cmp = f.getComponentAt(x, y);
+            return cmp == null || !(cmp instanceof PeerComponent);
+        }
+        return true;
+    }
+    
     public void flushGraphics(int x, int y, int width, int height) {
-        /*if(currentlyDrawingOn != null && backBuffer == currentlyDrawingOn.associatedImage) {
-            backBuffer.peer = finishDrawingOnImage();
-            flushBuffer(backBuffer.peer, x, y, width, height);
-            startDrawingOnImage(backBuffer.width, backBuffer.height, backBuffer.peer);
-        } else {
-            flushBuffer(backBuffer.peer, x, y, width, height);
-        }*/
         globalGraphics.clipApplied = false;
         flushBuffer(0, x, y, width, height);
-
-        /*if(Display.getInstance().isEdt()) {
-            Object lock = getDisplayLock();
-            int count = 3;
-            while(!isPainted()) {
-                synchronized(lock) {
-                    try {
-                        lock.wait(10);
-                    } catch (InterruptedException ex) {
-                        ex.printStackTrace();
-                    }
-                }
-                if(count == 0) {
-                    break;
-                }
-                count--;
-            }
-        }*/
     }
 
     private final static int[] singleDimensionX = new int[1];
@@ -1494,6 +1494,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.nativeDrawLine(ng.color, ng.alpha, x1, y1, x2, y2);
     }
+    
 
     static void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height) {
         nativeInstance.nativeFillRectMutable(color, alpha, x, y, width, height);
@@ -1501,6 +1502,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height) {
         nativeInstance.nativeFillRectGlobal(color, alpha, x, y, width, height);
+    }
+    
+    static void nativeClearRectGlobal(int x, int y, int width, int height) {
+        nativeInstance.nativeClearRectGlobal(x, y, width, height);
     }
 
     public void fillRect(Object graphics, int x, int y, int width, int height) {
@@ -1512,6 +1517,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyTransform();
         ng.applyClip();
         ng.nativeFillRect(ng.color, ng.alpha, x, y, width, height);
+    }
+    
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        ng.nativeClearRect(x, y, width, height);
     }
 
     private static void nativeDrawRectMutable(int color, int alpha, int x, int y, int width, int height) {
@@ -3641,6 +3654,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         
         
         void setClip(Shape newClip) {
+            if ( clip == null) {
+                clip = new ClipShape();
+            }
             if (!clip.equals(newClip, transform)) { 
                 clip.setShape(newClip, transform);
                 clipDirty = true;
@@ -4171,6 +4187,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 nativeInstance.clearRadialGradientPaintMutable();
             }
         }
+
+        public void nativeClearRect(int x, int y, int width, int height) {
+            nativeInstance.clearRectMutable(x, y, width, height);
+        }
     }
 
     class GlobalGraphics extends NativeGraphics {
@@ -4266,6 +4286,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         void nativeFillRect(int color, int alpha, int x, int y, int width, int height) {
             nativeFillRectGlobal(color, alpha, x, y, width, height);
         }
+
+        @Override
+        public void nativeClearRect(int x, int y, int width, int height) {
+            nativeClearRectGlobal(x, y, width, height);
+            
+        }
+        
+        
 
         void nativeDrawRect(int color, int alpha, int x, int y, int width, int height) {
             nativeDrawRectGlobal(color, alpha, x, y, width, height);
@@ -4484,6 +4512,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void fillLinearGradient(int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
             nativeInstance.fillLinearGradientGlobal(startColor, endColor, x, y, width, height, horizontal);
         }
+        
     }
 
     class NativeFont {
@@ -5818,6 +5847,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         protected boolean shouldRenderPeerImage() {
             return lightweightMode || !isInitialized();
         }
+
     }
 
     public boolean areMutableImagesFast() {
@@ -6747,6 +6777,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.deregisterPush();
     }
 
+    @Override
+    public void blockCopyPaste(boolean blockCopyPaste) {
+        nativeInstance.blockCopyPaste(blockCopyPaste);
+    }
+
+    
+    
     private static PushCallback pushCallback;
     
     public static void pushReceived(final String message, final String type) {

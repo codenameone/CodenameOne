@@ -20,20 +20,20 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.tools.translator.bytecodes;
+
+package com.codename1.ui;
 
 /**
- * Interface for an instruction that can be replaced by an expression and assigned
- * to a variable.  
- * @author shannah
+ * Allows access to package protected methods without exposing them thru official API
+ * 
+ * @author Shai Almog
  */
-public interface AssignableExpression {
+public class Accessor {
+    public static Object getNativeGraphics(Graphics g) {
+        return g.getGraphics();
+    }
     
-    /**
-     * Outputs C code to assign the expression to given variable.
-     * @param varName
-     * @param sb
-     * @return 
-     */
-    public boolean assignTo(String varName, StringBuilder sb);
+    public static boolean isPaintPeersBehindEnabled(Graphics g) {
+        return g.paintPeersBehind;
+    }
 }

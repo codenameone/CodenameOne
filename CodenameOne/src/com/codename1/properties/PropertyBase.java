@@ -127,4 +127,16 @@ public class PropertyBase<T, K> {
     
     void setImpl(Object val) {
     }
+    
+    /**
+     * Default toString that provides easier debug information
+     * @return a formatted representation of the property for debugging
+     */
+    public String toString() {
+        T o = get();
+        if(o == null) {
+            return getName() + " = null";
+        }
+        return getName() + " = '" + o + "' : " +o.getClass().getName();
+    }
 }

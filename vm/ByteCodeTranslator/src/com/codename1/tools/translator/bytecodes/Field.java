@@ -109,10 +109,10 @@ public class Field extends Instruction implements AssignableExpression {
     }
     
     @Override
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+    public boolean assignTo(String varName, StringBuilder sb) {
         if (opcode == Opcodes.GETSTATIC || (opcode == Opcodes.GETFIELD && useThis)) {
             StringBuilder b = new StringBuilder();
-            if (typeVarName != null) {
+            /*if (typeVarName != null) {
                 b.append(typeVarName).append(" = ");
                 switch(desc.charAt(0)) {
                     case 'L':
@@ -133,7 +133,7 @@ public class Field extends Instruction implements AssignableExpression {
                         break;
                 }
                 b.append("; ");
-            }
+            }*/
             if (varName != null) {
                 b.append(varName).append(" = ");
             }

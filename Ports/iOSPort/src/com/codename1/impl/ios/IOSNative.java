@@ -49,7 +49,7 @@ public final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
-    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar);
+    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar, boolean blockCopyPaste);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
@@ -609,6 +609,12 @@ public final class IOSNative {
     native void applyRadialGradientPaintGlobal(int startColor, int endColor, int x, int y, int width, int height);
 
     native void clearRadialGradientPaintGlobal();
+
+    native void clearRectMutable(int x, int y, int width, int height);
+
+    native void nativeClearRectGlobal(int x, int y, int width, int height);
+
+    native void blockCopyPaste(boolean blockCopyPaste);
 
 
    

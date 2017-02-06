@@ -23,10 +23,17 @@
 
 package com.codename1.properties;
 
+import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
+import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
-import com.codename1.ui.List;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -193,6 +200,24 @@ public class PropertyIndex implements Iterable<PropertyBase>{
     public void populateFromMap(Map<String, Object> m) {
         populateFromMap(m, null);
     }
+    
+    private Object listParse(List l, Class<? extends PropertyBusinessObject>recursiveType) throws InstantiationException, IllegalAccessException {
+        ArrayList al = new ArrayList();
+        for(Object o : l) {
+            if(o instanceof Map) {
+                PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
+                po.getPropertyIndex().populateFromMap((Map<String, Object>)o, recursiveType);
+                al.add(po);
+                continue;
+            }
+            if(o instanceof List) {
+                al.add(listParse((List)o,recursiveType));
+                continue;
+            }
+            al.add(o);
+        }
+        return al;
+    }
 
     /**
      * This is useful for JSON parsing, it allows converting JSON map data to objects
@@ -200,57 +225,94 @@ public class PropertyIndex implements Iterable<PropertyBase>{
      * @param recursiveType when running into map types we create this object type
      */
     public void populateFromMap(Map<String, Object> m, Class<? extends PropertyBusinessObject>recursiveType) {
-        for(PropertyBase p : this) {
-            Object val = m.get(p.getName());
-            if(val != null) {
-                if(val instanceof List) {
-                    if(p instanceof ListProperty) {
-                        ((ListProperty)p).setList((Collection)val);
-                    }
-                } else {
+        try {
+            for(PropertyBase p : this) {
+                Object val = m.get(p.getName());
+                if(val != null) {
+                    if(val instanceof List) {
+                        if(p instanceof ListProperty) {
+                            if(recursiveType != null) {
+                                if(((ListProperty)p) != null) {
+                                    ((ListProperty)p).clear();
+                                } 
+                                for(Object e : (Collection)val) {
+                                    if(e instanceof Map) {
+                                        PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
+                                        po.getPropertyIndex().populateFromMap((Map<String, Object>)e, recursiveType);
+                                        ((ListProperty)p).add(po);
+                                        continue;
+                                    }
+                                    if(e instanceof List) {
+                                        ((ListProperty)p).add(listParse((List)e, recursiveType));
+                                        continue;
+                                    }
+                                    ((ListProperty)p).add(e);
+                                }
+                            } else {
+                                ((ListProperty)p).setList((Collection)val);
+                            }
+                        }
+                        continue;
+                    } 
+
                     if(val instanceof Map) {
                         if(p instanceof MapProperty) {
-                            ((MapProperty)p).setMap((Map)val);
+                            ((MapProperty)p).clear();
+                            for(Object k : ((Map)val).keySet()) {
+                                Object value = ((Map)val).get(k);
+                                if(value instanceof Map) {
+                                    PropertyBusinessObject po = (PropertyBusinessObject)p.get();
+                                    po.getPropertyIndex().populateFromMap((Map<String, Object>)value, recursiveType);
+                                    ((MapProperty)p).set(k, po);
+                                    continue;
+                                }
+                                if(value instanceof List) {
+                                    ((MapProperty)p).set(k, listParse((List)value, recursiveType));
+                                    continue;
+                                }
+                                ((MapProperty)p).set(k, value);
+                            }                        
+                            continue;
                         } else {
                             if(p.get() instanceof PropertyBusinessObject) {
                                 PropertyBusinessObject po = (PropertyBusinessObject)p.get();
                                 po.getPropertyIndex().populateFromMap((Map<String, Object>)val, recursiveType);
                             } else {
                                 if(recursiveType != null) {
-                                    try {
-                                        PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
-                                        po.getPropertyIndex().populateFromMap((Map<String, Object>)val, recursiveType);
-                                        p.setImpl(po);
-                                    } catch(InstantiationException err) {
-                                        Log.e(err);
-                                    } catch(IllegalAccessException err) {
-                                        Log.e(err);
-                                    }
+                                    PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
+                                    po.getPropertyIndex().populateFromMap((Map<String, Object>)val, recursiveType);
+                                    p.setImpl(po);
                                 }
                             }
                         }
-                    } else {
-                        if(p instanceof IntProperty) {
-                            p.setImpl(Util.toIntValue(val));
-                            continue;
-                        } 
-                        if(p instanceof LongProperty) {
-                            p.setImpl(Util.toLongValue(val));
-                            continue;
-                        } 
-                        if(p instanceof FloatProperty) {
-                            p.setImpl(Util.toFloatValue(val));
-                            continue;
-                        } 
-                        if(p instanceof DoubleProperty) {
-                            p.setImpl(Util.toDoubleValue(val));
-                            continue;
-                        } 
-                        p.setImpl(val);
-                    }
+                        continue;
+                    } 
+                    if(p instanceof IntProperty) {
+                        p.setImpl(Util.toIntValue(val));
+                        continue;
+                    } 
+                    if(p instanceof LongProperty) {
+                        p.setImpl(Util.toLongValue(val));
+                        continue;
+                    } 
+                    if(p instanceof FloatProperty) {
+                        p.setImpl(Util.toFloatValue(val));
+                        continue;
+                    } 
+                    if(p instanceof DoubleProperty) {
+                        p.setImpl(Util.toDoubleValue(val));
+                        continue;
+                    } 
+                    p.setImpl(val);                
                 }
             }
-        }
+        } catch(InstantiationException err) {
+            Log.e(err);
+            throw new RuntimeException("Can't create instanceof class: " + err);
+        } catch(IllegalAccessException err) {
+            Log.e(err);
+            throw new RuntimeException("Can't create instanceof class: " + err);
+        }            
     }
     
     /**
@@ -260,6 +322,20 @@ public class PropertyIndex implements Iterable<PropertyBase>{
     public Map<String, Object> toMapRepresentation() {
         HashMap<String, Object> m = new HashMap<String, Object>();
         for(PropertyBase p : this) {
+            if(p instanceof MapProperty) {
+                MapProperty pp = (MapProperty)p;
+                if(pp.get() != null) {
+                    m.put(p.getName(), pp.asExplodedMap());
+                }
+                continue;
+            }
+            if(p instanceof ListProperty) {
+                ListProperty pp = (ListProperty)p;
+                if(pp.get() != null) {
+                    m.put(p.getName(), pp.asExplodedList());
+                }
+                continue;
+            }
             if(p instanceof Property) {
                 Property pp = (Property)p;
                 if(pp.get() != null) {
@@ -276,6 +352,36 @@ public class PropertyIndex implements Iterable<PropertyBase>{
      */
     public String toJSON() {
         return Result.fromContent(toMapRepresentation()).toString();
+    }
+    
+    /**
+     * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
+     * @param name the name of the storage file
+     */
+    public void storeJSON(String name) {
+        try {
+            OutputStream os = Storage.getInstance().createOutputStream(name);
+            os.write(toJSON().getBytes("UTF-8"));
+            os.close();
+        } catch(IOException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        }
+    }
+    
+    /**
+     * Loads JSON for the object from storage with the given name
+     * @param name the name of the storage
+     */
+    public void loadJSON(String name) {
+        try {
+            InputStream is = Storage.getInstance().createInputStream(name);
+            JSONParser jp = new JSONParser();
+            populateFromMap(jp.parseJSON(new InputStreamReader(is, "UTF-8")), parent.getClass());
+        } catch(IOException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        }
     }
     
     /**

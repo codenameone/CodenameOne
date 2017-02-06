@@ -85,6 +85,7 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -587,6 +588,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             if(Display.getInstance().getProperty("KeepScreenOn", "").equals("true")){
                 getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
+
+            if(Display.getInstance().getProperty("DisableScreenshots", "").equals("true")){
+                getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
             }
 
             if (m instanceof CodenameOneActivity) {
@@ -1951,7 +1956,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isShapeClipSupported(Object graphics){
-        return true;
+        return Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB;
     }
     
     @Override
@@ -2794,6 +2799,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
         if (getActivity() == null) {
+            return null;
+        }
+        if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record audio")){
             return null;
         }
         final AndroidRecorder[] record = new AndroidRecorder[1];
@@ -7727,7 +7735,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
             //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
             //an ugly workaround to the putExtra bug 
-            intent.setData(Uri.parse("http://a.com/a?" + getBackgroundFetchListener().getClass().getName()));
+            intent.setData(Uri.parse("http://codenameone.com/a?" + getBackgroundFetchListener().getClass().getName()));
             PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT);

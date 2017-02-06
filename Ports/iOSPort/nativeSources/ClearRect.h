@@ -20,20 +20,16 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package com.codename1.tools.translator.bytecodes;
+#import <Foundation/Foundation.h>
+#import "ExecutableOp.h"
 
-/**
- * Interface for an instruction that can be replaced by an expression and assigned
- * to a variable.  
- * @author shannah
- */
-public interface AssignableExpression {
-    
-    /**
-     * Outputs C code to assign the expression to given variable.
-     * @param varName
-     * @param sb
-     * @return 
-     */
-    public boolean assignTo(String varName, StringBuilder sb);
+@interface ClearRect : ExecutableOp {
+    int x;
+    int y;
+    int width;
+    int height;
 }
+-(id)initWithArgs:(int)xpos ypos:(int)ypos w:(int)w h:(int)h;
+-(void)execute;
+
+@end

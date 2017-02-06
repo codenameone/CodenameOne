@@ -23,6 +23,9 @@
 
 package com.codename1.tools.translator;
  
+import com.codename1.tools.translator.bytecodes.ArithmeticExpression;
+import com.codename1.tools.translator.bytecodes.ArrayLengthExpression;
+import com.codename1.tools.translator.bytecodes.ArrayLoadExpression;
 import com.codename1.tools.translator.bytecodes.AssignableExpression;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.CustomIntruction;
@@ -1068,6 +1071,24 @@ public class BytecodeMethod {
         
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
+        
+        for (int iter=0; iter < instructionCount - 1; iter++) {
+            Instruction current = instructions.get(iter);
+            if (current.isOptimized()) {
+                continue;
+            }
+            int currentOpcode = current.getOpcode();
+            switch(currentOpcode) {
+                case Opcodes.CHECKCAST: {
+                    // Remove the check cast for now as it gets in the way of other optimizations
+                    instructions.remove(iter);
+                    iter--;
+                    instructionCount--;
+                    break;
+                }
+            }
+        }
+        
         for(int iter = 0 ; iter < instructionCount - 1 ; iter++) {
             Instruction current = instructions.get(iter);
             if (current.isOptimized()) {
@@ -1137,8 +1158,8 @@ public class BytecodeMethod {
                                     instructions.add(iter, new CustomIntruction(s, s, dependentClasses, new AssignableExpression() {
 
                                         @Override
-                                        public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
-                                            return finalNext.assignTo(varName, typeVarName, sb);
+                                        public boolean assignTo(String varName, StringBuilder sb) {
+                                            return finalNext.assignTo(varName, sb);
                                         }
                                         
                                     }));
@@ -1188,7 +1209,45 @@ public class BytecodeMethod {
                     }
                 }
             }
+            
+            if (ArithmeticExpression.isArithmeticOp(current)) {
+                int addedIndex = ArithmeticExpression.tryReduce(instructions, iter);
+                if (addedIndex >= 0) {
+                    iter = addedIndex;
+                    instructionCount = instructions.size();
+                    continue;
+                }
+            }
+            
             switch(currentOpcode) {
+                
+                case Opcodes.ARRAYLENGTH: {
+                    int newIter = ArrayLengthExpression.tryReduce(instructions, iter);
+                    if (newIter >= 0) {
+                        instructionCount = instructions.size();
+                        iter = newIter;
+                        continue;
+                    }
+                    break;
+                }
+                   
+                
+                case Opcodes.POP: {
+                    if (iter > 0) {
+                        Instruction prev = instructions.get(iter-1);
+                        if (prev instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)prev;
+                            if (inv.methodHasReturnValue()) {
+                                inv.setNoReturn(true);
+                                instructions.remove(iter);
+                                iter--;
+                                instructionCount--;
+                                continue;
+                            }
+                        }
+                    }
+                    break;
+                }
                 
                 case Opcodes.ASTORE:
                 case Opcodes.ISTORE:
@@ -1214,12 +1273,31 @@ public class BytecodeMethod {
                     
                     break;
                 }
-                    
+                
+                case Opcodes.FALOAD:
+                case Opcodes.BALOAD:
+                case Opcodes.IALOAD:
+                case Opcodes.LALOAD:
+                case Opcodes.DALOAD:
+                case Opcodes.AALOAD:
+                case Opcodes.SALOAD:
+                case Opcodes.CALOAD: {
+                    int newIter = ArrayLoadExpression.tryReduce(instructions, iter);
+                    if (newIter >= 0) {
+                        iter = newIter;
+                        instructionCount = instructions.size();
+                        continue;
+                    }
+                    break;
+                }
+                
                 
                 /* Try to optimize if statements that just use constants
                    and local variables so that they don't need the intermediate
                    push and pop from the stack.
                 */
+                case Opcodes.IF_ACMPEQ:
+                case Opcodes.IF_ACMPNE:
                 case Opcodes.IF_ICMPLE:
                 case Opcodes.IF_ICMPLT:
                 case Opcodes.IF_ICMPNE:
@@ -1236,63 +1314,17 @@ public class BytecodeMethod {
                         
                         if (leftArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
-                            if (((AssignableExpression)leftArg).assignTo(null, null, sb)) {
+                            if (((AssignableExpression)leftArg).assignTo(null, sb)) {
                                 leftLiteral = sb.toString();
                             }
                         }
                         if (rightArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
-                            if (((AssignableExpression)rightArg).assignTo(null, null, sb)) {
+                            if (((AssignableExpression)rightArg).assignTo(null, sb)) {
                                 rightLiteral = sb.toString();
                             }
                         }
-                        /*
-                        switch (leftArg.getOpcode()) {
-                            case Opcodes.ICONST_0:
-                                leftLiteral = "0"; break;
-                            case Opcodes.ICONST_1:
-                                leftLiteral = "1"; break;
-                            case Opcodes.ICONST_2:
-                                leftLiteral = "2"; break;
-                            case Opcodes.ICONST_3:
-                                leftLiteral = "3"; break;
-                            case Opcodes.ICONST_4:
-                                leftLiteral = "4"; break;
-                            case Opcodes.ICONST_5:
-                                leftLiteral = "5"; break;
-                            case Opcodes.ICONST_M1:
-                                leftLiteral = "-1"; break;
-                            case Opcodes.ILOAD: {
-                                VarOp varLeft = (VarOp)leftArg;
-                                leftLiteral = "ilocals_"+varLeft.getIndex()+"_";
-                                break;
-                            }
-                                
-                        }
                         
-                        switch (rightArg.getOpcode()) {
-                            case Opcodes.ICONST_0:
-                                rightLiteral = "0"; break;
-                            case Opcodes.ICONST_1:
-                                rightLiteral = "1"; break;
-                            case Opcodes.ICONST_2:
-                                rightLiteral = "2"; break;
-                            case Opcodes.ICONST_3:
-                                rightLiteral = "3"; break;
-                            case Opcodes.ICONST_4:
-                                rightLiteral = "4"; break;
-                            case Opcodes.ICONST_5:
-                                rightLiteral = "5"; break;
-                            case Opcodes.ICONST_M1:
-                                rightLiteral = "-1"; break;
-                            case Opcodes.ILOAD: {
-                                VarOp varRight = (VarOp)rightArg;
-                                rightLiteral = "ilocals_"+varRight.getIndex()+"_";
-                                break;
-                            }
-                                
-                        }
-                        */
                         if (rightLiteral != null && leftLiteral != null) {
                             Jump jmp = (Jump)current;
                             instructions.remove(iter-2);
@@ -1317,12 +1349,87 @@ public class BytecodeMethod {
                                     operator = ">="; opName = "IF_ICMPGE"; break;
                                 case Opcodes.IF_ICMPEQ:
                                     operator = "=="; opName = "IF_ICMPEQ"; break;
+                                case Opcodes.IF_ACMPEQ:
+                                    operator = "=="; opName = "IF_ACMPEQ"; break;
+                                case Opcodes.IF_ACMPNE:
+                                    operator = "!="; opName = "IF_ACMPNE"; break;
                                 default :
                                     throw new RuntimeException("Invalid operator during optimization of integer comparison");
                             }
                                     
                             
                             sb.append("if (").append(leftLiteral).append(operator).append(rightLiteral).append(") /* ").append(opName).append(" CustomJump */ ");
+                            CustomJump newJump = CustomJump.create(jmp, sb.toString());
+                            //jmp.setCustomCompareCode(sb.toString());
+                            newJump.setOptimized(true);
+                            instructions.add(iter, newJump);
+                            instructionCount = instructions.size();
+                            
+                        }
+                        
+                    }
+                break;
+                }   
+                case Opcodes.IFNONNULL:
+                case Opcodes.IFNULL:
+                
+                case Opcodes.IFLE:
+                case Opcodes.IFLT:
+                case Opcodes.IFNE:
+                case Opcodes.IFGT:
+                case Opcodes.IFEQ:
+                case Opcodes.IFGE: {
+                    String rightArg = "0";
+                    if (currentOpcode == Opcodes.IFNONNULL || currentOpcode == Opcodes.IFNULL) {
+                        rightArg = "JAVA_NULL";
+                    }
+                    if (iter > 0) {
+                        Instruction leftArg = instructions.get(iter-1);
+                        
+                        String leftLiteral = null;
+                        
+                        
+                        if (leftArg instanceof AssignableExpression) {
+                            StringBuilder sb = new StringBuilder();
+                            if (((AssignableExpression)leftArg).assignTo(null, sb)) {
+                                leftLiteral = sb.toString();
+                            }
+                        }
+                        
+                        
+                        if (leftLiteral != null) {
+                            Jump jmp = (Jump)current;
+                            instructions.remove(iter-1);
+                            instructions.remove(iter-1);
+                            //instructions.remove(iter-2);
+                            iter-=1;
+                            //instructionCount -= 2;
+                            StringBuilder sb = new StringBuilder();
+                            String operator = null;
+                            String opName = null;
+                            switch (currentOpcode) {
+                                case Opcodes.IFLE:
+                                    operator = "<="; opName = "IFLE"; break;
+                                case Opcodes.IFLT:
+                                    operator = "<"; opName = "IFLT"; break;
+                                case Opcodes.IFNE:
+                                    operator = "!="; opName = "IFNE"; break;
+                                case Opcodes.IFGT:
+                                    operator = ">"; opName = "IFGT"; break;
+                                case Opcodes.IFGE:
+                                    operator = ">="; opName = "IFGE"; break;
+                                case Opcodes.IFEQ:
+                                    operator = "=="; opName = "IFEQ"; break;
+                                case Opcodes.IFNULL:
+                                    operator = "=="; opName = "IFNULL"; break;
+                                case Opcodes.IFNONNULL:
+                                    operator = "!="; opName = "IFNONNULL"; break;
+                                default :
+                                    throw new RuntimeException("Invalid operator during optimization of integer comparison");
+                            }
+                                    
+                            
+                            sb.append("if (").append(leftLiteral).append(operator).append(rightArg).append(") /* ").append(opName).append(" CustomJump */ ");
                             CustomJump newJump = CustomJump.create(jmp, sb.toString());
                             //jmp.setCustomCompareCode(sb.toString());
                             newJump.setOptimized(true);
@@ -1475,6 +1582,7 @@ public class BytecodeMethod {
                         Invoke inv = (Invoke)current;
                         List<ByteCodeMethodArg> invocationArgs = inv.getArgs();
                         int numArgs = invocationArgs.size();
+                        
                         //if (current.getOpcode() != Opcodes.INVOKESTATIC) {
                         //    numArgs++;
                         //}
@@ -1482,7 +1590,9 @@ public class BytecodeMethod {
                             String[] argLiterals = new String[numArgs];
                             for (int i=0; i<numArgs; i++) {
                                 Instruction instr = instructions.get(iter-numArgs+i);
-                                if (instr instanceof VarOp) {
+                                if (instr instanceof ArithmeticExpression) {
+                                    argLiterals[i] = ((ArithmeticExpression)instr).getExpressionAsString();
+                                } else if (instr instanceof VarOp) {
                                     VarOp var = (VarOp)instr;
                                     switch (instr.getOpcode()) {
                                         case Opcodes.ALOAD: {
@@ -1545,8 +1655,12 @@ public class BytecodeMethod {
                                             argLiterals[i] = "(JAVA_LONG)1";
                                             break;
                                         }
-
-
+                                        case Opcodes.BIPUSH: 
+                                        case Opcodes.SIPUSH: {
+                                            argLiterals[i] = String.valueOf(var.getIndex());
+                                            
+                                            break;
+                                        }
                                     }
                                 } else {
                                     switch (instr.getOpcode()) {
@@ -1592,6 +1706,20 @@ public class BytecodeMethod {
                                             argLiterals[i] = "(JAVA_LONG)1";
                                             break;
                                         }
+                                        case Opcodes.BIPUSH: {
+                                            if (instr instanceof BasicInstruction) {
+                                                argLiterals[i] = String.valueOf(((BasicInstruction)instr).getValue());
+                                            }
+                                            break;
+                                        }
+                                        case Opcodes.LDC : {
+                                            if (instr instanceof Ldc) {
+                                                Ldc ldc = (Ldc)instr;
+                                                argLiterals[i] = ldc.getValueAsString();
+                                                
+                                            }
+                                            break;
+                                        }
 
 
                                     }
@@ -1615,14 +1743,44 @@ public class BytecodeMethod {
                                 CustomInvoke newInvoke = CustomInvoke.create(inv);
                                 instructions.remove(iter);
                                 instructions.add(iter, newInvoke);
+                                int newIter = iter;
                                 for (int i=0; i< numArgs; i++) {
                                     instructions.remove(iter-numArgs);
+                                    newIter--;
                                     newInvoke.setLiteralArg(i, argLiterals[i]);
+                                }
+                                if (inv.getOpcode() != Opcodes.INVOKESTATIC) {
+                                    Instruction ldTarget = instructions.get(iter-numArgs-1);
+                                    if (ldTarget instanceof AssignableExpression) {
+                                        StringBuilder targetExprStr = new StringBuilder();
+                                        if (((AssignableExpression)ldTarget).assignTo(null, targetExprStr)) {
+                                            newInvoke.setTargetObjectLiteral(targetExprStr.toString().trim());
+                                            instructions.remove(iter-numArgs-1);
+                                            newIter--;
+                                            
+                                        }
+                                        
+                                    } else if (ldTarget instanceof CustomInvoke) {
+                                        // TODO
+                                    } else {
+                                        switch (ldTarget.getOpcode()) {
+                                            case Opcodes.ALOAD: {
+                                                VarOp v = (VarOp)ldTarget;
+                                                newInvoke.setTargetObjectLiteral("locals["+v.getIndex()+"].data.o");
+                                                instructions.remove(iter-numArgs-1);
+                                                newIter--;
+                                                break;
+                                            }
+                                        }
+                                    }
                                 }
                                 
                                 newInvoke.setOptimized(true);
-                                iter = 0;
+                                //iter = 0;
                                 instructionCount = instructions.size();
+                                iter = newIter;
+                                
+                                
                             }
                         }
                     }

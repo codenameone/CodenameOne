@@ -42,9 +42,10 @@ public class VarOp extends Instruction implements AssignableExpression {
     }
     
     @Override
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+    public boolean assignTo(String varName, StringBuilder sb) {
         StringBuilder b = new StringBuilder();
         b.append("    ");
+        /*
         if (typeVarName != null) {
             switch (opcode) {
                 case Opcodes.ALOAD:
@@ -53,7 +54,7 @@ public class VarOp extends Instruction implements AssignableExpression {
                     b.append("].type = CN1_TYPE_OBJECT; ");
                     break;
             }
-        }
+        }*/
         if (varName != null) {
             b.append(varName).append(" = ");
         }
@@ -98,16 +99,26 @@ public class VarOp extends Instruction implements AssignableExpression {
         b.append("    /* VarOp.assignFrom */ ");
         switch (opcode) {
             case Opcodes.ISTORE:
-                return ex.assignTo("ilocals_"+var+"_", null, b);
+                return ex.assignTo("ilocals_"+var+"_", b);
                 
             case Opcodes.LSTORE:
-                return ex.assignTo("llocals_"+var+"_", null, b);
+                return ex.assignTo("llocals_"+var+"_", b);
             case Opcodes.FSTORE:
-                return ex.assignTo("flocals_"+var+"_", null, b);
+                return ex.assignTo("flocals_"+var+"_", b);
             case Opcodes.DSTORE:
-                return ex.assignTo("dlocals_"+var+"_", null, b);
-            case Opcodes.ASTORE:
-                return ex.assignTo("locals["+var+"].data.o", "locals["+var+"].type", b);
+                return ex.assignTo("dlocals_"+var+"_", b);
+            case Opcodes.ASTORE: {
+                StringBuilder sb = new StringBuilder();
+                sb.append("locals[").append(var).append("].type=CN1_TYPE_INVALID;");
+                boolean res = ex.assignTo("locals["+var+"].data.o", sb);
+                if (!res) {
+                    return false;
+                }
+                sb.append("locals[").append(var).append("].type=CN1_TYPE_OBJECT;");
+                b.append(sb);
+                return true;
+            }
+                
         }
         b.append("\n");
         return false;

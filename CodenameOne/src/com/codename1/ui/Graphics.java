@@ -37,6 +37,14 @@ import com.codename1.ui.geom.Shape;
  * object directly.
  */
 public final class Graphics {
+    
+    /**
+     * Flag that specifies that native peers are rendered "behind" the this 
+     * graphics context.  The main difference is that drawPeerComponent() will
+     * call clearRect() for its bounds to "poke a hole" in the graphics context
+     * to see through to the native layer.
+     */
+    boolean paintPeersBehind;
     private int xTranslate;
     private int yTranslate;
     private Transform translation;
@@ -49,7 +57,6 @@ public final class Graphics {
 
     private Object[] nativeGraphicsState;
     private float scaleX = 1, scaleY = 1;
-    
     
     /**
      * Constructing new graphics with a given javax.microedition.lcdui.Graphics 
@@ -111,7 +118,7 @@ public final class Graphics {
             yTranslate += y;
         }
     }
-
+    
     /**
      * Returns the current x translate value 
      * 
@@ -157,7 +164,7 @@ public final class Graphics {
         color = 0xffffff & RGB;
         impl.setColor(nativeGraphics, color);
     }
-
+    
     /**
      * Returns the font used with the drawString method calls 
      * 
@@ -173,6 +180,7 @@ public final class Graphics {
      * @param font the font used with the drawString method calls
      */
     public void setFont(Font font) {
+        
         this.current = font;
         if(!(font instanceof CustomFont)) {
             impl.setNativeFont(nativeGraphics, font.getNativeFont());
@@ -203,7 +211,7 @@ public final class Graphics {
     public void setClip(int[] clip) {
         setClip(clip[0], clip[1], clip[2], clip[3]);
     }
-
+    
     /**
      * Returns the y clipping position
      * 
@@ -243,7 +251,7 @@ public final class Graphics {
     public void clipRect(int x, int y, int width, int height) {
         impl.clipRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
-
+    
     /**
      * Updates the clipping region to match the given region exactly
      * 
@@ -255,8 +263,6 @@ public final class Graphics {
     public void setClip(int x, int y, int width, int height) {
         impl.setClip(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
-
-    
     
     /**
      * Clips the Graphics context to the Shape.
@@ -278,6 +284,7 @@ public final class Graphics {
         }
         impl.setClip(nativeGraphics, shape);
     }
+    
     
     /**
      * Pushes the current clip onto the clip stack.  It can later be restored 
@@ -304,6 +311,7 @@ public final class Graphics {
      */
     public void drawLine(int x1, int y1, int x2, int y2) {
         impl.drawLine(nativeGraphics, xTranslate + x1, yTranslate + y1, xTranslate + x2, yTranslate + y2);
+        
     }
 
     /**
@@ -317,6 +325,25 @@ public final class Graphics {
      */
     public void fillRect(int x, int y, int width, int height) {
         impl.fillRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
+    }
+    
+    /**
+     * Clears rectangular area of the graphics context.  This will remove any color
+     * information that has already been drawn to the graphics context making it transparent.
+     * <p>The difference between this method and say {@link #fillRect(int, int, int, int) } with alpha=0 is
+     * that fillRect() will just blend with the colors underneath (and thus {@link #fillRect(int, int, int, int) }
+     * with an alpha of 0 actually does nothing.</p>
+     * NOTE: In contrast to other drawing methods, coordinates input here
+     * are absolute and will not be adjusted by the xTranslate and yTranslate values
+     * 
+     * <p>This method is designed to be used by {@link #drawPeerComponent(com.codename1.ui.PeerComponent) } only.</p>
+     * @param x The x-coordinate of the box to clear.  In screen coordinates.
+     * @param y The y-coordinate of the box to clear.  In screen coordinates.
+     * @param width The width of the box to clear.
+     * @param height The height of the box to clear.
+     */
+    private void clearRectImpl(int x, int y, int width, int height) {
+        impl.clearRect(nativeGraphics, x, y, width, height);
     }
 
     /**
@@ -374,7 +401,7 @@ public final class Graphics {
         b = Math.min(0xff, b + factor);
         setColor(((r << 16) & 0xff0000) | ((g << 8) & 0xff00) | (b & 0xff));
     }
-
+    
     /**
      * Makes the current color slightly darker, this is useful for many visual effects
      * 
@@ -390,7 +417,7 @@ public final class Graphics {
         b = Math.max(0, b - factor);
         setColor(((r << 16) & 0xff0000) | ((g << 8) & 0xff00) | (b & 0xff));
     }
-
+    
     /**
      * Fills a rounded rectangle in the same way as drawRoundRect
      * 
@@ -405,7 +432,7 @@ public final class Graphics {
     public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
         impl.fillRoundRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height, arcWidth, arcHeight);
     }
-
+    
     /**
      * Fills a circular or elliptical arc based on the given angles and bounding 
      * box. The resulting arc begins at startAngle and extends for arcAngle 
@@ -423,7 +450,7 @@ public final class Graphics {
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
         impl.fillArc(nativeGraphics, xTranslate + x, yTranslate + y, width, height, startAngle, arcAngle);
     }
-
+    
     /**
      * Draws a circular or elliptical arc based on the given angles and bounding 
      * box
@@ -438,7 +465,7 @@ public final class Graphics {
     public void drawArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
         impl.drawArc(nativeGraphics, xTranslate + x, yTranslate + y, width, height, startAngle, arcAngle);
     }
-
+    
     private void drawStringImpl(String str, int x, int y) {
         // remove a commonly used trick to create a spacer label from the paint queue
         if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
@@ -465,6 +492,7 @@ public final class Graphics {
         if(str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
             return;
         }
+        
         Object nativeFont = null;
         if(current != null) {
             nativeFont = current.getNativeFont();
@@ -572,7 +600,7 @@ public final class Graphics {
             drawImage(img.scaled(w, h), x, y);
         }
     }
-
+    
     void drawImageWH(Object nativeImage, int x, int y, int w ,int h) {
         impl.drawImage(nativeGraphics, nativeImage, x + xTranslate, y + yTranslate, w, h);
     }
@@ -641,7 +669,6 @@ public final class Graphics {
      * @see #isShapeSupported
      */
     public void fillShape(Shape shape){
-        
         if ( isShapeSupported() ){
             if ( xTranslate != 0 || yTranslate != 0 ){
                 GeneralPath p = tmpClipShape();
@@ -729,7 +756,6 @@ public final class Graphics {
      */
     public void setTransform(Transform transform){
         impl.setTransform(nativeGraphics, transform);
-        
     }
     
     /**
@@ -880,7 +906,7 @@ public final class Graphics {
         }
         impl.fillLinearGradient(nativeGraphics, startColor, endColor, x + xTranslate, y + yTranslate, width, height, horizontal);
     }
-
+    
     /**
      * Fills a rectangle with an optionally translucent fill color
      * 
@@ -893,7 +919,7 @@ public final class Graphics {
     public void fillRect(int x, int y, int w, int h, byte alpha) {
         impl.fillRect(nativeGraphics, x, y, w, h, alpha);
     }
-
+    
     /**
      *  Fills a closed polygon defined by arrays of x and y coordinates. 
      *  Each pair of (x, y) coordinates defines a point.
@@ -978,7 +1004,6 @@ public final class Graphics {
     public void setAlpha(int a) {
         impl.setAlpha(nativeGraphics, a);
     }
-
     
     /**
      * Returnes the alpha as a value between 0-255 (0 - 0xff) where 255 is completely opaque
@@ -1088,7 +1113,7 @@ public final class Graphics {
     public void rotate(float angle) {
         impl.rotate(nativeGraphics, angle);
     }
-
+    
     /**
      * Rotates the coordinate system around a radian angle using the affine transform
      *
@@ -1109,7 +1134,7 @@ public final class Graphics {
     public void shear(float x, float y) {
         impl.shear(nativeGraphics, x, y);
     }
-
+    
     /**
      * Starts accessing the native graphics in the underlying OS, when accessing
      * the native graphics Codename One shouldn't be used! The native graphics is unclipped
@@ -1222,4 +1247,17 @@ public final class Graphics {
     public float getScaleY() {
         return scaleY;
     }
+    
+    /**
+     * Draws a peer component.  This doesn't actually draw anything, it just activates
+     * the front graphics buffer and begins redirecting drawing operations to that buffer.
+     * <p>This is only used on platforms where {@link CodenameOneImplementation#isFrontGraphicsSupported() } is enabled.</p>
+     * @param peer The peer component to be drawn.
+     */
+    void drawPeerComponent(PeerComponent peer) {
+        if (paintPeersBehind) {
+            clearRectImpl(peer.getAbsoluteX(), peer.getAbsoluteY(), peer.getWidth(), peer.getHeight());
+        }
+        
+    }    
 }

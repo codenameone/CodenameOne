@@ -613,7 +613,7 @@ public abstract class CodenameOneImplementation {
      * Flush the currently painted drawing onto the screen if using a double buffer
      */
     public abstract void flushGraphics();
-
+    
     /**
      * Returns a graphics object for use by the painting
      * 
@@ -633,6 +633,18 @@ public abstract class CodenameOneImplementation {
         codenameOneGraphics = g;
     }
 
+    /**
+     * A flag that can be overridden by a platform to indicate that native 
+     * peers are rendered behind the main codename one graphics layer.  The main
+     * effect of this is that Graphics will call clearRect() any time a native
+     * component is "painted" to poke a hole through the CN1 layer.
+     * @return 
+     */
+    public boolean paintNativePeersBehind() {
+        return false;
+    }
+    
+    
     /**
      * Installs the display lock allowing implementors to synchronize against the 
      * Display mutex, this method is invoked internally and should not be used.
@@ -1386,6 +1398,10 @@ public abstract class CodenameOneImplementation {
      * @param height the height of the rectangle to be filled.
      */
     public abstract void fillRect(Object graphics, int x, int y, int width, int height);
+    
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        System.out.println("clearRect() not implemented on this platform");
+    }
 
     /**
      * Draws a rectangle in the given coordinates
@@ -5615,6 +5631,13 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /**
+     * Blocks or enables copy and paste in the entire app.
+     * @param blockCopyPaste True to block copy and paste.  False to enable it.
+     */
+    public void blockCopyPaste(boolean blockCopyPaste) {
+        
+    }
 
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
