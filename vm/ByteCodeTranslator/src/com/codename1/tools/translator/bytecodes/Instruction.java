@@ -23,6 +23,7 @@
 
 package com.codename1.tools.translator.bytecodes;
 
+import com.codename1.tools.translator.BytecodeMethod;
 import java.util.List;
 
 /**
@@ -32,6 +33,7 @@ import java.util.List;
 public abstract class Instruction {
     static boolean hasInstructions;
     private boolean optimized=false;
+    private BytecodeMethod method;
     
     public static void setHasInstructions(boolean h) {
         hasInstructions = h;
@@ -101,5 +103,20 @@ public abstract class Instruction {
     
     public char[] getStackOutputTypes() {
         return null;
+    }
+
+    /**
+     * @return the method
+     */
+    public BytecodeMethod getMethod() {
+        return method;
+    }
+
+    /**
+     * @param method the method to set
+     */
+    public void setMethod(BytecodeMethod method) {
+        this.method = method;
+        
     }
 }

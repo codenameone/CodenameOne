@@ -34,7 +34,7 @@ import org.objectweb.asm.Type;
  *
  * @author Shai Almog
  */
-public class Ldc extends Instruction {
+public class Ldc extends Instruction implements AssignableExpression {
     private Object cst;
     public Ldc(Object o) {
         super(Opcodes.LDC);
@@ -333,5 +333,18 @@ public class Ldc extends Instruction {
             b.append(" */");
         }
  
+    }
+
+    @Override
+    public boolean assignTo(String varName, StringBuilder sb) {
+        if (varName != null) {
+            sb.append("    ");
+            sb.append(varName).append(" = ");
+        }
+        sb.append(getValueAsString());
+        if (varName != null) {
+            sb.append(";\n");
+        }
+        return true;
     }
 }

@@ -34,7 +34,10 @@ public class Field extends Instruction implements AssignableExpression {
     private String owner;
     private String name;
     private String desc;
-    private boolean useThis;
+    //private boolean useThis;
+    
+    private Instruction targetOp;
+    private Instruction valueOp;
     
     public Field(int opcode, String owner, String name, String desc) {
         super(opcode);
@@ -54,6 +57,12 @@ public class Field extends Instruction implements AssignableExpression {
         t = unarray(t);
         if(t != null && !dependencyList.contains(t)) {
             dependencyList.add(t);
+        }
+        if (targetOp != null) {
+            targetOp.addDependencies(dependencyList);
+        }
+        if (valueOp != null) {
+            valueOp.addDependencies(dependencyList);
         }
     }
     
@@ -77,6 +86,8 @@ public class Field extends Instruction implements AssignableExpression {
                 "_" + name + "(threadStateData, __cn1Arg" + arg + ", __cn1ThisObject);\n";        
     }
 
+    
+    
     
     
     public String pushFieldFromThis() {
@@ -110,30 +121,10 @@ public class Field extends Instruction implements AssignableExpression {
     
     @Override
     public boolean assignTo(String varName, StringBuilder sb) {
-        if (opcode == Opcodes.GETSTATIC || (opcode == Opcodes.GETFIELD && useThis)) {
+        if (opcode == Opcodes.GETSTATIC || (opcode == Opcodes.GETFIELD)) {
             StringBuilder b = new StringBuilder();
-            /*if (typeVarName != null) {
-                b.append(typeVarName).append(" = ");
-                switch(desc.charAt(0)) {
-                    case 'L':
-                    case '[':
-                        b.append("CN1_TYPE_OBJECT");
-                        break;
-                    case 'D':
-                        b.append("CN1_TYPE_DOUBLE");
-                        break;
-                    case 'F':
-                        b.append("CN1_TYPE_FLOAT");
-                        break;
-                    case 'J':
-                        b.append("CN1_TYPE_LONG");
-                        break;
-                    default:
-                        b.append("CN1_TYPE_INT");
-                        break;
-                }
-                b.append("; ");
-            }*/
+            
+                
             if (varName != null) {
                 b.append(varName).append(" = ");
             }
@@ -144,12 +135,23 @@ public class Field extends Instruction implements AssignableExpression {
                 b.append(name.replace('/', '_').replace('$', '_'));
                 b.append("(threadStateData)");
             } else {
-                // useThis
+                
                 b.append("get_field_");
                 b.append(owner.replace('/', '_').replace('$', '_'));
                 b.append("_");
                 b.append(name);
-                b.append("(__cn1ThisObject)");
+                StringBuilder sb3 = new StringBuilder();
+                boolean targetProvided = (targetOp != null &&
+                    targetOp instanceof AssignableExpression && 
+                    ((AssignableExpression)targetOp).assignTo(null, sb3));
+                if (targetProvided) {
+                    b.append("(").append(sb3.toString().trim()).append(")");
+                //} else if (useThis) {
+                //    b.append("(__cn1ThisObject)");
+                } else {
+                    return false;
+                }
+                
             }
             if (varName != null) {
                 b.append(";\n");
@@ -163,9 +165,30 @@ public class Field extends Instruction implements AssignableExpression {
         
         return false;
     }
+
+    @Override
+    public void appendInstruction(StringBuilder b, List<Instruction> l) {
+        StringBuilder sb = new StringBuilder();
+        appendInstruction(sb); //To change body of generated methods, choose Tools | Templates.
+        if (valueOp != null && !valueOpAppended) {
+            valueOp.appendInstruction(b, l);
+            valueOpAppended = true;
+        }
+        if (targetOp != null && !targetOpAppended) {
+            targetOp.appendInstruction(b, l);
+            targetOpAppended = true;
+        }
+        b.append(sb);
+    }
+    
+    private boolean valueOpAppended;
+    private boolean targetOpAppended;
     
     @Override
-    public void appendInstruction(StringBuilder b) {
+    public void appendInstruction(StringBuilder sbOut) {
+        valueOpAppended = false;
+        targetOpAppended = false;
+        StringBuilder b = new StringBuilder();
         b.append("    ");
         switch(opcode) {
             case Opcodes.GETSTATIC:
@@ -193,34 +216,49 @@ public class Field extends Instruction implements AssignableExpression {
                 b.append(name.replace('/', '_').replace('$', '_'));
                 b.append("(threadStateData));\n");
                 break;
-            case Opcodes.PUTSTATIC:
+            case Opcodes.PUTSTATIC: {
                 //b.append("SAFE_RETAIN(1);\n    ");
                 b.append("set_static_");
                 b.append(owner.replace('/', '_').replace('$', '_'));
                 b.append("_");
                 b.append(name.replace('/', '_').replace('$', '_'));
                 b.append("(threadStateData, ");
-                switch(desc.charAt(0)) {
-                    case 'L':
-                    case '[':
-                        b.append("PEEK_OBJ(1));\n    SP--;\n");
-                        return;
-                    case 'D':
-                        b.append("POP_DOUBLE");
-                        break;
-                    case 'F':
-                        b.append("POP_FLOAT");
-                        break;
-                    case 'J':
-                        b.append("POP_LONG");
-                        break;
-                    default:
-                        b.append("POP_INT");
-                        break;
+                StringBuilder sb2 = new StringBuilder();
+                if (valueOp != null && valueOp instanceof AssignableExpression && ((AssignableExpression)valueOp).assignTo(null, sb2)) {
+                    b.append(sb2.toString().trim()).append(");\n");
+                    valueOpAppended = true;
+                } else {
+                    
+                    switch(desc.charAt(0)) {
+                        case 'L':
+                        case '[':
+                            b.append("PEEK_OBJ(1));\n    SP--;\n");
+                            sbOut.append(b);
+                            return;
+                        case 'D':
+                            b.append("POP_DOUBLE");
+                            break;
+                        case 'F':
+                            b.append("POP_FLOAT");
+                            break;
+                        case 'J':
+                            b.append("POP_LONG");
+                            break;
+                        default:
+                            b.append("POP_INT");
+                            break;
+                    }
+                    b.append("());\n");
                 }
-                b.append("());\n");
+                
                 break;
-            case Opcodes.GETFIELD:
+            }
+            case Opcodes.GETFIELD: {
+                StringBuilder sb3 = new StringBuilder();
+                boolean targetProvided = (targetOp != null &&
+                        targetOp instanceof AssignableExpression && 
+                        ((AssignableExpression)targetOp).assignTo(null, sb3));
+                
                 switch(desc.charAt(0)) {
                     case 'L':
                     case '[':
@@ -239,67 +277,208 @@ public class Field extends Instruction implements AssignableExpression {
                         b.append("PUSH_INT");
                         break;
                 }
+                
                 b.append("(get_field_");
                 b.append(owner.replace('/', '_').replace('$', '_'));
                 b.append("_");
                 b.append(name);
-                if(useThis) {
-                    b.append("(__cn1ThisObject));\n");
+                
+                if (targetProvided) {
+                    b.append("(").append(sb3.toString().trim()).append("));\n");
+                    targetOpAppended = true;
+                //} else if(useThis) {
+                //    b.append("(__cn1ThisObject));\n");
                 } else {
                     b.append("(POP_OBJ()));\n");
                 }
                 break;
-            case Opcodes.PUTFIELD:
+            }
+            case Opcodes.PUTFIELD: {
                 //b.append("SAFE_RETAIN(1);\n    ");
                 b.append("set_field_");
                 b.append(owner.replace('/', '_').replace('$', '_'));
                 b.append("_");
                 b.append(name);
                 b.append("(threadStateData, ");
-                switch(desc.charAt(0)) {
-                    case 'L':
-                    case '[':
-                        b.append("PEEK_OBJ");
-                        if(useThis) {
-                            b.append("(1), __cn1ThisObject);\n    SP--;\n");
-                        } else {
-                            b.append("(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
-                        }
-                        return;
-                    case 'D':
-                        b.append("POP_DOUBLE");
-                        break;
-                    case 'F':
-                        b.append("POP_FLOAT");
-                        break;
-                    case 'J':
-                        b.append("POP_LONG");
-                        break;
-                    default:
-                        b.append("POP_INT");
-                        break;
-                }
-                if(useThis) {
-                    b.append("(), __cn1ThisObject);\n");
+                StringBuilder sb2 = new StringBuilder();
+                StringBuilder sb3 = new StringBuilder();
+                if (valueOp != null && targetOp != null &&
+                        valueOp instanceof AssignableExpression && 
+                        targetOp instanceof AssignableExpression && 
+                        ((AssignableExpression)valueOp).assignTo(null, sb2) &&
+                        ((AssignableExpression)targetOp).assignTo(null, sb3)) {
+                    b.append(sb2.toString().trim()).append(", ").append(sb3.toString().trim()).append(");\n");
+                    valueOpAppended = true;
+                    targetOpAppended = true;
+                //} else if (valueOp != null && useThis && valueOp instanceof AssignableExpression && ((AssignableExpression)valueOp).assignTo(null, sb2)) {
+                //    sb2.setLength(0);
+                //    ((AssignableExpression)valueOp).assignTo(null, sb2);
+                //    b.append(sb2.toString().trim()).append(", __cn1ThisObject);\n    SP--;\n");
+                //    valueOpAppended = true;
                 } else {
-                    b.append("(), POP_OBJ());\n");
+                    switch(desc.charAt(0)) {
+                        case 'L':
+                        case '[':
+                            b.append("PEEK_OBJ");
+                            //if(useThis) {
+                            //    b.append("(1), __cn1ThisObject);\n    SP--;\n");
+                            //} else {
+                                b.append("(1), PEEK_OBJ(2));\n    POP_MANY(2);\n");
+                            //}
+                                sbOut.append(b);
+                            return;
+                        case 'D':
+                            b.append("POP_DOUBLE");
+                            break;
+                        case 'F':
+                            b.append("POP_FLOAT");
+                            break;
+                        case 'J':
+                            b.append("POP_LONG");
+                            break;
+                        default:
+                            b.append("POP_INT");
+                            break;
+                    }
+                    //if(useThis) {
+                    //    b.append("(), __cn1ThisObject);\n");
+                    //} else {
+                        b.append("(), POP_OBJ());\n");
+                    //}
                 }
                 break;
+            }
         }
+        if (valueOp != null && !valueOpAppended) {
+            valueOp.appendInstruction(sbOut);
+            valueOpAppended = true;
+        }
+        if (targetOp != null && !targetOpAppended) {
+            targetOp.appendInstruction(sbOut);
+            targetOpAppended = true;
+        }
+        sbOut.append(b);
     }
 
+    
+    
     /**
      * @return the useThis
      */
-    public boolean isUseThis() {
-        return useThis;
-    }
+    //public boolean isUseThis() {
+    //    return useThis;
+    //}
 
     /**
      * @param useThis the useThis to set
      */
-    public void setUseThis(boolean useThis) {
-        this.useThis = useThis;
+    //public void setUseThis(boolean useThis) {
+    //    this.useThis = useThis;
+    //}
+    
+    public static int tryReduce(List<Instruction> instructions, int index) {
+        Instruction instr = instructions.get(index);
+        if (!(instr instanceof Field)) {
+            return -1;
+        }
+        if (instr.getOpcode() == Opcodes.PUTFIELD) {
+            if (index < 2) {
+                return -1;
+            }
+            
+            Field f = (Field)instr;
+            if (f.targetOp != null || f.valueOp != null) {
+                return -1;
+            }
+            Instruction targetInstr = instructions.get(index-2);
+            if (!(targetInstr instanceof AssignableExpression)) {
+                return -1;
+            }
+            Instruction valueInstr = instructions.get(index-1);
+            if (!(valueInstr instanceof AssignableExpression)) {
+                return -1;
+            }
+            
+            StringBuilder sb = new StringBuilder();
+            
+            AssignableExpression targetExpr = (AssignableExpression) targetInstr;
+            if (!targetExpr.assignTo(null, sb)) {
+                return -1;
+            }
+            
+            AssignableExpression valueExpr = (AssignableExpression) valueInstr;
+            if (!valueExpr.assignTo(null, sb)) {
+                return -1;
+            }
+            
+            f.targetOp = targetInstr;
+            f.valueOp = valueInstr;
+            
+            instructions.remove(index-2);
+            instructions.remove(index-2);
+            return index-2;
+        } else if (instr.getOpcode() == Opcodes.PUTSTATIC) {
+            if (index < 1) {
+                return -1;
+            }
+            
+            Field f = (Field)instr;
+            if (f.valueOp != null) {
+                return -1;
+            }
+        
+            Instruction valueInstr = instructions.get(index-1);
+            if (!(valueInstr instanceof AssignableExpression)) {
+                return -1;
+            }
+            
+            StringBuilder sb = new StringBuilder();
+            
+           
+            
+            AssignableExpression valueExpr = (AssignableExpression) valueInstr;
+            if (!valueExpr.assignTo(null, sb)) {
+                return -1;
+            }
+            
+            
+            f.valueOp = valueInstr;
+            
+            instructions.remove(index-1);
+            
+            return index-1;
+        } else if (instr.getOpcode() == Opcodes.GETFIELD) {
+            if (index < 1) {
+                return -1;
+            }
+            
+            Field f = (Field)instr;
+            //if (f.useThis) {
+            //    return -1;
+            //}
+            
+            Instruction targetInstr = instructions.get(index-1);
+            if (!(targetInstr instanceof AssignableExpression)) {
+                return -1;
+            }
+            
+            StringBuilder sb = new StringBuilder();
+            
+           
+            
+            AssignableExpression targetExpr = (AssignableExpression) targetInstr;
+            if (!targetExpr.assignTo(null, sb)) {
+                return -1;
+            }
+            
+            
+            f.targetOp = targetInstr;
+            
+            instructions.remove(index-1);
+            
+            return index-1;
+        }
+        return -1;
     }
 
     

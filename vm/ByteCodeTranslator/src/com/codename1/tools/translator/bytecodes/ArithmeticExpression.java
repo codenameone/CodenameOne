@@ -152,6 +152,7 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
         }
         int opcode = instr.getOpcode();
         switch (opcode) {
+            
             case Opcodes.FLOAD:
             case Opcodes.DLOAD:
             case Opcodes.ILOAD:
@@ -165,6 +166,11 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
             case org.objectweb.asm.Opcodes.ICONST_M1:
             case org.objectweb.asm.Opcodes.LCONST_0:
             case org.objectweb.asm.Opcodes.LCONST_1: 
+            case Opcodes.DCONST_0:
+            case Opcodes.DCONST_1:
+            case Opcodes.FCONST_0:
+            case Opcodes.FCONST_1:
+            case Opcodes.FCONST_2:
             case org.objectweb.asm.Opcodes.BIPUSH:
             case org.objectweb.asm.Opcodes.SIPUSH:
             case Opcodes.LDC:
@@ -175,6 +181,17 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
 
     public static boolean isBinaryOp(Instruction instr) {
         switch (instr.getOpcode()) {
+            case Opcodes.ISHL:
+            case Opcodes.ISHR:
+            case Opcodes.LSHL:
+            case Opcodes.LSHR:
+            case Opcodes.IUSHR:
+            case Opcodes.LUSHR:
+            case Opcodes.DCMPG:
+            case Opcodes.DCMPL:
+            case Opcodes.FCMPG:
+            case Opcodes.FCMPL:
+            case Opcodes.LCMP:
             case Opcodes.IOR:
             case Opcodes.LOR:
             case Opcodes.IXOR:
@@ -197,6 +214,10 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
             case Opcodes.FREM:
             case Opcodes.DREM:
             case Opcodes.LREM:
+            case Opcodes.FMUL:
+            case Opcodes.DMUL:
+            case Opcodes.IMUL:
+            case Opcodes.LMUL:
                 return true;
         }
         return false;
@@ -211,6 +232,18 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
     public static boolean isArithmeticOp(Instruction instr) {
         
         switch (instr.getOpcode()) {
+            case Opcodes.ISHL:
+            case Opcodes.ISHR:
+            case Opcodes.LSHL:
+            case Opcodes.LSHR:
+            case Opcodes.IUSHR:
+            case Opcodes.LUSHR:
+            
+            case Opcodes.DCMPG:
+            case Opcodes.DCMPL:
+            case Opcodes.FCMPG:
+            case Opcodes.FCMPL:
+            case Opcodes.LCMP:
             case Opcodes.FNEG:
             case Opcodes.DNEG:
             case Opcodes.INEG:
@@ -251,6 +284,10 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
             case Opcodes.FREM:
             case Opcodes.DREM:
             case Opcodes.LREM:
+            case Opcodes.FMUL:
+            case Opcodes.DMUL:
+            case Opcodes.IMUL:
+            case Opcodes.LMUL:
                 return true;
         }
         return false;
@@ -330,6 +367,22 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                         return "((JAVA_LONG)0)";
                         
                     }
+                    case Opcodes.DCONST_0: {
+                        return "((JAVA_DOUBLE)0)";
+                    }
+                    case Opcodes.DCONST_1: {
+                        return "((JAVA_DOUBLE)1)";
+                    }
+                    case Opcodes.FCONST_0: {
+                        return "((JAVA_FLOAT)0)";
+                    }
+                    case Opcodes.FCONST_1: {
+                        return "((JAVA_FLOAT)1)";
+                    }
+                    case Opcodes.FCONST_2: {
+                        return "((JAVA_FLOAT)2";
+                    }
+                    
                     case org.objectweb.asm.Opcodes.LCONST_1: {
                         return "((JAVA_LONG)1)";
                         
@@ -407,6 +460,34 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
         } else {
 
             switch (opcode) {
+                
+                case Opcodes.ISHL: {
+                    return "BC_ISHL_EXPR("+subExpression.getExpressionAsString().trim() + ", "+subExpression2.getExpressionAsString().trim()+")";
+                }
+                case Opcodes.ISHR: {
+                    return "BC_ISHR_EXPR("+subExpression.getExpressionAsString().trim() + ", "+subExpression2.getExpressionAsString().trim()+")";
+                }
+                case Opcodes.LSHL: {
+                    return "BC_LSHL_EXPR("+subExpression.getExpressionAsString().trim() + ", "+subExpression2.getExpressionAsString().trim()+")";
+                }
+                case Opcodes.LSHR: {
+                    return "BC_LSHR_EXPR("+subExpression.getExpressionAsString().trim() + ", "+subExpression2.getExpressionAsString().trim()+")";
+                }
+                case Opcodes.IUSHR: {
+                    return "BC_IUSHR_EXPR("+subExpression.getExpressionAsString().trim() + ", "+subExpression2.getExpressionAsString().trim()+")";
+                }
+                case Opcodes.LUSHR: {
+                    return "BC_LUSHR_EXPR("+subExpression.getExpressionAsString().trim() + ", "+subExpression2.getExpressionAsString().trim()+")";
+                }
+
+                
+                case Opcodes.DCMPG:
+                case Opcodes.DCMPL:
+                case Opcodes.FCMPG:
+                case Opcodes.FCMPL:
+                case Opcodes.LCMP: {
+                    return "CN1_CMP_EXPR("+subExpression.getExpressionAsString().trim() + ", " + subExpression2.getExpressionAsString().trim()+")";
+                }
                 case Opcodes.D2F: {
                     return "((JAVA_FLOAT)" + subExpression.getExpressionAsString().trim() + ")";
                 }
