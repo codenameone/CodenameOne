@@ -2308,6 +2308,14 @@ public final class Display {
     }
 
     /**
+     * Checks to see if the platform supports a native image cache.
+     * @return True on platforms that support a native image cache.  Currently only Javascript.
+     */
+    boolean supportsNativeImageCache() {
+        return impl.supportsNativeImageCache();
+    }
+    
+    /**
      * Returns the game action code matching the given key combination
      *
      * @param keyCode key code received from the event
@@ -2491,7 +2499,7 @@ public final class Display {
     public boolean isMultiTouch() {
         return impl.isMultiTouch();
     }
-
+    
     /**
      * Indicates whether the device has a double layer screen thus allowing two
      * stages to touch events: click and hover. This is true for devices such
