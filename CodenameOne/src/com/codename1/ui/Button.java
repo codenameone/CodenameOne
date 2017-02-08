@@ -614,6 +614,7 @@ public class Button extends Label {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
+        calcSizeAutoSize();
         return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
     }
     
@@ -760,6 +761,7 @@ public class Button extends Label {
     @Override
     public void paint(Graphics g) {
         if(isLegacyRenderer()) {
+            initAutoResize();
             getUIManager().getLookAndFeel().drawButton(g, this);
             return;
         }
