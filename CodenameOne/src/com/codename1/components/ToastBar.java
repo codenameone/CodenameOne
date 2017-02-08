@@ -705,6 +705,11 @@ public class ToastBar {
                 layered.addComponent(position==Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();
             }
+            if(position == Component.BOTTOM && f.getInvisibleAreaUnderVKB() > 0) {
+                Style s = c.getAllStyles();
+                s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+                s.setMarginBottom(f.getInvisibleAreaUnderVKB());
+            }
             return c;
         }
         return null;
