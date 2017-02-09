@@ -503,10 +503,7 @@ public class ToastBar {
 
                 Label l = new Label(s.getMessage() != null ? s.getMessage() : "");
 
-                c.leadButton.addActionListener(s.getListener());
-
                 Button newLeadButton = new Button();
-                newLeadButton.addActionListener(s.getListener());
                 newLeadButton.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
@@ -516,6 +513,7 @@ public class ToastBar {
                         ToastBar.this.setVisible(false);
                     }
                 });
+                newLeadButton.addActionListener(s.getListener());
                 c.setLeadComponent(newLeadButton);
 
                 c.progressLabel.setVisible(s.isShowProgressIndicator());
