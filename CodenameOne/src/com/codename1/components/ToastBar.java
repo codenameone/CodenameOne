@@ -479,7 +479,7 @@ public class ToastBar {
      * Updates the ToastBar UI component with the settings of the current status.
      */
     private void updateStatus() {
-        ToastBarComponent c = getToastBarComponent();
+        final ToastBarComponent c = getToastBarComponent();
         if (c != null) {
             if (updatingStatus) {
                 pendingUpdateStatus = true;
@@ -503,7 +503,17 @@ public class ToastBar {
 
                 Label l = new Label(s.getMessage() != null ? s.getMessage() : "");
 
+                c.leadButton.getListeners().clear();
                 c.leadButton.addActionListener(s.getListener());
+                c.leadButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        if (c.currentlyShowing != null && !c.currentlyShowing.showProgressIndicator) {
+                            c.currentlyShowing.clear();
+                        }
+                        ToastBar.this.setVisible(false);
+                    }
+                }); 
 
                 c.progressLabel.setVisible(s.isShowProgressIndicator());
                 if (c.progressLabel.isVisible()) {
