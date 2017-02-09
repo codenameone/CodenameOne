@@ -504,7 +504,10 @@ public class ToastBar {
                 Label l = new Label(s.getMessage() != null ? s.getMessage() : "");
 
                 c.leadButton.addActionListener(s.getListener());
-                c.leadButton.addActionListener(new ActionListener() {
+
+                Button newLeadButton = new Button();
+                newLeadButton.addActionListener(s.getListener());
+                newLeadButton.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
                         if (c.currentlyShowing != null && !c.currentlyShowing.showProgressIndicator) {
@@ -513,6 +516,7 @@ public class ToastBar {
                         ToastBar.this.setVisible(false);
                     }
                 });
+                c.setLeadComponent(newLeadButton);
 
                 c.progressLabel.setVisible(s.isShowProgressIndicator());
                 if (c.progressLabel.isVisible()) {
