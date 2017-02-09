@@ -69,6 +69,32 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
             }
         }
     }
+
+    @Override
+    public boolean isConstant() {
+        switch (opcode) {
+            case Opcodes.ACONST_NULL:
+            case Opcodes.ICONST_0:
+            case Opcodes.ICONST_1:
+            case Opcodes.ICONST_2:
+            case Opcodes.ICONST_3:
+            case Opcodes.ICONST_4:
+            case Opcodes.ICONST_5:
+            case Opcodes.ICONST_M1:
+            case Opcodes.FCONST_0:
+            case Opcodes.FCONST_1:
+            case Opcodes.FCONST_2:
+            case Opcodes.DCONST_0:
+            case Opcodes.DCONST_1:
+            case Opcodes.LCONST_0:
+            case Opcodes.LCONST_1:
+            case Opcodes.LDC:
+                return true;
+        }
+        return super.isConstant();
+    }
+    
+    
     
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
