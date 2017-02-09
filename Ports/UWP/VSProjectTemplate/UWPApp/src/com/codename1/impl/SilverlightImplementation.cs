@@ -229,8 +229,15 @@ namespace com.codename1.impl
 #endif
               cl.SizeChanged += cl_SizeChanged;
               cl.ManipulationMode = ManipulationModes.All;
+              cl.PointerPressed += new PointerEventHandler(Canvas__pointerPressed);
+              //cl.CompositeMode = ElementCompositeMode.MinBlend;
               screen.ManipulationMode = ManipulationModes.All;
+              
               screen.PointerPressed += new PointerEventHandler(LayoutRoot_PointerPressed);
+              screen.Tapped += new TappedEventHandler(LayoutRoot_Tapped);
+              screen.PointerWheelChanged += new PointerEventHandler(LayoutRoot_PointerWheelChanged);
+              //screen.ManipulationMode = ManipulationModes.None;
+              //screen.IsHitTestVisible = false;
               screen.PointerReleased += new PointerEventHandler(LayoutRoot_PointerReleased);
               screen.PointerMoved += new PointerEventHandler(LayoutRoot_PointerMoved);
           }).AsTask().GetAwaiter();
@@ -242,6 +249,53 @@ namespace com.codename1.impl
             }
             Display.getInstance().setTransitionYield(0);
             setDragStartPercentage(3);
+        }
+
+        private void LayoutRoot_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+        {
+            point = e.GetCurrentPoint(screen).Position;
+
+
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
+            {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+
+                        routeWheelEventToWebview(wv, e);
+                        wv.Focus(FocusState.Pointer);
+                    }
+                }
+                return;
+            }
+        }
+
+        private void LayoutRoot_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            point = e.GetPosition(screen);//.Position;
+
+            
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
+            {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        
+                        routeTapEventToWebview(wv, e, "click");
+                        wv.Focus(FocusState.Pointer);
+                    }
+                }
+                return;
+            }
+        }
+
+        private void Canvas__pointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            //e.S
         }
 #if WINDOWS_UWP
         private void SilverlightImplementation_BackRequested(object sender,Windows.UI.Core.BackRequestedEventArgs e)
@@ -352,7 +406,7 @@ namespace com.codename1.impl
 
         public override bool paintNativePeersBehind()
         {
-            return false;
+            return true;
         }
 
         public override media.Media createMedia(java.io.InputStream n1, string n2, java.lang.Runnable n3)
@@ -441,6 +495,20 @@ namespace com.codename1.impl
         {
             var pointerId = e.Pointer;
             point = e.GetCurrentPoint(cl).Position;
+
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        wv.Focus(FocusState.Pointer);
+                        routePointerEventToWebview(wv, e, "mousemove");
+                    }
+                }
+                return;
+            }
+
             var BB = e.GetIntermediatePoints(cl);
             if (pointerId.PointerDeviceType == PointerDeviceType.Touch || pointerId.PointerDeviceType == PointerDeviceType.Mouse || pointerId.PointerDeviceType == PointerDeviceType.Pen)
             {
@@ -461,9 +529,283 @@ namespace com.codename1.impl
             e.Handled = true;
         }
 
+        private bool hitTest(int x, int y)
+        {
+            Form f = Display.getInstance().getCurrent();
+            if (f != null)
+            {
+                Component cmp = f.getComponentAt(x, y);
+                if (cmp != null && cmp is PeerComponent)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private string createJSPointerEventProperties(WebView wv, PointerPoint wvPoint, PointerRoutedEventArgs e)
+        {
+            int button = 0;
+            if (e.Pointer.PointerDeviceType == Windows.Devices.Input.PointerDeviceType.Mouse)
+            {
+                if (wvPoint.Properties.IsLeftButtonPressed)
+                {
+                    button |= 1;
+                }
+                if (wvPoint.Properties.IsMiddleButtonPressed)
+                {
+                    button |= 4;
+                }
+                if (wvPoint.Properties.IsRightButtonPressed)
+                {
+                    button |= 2;
+                }
+
+
+            }
+            return "{isPrimary:true,pointerId:1," +
+                "'bubbles': true," +
+              "'cancelable': true," +
+              "'view': window," +
+              "'detail': 0," +
+              "'screenX': " + point.X + "," +
+              "'screenY': " + point.Y + "," +
+              "'clientX': " + wvPoint.Position.X + "," +
+              "'clientY': " + wvPoint.Position.Y + "," +
+              "'ctrlKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              "'altKey': " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Menu) ? "true" : "false") + "," +
+              "'shiftKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Shift) ? "true" : "false") + "," +
+              "'metaKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              "'button': " + button + "," +
+              "'relatedTarget': null" +
+            "}";
+
+        }
+
+        private string createJSClickEventProperties(WebView wv, Windows.Foundation.Point wvPoint, TappedRoutedEventArgs e)
+        {
+            
+            return "{isPrimary:true, pointerId:1," +
+                "'bubbles': true," +
+              "'cancelable': true," +
+              "'view': window," +
+              "'detail': 0," +
+              "'screenX': " + point.X + "," +
+              "'screenY': " + point.Y + "," +
+              "'clientX': " + wvPoint.X + "," +
+              "'clientY': " + wvPoint.Y + "," +
+              //"'ctrlKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              //"'altKey': " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Menu) ? "true" : "false") + "," +
+              //"'shiftKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Shift) ? "true" : "false") + "," +
+              //"'metaKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              //"'button': " + button + "," +
+              "'relatedTarget': null" +
+            "}";
+
+        }
+
+        private string createJSPointerEvent(WebView wv, PointerRoutedEventArgs e, string eventName)
+        {
+            PointerPoint wvPoint = e.GetCurrentPoint(wv);
+            
+
+            string pointerEventName = null;
+            string touchEventName = null;
+            switch (eventName)
+            {
+                case "mousedown":
+                    pointerEventName = "pointerdown";
+                    touchEventName = "touchstart";
+                    break;
+                case "mouseup":
+                    pointerEventName = "pointerup";
+                    touchEventName = "touchend";
+                    break;
+                case "mousemove":
+                    pointerEventName = "pointermove";
+                    touchEventName = "touchmove";
+                    break;
+            }
+
+            
+            
+
+            string mouseover = "" +
+            "if (!window.cn1__mouseOverOutTrigger) { var currentHoveredElement = null; var currentDraggedElement = null; var dragStarted = false; " +/*
+                "var mouseDown = function(evt) {" +
+                "    var el = document.elementFromPoint(evt.clientX, evt.clientY);" +
+                "    currentDraggedElement = el; dragStarted = false;" +
+                "};" +
+                "window.addEventListener('mousedown', mouseDown, true);" +
+                "var mouseUp = function(evt) {" +
+                "    var el = document.elementFromPoint(evt.clientX, evt.clientY);" +
+                "    if (currentDraggedElement != null) {" +
+                "        var dragEnd = new DragEvent('dragend', {bubbles:true, cancelable:true, view:window, detail:0, screenX:evt.screenX, screenY:evt.screenY, clientX:evt.clientX, clientY:evt.clientY});" +
+                "        currentDraggedElement.dispatchEvent(dragEnd);" +
+                "        currentDraggedElement = null;"+
+                "    }"+
+                "    currentDraggedElement = null;"+
+                "    dragStarted = false;"+
+                "};"+
+                "window.addEventListener('mouseup', mouseUp, true);"+*/
+                "var mouseMove = function(evt) {" +
+                "    var el = document.elementFromPoint(evt.clientX, evt.clientY);"+
+               
+                "    if (el != currentHoveredElement && currentHoveredElement != null) {"+
+                "        var mouseOutEvt = new MouseEvent('mouseout', "+
+                "            {" +
+                "                'bubbles': true," +
+                "                'cancelable': true," +
+                "                'view': window," +
+                "                'detail': 0," +
+                "                'screenX': evt.screenX,"+
+                "                'screenY': evt.screenY,"+
+                "                'clientX': evt.clientX," +
+                "                'clientY': evt.clientY," +
+                "                'relatedTarget': el" +
+                "            }"+
+                "        ); "+
+                "        currentHoveredElement.dispatchEvent(mouseOutEvt);"+
+                "        var pointerOutEvt = new PointerEvent('pointerout', " +
+                "            {" +
+                "                'bubbles': true," +
+                "                'cancelable': true," +
+                "                'view': window," +
+                "                'detail': 0," +
+                "                'screenX': evt.screenX," +
+                "                'screenY': evt.screenY," +
+                "                'clientX': evt.clientX," +
+                "                'clientY': evt.clientY," +
+                "                'relatedTarget': el" +
+                "            }" +
+                "        ); " +
+                "        currentHoveredElement.dispatchEvent(pointerOutEvt);" +
+                "    }" +
+                "    if (el != currentHoveredElement && el != null) {"+
+                "        var mouseOverEvt = new MouseEvent('mouseover', "+
+                "        {" +
+                "            'bubbles': true," +
+                "            'cancelable': true," +
+                "            'view': window," +
+                "            'detail': 0," +
+                "            'screenX': evt.screenX," +
+                "            'screenY': evt.screenY," +
+                "            'clientX': evt.clientX," +
+                "            'clientY': evt.clientY," +
+                "            'relatedTarget': currentHoveredElement" +
+                "         });"+
+                "         el.dispatchEvent(mouseOverEvt); "+
+                "        var pointerOverEvt = new MouseEvent('pointerover', " +
+                "        {" +
+                "            'bubbles': true," +
+                "            'cancelable': true," +
+                "            'view': window," +
+                "            'detail': 0," +
+                "            'screenX': evt.screenX," +
+                "            'screenY': evt.screenY," +
+                "            'clientX': evt.clientX," +
+                "            'clientY': evt.clientY," +
+                "            'relatedTarget': currentHoveredElement" +
+                "         });" +
+                "         el.dispatchEvent(pointerOverEvt); " +
+                "    } " +
+                "    if (currentDraggedElement != null) {"+
+                "        if (!dragStarted) {"+
+                "            dragStarted = true;"+
+                "            var dragStart = new DragEvent('dragstart', {"+
+                "                bubbles: true, cancelable: true, view: window, detail: 0, screenX:evt.screenX, screenY:evt.screenY, clientX:evt.clientX, clientY:evt.clientY"+
+                "            }); currentDraggedElement.dispatchEvent(dragStart);"+
+                "        } else {"+
+                "            var drag = new DragEvent('drag', {"+
+                "                bubbles: true, cancelable: true, view: window, details: 0, screenX:evt.screenX, screenY:evt.screenY, clientX:evt.clientX, clientY:evt.clientY"+
+                "            }); currentDraggedElement.dispatchEvent(drag);"+
+                "        }"+
+                "    }"+
+                "    currentHoveredElement = el;"+
+                "    " +
+                "};"+
+                "window.addEventListener('mousemove', mouseMove, true);"+
+                "window.cn1__mouseOverOutTrigger = mouseMove;" +
+            "}";
+
+            string createEventNewJs = mouseover +
+                "var evt = null;var el = document.elementFromPoint(" + wvPoint.Position.X + ", " + wvPoint.Position.Y + "); " +
+                (pointerEventName != null ? ("var evt = new PointerEvent('" + pointerEventName + "', " + createJSPointerEventProperties(wv, wvPoint, e) + ");" +
+                "if (el != null){ el.dispatchEvent(evt);}") : "") +
+                "evt = new MouseEvent('" + eventName + "', " + createJSPointerEventProperties(wv, wvPoint, e) + ");" +
+                " if (el != null) { el.dispatchEvent(evt);}";// +
+                //(touchEventName != null ?(""+
+                //"evt = document.createEvent('TouchEvent');evt.touches = [{pageX:"+wvPoint.Position.X+", pageY:"+wvPoint.Position.Y+"}];"+
+                //"if (el != null) {el.dispatchEvent(evt);}"
+                //) :(""));
+
+            
+            return createEventNewJs;
+
+        }
+        private string createJSWheelEvent(WebView wv, PointerRoutedEventArgs e)
+        {
+            wv.Focus(FocusState.Pointer);
+            PointerPoint wvPoint = e.GetCurrentPoint(wv);
+
+            int delta = wvPoint.Properties.MouseWheelDelta;
+
+
+            
+
+            string createEventNewJs = 
+                "var evt = null;var el = document.elementFromPoint(" + wvPoint.Position.X + ", " + wvPoint.Position.Y + "); " +
+                "evt = new WheelEvent('wheel', {deltaY: "+delta+", bubbles:true, cancelable:true, view:window, detail:0, screenX:"+wvPoint.Position.X+", screenY:"+wvPoint.Position.Y+", clientX:"+wvPoint.Position.X+", clientY:"+wvPoint.Position.Y+", wheelDelta:"+delta+", wheelDeltaY:"+delta+"});" +
+                " evt.wheelDelta = "+delta+"; if (el != null) { el.dispatchEvent(evt); console.log('dispatching wheel '+evt + 'delta is "+delta+"');}";// +
+                                                             //(touchEventName != null ?(""+
+                                                             //"evt = document.createEvent('TouchEvent');evt.touches = [{pageX:"+wvPoint.Position.X+", pageY:"+wvPoint.Position.Y+"}];"+
+                                                             //"if (el != null) {el.dispatchEvent(evt);}"
+                                                             //) :(""));
+
+
+            return createEventNewJs;
+
+        }
+
+        private string createJSClickEvent(WebView wv, TappedRoutedEventArgs e, string eventName)
+        {
+
+            Windows.Foundation.Point wvPoint = e.GetPosition(wv);
+
+            
+
+
+            string createEventNewJs = ""+
+                "var evt = null;var el = document.elementFromPoint(" + wvPoint.X + ", " + wvPoint.Y + "); " +
+                "evt = new MouseEvent('" + eventName + "', " + createJSClickEventProperties(wv, wvPoint, e) + ");" +
+                " if (el != null) { el.dispatchEvent(evt);el.focus();}";
+            return createEventNewJs;
+
+        }
+
+        private void routePointerEventToWebview(WebView wv, PointerRoutedEventArgs e, string eventName)
+        {
+            string js = "(function(){" + createJSPointerEvent(wv, e, eventName) + "})()";
+            wv.InvokeScriptAsync("eval", new string[] { js });
+        }
+
+        private void routeWheelEventToWebview(WebView wv, PointerRoutedEventArgs e)
+        {
+            string js = "(function(){" + createJSWheelEvent(wv, e) + "})()";
+            wv.InvokeScriptAsync("eval", new string[] { js });
+        }
+
+        private void routeTapEventToWebview(WebView wv, TappedRoutedEventArgs e, string eventName)
+        {
+            string js = "(function(){" + createJSClickEvent(wv, e, eventName) + "})()";
+            wv.InvokeScriptAsync("eval", new string[] { js });
+        }
+
         private void LayoutRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+
             point = e.GetCurrentPoint(cl).Position;
+            
             if (instance.currentlyEditing != null)
             {
                 Form f = instance.currentlyEditing.getComponentForm();
@@ -471,6 +813,18 @@ namespace com.codename1.impl
                 {
                     return;
                 }
+            }
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        wv.Focus(FocusState.Pointer);
+                        routePointerEventToWebview(wv, e, "mousedown");
+                    }
+                }
+                return;
             }
             pointerPressed(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
             screen.CapturePointer(e.Pointer);
@@ -488,6 +842,18 @@ namespace com.codename1.impl
                     commitEditing();
                 }
             }
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        wv.Focus(FocusState.Pointer);
+                        routePointerEventToWebview(wv, e, "mouseup");
+                    }
+                }
+                return;
+            }
             pointerReleased(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
             e.Handled = true;
             return;
@@ -502,6 +868,7 @@ namespace com.codename1.impl
         {
             if (displayWidth < 0)
             {
+               
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
                     displayWidth = Convert.ToInt32(cl.ActualWidth * scaleFactor);

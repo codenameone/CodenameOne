@@ -60,6 +60,7 @@ namespace com.codename1.impl
                 {
                     if (SilverlightImplementation.cl.Children.Contains(element))
                     {
+                        element.SetValue(Canvas.ZIndexProperty, 100);
                         Canvas.SetLeft(element, x / SilverlightImplementation.scaleFactor);
                         Canvas.SetTop(element, y / SilverlightImplementation.scaleFactor);
                         element.Width = width / SilverlightImplementation.scaleFactor;
