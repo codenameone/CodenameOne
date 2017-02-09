@@ -85,6 +85,7 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -587,6 +588,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             if(Display.getInstance().getProperty("KeepScreenOn", "").equals("true")){
                 getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            }
+
+            if(Display.getInstance().getProperty("DisableScreenshots", "").equals("true")){
+                getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
             }
 
             if (m instanceof CodenameOneActivity) {
@@ -1951,7 +1956,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isShapeClipSupported(Object graphics){
-        return true;
+        return Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB;
     }
     
     @Override

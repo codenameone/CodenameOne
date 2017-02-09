@@ -9035,6 +9035,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             } catch(IOException err) {
                 throw new RuntimeException(err);
             }
+            return;
         }
         throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
    }    

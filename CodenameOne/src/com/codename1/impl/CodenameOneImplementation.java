@@ -59,6 +59,9 @@ import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -974,6 +977,99 @@ public abstract class CodenameOneImplementation {
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
     }
     
+    /**
+     * Returns true if the platform supports a native image cache.  The native image cache
+     * is different than just {@link FileSystemStorage#hasCachesDir()}.  A native image cache
+     * is an image cache that the platform provides that is full transparent to Codename One
+     * with respect to how images are stored, and whether they are cached.  Currently only
+     * the Javascript port supprts a native image cache.
+     * 
+     * <p>This is used by {@link URLImage#createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }
+     * to determine if it should use a cached image, or to defer to its storage and filesystem methods.</p>
+     * @return True on platforms that support a native image cache.  Currently only Javascript.
+     * @see Display#supportsNativeImageCache() 
+     */
+    public boolean supportsNativeImageCache() {
+        return false;
+    }
+    
+    /**
+     * Downloads an image from a URL to the cache. Platforms
+     * that support a native image cache {@link #supportsNativeImageCache() } (e.g. Javascript) override this method to defer to the 
+     * platform's handling of cached images.  Platforms that have a caches directory ({@link FileSystemStorage#hasCachesDir() }
+     * will use that directory to cache the image.  Other platforms will just download to storage.
+     * 
+     * @param url The URL of the image to download.
+     * @param onSuccess Callback on success.
+     * @param onFail Callback on fail.
+     * 
+     * @see URLImage#createToCache(com.codename1.ui.EncodedImage, java.lang.String, com.codename1.ui.URLImage.ImageAdapter) 
+     */
+    public void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail) {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        if (fs.hasCachesDir()) {
+            String name = "cn1_image_cache["+url+"]";
+            name = StringUtil.replaceAll(name, "/", "_");
+            name = StringUtil.replaceAll(name, "\\", "_");
+            name = StringUtil.replaceAll(name, "%", "_");
+            name = StringUtil.replaceAll(name, "?", "_");
+            name = StringUtil.replaceAll(name, "*", "_");
+            name = StringUtil.replaceAll(name, ":", "_");
+            name = StringUtil.replaceAll(name, "=", "_");   
+            
+            String filePath = fs.getCachesDir() + fs.getFileSystemSeparator() + name;
+            
+            // We use Util.downloadImageToFileSystem rather than CodenameOneImplementation.downloadImageToFileSystem
+            // because we want it to try to load from file system first.
+            Util.downloadImageToFileSystem(url, filePath, onSuccess, onFail);
+        } else {
+            // We use Util.downloadImageToStorage rather than CodenameOneImplementation.downloadImageToStorage
+            // because we want it to try to load from storage first.
+            Util.downloadImageToStorage(url, "cn1_image_cache["+url+"]", onSuccess, onFail);
+        }
+    }
+    
+    /**
+     * Downloads an image to storage. This will *not* first check to see if the image is located in storage
+     * already.  It will download and overwrite any existing image at the provided location.
+     * 
+     * <p>Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
+     * the browser cache for downloading the image.</p>
+     * 
+     * @param url The URL of the image to download.
+     * @param fileName The storage key to be used to store the image.
+     * @param onSuccess Callback on success.  Will be executed on EDT.
+     * @param onFail Callback on failure.  Will be executed on EDT.
+     */
+    public void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setDuplicateSupported(true);
+        cr.setUrl(url);
+        cr.downloadImageToStorage(fileName, onSuccess, onFail);
+    }
+    
+    /**
+     * Downloads an image to file system. This will *not* first check to see if the file exists already.  
+     * It will download and overwrite any existing image at the provided location.
+     * 
+     * <p>Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
+     * the browser cache for downloading the image.</p>
+     * 
+     * @param url The URL of the image to download.
+     * @param fileName The storage key to be used to store the image.
+     * @param onSuccess Callback on success.  Will be executed on EDT.
+     * @param onFail Callback on failure.  Will be executed on EDT.
+     */
+    public void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setDuplicateSupported(true);
+        cr.setUrl(url);
+        cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
+    }
     
     /**
      * Returns the number of softkeys on the device
@@ -5629,6 +5725,14 @@ public abstract class CodenameOneImplementation {
 
     public boolean isScrollWheeling() {
         return false;
+    }
+
+    /**
+     * Blocks or enables copy and paste in the entire app.
+     * @param blockCopyPaste True to block copy and paste.  False to enable it.
+     */
+    public void blockCopyPaste(boolean blockCopyPaste) {
+        
     }
 
     // END TRANSFORMATION METHODS--------------------------------------------------------------------    

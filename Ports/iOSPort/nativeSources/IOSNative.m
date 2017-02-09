@@ -225,7 +225,7 @@ extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBIm
 extern void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL dialogHeight, int color, JAVA_LONG imagePeer,
- int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar);
+ int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 
@@ -356,10 +356,10 @@ NSString* toNSString(JAVA_OBJECT str) {
 }
 #endif
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG
                                                                                                                                                                          JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7,
                                                                                                                                                                          JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
-                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar)
+                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar, JAVA_BOOLEAN blockCopyPaste)
 {
     POOL_BEGIN();
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
@@ -367,7 +367,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     char cc[l];
     memcpy(cc, chr, l);
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
-                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
+                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar, blockCopyPaste);
     POOL_END();
 }
 extern float scaleValue;
@@ -2329,6 +2329,17 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
         com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
     }];
     com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+}
+
+extern BOOL CN1_blockPaste;
+extern BOOL CN1_blockCopy;
+extern BOOL CN1_blockCut;
+//native void blockCopyPaste(boolean blockCopyPaste);
+void com_codename1_impl_ios_IOSNative_blockCopyPaste___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN blockCopyPaste) {
+    CN1_blockPaste = blockCopyPaste;
+    CN1_blockCut = blockCopyPaste;
+    CN1_blockCopy = blockCopyPaste;
+
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
@@ -6794,13 +6805,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_j
     JAVA_INT i = startPos;
     for (; i < endOffset; i++) {
         if (src[i] == separator) {
-            JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+            if (i > startPos) {
+                JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+
+                java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
+            }
             startPos = i + 1;
-            java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
         }
     }
-    if (i >= startPos) {
+    if (i > startPos) {
         JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
         java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);

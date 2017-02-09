@@ -138,12 +138,12 @@
                       </Properties>
                       <Constraints>
                         <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
-                          <JTabbedPaneConstraints tabName="GUI Builder" toolTip="GUI Builder">
-                            <Property name="tabTitle" type="java.lang.String" value="GUI Builder"/>
+                          <JTabbedPaneConstraints tabName="Old GUI Builder" toolTip="Old GUI Builder">
+                            <Property name="tabTitle" type="java.lang.String" value="Old GUI Builder"/>
                             <Property name="tabIcon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
                               <Image iconType="3" name="/com/codename1/designer/resources/GUIBuilder.png"/>
                             </Property>
-                            <Property name="tabToolTip" type="java.lang.String" value="GUI Builder"/>
+                            <Property name="tabToolTip" type="java.lang.String" value="Old GUI Builder"/>
                           </JTabbedPaneConstraints>
                         </Constraint>
                       </Constraints>

@@ -226,7 +226,13 @@ public class Form extends Container {
         return f.getInvisibleAreaUnderVKB();
     }
     
-    int getInvisibleAreaUnderVKB() {
+    /**
+     * In some virtual keyboard implementations (notably iOS) this value is used to determine the height of 
+     * the virtual keyboard
+     * 
+     * @return height in pixels of the virtual keyboard
+     */
+    public int getInvisibleAreaUnderVKB() {
         if(bottomPaddingMode) {
             return 0;
         }

@@ -42,6 +42,10 @@ public class CustomInvoke extends Instruction {
     private boolean itf;
     private String[] literalArgs;
     private int origOpcode;
+    private String targetObjectLiteral;
+    private boolean noReturn;
+    
+    
     
     
     public CustomInvoke(int opcode, String owner, String name, String desc, boolean itf) {
@@ -51,6 +55,15 @@ public class CustomInvoke extends Instruction {
         this.name = name;
         this.desc = desc;
         this.itf = itf;
+    }
+    
+    public void setTargetObjectLiteral(String lit) {
+        this.targetObjectLiteral = lit;
+        
+    }
+    
+    public String getTargetObjectLiteral() {
+        return targetObjectLiteral;
     }
     
     public static CustomInvoke create(Invoke invoke) {
@@ -111,11 +124,115 @@ public class CustomInvoke extends Instruction {
         return findActualOwner(bc.getBaseClassObject());
     }
     
+    public boolean methodHasReturnValue() {
+        return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>()) != null;
+    }
+    
+    public String getReturnValue() {
+        ArrayList<String> args = new ArrayList<String>();
+        StringBuilder sb = new StringBuilder();
+        String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sb, args);
+        return returnVal;
+    }
+    
+    
+    public boolean appendExpression(StringBuilder b) {
+        // special case for clone on an array which isn't a real method invocation
+        if(name.equals("clone") && owner.indexOf('[') > -1) {
+            if (targetObjectLiteral != null) {
+                b.append("cloneArray(").append(targetObjectLiteral).append(")");
+            } else {
+                b.append("cloneArray(POP_OBJ(1))");
+            }
+            return true;
+        }
+        
+        StringBuilder bld = new StringBuilder();
+        if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
+            //b.append("    ");
+            bld.append("virtual_");
+        }
+        
+        if(origOpcode == Opcodes.INVOKESTATIC) {
+            // find the actual class of the static method to workaround javac not defining it correctly
+            ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+            owner = findActualOwner(bc);
+        }
+
+        bld.append(owner.replace('/', '_').replace('$', '_'));
+        bld.append("_");
+        if(name.equals("<init>")) {
+            bld.append("__INIT__");
+        } else {
+            if(name.equals("<clinit>")) {
+                bld.append("__CLINIT__");
+            } else {
+                bld.append(name);
+            }
+        }
+        bld.append("__");
+        ArrayList<String> args = new ArrayList<String>();
+        String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
+        int numLiteralArgs = this.getNumLiteralArgs();
+        if (numLiteralArgs > 0) {
+            b.append("/* CustomInvoke */");
+        }
+        boolean noPop = false;
+        b.append(bld);
+        
+        b.append("(threadStateData");
+        
+        
+        
+        if(origOpcode != Opcodes.INVOKESTATIC) {
+            if (targetObjectLiteral == null) {
+                //b.append(", SP[-");
+                //b.append(args.size() + 1 - numLiteralArgs);
+                //b.append("].data.o");
+                return false;
+            } else {
+                b.append(", ").append(targetObjectLiteral);
+                numLiteralArgs++;
+            }
+        }
+        //int offset = args.size();
+        //int numArgs = offset;
+        int argIndex=0;
+        for(String a : args) {
+            
+            b.append(", ");
+            if (literalArgs != null && literalArgs[argIndex] != null) {
+                b.append(literalArgs[argIndex]);
+            } else {
+                return false;
+                //b.append("SP[-");
+                //b.append(offset);
+                //b.append("].data.");
+                //b.append(a);
+                //offset--;
+            }
+            argIndex++;
+        }
+        if (returnVal == null) {
+            return false;
+        }
+        
+        b.append(")");
+        
+        return true;
+        
+    }
+    
+    
     @Override
     public void appendInstruction(StringBuilder b) {
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
-            b.append("    POP_MANY_AND_PUSH_OBJ(cloneArray(PEEK_OBJ(1)), 1);\n");
+            if (targetObjectLiteral != null) {
+                b.append("    PUSH_OBJ(cloneArray(").append(targetObjectLiteral).append("));\n");
+            } else {
+                b.append("    POP_MANY_AND_PUSH_OBJ(cloneArray(PEEK_OBJ(1)), 1);\n");
+            }
             return;
         }
         
@@ -154,7 +271,7 @@ public class CustomInvoke extends Instruction {
             b.append("/* CustomInvoke */");
         }
         boolean noPop = false;
-        if(returnVal == null) {
+        if(returnVal == null || noReturn) {
             b.append(bld);
         } else {
             if(args.size() - numLiteralArgs == 0 && origOpcode == Opcodes.INVOKESTATIC) {
@@ -197,9 +314,14 @@ public class CustomInvoke extends Instruction {
         
         
         if(origOpcode != Opcodes.INVOKESTATIC) {
-            b.append(", SP[-");
-            b.append(args.size() + 1 - numLiteralArgs);
-            b.append("].data.o");
+            if (targetObjectLiteral == null) {
+                b.append(", SP[-");
+                b.append(args.size() + 1 - numLiteralArgs);
+                b.append("].data.o");
+            } else {
+                b.append(", "+targetObjectLiteral);
+                numLiteralArgs++;
+            }
         }
         int offset = args.size();
         //int numArgs = offset;
@@ -222,7 +344,7 @@ public class CustomInvoke extends Instruction {
             b.append("));\n");
             return;
         }
-        if(returnVal != null) {
+        if(returnVal != null && !noReturn) {
             b.append(");\n");
             if(origOpcode != Opcodes.INVOKESTATIC) {
                 if(args.size() - numLiteralArgs > 0) {
@@ -237,22 +359,46 @@ public class CustomInvoke extends Instruction {
                     b.append(";\n");
                 }
             }
-            if(returnVal.equals("JAVA_OBJECT")) {
-                b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
-            } else {
-                if(returnVal.equals("JAVA_INT")) {
-                    b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
+            if (targetObjectLiteral == null) {
+                if(returnVal.equals("JAVA_OBJECT")) {
+                    b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
                 } else {
-                    if(returnVal.equals("JAVA_LONG")) {
-                        b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
+                    if(returnVal.equals("JAVA_INT")) {
+                        b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
                     } else {
-                        if(returnVal.equals("JAVA_DOUBLE")) {
-                            b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
+                        if(returnVal.equals("JAVA_LONG")) {
+                            b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
                         } else {
-                            if(returnVal.equals("JAVA_FLOAT")) {
-                                b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
+                            if(returnVal.equals("JAVA_DOUBLE")) {
+                                b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
                             } else {
-                                throw new UnsupportedOperationException("Unknown type: " + returnVal);
+                                if(returnVal.equals("JAVA_FLOAT")) {
+                                    b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
+                                } else {
+                                    throw new UnsupportedOperationException("Unknown type: " + returnVal);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                if(returnVal.equals("JAVA_OBJECT")) {
+                    b.append("    PUSH_OBJ(tmpResult); }\n");
+                } else {
+                    if(returnVal.equals("JAVA_INT")) {
+                        b.append("    PUSH_INT(tmpResult); }\n");
+                    } else {
+                        if(returnVal.equals("JAVA_LONG")) {
+                            b.append("    PUSH_LONG(tmpResult); }\n");
+                        } else {
+                            if(returnVal.equals("JAVA_DOUBLE")) {
+                                b.append("    PUSH_DOUBLE(tmpResult); }\n");
+                            } else {
+                                if(returnVal.equals("JAVA_FLOAT")) {
+                                    b.append("    PUSH_FLOAT(tmpResult); }\n");
+                                } else {
+                                    throw new UnsupportedOperationException("Unknown type: " + returnVal);
+                                }
                             }
                         }
                     }
@@ -305,4 +451,20 @@ public class CustomInvoke extends Instruction {
         }
         return count;
     }
+
+    /**
+     * @return the noReturn
+     */
+    public boolean isNoReturn() {
+        return noReturn;
+    }
+
+    /**
+     * @param noReturn the noReturn to set
+     */
+    public void setNoReturn(boolean noReturn) {
+        this.noReturn = noReturn;
+    }
+
+    
 }

@@ -1257,12 +1257,7 @@ public class Util {
      * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
-        ConnectionRequest cr = new ConnectionRequest();
-        cr.setPost(false);
-        cr.setFailSilently(true);
-        cr.setDuplicateSupported(true);
-        cr.setUrl(url);
-        cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
+        implInstance.downloadImageToFileSystem(url, fileName, onSuccess, onFail);
     }
     
     /**
@@ -1291,12 +1286,12 @@ public class Util {
      * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
-        ConnectionRequest cr = new ConnectionRequest();
-        cr.setPost(false);
-        cr.setFailSilently(true);
-        cr.setDuplicateSupported(true);
-        cr.setUrl(url);
-        cr.downloadImageToStorage(fileName, onSuccess, onFail);
+        implInstance.downloadImageToStorage(url, fileName, onSuccess, onFail);
+    }
+    
+    public static void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        implInstance.downloadImageToCache(url, onSuccess, onFail);
+        
     }
     
     /**
