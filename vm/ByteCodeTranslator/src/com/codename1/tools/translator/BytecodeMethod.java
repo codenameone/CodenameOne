@@ -1073,8 +1073,12 @@ public class BytecodeMethod {
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
         
+        boolean hasTryCatch = false;
         for (int iter=0; iter < instructionCount - 1; iter++) {
             Instruction current = instructions.get(iter);
+            if (current instanceof TryCatch) {
+                hasTryCatch = true;
+            }
             current.setMethod(this);
             if (current.isOptimized()) {
                 continue;
@@ -1200,6 +1204,129 @@ public class BytecodeMethod {
                     break;
                 }
                 
+                case Opcodes.IRETURN:
+                case Opcodes.FRETURN:
+                case Opcodes.ARETURN:
+                case Opcodes.LRETURN:
+                case Opcodes.DRETURN: {
+                    if (iter > 0 && current instanceof BasicInstruction) {
+                        Instruction prev = instructions.get(iter-1);
+                        if (prev instanceof AssignableExpression) {
+                            AssignableExpression expr = (AssignableExpression)prev;
+                            StringBuilder sb= new StringBuilder();
+                            if (expr.assignTo(null, sb)) {
+                                instructions.remove(iter-1);
+                                instructions.remove(iter-1);
+                                String exprString = sb.toString().trim();
+                                String retVal = exprString;
+                                sb.setLength(0);
+                                if(synchronizedMethod) {
+                                    sb.append("\n{\n    ");
+                                    switch (currentOpcode) {
+                                        case Opcodes.IRETURN:
+                                            sb.append("JAVA_INT");
+                                            break;
+                                        case Opcodes.FRETURN:
+                                            sb.append("JAVA_FLOAT");
+                                            break;
+                                        case Opcodes.ARETURN:
+                                            sb.append("JAVA_OBJECT");
+                                            break;
+                                        case Opcodes.LRETURN:
+                                            sb.append("JAVA_LONG");
+                                            break;
+                                        case Opcodes.DRETURN:
+                                            sb.append("JAVA_DOUBLE");
+                                            break;
+                                    }
+                                    sb.append(" ___returnValue=").append(exprString).append(";\n");
+                                    retVal = "___returnValue";
+                                    if(staticMethod) {
+                                        sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                        sb.append(getClsName());
+                                        sb.append(");\n");
+                                    } else {
+                                        sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                    }
+                                }
+                                if(hasTryCatch) {
+                                    sb.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return ").append(retVal).append(";\n");
+                                } else {
+                                    sb.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return ").append(retVal).append(";\n");
+                                }
+                                if (synchronizedMethod) {
+                                    sb.append("}\n");
+                                }
+                                
+                                instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
+                                iter--;
+                                instructionCount = instructions.size();
+                                continue;
+                                
+                            }
+                        } else if (prev instanceof CustomInvoke) {
+                            
+                            CustomInvoke expr = (CustomInvoke)prev;
+                            String returnType = expr.getReturnValue();
+                            if (returnType != null && !"JAVA_OBJECT".equals(returnType)) {
+                                // We can't safely return a JAVA_OBJECT directly because it needs to be added 
+                                // to the stack for the GC
+                                StringBuilder sb= new StringBuilder();
+                                if (expr.appendExpression(sb)) {
+                                    instructions.remove(iter-1);
+                                    instructions.remove(iter-1);
+                                    String exprString = sb.toString().trim();
+                                    String retVal = exprString;
+                                    sb.setLength(0);
+                                    sb.append("\n{\n    ");
+                                    switch (currentOpcode) {
+                                        case Opcodes.IRETURN:
+                                            sb.append("JAVA_INT");
+                                            break;
+                                        case Opcodes.FRETURN:
+                                            sb.append("JAVA_FLOAT");
+                                            break;
+                                        case Opcodes.ARETURN:
+                                            sb.append("JAVA_OBJECT");
+                                            break;
+                                        case Opcodes.LRETURN:
+                                            sb.append("JAVA_LONG");
+                                            break;
+                                        case Opcodes.DRETURN:
+                                            sb.append("JAVA_DOUBLE");
+                                            break;
+                                    }
+                                    sb.append(" ___returnValue=").append(exprString).append(";\n");
+                                    retVal = "___returnValue";
+                                    if(synchronizedMethod) {
+                                        if(staticMethod) {
+                                            sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                            sb.append(getClsName());
+                                            sb.append(");\n");
+                                        } else {
+                                            sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                        }
+                                    }
+                                    if(hasTryCatch) {
+                                        sb.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return ").append(retVal).append(";\n");
+                                    } else {
+                                        sb.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return ").append(retVal).append(";\n");
+                                    }
+                                    sb.append("}\n");
+                                    
+
+                                    instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
+                                    iter--;
+                                    instructionCount = instructions.size();
+                                    continue;
+
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+                
                 case Opcodes.BASTORE:
                 case Opcodes.SASTORE:
                 case Opcodes.CASTORE:
@@ -1209,35 +1336,39 @@ public class BytecodeMethod {
                 case Opcodes.LASTORE:
                 case Opcodes.FASTORE: {
                     if (iter > 2 && current instanceof BasicInstruction) {
-                        Instruction prev3 = instructions.get(iter-3);
-                        Instruction prev2 = instructions.get(iter-2);
-                        Instruction prev1 = instructions.get(iter-1);
                         StringBuilder devNull = new StringBuilder();
-                        if ( prev3 instanceof AssignableExpression && prev2 instanceof AssignableExpression && prev1 instanceof AssignableExpression) {
-                            String arrayLiteral = null;
-                            String indexLiteral = null;
-                            String valueLiteral = null;
-                            AssignableExpression arrayExpr = (AssignableExpression)prev3;
-                            AssignableExpression indexExpr = (AssignableExpression)prev2;
-                            AssignableExpression valueExpr = (AssignableExpression)prev1;
-                            if (arrayExpr.assignTo(null, devNull)) {
+                        String arrayLiteral = null;
+                        String indexLiteral = null;
+                        String valueLiteral = null;
+                        Instruction prev3 = instructions.get(iter-3);
+                        if (prev3 instanceof AssignableExpression) {
+                            if (((AssignableExpression)prev3).assignTo(null, devNull)) {
                                 arrayLiteral = devNull.toString().trim();
-                            } else {
-                                break;
+                                
                             }
-                            devNull.setLength(0);
-                            if (indexExpr.assignTo(null, devNull)) {
+                        }
+                        devNull.setLength(0);
+                        Instruction prev2 = instructions.get(iter-2);
+                        if (prev2 instanceof AssignableExpression) {
+                            if (((AssignableExpression)prev2).assignTo(null, devNull)) {
                                 indexLiteral = devNull.toString().trim();
-                            } else {
-                                break;
                             }
-                            devNull.setLength(0);
-                            if (valueExpr.assignTo(null, devNull)) {
+                        }
+                        devNull.setLength(0);
+                        Instruction prev1 = instructions.get(iter-1);
+                        
+                        if (prev1 instanceof AssignableExpression) {
+                            if (((AssignableExpression)prev1).assignTo(null, devNull)) {
                                 valueLiteral = devNull.toString().trim();
-                            } else {
-                                break;
                             }
-                            
+                        } else if (prev1 instanceof CustomInvoke) {
+                            devNull.setLength(0);
+                            if (((CustomInvoke)prev1).appendExpression(devNull)) {
+                                valueLiteral = devNull.toString().trim();
+                            }
+                        }
+                        
+                        if (arrayLiteral != null  && indexLiteral != null && valueLiteral != null) {
                             String elementType = null;
                             switch (current.getOpcode()) {
                                 case Opcodes.AASTORE:
@@ -1322,10 +1453,22 @@ public class BytecodeMethod {
                             if (((AssignableExpression)leftArg).assignTo(null, sb)) {
                                 leftLiteral = sb.toString().trim();
                             }
+                        } else if (leftArg instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)leftArg;
+                            StringBuilder sb = new StringBuilder();
+                            if (!"JAVA_OBJECT".equals(inv.getReturnValue()) && inv.appendExpression(sb)) {
+                                leftLiteral = sb.toString().trim();
+                            }
                         }
                         if (rightArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
                             if (((AssignableExpression)rightArg).assignTo(null, sb)) {
+                                rightLiteral = sb.toString().trim();
+                            }
+                        } else if (rightArg instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)rightArg;
+                            StringBuilder sb = new StringBuilder();
+                            if (!"JAVA_OBJECT".equals(inv.getReturnValue()) && inv.appendExpression(sb)) {
                                 rightLiteral = sb.toString().trim();
                             }
                         }
@@ -1397,7 +1540,13 @@ public class BytecodeMethod {
                         if (leftArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
                             if (((AssignableExpression)leftArg).assignTo(null, sb)) {
-                                leftLiteral = sb.toString();
+                                leftLiteral = sb.toString().trim();
+                            }
+                        } else if (leftArg instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)leftArg;
+                            StringBuilder sb = new StringBuilder();
+                            if (inv.appendExpression(sb)) {
+                                leftLiteral = sb.toString().trim();
                             }
                         }
                         
@@ -1448,6 +1597,9 @@ public class BytecodeMethod {
                 }   
                    
                 
+                
+                
+                
                 case Opcodes.INVOKEVIRTUAL:
                 case Opcodes.INVOKESTATIC:
                 case Opcodes.INVOKESPECIAL:
@@ -1468,6 +1620,14 @@ public class BytecodeMethod {
                                 Instruction instr = instructions.get(iter-numArgs+i);
                                 if (instr instanceof AssignableExpression && ((AssignableExpression)instr).assignTo(null, devNull)) {
                                     argLiterals[i] = devNull.toString().trim();
+                                } else if (instr instanceof CustomInvoke) {
+                                    CustomInvoke cinv = (CustomInvoke)instr;
+                                    devNull.setLength(0);
+                                    if (!"JAVA_OBJECT".equals(cinv.getReturnValue()) && cinv.appendExpression(devNull)) {
+                                        // We can't add invocations that return objects directly
+                                        // because they need to be added to the stack for GC
+                                        argLiterals[i] = devNull.toString().trim();
+                                    }
                                 } else if (instr instanceof ArithmeticExpression) {
                                     argLiterals[i] = ((ArithmeticExpression)instr).getExpressionAsString().trim();
                                 } else if (instr instanceof VarOp) {
@@ -1643,7 +1803,9 @@ public class BytecodeMethod {
                                         }
                                         
                                     } else if (ldTarget instanceof CustomInvoke) {
-                                        // TODO
+                                        // WE Can't pass a custom invoke as the target directly
+                                        // because it the return value needs to be added to the 
+                                        // stack for the GC
                                     } else {
                                         switch (ldTarget.getOpcode()) {
                                             case Opcodes.ALOAD: {

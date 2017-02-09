@@ -46,6 +46,8 @@ public class CustomInvoke extends Instruction {
     private boolean noReturn;
     
     
+    
+    
     public CustomInvoke(int opcode, String owner, String name, String desc, boolean itf) {
         super(-1);
         this.origOpcode = opcode;
@@ -126,7 +128,12 @@ public class CustomInvoke extends Instruction {
         return BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, new StringBuilder(), new ArrayList<String>()) != null;
     }
     
-    
+    public String getReturnValue() {
+        ArrayList<String> args = new ArrayList<String>();
+        StringBuilder sb = new StringBuilder();
+        String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, sb, args);
+        return returnVal;
+    }
     
     
     public boolean appendExpression(StringBuilder b) {

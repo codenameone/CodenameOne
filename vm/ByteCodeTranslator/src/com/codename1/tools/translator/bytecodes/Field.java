@@ -224,8 +224,12 @@ public class Field extends Instruction implements AssignableExpression {
                 b.append(name.replace('/', '_').replace('$', '_'));
                 b.append("(threadStateData, ");
                 StringBuilder sb2 = new StringBuilder();
+                StringBuilder sb3 = new StringBuilder();
                 if (valueOp != null && valueOp instanceof AssignableExpression && ((AssignableExpression)valueOp).assignTo(null, sb2)) {
                     b.append(sb2.toString().trim()).append(");\n");
+                    valueOpAppended = true;
+                } else if (valueOp != null && valueOp instanceof CustomInvoke && ((CustomInvoke)valueOp).appendExpression(sb3)) {
+                    b.append(sb3.toString().trim()).append(");\n");
                     valueOpAppended = true;
                 } else {
                     
@@ -300,21 +304,28 @@ public class Field extends Instruction implements AssignableExpression {
                 b.append("_");
                 b.append(name);
                 b.append("(threadStateData, ");
+                
+                
+                
                 StringBuilder sb2 = new StringBuilder();
                 StringBuilder sb3 = new StringBuilder();
-                if (valueOp != null && targetOp != null &&
-                        valueOp instanceof AssignableExpression && 
-                        targetOp instanceof AssignableExpression && 
-                        ((AssignableExpression)valueOp).assignTo(null, sb2) &&
-                        ((AssignableExpression)targetOp).assignTo(null, sb3)) {
-                    b.append(sb2.toString().trim()).append(", ").append(sb3.toString().trim()).append(");\n");
+                
+                String targetLiteral = null;
+                String valueLiteral = null;
+                if (valueOp != null && valueOp instanceof AssignableExpression && ((AssignableExpression)valueOp).assignTo(null, sb2)) {
+                    valueLiteral = sb2.toString().trim();
+                } else if (valueOp != null && valueOp instanceof CustomInvoke && ((CustomInvoke)valueOp).appendExpression(sb3)) {
+                    valueLiteral = sb3.toString().trim();
+                }
+                sb3.setLength(0);
+                if (targetOp != null && targetOp instanceof AssignableExpression && ((AssignableExpression)targetOp).assignTo(null, sb3)) {
+                    targetLiteral = sb3.toString().trim();
+                }
+                
+                if (valueLiteral != null && targetLiteral != null) {
+                    b.append(valueLiteral).append(", ").append(targetLiteral).append(");\n");
                     valueOpAppended = true;
                     targetOpAppended = true;
-                //} else if (valueOp != null && useThis && valueOp instanceof AssignableExpression && ((AssignableExpression)valueOp).assignTo(null, sb2)) {
-                //    sb2.setLength(0);
-                //    ((AssignableExpression)valueOp).assignTo(null, sb2);
-                //    b.append(sb2.toString().trim()).append(", __cn1ThisObject);\n    SP--;\n");
-                //    valueOpAppended = true;
                 } else {
                     switch(desc.charAt(0)) {
                         case 'L':
