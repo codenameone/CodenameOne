@@ -503,7 +503,6 @@ public class ToastBar {
 
                 Label l = new Label(s.getMessage() != null ? s.getMessage() : "");
 
-                c.leadButton.getListeners().clear();
                 c.leadButton.addActionListener(s.getListener());
                 c.leadButton.addActionListener(new ActionListener() {
                     @Override
