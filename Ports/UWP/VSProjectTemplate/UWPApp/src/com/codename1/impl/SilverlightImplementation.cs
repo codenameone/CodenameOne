@@ -46,6 +46,9 @@ using Windows.Foundation.Metadata;
 using Windows.ApplicationModel.DataTransfer;
 using com.codename1.db;
 using Windows.UI.ViewManagement;
+using Windows.UI.Composition;
+using Microsoft.Graphics.Canvas.UI.Composition;
+using Microsoft.Graphics.Canvas.Brushes;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -116,6 +119,55 @@ namespace com.codename1.impl
             Canvas.SetLeft(screen, 0);
             Canvas.SetTop(screen, 0);
             myView = new WindowsAsyncView(screen);
+            /*
+            Visual hostVisual = Windows.UI.Xaml.Hosting.ElementCompositionPreview.GetElementVisual(cl);
+            var root = hostVisual.Compositor.CreateContainerVisual();
+            Windows.UI.Xaml.Hosting.ElementCompositionPreview.SetElementChildVisual(cl, root);
+            var rect = hostVisual.Compositor.CreateSpriteVisual();
+            rect.Size = new Vector2(100, 100);
+            rect.Brush = hostVisual.Compositor.CreateColorBrush(Windows.UI.Colors.Silver);
+            rect.Offset = new Vector3(100, 100, 0);
+            rect.CenterPoint = new Vector3(100, 100, 0);
+            root.Children.InsertAtTop(rect);
+
+
+            var canvasDevice = CanvasDevice.GetSharedDevice();
+            var graphicsDevice = CanvasComposition.CreateCompositionGraphicsDevice(hostVisual.Compositor, canvasDevice);
+            var drawingVisual = hostVisual.Compositor.CreateSpriteVisual();
+            
+            drawingVisual.Size = new Vector2(400, 400);
+            drawingVisual.Opacity = 0.5f;
+            var execMode = WebView.DefaultExecutionMode;
+
+
+            var drawingSurface = graphicsDevice.CreateDrawingSurface(new Size(400, 400), DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                DirectXAlphaMode.Premultiplied);
+            var brush = hostVisual.Compositor.CreateSurfaceBrush(drawingSurface);
+            drawingVisual.Brush = brush;
+
+            using (var drawingSession = CanvasComposition.CreateDrawingSession(drawingSurface))
+            {
+                drawingSession.FillRectangle(new Rect(200, 200, 200, 50), Windows.UI.Colors.Red);
+                drawingSession.FillRectangle(new Rect(200, 200, 50, 200), Windows.UI.Colors.Red);
+                drawingSession.FillRectangle(new Rect(200, 350, 200, 50), Windows.UI.Colors.Red);
+                drawingSession.FillRectangle(new Rect(350, 200, 50, 200), Windows.UI.Colors.Red);
+                
+                CanvasBlend oldBlend = drawingSession.Blend;
+                drawingSession.Blend = CanvasBlend.Copy;
+                CanvasSolidColorBrush brush2 = new CanvasSolidColorBrush(drawingSession, Windows.UI.Colors.Transparent);
+
+                brush2.Color = Windows.UI.Colors.Transparent;
+                brush2.Opacity = 1;
+                drawingSession.FillRectangle(250, 250, 100, 100, brush2);
+                drawingSession.Blend = oldBlend;
+                
+
+            }
+            root.Children.InsertAtTop(drawingVisual);
+            //var compositionTarget = hostVisual.Compositor.CreateTargetForCurrentView();
+            //compositionTarget.Root = root;
+            */
+
         }
 
         private static string getDictValue(Dictionary<string, string> aSettings, string aKey, string aDefaultValue)
@@ -266,6 +318,8 @@ namespace com.codename1.impl
 
                         routeWheelEventToWebview(wv, e);
                         wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[]{ });
+
                     }
                 }
                 return;
@@ -287,6 +341,7 @@ namespace com.codename1.impl
                         
                         routeTapEventToWebview(wv, e, "click");
                         wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
                     }
                 }
                 return;
@@ -503,6 +558,7 @@ namespace com.codename1.impl
                     {
                         WebView wv = (WebView)child;
                         wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
                         routePointerEventToWebview(wv, e, "mousemove");
                     }
                 }
@@ -604,6 +660,56 @@ namespace com.codename1.impl
 
         }
 
+        static String createCaretRangeJSFuncs()
+        {
+            return "function getMouseEventCaretRange(evt) {\n" +
+                "    var range, x = evt.clientX, y = evt.clientY;\n" +
+                "\n" +
+                "    // Try the simple IE way first\n" +
+                "    if (document.body.createTextRange) {\n" +
+                "        range = document.body.createTextRange();\n" +
+                "        range.moveToPoint(x, y);\n" +
+                "    }\n" +
+                "\n" +
+                "    else if (typeof document.createRange != \"undefined\") {\n" +
+                "        // Try Mozilla's rangeOffset and rangeParent properties,\n" +
+                "        // which are exactly what we want\n" +
+                "        if (typeof evt.rangeParent != \"undefined\") {\n" +
+                "            range = document.createRange();\n" +
+                "            range.setStart(evt.rangeParent, evt.rangeOffset);\n" +
+                "            range.collapse(true);\n" +
+                "        }\n" +
+                "\n" +
+                "        // Try the standards-based way next\n" +
+                "        else if (document.caretPositionFromPoint) {\n" +
+                "            var pos = document.caretPositionFromPoint(x, y);\n" +
+                "            range = document.createRange();\n" +
+                "            range.setStart(pos.offsetNode, pos.offset);\n" +
+                "            range.collapse(true);\n" +
+                "        }\n" +
+                "\n" +
+                "        // Next, the WebKit way\n" +
+                "        else if (document.caretRangeFromPoint) {\n" +
+                "            range = document.caretRangeFromPoint(x, y);\n" +
+                "        }\n" +
+                "    }\n" +
+                "\n" +
+                "    return range;\n" +
+                "}\n" +
+                "\n" +
+                "function selectRange(range) {\n" +
+                "    if (range) {\n" +
+                "        if (typeof range.select != \"undefined\") {\n" +
+                "            range.select();\n" +
+                "        } else if (typeof window.getSelection != \"undefined\") {\n" +
+                "            var sel = window.getSelection();\n" +
+                "            sel.removeAllRanges();\n" +
+                "            sel.addRange(range);\n" +
+                "        }\n" +
+                "    }\n" +
+                "}";
+        }
+
         private string createJSPointerEvent(WebView wv, PointerRoutedEventArgs e, string eventName)
         {
             PointerPoint wvPoint = e.GetCurrentPoint(wv);
@@ -648,6 +754,7 @@ namespace com.codename1.impl
                 "    dragStarted = false;"+
                 "};"+
                 "window.addEventListener('mouseup', mouseUp, true);"+*/
+               
                 "var mouseMove = function(evt) {" +
                 "    var el = document.elementFromPoint(evt.clientX, evt.clientY);"+
                
@@ -821,6 +928,7 @@ namespace com.codename1.impl
                     {
                         WebView wv = (WebView)child;
                         wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
                         routePointerEventToWebview(wv, e, "mousedown");
                     }
                 }
@@ -849,6 +957,7 @@ namespace com.codename1.impl
                     {
                         WebView wv = (WebView)child;
                         wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
                         routePointerEventToWebview(wv, e, "mouseup");
                     }
                 }
@@ -1076,7 +1185,57 @@ namespace com.codename1.impl
             //if the view is not visible make sure the edt won't wait.
             return base.hasPendingPaints();
         }
-      
+
+        List<SilverlightBrowserComponent> renderedBrowserComponents = new List<SilverlightBrowserComponent>();
+
+        public override void beforeComponentPaint(Component c, Graphics g)
+        {
+            if (c is Form)
+            {
+                renderedBrowserComponents.Clear();
+                return;
+            }
+            if (c is SilverlightBrowserComponent)
+            {
+                renderedBrowserComponents.Add((SilverlightBrowserComponent)c);
+                ((SilverlightBrowserComponent)c).setShouldRenderInFront(true);
+                return;
+            }
+            if (renderedBrowserComponents.Count() > 0)
+            {
+                
+                int absX = c.getAbsoluteX();
+                int absY = c.getAbsoluteY();
+                int w = c.getWidth();
+                int h = c.getHeight();
+                foreach (SilverlightBrowserComponent bc in renderedBrowserComponents)
+                {
+                    bool renderInFront = bc.isShouldRenderInFront();
+                    
+                    if (renderInFront && Rectangle.intersects(bc.getAbsoluteX(), bc.getAbsoluteY(), bc.getWidth(), bc.getHeight(),
+                        absX, absY, w, h))
+                    {
+                        //java.lang.System.@out.println("Should render in front NO");
+                        bc.setShouldRenderInFront(false);
+                    }
+                }
+            }
+            base.beforeComponentPaint(c, g);
+        }
+
+        public override void afterComponentPaint(Component c, Graphics g)
+        {
+            if (c is Form)
+            {
+                foreach (SilverlightBrowserComponent bc in renderedBrowserComponents)
+                {
+                    bc.updateZIndex();
+                }
+                    
+            }
+            base.afterComponentPaint(c, g);
+        }
+
         public override void repaint(Animation cmp)
         {
             if (myView != null)
@@ -1939,25 +2098,83 @@ namespace com.codename1.impl
         {
             private BrowserComponent bc;
             private WebView webView;
+            private bool shouldRenderInFront;
+            private bool isRenderedInFront;
+            private string pendingPageContent;
+            private bool initialized;
 
             public SilverlightBrowserComponent(WebView element, BrowserComponent bc) : base(element)
             {
                 webView = element;
                 this.bc = bc;
-                
+                setZIndex(1);
+                isRenderedInFront = true;
 
             }
+
+            public bool isBrowserInitialized()
+            {
+                return initialized;
+            }
+
+            public void setPendingPageContent(string content)
+            {
+                pendingPageContent = content;
+            }
+
+            public bool isShouldRenderInFront()
+            {
+                return shouldRenderInFront;
+            }
+
+            public void setShouldRenderInFront(bool b)
+            {
+                this.shouldRenderInFront = b;
+            }
+
+            public void setIsRenderedInFront(bool b)
+            {
+                this.isRenderedInFront = b;
+            }
+
+            public void updateZIndex()
+            {
+                if (shouldRenderInFront != isRenderedInFront)
+                {
+                    isRenderedInFront = shouldRenderInFront;
+                    int zIndex = isRenderedInFront ? 1 : -1;
+                    setZIndex(zIndex);
+                    dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    {
+                        element.SetValue(Canvas.ZIndexProperty, zIndex);
+                    });
+                }
+            }
+
+            //public override void paint(Graphics g)
+            //{
+            //    base.paint(g);
+            //}
 
             protected override void initComponent()
             {
                 base.initComponent();
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
+                    webView.Opacity = 1f;
+                    //webView.DefaultBackgroundColor = Windows.UI.Colors.Red;
+                    webView.Visibility = Visibility.Visible;
                     webView.DOMContentLoaded += webview_DOMContentLoaded;
                     webView.NavigationStarting += webview_Navigating;
                     webView.ContentLoading += webview_ContentLoading;
                     webView.IsTapEnabled = true;
                     webView.NavigationCompleted += webview_NavigationCompleted;
+                    if (pendingPageContent != null)
+                    {
+                        webView.NavigateToString(pendingPageContent);
+                        pendingPageContent = null;
+                    }
+                    initialized = true;
                 });
 
             }
@@ -1966,6 +2183,7 @@ namespace com.codename1.impl
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
+                    initialized = false;
                     webView.DOMContentLoaded -= webview_DOMContentLoaded;
                     webView.NavigationStarting -= webview_Navigating;
                     webView.ContentLoading -= webview_ContentLoading;
@@ -1993,7 +2211,11 @@ namespace com.codename1.impl
 
             void webview_ContentLoading(WebView sender, WebViewContentLoadingEventArgs e)
             {
-                ActionEvent ev = new ActionEvent(e == null ? null : e.Uri.OriginalString);
+                ActionEvent ev = new ActionEvent(e == null ? null : e.Uri == null ? null : e.Uri.OriginalString);
+                string jsInject = createCaretRangeJSFuncs();
+                //jsInject = "(function(){ " + jsInject + "\n window.__cn1__getMouseEventCaretRange = getMouseEventCaretRange; window.__cn1__selectRange = selectRange;"+
+                //    "window.addEventListener('click', function(e){ try { console.log('caret pos: '); console.log(document.caretRangeFromPoint(e.clientX, e.clientY));console.log(e); e.target.focus(); var caretRange = getMouseEventCaretRange(e); console.log(caretRange); window.setTimeout(function(){try {selectRange(caretRange);} catch (e){console.log(e);}}, 0);} catch (e){console.log(e);}}, false);\n})();";
+                //sender.InvokeScriptAsync("eval", new string[] { jsInject });
                 bc.fireWebEvent("onLoad", ev);
             }
 
@@ -2015,16 +2237,16 @@ namespace com.codename1.impl
         {
             //SilverlightBrowserComponent sp = null;
             WebView webView = null;
-            using (AutoResetEvent are = new AutoResetEvent(false))
-            {
+            //using (AutoResetEvent are = new AutoResetEvent(false))
+            //{
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
                     webView = new WebView();
                     
-                    are.Set();
+                    //are.Set();
                 }).AsTask().GetAwaiter().GetResult();
-                are.WaitOne();
-            }
+                //are.WaitOne();
+            //}
             BrowserComponent currentBrowser = (BrowserComponent)n1;
 
             SilverlightBrowserComponent sp = new SilverlightBrowserComponent(webView, currentBrowser);
@@ -2032,7 +2254,7 @@ namespace com.codename1.impl
         }
         
 
-        
+       
 
         
 
@@ -2066,6 +2288,8 @@ namespace com.codename1.impl
         public override void setBrowserURL(PeerComponent browserPeer, string url)
         {
             WebView webView = null; ;
+            //url = "https://maps.google.com";
+            //url = "https://www.google.com";
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
                webView = (WebView)((SilverlightPeer)browserPeer).element;
@@ -2082,7 +2306,7 @@ namespace com.codename1.impl
                    return;
                }
                webView.Source = new Uri(uri);
-           }).AsTask().GetAwaiter().GetResult();
+           });
         }
  
         public override void browserReload(PeerComponent n1)
@@ -2156,17 +2380,23 @@ namespace com.codename1.impl
          {
             webView = (WebView)((SilverlightPeer)n1).element;
             webView.GoForward();
-         }).AsTask().GetAwaiter().GetResult();
+         });
         }
 
         public override void setBrowserPage(PeerComponent n1, string n2, string n3)
         {
+            SilverlightBrowserComponent bc = (SilverlightBrowserComponent)n1;
+            if (!bc.isBrowserInitialized())
+            {
+                bc.setPendingPageContent(n2);
+                return;
+            }
             WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
                webView = (WebView)((SilverlightPeer)n1).element;
                webView.NavigateToString(n2);
-           }).AsTask().GetAwaiter();
+           });
         }
 
 

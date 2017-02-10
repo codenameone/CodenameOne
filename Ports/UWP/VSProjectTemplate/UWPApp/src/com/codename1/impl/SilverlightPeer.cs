@@ -17,6 +17,17 @@ namespace com.codename1.impl
         public FrameworkElement element;
         private bool lightweightMode;
         private object peerImage = null;
+        private int zIndex = -1;
+
+        public void setZIndex(int zIndex)
+        {
+            this.zIndex = zIndex;
+        }
+
+        public int getZIndex()
+        {
+            return zIndex;
+        }
 
         public SilverlightPeer(FrameworkElement element):base(element)
         {
@@ -60,12 +71,12 @@ namespace com.codename1.impl
                 {
                     if (SilverlightImplementation.cl.Children.Contains(element))
                     {
-                        element.SetValue(Canvas.ZIndexProperty, 100);
-                        Canvas.SetLeft(element, x / SilverlightImplementation.scaleFactor);
+                        element.SetValue(Canvas.ZIndexProperty, zIndex);
+                       Canvas.SetLeft(element, x / SilverlightImplementation.scaleFactor);
                         Canvas.SetTop(element, y / SilverlightImplementation.scaleFactor);
                         element.Width = width / SilverlightImplementation.scaleFactor;
                         element.Height = height / SilverlightImplementation.scaleFactor;
-                    }
+                    } 
                 }).AsTask();
             }
         }
@@ -77,6 +88,8 @@ namespace com.codename1.impl
                 if (!SilverlightImplementation.cl.Children.Contains(element))
                 {
                     SilverlightImplementation.cl.Children.Add(element);
+                    element.Visibility = Visibility.Visible;
+                    layoutPeer();
                 }
             }).AsTask();
             layoutPeer();
