@@ -220,7 +220,11 @@ public class Oauth2 {
                     old.showBack();
                 }
             };
-            authenticationForm.addCommand(cancel);
+            if (authenticationForm.getToolbar() != null){
+                authenticationForm.getToolbar().addCommandToLeftBar(cancel);
+            } else {
+                authenticationForm.addCommand(cancel);
+            }
             authenticationForm.setBackCommand(cancel);
         }
         authenticationForm.setLayout(new BorderLayout());
