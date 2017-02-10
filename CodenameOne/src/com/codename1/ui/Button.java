@@ -156,19 +156,30 @@ public class Button extends Label {
     }
     
     /**
+     * Constructor a button with text, image and uiid
+     * 
+     * @param text label appearing on the button
+     * @param icon image appearing on the button
+     * @param id UIID unique identifier for component type
+     */
+    public Button(String text, Image icon, String id) {
+        super(text);
+        setUIID(id);
+        setFocusable(true);
+        setIcon(icon);
+        this.pressedIcon = icon;
+        this.rolloverIcon = icon;
+        releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
+    }
+    
+    /**
      * Constructor a button with text and image
      * 
      * @param text label appearing on the button
      * @param icon image appearing on the button
      */
     public Button(String text, Image icon) {
-        super(text);
-        setUIID("Button");
-        setFocusable(true);
-        setIcon(icon);
-        this.pressedIcon = icon;
-        this.rolloverIcon = icon;
-        releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
+        this(text, icon, "Button");
     }
 
     /**
