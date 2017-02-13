@@ -104,7 +104,7 @@ public class Button extends Label {
      * @param text label appearing on the button
      */
     public Button(String text) {
-        this(text, null);
+        this(text, null, "Button");
     }
     
     /**
@@ -160,7 +160,7 @@ public class Button extends Label {
      * 
      * @param text label appearing on the button
      * @param icon image appearing on the button
-     * @param id UIID unique identifier for component type
+     * @param id UIID unique identifier for button
      */
     public Button(String text, Image icon, String id) {
         super(text);
@@ -180,6 +180,16 @@ public class Button extends Label {
      */
     public Button(String text, Image icon) {
         this(text, icon, "Button");
+    }
+    
+    /**
+     * Constructor a button with text and image
+     * 
+     * @param text label appearing on the button
+     * @param id UIID unique identifier for button
+     */
+    public Button(String text, String id) {
+        this(text, null, id);
     }
 
     /**
