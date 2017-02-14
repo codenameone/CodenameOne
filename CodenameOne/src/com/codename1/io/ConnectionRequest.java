@@ -2212,7 +2212,8 @@ public class ConnectionRequest implements IOProgressListener {
             final ActionListener onDownload = new ActionListener<NetworkEvent>() {
 
                 public void actionPerformed(NetworkEvent nevt) {
-                    if (nevt.getResponseCode() == 200) {
+                    int rc = nevt.getResponseCode();
+                    if (rc == 200 || rc == 201 ) {
                         downloadImage(onSuccess, onFail, true);
                     } else {
                         if (nevt.getError() == null) {

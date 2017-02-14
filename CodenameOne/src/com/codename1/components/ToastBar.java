@@ -900,7 +900,8 @@ public class ToastBar {
                 NetworkManager.getInstance().removeErrorListener(errorListener);
                 NetworkManager.getInstance().removeProgressListener(progListener[0]);
                 s.clear();
-                if (onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
+                int rc = cr.getResponseCode();
+                if (onSuccess != null && (rc == 200 || rc == 201 || rc == 202)) {
                     onSuccess.onSucess(evt);
                 }
             }

@@ -1334,7 +1334,8 @@ public class Util {
         } else {
             NetworkManager.getInstance().addToQueueAndWait(cr);
         }
-        return cr.getResponseCode() == 200;
+        int rc = cr.getResponseCode();
+        return rc == 200 || rc == 201;
     }
     
     /**
