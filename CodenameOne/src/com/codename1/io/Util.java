@@ -32,6 +32,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.Base64;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.SuccessCallback;
@@ -1515,5 +1516,46 @@ public class Util {
             return 0;
         }
         throw new IllegalArgumentException("Not a number: " + number);
+    }
+    
+    /**
+     * Encodes a string in a way that makes it harder to read it "as is" this makes it possible for Strings to be 
+     * "encoded" within the app and thus harder to discover by a casual search.
+     * 
+     * @param s the string to decode
+     * @return the decoded string
+     */
+    public  static String xorDecode(String s) {
+        try { 
+            byte[] dat = Base64.decode(s.getBytes("UTF-8"));
+            for(int iter = 0 ; iter < dat.length ; iter++) {
+                dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
+            }
+            return new String(dat, "UTF-8");
+        } catch(UnsupportedEncodingException err) {
+            // will never happen damn stupid exception
+            err.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * The inverse method of xorDecode, this is normally unnecessary and is here mostly for completeness
+     * 
+     * @param s a regular string
+     * @return a String that can be used in the xorDecode method
+     */
+    public static String xorEncode(String s) {
+        try { 
+            byte[] dat = s.getBytes("UTF-8");
+            for(int iter = 0 ; iter < dat.length ; iter++) {
+                dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
+            }
+            return Base64.encodeNoNewline(dat);
+        } catch(UnsupportedEncodingException err) {
+            // will never happen damn stupid exception
+            err.printStackTrace();
+            return null;
+        }
     }
 }
