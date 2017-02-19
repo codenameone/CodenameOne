@@ -5862,6 +5862,19 @@ public abstract class CodenameOneImplementation {
         registerServerPush(id, applicationKey, pushType, udid, packageName);
     }
     
+    protected final void sendRegisteredForPush(String id) {
+        if (callback != null) {
+            callback.registeredForPush(id);
+        }
+    }
+    
+    
+    protected final void pushReceived(String data) {
+        if (callback != null) {
+            callback.push(data);
+        }
+    }
+    
     /**
      * For use by implementations, stop receiving push notifications from the server
      */
