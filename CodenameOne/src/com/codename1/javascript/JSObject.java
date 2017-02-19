@@ -1018,5 +1018,15 @@ public class JSObject {
              
         });
     }
+
+    /**
+     * Returns the toString from the JavaScript object effectively the equivalent of {@code callString("toString")}
+     * @return the String representation of the JavaScript object
+     */
+    @Override
+    public String toString() {
+        return callString("toString");
+    }
+
     
 }
