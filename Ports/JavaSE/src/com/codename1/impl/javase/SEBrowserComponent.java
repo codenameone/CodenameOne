@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
@@ -43,6 +44,7 @@ import javafx.concurrent.Worker.State;
 import javafx.event.EventHandler;
 
 import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JComponent;
@@ -109,6 +111,13 @@ public class SEBrowserComponent extends PeerComponent {
             System.out.println("It looks like you are running on a version of Java older than Java 8. We recommend upgrading");
             t.printStackTrace();
         }
+        
+        we.setOnError(new EventHandler<WebErrorEvent>() {
+            @Override
+            public void handle(WebErrorEvent event) {
+                Log.p("WebError: " + event.toString());
+            }
+        });
         
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
