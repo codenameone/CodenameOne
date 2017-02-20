@@ -958,8 +958,13 @@ public final class GeneralPath implements Shape {
         
         private void _addToPath(GeneralPath p, double startAngle, double sweepAngle) {
             //double _2pi = Math.PI*2;
-            
-            if (Math.abs(sweepAngle) > Math.PI/4) {
+            double absSweepAngle = Math.abs(sweepAngle);
+            if (absSweepAngle < 0.0001) {
+                // Basically zero sweep angle so we won't draw anytything here.
+                // IOS seemed to choke when we tried to draw too small an arc
+                return;
+            }
+            if (absSweepAngle > Math.PI/4) {
                 //double halfAngle = sweepAngle/2;
                 double diff = Math.PI/4;
                 if (sweepAngle < 0) {
