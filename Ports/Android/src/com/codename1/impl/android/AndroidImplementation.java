@@ -6030,6 +6030,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         String id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
+        if (id == null) {
+            id = Display.getInstance().getProperty("gcm.sender_id", null);
+        }
         if(has) {
             Log.d("Codename One", "Sending async push request for id: " + id);
             ((CodenameOneActivity) getActivity()).registerForPush(id);
