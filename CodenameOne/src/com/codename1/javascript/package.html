@@ -35,19 +35,13 @@
         
         <h2>Requirements</h2>
         
-        <p>Currently the CodenameOne bridge will only run on platforms that include a native browser component.   This includes only
-            iOS and Android currently.  Blackberry will be supported soon, but its native browser component is still quite buggy
-            and is disabled by default.</p>
+        <p>The bridge will only run on platforms that include a native browser component.   This includes iOS, 
+            Android, Windows, Desktop &amp; JavaScript at this time.  </p>
         
-        <h2>Installation</h2>
-        
-        <p>To use the Codename One JS Bridge, you simply need to include the 
-            <a href="https://github.com/shannah/CodenameOneJS/blob/master/dist/CN1JSLib.cn1lib?raw=true">CN1JSLib library</a> in your Codename One project.</p>
-        <p>For information about including Codename One libraries in your application, see <a href="http://www.codenameone.com/3/post/2013/02/new-preliminary-library-support.html">http://www.codenameone.com/3/post/2013/02/new-preliminary-library-support.html</a>.</p>
         
         <h2>Usage</h2>
         
-        <p>The {@ref JavascriptContext} class lays the foundation by enabling you to call
+        <p>The {@link com.codename1.javascript.JavascriptContext} class lays the foundation by enabling you to call
             Javascript code directly from Java.  It provides automatic type conversion
             between Java and Javascript types as follows:</p>
         
@@ -115,7 +109,7 @@
         <p>
             Note that this conversion table is more verbose than necessary, since Javascript functions 
             and arrays are, in fact Objects themselves, so those rows are redundant.  All Javascript
-            objects are converted to {@link ca.weblite.codename1.js.JSObject}s.
+            objects are converted to {@link com.codename1.javascript.JSObject}s.
         </p>
         
         <h3>Getting Started</h3>
@@ -128,11 +122,11 @@
         
         <h3>Getting Values</h3>
         
-        <p>The {@link ca.weblite.codename1.js.JavascriptContext#get(String)} method is used to get values from Javascript.  
+        <p>The {@link com.codename1.javascript.JavascriptContext#get(String)} method is used to get values from Javascript.  
             It takes an arbitrary Javascript expression, executes it, and returns the
             result, after converting it to the corresponding Java type.  E.g. if the result
             is a String, it will return a String and if it is a Number it will return a 
-            java Double object.  If the result is an Object, it will return a {@link ca.weblite.codename1.js.JSObject}.</p>
+            java Double object.  If the result is an Object, it will return a {@link com.codename1.javascript.JSObject}.</p>
         
         <p>The following is a simple example that retrieves the document content, which
             is a string:</p>
@@ -167,21 +161,21 @@
 
         <h4>Returning Objects</h4>
         
-        <p>The previous examples involved only primitive return values.  The {@link ca.weblite.codename1.js.JavascriptContext} abstraction,
+        <p>The previous examples involved only primitive return values.  The {@link com.codename1.javascript.JavascriptContext} abstraction,
             in these cases, doesn't offer a whole lot of added-value over just using the BrowserComponent.executeJavascriptAndReturnString()
             method.  The real value is when we are dealing with objects.</p>
         <p>The following example obtains a reference to the <code>window</code> object and wraps it in a 
-            proxy {@link ca.weblite.codename1.js.JSObject} class so that we can work directly with the window object:</p>
+            proxy {@link com.codename1.javascript.JSObject} class so that we can work directly with the window object:</p>
         
         <script src="https://gist.github.com/4512795.js"></script>
         
         <p>This code produces the exact same result as the previous example.  The difference
-            is the intermediary step of wrapping the window object in a {@link ca.weblite.codename1.js.JSObject}, and
+            is the intermediary step of wrapping the window object in a {@link com.codename1.javascript.JSObject}, and
             obtaining the outerHeight and outerWidth properties directly via that proxy object.</p>
         
-        <p>You can obtain a {@link ca.weblite.codename1.js.JSObject} proxy for any Javascript object, even ones that you create
+        <p>You can obtain a {@link com.codename1.javascript.JSObject} proxy for any Javascript object, even ones that you create
             on the fly.  The following example creates an anonymous object with some keys and values
-            and uses a {@link ca.weblite.codename1.js.JSObject} proxy to interact with this object from Java.</p>
+            and uses a {@link com.codename1.javascript.JSObject} proxy to interact with this object from Java.</p>
         
         <script src="https://gist.github.com/4512841.js"></script>
         
@@ -190,19 +184,19 @@
         <p><center><img src="http://media.weblite.ca/files/photos/steve-is-34-dialog.png"/></center></p>
 
         <p>See <a href="#working-with-objects">Working With Objects</a> for more information
-            about working with the {@link ca.weblite.codename1.js.JSObject} class.</p>
+            about working with the {@link com.codename1.javascript.JSObject} class.</p>
         
         <h4>Returning Functions and Arrays</h4>
         
-        <p>In Javascript, functions and arrays are just objects, so these are also encapsulated as {@link ca.weblite.codename1.js.JSObject}
+        <p>In Javascript, functions and arrays are just objects, so these are also encapsulated as {@link com.codename1.javascript.JSObject}
             proxies.  See <a href="#working-with-arrays">Working with Arrays</a> and 
             <a href="#working-with-functions">Workin with Functions</a> for more details on how to work
-            with these values via the {@link ca.weblite.codename1.js.JSObject} interface.</p>
+            with these values via the {@link com.codename1.javascript.JSObject} interface.</p>
         
         <h3>Setting Values</h3>
         
-        <p>Just as you can get values from Javascript using {@link ca.weblite.codename1.js.JavascriptContext}'s get() method, you can
-            also set values via {@link ca.weblite.codename1.js.JavascriptContext#set(String,Object)}.</p>
+        <p>Just as you can get values from Javascript using {@link com.codename1.javascript.JavascriptContext}'s get() method, you can
+            also set values via {@link com.codename1.javascript.JavascriptContext#set(String,Object)}.</p>
         
         <p>The following is a simple example that sets the location, and causes it to redirect to
             a different page:</p>
@@ -221,7 +215,7 @@
             primitives like numbers and booleans, but you can also set Object values using the set() method.
         </p>
         
-        <p>The following example creates an anonymous Javascript object, wraps it in a {@link ca.weblite.codename1.js.JSObject} proxy,
+        <p>The following example creates an anonymous Javascript object, wraps it in a {@link com.codename1.javascript.JSObject} proxy,
             sets some values on it, then sets the object as a property of the top-level window object.</p>
         
         <script src="https://gist.github.com/4513301.js"></script>
@@ -234,7 +228,7 @@
 
         <h2>Working with Objects</h2>
         
-        <p>Previously examples showed how to obtain a {@link ca.weblite.codename1.js.JSObject} proxy to a Javascript object.  There are 4 ways to get a {@link ca.weblite.codename1.js.JSObject}:</p>
+        <p>Previously examples showed how to obtain a {@link com.codename1.javascript.JSObject} proxy to a Javascript object.  There are 4 ways to get a {@link com.codename1.javascript.JSObject}:</p>
         <ol>
             <li>Create an anonymous object: <br><code>JSObject obj = (JSObject)ctx.get("{}");</code></li>
             <li>Reference an existing object directly: <br><code>JSObject obj = (JSObject)ctx.get("window.location");</code></li>
@@ -246,14 +240,14 @@
             </li>
         </ol>
         
-        <p>{@link ca.weblite.codename1.js.JSObject}s are essentially just proxies around a Javascript object.  Any calls to retrieve 
-            properties from a {@link ca.weblite.codename1.js.JSObject} are just sent directly to the Javascript context, and the result
-            returned.  The {@link ca.weblite.codename1.js.JSObject} object doesn't store copies the javascript object's properties.  It just
-            retrieves them as they are required via the {@link ca.weblite.codename1.js.JSObject#get(String)} method.</p>
+        <p>{@link com.codename1.javascript.JSObject}s are essentially just proxies around a Javascript object.  Any calls to retrieve 
+            properties from a {@link com.codename1.javascript.JSObject} are just sent directly to the Javascript context, and the result
+            returned.  The {@link com.codename1.javascript.JSObject} object doesn't store copies the javascript object's properties.  It just
+            retrieves them as they are required via the {@link com.codename1.javascript.JSObject#get(String)} method.</p>
         
         <h3>Getting Simple Values</h3>
         
-        <p>You can always retrieve the properties of an object using the {@link ca.weblite.codename1.js.JSObject#get(String)} method.  It takes the name of the property 
+        <p>You can always retrieve the properties of an object using the {@link com.codename1.javascript.JSObject#get(String)} method.  It takes the name of the property 
             as a parameter, and returns its value, converted to the appropriate Java type.  (e.g. if it is a String,
             it returns a String, if it is a number it returns a Double, and if it is an Object, it returns an object.</p>
         
@@ -321,17 +315,17 @@ var obj = {
        
 <h3>Setting Object Values</h3>
 
-<p>The {@link ca.weblite.codename1.js.JSObject#set(String,Object)} method works the same as the {@link ca.weblite.codename1.js.JavascriptContext#set(String,Object)} method except that it treats the local
+<p>The {@link com.codename1.javascript.JSObject#set(String,Object)} method works the same as the {@link com.codename1.javascript.JavascriptContext#set(String,Object)} method except that it treats the local
     object as the root node.  It allows you to easily set properties on the object.  Values set here should
     be provided using Java values as they will automatically be converted to the appropriate associated Javascript
-    type.  If you are setting an Object as a value, then you'll need to set it as a {@link ca.weblite.codename1.js.JSObject} and not a string
+    type.  If you are setting an Object as a value, then you'll need to set it as a {@link com.codename1.javascript.JSObject} and not a string
     representation of the object.  This is because Strings will just be converted to Javascript strings.</p>
 
-<p>Properties set via the {@link ca.weblite.codename1.js.JSObject#set(String,Object)} method modify the underlying Javascript object directly so that the change
+<p>Properties set via the {@link com.codename1.javascript.JSObject#set(String,Object)} method modify the underlying Javascript object directly so that the change
     is immediately effective inside the javascript environment.
 </p>
-<p>Just as with the {@link ca.weblite.codename1.js.JSObject#get(String)} method, you can set the values of direct properties or nested properties using
-    the dot '.' notation.  And just like {@link ca.weblite.codename1.js.JSObject#get(String)}, you can force setting a direct property in cases where the property
+<p>Just as with the {@link com.codename1.javascript.JSObject#get(String)} method, you can set the values of direct properties or nested properties using
+    the dot '.' notation.  And just like {@link com.codename1.javascript.JSObject#get(String)}, you can force setting a direct property in cases where the property
     name includes a '.', by wrapping the <var>key</var> inside single quotes.
     
 </p>
@@ -370,10 +364,10 @@ String canadaName = (String)canada.get("name");
         
         <h3>Calling Object Methods</h3>
         
-        <p>The {@link ca.weblite.codename1.js.JSObject#call(String,Object)} method allows you to call javascript methods that 
+        <p>The {@link com.codename1.javascript.JSObject#call(String,Object)} method allows you to call javascript methods that 
             are members of the underlying object.  It arguments are passed as an
             Object[] array.  These will be automatically converted from the Java type to the corresponding
-            Javascript type.  Java type conversion are the same as using the {@link ca.weblite.codename1.js.JavascriptContext#set(String,Object)} method.
+            Javascript type.  Java type conversion are the same as using the {@link com.codename1.javascript.JavascriptContext#set(String,Object)} method.
         </p>
         
         <p>The following example shows an object with a simple <code>add()</code> method
@@ -390,7 +384,7 @@ Double result = (Double)obj.call("add",
 <h3>Working with Arrays</h3>
 
 <p>In javascript, arrays are just objects that include a special ability to be iterated.  You can use the alternate
-    version of {@link ca.weblite.codename1.js.JSObject#get(int)} which takes an <var>int</var> as a parameter to retrieve the elements of an array.</p>
+    version of {@link com.codename1.javascript.JSObject#get(int)} which takes an <var>int</var> as a parameter to retrieve the elements of an array.</p>
 
 <p>For example, consider the following javascript object:</p>
 <p><code><pre>
@@ -405,7 +399,7 @@ var obj = {
 
         </pre></code></p>
         
-        <p>Then assuming we have a {@link ca.weblite.codename1.js.JSObject} proxy for this object, we could loop through the players
+        <p>Then assuming we have a {@link com.codename1.javascript.JSObject} proxy for this object, we could loop through the players
             array and output the name and age of each player as follows:</p>
         
         <p><code><pre>
@@ -430,9 +424,9 @@ for ( int i=0; i&lt;len; i++){
             <li>Accessing the file system or storage API</li>
         </ul>
         
-        <p>The Codename One JS bridge supports javascript to java method calling by way of the {@link ca.weblite.codename1.js.JSFunction} interface
-            and the {@link ca.weblite.codename1.js.JSObject#set(String,Object)} methods on the {@link ca.weblite.codename1.js.JSObject} class.  You can implement a {@link ca.weblite.codename1.js.JSFunction}
-            object and register it as a callback with a {@link ca.weblite.codename1.js.JSObject}, then you will be able to 
+        <p>The Codename One JS bridge supports javascript to java method calling by way of the {@link com.codename1.javascript.JSFunction} interface
+            and the {@link com.codename1.javascript.JSObject#set(String,Object)} methods on the {@link com.codename1.javascript.JSObject} class.  You can implement a {@link com.codename1.javascript.JSFunction}
+            object and register it as a callback with a {@link com.codename1.javascript.JSObject}, then you will be able to 
             execute this object's apply method via a Javascript proxy.</p>
         
         <p>As an example, let's implement a simple logging function:</p>
@@ -461,32 +455,32 @@ c.executeAndReturnString("logger.log('This is a test message');");
 <p>Running it on a device will yield similar output in the device log file.</p>
 
 <p>Let's step through this code to see what is happening.  First we create a new, empty javascript object
-    and wrap it in a JSObject proxy.  Then we use the {@link ca.weblite.codename1.js.JSObject}'s {@link ca.weblite.codename1.js.JSObject#set(String,Object)} method to add an anonymous {@link ca.weblite.codename1.js.JSFunction}
+    and wrap it in a JSObject proxy.  Then we use the {@link com.codename1.javascript.JSObject}'s {@link com.codename1.javascript.JSObject#set(String,Object)} method to add an anonymous {@link com.codename1.javascript.JSFunction}
     object to it with the propery of "log".  This step registers a method proxy on the Javascript side that acts just
-    like a normal javascript method, but which actually triggers the {@link ca.weblite.codename1.js.JSFunction}'s {@link ca.weblite.codename1.js.JSFunction#apply(JSObject,Object[])} method.</p>
+    like a normal javascript method, but which actually triggers the {@link com.codename1.javascript.JSFunction}'s {@link com.codename1.javascript.JSFunction#apply(JSObject,Object[])} method.</p>
 
 <p>We then set this <var>logger</var> object to the global javascript scope by making it a direct child
     of the <var>window</var> object.  Finally we issue a Javascript method call to <code>logger.log()</code>.  This 
-    is what effectively calls the apply() method on our {@link ca.weblite.codename1.js.JSFunction} object.</p>
+    is what effectively calls the apply() method on our {@link com.codename1.javascript.JSFunction} object.</p>
 
 <h3>Caveats</h3>
 
 <p><strong>JSFunction callbacks are executed asynchronously so as to prevent deadlocks.</strong>  This means that you cannot 
-    return a value from this method using a return statement (hence the reason why the interface definition for {@link ca.weblite.codename1.js.JSFunction#apply(JSObject,Object[])} is <var>void</var>.
+    return a value from this method using a return statement (hence the reason why the interface definition for {@link com.codename1.javascript.JSFunction#apply(JSObject,Object[])} is <var>void</var>.
 </p>
 <p><strong>If you want to return a value back to Javascript, then you'll need to do it by providing a 
-        callback function as one of the parameters, and call this callback method from inside the {@link ca.weblite.codename1.js.JSFunction#apply(JSObject,Object[])}
+        callback function as one of the parameters, and call this callback method from inside the {@link com.codename1.javascript.JSFunction#apply(JSObject,Object[])}
         method upon completion.</strong></p>
         
         <h3>Example: Passing a Javascript Callback to Your Callback</h3>
         
-        <p>Since {@link ca.weblite.codename1.js.JSFunction} callbacks are executed asynchronously, if you want to be able to return a result back to Javascript, you will
+        <p>Since {@link com.codename1.javascript.JSFunction} callbacks are executed asynchronously, if you want to be able to return a result back to Javascript, you will
             need to do this via a Javascript callback.  This is quite a common pattern in Javascript since it is single threaded and relies
             upon non-blocking patterns.</p>
         
-        <p>As an example, let's create a {@link ca.weblite.codename1.js.JSFunction} callback that adds two numbers together and returns the result to Javascript via a callback:</p>
+        <p>As an example, let's create a {@link com.codename1.javascript.JSFunction} callback that adds two numbers together and returns the result to Javascript via a callback:</p>
         
-        <p>First we will create the {@link ca.weblite.codename1.js.JSFunction} object to perform the addition, as follows:</p>
+        <p>First we will create the {@link com.codename1.javascript.JSFunction} object to perform the addition, as follows:</p>
         <p><code><pre>
 WebBrowser b = new WebBrowser(){
     protected void onLoad(String url){
@@ -509,15 +503,15 @@ WebBrowser b = new WebBrowser(){
 
 b.setURL("jar:///ca/weblite/codename1/tests/AddAsync.html");
                 </pre></code></p>
-                <p>In this snippet, we start by obtaining a reference to the "window" object.  We then add a method to this object named "addAsync".  This method is a {@link ca.weblite.codename1.js.JSFunction}
-                    object that we implement inline.  The apply() method of the {@link ca.weblite.codename1.js.JSFunction} object is the Java method that will be executed when the addAsync method is called 
+                <p>In this snippet, we start by obtaining a reference to the "window" object.  We then add a method to this object named "addAsync".  This method is a {@link com.codename1.javascript.JSFunction}
+                    object that we implement inline.  The apply() method of the {@link com.codename1.javascript.JSFunction} object is the Java method that will be executed when the addAsync method is called 
                     from Javascript.  In this case the addAsync method expects three parameters:</p>
                 <ol>
                     <li>The two numbers that are being added together.</li>
                     <li>A Javascript callback method that will be executed when completed and passed the result of the addition
                     as a parameter.</li>
                 </ol>
-                <p>Notice that all numerical arguments are converted to Java Double objects, and the callback function is converted to a {@link ca.weblite.codename1.js.JSObject} object.  Also notice the use
+                <p>Notice that all numerical arguments are converted to Java Double objects, and the callback function is converted to a {@link com.codename1.javascript.JSObject} object.  Also notice the use
                     of <var>callback.call()</var>, which just calls the <var>callback</var> as a function itself.  With this variant of the <var>call()</var> method,
                     the <var>window</var> object is used as <var>this</var>.  Notice also that we pass the result inside an <var>Object[]</var> array.  This array will be expanded to
                     the direct javascript function parameters.  (i.e. it will not pass an array as the parameter to the javascript method, the array elements are extracted

@@ -47,8 +47,8 @@ public class ContactsModel extends DefaultListModel {
      * Constructor with contacts ids
      * @param ids the contact ids we would like this model to handle
      */
-    public ContactsModel(String[] ids) {
-        super(ids);
+    public ContactsModel(String... ids) {
+        super((Object[])ids);
     }
     
     /**

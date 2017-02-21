@@ -22,23 +22,33 @@
  */
 package com.codename1.ui;
 
+import com.codename1.components.InfiniteProgress;
 import com.codename1.components.InfiniteScrollAdapter;
 import com.codename1.ui.layouts.BoxLayout;
 
 /**
- * This abstract Container can scroll indefinitely (or at least until
+ * <p>This abstract Container can scroll indefinitely (or at least until
  * we run out of data).
- * This class uses the InfiniteScrollAdapter to bring more data and the pull to 
- * refresh feature to refresh current displayed data.
+ * This class uses the {@link com.codename1.components.InfiniteScrollAdapter} to bring more data and the pull to 
+ * refresh feature to refresh current displayed data.</p>
+ * <p>
+ * The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/9e2f7984beb22d9e372c.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png" alt="Sample usage of infinite scroll adapter" />
+ * <script src="https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js"></script>
  * 
  * @author Chen
  */
 public abstract class InfiniteContainer extends Container {
 
     private int amount = 10;
+    private boolean amountSet;
 
     private boolean requestingResults;
 
+    private InfiniteScrollAdapter adapter;
+    
     /**
      * Creates the InfiniteContainer.
      * The InfiniteContainer is created with BoxLayout Y layout.
@@ -60,12 +70,20 @@ public abstract class InfiniteContainer extends Container {
         if(amount <= 0){
             throw new IllegalArgumentException("amount must be greater then zero");
         }
+        amountSet = true;
     }
 
     @Override
     void resetScroll() {
     }
 
+    boolean shouldContinue(Component[] cmps) {
+        if(amountSet) {
+            return cmps.length == amount;
+        } else {
+            return cmps != null && cmps.length > 0;
+        }
+    }
     
     @Override
     protected void initComponent() {
@@ -74,78 +92,122 @@ public abstract class InfiniteContainer extends Container {
         addPullToRefresh(new Runnable() {
 
             public void run() {
-
-                Display.getInstance().invokeAndBlock(new Runnable() {
-
-                    public void run() {
-                        requestingResults = true;
-                        Component[] components = fetchComponents(0, amount);
-                        if (components == null) {
-                            components = new Component[0];
-                        }
-                        final Component[] cmps = components;
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            public void run() {
-                                removeAll();
-                                InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, cmps.length == amount);
-                                requestingResults = false;
-                            }
-                        });
-                    }
-                });
-
+                refresh();
             }
         });
     }
 
+    /**
+     * This refreshes the UI in a similar way to the "pull to refresh" functionality
+     */
+    public void refresh() {
+        if(isAsync()) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    refreshImpl();
+                }
+            });        
+            return;
+        }
+        refreshImpl();
+    }
+    
+    void refreshImpl() {
+        requestingResults = true;
+        Component[] components = fetchComponents(0, amount);
+        if (components == null) {
+            components = new Component[0];
+        }
+        final Component[] cmps = components;
+        if(!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+
+                public void run() {
+                    removeAll();
+                    InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
+                    requestingResults = false;
+                }
+            });
+        } else {
+            removeAll();
+            InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
+            requestingResults = false;
+        }
+    }
+
+    void fetchMore() {
+        if (requestingResults) {
+            return;
+        }
+        requestingResults = true;
+        Component[] components = fetchComponents(getComponentCount() - 1, amount);
+        if (components == null) {
+            components = new Component[0];
+        }
+        final Component[] cmps = components;
+        if(!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
+                    requestingResults = false;
+                }
+            });
+        } else {
+            InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
+            requestingResults = false;
+        }
+    }
+    
     private void createInfiniteScroll() {
-        InfiniteScrollAdapter.createInfiniteScroll(this, new Runnable() {
+        adapter = InfiniteScrollAdapter.createInfiniteScroll(this, new Runnable() {
 
             public void run() {
-                Display.getInstance().scheduleBackgroundTask(new Runnable() {
-
-                    public void run() {
-                        if (requestingResults) {
-                            return;
+                if(isAsync()) {
+                    Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                        public void run() {
+                            fetchMore();
                         }
-                        requestingResults = true;
-                        Component[] components = fetchComponents(getComponentCount() - 1, amount);
-                        if (components == null) {
-                            components = new Component[0];
-                        }
-                        final Component[] cmps = components;
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            public void run() {
-                                InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, cmps.length == amount);
-                                requestingResults = false;
-                            }
-                        });
-
-                    }
-                });
-
+                    });
+                } else {
+                    fetchMore();
+                }
             }
         });
 
     }
 
     /**
-     * This is an abstract method that should be implemented by the sub classes
-     * to fetch the data.
-     * This method is invoked on a background thread, sub classes should 
-     * preform their networking/data fetching here.
+     * Indicates whether {@link #fetchComponents(int, int)} should be invoked asynchronously off the EDT
+     * @return this is set to true for compatibility with older versions of the infinite container
+     */
+    protected boolean isAsync() {
+        return false;
+    }
+    
+    /**
+     * <p>This is an abstract method that should be implemented by the sub classes
+     * to fetch the data.</p>
+     * <p><b>When {@link #isAsync()} is overriden to return true this method is invoked on a background thread</b>.
+     * Notice that in this case the method might cause EDT violations warnings, since the 
+     * subclasses will need to create the Components off the EDT. While these are EDT violations they
+     * probably won't cause problems for more code.</p>
+     * <p>Sub classes should preform their networking/data fetching here.</p>
      * 
-     * Notice - this method might cause EDT violations warnings, since the 
-     * subclasses will need to create the Components not on the EDT, 
-     * these warnings are legit and can be ignored.
      * 
      * @param index the index from which to bring data
      * @param amount the size of components to bring
      * 
      * @return Components array of the returned data, size of the array can be the 
-     * size of the amount or smaller, if no data to fetch method can return null.
+     * size of the amount or smaller, if there is no more data to fetch the method should return null.
      */ 
     public abstract Component[] fetchComponents(int index, int amount);
+
+
+    /**
+     * Lets us manipulate the infinite progress object e.g. set the animation image etc.
+     * @return the infinite progress component underlying this container
+     */
+    public InfiniteProgress getInfiniteProgress() {
+        return adapter.getInfiniteProgress();
+    }
 }

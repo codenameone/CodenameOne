@@ -136,6 +136,7 @@ public final class System {
     public static void gc() {
         if(startedGc) {
             forceGc = true;
+            gcShouldLoop = true;
         }
         startGCThread();
         synchronized(LOCK) {

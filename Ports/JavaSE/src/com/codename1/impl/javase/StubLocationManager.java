@@ -22,11 +22,13 @@
  */
 package com.codename1.impl.javase;
 
+import static com.codename1.impl.javase.JavaSEPort.locSimulation;
 import com.codename1.location.Location;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
 import com.codename1.ui.Display;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Level;
@@ -42,7 +44,7 @@ class StubLocationManager extends LocationManager {
     private Timer timer;
     private TimerTask task;
     private Location loc = new Location();
-
+    private boolean checked;
     private static StubLocationManager instance = new StubLocationManager();
 
     private StubLocationManager() {
@@ -52,17 +54,45 @@ class StubLocationManager extends LocationManager {
         double lon = p.getDouble("lastGoodLon", -74.005973);
         loc.setLongitude(lon);
         loc.setLatitude(lat);
+        loc.setAccuracy(p.getFloat("accuracy", 55));
+        loc.setAltitude(p.getDouble("Altitude",1000));
+        loc.setDirection(p.getFloat("direction", 0));
+        loc.setVelocity(p.getFloat("velocity",50));
+        loc.setStatus(p.getInt("state", AVAILABLE));
+        if(locSimulation==null) {
+                locSimulation = new LocationSimulation();
+        }
+        JavaSEPort.locSimulation.setMeasUnit(p.getInt("unit", LocationSimulation.E_MeasUnit_Metric));
+        JavaSEPort.locSimulation.setLocation(loc);
     }
 
+    private void checkLocationRegistration() {
+        if(!checked) {
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.locationUsageDescription")) {
+                    Display.getInstance().setProjectBuildHint("ios.locationUsageDescription", "Some functionality of the application depends on your location");
+                }
+            }
+            checked = true;
+        }
+    }
+    
     public static LocationManager getLocationManager() {
         return instance;
     }
 
     @Override
     public Location getCurrentLocation() throws IOException {
+        checkLocationRegistration();
         if (JavaSEPort.locSimulation != null) {
             loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
             loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
+            loc.setAccuracy(JavaSEPort.locSimulation.getAccuracy());
+            loc.setAltitude(JavaSEPort.locSimulation.getAltitude());
+            loc.setDirection(JavaSEPort.locSimulation.getDirection());
+            loc.setVelocity(JavaSEPort.locSimulation.getVelocity());
+            loc.setStatus(JavaSEPort.locSimulation.getState());
         }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
@@ -70,9 +100,15 @@ class StubLocationManager extends LocationManager {
 
     @Override
     public Location getLastKnownLocation() {
+        checkLocationRegistration();
         if (JavaSEPort.locSimulation != null) {
             loc.setLatitude(JavaSEPort.locSimulation.getLatitude());
             loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
+            loc.setAccuracy(JavaSEPort.locSimulation.getAccuracy());
+            loc.setAltitude(JavaSEPort.locSimulation.getAltitude());
+            loc.setDirection(JavaSEPort.locSimulation.getDirection());
+            loc.setVelocity(JavaSEPort.locSimulation.getVelocity());
+            loc.setStatus(JavaSEPort.locSimulation.getState());
         }
         loc.setTimeStamp(System.currentTimeMillis());
         return loc;
@@ -80,6 +116,7 @@ class StubLocationManager extends LocationManager {
 
     @Override
     protected void bindListener() {
+        checkLocationRegistration();
         setStatus(AVAILABLE);
         final LocationListener l = getLocationListener();
         task = new TimerTask() {

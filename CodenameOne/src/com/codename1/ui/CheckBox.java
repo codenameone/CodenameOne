@@ -32,9 +32,13 @@ import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * Checkbox is a button that can be selected or deselected, and which displays
- * its state to the user.
+ *<p>CheckBox is a button that can be selected or deselected and displays
+ * its state to the user. Check out {@link com.codename1.ui.RadioButton} for
+ * a more exclusive selection approach. Both components support a toggle button
+ * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.</p>
  * 
+ * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
  * @author Chen Fishbein
  */
 public class CheckBox extends Button {
@@ -109,7 +113,11 @@ public class CheckBox extends Button {
         super.released(x, y);
     }
 
-    void fireActionEvent(int x, int y) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void fireActionEvent(int x, int y) {
         super.fireActionEvent(x, y);
         if(bindListeners != null) {
             if(isSelected()) {
@@ -265,4 +273,47 @@ public class CheckBox extends Button {
         }
         super.setBoundPropertyValue(prop, value);
     }
+    
+    /**
+     * Shorthand for creating the check box setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param text the text for the button
+     * @param icon the icon for the button
+     * @return a check box
+     */
+    public static CheckBox createToggle(String text, Image icon) {
+        CheckBox cb = new CheckBox(text, icon);
+        cb.setToggle(true);
+        return cb;
+    }
+    
+    
+    /**
+     * Shorthand for creating the check box setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param text the text for the button
+     * @return a check box
+     */
+    public static CheckBox createToggle(String text) {
+        CheckBox cb = new CheckBox(text, null);
+        cb.setToggle(true);
+        return cb;
+    }
+    
+    
+    /**
+     * Shorthand for creating the check box setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param icon the icon for the button
+     * @return a check box
+     */
+    public static CheckBox createToggle(Image icon) {
+        CheckBox cb = new CheckBox("", icon);
+        cb.setToggle(true);
+        return cb;
+    }
+    
 }

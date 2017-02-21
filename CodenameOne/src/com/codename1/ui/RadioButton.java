@@ -32,15 +32,20 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * RadioButton is a {@link Button} that maintains a selection state exclusively
- * within a specific {@link ButtonGroup}
+ * <p>RadioButton is a {@link Button} that maintains a selection state exclusively
+ * within a specific {@link ButtonGroup}. Check out {@link com.codename1.ui.CheckBox} for
+ * a looser selection approach. Both components support a toggle button
+ * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.</p>
  * 
+ * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
  * @author Chen Fishbein
  */
 public class RadioButton extends Button {
 
+    private boolean unselectAllowed; 
     
-    private boolean selected= false;
+    private boolean selected;
     
     /**
      * The group in which this button is a part
@@ -49,7 +54,7 @@ public class RadioButton extends Button {
 
     private boolean oppositeSide;
 
-    private EventDispatcher bindListeners = null;
+    private EventDispatcher bindListeners;
 
     /**
      * Constructs a radio with the given text
@@ -74,6 +79,30 @@ public class RadioButton extends Button {
         bg.add(rb);
         rb.setToggle(true);
         return rb;
+    }
+
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param text the text for the button
+     * @param bg the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(String text, ButtonGroup bg) {
+        return createToggle(text, null, bg);
+    }
+    
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into 
+     * a toggle button
+     * 
+     * @param icon the icon for the button
+     * @param bg the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(Image icon, ButtonGroup bg) {
+        return createToggle(null, icon, bg);
     }
     
     /**
@@ -130,7 +159,11 @@ public class RadioButton extends Button {
 
     }
     
-    void fireActionEvent(int x, int y) {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void fireActionEvent(int x, int y) {
         super.fireActionEvent(x, y);
         if(bindListeners != null) {
             if(isSelected()) {
@@ -190,13 +223,31 @@ public class RadioButton extends Button {
         }
     }
     
+
+    /**
+     * Returns true if this RadioButton can be unselected
+     * @return true to allow deselection of radio buttons
+     */
+    public boolean isUnselectAllowed() {
+        return unselectAllowed;
+    }
+
+    /**
+     * Allows unselecting a selected RadioButton.
+     * This is useful for when implementing a ButtonGroup that allows no selection or a single selection., 
+     * @param unselectAllowed true to allow deselection of a radio button, false for the default behavior
+     */
+    public void setUnselectAllowed(boolean unselectAllowed) {
+        this.unselectAllowed = unselectAllowed;
+    }
+    
     /**
      * {@inheritDoc}
      */
     public void released(int x, int y) {
-        // prevent the radio button from being "turned off"
-        if(!isSelected()) {
-            setSelected(true);
+        // prevent the radio button from being "turned off" unless unselectAllowed
+        if(!isSelected() || unselectAllowed) { 
+            setSelected(!isSelected()); 
         }
         super.released(x, y);
     }

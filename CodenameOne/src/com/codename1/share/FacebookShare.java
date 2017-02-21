@@ -52,7 +52,17 @@ public class FacebookShare extends ShareService {
      * Default Constructor
      */
     public FacebookShare() {
-        super("Facebook", Resources.getSystemResource().getImage("facebook.png"));
+        super("Facebook", null);
+    }
+
+    @Override
+    public Image getIcon() {
+        Image i = super.getIcon();
+        if(i == null) {
+            i = Resources.getSystemResource().getImage("facebook.png");
+            setIcon(i);
+        }
+        return i;
     }
 
     /**

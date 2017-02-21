@@ -648,7 +648,7 @@ public class UIBuilder { //implements Externalizable {
         }
         if(listener instanceof DataChangedListener) {
             if(cmp instanceof TextField) {
-                ((TextField)cmp).addDataChangeListener((DataChangedListener)listener);
+                ((TextField)cmp).addDataChangedListener((DataChangedListener)listener);
                 return;
             }
             ((Slider)cmp).addDataChangedListener((DataChangedListener)listener);
@@ -1427,7 +1427,7 @@ public class UIBuilder { //implements Externalizable {
                         items[iter] = in.readUTF();
                     }
                     if(!setListModel(((List)cmp))) {
-                        ((List)cmp).setModel(new DefaultListModel(items));
+                        ((List)cmp).setModel(new DefaultListModel((Object[])items));
                     }
                     break;
 
@@ -2157,10 +2157,14 @@ public class UIBuilder { //implements Externalizable {
      * @param backCommand the back command 
      */
     protected void setBackCommand(Form f, Command backCommand) {
-        if(shouldAddBackCommandToMenu()) {
-            f.addCommand(backCommand, f.getCommandCount());
+        if(f.getToolbar() != null) {
+            f.getToolbar().setBackCommand(backCommand);
+        } else {
+            if(shouldAddBackCommandToMenu()) {
+                f.addCommand(backCommand, f.getCommandCount());
+            }
+            f.setBackCommand(backCommand);
         }
-        f.setBackCommand(backCommand);
     }
     
     private void initBackForm(Form f) {
@@ -2671,7 +2675,7 @@ public class UIBuilder { //implements Externalizable {
     }
 
     /**
-     * Returns either the parent form or the component bellow the embedded container
+     * Returns either the parent form or the component below the embedded container
      * above c.
      * 
      * @param c the component whose root ancestor we should find

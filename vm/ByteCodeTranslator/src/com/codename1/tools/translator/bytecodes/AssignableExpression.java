@@ -35,5 +35,5 @@ public interface AssignableExpression {
      * @param sb
      * @return 
      */
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb);
+    public boolean assignTo(String varName, StringBuilder sb);
 }

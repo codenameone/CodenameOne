@@ -36,30 +36,7 @@ import com.codename1.ui.List;
  * the DefaultListCellRenderer or GenericListCellRenderer whenever possible
  * to avoid mistakes.<br>
  * <p>An instance of a renderer can be developed as such:
- * <pre>
-<strong>public</strong> <strong>class</strong> <font color="#2040a0">MyYesNoRenderer</font> <strong>extends</strong> <font color="#2040a0">Label</font> <strong>implements</strong> <font color="#2040a0">ListCellRenderer</font> <font color="4444FF"><strong>{</strong></font>
-        <font color="#2040a0">Label label = new label</font><strong>(&quot;&quot;);</strong>
-    <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListCellRendererComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font>, <font color="#2040a0">Object</font> <font color="#2040a0">value</font>, <strong>int</strong> <font color="#2040a0">index</font>, <strong>boolean</strong> <font color="#2040a0">isSelected</font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
-        <strong>if</strong><font color="4444FF"><strong>(</strong></font> <font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">Boolean</font><font color="4444FF"><strong>)</strong></font><font color="#2040a0">value</font><font color="4444FF"><strong>)</strong></font>.<font color="#2040a0">booleanValue</font><font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
-            <font color="#2040a0">setText</font><font color="4444FF"><strong>(</strong></font><font color="#008000">&quot;Yes&quot;</font><font color="4444FF"><strong>)</strong></font><font color="4444FF">;</font>
-        <font color="4444FF"><strong>}</strong></font> <strong>else</strong> <font color="4444FF"><strong>{</strong></font>
-            <font color="#2040a0">setText</font><font color="4444FF"><strong>(</strong></font><font color="#008000">&quot;No&quot;</font><font color="4444FF"><strong>)</strong></font><font color="4444FF">;</font>
-        <font color="4444FF"><strong>}</strong></font>
-        <strong>return</strong> <strong>this</strong><font color="4444FF">;</font>
-    <font color="4444FF"><strong>}</strong></font>
-    <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListFocusComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
-        <font color="#2040a0">label.getStyle().setBgTransparency(</font><font color="#008000">100</font>);
-     </strong>
-        <strong>return</strong> <font color="#2040a0">label</font><font color="4444FF">;</font>
-    <font color="4444FF"><strong>}</strong></font>
-<font color="4444FF"><strong>}</strong></font>
- * </pre>
- * 
- * <p>It is recommended that the component whose values are manipulated would not 
- * support features such as repaint(). This is accomplished by overriding repaint
- * in the subclass with an empty implementation. This is advised for performance
- * reasons, otherwise every change made to the component might trigger a repaint that 
- * wouldn't do anything but still cost in terms of processing.
+ * <script src="https://gist.github.com/codenameone/003d20de84f1a962b811.js"></script></pre>
  * 
  * @author Chen Fishbein
  */
@@ -81,7 +58,7 @@ public interface ListCellRenderer<T> {
     /**
      * Returns a component instance that is painted under the currently focused renderer
      * and is animated to provide smooth scrolling. 
-     * When the selection moves, this component is drawn above/bellow the list items - 
+     * When the selection moves, this component is drawn above/below the list items - 
      * it is recommended to give this component some level of transparency (see above code example). 
      * This method is optional an implementation 
      * can choose to return null.

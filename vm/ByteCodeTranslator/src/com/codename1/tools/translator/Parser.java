@@ -23,12 +23,7 @@
 
 package com.codename1.tools.translator;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import org.objectweb.asm.AnnotationVisitor;
@@ -372,6 +367,10 @@ public class Parser extends ClassVisitor {
     
     public static void writeOutput(File outputDirectory) throws Exception {
         System.out.println("outputDirectory is: " + outputDirectory.getAbsolutePath() );
+        if(ByteCodeClass.getMainClass()==null){
+			System.out.println("Error main class is not defined. The main class name is expected to have a public static void main(String[]) method and it is assumed to reside in the com.package.name directory");
+			System.exit(1);
+		}
         String file = "Unknown File";
         try {
             for(ByteCodeClass bc : classes) {
@@ -383,10 +382,26 @@ public class Parser extends ClassVisitor {
                 bc.setBaseClassObject(getClassByName(bc.getBaseClass()));
                 List<ByteCodeClass> lst = new ArrayList<ByteCodeClass>();
                 for(String s : bc.getBaseInterfaces()) {
-                    lst.add(getClassByName(s));
+					ByteCodeClass bcode=getClassByName(s);
+					if(bcode==null){
+					  System.out.println("Error while working with the class: " + s+" file:"+file+" no class definition");
+					} else {
+						lst.add(getClassByName(s));
+					}
                 }
                 bc.setBaseInterfacesObject(lst);
             }
+            boolean foundNewUnitTests = true;
+            while (foundNewUnitTests) {
+                foundNewUnitTests = false;
+                for (ByteCodeClass bc : classes) {
+                    if (!bc.isUnitTest() && bc.getBaseClassObject() != null && bc.getBaseClassObject().isUnitTest()) {
+                        bc.setIsUnitTest(true);
+                        foundNewUnitTests = true;
+                    }
+                }
+            }
+            
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
@@ -401,10 +416,16 @@ public class Parser extends ClassVisitor {
             eliminateUnusedMethods();
 
             generateClassAndMethodIndexHeader(outputDirectory);
+
+            boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
+            ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
+
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
-                writeFile(bc.getClsName(), bc, outputDirectory);
+                writeFile(bc, outputDirectory, cos);
             }
+            if (cos != null) cos.realClose();
+
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
@@ -577,21 +598,24 @@ public class Parser extends ClassVisitor {
         
         return false;
     }
-    
-    private static void writeFile(String clsName, ByteCodeClass cls, File outputDir) throws Exception {
-        String fileName = clsName + "." + ByteCodeTranslator.output.extension();
-        
-        FileOutputStream outMain = new FileOutputStream(new File(outputDir, fileName));
-        
-        // we also need to write the header file for iOS
+
+    private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputStream writeBufferInstead) throws Exception {
+        OutputStream outMain =
+                writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS ?
+                        writeBufferInstead :
+                        new FileOutputStream(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()));
+
+        if (outMain instanceof ConcatenatingFileOutputStream) {
+            ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
+        }
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
             outMain.write(cls.generateCCode(classes).getBytes());
             outMain.close();
-            String headerName = clsName + ".h";
 
+            // we also need to write the header file for iOS
+            String headerName = cls.getClsName() + ".h";
             FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName));
             outHeader.write(cls.generateCHeader().getBytes());
-
             outHeader.close();
         } else {
             outMain.write(cls.generateCSharpCode().getBytes());
@@ -669,6 +693,12 @@ public class Parser extends ClassVisitor {
         }
         if((access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL) {
             cls.setFinalClass(true);
+        }
+        if ("com/codename1/testing/UnitTest".equals(superName) || "com/codename1/testing/AbstractTest".equals(superName)) {
+            cls.setIsUnitTest(true);
+        }
+        if ((access & Opcodes.ACC_ENUM) == Opcodes.ACC_ENUM) {
+            cls.setIsEnum(true);
         }
         super.visit(version, access, name, signature, superName, interfaces); 
     }    

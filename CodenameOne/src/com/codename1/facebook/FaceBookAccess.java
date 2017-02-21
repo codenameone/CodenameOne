@@ -59,7 +59,7 @@ import java.util.Vector;
 public class FaceBookAccess {
 
     private static String clientId = "132970916828080";
-    private static String redirectURI = "http://www.codenameone.com/";
+    private static String redirectURI = "https://www.codenameone.com/";
     private static String clientSecret = "6aaf4c8ea791f08ea15735eb647becfe";
     private static String[] permissions = new String[]{"public_profile", "email", "user_friends"};
     private static FaceBookAccess instance = new FaceBookAccess();
@@ -859,7 +859,7 @@ public class FaceBookAccess {
                 h[iter].put("fetching", Boolean.TRUE);
             }
         }
-        DefaultListModel dl = new DefaultListModel(h) {
+        DefaultListModel dl = new DefaultListModel((Object[])h) {
             public Object getItem(int offset) {
                 Hashtable hash = (Hashtable)super.getItemAt(offset);
                 if(!hash.containsKey("fetching")) {

@@ -8,5 +8,28 @@
             The Localization API allows developers to adapt their applications to different geographic locales and
             conventions. 
         </p>
+        <h3>Portable Localization</h3>
+        <p>
+            Most of the classes within this package are clones of Java SE classes such as {@link com.codename1.l10n.SimpleDateFormat}
+            vs. {@link java.text.SimpleDateFormat}. The main motivation of placing these classes here and using the
+            cloned version is portability. 
+        </p>
+        <p>
+            If we would use {@link java.text.SimpleDateFormat} its behavior would be slightly different on Android 
+            or in the simulator vs. its behavior on iOS. That is because the implementation would be radically different.
+            When you use {@link com.codename1.l10n.SimpleDateFormat} the implementation might be missing
+            some pieces but it would be more consistent with the implementation you would get on the device which
+            is always preferable.
+        </p>
+        <h3>L10NManager</h3>
+        <p>
+            The localization manager allows adapting values for display in different locales thru parsing and formatting
+            capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency 
+            related API's similar to Locale/currency API's from JavaSE.<br>
+            The sample code below just lists the various capabilities of the API:
+        </p>
+        <script src="https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js"></script>
+        <img src="https://www.codenameone.com/img/developer-guide/l10n-manager.png" alt="Localization formatting/parsing and information" />
+
     </body>
 </html>

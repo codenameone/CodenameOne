@@ -30,7 +30,7 @@ import com.codename1.util.regex.RE;
  * @author Shai Almog
  */
 public class RegexConstraint implements Constraint {
-    private static final String validEmailRegex = "^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$";
+    private static final String validEmailRegex = "^([a-zA-Z0-9.!#$%&'*+/=?^`{|}~]|-|_)+@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$";
     private static final String validURLRegex = "^(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;]*[-a-zA-Z0-9+&@#/%=~_|]";
     private RE regex;
     private String errorMessage;

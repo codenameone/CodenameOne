@@ -101,13 +101,16 @@ public abstract class PushNotificationService extends Service implements PushCal
             NotificationManager nm = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
             Intent newIntent = new Intent(this, getStubClass());
             PendingIntent contentIntent = PendingIntent.getActivity(this, 0, newIntent, PendingIntent.FLAG_CANCEL_CURRENT);
-            Notification notif = new Notification();
-            notif.icon = android.R.drawable.stat_notify_sync;
-            notif.tickerText = value;
-            notif.flags |= Notification.FLAG_AUTO_CANCEL;
-            notif.when = System.currentTimeMillis();
-            notif.defaults = Notification.DEFAULT_ALL;
-            notif.setLatestEventInfo(this, value, "", contentIntent);
+            
+            Notification.Builder builder = new Notification.Builder(this)
+                    .setContentIntent(contentIntent)
+                    .setSmallIcon(android.R.drawable.stat_notify_sync)
+                    .setTicker(value)
+                    .setAutoCancel(true)
+                    .setWhen(System.currentTimeMillis())
+                    .setContentTitle(value)
+                    .setDefaults(Notification.DEFAULT_ALL);
+            Notification notif = builder.build();
             nm.notify((int)System.currentTimeMillis(), notif);
         }
     }

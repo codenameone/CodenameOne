@@ -116,7 +116,7 @@ public class CacheMap {
                 Object currentKey = e.nextElement();
                 Object[] currentValue = (Object[])memoryCache.get(currentKey);
                 long currentAge = ((Long)currentValue[0]).longValue();
-                if(currentAge <= oldest) {
+                if(currentAge <= oldest || oldestValue == null) {
                     oldest = currentAge;
                     oldestKey = currentKey;
                     oldestValue = currentValue;

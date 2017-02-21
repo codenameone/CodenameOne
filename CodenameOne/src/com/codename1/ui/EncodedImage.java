@@ -32,9 +32,45 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * An image that only keeps the binary data of the source file used to load it
- * in permanent memory. This allows the bitmap to get collected while the binary
- * data remains, a weak reference is used for caching.
+ * <p>{@code EncodedImage} is the workhorse of Codename One. Images returned from resource files are 
+ * {@code EncodedImage} and many API's expect it.</p>
+ * 
+ * <p>{@code EncodedImage} is effectively a an image that is "hidden" and extracted as needed to remove the 
+ * memory overhead associated with loaded image. When creating an {@code EncodedImage} only the PNG 
+ * (or JPEG etc.) is loaded to an array in RAM. Normally such images are very small (relatively) so they can be 
+ * kept in memory without much overhead.</p>
+ * 
+ * <p>When image information is needed (pixels) the image is decoded into RAM and kept in a weak/sort 
+ * reference (see {@link com.codename1.ui.Display#createSoftWeakRef(java.lang.Object)}). This allows the 
+ * image to be cached for performance and allows the garbage collector to reclaim it when the memory becomes 
+ * scarce.</p>
+ * 
+ * <p>Since the fully decoded image can be pretty big ({@code width X height X 4}) the ability to store just the 
+ * encoded image can be pretty stark. E.g. A standard 50x100 image will take up 20,000 bytes of RAM for a 
+ * standard image but an {@code EncodedImage} can reduce that to 1kb-2kb of RAM.</p>
+ * 
+ * <p>When drawing an {@code EncodedImage} it checks the weak reference cache and if the image is cached then 
+ * it is shown  otherwise the image is loaded the encoded image cache it then drawn.</p>
+ * 
+ * <p>{@code EncodedImage} is not final and can be derived to produce complex image fetching strategies 
+ * e.g. the {@link com.codename1.ui.URLImage} class that can dynamically download its content from the web.</p>
+ * 
+ * <p>{@code EncodedImage} can be instantiated via the create methods in the class. Pretty much any image 
+ * can be converted into an `EncodedImage` via the  {@link #createFromImage(com.codename1.ui.Image, boolean)} 
+ * method.</p>
+ * 
+ * <h3>EncodedImage Locking</h3>
+ * <p>Naturally loading the image is more expensive so we want the images that are on the current form to remain in 
+ * cache (otherwise GC will thrash a lot). That's where {@link #lock()} kicks in, when {@link #lock()} is active we 
+ * keep a hard reference to the actual native image so it won't get GC'd. This significantly improves performance!</p>
+ * 
+ * <p>Internally this is invoked automatically for background images, icons etc. which results in a huge performance 
+ * boost. This makes sense since these images are currently showing and they will be in RAM anyway. However, 
+ * if you use a complex renderer or custom drawing UI you should {@link #lock()} your images where possible!</p>
+ * 
+ * <p>To verify that locking might be a problem you can launch the performance monitor tool (accessible from 
+ * the simulator menu), if you get log messages that indicate that an unlocked image was drawn you might 
+ * have a problem.</p>
  *
  * @author Shai Almog
  */
@@ -48,7 +84,7 @@ public class EncodedImage extends Image {
     private boolean opaque = false;
     private Object cache;
     private Image hardCache;
-    private boolean locked;
+    private int locked;
     
     private EncodedImage(byte[][] imageData) {
         super(null);
@@ -302,7 +338,7 @@ public class EncodedImage extends Image {
             return hardCache;
         }
         Image i = getInternal();
-        if(locked) {
+        if(locked > 0) {
             hardCache = i;
         }
         return i;
@@ -344,15 +380,15 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public boolean isLocked() {
-        return locked;
+        return locked > 0;
     }
     
     /**
      * {@inheritDoc}
      */
     public void asyncLock(final Image internal) {
-        if(!locked) {
-            locked = true;
+        if(locked <= 0) {
+            locked = 1;
             if(cache != null) {
                 hardCache = (Image)Display.getInstance().extractHardRef(cache);
                 if(hardCache != null) {
@@ -372,7 +408,7 @@ public class EncodedImage extends Image {
                         impl.setImageName(i.getImage(), getImageName());
                         Display.getInstance().callSerially(new Runnable() {
                             public void run() {
-                                if(locked) {
+                                if(locked > 0) {
                                     hardCache = i;
                                 }
                                 cache = Display.getInstance().createSoftWeakRef(i);
@@ -393,11 +429,13 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public void lock() {
-        if(!locked) {
-            locked = true;
+        if(locked < 1) {
+            locked = 1;
             if(cache != null) {
                 hardCache = (Image)Display.getInstance().extractHardRef(cache);
             }
+        } else {
+            locked ++;
         }
     }
 
@@ -405,14 +443,15 @@ public class EncodedImage extends Image {
      * {@inheritDoc}
      */
     public void unlock() {
-        if(locked) {
+        locked--;
+        if(locked < 1) {
             if(hardCache != null) {
                 if(cache == null || Display.getInstance().extractHardRef(cache) == null) {
                     cache = Display.getInstance().createSoftWeakRef(hardCache);
                 }
                 hardCache = null;
             }
-            locked = false;
+            locked = 0;
         }
     }
 
@@ -552,15 +591,26 @@ public class EncodedImage extends Image {
     }
 
     /**
-     * Performs scaling using ImageIO to gnerate an encoded Image
-     * @param width the width of the image
-     * @param height the height of the image
+     * Performs scaling using ImageIO to generate an encoded Image
+     * @param width the width of the image, -1 to scale based on height and preserve aspect ratio
+     * @param height the height of the image, -1 to scale based on width and preserve aspect ratio
      * @return new encoded image
      */
     public EncodedImage scaledEncoded(int width, int height) {
         if(width == getWidth() && height == getHeight()) {
             return this;
         }
+        
+        if(width < 0) {
+            float ratio = ((float)height) / ((float)getHeight());
+            width = Math.max(1, (int)(getWidth() * ratio));
+        } else {
+            if(height < 0) {
+                float ratio = ((float)width) / ((float)getWidth());
+                height = Math.max(1, (int)(getHeight() * ratio));
+            }
+        }
+        
         try {
             ImageIO io = ImageIO.getImageIO();
             if(io != null) {

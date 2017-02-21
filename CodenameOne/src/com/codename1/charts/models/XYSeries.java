@@ -39,11 +39,11 @@ public class XYSeries{
   /** The minimum value for the X axis. */
   private double mMinX = MathHelper.NULL_VALUE;
   /** The maximum value for the X axis. */
-  private double mMaxX = -MathHelper.NULL_VALUE;
+  private double mMaxX = MathHelper.NULL_VALUE;
   /** The minimum value for the Y axis. */
   private double mMinY = MathHelper.NULL_VALUE;
   /** The maximum value for the Y axis. */
-  private double mMaxY = -MathHelper.NULL_VALUE;
+  private double mMaxY = MathHelper.NULL_VALUE;
   /** The scale number for this series. */
   private final int mScaleNumber;
   /** Contains the annotations. */
@@ -81,9 +81,9 @@ public class XYSeries{
    */
   private void initRange() {
     mMinX = MathHelper.NULL_VALUE;
-    mMaxX = -MathHelper.NULL_VALUE;
+    mMaxX = MathHelper.NULL_VALUE;
     mMinY = MathHelper.NULL_VALUE;
-    mMaxY = -MathHelper.NULL_VALUE;
+    mMaxY = MathHelper.NULL_VALUE;
     int length = getItemCount();
     for (int k = 0; k < length; k++) {
       double x = getX(k);
@@ -101,10 +101,10 @@ public class XYSeries{
    * @param y the new y value
    */
   private void updateRange(double x, double y) {
-    mMinX = Math.min(mMinX, x);
-    mMaxX = Math.max(mMaxX, x);
-    mMinY = Math.min(mMinY, y);
-    mMaxY = Math.max(mMaxY, y);
+    mMinX = mMinX == MathHelper.NULL_VALUE ? x : Math.min(mMinX, x);
+    mMaxX = mMaxX == MathHelper.NULL_VALUE ? x : Math.max(mMaxX, x);
+    mMinY = mMinY == MathHelper.NULL_VALUE ? y : Math.min(mMinY, y);
+    mMaxY = mMaxY == MathHelper.NULL_VALUE ? y : Math.max(mMaxY, y);
     
    
   }
@@ -257,6 +257,22 @@ public class XYSeries{
    */
   public void addAnnotation(String annotation, double x, double y) {
     mAnnotations.add(annotation);
+    while (mStringXY.get(x) != null) {
+      x += getPadding(x);
+    }
+    mStringXY.put(x, y);
+  }
+
+  /**
+   * Add an String at (x,y) coordinates
+   * 
+   * @param annotation String text
+   * @param index the index to add the annotation to
+   * @param x
+   * @param y
+   */
+  public void addAnnotation(String annotation, int index, double x, double y) {
+    mAnnotations.add(index, annotation);
     while (mStringXY.get(x) != null) {
       x += getPadding(x);
     }

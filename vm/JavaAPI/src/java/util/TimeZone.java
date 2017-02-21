@@ -91,13 +91,16 @@ public abstract class TimeZone{
 
                 @Override
                 public boolean useDaylightTime() {
-                    return true;
+                    Date now = new Date();
+                    return isTimezoneDST(tzone, now.getTime()) != isTimezoneDST(tzone, now.getTime() + 15724800000l); // 26 weeks
                 }
             };
             defaultTimeZone.ID = tzone;
         }
         return defaultTimeZone;
     }
+    
+    
 
     int getDSTSavings() {
         return useDaylightTime() ? 3600000 : 0;
@@ -128,9 +131,45 @@ public abstract class TimeZone{
     /**
      * Gets the TimeZone for the given ID.
      */
-    public static java.util.TimeZone getTimeZone(java.lang.String ID){
-        // TODO
-        return getDefault();
+    public static java.util.TimeZone getTimeZone(final java.lang.String ID){
+        if(ID != null && ID.equalsIgnoreCase("gmt")) {
+            return GMT;
+        } else if (ID.equalsIgnoreCase(getTimezoneId())) {
+            return getDefault();
+        } else {
+            TimeZone out = new TimeZone() {
+                @Override
+                public int getOffset(int era, int year, int month, int day, int dayOfWeek, int timeOfDayMillis) {
+                    return getTimezoneOffset(ID, year, month + 1, day, timeOfDayMillis);
+                }
+
+                @Override
+                public int getRawOffset() {
+                    return getTimezoneRawOffset(ID);
+                }
+
+                boolean inDaylightTime(Date time) {
+                    return isTimezoneDST(ID, time.getTime());
+                }
+
+                @Override
+                public boolean useDaylightTime() {
+                    Date now = new Date();
+                    return isTimezoneDST(ID, now.getTime()) != isTimezoneDST(ID, now.getTime() + 15724800000l); // 26 weeks
+                }
+                
+                public boolean equals(Object tz) {
+                    return (tz instanceof TimeZone && ID.equalsIgnoreCase(((TimeZone)tz).ID));
+                }
+
+                public int hashCode() {
+                    return ID.hashCode();
+                }
+                
+            };
+            out.ID = ID;
+            return out;
+        }
     }
 
     /**

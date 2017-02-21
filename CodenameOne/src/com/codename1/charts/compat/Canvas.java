@@ -36,6 +36,8 @@ import com.codename1.ui.geom.Shape;
 
 import com.codename1.charts.compat.GradientDrawable.Orientation;
 import com.codename1.charts.util.ColorUtil;
+import com.codename1.ui.geom.GeneralPath;
+import java.util.ArrayList;
 
 /**
  * An internal compatibility class for use by the Charts library.  Since the 
@@ -213,7 +215,6 @@ public class Canvas  {
 
     
     public void drawArc(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint) {
-        
         applyPaint(paint);
         Paint.Style style = paint.getStyle();
         if ( Paint.Style.FILL.equals(style)){
@@ -230,6 +231,9 @@ public class Canvas  {
         
     }
 
+    public void drawArcWithGradient(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint, GradientDrawable gradient) {
+        g.fillRadialGradient(gradient.colors[1], gradient.colors[0], (int)oval.getX(), (int)oval.getY(), (int)oval.getWidth(), (int)oval.getHeight(), -(int)Math.floor(currentAngle), -(int)Math.ceil(sweepAngle));
+    }
     
     public void drawPoint(Float get, Float get0, Paint paint) {
         throw new RuntimeException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
@@ -283,6 +287,10 @@ public class Canvas  {
         
         
         
+    }
+
+    public boolean isShapeClipSupported() {
+        return g.isShapeClipSupported();
     }
     
 }

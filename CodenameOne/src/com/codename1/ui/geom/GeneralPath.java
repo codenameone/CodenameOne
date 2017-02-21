@@ -26,13 +26,14 @@ package com.codename1.ui.geom;
 import com.codename1.io.Log;
 import com.codename1.ui.Transform;
 import com.codename1.util.MathUtil;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
- * A general geometric path, consisting of any number of subpaths constructed
+ * <p>A general geometric path, consisting of any number of subpaths constructed
  * out of straight lines and cubic or quadratic Bezier curves. The inside of the
  * curve is defined for drawing purposes by a winding rule. Either the
- * {@link #WIND_EVEN_ODD} or {@link #WIND_NON_ZERO} winding rule can be chosen.
+ * {@link #WIND_EVEN_ODD} or {@link #WIND_NON_ZERO} winding rule can be chosen.</p>
  *
  * <h4>A drawing of a GeneralPath</h4>
  *
@@ -54,10 +55,13 @@ import java.util.Arrays;
  * intersection 'down') Point C in the image is inside (two intersections in the
  * 'down' direction)</p>
  *
- * <!--(Note: This description and image were copied from <a
+ * <script src="https://gist.github.com/codenameone/3f2f8cdaabb7780eae6f.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/graphics-shape-fill.png" alt="Fill a shape general path" />
+ * 
+ * <p>Note: This description and image were copied from <a
  * href="http://developer.classpath.org/doc/java/awt/geom/GeneralPath.html">the
  * GNU classpath</a>
- * docs). License here http://www.gnu.org/licenses/licenses.html#FDL -->
+ * docs). License here http://www.gnu.org/licenses/licenses.html#FDL</p>
  *
  * @author shannah
  *
@@ -66,6 +70,152 @@ import java.util.Arrays;
  */
 public final class GeneralPath implements Shape {
 
+    private static int MAX_POOL_SIZE=20;
+    
+    private static ArrayList<GeneralPath> pathPool;
+    private static ArrayList<Rectangle> rectPool;
+    private static ArrayList<float[]> floatPool;
+    private static ArrayList<boolean[]> boolPool;
+    private static ArrayList<Iterator> iteratorPool;
+    
+    
+    private static ArrayList<GeneralPath> pathPool() {
+        if (pathPool == null) {
+            pathPool = new ArrayList<GeneralPath>();
+        }
+        return pathPool;
+    }
+    
+    private static ArrayList<Rectangle> rectPool() {
+        if (rectPool == null) {
+            rectPool = new ArrayList<Rectangle>();
+        }
+        return rectPool;
+    }
+    
+    private static ArrayList<float[]> floatPool() {
+        if (floatPool == null) {
+            floatPool = new ArrayList<float[]>();
+        }
+        return floatPool;
+    }
+    
+    private static ArrayList<boolean[]> boolPool() {
+        if (boolPool == null) {
+            boolPool = new ArrayList<boolean[]>();
+        }
+        return boolPool;
+    }
+    
+    private static ArrayList<Iterator> iteratorPool() {
+        if (iteratorPool == null) {
+            iteratorPool = new ArrayList<Iterator>();
+        }
+        return iteratorPool;
+    }
+    
+    private static synchronized GeneralPath createPathFromPool() {
+        if (!pathPool().isEmpty()) {
+            GeneralPath out = pathPool.remove(pathPool.size()-1);
+            out.reset();
+            return out;
+        }
+        return new GeneralPath();
+    }
+    
+    private static synchronized Rectangle createRectFromPool() {
+        if (!rectPool().isEmpty()) {
+            return rectPool.remove(rectPool.size()-1);
+        }
+        return new Rectangle();
+    }
+    
+    private static synchronized float[] createFloatArrayFromPool(int size) {
+        int len = floatPool().size();
+        for (int i=0; i<len; i++) {
+            float[] arr = floatPool.get(i);
+            if (arr.length == size) {
+                return floatPool.remove(i);
+            }
+        }
+        return new float[size];
+    }
+    
+    
+    private static synchronized boolean[] createBoolArrayFromPool(int size) {
+        int len = boolPool().size();
+        for (int i=0; i<len; i++) {
+            boolean[] arr = boolPool.get(i);
+            if (arr.length == size) {
+                return boolPool.remove(i);
+            }
+        }
+        return new boolean[size];
+    }
+    
+    private static synchronized Iterator createIteratorFromPool(GeneralPath p, Transform t) {
+        if (!iteratorPool().isEmpty()) {
+            Iterator it = iteratorPool.remove(iteratorPool.size()-1);
+            it.p = p;
+            it.transform = t;
+            it.reset();
+            return it;
+        }
+        return (Iterator)p.getPathIterator(t);
+        
+    }
+    
+    /**
+     * Returns a GeneralPath to the reusable object pool for GeneralPaths.
+     * @param p The path to recycle.
+     * 
+     * @see #createFromPool() 
+     */
+    public static synchronized void recycle(GeneralPath p) {
+        if (pathPool().size() >= MAX_POOL_SIZE || p == null) return;
+        pathPool.add(p);
+    }
+    
+    private static synchronized void recycle(Rectangle r) {
+        if (rectPool.size() >= MAX_POOL_SIZE || r == null) return;
+        rectPool.add(r);
+    }
+    
+    private static synchronized void recycle(float[] a) {
+        if (floatPool().size() >= MAX_POOL_SIZE || a == null) return;
+        floatPool.add(a);
+    }
+    
+    
+    private static synchronized void recycle(boolean[] b) {
+        if (boolPool().size() >= MAX_POOL_SIZE || b == null) {
+            return;
+        }
+        boolPool.add(b);
+    }
+    
+    private static synchronized void recycle(Iterator it) {
+        if (iteratorPool().size() >= MAX_POOL_SIZE || it == null) {
+            return;
+        }
+        iteratorPool.add(it);
+    }
+    
+    /**
+     * Creates a new GeneralPath from an object Pool.  This is useful
+     * if you need to create a temporary General path that you wish
+     * to dispose of after using.  
+     * 
+     * <p>You should return this object back to the pool when you are done
+     * using the {@link #recycle(com.codename1.ui.geom.GeneralPath) } method.
+     * @return 
+     */
+    public static GeneralPath createFromPool() {
+        return createPathFromPool();
+    }
+    
+    
+    
     private boolean dirty = false;
 
     // END Alpha Mask Caching Functionality
@@ -113,6 +263,8 @@ public final class GeneralPath implements Shape {
      * The path rule
      */
     private int rule;
+    
+    
 
     /**
      * The space amount in points buffer for different segmenet's types
@@ -155,6 +307,11 @@ public final class GeneralPath implements Shape {
             this.p = path;
 
         }
+        
+        private void reset() {
+            typeIndex = 0;
+            pointIndex = 0;
+        }
 
         public int getWindingRule() {
             return p.getWindingRule();
@@ -168,19 +325,40 @@ public final class GeneralPath implements Shape {
             typeIndex++;
         }
 
-        public int currentSegment(double[] coords) {
+        private void transformSegmentInPlace() {
             if (isDone()) {
                 // awt.4B=Iterator out of bounds
                 throw new IndexOutOfBoundsException("Path done"); //$NON-NLS-1$
             }
+            if (transform == null) {
+                return;
+            }
             int type = p.types[typeIndex];
             int count = GeneralPath.pointShift[type];
-            for (int i = 0; i < count; i++) {
-                coords[i] = p.points[pointIndex + i];
+            for (int i=0; i < count; i+=2) {
+                buf[0] = p.points[pointIndex + i];
+                buf[1] = p.points[pointIndex + i + 1];
+                transform.transformPoint(buf, buf);
+                p.points[pointIndex+i] = buf[0];
+                p.points[pointIndex+i+1] = buf[1];
             }
-
-            pointIndex += count;
-            return type;
+        }
+        
+        
+        public int currentSegment(double[] coords) {
+            float[] fcoords = createFloatArrayFromPool(6);
+            try {
+                int res = currentSegment(fcoords);
+                int type = p.types[typeIndex];
+                int count = GeneralPath.pointShift[type];
+            
+                for (int i=0; i< count; i ++) {
+                    coords[i] = fcoords[i];
+                }
+                return res;
+            } finally {
+                recycle(fcoords);
+            }
         }
 
         private float[] buf = new float[2];
@@ -192,16 +370,10 @@ public final class GeneralPath implements Shape {
             }
             int type = p.types[typeIndex];
             int count = GeneralPath.pointShift[type];
-            System.arraycopy(p.points, pointIndex, coords, 0, count);
-            if (transform != null) {
-
-                for (int i = 0; i < count; i += 2) {
-                    buf[0] = coords[i];
-                    buf[1] = coords[i + 1];
-                    transform.transformPoint(buf, buf);
-                    coords[i] = buf[0];
-                    coords[i + 1] = buf[1];
-                }
+            if (transform == null) {
+                System.arraycopy(p.points, pointIndex, coords, 0, count);
+            } else {
+                transform.transformPoints(2, p.points, pointIndex, coords, 0, count / 2);
             }
             pointIndex += count;
             return type;
@@ -246,6 +418,49 @@ public final class GeneralPath implements Shape {
     }
     
     /**
+     * Checks to see if this path forms a polygon.
+     * @return True if the path is a polygon.
+     */
+    public boolean isPolygon() {
+        
+        if (isRectangle()) {
+            return true;
+        }
+        Iterator it = createIteratorFromPool(this, null);
+        float[] curr = createFloatArrayFromPool(6);
+        float[] firstPoint = createFloatArrayFromPool(2);
+        try {
+            boolean firstMove = false;
+            int cmd = -1;
+            while (!it.isDone()) {
+                switch (cmd = it.currentSegment(curr)) {
+                    case PathIterator.SEG_MOVETO: {
+                        if (firstMove) {
+                            return false;
+                        }
+                        firstMove = true;
+                        firstPoint[0] = curr[0];
+                        firstPoint[1] = curr[1];
+                        break;
+                    }
+                    case PathIterator.SEG_CUBICTO:
+                    case PathIterator.SEG_QUADTO:
+                    return false;
+                }
+                it.next();
+            }
+            
+            return cmd == PathIterator.SEG_CLOSE || (curr[0] == firstPoint[0] && curr[1] == firstPoint[1]);
+            
+        } finally {
+            recycle(it);
+            recycle(curr);
+            recycle(firstPoint);
+        }
+        
+    }
+    
+    /**
      * Returns the number of path commands in this path.
      * @return The number of path commands in this path.
      */
@@ -285,36 +500,45 @@ public final class GeneralPath implements Shape {
      */
     public GeneralPath(Shape shape) {
         this(WIND_NON_ZERO, BUFFER_SIZE);
-        PathIterator p = shape.getPathIterator();
-        setWindingRule(p.getWindingRule());
-        append(p, false);
+        if (shape.getClass() == GeneralPath.class) {
+            setPath((GeneralPath)shape, null);
+        } else {
+            PathIterator p = shape.getPathIterator();
+            setWindingRule(p.getWindingRule());
+            append(p, false);
+        }
     }
     
     public String toString(){
         StringBuilder sb = new StringBuilder();
         sb.append("[General Path: ");
-        PathIterator it = getPathIterator();
-        float[] buf = new float[6];
-        while (!it.isDone() ){
-            int type = it.currentSegment(buf);
-            switch ( type ){
-                case PathIterator.SEG_MOVETO:
-                    sb.append("Move ("+buf[0]+","+buf[1]+"), ");
-                    break;
-                case PathIterator.SEG_LINETO:
-                    sb.append("Line ("+buf[0]+","+buf[1]+"), ");
-                    break;
-                case PathIterator.SEG_CUBICTO:
-                    sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+".."+buf[4]+","+buf[5]+")");
-                    break;
-                case PathIterator.SEG_QUADTO:
-                    sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+")");
-                    break;
-                case PathIterator.SEG_CLOSE:
-                    sb.append(" CLOSE]");
-                    break;
+        Iterator it = createIteratorFromPool(this, null);
+        float[] buf = createFloatArrayFromPool(6);//new float[6];
+        try {
+            while (!it.isDone() ){
+                int type = it.currentSegment(buf);
+                switch ( type ){
+                    case PathIterator.SEG_MOVETO:
+                        sb.append("Move ("+buf[0]+","+buf[1]+"), ");
+                        break;
+                    case PathIterator.SEG_LINETO:
+                        sb.append("Line ("+buf[0]+","+buf[1]+"), ");
+                        break;
+                    case PathIterator.SEG_CUBICTO:
+                        sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+".."+buf[4]+","+buf[5]+")");
+                        break;
+                    case PathIterator.SEG_QUADTO:
+                        sb.append("Curve ("+buf[0]+","+buf[1]+".."+buf[2]+","+buf[3]+")");
+                        break;
+                    case PathIterator.SEG_CLOSE:
+                        sb.append(" CLOSE]");
+                        break;
+                }
+                it.next();
             }
-            it.next();
+        } finally {
+            recycle(buf);
+            recycle(it);
         }
         return sb.toString();
     }
@@ -334,6 +558,41 @@ public final class GeneralPath implements Shape {
         }
         dirty = true;
         this.rule = rule;
+    }
+    
+    
+    public boolean equals(Shape shape, Transform t) {
+        if (t != null && !t.isIdentity()) {
+            GeneralPath p = createPathFromPool();
+            p.setShape(shape, t);
+            try {
+                return equals(p, (Transform)null);
+            } finally {
+                recycle(p);
+            }
+        }
+        if (shape == this) return true;
+        if (shape instanceof Rectangle) {
+            Rectangle r = (Rectangle)shape;
+            Rectangle tmpRect = createRectFromPool();
+            try {
+                getBounds(tmpRect);
+                return r.equals(tmpRect);
+            } finally {
+                recycle(tmpRect);
+            }
+        } else if (shape instanceof GeneralPath) {
+            GeneralPath tmpPath = (GeneralPath)shape;
+            return Arrays.equals(points, tmpPath.points) && Arrays.equals(types, tmpPath.types);
+        } else {
+            GeneralPath tmpPath2 = createPathFromPool();
+            try {
+                tmpPath2.setShape(shape, null);
+                return equals(tmpPath2, (Transform)null);
+            } finally {
+                recycle(tmpPath2);
+            }
+        }
     }
 
     /**
@@ -367,6 +626,7 @@ public final class GeneralPath implements Shape {
             points = tmp;
         }
     }
+    
 
     public void moveTo(double x, double y){
         moveTo((float)x, (float)y);
@@ -467,6 +727,7 @@ public final class GeneralPath implements Shape {
      * @param sweepAngle Sweep angle in radians. Counter-clockwise.
      */
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle) {
+        
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
     
@@ -481,10 +742,12 @@ public final class GeneralPath implements Shape {
      * @param joinPath If true, then this will join the arc to the existing path with a line.
      */
     public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle, boolean joinPath) {
-        float cx = x+w/2;
-        float cy = y+h/2;
-        createBezierArcRadians(cx, cy, w/2, h/2, -startAngle, -sweepAngle, 4, false, this, joinPath);
+        
+        Ellipse e = new Ellipse();
+        Ellipse.initWithBounds(e, x, y, w, h);
+        e.addToPath(this, -startAngle, -sweepAngle, joinPath);
     }
+    
     
     /**
      * Draws an elliptical arc on the path given the provided bounds.
@@ -498,6 +761,8 @@ public final class GeneralPath implements Shape {
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle) {
         arc(x, y, w, h, startAngle, sweepAngle, false);
     }
+    
+    
     /**
      * Draws an elliptical arc on the path given the provided bounds.
      * @param x Left x coord of bounding rect.
@@ -509,74 +774,276 @@ public final class GeneralPath implements Shape {
      * @param joinPath If true then this will join the arc to the existing path with a line.
      */
     public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle, boolean joinPath) {
-        double cx = x+w/2;
-        double cy = y+h/2;
-        createBezierArcRadians((float)cx, (float)cy, (float)w/2, (float)h/2, -startAngle, -sweepAngle, 4, false, this, joinPath);
+        arc((float)x, (float)y, (float)w, (float)h, (float)startAngle, (float)sweepAngle, joinPath);
     }
     
     
+//    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+//                                          double startX, double startY, double endX, double endY) {
+//        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY, false);
+//    }
     
-    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
-                                          double startX, double startY, double endX, double endY) {
-        if ( startX != endX || startY != endY ){
-            double ax = startX - cx;
-            double ay = startY - cy;
-            double bx = endX - cx;
-            double by = endY- cy;
+    
+    /**
+     * 
+     * @param path
+     * @param cx
+     * @param cy
+     * @param startX
+     * @param startY
+     * @param endX
+     * @param endY
+     * @param clockwise 
+     */
+//    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+//                                          double startX, double startY, double endX, double endY, boolean clockwise) {
+//        if ( startX != endX || startY != endY ){
+//            double ax = startX - cx;
+//            double ay = startY - cy;
+//            double bx = endX - cx;
+//            double by = endY- cy;
+//            
+//            final double r1s = ax * ax + ay * ay;
+//            final double r2s = bx * bx + by * by;
+//            double ellipseScaleY = 0;
+//            if (Math.abs(r1s - r2s) > 2) {
+//                // This is not a circle
+//                // Let's get the arc for the circle
+//                ellipseScaleY = Math.sqrt(((ax*ax) - (bx*bx)) / (by*by - ay*ay));
+//                startY = cy + ellipseScaleY * (startY-cy);
+//                endY = cy + ellipseScaleY * (endY-cy);
+//                
+//                ay = startY - cy;
+//                by = endY - cy;
+//            } else {
+//                double startAngle = MathUtil.atan2(ay, ax);
+//                double endAngle = MathUtil.atan2(by, bx);
+//                
+//                double dist = Math.abs(endAngle - startAngle);
+//                if (clockwise) {
+//                    if (startAngle > endAngle) {
+//                        dist = Math.PI*2-dist;
+//                    }
+//                } else {
+//                    if (startAngle < endAngle) {
+//                        dist = Math.PI*2-dist;
+//                    }
+//                }
+//                
+//                //System.out.println("dist: "+dist+" startAngle: "+startAngle+" endAngle: "+endAngle);
+//                if (dist > Math.PI/3) {
+//                    // We bisect
+//                    double r = Math.sqrt(r1s);
+//                    double bisectAngle = (startAngle + endAngle)/2;
+//                    if (clockwise) {
+//                        if (startAngle > endAngle) {
+//                            bisectAngle += Math.PI;
+//                        }
+//                    } else {
+//                        if (startAngle < endAngle) {
+//                            bisectAngle += Math.PI;
+//                        }
+//                    }
+//                    double bisectX = cx + r * Math.cos(bisectAngle);
+//                    double bisectY = cy + r * Math.sin(bisectAngle);
+//                    addBezierArcToPath(path, cx, cy, startX, startY, bisectX, bisectY, clockwise);
+//                    addBezierArcToPath(path, cx, cy, bisectX, bisectY, endX, endY, clockwise);
+//                    return;
+//                }
+//                
+//                
+//            }
+//            
+//            final double q1 = r1s;//ax * ax + ay * ay;
+//            final double q2 = q1 + ax * bx + ay * by;
+//            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
+//            final float x2 = (float)(cx + ax - k2 * ay);
+//            float y2 = (float)(cy + ay + k2 * ax);
+//            final float x3 = (float)(cx + bx + k2 * by);
+//             float y3 = (float)(cy + by - k2 * bx);
+//            if (ellipseScaleY != 0) {
+//                y2 = (float)(cy + (y2-cy)/ellipseScaleY);
+//                y3 = (float)(cy + (y3-cy)/ellipseScaleY);
+//                endY = (float)(cy + (endY-cy)/ellipseScaleY);
+//            }
+//            path.curveTo(x2, y2, x3, y3, endX, endY);
+//            
+//        } 
+//    }
+    
+    
+    static class Ellipse {
+        private double a;
+        private double b;
+        private double cx;
+        private double cy;
+        private EPoint _tmp1=new EPoint();
+        
+        static void initWithBounds(Ellipse e, double x, double y, double w, double h) {
+            e.cx = x+w/2;
+            e.cy = y+h/2;
+            e.a = w/2;
+            e.b = h/2;
+        }
+        
+        static void initWithPerimeterPoints(Ellipse e, double cx, double cy, double p1x, double p1y, double p2x, double p2y) {
+
+            /*
+            e.cx = cx;
+            e.cy = cy;
+            double x1 = p1x-cx;
+            double y1 = p1y-cy;
+            double x2 = p2x-cx;
+            double y2 = p2y-cy;
+            double x1s = x1*x1;
+            double x2s = x2*x2;
+            double y1s = y1*y1;
+            double y2s = y2*y2;
+            if (Math.abs(x1s-x2s) < 0.001 ||Math.abs(y1s-y2s) < 0.001) {
+                a = b = Math.max(Math.sqrt(Math.abs(y2)));
+            }
+            if (Math.abs(x1s-x2s) > 0.001) {
+                e.b = Math.sqrt((x1s*y2s-x2s-y1s)/(x1s-x2s));
+                double bs = e.b*e.b;
+                e.a = Math.sqrt(x1s*bs/(bs-y1s));
+            } else {
+                e.a = Math.sqrt((y1s*x2s-y2s-x1s)/(y1s-y2s));
+                double as = e.a*e.a;
+                e.b = Math.sqrt(y1s*as/(as-x1s));
+            }
+            */
             
-            final double r1s = ax * ax + ay * ay;
-            final double r2s = bx * bx + by * by;
-            double ellipseScaleY = 0;
-            if (Math.abs(r1s - r2s) > 1) {
-                // This is not a circle
-                // Let's get the arc for the circle
-                ellipseScaleY = Math.sqrt(((ax*ax) - (bx*bx)) / (by*by - ay*ay));
-                startY = cy + ellipseScaleY * (startY-cy);
-                endY = cy + ellipseScaleY * (endY-cy);
+        }
+        
+        @Override
+        public String toString() {
+            
+            return "Ellipse center=("+cx+","+cy+") a="+a+", b="+b+")";
+        }
+        
+        void getPointAtAngle(double theta, EPoint out) {
+            double tanTheta = Math.tan(theta);
+            double tanThetas = tanTheta*tanTheta;
+            double bs = b*b;
+            double as = a*a;
+            double x = a*b/Math.sqrt(bs+as*tanThetas);
+            if (Math.cos(theta)<0) {
+                x = -x;
+            }
+            double y = a*b/Math.sqrt(as+bs/tanThetas);
+            if (Math.sin(theta)<0) {
+                y = -y;
+            }
+            out.x = x + cx;
+            out.y = y + cy;
+        }
+        
+        double getAngleAtPoint(double px, double py) {
+            px -= cx;
+            py -= cy;
+            
+            return MathUtil.atan2(py, px);
+        }
+        
+        void addToPath(GeneralPath p, double startAngle, double sweepAngle, boolean join) {
+            getPointAtAngle(startAngle, _tmp1);
+            if (join) {
                 
-                ay = startY - cy;
-                by = endY - cy;
+                p.lineTo(_tmp1.x, _tmp1.y);
+            } else {
+                p.moveTo(_tmp1.x, _tmp1.y);
             }
-            
-            final double q1 = ax * ax + ay * ay;
-            final double q2 = q1 + ax * bx + ay * by;
-            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
-            final float x2 = (float)(cx + ax - k2 * ay);
-            float y2 = (float)(cy + ay + k2 * ax);
-            final float x3 = (float)(cx + bx + k2 * by);
-             float y3 = (float)(cy + by - k2 * bx);
-            if (ellipseScaleY != 0) {
-                y2 = (float)(cy + (y2-cy)/ellipseScaleY);
-                y3 = (float)(cy + (y3-cy)/ellipseScaleY);
-                endY = (float)(cy + (endY-cy)/ellipseScaleY);
+            _addToPath(p, startAngle, sweepAngle);
+        }
+        
+        private void _addToPath(GeneralPath p, double startAngle, double sweepAngle) {
+            //double _2pi = Math.PI*2;
+            double absSweepAngle = Math.abs(sweepAngle);
+            if (absSweepAngle < 0.0001) {
+                // Basically zero sweep angle so we won't draw anytything here.
+                // IOS seemed to choke when we tried to draw too small an arc
+                return;
             }
-            path.curveTo(x2, y2, x3, y3, endX, endY);
+            if (absSweepAngle > Math.PI/4) {
+                //double halfAngle = sweepAngle/2;
+                double diff = Math.PI/4;
+                if (sweepAngle < 0) {
+                    diff = -diff;
+                }
+                _addToPath(p, startAngle, diff);
+                _addToPath(p, startAngle+diff, sweepAngle-diff);
+            } else {
+                getPointAtAngle(startAngle+sweepAngle, _tmp1);
+                //System.out.println("Line to "+_tmp1.x+", "+_tmp1.y);
+                EPoint controlPoint = new EPoint();
+                calculateBezierControlPoint(startAngle, sweepAngle, controlPoint);
+                p.quadTo(controlPoint.x, controlPoint.y, _tmp1.x, _tmp1.y);
+                //p.lineTo(_tmp1.x, _tmp1.y);
+            }
+        }
+        
+        private void calculateBezierControlPoint(double startAngle, double sweepAngle, EPoint point) {
+            EPoint p1 = new EPoint();
             
-        } 
+            getPointAtAngle(startAngle, p1);
+            p1.x-= cx;
+            p1.y -= cy;
+            
+            EPoint p2 = new EPoint();
+            getPointAtAngle(startAngle+sweepAngle, p2);
+            p2.x -= cx;
+            p2.y -= cy;
+            
+            //System.out.println("p1: "+p1.x+", "+p1.y+", p2:"+p2.x+","+p2.y);
+            double x1s = p1.x*p1.x;
+            double y1s = p1.y*p1.y;
+            double x2s = p2.x*p2.x;
+            double y2s = p2.y*p2.y;
+            
+            double as = a*a;
+            double bs = b*b;
+            //point.x = (x2s*bs/(p2.y*as) + p2.y - x1s*bs/(p1.y*as) - p1.y) / (-p1.x*bs/(p1.y*as) + p2.x*bs/(p2.y*as));
+            //point.y = (-p1.x*bs/(p1.y*as))*point.x + x1s*bs/(p1.y*as) + p1.y;
+            
+            
+            point.x = -(p1.y*(-as*y2s-bs*x2s)+as*y1s*p2.y+bs*x1s*p2.y)/(bs*p2.x*p1.y-bs*p1.x*p2.y);
+            point.y = (p1.x*(-as*y2s-bs*x2s)+as*p2.x*y1s+bs*x1s*p2.x)/(as*p2.x*p1.y-as*p1.x*p2.y);
+            
+            point.x += cx;
+            point.y += cy;
+            //System.out.println("control: "+point.x+","+point.y);
+        }
+    
+        
+    }
+    
+    static class EPoint {
+        double x;
+        double y;
     }
     
     /**
-     * Adds a circular arc to the given path by approximating it through a cubic BÈzier curve, splitting it if
+     * Adds a circular arc to the given path by approximating it through a cubic Bezier curve, splitting it if
      * necessary. The precision of the approximation can be adjusted through {@code pointsOnCircle} and
      * {@code overlapPoints} parameters.
      * <p>
-     * <strong>Example:</strong> imagine an arc starting from 0∞ and sweeping 100∞ with a value of
-     * {@code pointsOnCircle} equal to 12 (threshold -> 360∞ / 12 = 30∞):
+     * <strong>Example:</strong> imagine an arc starting from 0? and sweeping 100? with a value of
+     * {@code pointsOnCircle} equal to 12 (threshold -> 360? / 12 = 30?):
      * <ul>
      * <li>if {@code overlapPoints} is {@code true}, it will be split as following:
      * <ul>
-     * <li>from 0∞ to 30∞ (sweep 30∞)</li>
-     * <li>from 30∞ to 60∞ (sweep 30∞)</li>
-     * <li>from 60∞ to 90∞ (sweep 30∞)</li>
-     * <li>from 90∞ to 100∞ (sweep 10∞)</li>
+     * <li>from 0? to 30? (sweep 30?)</li>
+     * <li>from 30? to 60? (sweep 30?)</li>
+     * <li>from 60? to 90? (sweep 30?)</li>
+     * <li>from 90? to 100? (sweep 10?)</li>
      * </ul>
      * </li>
      * <li>if {@code overlapPoints} is {@code false}, it will be split into 4 equal arcs:
      * <ul>
-     * <li>from 0∞ to 25∞ (sweep 25∞)</li>
-     * <li>from 25∞ to 50∞ (sweep 25∞)</li>
-     * <li>from 50∞ to 75∞ (sweep 25∞)</li>
-     * <li>from 75∞ to 100∞ (sweep 25∞)</li>
+     * <li>from 0? to 25? (sweep 25?)</li>
+     * <li>from 25? to 50? (sweep 25?)</li>
+     * <li>from 50? to 75? (sweep 25?)</li>
+     * <li>from 75? to 100? (sweep 25?)</li>
      * </ul>
      * </li>
      * </ul>
@@ -591,9 +1058,9 @@ public final class GeneralPath implements Shape {
      * @param radius            The radius of the circle.
      * @param startAngleRadians The starting angle on the circle (in radians).
      * @param sweepAngleRadians How long to make the total arc (in radians).
-     * @param pointsOnCircle    Defines a <i>threshold</i> (360∞ /{@code pointsOnCircle}) to split the BÈzier arc to
+     * @param pointsOnCircle    Defines a <i>threshold</i> (360? /{@code pointsOnCircle}) to split the Bezier arc to
      *                          better approximate a circular arc, depending also on the value of {@code overlapPoints}.
-     *                          The suggested number to have a reasonable approximation of a circle is at least 4 (90∞).
+     *                          The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
      *                          Less than 1 will be ignored (the arc will not be split).
      * @param overlapPoints     Given the <i>threshold</i> defined through {@code pointsOnCircle}:
      *                          <ul>
@@ -608,101 +1075,117 @@ public final class GeneralPath implements Shape {
      *
      * @see #createBezierArcDegrees(android.graphics.PointF, float, float, float, int, boolean, android.graphics.Path)
      */
-    private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
-                                              double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
-                                              GeneralPath addToPath, boolean joinPath)
-    {
-        final GeneralPath path = addToPath;
-        if (sweepAngleRadians == 0d) { return; }
- 
-        float radius = radiusX;
-        float yScale = radiusY / radius;
-        
-        if (pointsOnCircle >= 1)
-        {
-            final double threshold = Math.PI * 2d / pointsOnCircle;
-            if (Math.abs(sweepAngleRadians) > threshold)
-            {
-                double angle = normalizeRadians(startAngleRadians);
-                //PointF end, start = pointFromAngleRadians(center, radius, angle);
-                double endX, endY;
-                double startX = cx + radius * Math.cos(angle);
-                double startY = cy + radius * Math.sin(angle) * yScale;
-                if (joinPath) {
-                    path.lineTo(startX, startY);
-                } else {
-                    path.moveTo(startX, startY);
-                }
-                if (overlapPoints)
-                {
-                    final boolean cw = sweepAngleRadians > 0; // clockwise?
-                    final double angleEnd = angle + sweepAngleRadians;
-                    while (true)
-                    {
-                        double next = (cw ? Math.ceil(angle / threshold) : Math.floor(angle / threshold)) * threshold;
-                        if (angle == next) { next += threshold * (cw ? 1d : -1d); }
-                        final boolean isEnd = cw ? angleEnd <= next : angleEnd >= next;
-                        //end = pointFromAngleRadians(center, radius, isEnd ? angleEnd : next);
-                        endX = cx + radius * Math.cos(isEnd ? angleEnd : next);
-                        endY = cy + radius * Math.sin(isEnd ? angleEnd : next) *yScale;
-                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
-                        if (isEnd) { break; }
-                        angle = next;
-                        startX = endX;
-                        startY = endY;
-                    }
-                }
-                else
-                {
-                    final int n = Math.abs((int)Math.ceil(sweepAngleRadians / threshold));
-                    final double sweep = sweepAngleRadians / (double)n;
-                    for (int i = 0;
-                         i < n;
-                         i++, startX = endX, startY = endY)
-                    {
-                        angle += sweep;
-                        //end = pointFromAngleRadians(center, radius, angle);
-                        endX = cx + radius * Math.cos(angle);
-                        endY = cy + radius * Math.sin(angle) * yScale;
-                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
-                    }
-                    
-                }
-                return;
-            }
-        }
- 
-        startAngleRadians = normalizeRadians(startAngleRadians);
-        double startX = cx + radius * Math.cos(startAngleRadians);
-        double startY = cy + radius * Math.sin(startAngleRadians) * yScale;
-        
-        double endX = cx + radius * Math.cos(startAngleRadians + sweepAngleRadians);
-        double endY = cy + radius * Math.sin(startAngleRadians + sweepAngleRadians) * yScale;
-        if (joinPath) {
-            path.lineTo(startX, startY);
-        } else {
-            path.moveTo(startX, startY);
-        }
-        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
-        
-    }
+//    private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
+//                                              double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
+//                                              GeneralPath addToPath, boolean joinPath)
+//    {
+//        final GeneralPath path = addToPath;
+//        if (sweepAngleRadians == 0d) { return; }
+// 
+//        float radius = radiusX;
+//        float yScale = radiusY / radius;
+//        
+//        if (pointsOnCircle >= 1)
+//        {
+//            final double threshold = Math.PI * 2d / pointsOnCircle;
+//            if (Math.abs(sweepAngleRadians) > threshold)
+//            {
+//                double angle = normalizeRadians(startAngleRadians);
+//                //PointF end, start = pointFromAngleRadians(center, radius, angle);
+//                double endX, endY;
+//                double startX = cx + radius * Math.cos(angle);
+//                double startY = cy + radius * Math.sin(angle) * yScale;
+//                if (joinPath) {
+//                    path.lineTo(startX, startY);
+//                } else {
+//                    path.moveTo(startX, startY);
+//                }
+//                if (overlapPoints)
+//                {
+//                    final boolean cw = sweepAngleRadians > 0; // clockwise?
+//                    final double angleEnd = angle + sweepAngleRadians;
+//                    while (true)
+//                    {
+//                        double next = (cw ? Math.ceil(angle / threshold) : Math.floor(angle / threshold)) * threshold;
+//                        if (angle == next) { next += threshold * (cw ? 1d : -1d); }
+//                        final boolean isEnd = cw ? angleEnd <= next : angleEnd >= next;
+//                        //end = pointFromAngleRadians(center, radius, isEnd ? angleEnd : next);
+//                        endX = cx + radius * Math.cos(isEnd ? angleEnd : next);
+//                        endY = cy + radius * Math.sin(isEnd ? angleEnd : next) *yScale;
+//                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//                        if (isEnd) { break; }
+//                        angle = next;
+//                        startX = endX;
+//                        startY = endY;
+//                    }
+//                }
+//                else
+//                {
+//                    final int n = Math.abs((int)Math.ceil(sweepAngleRadians / threshold));
+//                    final double sweep = sweepAngleRadians / (double)n;
+//                    for (int i = 0;
+//                         i < n;
+//                         i++, startX = endX, startY = endY)
+//                    {
+//                        angle += sweep;
+//                        //end = pointFromAngleRadians(center, radius, angle);
+//                        endX = cx + radius * Math.cos(angle);
+//                        endY = cy + radius * Math.sin(angle) * yScale;
+//                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//                    }
+//                    
+//                }
+//                return;
+//            }
+//        }
+// 
+//        startAngleRadians = normalizeRadians(startAngleRadians);
+//        double startX = cx + radius * Math.cos(startAngleRadians);
+//        double startY = cy + radius * Math.sin(startAngleRadians) * yScale;
+//        
+//        double endX = cx + radius * Math.cos(startAngleRadians + sweepAngleRadians);
+//        double endY = cy + radius * Math.sin(startAngleRadians + sweepAngleRadians) * yScale;
+//        if (joinPath) {
+//            path.lineTo(startX, startY);
+//        } else {
+//            path.moveTo(startX, startY);
+//        }
+//        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//        
+//    }
     
      /**
-     * Normalize the input radians in the range 360∞ > x >= 0∞.
+     * Normalize the input radians in the range 360? > x >= 0?.
      *
      * @param radians The angle to normalize (in radians).
      *
-     * @return The angle normalized in the range 360∞ > x >= 0∞.
+     * @return The angle normalized in the range 360? > x >= 0?.
      */
-    private static double normalizeRadians(double radians)
-    {
-        double PI2 = Math.PI*2d;
-        radians %= PI2;
-        if (radians < 0d) { radians += PI2; }
-        if (radians == PI2) { radians = 0d; }
-        return radians;
-    }
+//    private static double normalizeRadians(double radians)
+//    {
+//        double PI2 = Math.PI*2d;
+//        radians %= PI2;
+//        if (radians < 0d) { radians += PI2; }
+//        if (radians == PI2) { radians = 0d; }
+//        return radians;
+//    }
     
+    
+    /**
+     * Adds an arc to the path.  This method uses an approximation of an arc using
+     * a cubic path.  It is not a precise arc.
+     * 
+     * <p>Note:  The arc is drawn counter-clockwise around the center point.  See {@link #arcTo(double, double, double, double, boolean) } 
+     * to draw clockwise.</p>
+     * 
+     * @param cX The x-coordinate of the oval center.
+     * @param cY The y-coordinate of the oval center.
+     * @param endX The end X coordinate.
+     * @param endY The end Y coordinate.
+     */
+    public void arcTo(float cX, float cY, float endX, float endY) {
+        arcTo(cX, cY, endX, endY, false);
+    }
     /**
      * Adds an arc to the path.  This method uses an approximation of an arc using
      * a cubic path.  It is not a precise arc.
@@ -710,15 +1193,53 @@ public final class GeneralPath implements Shape {
      * @param cY The y-coordinate of the oval center.
      * @param endX The end X coordinate.
      * @param endY The end Y coordinate.
+     * @param clockwise If true, the arc is drawn clockwise around the center point.
      */
-    public void arcTo(float cX, float cY, float endX, float endY){
+    public void arcTo(float cX, float cY, float endX, float endY, boolean clockwise){
         if ( pointSize < 2 ){
             throw new RuntimeException("Cannot add arc to path if it doesn't already have a starting point.");
             
         }
         float startX = points[pointSize-2];
         float startY = points[pointSize-1];
-        addBezierArcToPath(this, cX, cY, startX, startY, endX, endY);
+        
+        float dx = endX-cX;
+        float dy = endY-cY;
+        double r2 = Math.sqrt(dx*dx+dy*dy);
+        double dx1 = startX-cX;
+        double dy1 = startY-cY;
+        double r1 = Math.sqrt(dx1*dx1+dy1*dy1);
+        if (Math.abs(r1-r2) > 1) {
+            Log.e(new RuntimeException("arcTo() called with start and end points that don't lie on the same arc r1="+r1+", r2="+r2));
+            
+        }
+        Ellipse e = new Ellipse();
+        Ellipse.initWithBounds(e, cX-r2, cY-r2, r2*2, r2*2);
+        double startAngle = e.getAngleAtPoint(startX, startY);
+        double endAngle = e.getAngleAtPoint(endX, endY);
+        double sweepAngle = endAngle-startAngle;
+        if (clockwise && sweepAngle > 0) {
+            sweepAngle = -sweepAngle;
+        } else if (!clockwise && sweepAngle > 0) {
+            sweepAngle = 2*Math.PI-sweepAngle;
+        }
+        
+        arc(cX-r2, cY-r2, r2*2, r2*2, -startAngle, sweepAngle, true);
+        lineTo(endX, endY);
+    }
+    
+    /**
+     * Adds an arc to the path.  This method uses an approximation of an arc using
+     * a cubic path.  It is not a precise arc.
+     * <p>Note:  The arc is drawn counter-clockwise around the center point.  See {@link #arcTo(double, double, double, double, boolean) } 
+     * to draw clockwise.</p>
+     * @param cX The x-coordinate of the oval center.
+     * @param cY The y-coordinate of the oval center.
+     * @param endX The end X coordinate.
+     * @param endY The end Y coordinate.
+     */
+    public void arcTo(double cX, double cY, double endX, double endY) {
+        arcTo(cX, cY, endX, endY, false);
     }
     
     /**
@@ -728,9 +1249,11 @@ public final class GeneralPath implements Shape {
      * @param cY The y-coordinate of the oval center.
      * @param endX The end X coordinate.
      * @param endY The end Y coordinate.
+     * @param clockwise If true, the arc is drawn clockwise around the center point.
+     * 
      */
-    public void arcTo(double cX, double cY, double endX, double endY){
-        arcTo((float)cX, (float)cY, (float)endX, (float)endY);
+    public void arcTo(double cX, double cY, double endX, double endY, boolean clockwise){
+        arcTo((float)cX, (float)cY, (float)endX, (float)endY, clockwise);
     }
 
     /**
@@ -754,8 +1277,18 @@ public final class GeneralPath implements Shape {
      * @param connect whether to connect the new shape to the existing path.
      */
     public void append(Shape shape, boolean connect) {
-        PathIterator p = shape.getPathIterator();
-        append(p, connect);
+        if (shape.getClass() == GeneralPath.class) {
+            Iterator it = createIteratorFromPool((GeneralPath)shape, null);
+            try {
+                append(it, connect);
+            } finally {
+                recycle(it);
+            }
+        } else {
+            PathIterator p = shape.getPathIterator();
+            append(p, connect);
+        }
+        
         dirty = true;
     }
 
@@ -774,7 +1307,13 @@ public final class GeneralPath implements Shape {
      * {@link PathIterator#SEG_MOVETO} unchanged.
      */
     public void append(PathIterator path, boolean connect) {
-        float coords[] = new float[6];
+        float coords[] = createFloatArrayFromPool(6);//new float[6];
+        append(path, connect, coords);
+        recycle(coords);
+    }
+    
+    private void append(PathIterator path, boolean connect, float[] tmpCoordsBuf) {
+        float coords[] = tmpCoordsBuf;
         while (!path.isDone()) {
             
             switch (path.currentSegment(coords)) {
@@ -818,6 +1357,20 @@ public final class GeneralPath implements Shape {
         if (typeSize == 0) {
             return null;
         }
+        float[] out = new float[2];
+        getCurrentPoint(out);
+        return out;
+    }
+    
+    /**
+     * Sets the coordinates of the given point to the current point in the path.
+     *
+     * @param point Out parameter.  Will be filled with the coords of the current point.
+     */
+    public void getCurrentPoint(float[] point) {
+        if (typeSize == 0) {
+            throw new RuntimeException("Cannot get point because the size of this command is 0");
+        }
         int j = pointSize - 2;
         if (types[typeSize - 1] == PathIterator.SEG_CLOSE) {
 
@@ -829,7 +1382,9 @@ public final class GeneralPath implements Shape {
                 j -= pointShift[type];
             }
         }
-        return new float[]{points[j], points[j + 1]};
+        point[0] = points[j];
+        point[1] = points[j+1];
+        //return new float[]{points[j], points[j + 1]};
     }
 
     /**
@@ -847,6 +1402,16 @@ public final class GeneralPath implements Shape {
      * @return 4-element array of the form {@code [x, y, width, height]}.
      */
     public float[] getBounds2D() {
+        float[] out = new float[4];
+        getBounds2D(out);
+        return out;
+    }
+    
+    /**
+     * Sets the 4-element array to the bounding box coordinates of the path.  x, y, width, height.
+     * @param out 4-element float[] array.
+     */
+    public void getBounds2D(float[] out) {
         float rx1, ry1, rx2, ry2;
         if (pointSize == 0) {
             rx1 = ry1 = rx2 = ry2 = 0.0f;
@@ -869,7 +1434,10 @@ public final class GeneralPath implements Shape {
                 }
             }
         }
-        return new float[]{rx1, ry1, rx2 - rx1, ry2 - ry1};
+        out[0] = rx1;
+        out[1] = ry1;
+        out[2] = rx2-rx1;
+        out[3] = ry2-ry1;
     }
 
     /**
@@ -891,65 +1459,124 @@ public final class GeneralPath implements Shape {
 
     }
     
-    public boolean isRectangle(){
-        Rectangle bounds = getBounds();
-        PathIterator it = getPathIterator();
-        float[] buf = new float[6];
-        boolean[] corners = new boolean[4];
-        int prevX = 0; 
-        int prevY = 0;
-        while ( !it.isDone() ){
-            int type = it.currentSegment(buf);
-            
-            // Rectangulars only support moves, lines, and closes
-            if ( type != PathIterator.SEG_CLOSE && type != PathIterator.SEG_LINETO && type != PathIterator.SEG_MOVETO ){
-                return false;
-            }
-            
-            
-            // Get the current point
-            int x = (int)buf[0];
-            int y = (int)buf[1];
-            
-            // Make sure there are no diagonal lines
-            if ( type == PathIterator.SEG_LINETO && !(x == prevX || y == prevY )){
-                return false;
-            }
-            
-            // Make sure point is on the perimeter.
-            if ( x != bounds.getX() && y != bounds.getY() && x != bounds.getX()+bounds.getWidth() && y != bounds.getY()+bounds.getHeight() ){
-                return false;
-            }
-            
-            // Make sure that all corners are accounted for.
-            for ( int i=0; i<4; i++){
-                if ( corners[i] ){
-                    continue;
+    /**
+     * Sets the coordinates of the provided rectangle to the bounding box of this path.
+     * @param out 
+     */
+    public void getBounds(Rectangle out) {
+        float rx1, ry1, rx2, ry2;
+        if (pointSize == 0) {
+            rx1 = ry1 = rx2 = ry2 = 0.0f;
+        } else {
+            int i = pointSize - 1;
+            ry1 = ry2 = points[i--];
+            rx1 = rx2 = points[i--];
+            while (i > 0) {
+                float y = points[i--];
+                float x = points[i--];
+                if (x < rx1) {
+                    rx1 = x;
+                } else if (x > rx2) {
+                    rx2 = x;
                 }
-                switch (i){
-                    case 0:
-                        corners[i] = (x == bounds.getX() && y == bounds.getY());
-                        break;
-                    case 1:
-                        corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY());
-                        break;
-                    case 2:
-                        corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY() + bounds.getHeight());
-                        break;
-                    case 3:
-                        corners[i] = (x== bounds.getX() && y == bounds.getY()+bounds.getHeight());
-                        break;
+                if (y < ry1) {
+                    ry1 = y;
+                } else if (y > ry2) {
+                    ry2 = y;
                 }
             }
-            
-            prevX = x;
-            prevY = y;
-            it.next();
         }
+        int x1 = (int)Math.floor(rx1);
+        int y1 = (int)Math.floor(ry1);
+        int x2 = (int)Math.ceil(rx2);
+        int y2 = (int)Math.ceil(ry2);
+        out.setX(x1);
+        out.setY(y1);
+        out.setWidth(x2-x1);
+        out.setHeight(y2-y1);
         
-        return corners[0] && corners[1] && corners[2] && corners[3];
     }
+    
+    /**
+     * Checks to see if this path is a rectangle.
+     * @return True if this path forms a rectangle.  False otherwise.
+     */
+    public boolean isRectangle() {
+        float[] tmpPointsBuf = createFloatArrayFromPool(6);
+        boolean[] tmpCornersBuf = createBoolArrayFromPool(4);
+        Iterator it = createIteratorFromPool(this, null);
+        Rectangle bounds = createRectFromPool();
+        try {
+            getBounds(bounds);
+            if (tmpPointsBuf.length != 6) {
+                throw new RuntimeException("points buffer must be length 6");
+            }
+            float[] buf = tmpPointsBuf;
+            if (tmpCornersBuf.length != 4) {
+                throw new RuntimeException("corners buffer must be length 4");
+            }
+            boolean[] corners = tmpCornersBuf;
+            int prevX = 0; 
+            int prevY = 0;
+            while ( !it.isDone() ){
+                int type = it.currentSegment(buf);
 
+                // Rectangulars only support moves, lines, and closes
+                if ( type != PathIterator.SEG_CLOSE && type != PathIterator.SEG_LINETO && type != PathIterator.SEG_MOVETO ){
+                    return false;
+                }
+
+
+                // Get the current point
+                int x = (int)buf[0];
+                int y = (int)buf[1];
+
+                // Make sure there are no diagonal lines
+                if ( type == PathIterator.SEG_LINETO && !(x == prevX || y == prevY )){
+                    return false;
+                }
+
+                // Make sure point is on the perimeter.
+                if ( x != bounds.getX() && y != bounds.getY() && x != bounds.getX()+bounds.getWidth() && y != bounds.getY()+bounds.getHeight() ){
+                    return false;
+                }
+
+                // Make sure that all corners are accounted for.
+                for ( int i=0; i<4; i++){
+                    if ( corners[i] ){
+                        continue;
+                    }
+                    switch (i){
+                        case 0:
+                            corners[i] = (x == bounds.getX() && y == bounds.getY());
+                            break;
+                        case 1:
+                            corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY());
+                            break;
+                        case 2:
+                            corners[i] = (x == bounds.getX()+bounds.getWidth() && y == bounds.getY() + bounds.getHeight());
+                            break;
+                        case 3:
+                            corners[i] = (x== bounds.getX() && y == bounds.getY()+bounds.getHeight());
+                            break;
+                    }
+                }
+
+                prevX = x;
+                prevY = y;
+                it.next();
+            }
+
+            return corners[0] && corners[1] && corners[2] && corners[3];
+        } finally {
+            recycle(tmpPointsBuf);
+            recycle(tmpCornersBuf);
+            recycle(it);
+            recycle(bounds);
+        }
+    }
+    
+    
     /**
      * {{@inheritDoc}}
      */
@@ -976,10 +1603,148 @@ public final class GeneralPath implements Shape {
     public Shape createTransformedShape(Transform m){
         
         GeneralPath out = new GeneralPath();
-        out.append(getPathIterator(m), false);
+        out.setPath(this, m);
         return out;
     }
+    
+    /**
+     * Sets this path to be identical to the provided path {@code p} with the given
+     * Transform {@code t} applied to it.
+     * @param p The path to copy.
+     * @param t The transform to apply to all points in the path.
+     */
+    public void setPath(GeneralPath p, Transform t) {
+        dirty = true;
+        typeSize = p.typeSize;
+        pointSize = p.pointSize;
+        rule = p.rule;
+        if (points == null || points.length < pointSize) {
+            points = new float[pointSize];
+        }
+        if (types == null || types.length < typeSize) {
+            types = new byte[typeSize];
+        }
+        System.arraycopy(p.types, 0, types, 0, typeSize);
+        if (t == null || t.isIdentity()) {
+            System.arraycopy(p.points, 0, points, 0, pointSize);
+            
+        } else {
+            t.transformPoints(2, p.points, 0, points, 0, pointSize / 2);
+            
+        }
+        
+    }
+    
+    /**
+     * Sets this path to be a rectangle with the provided bounds, but with 
+     * the given transform applied to it.
+     * @param r Rectangle to copy.
+     * @param t The transform to apply to the points in in {@code r}.
+     */
+    public void setRect(Rectangle r, Transform t) {
+        reset();
+        int x = r.getX();
+        int y = r.getY();
+        Dimension size = r.getSize();
+        int w = size.getWidth();
+        int h = size.getHeight();
 
+        if (t == null) {
+            moveTo(x, y);
+            lineTo(x + w, y);
+            lineTo(x + w, y + h);
+            lineTo(x, y+ h);
+            closePath();
+        } else {
+            float[] pointBuffer = createFloatArrayFromPool(6);
+            try {
+                pointBuffer[0] = x;
+                pointBuffer[1] = y;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                moveTo(pointBuffer[0], pointBuffer[1]);
+                pointBuffer[0] = x+w;
+                pointBuffer[1] = y;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                lineTo(pointBuffer[0], pointBuffer[1]);
+                pointBuffer[0] = x+w;
+                pointBuffer[1] = y+h;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                lineTo(pointBuffer[0], pointBuffer[1]);
+                pointBuffer[0] = x;
+                pointBuffer[1] = y+h;
+                pointBuffer[2] = 0;
+                t.transformPoint(pointBuffer, pointBuffer);
+                lineTo(pointBuffer[0], pointBuffer[1]);
+                closePath();
+            } finally {
+                recycle(pointBuffer);
+            }
+        }
+    }
+    
+    /**
+     * Sets this path to be a copy of the provided shape, but with the provided
+     * transform applied to it.
+     * @param s The shape to copy.
+     * @param t The transform to apply to all points in the shape.
+     */
+    public void setShape(Shape s, Transform t) {
+        if (s.getClass() == GeneralPath.class) {
+            setPath((GeneralPath)s, t);
+        } else if (s.getClass() == Rectangle.class) {
+            setRect((Rectangle)s, t);
+        } else {
+            reset();
+            append(s.getPathIterator(t), false);
+        }
+    }
+    
+    /**
+     * Sets the current path to the intersection of itself and the provided rectangle.
+     * @param rect The rectangle to intersect with this path.
+     * @return True if {@code rect} intersects the current path.  False otherwise.  If there is no intersection, the
+     * path will be reset to be empty.
+     */
+    public boolean intersect(Rectangle rect) {
+        GeneralPath intersectionScratchPath = createPathFromPool();
+        try {
+            
+            Shape result = ShapeUtil.intersection(rect, this, intersectionScratchPath);
+            if (result != null) {
+                this.setPath(intersectionScratchPath, null);
+                return true;
+            }
+            reset();
+            return false;
+
+        } finally {
+            recycle(intersectionScratchPath);
+        }
+    }
+    
+    public boolean intersect(int x, int y, int w, int h) {
+        Rectangle r = createRectFromPool();
+        try {
+            r.setBounds(x, y, w, h);
+            return intersect(r);
+        } finally {
+            recycle(r);
+        }
+    }
+    
+    /**
+     * Transforms the current path in place using the given transform.
+     * @param m The transform to apply to the path.
+     */
+    public void transform(Transform m) {
+        if (m != null && !m.isIdentity()) {
+            m.transformPoints(2, points, 0, points, 0, pointSize / 2 );
+        }
+    }
+    
     /**
      * Resets this path to be the intersection of itself with the given shape.  Note that only 
      * {@link com.codename1.ui.geom.Rectangle}s are current supported.  If you pass any other
@@ -992,20 +1757,20 @@ public final class GeneralPath implements Shape {
         if ( !(shape instanceof Rectangle) ){
             throw new RuntimeException("GeneralPath.intersect() only supports Rectangles");
         }
-        Rectangle r = (Rectangle)shape;
-        GeneralPath tmp = (GeneralPath)ShapeUtil.intersection(r, this);
-        this.reset();
-        this.append(tmp, false);
-        //Log.p("End intersect");
+        intersect((Rectangle)shape);
     }
     
     /**
      * {{@inheritDoc}}
      */
     public Shape intersection(Rectangle rect){
-        return ShapeUtil.intersection(rect, this);
+        Shape out = ShapeUtil.intersection(rect, this);
+        if (out == null) {
+            return new Rectangle(rect.getX(), rect.getY(), 0, 0);
+        }
+        return out;
     }
-
+    
     /**
      * Checks cross count according to path rule to define is it point inside shape or not. 
      * @param cross - the point cross count
@@ -1020,6 +1785,9 @@ public final class GeneralPath implements Shape {
 
     /**
      * Checks if the given point is contained in the current shape.
+     * @param x The x coordinate to check
+     * @param y The y coordinate to check
+     * @return True if the point is inside the shape.
      */
     public boolean contains(float x, float y) {
        return isInside(ShapeUtil.crossShape(this, x, y));
@@ -1039,8 +1807,8 @@ public final class GeneralPath implements Shape {
     private static class ShapeUtil {
     
     
+        
 
-   
     /**
      * Generates the intersection of a given shape and a given rectangle.  Only supported convex polygons.
      *
@@ -1050,93 +1818,100 @@ public final class GeneralPath implements Shape {
      * rectangle.
      */
     static Shape intersection(Rectangle r, Shape s) {
+        return intersection(r, s, new GeneralPath());
+    }
+        
+    
+    private static Shape intersection(Rectangle r, Shape s, GeneralPath out) {
+        
         Shape segmentedShape = segmentShape(r, s);
-        PathIterator it = segmentedShape.getPathIterator(null);
-        GeneralPath out = new GeneralPath();
-        float[] buf = new float[6];
-        boolean started = false;
-        int count = 0;
+        Iterator it = createIteratorFromPool((GeneralPath)segmentedShape, null);
+        //GeneralPath out = new GeneralPath();
+        float[] buf = createFloatArrayFromPool(6);//new float[6];
+        try {
+            boolean started = false;
+            float x1 = r.getX();
+            float x2 = r.getX() + r.getWidth();
+            float y1 = r.getY();
+            float y2 = r.getY() + r.getHeight();
 
-        float x1 = r.getX();
-        float x2 = r.getX() + r.getWidth();
-        float y1 = r.getY();
-        float y2 = r.getY() + r.getHeight();
+            float minX = -1;
+            float minY = -1;
+            float maxX = -1;
+            float maxY = -1;
 
-        //System.out.println("x1` is "+x1);
-        
-        float minX = -1;
-        float minY = -1;
-        float maxX = -1;
-        float maxY = -1;
+            float prevX=0; 
+            float prevY=0;
 
-        float prevX=0; 
-        float prevY=0;
-        
-        while (!it.isDone()) {
-            int type = it.currentSegment(buf);
+            while (!it.isDone()) {
+                int type = it.currentSegment(buf);
 
-            switch (type) {
+                switch (type) {
 
-                case PathIterator.SEG_CLOSE:
-                    //System.out.println("Closing path");
-                    out.closePath();
-                    break;
+                    case PathIterator.SEG_CLOSE:
+                        //System.out.println("Closing path");
+                        out.closePath();
+                        break;
 
-                case PathIterator.SEG_MOVETO:
-                case PathIterator.SEG_LINETO:
-                    if (buf[0] < x1) {
-                        buf[0] = x1;
-                    } else if (buf[0] > x2) {
-                        buf[0] = x2;
-                    }
-                    if (buf[1] < y1) {
-                        buf[1] = y1;
-                    } else if (buf[1] > y2) {
-                        buf[1] = y2;
-                    }
-
-                    if (!started || (buf[0] < minX)) {
-                        minX = buf[0];
-                    }
-                    if (!started || (buf[0] > maxX)) {
-                        maxX = buf[0];
-                    }
-
-                    if (!started || (buf[1] < minY)) {
-                        minY = buf[1];
-                    }
-                    if (!started || (buf[1] > maxY)) {
-                        maxY = buf[1];
-                    }
-
-                    if (type == PathIterator.SEG_MOVETO) {
-                        
-                        //System.out.println("Moving to "+buf[0]+","+buf[1]);
-                        out.moveTo(buf[0], buf[1]);
-                    } else { // type == PathITerator.SEG_LINETO
-                        
-                        if ( prevX != buf[0] || prevY != buf[1]){
-                            //System.out.println("Line to "+buf[0]+","+buf[1]);
-                            out.lineTo(buf[0], buf[1]);
+                    case PathIterator.SEG_MOVETO:
+                    case PathIterator.SEG_LINETO:
+                        if (buf[0] < x1) {
+                            buf[0] = x1;
+                        } else if (buf[0] > x2) {
+                            buf[0] = x2;
                         }
-                    }
-                    prevX = buf[0];
-                    prevY = buf[1];
-                    started = true;
-                    count++;
-                    break;
-                default:
-                    throw new RuntimeException("Intersection only supports polygons currently");
+                        if (buf[1] < y1) {
+                            buf[1] = y1;
+                        } else if (buf[1] > y2) {
+                            buf[1] = y2;
+                        }
+
+                        if (!started || (buf[0] < minX)) {
+                            minX = buf[0];
+                        }
+                        if (!started || (buf[0] > maxX)) {
+                            maxX = buf[0];
+                        }
+
+                        if (!started || (buf[1] < minY)) {
+                            minY = buf[1];
+                        }
+                        if (!started || (buf[1] > maxY)) {
+                            maxY = buf[1];
+                        }
+
+                        if (type == PathIterator.SEG_MOVETO) {
+
+                            //System.out.println("Moving to "+buf[0]+","+buf[1]);
+                            out.moveTo(buf[0], buf[1]);
+                        } else { // type == PathITerator.SEG_LINETO
+
+                            if ( prevX != buf[0] || prevY != buf[1]){
+                                //System.out.println("Line to "+buf[0]+","+buf[1]);
+                                out.lineTo(buf[0], buf[1]);
+                            }
+                        }
+                        prevX = buf[0];
+                        prevY = buf[1];
+                        started = true;
+                        //count++;
+                        break;
+                    default:
+                        throw new RuntimeException("Intersection only supports polygons currently");
+                }
+                it.next();
+
             }
-            it.next();
-            
-        }
 
-        if (maxX - minX <= 1f || maxY - minY <= 1f) {
-            return null;
-        }
+            if (maxX - minX <= 1f || maxY - minY <= 1f) {
+                return null;
+            }
 
-        return out;
+            return out;
+        } finally {
+            recycle(it);
+            recycle(buf);
+        }
 
     }
 
@@ -1154,222 +1929,239 @@ public final class GeneralPath implements Shape {
      * start/end points of a segment.
      */
     static Shape segmentShape(Rectangle r, Shape s) {
-        PathIterator it = s.getPathIterator(null);
-        GeneralPath out = new GeneralPath();
-        float[] buf = new float[6];     // buffer to hold segment coordinates from PathIterator.currentSegment
-        float[] curr = new float[2];    // Placeholder for current point
-        float[] prev = new float[2];    // Placeholder for previous point
-        float[] mark = new float[2];    // Placeholder for the moveTo point
-        float[] buf4 = new float[4];    // Reusable buffer to hold two points.
-
-        float prevX = -1;               // Placeholder for previous X coord.
-        float prevY = -1;               // Placeholder for previous Y coord.
-        float currX = 0;                // Placeholder for current X coord.
-        float currY = 0;                // Placeholder for current Y coord.
-        float[] intersects = null;      // Placeholder for intersection points
-        while (!it.isDone()) {
-            
-            int type = it.currentSegment(buf);
-            switch (type) {
-                
-                case PathIterator.SEG_MOVETO:
-                    // Move to segment is transferred straight through
-                    prevX = prev[0] = mark[0] = buf[0];
-                    prevY = prev[1] = mark[1] = buf[1];
-                    out.moveTo(prevX, prevY);
-                    
-                    //System.out.println("Moving to "+prevX+","+prevY);
-                    break;
-
-                case PathIterator.SEG_LINETO:
-                    // Line Segment may need to be partitioned if it crosses
-                    // an edge of the rectangle.
-                    currX = curr[0] = buf[0];
-                    currY = curr[1] = buf[1];
-
-                    // Check if line intersects rectangle
-                    intersects = intersectLineWithRectAsHash(prevX, prevY, currX, currY, r);
-                    //System.out.println("Looking for intersections between "+prevX+","+prevY+" and "+currX+","+currY);
-                    //System.out.println("Intersects: "+intersects[0]+", "+intersects[1]+"  "+intersects[2]+","+intersects[3]);
-                    if (intersects[8] >= 1) {
-                        int num = (int)intersects[8];
-                        int len = num*2;
-                        for ( int i=0; i<len; i+=2){
-                            out.lineTo(intersects[i], intersects[i+1]);
-                            
-                        }
-                       
-                    } 
-                    //System.out.println("Line to "+currX+","+currY);
-                    out.lineTo(currX, currY);
-
-                    // Set current position to prev for next iteration.
-                    prevX = currX;
-                    prevY = currY;
-                    float[] tmp = curr;
-                    curr = prev;
-                    prev = tmp;
-
-                    break;
-                case PathIterator.SEG_CLOSE:
-
-                    // Closing the path.  Need to check if there is an intersection
-                    // on this last closing path.
-                    currX = curr[0] = mark[0];
-                    currY = curr[1] = mark[1];
-                    intersects = intersectLineWithRectAsHash(prevX, prevY, currX, currY, r);
-                    if (intersects[8] >= 1) {
-                        int num = (int)intersects[8];
-                        int len = num*2;
-                        for ( int i=0; i<len; i+=2){
-                            out.lineTo(intersects[i], intersects[i+1]);
-                            
-                        }
-                       
-                    } 
-                    out.closePath();
-                    
-                    break;
-                default:
-                    throw new RuntimeException("Shape segmentation only supported for polygons");
-            }
-            it.next();
-        }
-        return out;
+        return segmentShape(r, s, new GeneralPath());
     }
-
-    
-    static float[] intersectLineWithRectAsHash(float x1, float y1, float x2, float y2, Rectangle rect){
-        float[] out = new float[9]; // max 4 points here
-        float[] x = new float[4];
-        //float[] y = new float[4];
-        float rx1 = rect.getX();
-        float ry1 = rect.getY();
-        float rx2 = rect.getX()+rect.getWidth();
-        float ry2 = rect.getY()+rect.getHeight();
-        
-        float dx = x2-x1;
-        float dy = y2-y1;
-        int num=0;
-        
-        float minY = Math.min(y1,y2);
-        float maxY = Math.max(y1,y2);
-        float minX = Math.min(x1, x2);
-        float maxX = Math.max(x1, x2);
-        int i = 0;
-        if ( dx == 0 ){
-            if ( ry1 > minY && ry1 < maxY ){
-                num++;
-                x[i++] = ry1;
-                //out[i++] = ry1;
-            }
-            if ( ry2 > minY && ry2 < maxY ){
-                num++;
-                x[i++] = ry2;
-                //out[i++] = ry2;
-            }
-            
-            Arrays.sort(x, 0, num);
-            if ( y1 <= y2 ){
-                for ( i=0; i<num; i++){
-                    int j = 2*i;
-                    out[j] = x1;
-                    out[j+1] = x[i];
-                }
-            } else {
-                for ( i=0; i<num; i++){
-                    int j = 2*(num-i-1);
-                    out[j] = x1;
-                    out[j+1] = x[i];
-                }
-            }
-            
-            
-            out[8] = num;
-            
-            
-        } else if ( dy == 0 ){
-            if ( rx1 > minX && rx1 < maxX ){
-                num++;
-                x[i++] = rx1;
-                //out[i++] = y1;
-            }
-            if ( rx2 > minX && rx2 < maxX ){
-                num++;
-                x[i++] = rx2;
-                //out[i++] = y1;
-            }
-            Arrays.sort(x, 0, num);
-            if ( x1 <= x2 ){
-                for ( i=0; i<num; i++){
-                    int j = 2*i;
-                    out[j] = x[i];
-                    out[j+1] = y1;
-                }
-            } else {
-                for ( i=0; i<num; i++){
-                    int j = 2*(num-i-1);
-                    out[j] = x[i];
-                    out[j+1] = y1;
-                }
-            }
-            out[8] = num;
-        } else {
-            float m = dy/dx;
-            
-            if ( rx1 > minX && rx1 < maxX ){
-                num++;
-                x[i] = rx1;
-                //y[i] = y1+(rx1-x1)*m;
-                i++;
-            }
-            if ( rx2 > minX && rx2 < maxX ){
-                num++;
-                x[i] = rx2;
-                //y[i++] = y1+(rx2-x1)*m;
-                i++;
-            }
-            if ( ry1 > minY && ry1 < maxY ){
-                num++;
-                x[i] = x1+(ry1-y1)/m;
-                //out[i++] = ry1;
-                i++;
-            }
-            if ( ry2 > minY && ry2 < maxY ){
-                num++;
-                x[i] = x1+(ry2-y1)/m;
-                //out[i++] = ry2;
-                i++;
-            }
-            
-            Arrays.sort(x, 0, num);
-            if ( x1 < x2 ){
-                for ( i=0; i<num; i++){
-                    int j = 2*i;
-                    out[j] = x[i];
-                    out[j+1] = y1 + (x[i]-x1)*m;
-                }
-            } else {
-                for ( i=0; i<num; i++){
-                    int j = 2*(num-i-1);
-                    out[j] = x[i];
-                    out[j+1] = y1 + (x[i]-x1)*m;
-                }
-            }
-            out[8] = num;
+    private static GeneralPath segmentShape(Rectangle r, Shape s, GeneralPath out) {
+        GeneralPath tmpGeneralPath = null;
+        if (s.getClass() != GeneralPath.class) {
+            tmpGeneralPath = createPathFromPool();
+            tmpGeneralPath.setShape(s, null);
+            s = tmpGeneralPath;
         }
         
-        
-        
-        
-        return out;
+        Iterator it = createIteratorFromPool((GeneralPath)s, null);
+        //GeneralPath out = new GeneralPath();
+        float[] buf = createFloatArrayFromPool(6); // buffer to hold segment coordinates from PathIterator.currentSegment
+        float[] curr = createFloatArrayFromPool(2);    // Placeholder for current point
+        float[] prev = createFloatArrayFromPool(2);   // Placeholder for previous point
+        float[] mark = createFloatArrayFromPool(2);   // Placeholder for the moveTo point
+        //float[] buf4 = new float[4];    // Reusable buffer to hold two points.
+        float[] intersects = createFloatArrayFromPool(9);
+        try {
+            float prevX = -1;               // Placeholder for previous X coord.
+            float prevY = -1;               // Placeholder for previous Y coord.
+            float currX = 0;                // Placeholder for current X coord.
+            float currY = 0;                // Placeholder for current Y coord.
+            //float[] intersects = null;      // Placeholder for intersection points
+            while (!it.isDone()) {
+
+                int type = it.currentSegment(buf);
+                switch (type) {
+
+                    case PathIterator.SEG_MOVETO:
+                        // Move to segment is transferred straight through
+                        prevX = prev[0] = mark[0] = buf[0];
+                        prevY = prev[1] = mark[1] = buf[1];
+                        out.moveTo(prevX, prevY);
+
+                        //System.out.println("Moving to "+prevX+","+prevY);
+                        break;
+
+                    case PathIterator.SEG_LINETO:
+                        // Line Segment may need to be partitioned if it crosses
+                        // an edge of the rectangle.
+                        currX = curr[0] = buf[0];
+                        currY = curr[1] = buf[1];
+
+                        // Check if line intersects rectangle
+                        intersectLineWithRectAsHash(prevX, prevY, currX, currY, r, intersects);
+                        //System.out.println("Looking for intersections between "+prevX+","+prevY+" and "+currX+","+currY);
+                        //System.out.println("Intersects: "+intersects[0]+", "+intersects[1]+"  "+intersects[2]+","+intersects[3]);
+                        if (intersects[8] >= 1) {
+                            int num = (int)intersects[8];
+                            int len = num*2;
+                            for ( int i=0; i<len; i+=2){
+                                out.lineTo(intersects[i], intersects[i+1]);
+
+                            }
+
+                        } 
+                        //System.out.println("Line to "+currX+","+currY);
+                        out.lineTo(currX, currY);
+
+                        // Set current position to prev for next iteration.
+                        prevX = currX;
+                        prevY = currY;
+                        float[] tmp = curr;
+                        curr = prev;
+                        prev = tmp;
+
+                        break;
+                    case PathIterator.SEG_CLOSE:
+
+                        // Closing the path.  Need to check if there is an intersection
+                        // on this last closing path.
+                        currX = curr[0] = mark[0];
+                        currY = curr[1] = mark[1];
+                        intersectLineWithRectAsHash(prevX, prevY, currX, currY, r, intersects);
+                        if (intersects[8] >= 1) {
+                            int num = (int)intersects[8];
+                            int len = num*2;
+                            for ( int i=0; i<len; i+=2){
+                                out.lineTo(intersects[i], intersects[i+1]);
+
+                            }
+
+                        } 
+                        out.closePath();
+
+                        break;
+                    default:
+                        throw new RuntimeException("Shape segmentation only supported for polygons");
+                }
+                it.next();
+            }
+            return out;
+        } finally {
+            recycle(it);
+            recycle(buf);
+            recycle(curr);
+            recycle(prev);
+            recycle(mark);
+            recycle(intersects);
+            recycle(tmpGeneralPath);
+        }
+    }
+
+    private static float[] intersectLineWithRectAsHash(float x1, float y1, float x2, float y2, Rectangle rect,
+            float[] out
+            ){
+        //float[] out = new float[9]; // max 4 points here
+        float[] x = createFloatArrayFromPool(4);
+        try {
+            //float[] y = new float[4];
+            float rx1 = rect.getX();
+            float ry1 = rect.getY();
+            float rx2 = rect.getX()+rect.getWidth();
+            float ry2 = rect.getY()+rect.getHeight();
+
+            float dx = x2-x1;
+            float dy = y2-y1;
+            int num=0;
+
+            float minY = Math.min(y1,y2);
+            float maxY = Math.max(y1,y2);
+            float minX = Math.min(x1, x2);
+            float maxX = Math.max(x1, x2);
+            int i = 0;
+            if ( dx == 0 ){
+                if ( ry1 > minY && ry1 < maxY ){
+                    num++;
+                    x[i++] = ry1;
+                    //out[i++] = ry1;
+                }
+                if ( ry2 > minY && ry2 < maxY ){
+                    num++;
+                    x[i++] = ry2;
+                    //out[i++] = ry2;
+                }
+
+                Arrays.sort(x, 0, num);
+                if ( y1 <= y2 ){
+                    for ( i=0; i<num; i++){
+                        int j = 2*i;
+                        out[j] = x1;
+                        out[j+1] = x[i];
+                    }
+                } else {
+                    for ( i=0; i<num; i++){
+                        int j = 2*(num-i-1);
+                        out[j] = x1;
+                        out[j+1] = x[i];
+                    }
+                }
+
+
+                out[8] = num;
+
+
+            } else if ( dy == 0 ){
+                if ( rx1 > minX && rx1 < maxX ){
+                    num++;
+                    x[i++] = rx1;
+                    //out[i++] = y1;
+                }
+                if ( rx2 > minX && rx2 < maxX ){
+                    num++;
+                    x[i++] = rx2;
+                    //out[i++] = y1;
+                }
+                Arrays.sort(x, 0, num);
+                if ( x1 <= x2 ){
+                    for ( i=0; i<num; i++){
+                        int j = 2*i;
+                        out[j] = x[i];
+                        out[j+1] = y1;
+                    }
+                } else {
+                    for ( i=0; i<num; i++){
+                        int j = 2*(num-i-1);
+                        out[j] = x[i];
+                        out[j+1] = y1;
+                    }
+                }
+                out[8] = num;
+            } else {
+                float m = dy/dx;
+
+                if ( rx1 > minX && rx1 < maxX ){
+                    num++;
+                    x[i] = rx1;
+                    //y[i] = y1+(rx1-x1)*m;
+                    i++;
+                }
+                if ( rx2 > minX && rx2 < maxX ){
+                    num++;
+                    x[i] = rx2;
+                    //y[i++] = y1+(rx2-x1)*m;
+                    i++;
+                }
+                if ( ry1 > minY && ry1 < maxY ){
+                    num++;
+                    x[i] = x1+(ry1-y1)/m;
+                    //out[i++] = ry1;
+                    i++;
+                }
+                if ( ry2 > minY && ry2 < maxY ){
+                    num++;
+                    x[i] = x1+(ry2-y1)/m;
+                    //out[i++] = ry2;
+                    i++;
+                }
+
+                Arrays.sort(x, 0, num);
+                if ( x1 < x2 ){
+                    for ( i=0; i<num; i++){
+                        int j = 2*i;
+                        out[j] = x[i];
+                        out[j+1] = y1 + (x[i]-x1)*m;
+                    }
+                } else {
+                    for ( i=0; i<num; i++){
+                        int j = 2*(num-i-1);
+                        out[j] = x[i];
+                        out[j+1] = y1 + (x[i]-x1)*m;
+                    }
+                }
+                out[8] = num;
+            }
+            return out;
+        } finally {
+            recycle(x);
+        }
         
     }
     
-    
-        
-        //public class Crossing {
-
     /**
      * Allowable tolerance for bounds comparison
      */
@@ -1862,6 +2654,7 @@ public final class GeneralPath implements Shape {
         if (!s.getBounds().contains((int)x, (int)y)) {
             return 0;
         }
+        
         return crossPath(s.getPathIterator(null), x, y);
     }
 

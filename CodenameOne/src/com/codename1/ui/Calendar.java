@@ -43,17 +43,28 @@ import java.util.TimeZone;
 import java.util.Vector;
 
 /**
- * Date widget for selecting a date/time value.
+ * <p>Date widget for selecting a date/time value.<br>
  * To localize strings for month names
  * use the values "Calendar.Month" using the 3 first characters of the month name
- * in the resource localization e.g. "Calendar.Jan", "Calendar.Feb" etc...
+ * in the resource localization e.g. "{@code Calendar.Jan}", "{@code Calendar.Feb}" etc...<br>
  * To localize strings for day names
- * use the values "Calendar.Day" in the resource localization e.g. "Calendar.Sunday", "Calendar.Monday" etc...
+ * use the values "Calendar.Day" in the resource localization e.g. "{@code Calendar.Sunday}", 
+ * "{@code Calendar.Monday}" etc...</p>
+ * 
+ * <p>
+ * Note that we recommend using the {@link com.codename1.ui.spinner.Picker} class which is superior when
+ * running on the device for most use cases.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/8f520493f7681b5d16a3.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-calendar.png" alt="Default calendar look" />
  *
  * @author Iddo Ari, Shai Almog
  */
 public class Calendar extends Container {
-
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding single digit days
+     */
+    private boolean twoDigitMode;
     private ComboBox month;
     private ComboBox year;
     private MonthView mv;
@@ -388,6 +399,26 @@ public class Calendar extends Container {
      *
      * @param l listener to add
      */
+    public void addDataChangedListener(DataChangedListener l) {
+        mv.addDataChangeListener(l);
+    }
+
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to remove
+     */
+    public void removeDataChangedListener(DataChangedListener l) {
+        mv.removeDataChangeListener(l);
+    }
+    
+    
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to add 
+     * @deprecated use #addDataChangedListener(DataChangedListener) instead
+     */
     public void addDataChangeListener(DataChangedListener l) {
         mv.addDataChangeListener(l);
     }
@@ -396,6 +427,7 @@ public class Calendar extends Container {
      * Allows tracking selection changes in the calendar in real time
      *
      * @param l listener to remove
+     * @deprecated use #removeDataChangedListener(DataChangedListener) instead
      */
     public void removeDataChangeListener(DataChangedListener l) {
         mv.removeDataChangeListener(l);
@@ -468,7 +500,31 @@ public class Calendar extends Container {
      * @param day the new button day
      */
     protected void updateButtonDayDate(Button dayButton, int currentMonth, int day) {
-        dayButton.setText("" + day);
+        if(twoDigitMode) {
+            if(day < 10) {
+                dayButton.setText("0" + day);
+            } else {
+                dayButton.setText("" + day);
+            }
+        } else {
+            dayButton.setText("" + day);
+        }
+    }
+
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding single digit days
+     * @return the twoDigitMode
+     */
+    public boolean isTwoDigitMode() {
+        return twoDigitMode;
+    }
+
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding single digit days
+     * @param twoDigitMode the twoDigitMode to set
+     */
+    public void setTwoDigitMode(boolean twoDigitMode) {
+        this.twoDigitMode = twoDigitMode;
     }
 
     class MonthView extends Container implements ActionListener{

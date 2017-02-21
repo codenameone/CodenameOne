@@ -64,8 +64,8 @@ public class CloudListModel implements ListModel {
     
     /**
      * Creates a list model that shows all the cloud elements that have the given key matching
-     * the given value at the visibility scope listed bellow. This model can be further narrowed 
-     * down by using the filter functionality bellow.<br>
+     * the given value at the visibility scope listed below. This model can be further narrowed 
+     * down by using the filter functionality below.<br>
      * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
      * and caches data as needed.
      * 
@@ -108,8 +108,8 @@ public class CloudListModel implements ListModel {
         
     /**
      * Creates a list model that shows all the cloud elements that have the given key matching
-     * the given value at the visibility scope listed bellow. This model can be further narrowed 
-     * down by using the filter functionality bellow.<br>
+     * the given value at the visibility scope listed below. This model can be further narrowed 
+     * down by using the filter functionality below.<br>
      * This is effectively equivalent to issuing a queryEquals method, however it polls in batches
      * and caches data as needed.
      * 

@@ -23,6 +23,7 @@
 package com.codename1.components;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.ButtonGroup;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
 import com.codename1.ui.Container;
@@ -38,10 +39,14 @@ import java.util.Collection;
 import java.util.Vector;
 
 /**
- * A powerful button like component that allows multiple rows/and an icon to be added
+ * <p>A powerful button like component that allows multiple rows/and an icon to be added
  * every row/icon can have its own UIID. Internally the multi-button is a container with
- * a lead component. Up to 4 rows are supported.
+ * a lead component. Up to 4 rows are supported.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/c0991e96258f813df91e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-multibutton.png" alt="MultiButton usages Sample" />
  *
+ * @see SpanButton
  * @author Shai Almog
  */
 public class MultiButton extends Container {
@@ -262,6 +267,7 @@ public class MultiButton extends Container {
             }
             par.replace(old, emblem, null);
             setLeadComponent(emblem);
+            emblem.setShowEvenIfBlank(true);
         }
     }
     
@@ -1040,5 +1046,36 @@ public class MultiButton extends Container {
      */
     public void setMaskName(String maskName) {
         icon.setMaskName(maskName);
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @return the shouldLocalize value
+     */
+    public boolean isShouldLocalize() {
+        return firstRow.isShouldLocalize();
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @param shouldLocalize the shouldLocalize to set
+     */
+    public void setShouldLocalize(boolean shouldLocalize) {
+        firstRow.setShouldLocalize(shouldLocalize);
+        secondRow.setShouldLocalize(shouldLocalize);
+        thirdRow.setShouldLocalize(shouldLocalize);
+        forthRow.setShouldLocalize(shouldLocalize);
+    }
+    
+    /**
+     * Sets the button group for a radio button mode multibutton
+     * @param bg the button group
+     */
+    public void setGroup(ButtonGroup bg) {
+        bg.add((RadioButton)emblem);
     }
 }

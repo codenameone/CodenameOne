@@ -23,6 +23,8 @@
 
 package com.codename1.ui.animations;
 
+import java.util.ArrayList;
+
 /**
  * Parent class representing an animation object within the AnimationManager queue.
  *
@@ -32,6 +34,19 @@ public abstract class ComponentAnimation {
     private Object notifyLock;
     private Runnable onCompletion;
     private int step = -1;
+    private ArrayList<Runnable> post;
+
+    /**
+     * Invokes the runnable just as the animation finishes thus allowing cleanup of the UI for the upcoming 
+     * animations, this is useful when running a complex sequence
+     * @param r the runnable to call when the animation is done
+     */
+    public void addOnCompleteCall(Runnable r) {
+        if(post == null) {
+            post = new ArrayList<Runnable>();
+        }
+        post.add(r);        
+    }
     
     /**
      * Step mode allows stepping thru an animation one frame at a time, e.g. when scrolling down an animation
@@ -87,6 +102,11 @@ public abstract class ComponentAnimation {
             if(onCompletion != null) {
                 onCompletion.run();
             }
+            if(post != null) {
+                for(Runnable p : post) {
+                    p.run();
+                }
+            }
         }
     }
     
@@ -130,15 +150,44 @@ public abstract class ComponentAnimation {
     public static ComponentAnimation compoundAnimation(ComponentAnimation... anims) {
         return new CompoundAnimation(anims);
     }
+
+    /**
+     * Allows us to create an animation that places several separate animations in a sequence so they appear as a 
+     * single animation to the system and process one after the other
+     * @param anims the animations
+     * @return the sequential animation
+     */
+    public static ComponentAnimation sequentialAnimation(ComponentAnimation... anims) {
+        return new CompoundAnimation(anims, true);
+    }
     
     static class CompoundAnimation extends ComponentAnimation {
         private ComponentAnimation[] anims;
+        int sequence;
         public CompoundAnimation(ComponentAnimation[] anims) {
             this.anims = anims;
+            sequence = -1;
+        }
+
+        public CompoundAnimation(ComponentAnimation[] anims, boolean s) {
+            this.anims = anims;
+            sequence = 0;
         }
 
         @Override
         public boolean isInProgress() {
+            if(sequence > -1 && sequence < anims.length) {
+                if(anims[sequence].isInProgress()) {
+                    return true;
+                }
+                while(anims.length > sequence) {
+                    if(anims[sequence].isInProgress()) {
+                        return true;
+                    }
+                    sequence++;
+                }
+                return false;
+            }
             for(ComponentAnimation a : anims) {
                 if(a.isInProgress()) {
                     return true;
@@ -149,6 +198,10 @@ public abstract class ComponentAnimation {
 
         @Override
         protected void updateState() {
+            if(sequence > -1) {
+                anims[Math.min(sequence, anims.length - 1)].updateState();
+                return;
+            }
             for(ComponentAnimation a : anims) {
                 a.updateState();
             }

@@ -73,7 +73,7 @@ public class FacebookImpl extends FacebookConnect {
             }
 
         }
-        FacebookSdk.sdkInitialize(AndroidNativeUtil.getActivity().getApplicationContext());
+        FacebookSdk.sdkInitialize(AndroidNativeUtil.getContext().getApplicationContext());
 
     }
 
@@ -95,6 +95,9 @@ public class FacebookImpl extends FacebookConnect {
 
         LoginManager login = LoginManager.getInstance();
         final CallbackManager mCallbackManager = CallbackManager.Factory.create();
+        if (AndroidNativeUtil.getActivity() == null) {
+            throw new RuntimeException("Cannot login to facebook when running in the background.");
+        }
         final CodenameOneActivity activity = (CodenameOneActivity) AndroidNativeUtil.getActivity();
         activity.setIntentResultListener(new IntentResultListener() {
 
@@ -144,6 +147,10 @@ public class FacebookImpl extends FacebookConnect {
     }
 
     public void askPublishPermissions(final LoginCallback cb) {
+        if (AndroidNativeUtil.getActivity() == null) {
+            throw new RuntimeException("Cannot ask for publish permissions when running in the background.");
+        
+        }
         if (loginLock) {
             return;
         }
@@ -181,7 +188,7 @@ public class FacebookImpl extends FacebookConnect {
     public boolean hasPublishPermissions() {
         AccessToken fbToken = AccessToken.getCurrentAccessToken();
         if (fbToken != null && !fbToken.isExpired()) {
-            return fbToken.getPermissions().contains(PUBLISH_PERMISSIONS);
+            return fbToken.getPermissions().contains(PUBLISH_PERMISSIONS.get(0));
         }
         return false;
     }
@@ -193,6 +200,9 @@ public class FacebookImpl extends FacebookConnect {
     
     @Override
     public void inviteFriends(String appLinkUrl, String previewImageUrl, final Callback cb) {
+        if (AndroidNativeUtil.getActivity() == null) {
+            throw new RuntimeException("Cannot invite friends while running in the background.");
+        }
         if (AppInviteDialog.canShow()) {
             AppInviteContent content = new AppInviteContent.Builder()
                     .setApplinkUrl(appLinkUrl)

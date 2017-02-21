@@ -49,7 +49,7 @@ public class SwitchInstruction extends Instruction {
     
     @Override
     public void appendInstruction(StringBuilder b, List<Instruction> instructions) {
-        b.append("    stackPointer--;\n    switch(stack[stackPointer].data.i) {\n");
+        b.append("    SP--;\n    switch((*SP).data.i) {\n");
         for(int iter = 0 ; iter < keys.length ; iter++) {
             b.append("        case ");
             b.append(keys[iter]);

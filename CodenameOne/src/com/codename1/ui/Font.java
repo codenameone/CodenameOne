@@ -28,38 +28,41 @@ import java.util.HashMap;
 import java.util.Hashtable;
 
 /**
- * A simple abstraction of platform fonts and library fonts that enables the
- * library to use more elaborate fonts unsupported by a specific device.
- * This abstraction also supports bitmap fonts using an Ant task (more details
- * about the unifier are explained in the javadoc overview document).
- * <p>A bitmap font can be created manually but that is tedious, normally you would use
- * the Ant task as illustrated bellow to produce a resource file containing
- * the supported bitmap font. For further detail read the overview document and 
- * {@link com.codename1.ui.util.Resources}.
-<pre>
-&lt;target name="pre-init"&gt;
-     &lt;taskdef classpath="ImageUnifier.jar" classname="com.sun.jwt.resource.Builder" name="build" /&gt;
-     &lt;build dest="src/font.res"&gt;
-        &lt;font src="images/arial.ttf" bold="true" italic="true" size="11" /&gt;
-        &lt;font logicalName="Dialog" /&gt;
-    &lt;/build&gt;
-&lt;/target&gt;
-</pre>
- * <p>The following attributes can be expressed for a font ant task:
+ * <p>Codename One currently supports 3 font types:</p>
  * <ul>
- * <li>name - name for the font to load from the resource file (optional: defaults to logical name or file name).
- * <li>charset - defaults to the English alphabet, numbers and common signs. 
- * Should contain a list of all characters that should be supported by a font. E.g. if a font would always be
- * used for uppercase letters then it would save space to define the charset as: {@code "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
- * <li>src - font file in the case of using a file, defaults to TrueType font
- * <li>size - floating point size of the font
- * <li>bold - defaults to false indicates if the font should be bold
- * <li>italic - defaults to false indicates if the font should be italic
- * <li>trueType - defaults to true, relevant only when src is used. If set to false type 1 fonts are assumed.
- * <li>antiAliasing - defaults to true otherwise fonts will be aliased
- * <li>logicalName - logical name of the font as specified by java.awt.Font in Java SE: 
- * {@code Dialog, DialogInput, Monospaced, Serif, or SansSerif }
+ *      <li><b>System fonts</b> - these are very simplistic builtin fonts. They work on all platforms and come 
+ *                  in one of 3 sizes. However, they are ubiquitous and work in every platform in all languages.
+ *                    A system font can be created using {@link Font#createSystemFont(int, int, int)}.</li>
+ *
+ *      <li><b>TTF files</b> - you can just place a TTF file in the src directory of the project and it will appear in 
+ *                  the Codename One Designer as an option. You can load such a font using {@link Font#createTrueTypeFont(java.lang.String, java.lang.String)}.</li>
+ *      <li><b>Native fonts</b> - these aren't supported on all platforms but generally they allow you to use a set 
+ *                  of platform native good looking fonts. E.g. on Android the devices Roboto font will be used and on 
+ *                  iOS Helvetica Neue will be used. You can load such a font using {@link Font#createTrueTypeFont(java.lang.String, java.lang.String)}.</li>
  * </ul>
+ * <p>
+ *    <b>WARNING:</b> If you use a TTF file <b>MAKE SURE</b> not to delete the file when there <b>MIGHT</b> 
+ *          be a reference to it. This can cause hard to track down issues!<br />
+ *   <b>IMPORTANT:</b> due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it. 
+ *          In the simulator you will see Roboto as the fallback in some cases and not the device font unless you 
+ *          are running on a Mac. Notice that the Roboto font from Google doesn't support all languages and thus
+ *          special characters might not work on the simulator but would work on the device.
+ * </p>
+ * 
+ * <p>
+ * The sample code below demonstrates a catalog of available fonts, the scr
+ * </p>
+ * <script src="https://gist.github.com/codenameone/1081b77246b8485856be.js"></script>
+ * <h4>The demo code on the iPad simulator on a Mac</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/theme-font-catalog.png" alt="The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC" />
+ * 
+ * <h4>The demo code on an Android 5.1 OPO device (OnePlus One)</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/theme-font-catalog-opo.png" alt="The same demo running on a OnePlus One device with Android 5.1" />
+ * 
+ * <p>
+ *    The Font class also supports bitmap fonts but this support is strictly aimed at legacy applications. We no longer
+ * maintain that functionality.
+ * </p>
  */
 public class Font {
     /**
@@ -209,7 +212,7 @@ public class Font {
      * native:MainThin, native:MainLight, native:MainRegular, native:MainBold, native:MainBlack,
      * native:ItalicThin, native:ItalicLight, native:ItalicRegular, native:ItalicBold, native:ItalicBlack.
      * <b>Important</b> due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it.
-     * In the simulator you will always see Roboto and not the device font
+     * In the simulator you will see Roboto and not the device font unless you are running on a Mac
      * 
      * @param fontName the name of the font
      * @param fileName the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
@@ -293,6 +296,10 @@ public class Font {
      * @return newly created font or null if creation failed
      */
     public static Font create(String lookup) {
+        // for general convenience
+        if(lookup.startsWith("native:")) {
+            return createTrueTypeFont(lookup, lookup);
+        }
         Object n = Display.impl.loadNativeFont(lookup);
         if(n == null) {
             return null;
@@ -560,7 +567,7 @@ public class Font {
     * {@inheritDoc}
     */
    public boolean equals(Object o) {
-       if(ttf) {
+       if(ttf && o != null) {
            return ((Font)o).font != null && ((Font)o).ttf && ((Font)o).font.equals(font);
        }
        if(o != null && o.getClass() == getClass()) {

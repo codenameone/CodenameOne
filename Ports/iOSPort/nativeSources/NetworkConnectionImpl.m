@@ -133,6 +133,15 @@ int connections = 0;
 #endif
 }
 
+- (NSURLRequest *)connection:(NSURLConnection *)connection
+             willSendRequest:(NSURLRequest *)_request
+            redirectResponse:(NSHTTPURLResponse *)response {
+    if (response.statusCode >= 300 && response.statusCode < 400) {
+        return nil;
+    }
+    return _request;
+}
+
 extern void connectionComplete(void* peer);
 
 extern void connectionReceivedData(void* peer, NSData* data);

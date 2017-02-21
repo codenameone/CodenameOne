@@ -42,9 +42,10 @@ public class VarOp extends Instruction implements AssignableExpression {
     }
     
     @Override
-    public boolean assignTo(String varName, String typeVarName, StringBuilder sb) {
+    public boolean assignTo(String varName, StringBuilder sb) {
         StringBuilder b = new StringBuilder();
-        b.append("    ");
+        
+        /*
         if (typeVarName != null) {
             switch (opcode) {
                 case Opcodes.ALOAD:
@@ -53,8 +54,9 @@ public class VarOp extends Instruction implements AssignableExpression {
                     b.append("].type = CN1_TYPE_OBJECT; ");
                     break;
             }
-        }
+        }*/
         if (varName != null) {
+            b.append("    ");
             b.append(varName).append(" = ");
         }
         switch(opcode) {
@@ -79,9 +81,13 @@ public class VarOp extends Instruction implements AssignableExpression {
                 b.append("_");
                 break;
             case Opcodes.ALOAD:
-                b.append("locals[");
-                b.append(var);
-                b.append("].data.o");
+                if (getMethod() != null && !getMethod().isStatic() && var == 0) {
+                    b.append("__cn1ThisObject");
+                } else {
+                    b.append("locals[");
+                    b.append(var);
+                    b.append("].data.o");
+                }
                 break;
             default:
                 return false;
@@ -98,18 +104,78 @@ public class VarOp extends Instruction implements AssignableExpression {
         b.append("    /* VarOp.assignFrom */ ");
         switch (opcode) {
             case Opcodes.ISTORE:
-                return ex.assignTo("ilocals_"+var+"_", null, b);
+                return ex.assignTo("ilocals_"+var+"_", b);
                 
             case Opcodes.LSTORE:
-                return ex.assignTo("llocals_"+var+"_", null, b);
+                return ex.assignTo("llocals_"+var+"_", b);
             case Opcodes.FSTORE:
-                return ex.assignTo("flocals_"+var+"_", null, b);
+                return ex.assignTo("flocals_"+var+"_", b);
             case Opcodes.DSTORE:
-                return ex.assignTo("dlocals_"+var+"_", null, b);
-            case Opcodes.ASTORE:
-                return ex.assignTo("locals["+var+"].data.o", "locals["+var+"].type", b);
+                return ex.assignTo("dlocals_"+var+"_", b);
+            case Opcodes.ASTORE: {
+                StringBuilder sb = new StringBuilder();
+                sb.append("locals[").append(var).append("].type=CN1_TYPE_INVALID;");
+                boolean res = ex.assignTo("locals["+var+"].data.o", sb);
+                if (!res) {
+                    return false;
+                }
+                sb.append("locals[").append(var).append("].type=CN1_TYPE_OBJECT;");
+                b.append(sb);
+                return true;
+            }
+                
         }
         b.append("\n");
+        return false;
+    }
+    
+    public boolean assignFrom(CustomInvoke ex, StringBuilder b) {
+        b.append("    /* VarOp.assignFrom */ ");
+        StringBuilder sb = new StringBuilder();
+        switch (opcode) {
+            case Opcodes.ISTORE:
+                if (ex.appendExpression(sb)) {
+                    b.append("ilocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                    return true;
+                }
+            break;
+                
+            case Opcodes.LSTORE:
+                if (ex.appendExpression(sb)) {
+                    b.append("llocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                    return true;
+                }
+            break;
+            case Opcodes.FSTORE:
+                if (ex.appendExpression(sb)) {
+                    b.append("flocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                    return true;
+                }
+            break;
+                
+            case Opcodes.DSTORE:
+                if (ex.appendExpression(sb)) {
+                    b.append("dlocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                    return true;
+                }
+            break;
+
+            case Opcodes.ASTORE: {
+                StringBuilder sb2 = new StringBuilder();
+                //sb2.append("locals[").append(var).append("].type=CN1_TYPE_INVALID; ");
+                if (ex.appendExpression(sb)) {
+                    sb2.append("locals[").append(var).append("].data.o = ").append(sb.toString().trim()).append(";");
+                    sb2.append("locals[").append(var).append("].type=CN1_TYPE_OBJECT;");
+                    b.append(sb2);
+                    return true;
+                }
+                
+            break;
+               
+            }
+                
+        }
+        //b.append("\n");
         return false;
     }
     
@@ -118,10 +184,10 @@ public class VarOp extends Instruction implements AssignableExpression {
         b.append("    ");
         switch(opcode) {
             case Opcodes.ILOAD:
-                b.append("stack[stackPointer].type = CN1_TYPE_INT; /* ILOAD */ \n" +
-                        "    stack[stackPointer].data.i = ilocals_");
+                b.append("(*SP).type = CN1_TYPE_INT; /* ILOAD */ \n" +
+                        "    (*SP).data.i = ilocals_");
                 b.append(var);
-                b.append("_; \n    stackPointer++;\n");
+                b.append("_; \n    SP++;\n");
                 return;
             case Opcodes.LLOAD:
                 b.append("BC_LLOAD(");

@@ -84,12 +84,12 @@ public class GridBagLayout extends Layout {
             }
             cons = defaultConstraints;
         }
-        try {
+        /*try {
             //cons.verify();
         } catch (IllegalArgumentException e) {
             // awt.81=AddLayoutComponent: {0}
             throw new IllegalArgumentException("AddLayoutComponent: " + e.getMessage()); //$NON-NLS-1$
-        }
+        }*/
         GridBagConstraints consClone = (GridBagConstraints) cons.clone();
         comptable.put(comp, consClone);
         Container parent = comp.getParent();
@@ -115,12 +115,12 @@ public class GridBagLayout extends Layout {
 
     public void setConstraints(Component comp, GridBagConstraints constraints) {
         GridBagConstraints consClone = (GridBagConstraints) constraints.clone();
-        try {
+        /*try {
             //                consClone.verify();
         } catch (IllegalArgumentException e) {
             // awt.85=SetConstraints: {0}
             throw new IllegalArgumentException("SetConstraints: " + e.getMessage()); //$NON-NLS-1$
-        }
+        }*/
         ParentInfo info = getParentInfo(comp.getParent());
         if (info != null) {
             GridBagConstraints cons = comptable.get(comp);
@@ -147,17 +147,18 @@ public class GridBagLayout extends Layout {
         Style s = parent.getStyle();
         ParentInfo info = lastParentInfo = getParentInfo(parent);
         if (getComponentsNumber(parent) == 0) {
-            return new Dimension(s.getPadding(Component.LEFT) + s.getPadding(Component.RIGHT), s.getPadding(Component.TOP) + s.getPadding(Component.BOTTOM));
+            return new Dimension(s.getHorizontalPadding(), s.getVerticalPadding());
         }
         try {
             validate(parent, info);
         } catch (RuntimeException e) {
             // awt.87=PreferredLayoutSize: {0}
+            e.printStackTrace();
             throw new IllegalArgumentException("PreferredLayoutSize: " + e.getMessage()); //$NON-NLS-1$
         }
         Dimension d = info.grid.preferredSize();
-        d.setWidth(d.getWidth() + s.getPadding(Component.LEFT) + s.getPadding(Component.RIGHT));
-        d.setHeight(d.getHeight() + s.getPadding(Component.TOP) + s.getPadding(Component.BOTTOM));
+        d.setWidth(d.getWidth() + s.getHorizontalPadding());
+        d.setHeight(d.getHeight() + s.getVerticalPadding());
         return d;
         //return addInsets(grid.preferredSize(), parent);
     }
@@ -171,6 +172,7 @@ public class GridBagLayout extends Layout {
             arrangeGridImpl(parent, info);
         } catch (RuntimeException e) {
             // awt.88=LayoutContainer: {0}
+            e.printStackTrace();
             throw new IllegalArgumentException("LayoutContainer: " + e.getMessage()); //$NON-NLS-1$
         }
         setComponentsBounds(info);
@@ -244,6 +246,7 @@ public class GridBagLayout extends Layout {
             arrangeGridImpl(parent, info);
         } catch (RuntimeException e) {
             // awt.86=MinimumLayoutSize: {0}
+            e.printStackTrace();
             throw new IllegalArgumentException("MinimumLayoutSize: " + e.getMessage()); //$NON-NLS-1$
         }
     }
@@ -279,12 +282,12 @@ public class GridBagLayout extends Layout {
     }*/
 
     protected void AdjustForGravity(GridBagConstraints constraints, Rectangle r) {
-        try {
+        /*try {
             //                ((GridBagConstraints) constraints).verify();
         } catch (IllegalArgumentException e) {
             // awt.8C={0}
             throw new IllegalArgumentException("AdjustForGravity: " + e.getMessage()); //$NON-NLS-1$
-        }
+        }*/
         //Don't get parent as param, so have to use older info if exists
         if (layoutInfo == null) {
             r.setBounds(0, 0, 0, 0);

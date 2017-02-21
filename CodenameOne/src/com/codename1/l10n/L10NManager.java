@@ -26,7 +26,13 @@ import com.codename1.ui.Display;
 import java.util.Date;
 
 /**
- * The localization manager allows adapting values for display in different locales
+ * <p>The localization manager allows adapting values for display in different locales thru parsing and formatting
+ * capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
+ * related API's similar to Locale/currency API's from JavaSE.<br>
+ * The sample code below just lists the various capabilities of the API:</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/l10n-manager.png" alt="Localization formatting/parsing and information" />
  *
  * @author Shai Almog
  */
@@ -180,6 +186,16 @@ public class L10NManager {
      * @return formatted string 
      */
     public String format(double number, int decimalPlaces) {
+        if(decimalPlaces == 0) {
+            return format((double)((long)number));
+        }
+            
+        double pos = 10;
+        for(int iter = 1 ; iter < decimalPlaces ; iter++) {
+            pos *= 10;
+        }
+        long ln = (long)(number * pos);
+        number = ((double)ln) / pos;
         return format(number);
     }
     

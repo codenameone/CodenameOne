@@ -26,8 +26,24 @@ package com.codename1.ui.tree;
 import java.util.Vector;
 
 /**
- * Arranges tree node objects, a node can essentially be anything
+ * <p>Arranges tree node objects, a node can essentially be anything and it will be displayed in a hierarchy
+ * using the {@link com.codename1.ui.tree.Tree}</p>
  *
+ * <script src="https://gist.github.com/codenameone/870d4412694bca3092c4.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/tree.png" alt="Tree sample code" />
+ * 
+ * <p>
+ * And heres a more "real world" example showing an XML hierarchy in a {@code Tree}:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tree-xml.png" alt="Tree with XML data" />
+ *
+ * <p>
+ * Another real world example showing the {@link com.codename1.io.FileSystemStorage} as a tree:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/2877412809a8cff646af.js"></script>            
+ * <img src="https://www.codenameone.com/img/developer-guide/filesystem-tree.png" alt="Simple sample of a tree for the FileSystemStorage API">
+ * 
  * @author Shai Almog
  */
 public interface TreeModel {

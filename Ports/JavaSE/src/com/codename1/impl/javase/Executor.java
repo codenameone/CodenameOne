@@ -25,12 +25,15 @@ package com.codename1.impl.javase;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
+import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Properties;
+import java.util.prefs.Preferences;
 import javax.swing.SwingUtilities;
 
 /**
@@ -43,11 +46,46 @@ public class Executor {
     private static Object app;
     
     public static void main(final String[] argv) throws Exception {
-        SwingUtilities.invokeLater(new Runnable() {
+        
+        setProxySettings();
+        
+        final Properties p = new Properties();
+        String currentDir = System.getProperty("user.dir");
+        File props = new File(currentDir, "codenameone_settings.properties");
+        if(props.exists()) {
+            FileInputStream f = null;
+            try {
+                f = new FileInputStream(props);
+                p.load(f);
+                f.close();
+            } catch (Exception ex) {
+            } finally {
+                try {
+                    f.close();
+                } catch (IOException ex) {
+                }
+            }
+        }
+
+            SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
                 try {
-                    c = Class.forName(argv[0]);
+                    String packageName = p.getProperty("codename1.packageName");
+                    String mainName = p.getProperty("codename1.mainName");
+                    if(argv.length > 1) {
+                        if(argv[1].equalsIgnoreCase("-force") || packageName == null) {
+                            c = Class.forName(argv[0]);
+                        } else {
+                            c = Class.forName(packageName + "." + mainName);
+                        }
+                    } else {
+                        if(packageName == null || System.getenv("FORCE_CLASS") != null) {
+                            c = Class.forName(argv[0]);
+                        } else {
+                            c = Class.forName(packageName + "." + mainName);
+                        }
+                    }
                     try {
                         Method m = c.getDeclaredMethod("main", String[].class);
                         m.invoke(null, new Object[]{null});
@@ -60,6 +98,10 @@ public class Executor {
                                 Display.deinitialize();
                             }
                             final Method m = c.getDeclaredMethod("init", Object.class);
+                            if(m.getExceptionTypes() != null && m.getExceptionTypes().length > 0) {
+                                System.err.println("ERROR: the init method can't declare a throws clause");
+                                System.exit(1);
+                            }
                             app = c.newInstance();
                             if(app instanceof PushCallback) {
                                 CodenameOneImplementation.setPushCallback((PushCallback)app);
@@ -73,33 +115,17 @@ public class Executor {
                                 public void run() {
                                     try {
                                         m.invoke(app, new Object[]{null});
-                                        String currentDir = System.getProperty("user.dir");
-                                        File props = new File(currentDir, "codenameone_settings.properties");
-                                        if(props.exists()) {
-                                            FileInputStream f = null;
-                                            try {
-                                                Properties p = new Properties();
-                                                f = new FileInputStream(props);
-                                                p.load(f);
-                                                f.close();
-                                                String zone = p.getProperty("codename1.arg.vserv.zone", null);
-                                                if(zone != null && zone.length() > 0) {
-                                                    com.codename1.impl.VServAds v = new com.codename1.impl.VServAds();
-                                                    v.showWelcomeAd(); 
-                                                    v.bindTransitionAd(Integer.parseInt(p.getProperty("codename1.arg.vserv.transition", "300000")));
-                                                }
-                                            } catch (Exception ex) {
-                                            } finally {
-                                                try {
-                                                    f.close();
-                                                } catch (IOException ex) {
-                                                }
-                                            }
-                                        }
                                         Method start = c.getDeclaredMethod("start", new Class[0]);
+                                        if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
+                                            System.err.println("ERROR: the start method can't declare a throws clause");
+                                            System.exit(1);
+                                        }
                                         start.invoke(app, new Object[0]);
                                     } catch (NoSuchMethodException err) {
                                         System.out.println("Couldn't find a main or a startup in " + argv[0]);
+                                    } catch (InvocationTargetException err) {
+                                        err.getTargetException().printStackTrace();
+                                        System.exit(1);
                                     } catch (Exception err) {
                                         err.printStackTrace();
                                         System.exit(1);
@@ -120,6 +146,10 @@ public class Executor {
         if(c != null && app != null){
             try {
                 Method stop = c.getDeclaredMethod("stop", new Class[0]);
+                if(stop.getExceptionTypes() != null && stop.getExceptionTypes().length > 0) {
+                    System.err.println("ERROR: the stop method can't declare a throws clause");
+                    System.exit(1);
+                }
                 stop.invoke(app, new Object[0]);
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -142,12 +172,50 @@ public class Executor {
         if(c != null && app != null){
             try {
                 Method start = c.getDeclaredMethod("start", new Class[0]);
+                if(start.getExceptionTypes() != null && start.getExceptionTypes().length > 0) {
+                    System.err.println("ERROR: the start method can't declare a throws clause");
+                    System.exit(1);
+                }
                 start.invoke(app, new Object[0]);
             } catch (Exception ex) {
                 ex.printStackTrace();
             } 
         }
     
+    }
+    
+    private static void setProxySettings() {
+        Preferences proxyPref = Preferences.userNodeForPackage(Component.class);
+        int proxySel = proxyPref.getInt("proxySel", 2);
+        String proxySelHttp = proxyPref.get("proxySel-http", "");
+        String proxySelPort = proxyPref.get("proxySel-port", "");
+
+        switch (proxySel) {
+            case 1:
+                System.getProperties().remove("java.net.useSystemProxies");
+                System.getProperties().remove("http.proxyHost");
+                System.getProperties().remove("http.proxyPort");
+                System.getProperties().remove("https.proxyHost");
+                System.getProperties().remove("https.proxyPort");
+                break;
+            case 2:
+                System.setProperty("java.net.useSystemProxies", "true");
+                System.getProperties().remove("http.proxyHost");
+                System.getProperties().remove("http.proxyPort");
+                System.getProperties().remove("https.proxyHost");
+                System.getProperties().remove("https.proxyPort");
+                break;
+            case 3:
+                System.setProperty("http.proxyHost", proxySelHttp);
+                System.setProperty("http.proxyPort", proxySelPort);
+                System.setProperty("https.proxyHost", proxySelHttp);
+                System.setProperty("https.proxyPort", proxySelPort);
+                break;
+        }
+    }
+    
+    static Object getApp() {
+        return app;
     }
     
 }

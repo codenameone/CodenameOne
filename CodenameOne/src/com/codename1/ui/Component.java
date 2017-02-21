@@ -98,6 +98,12 @@ public class Component implements Animation, StyleListener {
     private int tensileLength = -1;
 
     /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that 
+     * hierarchy to still act as a standalone component
+     */
+    private boolean blockLead;
+    
+    /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
      */
@@ -117,7 +123,7 @@ public class Component implements Animation, StyleListener {
     private Component nextFocusLeft;
     private String name;
     boolean hasLead;
-
+    
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
@@ -313,6 +319,16 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * This is identical to invoking {@link #sameWidth} followed by {@link #sameHeight}
+     * 
+     * @param c the components to group together, this will override all previous width/height grouping
+     */
+    public static void setSameSize(Component... c) {
+        setSameWidth(c);
+        setSameHeight(c);
+    }
+    
+    /**
      * Places all of these components in the same width group, to remove a component from
      * the group invoke this method with that component only.
      * 
@@ -429,6 +445,8 @@ public class Component implements Animation, StyleListener {
         alwaysTensile = laf.isDefaultAlwaysTensile();
         tensileHighlightEnabled = laf.isDefaultTensileHighlight();
         scrollOpacityChangeSpeed = laf.getFadeScrollBarSpeed();
+        isScrollVisible = laf.isScrollVisible();
+        
         if(tensileHighlightEnabled) {
             tensileLength = 3;
         } else {
@@ -444,11 +462,17 @@ public class Component implements Animation, StyleListener {
             if (unSelectedStyle.getBgPainter() == null) {
                 unSelectedStyle.setBgPainter(new BGPainter());
             }
+            if(cellRenderer) {
+                unSelectedStyle.markAsRendererStyle();
+            }
         }
         if(disabledStyle != null) {
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
+            }
+            if(cellRenderer) {
+                disabledStyle.markAsRendererStyle();
             }
         }
     }
@@ -509,6 +533,9 @@ public class Component implements Animation, StyleListener {
     }
 
     Component getLeadComponent() {
+        if(isBlockLead()) {
+            return null;
+        }
         Container p = getParent();
         if(p != null) {
             return p.getLeadComponent();
@@ -703,7 +730,7 @@ public class Component implements Animation, StyleListener {
      * @return baseline value from the top of the component
      */
     public int getBaseline(int width, int height) {
-        return height - getStyle().getPadding(false, BOTTOM);
+        return height - getStyle().getPaddingBottom();
     }
 
     /**
@@ -758,7 +785,7 @@ public class Component implements Animation, StyleListener {
     Dimension getPreferredSizeWithMargin() {
         Dimension d = preferredSize();
         Style s = getStyle();
-        return new Dimension(d.getWidth() +s.getMargin(LEFT) + s.getMargin(RIGHT), d.getHeight() + s.getMargin(TOP) + s.getMargin(BOTTOM));
+        return new Dimension(d.getWidth() +s.getHorizontalMargins(), d.getHeight() + s.getVerticalMargins());
     }
 
     /**
@@ -908,8 +935,18 @@ public class Component implements Animation, StyleListener {
         selectedStyle = null;
         disabledStyle = null;
         pressedStyle = null;
+        allStyles = null;
         if(!sizeRequestedByUser) {
             preferredSize = null;
+        }
+    }
+    
+    /**
+     * This method will remove the Component from its parent.
+     */
+    public void remove(){
+        if(parent != null){
+            parent.removeComponent(this);
         }
     }
 
@@ -1431,9 +1468,12 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Paints this component as a root by going to all the parent components and
+     * <p>Paints this component as a root by going to all the parent components and
      * setting the absolute translation based on coordinates and scroll status.
-     * Restores translation when the painting is finished.
+     * Restores translation when the painting is finished.<br>
+     * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
+     * that creates an image for sharing on social media</p>
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
      * 
      * @param g the graphics to paint this Component on
      */
@@ -1443,9 +1483,13 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Paints this component as a root by going to all the parent components and
+     * <p>Paints this component as a root by going to all the parent components and
      * setting the absolute translation based on coordinates and scroll status.
-     * Restores translation when the painting is finished.
+     * Restores translation when the painting is finished.<br>
+     * One of the uses of this method is to create a "screenshot" as is demonstrated in the code below
+     * that creates an image for sharing on social media</p>
+     * <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     * 
      * 
      * @param g the graphics to paint this Component on
      * @param background if true paints all parents background
@@ -1508,6 +1552,10 @@ public class Component implements Animation, StyleListener {
         if(parent != null) {
             parent.paintGlassImpl(g);
         }
+        paintTensile(g);
+    }
+
+    void paintTensile(Graphics g) {
         if(tensileHighlightIntensity > 0) {
             int i = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
             if(scrollY >= i - 1) {
@@ -1519,9 +1567,9 @@ public class Component implements Animation, StyleListener {
                     tensileHighlightIntensity = 0;
                 }
             }
-        }
+        }        
     }
-
+    
     private void drawPainters(com.codename1.ui.Graphics g, Component par, Component c,
             int x, int y, int w, int h) {
         if(flatten && getWidth() > 0 && getHeight() > 0) {
@@ -1804,8 +1852,12 @@ public class Component implements Animation, StyleListener {
     protected void setScrollY(int scrollY) {
         if(this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
+            
             if(ci.isAsyncEditMode() && ci.isEditingText()) {
-                ci.hideTextEditor();
+                Component editingText = ci.getEditingText();
+                if (editingText != null && this instanceof Container && ((Container)this).contains(editingText)) {
+                    ci.hideTextEditor();
+                }
             }
         }
         // the setter must always update the value regardless... 
@@ -2267,6 +2319,27 @@ public class Component implements Animation, StyleListener {
         return animationSpeed;
     }
 
+    /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that
+     * hierarchy to still act as a standalone component
+     * @return the blockLead
+     */
+    public boolean isBlockLead() {
+        return blockLead;
+    }
+
+    /**
+     * Prevent a lead component hierarchy from this specific component, this allows a component within that
+     * hierarchy to still act as a standalone component
+     * @param blockLead the blockLead to set
+     */
+    public void setBlockLead(boolean blockLead) {
+        this.blockLead = blockLead;
+        if(blockLead) {
+            hasLead = false;
+        }
+    }
+
     class AnimationTransitionPainter implements Painter{
         int alpha;
         Style originalStyle;
@@ -2333,70 +2406,70 @@ public class Component implements Animation, StyleListener {
         final Motion fontMotion = m;
         m = null;
 
-        if(sourceStyle.getPadding(TOP) != destStyle.getPadding(TOP)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(TOP), destStyle.getPadding(TOP), d);
+        if(sourceStyle.getPaddingTop() != destStyle.getPaddingTop()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingTop(), destStyle.getPaddingTop(), d);
         }
         final Motion paddingTop = m;
         m = null;
 
-        if(sourceStyle.getPadding(BOTTOM) != destStyle.getPadding(BOTTOM)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(BOTTOM), destStyle.getPadding(BOTTOM), d);
+        if(sourceStyle.getPaddingBottom() != destStyle.getPaddingBottom()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingBottom(), destStyle.getPaddingBottom(), d);
         }
         final Motion paddingBottom = m;
         m = null;
 
-        if(sourceStyle.getPadding(LEFT) != destStyle.getPadding(LEFT)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(LEFT), destStyle.getPadding(LEFT), d);
+        if(sourceStyle.getPaddingLeftNoRTL()!= destStyle.getPaddingLeftNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingLeftNoRTL(), destStyle.getPaddingLeftNoRTL(), d);
         }
         final Motion paddingLeft = m;
         m = null;
 
-        if(sourceStyle.getPadding(RIGHT) != destStyle.getPadding(RIGHT)) {
-            m = Motion.createLinearMotion(sourceStyle.getPadding(RIGHT), destStyle.getPadding(RIGHT), d);
+        if(sourceStyle.getPaddingRightNoRTL()!= destStyle.getPaddingRightNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getPaddingRightNoRTL(), destStyle.getPaddingRightNoRTL(), d);
         }
         final Motion paddingRight = m;
         m = null;
 
-        if(sourceStyle.getMargin(TOP) != destStyle.getMargin(TOP)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(TOP), destStyle.getMargin(TOP), d);
+        if(sourceStyle.getMarginTop()!= destStyle.getMarginTop()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginTop(), destStyle.getMarginTop(), d);
         }
         final Motion marginTop = m;
         m = null;
 
-        if(sourceStyle.getMargin(BOTTOM) != destStyle.getMargin(BOTTOM)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(BOTTOM), destStyle.getMargin(BOTTOM), d);
+        if(sourceStyle.getMarginBottom() != destStyle.getMarginBottom()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginBottom(), destStyle.getMarginBottom(), d);
         }
         final Motion marginBottom = m;
         m = null;
 
-        if(sourceStyle.getMargin(LEFT) != destStyle.getMargin(LEFT)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(LEFT), destStyle.getMargin(LEFT), d);
+        if(sourceStyle.getMarginLeftNoRTL()!= destStyle.getMarginLeftNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginLeftNoRTL(), destStyle.getMarginLeftNoRTL(), d);
         }
         final Motion marginLeft = m;
         m = null;
 
-        if(sourceStyle.getMargin(RIGHT) != destStyle.getMargin(RIGHT)) {
-            m = Motion.createLinearMotion(sourceStyle.getMargin(RIGHT), destStyle.getMargin(RIGHT), d);
+        if(sourceStyle.getMarginRightNoRTL()!= destStyle.getMarginRightNoRTL()) {
+            m = Motion.createLinearMotion(sourceStyle.getMarginRightNoRTL(), destStyle.getMarginRightNoRTL(), d);
         }
         final Motion marginRight = m;
         m = null;
 
         if(paddingLeft != null || paddingRight != null || paddingTop != null || paddingBottom != null) {
             // convert the padding to pixels for smooth animation
-            int left = sourceStyle.getPadding(LEFT);
-            int right = sourceStyle.getPadding(RIGHT);
-            int top = sourceStyle.getPadding(TOP);
-            int bottom = sourceStyle.getPadding(BOTTOM);
+            int left = sourceStyle.getPaddingLeftNoRTL();
+            int right = sourceStyle.getPaddingRightNoRTL();
+            int top = sourceStyle.getPaddingTop();
+            int bottom = sourceStyle.getPaddingBottom();
             sourceStyle.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
             sourceStyle.setPadding(top, bottom, left, right);
         }
         
         if(marginLeft != null || marginRight != null || marginTop != null || marginBottom != null) {
             // convert the margin to pixels for smooth animation
-            int left = sourceStyle.getMargin(LEFT);
-            int right = sourceStyle.getMargin(RIGHT);
-            int top = sourceStyle.getMargin(TOP);
-            int bottom = sourceStyle.getMargin(BOTTOM);
+            int left = sourceStyle.getMarginLeftNoRTL();
+            int right = sourceStyle.getMarginRightNoRTL();
+            int top = sourceStyle.getMarginTop();
+            int bottom = sourceStyle.getMarginBottom();
             sourceStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
             sourceStyle.setMargin(top, bottom, left, right);
         }
@@ -2421,6 +2494,7 @@ public class Component implements Animation, StyleListener {
         return new ComponentAnimation() {
             private boolean finished;
             private boolean stepMode;
+            private boolean started;
             
             @Override
             public boolean isStepModeSupported() {
@@ -2476,6 +2550,9 @@ public class Component implements Animation, StyleListener {
             
             @Override
             public boolean isInProgress() {
+                if(!stepMode && !started) {
+                    return true;
+                }
                 return stepMode ||
                         !((bgMotion == null || bgMotion.isFinished()) && 
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&
@@ -2494,6 +2571,43 @@ public class Component implements Animation, StyleListener {
             protected void updateState() {
                 if(finished) {
                     return;
+                }
+                
+                if(!started && !stepMode) {
+                    started = true;
+                    if(bgMotion != null) {
+                        bgMotion.start();
+                    }
+                    if(fgColorMotion != null) {
+                        fgColorMotion.start();
+                    }
+                    if(fontMotion != null) {
+                        fontMotion.start();
+                    }
+                    if(paddingTop != null) {
+                        paddingTop.start();
+                    }
+                    if(paddingBottom != null) {
+                        paddingBottom.start();
+                    }
+                    if(paddingLeft != null) {
+                        paddingLeft.start();
+                    }
+                    if(paddingRight != null) {
+                        paddingRight.start();
+                    }
+                    if(marginTop != null) {
+                        marginTop.start();
+                    }
+                    if(marginBottom != null) {
+                        marginBottom.start();
+                    }
+                    if(marginLeft != null) {
+                        marginLeft.start();
+                    }
+                    if(marginRight != null) {
+                        marginRight.start();
+                    }
                 }
                                 
                 if(!isInProgress()) {
@@ -2623,7 +2737,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHover(int[] x, int[] y) {
-        pointerDragged(x, y);
     }
 
     void clearDrag() {
@@ -2637,10 +2750,18 @@ public class Component implements Animation, StyleListener {
             }
         }
         if (draggedMotionY != null) {
-            if (draggedMotionY.getValue() < 0) {
+            int dmv = draggedMotionY.getValue();
+            if (dmv < 0) {
                 setScrollY(0);
-            } else if (draggedMotionY.getValue() > getScrollDimension().getHeight() - getHeight()) {
-                setScrollY(getScrollDimension().getHeight() - getHeight());
+            } else {
+                int hh = getScrollDimension().getHeight() - getHeight();
+                if (dmv > hh) {
+                    if(hh < 0) {
+                        setScrollY(0);
+                    } else {
+                        setScrollY(hh);
+                    }
+                }
             }
         }
         draggedMotionX = null;
@@ -2665,7 +2786,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        pointerReleaseImpl(x[0], y[0]);
     }
 
     /**
@@ -2677,8 +2797,6 @@ public class Component implements Animation, StyleListener {
      * @param y the pointer y coordinate
      */
     public void pointerHoverPressed(int[] x, int[] y) {
-        dragActivated = false;
-        clearDrag();
     }
     
     /**
@@ -2843,8 +2961,11 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * This method adds a refresh task to the Component, the task will be 
-     * executed if the user has pulled the scroll beyond a certain height.
+     * <p>This method adds a refresh task to the Component, the task will be 
+     * executed if the user has pulled the scroll beyond a certain height.</p>
+     * 
+     * <script src="https://gist.github.com/codenameone/da87714157f97c739b2a.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/pull-to-refresh.png" alt="Simple pull to refresh demo" />
      * 
      * @param task the refresh task to execute.
      */ 
@@ -2861,6 +2982,9 @@ public class Component implements Animation, StyleListener {
      */
     public void pointerDragged(final int x, final int y) {
         Form p = getComponentForm();
+        if(p == null){
+            return;
+        }
         
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
@@ -2879,7 +3003,7 @@ public class Component implements Animation, StyleListener {
                     }
                 });
             }
-            
+                      
             if (!dragActivated) {
                 dragActivated = true;
                 setVisible(false);
@@ -2920,8 +3044,8 @@ public class Component implements Animation, StyleListener {
             }
             if(scrollParent != null){
                 Style s = getStyle();
-                int w = getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT);
-                int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
+                int w = getWidth() - s.getHorizontalPadding();
+                int h = getHeight() - s.getVerticalPadding();
 
                 Rectangle view;
                 int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
@@ -2956,6 +3080,10 @@ public class Component implements Animation, StyleListener {
                 
             return;
         }
+        if(dragActivated && p.getDraggedComponent() == null){
+            dragActivated = false;
+        }
+        
         if(!dragActivated){
             boolean draggedOnX = Math.abs(p.initialPressX - x) > Math.abs(p.initialPressY - y);
             shouldGrabScrollEvents = (isScrollableX() && draggedOnX) || isScrollableY() && !draggedOnX;
@@ -3267,7 +3395,7 @@ public class Component implements Animation, StyleListener {
             }
             if(dropTargetComponent != null) {
                 p.repaint(x, y, getWidth(), getHeight());
-                getParent().scrollRectToVisible(x, y, getWidth(), getHeight(), getParent());
+                getParent().scrollRectToVisible(getX(), getY(), getWidth(), getHeight(), getParent());
                 if(dropListener != null) {
                     ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
                     dropListener.fireActionEvent(ev);
@@ -3488,7 +3616,7 @@ public class Component implements Animation, StyleListener {
         }
         isUnselectedStyle = false;
 
-        if(hasLead) {
+        if(hasLead && !blockLead) {
             Component lead = getLeadComponent();
             if(lead != null) {
                 if(!lead.isEnabled()) {
@@ -3587,6 +3715,9 @@ public class Component implements Animation, StyleListener {
             selectedStyle.addStyleListener(this);
             if (selectedStyle.getBgPainter() == null) {
                 selectedStyle.setBgPainter(new BGPainter());
+            }
+            if(cellRenderer) {
+                selectedStyle.markAsRendererStyle();
             }
         }
         return selectedStyle;
@@ -3754,7 +3885,9 @@ public class Component implements Animation, StyleListener {
             unSelectedStyle = getUnselectedStyle();
             selectedStyle = null;
             disabledStyle = null;
-            pressedStyle = null;        
+            pressedStyle = null;       
+            allStyles = null;
+            
         }
         checkAnimation();
         manager.getLookAndFeel().bind(this);
@@ -3882,6 +4015,8 @@ public class Component implements Animation, StyleListener {
                         startTensile(dragVal, getScrollDimension().getHeight() - getHeight() + iv, true);
                     } else {
                         if (snapToGrid && getScrollY() < edge && getScrollY() > 0) {
+                            boolean tVal = tensileDragEnabled;
+                            tensileDragEnabled = true;
                             int dest = getGridPosY();
                             int scroll = getScrollY();
                             if (dest != scroll) {
@@ -3889,6 +4024,7 @@ public class Component implements Animation, StyleListener {
                             } else {
                                 draggedMotionY = null;
                             }
+                            tensileDragEnabled = tVal;
                         } else {
                             draggedMotionY = null;
                         }
@@ -3923,6 +4059,8 @@ public class Component implements Animation, StyleListener {
                         startTensile(dragVal, getScrollDimension().getWidth() - getWidth(), false);
                     } else {
                         if (snapToGrid && getScrollX() < edge && getScrollX() > 0) {
+                            boolean tVal = tensileDragEnabled;
+                            tensileDragEnabled = true;
                             int dest = getGridPosX();
                             int scroll = getScrollX();
                             if (dest != scroll) {
@@ -3930,6 +4068,7 @@ public class Component implements Animation, StyleListener {
                             } else {
                                 draggedMotionX = null;
                             }
+                            tensileDragEnabled = tVal;
                         } else {
                             draggedMotionX = null;
                         }
@@ -3957,8 +4096,9 @@ public class Component implements Animation, StyleListener {
         
         
         Painter bgp = getStyle().getBgPainter();
-        animateBackground = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
-
+        boolean animateBackgroundB = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation)bgp).animate();
+        animateBackground = animateBackgroundB || animateBackground;
+                
         if(getUIManager().getLookAndFeel().isFadeScrollBar()) {
             if(tensileHighlightIntensity > 0) {
                 tensileHighlightIntensity = Math.max(0, tensileHighlightIntensity - (scrollOpacityChangeSpeed * 2));
@@ -4015,8 +4155,8 @@ public class Component implements Animation, StyleListener {
         if (isScrollable()) {
             int scrollPosition = getScrollY();
             Style s = getStyle();
-            int w = getWidth() - s.getPadding(isRTL(), LEFT) - s.getPadding(isRTL(), RIGHT);
-            int h = getHeight() - s.getPadding(false, TOP) - s.getPadding(false, BOTTOM);
+            int w = getWidth() - s.getHorizontalPadding();
+            int h = getHeight() - s.getVerticalPadding();
 
             Rectangle view;
             int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
@@ -4059,7 +4199,7 @@ public class Component implements Animation, StyleListener {
                     setScrollX(relativeX);
                 }
                 int rightX = relativeX + width - 
-                        s.getPadding(LEFT) - s.getPadding(RIGHT);
+                        s.getHorizontalPadding();
                 if (getScrollX() + w < rightX) {
                     setScrollX(getScrollX() + (rightX - (getScrollX() + w)));
                 } else {
@@ -4074,7 +4214,7 @@ public class Component implements Animation, StyleListener {
                     scrollPosition = relativeY;
                 }
                 int bottomY = relativeY + height - 
-                        s.getPadding(TOP) - s.getPadding(BOTTOM);
+                        s.getVerticalPadding();
                 if (getScrollY() + h < bottomY + invisibleAreaUnderVKB) {
                     scrollPosition = getScrollY() + (bottomY - (getScrollY() + h)) + invisibleAreaUnderVKB;
                 } else {
@@ -4147,6 +4287,11 @@ public class Component implements Animation, StyleListener {
      */
     public void setCellRenderer(boolean cellRenderer) {
         this.cellRenderer = cellRenderer;
+        if(cellRenderer) {
+            getUnselectedStyle().markAsRendererStyle();
+            getSelectedStyle().markAsRendererStyle();
+            getDisabledStyle().markAsRendererStyle();
+        }
     }
 
     /**
@@ -4424,8 +4569,8 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Used to reduce coupling between the TextArea component and display/implementation
-     * classes thus reduce the size of the hello world MIDlet
+     * Used to reduce coupling between the {@link TextArea} component and display/implementation
+     * classes thus reduce the size of the hello world 
      * 
      * @param text text after editing is completed
      */
@@ -5051,7 +5196,7 @@ public class Component implements Animation, StyleListener {
         } else {
             setPreferredSize(null);
             if(changeMargin) {
-                if(getUnselectedStyle().getMargin(LEFT) == 0) {
+                if(getUnselectedStyle().getMarginLeftNoRTL() == 0) {
                     setUIID(getUIID());
                 }
             }

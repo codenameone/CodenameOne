@@ -35,6 +35,7 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.layouts.BorderLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
@@ -50,6 +51,7 @@ import java.io.Writer;
  * @author Shai Almog
  */
 public class Log {
+    private static boolean crashBound;
     /**
      * Constant indicating the logging level Debug is the default and the lowest level
      * followed by info, warning and error
@@ -99,6 +101,8 @@ public class Log {
     public static int REPORTING_PRODUCTION = 3; 
     
     private int reporting = REPORTING_NONE;
+
+    private static boolean initialized;
     
     /**
      * Indicates the level of log reporting, this allows developers to send device logs to the cloud
@@ -168,7 +172,7 @@ public class Log {
         r.addArgument("p", Display.getInstance().getProperty("package_name", ""));
         r.addArgument("v", Display.getInstance().getProperty("AppVersion", "0.1"));
         r.addArgument("pl", Display.getInstance().getPlatformName());
-        r.addArgument("u", Display.getInstance().getProperty("udid", ""));
+        //r.addArgument("u", Display.getInstance().getProperty("udid", ""));
         com.codename1.io.NetworkManager.getInstance().addToQueueAndWait(r);
         return Preferences.get("UDeviceId__$", (long)-1);
     }
@@ -321,6 +325,18 @@ public class Log {
      * @param level one of DEBUG, INFO, WARNING, ERROR
      */
     protected void print(String text, int level) {
+        if(!initialized) {
+            initialized  = true;
+            try {
+                InputStream is = Display.getInstance().getResourceAsStream(getClass(), "/cn1-version-numbers");
+                if(is != null) {
+                    print("Codename One revisions: " + Util.readToString(is), INFO);
+                }
+            } catch(IOException err) {
+                // shouldn't happen...
+                err.printStackTrace();
+            }
+        }
         if(this.level > level) {
             return;
         }
@@ -413,6 +429,7 @@ public class Log {
      * the application any way it sees fit
      * 
      * @return string containing the whole log
+     * @deprecated this was practical in old J2ME devices but hasn't been maintained in ages, use sendLog() instead
      */
     public static String getLogContent() {
         try {
@@ -540,14 +557,26 @@ public class Log {
                 if(consumeError) {
                     evt.consume();
                 }
-                p("Exception in AppName version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
+                p("Exception in " + Display.getInstance().getProperty("AppName", "app") + " version " + Display.getInstance().getProperty("AppVersion", "Unknown"));
                 p("OS " + Display.getInstance().getPlatformName());
                 p("Error " + evt.getSource());
-                p("Current Form " + Display.getInstance().getCurrent().getName());
+                if(Display.getInstance().getCurrent() != null) {
+                    p("Current Form " + Display.getInstance().getCurrent().getName());
+                } else {
+                    p("Before the first form!");
+                }
                 e((Throwable)evt.getSource());
                 sendLog();
             }
         });
-        
+        crashBound = true;
+    }
+    
+    /**
+     * Returns true if the user bound crash protection
+     * @return true if crash protection is bound
+     */
+    public static boolean isCrashBound() {
+        return crashBound;
     }
 }

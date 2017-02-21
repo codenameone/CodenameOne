@@ -265,6 +265,17 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+        g.translate(x, y);
+        float scaleX = ((float)w) / ((float)size.getWidth());
+        float scaleY = ((float)h) / ((float)size.getHeight());
+        paintScaled(g, scaleX, scaleY);
+        g.translate(-x, -y);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
     public int getWidth() {
         if(scaledTo != null) {
             return scaledTo.getWidth();

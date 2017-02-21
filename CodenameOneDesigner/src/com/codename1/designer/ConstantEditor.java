@@ -26,6 +26,7 @@ package com.codename1.designer;
 
 import com.codename1.designer.ResourceEditorView;
 import com.codename1.ui.util.EditableResources;
+import java.awt.Dimension;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -61,6 +62,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("defaultCommandImage", "Image to give a command with no icon");
         helpMap.put("dialogButtonCommandsBool", "Place commands in the dialogs as buttons");
         helpMap.put("dialogPosition", "Place the dialog in an arbitrary border layout position (e.g. North, South, Center etc.)");
+        helpMap.put("dialogBlurRadiusInt", "Sets the default Gaussian blur radius for the background of the dialogs. The default value is -1 indicating no blur");
         helpMap.put("centeredPopupBool", "Popup of the combo box will appear in the center of the screen");
         helpMap.put("changeTabOnFocusBool","Usefull for feature phones, allows changing the tab when the focus changes immediately without pressing a key");
         helpMap.put("checkBoxCheckDisImage","CheckBox image to use instead of Codename One drawing it on its own");
@@ -71,11 +73,11 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("checkBoxUncheckedImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("checkBoxUncheckedFocusImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("comboImage", "Combo image to use instead of Codename One drawing it on its own");
-        helpMap.put("commandBehavior", "Indicates how commands should act, as a touch menu, native menu etc. Possible values: SoftKey, Touch, Bar, Title, Right, Native");
+        helpMap.put("commandBehavior", "Indicates how commands should act, as a touch menu, native menu etc. Possible values: SoftKey, Touch, Bar, Title, Right, Native, ics, Side");
         helpMap.put("ComponentGroupBool", "Enables component group which allows components to be logically grouped together so the UIID's of components would be modified based on their group placement. This allows for some unique styling effects where the first/last elements have different styles from the rest of the elements. Its disabled by default thus leaving its usage up to the designer.");
-        helpMap.put("dialogTransitionIn", "Default transition for dialog");
+        helpMap.put("dialogTransitionIn", "Default transition for dialog Possible values: empty, slide, cover, uncover, fade, pulse, bubble");
         helpMap.put("dialogTransitionInImage", "Default transition Image for dialog, causes a Timeline transition effect");
-        helpMap.put("dialogTransitionOut", "Default transition for dialog");
+        helpMap.put("dialogTransitionOut", "Default transition for dialog Possible values: empty, slide, cover, uncover, fade");
         helpMap.put("defaultCommandImage","An image to place on a command if none is defined, only applies to touch commands");
         helpMap.put("defaultEmblemImage","The emblem painted on the side of the multibutton, by default this is an arrow on some platforms");
         helpMap.put("dialogTransitionOutImage", "Default transition Image for dialog, causes a Timeline transition effect");
@@ -94,10 +96,11 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("firstCharRTLBool", "Indicates to the GenericListCellRenderer that it should determine RTL status based on the first character in the sentence");
         helpMap.put("noTextModeBool","Indicates that the on-off switch in iOS shouldn't draw text on top of the switch which is the case for iOS 7+ but not for prior versions");
         helpMap.put("fixedSelectionInt", "Number corresponding to the fixed selection constants in List");
-        helpMap.put("formTransitionIn", "Default transition for form");
+        helpMap.put("formTransitionIn", "Default transition for form Possible values: empty, slide, cover, uncover, fade, pulse, bubble");
         helpMap.put("formTransitionInImage", "Default transition Image for form, causes a Timeline transition effect");
-        helpMap.put("formTransitionOut", "Default transition for form");
+        helpMap.put("formTransitionOut", "Default transition for form Possible values: empty, slide, cover, uncover, fade, pulse, bubble");
         helpMap.put("formTransitionOutImage", "Default transition Image for form, causes a Timeline transition effect");
+        helpMap.put("globalToobarBool", "Turns the toolbar API on/off globally");
         helpMap.put("hideBackCommandBool","Hides the back command from the side menu when possible");
         helpMap.put("hideEmptyTitleBool", "Indicates that a title with no content should be hidden even if the border for the title occupies space");
         helpMap.put("hideLeftSideMenuBool","Hides the side menu icon that appears on the left side of the UI");
@@ -119,13 +122,14 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("menuSlideDirection", "Defines menu entrance effect");
         helpMap.put("menuSlideInDirBool", "Defines menu entrance effect");
         helpMap.put("menuSlideOutDirBool", "Defines menu entrance effect");
-        helpMap.put("menuTransitionIn", "Defines menu entrance effect");
+        helpMap.put("menuTransitionIn", "Defines menu entrance effect Possible values: empty, slide, cover, uncover, fade, pulse, bubble");
         helpMap.put("menuTransitionInImage", "Defines menu entrance effect");
-        helpMap.put("menuTransitionOut", "Defines menu exit effect");
+        helpMap.put("menuTransitionOut", "Defines menu exit effect Possible values: empty, slide, cover, uncover, fade");
         helpMap.put("menuTransitionOutImage", "Defines menu entrance effect");
         helpMap.put("menuWidthPercent", "Allows positioning and sizing the menu");
         helpMap.put("minimizeOnBackBool", "Indicates whether the form should minimize the entire application when the physical back button is pressed (if available) and no command is defined as the back command. Defaults to true.");
         helpMap.put("onOffIOSModeBool","Indicates whether the on-off switch should use the iOS or Android mode");
+        helpMap.put("OverlayThemes", "Specify themes that should be loaded to override properties of this theme.  Themes must be located in same directory as this theme.  <br>Delimit multiple themes by commas.<br>E.g. If you want the theme files theme2.res and theme3.res to override the styles of this theme, and they are located in the same directory as this theme, then you would have 'theme2,theme3' for the value of this constant.");
         helpMap.put("otherPopupRendererBool","Indicates that a separate renderer UIID/instance should be used to the list within the combo box popup");
         helpMap.put("PackTouchMenuBool", "Enables preferred sized packing of the touch menu (true by default), when set to false this allows manually determining the touch menu size using percentages");
         helpMap.put("paintsTitleBarBool","Indicates that the StatusBar UIID should be added to the top of the form to space down the title area as is the case on iOS 7+ where the status bar is painted on top of the UI");
@@ -201,7 +205,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.keySet().toArray(arr);
         Arrays.sort(arr, String.CASE_INSENSITIVE_ORDER);
         constant.setModel(new javax.swing.DefaultComboBoxModel(arr));
-        
+        help.setPreferredSize(new Dimension(400, 200));
         help.setText("<html><body>" + helpMap.get("comboImage") + "</body></html>");
         if(key != null) {
             constant.setSelectedItem(key.substring(1, key.length()));

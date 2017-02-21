@@ -41,11 +41,12 @@ import java.util.Collection;
 import java.util.Vector;
 
 /**
- * The on/off switch is a checkbox of sort (although it derives container) that represents its state as 
+ * <p>The on/off switch is a checkbox of sort (although it derives container) that represents its state as 
  * a switch each of which has a short label associated with it.
  * It has two types: Android and iOS. The types differ in the way that they are rendered.
  * The Android type (the default) is just a button with a label that can be moved/dragged between
- * the two states. The iOS version is more elaborate due to the look of that platform. 
+ * the two states. The iOS version is more elaborate due to the look of that platform. </p>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-onoffswitch.png" alt="The looks of the on-off switch">
  *
  * @author Shai Almog
  */
@@ -79,6 +80,12 @@ public class OnOffSwitch extends Container {
      */
     protected Dimension calcPreferredSize() {
         if(iosMode) {
+            if(switchMaskImage == null) {
+                switchMaskImage = UIManager.getInstance().getThemeImageConstant("switchMaskImage");
+                if(switchMaskImage == null) {
+                    return super.calcPreferredSize();
+                }
+            }
             return new Dimension(switchMaskImage.getWidth(), switchMaskImage.getHeight());
         }
         return super.calcPreferredSize();
@@ -192,8 +199,8 @@ public class OnOffSwitch extends Container {
                 switchButtonPadInt *= 2;
             }
             Style s = getStyle();
-            int x = getX() + s.getPadding(LEFT);
-            int y = getY() + s.getPadding(TOP);
+            int x = getX() + s.getPaddingLeftNoRTL();
+            int y = getY() + s.getPaddingTop();
             if(!value) {
                 if(deltaX > 0) {
                     dragged = false;

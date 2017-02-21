@@ -38,13 +38,33 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.LazyValue;
 
 /**
- * Contains common transition animations including the following:
+ * <p>Contains common transition animations that can be applied to forms &amp; components 
+ * including the following types:
  * <ol>
- * <li>Slide - the exiting form slides out of the screen while the new form slides in. 
- * <li>Fade - components fade into/out of the screen
- * <li>Timeline - uses an animation image as an alpha mask between the source/destination
+ * <li>Slide - the exiting form slides out of the screen while the new form slides in (can be vertical or horizontal). </li>
+ * <li>Slide Fade - slides the content pane while fading the title. This is the default iOS transition. </li>
+ * <li>Cover/Uncover - like slide only one of the forms remains in place while the other moves. </li>
+ * <li>Fade - components fade into/out of the screen<li>
+ * <li>Timeline - uses an animation image as an alpha mask between the source/destination</li>
  * </ol>
- * <p>Instances of this class are created using factory methods.
+ * 
+ * <p>
+ * The code below demonstrates the common transitions
+ * </p>
+ * <script src="https://gist.github.com/codenameone/47602e679f61712693bd.js"></script>
+ * <h4>Slide</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-slide.jpg" alt="Slide" />
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-vertical.jpg" alt="Slide" />
+ * 
+ * <h4>Slide Fade</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-slide-fade.jpg" alt="Slide Fade" />
+ * 
+ * <h4>Cover/Uncover</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-cover.jpg" alt="Cover" />
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-uncover.jpg" alt="Uncover" />
+ * 
+ * <h4>Fade</h4>
+ * <img src="https://www.codenameone.com/img/developer-guide/transition-fade.jpg" alt="Fade" />
  * 
  * @author Shai Almog, Chen Fishbein
  */
@@ -414,8 +434,7 @@ public final class CommonTransitions extends Transition {
             if (buffer == null) {
                 buffer = createMutableImage(w, h);
             } else {
-                // this might happen when screen orientation changes or a MIDlet moves
-                // to an external screen
+                // this might happen when screen orientation changes 
                 if(buffer.getWidth() != w || buffer.getHeight() != h) {
                     buffer = createMutableImage(w, h);
                     rgbBuffer = null;
@@ -474,25 +493,26 @@ public final class CommonTransitions extends Transition {
             int dest;
             int startOffset = 0;
             boolean direction = forward;
-            if ( (source.getUIManager().getLookAndFeel().isRTL())) {
-                    direction=!direction;
+            //flip the direction only for horizontal slides
+            if ((source.getUIManager().getLookAndFeel().isRTL()) && slideType == SLIDE_HORIZONTAL) {
+                direction = !direction;
             }
             if (slideType == SLIDE_HORIZONTAL) {
                 dest = w;
                 if(destination instanceof Dialog) {
                     startOffset = w - getDialogParent(destination).getWidth();
                     if(direction) {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(destination.isRTL(), Component.LEFT);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginLeft(destination.isRTL());
                     } else {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(destination.isRTL(), Component.RIGHT);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginRight(destination.isRTL());
                     }
                 } else {
                     if(source instanceof Dialog) {
                         dest = getDialogParent(source).getWidth();
                         if(direction) {
-                            dest += getDialogParent(source).getStyle().getMargin(source.isRTL(), Component.LEFT);
+                            dest += getDialogParent(source).getStyle().getMarginLeft(source.isRTL());
                         } else {
-                            dest += getDialogParent(source).getStyle().getMargin(source.isRTL(), Component.RIGHT);
+                            dest += getDialogParent(source).getStyle().getMarginRight(source.isRTL());
                         }
                     }
                 }
@@ -502,10 +522,10 @@ public final class CommonTransitions extends Transition {
                     startOffset = h - getDialogParent(destination).getHeight() -
                         getDialogTitleHeight((Dialog)destination);
                     if(direction) {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(false, Component.BOTTOM);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginBottom();
                     } else {
-                        startOffset -= getDialogParent(destination).getStyle().getMargin(false, Component.TOP);
-                        startOffset -= ((Dialog)destination).getTitleStyle().getMargin(false, Component.TOP);
+                        startOffset -= getDialogParent(destination).getStyle().getMarginTop();
+                        startOffset -= ((Dialog)destination).getTitleStyle().getMarginTop();
                         if(!drawDialogMenu && ((Dialog)destination).getCommandCount() > 0) {
                             Container p = ((Dialog)destination).getSoftButton(0).getParent();
                             if(p != null) {
@@ -518,10 +538,10 @@ public final class CommonTransitions extends Transition {
                         dest = getDialogParent(source).getHeight() +
                             getDialogTitleHeight((Dialog)source);
                         if(direction) {
-                            dest += getDialogParent(source).getStyle().getMargin(false, Component.BOTTOM);
+                            dest += getDialogParent(source).getStyle().getMarginBottom();
                         } else {
-                            dest += getDialogParent(source).getStyle().getMargin(false, Component.TOP);
-                            dest += ((Dialog)source).getTitleStyle().getMargin(false, Component.TOP);
+                            dest += getDialogParent(source).getStyle().getMarginTop();
+                            dest += ((Dialog)source).getTitleStyle().getMarginTop();
                             if(((Dialog)source).getCommandCount() > 0) {
                                 Container p = ((Dialog)source).getSoftButton(0).getParent();
                                 if(p != null) {
@@ -837,15 +857,23 @@ public final class CommonTransitions extends Transition {
             }
         }
         // for slow mutable images
-        if(buffer == null) {
-            paint(graphics, src, 0, 0);
+        if (buffer == null) {
             Component dest = getDestination();
-            dest.setX(src.getX());
-            dest.setY(src.getY());
-            dest.setWidth(src.getWidth());
-            dest.setHeight(src.getHeight());
-            graphics.setAlpha(position);
-            paint(graphics, dest, 0, 0);
+            Component srcCmp = src;
+            Component destCmp = dest;
+            int alpha = position;
+            if (src instanceof Dialog && dest instanceof Form) {
+                srcCmp = dest;
+                destCmp = src;
+                alpha = 255 - position;
+            }
+            paint(graphics, srcCmp, 0, 0);
+            destCmp.setX(srcCmp.getX());
+            destCmp.setY(srcCmp.getY());
+            destCmp.setWidth(srcCmp.getWidth());
+            destCmp.setHeight(srcCmp.getHeight());
+            graphics.setAlpha(alpha);
+            paint(graphics, destCmp, 0, 0);
             graphics.setAlpha(255);
             return;
         }
@@ -928,7 +956,7 @@ public final class CommonTransitions extends Transition {
         }
 
         boolean dir = forward;
-        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
+        if(dest != null && dest.getUIManager().getLookAndFeel().isRTL() && slideType == SLIDE_HORIZONTAL) {
             dir = !dir;
         }
         if(dir) {
@@ -1131,31 +1159,32 @@ public final class CommonTransitions extends Transition {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
-        if(cmp instanceof Dialog) {
-            if(transitionType != TYPE_FADE) {
-                if(!(getSource() instanceof Dialog && getDestination() instanceof Dialog && 
-                        cmp == getDestination())) {
-                    Painter p = cmp.getStyle().getBgPainter();
-                    cmp.getStyle().setBgPainter(null);
-                    g.translate(x, y);
-                    Dialog dlg = (Dialog)cmp;
-                    g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
-                    getDialogParent(dlg).paintComponent(g, false);
-                    g.translate(-x, -y);
-                    if(drawDialogMenu && dlg.getCommandCount() > 0) {
-                        Component menuBar = dlg.getSoftButton(0).getParent();
-                        if(menuBar != null) {
-                            g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
-                            menuBar.paintComponent(g, false);
-                        }
+        if (cmp instanceof Dialog) {
+            if (transitionType == TYPE_FADE && Display.getInstance().areMutableImagesFast()) {
+                cmp.paintComponent(g, background);
+                return;
+            }
+            if (!(getSource() instanceof Dialog && getDestination() instanceof Dialog
+                    && cmp == getDestination())) {
+                Painter p = cmp.getStyle().getBgPainter();
+                cmp.getStyle().setBgPainter(null);
+                g.translate(x, y);
+                Dialog dlg = (Dialog) cmp;
+                g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
+                getDialogParent(dlg).paintComponent(g, false);
+                g.translate(-x, -y);
+                if (drawDialogMenu && dlg.getCommandCount() > 0) {
+                    Component menuBar = dlg.getSoftButton(0).getParent();
+                    if (menuBar != null) {
+                        g.setClip(0, 0, cmp.getWidth(), cmp.getHeight());
+                        menuBar.paintComponent(g, false);
                     }
-
-                    g.setClip(cx, cy, cw, ch);
-                    cmp.getStyle().setBgPainter(p);
-                    return;
                 }
-            } 
-            cmp.paintComponent(g, background);
+                g.setClip(cx, cy, cw, ch);
+                cmp.getStyle().setBgPainter(p);
+            }else{
+                cmp.paintComponent(g, background);            
+            }
             return;
         }
         //g.clipRect(cmp.getAbsoluteX(), cmp.getAbsoluteY(), cmp.getWidth(), cmp.getHeight());

@@ -32,14 +32,17 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 
 /**
- * A complex button similar to MultiButton that breaks lines automatically and looks like a regular button (more or less).
- * Unlike the multi button the span button has the UIID style of a button.
+ * <p>A complex button similar to MultiButton that breaks lines automatically and looks like a regular button (more or less).
+ * Unlike the multi button the span button has the UIID style of a button.</p>
+ * <script src="https://gist.github.com/codenameone/7bc6baa3a0229ec9d6f6.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-spanbutton.png" alt="SpanButton Sample" />
  *
  * @author Shai Almog
  */
 public class SpanButton extends Container {
     private Button actualButton;
     private TextArea text;
+    private boolean shouldLocalize = true;
     
     /**
      * Default constructor will be useful when adding this to the GUI builder
@@ -69,6 +72,7 @@ public class SpanButton extends Container {
         text.setUIID("Button");
         text.setEditable(false);
         text.setFocusable(false);
+        text.setActAsLabel(true);
         removeBackground(text.getUnselectedStyle());
         removeBackground(text.getSelectedStyle());
         removeBackground(text.getPressedStyle());
@@ -94,6 +98,22 @@ public class SpanButton extends Container {
      */
     public String getTextUIID() {
         return text.getUIID();
+    }
+    
+    /**
+     * Returns the Style proxy object for the text of this span button.
+     * @return The Style object for the text of this span button.
+     */
+    public Style getTextAllStyles() {
+        return text.getAllStyles();
+    }
+    
+    /**
+     * Returns the Style object for the text of this span button.
+     * @return The Style object for the text of this span button.
+     */
+    public Style getTextStyle() {
+        return text.getStyle();
     }
     
     /**
@@ -124,7 +144,11 @@ public class SpanButton extends Container {
      * @param t text of the button
      */
     public void setText(String t) {
-        text.setText(getUIManager().localize(t, t));
+        if(shouldLocalize) {
+            text.setText(getUIManager().localize(t, t));
+        } else {
+            text.setText(t);
+        }
     }
 
     /**
@@ -280,5 +304,75 @@ public class SpanButton extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @return the shouldLocalize value
+     */
+    public boolean isShouldLocalize() {
+        return shouldLocalize;
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by default
+     * all text is localized so this allows disabling automatic localization for 
+     * a specific component.
+     * @param shouldLocalize the shouldLocalize to set
+     */
+    public void setShouldLocalize(boolean shouldLocalize) {
+        this.shouldLocalize = shouldLocalize;
+    }
+
+    /**
+     * Sets the pressed icon for the button
+     * @param i the icon
+     */
+    public void setPressedIcon(Image i) {
+        actualButton.setPressedIcon(i);
+    }
+    
+    /**
+     * Returns the pressed icon of the button
+     * @return the pressed icon
+     */
+    public Image getPressedIcon() {
+        return actualButton.getPressedIcon();
+    }
+
+
+    /**
+     * Sets the rollover icon for the button
+     * @param i the icon
+     */
+    public void setRolloverIcon(Image i) {
+        actualButton.setRolloverIcon(i);
+    }
+    
+    /**
+     * Returns the rollover icon of the button
+     * @return the pressed icon
+     */
+    public Image getRolloverIcon() {
+        return actualButton.getRolloverIcon();
+    }
+
+
+    /**
+     * Sets the disabled icon for the button
+     * @param i the icon
+     */
+    public void setDisabledIcon(Image i) {
+        actualButton.setDisabledIcon(i);
+    }
+    
+    /**
+     * Returns the disabled icon of the button
+     * @return the pressed icon
+     */
+    public Image getDisabledIcon() {
+        return actualButton.getDisabledIcon();
     }
 }

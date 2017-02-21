@@ -32,8 +32,18 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Abstracts the underlying application specific storage system such as RMS
- *
+ * <p>Abstracts the underlying application specific storage system, unlike the {@link com.codename1.io.FileSystemStorage}
+ * this class is a higher level abstraction. The {@code Storage} class is designed to be very portable and as
+ * such it has no support for staple file system capabilities such as hierarchies. <br>
+ * Check out a more thorough discussion of this API {@link com.codename1.io here}.
+ * </p>
+ * <p>
+ * The sample code below shows a simple storage browser tool in action:
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/a941ef1f2f398b2c1074.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/storage-list.png" alt="List of files within the storage" />
+ * 
  * @author Shai Almog
  */
 public class Storage {
@@ -77,7 +87,9 @@ public class Storage {
      */
     private static void init(Object data) {
         Util.getImplementation().setStorageData(data);
-        INSTANCE = new Storage();
+        if(INSTANCE == null) {
+            INSTANCE = new Storage();
+        }
     }
 
     /**
@@ -101,7 +113,7 @@ public class Storage {
         }
         return INSTANCE;
     }
-
+    
     /**
      * Storage is cached for faster access, however this might cause a problem with refreshing
      * objects since they are not cloned. Clearing the cache allows to actually reload from the
@@ -191,12 +203,17 @@ public class Storage {
     }
     
     /**
-     * Writes the given object to storage assuming it is an externalizable type
-     * or one of the supported types
+     * <p>Writes the given object to storage assuming it is an externalizable type
+     * or one of the supported types.</p>
+     * 
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
      *
      * @param name store name
      * @param o object to store
-     * @return true for success, false for failue
+     * @return true for success, false for failure
      */
     public boolean writeObject(String name, Object o) {
         name = fixFileName(name);
@@ -208,7 +225,10 @@ public class Storage {
             d.close();
             return true;
         } catch(Exception err) {
-            err.printStackTrace();
+            Log.e(err);
+            if(Log.isCrashBound()) {
+                Log.sendLog();
+            }
             Util.getImplementation().deleteStorageFile(name);
             Util.getImplementation().cleanup(d);
             return false;
@@ -216,7 +236,12 @@ public class Storage {
     }
 
     /**
-     * Reads the object from the storage, returns null if the object isn't there
+     * <p>Reads the object from the storage, returns null if the object isn't there</p>
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
+     *
      *
      * @param name name of the store
      * @return object stored under that name
@@ -238,7 +263,10 @@ public class Storage {
             cache.put(name, o);
             return o;
         } catch(Exception err) {
-            err.printStackTrace();
+            Log.e(err);
+            if(Log.isCrashBound()) {
+                Log.sendLog();
+            }
             Util.getImplementation().cleanup(d);
             return null;
         }
@@ -260,5 +288,13 @@ public class Storage {
      */
     public void setNormalizeNames(boolean normalizeNames) {
         this.normalizeNames = normalizeNames;
+    }
+    
+    /**
+     * Allows installing a custom storage instance to provide functionality such as seamless encryption
+     * @param s the storage instance
+     */
+    public static void setStorageInstance(Storage s) {
+        INSTANCE = s;
     }
 }

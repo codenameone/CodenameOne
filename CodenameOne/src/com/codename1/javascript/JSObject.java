@@ -24,7 +24,9 @@ package com.codename1.javascript;
 
 
 import com.codename1.util.Callback;
+import com.codename1.util.CallbackAdapter;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 
 /**
  * A Java Wrapper around a Javascript object. In Javascript there are only a few
@@ -477,12 +479,13 @@ public class JSObject {
     
     
     /**
-     * Sets a property on the underlying Javascript object.
+     * Sets a property on the underlying Javascript object. Equivalent of <code>this[key] = js;</code>.
      * @param key The name of the property to set on the current object.
      * @param js The value of the property.  This value should be provided as a 
      * Java value and it will be converted to the appropriate Javascript value.
      * See @ref JavascriptContext.set() for a conversion table of the Java to
      * Javascript type conversions.
+     * @param async If this flag is set, then the call will be asynchronous (will not wait for command to complete before continuing execution).
      */
     public void set(String key, Object js, boolean async){
         if ( js instanceof JSFunction ){
@@ -498,61 +501,145 @@ public class JSObject {
         context.set(key, js);
     }
     
+    /**
+     * Sets a property on this object.  This call is synchronous. Equivalent of <code>this[key] = value;</code>.
+     * @param key The name of the property.
+     * @param js A value for the property.  This may be a primitive type, a JSObject, or a JSFunction.
+     * @see #set(java.lang.String, java.lang.Object, boolean) 
+     */
     public void set(String key, Object js) {
         set(key, js, false);
     }
     
+    /**
+     * Sets a property on this object to an integer value. Equivalent of <code>this[key] = value;</code>.
+     * @param key The property name to set.
+     * @param value The value to assign to the property.
+     * @param async True if you want this call to be asynchronous.
+     */
     public void setInt(String key, int value, boolean async){
         set(key, new Double(value), async);
     }
+    
+    /**
+     * Sets a property on this object to an integer value synchronously. Equivalent of <code>this[key] = value;</code>.
+     * @param key The name of the property to set.
+     * @param value The integer value of to set.
+     */
     public void setInt(String key, int value) {
         set(key, value, false);
     }
     
+    /**
+     * Sets a property on this object to a double value. Equivalent of <code>this[key] = value;</code>.
+     * @param key The name of the property to set
+     * @param value The value to set.
+     * @param async True if you want this call to be asynchronous.
+     */
     public void setDouble(String key, double value, boolean async){
         set(key, new Double(value), async);
     }
     
+    /**
+     * Sets a property on this object to a double value synchronously. Equivalent of <code>this[key] = value;</code>.
+     * @param key The name of the property to set
+     * @param value The value to set.
+     */
     public void setDouble(String key, double value) {
         set(key, value, false);
     }
     
+    /**
+     * Sets a property on this object to a boolean value. Equivalent of <code>this[key] = value;</code>.
+     * @param key The name of the property to set
+     * @param value The value to set.
+     * @param async True if you want this call to be asynchronous.
+     */
     public void setBoolean(String key, boolean value, boolean async){
         set(key, value ? Boolean.TRUE : Boolean.FALSE);
     }
     
+    /**
+     * Sets a property on this object to a boolean value synchronously.  Equivalent of <code>this[key] = value;</code>.
+     * @param key The name of the property to set
+     * @param value The value to set.
+     */
     public void setBoolean(String key, boolean value) {
         setBoolean(key, value, false);
     }
     
+    /**
+     * Sets an indexed value on this object (assuming this object is a Javascript array).  Equivalent of <code>this[index] = js;</code>.
+     * @param index The index to set.
+     * @param js The object to set.  This may be a primitive type, a String, a JSObject, or a JSFunction.
+     * @param async True to make this call asynchronously.
+     */
     public void set(int index, Object js, boolean async){
         context.set(toJSPointer()+"["+index+"]", js, async);
     }
     
+    /**
+     * Sets an indexed value on this object synchronously (assuming this object is a Javascript array).  Equivalent of <code>this[index] = js;</code>.
+     * @param index The index to set.
+     * @param js The object to set.  This may be a primitive type, a String, a JSObject, or a JSFunction.
+     */
     public void set(int index, Object js) {
         set(index, js, false);
     }
     
+    /**
+     * Sets an indexed value on this array to an integer.  Assumes this object is a Javascript array. Equivalent of <code>this[index] = value;</code>.
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     * @param async True to make this call asynchronous.
+     */
     public void setInt(int index, int value, boolean async){
         set(index, new Double(value), async);
     }
     
+    /**
+     * Sets an indexed value on this array to an integer synchronously.  Assumes this object is a Javascript array. Equivalent of <code>this[index] = value;</code>.
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     */
     public void setInt(int index, int value) {
         set(index, value, false);
     }
     
+    /**
+     * Sets an indexed value on this array to a double.  Assumes this object is a Javascript array. Equivalent of <code>this[index] = value;</code>.
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     * @param async True to make this call asynchronous.
+     */
     public void setDouble(int index, double value, boolean async){
         set(index, new Double(value), async);
     }
     
+    /**
+     * Sets an indexed value on this array to a double synchronously.  Assumes this object is a Javascript array. Equivalent of <code>this[index] = value;</code>.
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     */
     public void setDouble(int index, double value) {
         set(index, value, false);
     }
     
+    /**
+     * Sets an indexed value on this array to a boolean.  Assumes this object is a Javascript array. Equivalent of <code>this[index] = value;</code>.
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     * @param async True to make this call asynchronous.
+     */
     public void setBoolean(int index, boolean value, boolean async){
         set(index, value ? Boolean.TRUE : Boolean.FALSE, async);
     }
     
+    /**
+     * Sets an indexed value on this array to a boolean synchronously.  Assumes this object is a Javascript array. Equivalent of <code>this[index] = value;</code>.
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     */
     public void setBoolean(int index, boolean value) {
         setBoolean(index, value, false);
     }
@@ -625,26 +712,89 @@ public class JSObject {
      */
     public Object call(String key, Object[] params){
         return context.call(toJSPointer()+"."+key, this, params);
-        
     }
     
+    /**
+     * Calls a method on the underlying Javascript object asynchronously.
+     * @param key The name of the method to call.
+     * @param params Array of parameters to pass to the method.  These will be 
+     * converted to corresponding Javascript types according to the translation 
+     * table specified in {@link JavascriptContext#set(String,Object)}
+     * @param callback Callback to be called when the method call is completed.
+     */
     public void callAsync(String key, Object[] params, Callback callback) {
         context.callAsync(this, this, params, callback);
     }
     
+    /**
+     * Calls a method on the underlying Javascript object asynchronously.
+     * @param key The name of the method to call.
+     * @param params Array of parameters to pass to the method.  These will be 
+     * converted to corresponding Javascript types according to the translation 
+     * table specified in {@link JavascriptContext#set(String,Object)}
+     * @param callback Callback to be called when the method call is completed.
+     */
+    public void callAsync(String key, Object[] params, final SuccessCallback callback) {
+        this.callAsync(key, params, new CallbackAdapter() {
+
+            @Override
+            public void onSucess(Object value) {
+                callback.onSucess(value);
+            }
+            
+        });
+    }
+    
+    /**
+     * Calls a method on the underlying Javascript object synchronously with no arguments.
+     * @param key The name of the method.
+     * @return The return value of the method.  
+     */
     public Object call(String key){
         return call(key, new Object[]{});
     }
     
+    /**
+     * Calls a method on the underlying Javascript object asynchronously with no arguments.
+     * @param key The name of the method.
+     * @param callback Callback to be called with the return value.
+     */
     public void callAsync(String key, Callback callback) {
         callAsync(key, new Object[]{}, callback);
     }
     
+    /**
+     * Calls a method on the underlying Javascript object asynchronously with no arguments.
+     * @param key The name of the method.
+     * @param callback Callback to be called with the return value.
+     */
+    public void callAsync(String key, final SuccessCallback callback) {
+        callAsync(key, new CallbackAdapter() {
+
+            @Override
+            public void onSucess(Object value) {
+                callback.onSucess(value);
+            }
+            
+        });
+    }
+    
+    /**
+     * Calls a method on the underlying Javascript object that returns an int.   Called synchronously with no arguments.
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
     public int callInt(String key){
         Double d = (Double)call(key);
         return d.intValue();
     }
     
+    /**
+     * Calls a method on the underlying Javascript object that returns an int.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
     public void callIntAsync(String key, final Callback<Integer> callback) {
         callDoubleAsync(key, new Callback<Double>() {
 
@@ -659,29 +809,128 @@ public class JSObject {
         });
     }
     
+    /**
+     * Calls a method on the underlying Javascript object that returns an int.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callIntAsync(String key, final SuccessCallback<Integer> callback) {
+        callIntAsync(key, new CallbackAdapter<Integer>() {
+
+            @Override
+            public void onSucess(Integer value) {
+                callback.onSucess(value);
+            }
+            
+        });
+    }
+    
+    /**
+     * Calls a method on the underlying Javascript object that returns a double.   Called synchronously with no arguments.
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
     public double callDouble(String key){
         Double d = (Double)call(key);
         return d.doubleValue();
     }
     
+    /**
+     * Calls a method on the underlying Javascript object that returns a double.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
     public void callDoubleAsync(String key, Callback<Double> callback) {
         callAsync(key, callback);
     }
     
+    /**
+     * Calls a method on the underlying Javascript object that returns a double.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callDoubleAsync(String key, final SuccessCallback<Double> callback) {
+        callDoubleAsync(key, new CallbackAdapter<Double>() {
+
+            @Override
+            public void onSucess(Double value) {
+                callback.onSucess(value);
+            }
+            
+        });
+    }
+    
+    /**
+     * Calls a method on the underlying Javascript object that returns a String.   Called synchronously with no arguments.
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
     public String callString(String key){
         return (String)call(key);
     }
     
+    /**
+     * Calls a method on the underlying Javascript object that returns a String.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
     public void callStringAsync(String key, Callback<String> callback) {
         callAsync(key, callback);
     }
     
+    /**
+     * Calls a method on the underlying Javascript object that returns a String.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callStringAsync(String key, final SuccessCallback<String> callback) {
+        callStringAsync(key, new CallbackAdapter<String>() {
+
+            @Override
+            public void onSucess(String value) {
+                callback.onSucess(value);
+            }
+        });
+    }
+    
+    /**
+     * Calls a method on the underlying Javascript object that returns a Javascript object.   Called synchronously with no arguments.
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
     public JSObject callObject(String key){
         return (JSObject)call(key);
     }
     
+    /**
+     * Calls a method on the underlying Javascript object that returns a Javascript object.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
     public void callObjectAsync(String key, Callback<JSObject> callback) {
         callAsync(key, callback);
+    }
+    
+    /**
+     * Calls a method on the underlying Javascript object that returns a Javascript object.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     * @param key The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callObjectAsync(String key, final SuccessCallback<JSObject> callback) {
+        callObjectAsync(key, new CallbackAdapter<JSObject>() {
+
+            @Override
+            public void onSucess(JSObject value) {
+                callback.onSucess(value);
+            }
+        });
     }
     
     /**
@@ -706,14 +955,78 @@ public class JSObject {
      * @return The result of the javascript function call converted to the appropriate
      * Java type.
      */
-    public Object call(Object[] params){
+    public Object call(Object... params){
         JSObject window = (JSObject)context.get("window");
         return context.call(this, window, params);
     }
     
-   
+    /**
+     * Calls the object as a function statically.  The call is made asynchronously  In this case "this" will
+     * be window.
+     * 
+     * <p>E.g.</p>
+     * <code><pre>
+     * JSObject alert = (JSObject)ctx.get("window.alert");
+     * alert.call(new Object[]{"An alert message"});
+     * </pre></code>
+     * <p>The above gets a reference to the alert() function (remember functions are
+     * objects in Javascript).  Then it calls
+     * it via Java, passing it a single string parameter.  This is equivalent 
+     * to the following Javasript:</p>
+     * <p><code><pre>
+     * alert("An alert message");
+     * </pre></code></p>
+     * 
+     * @param params The parameters to pass to the function.  These will be converted
+     * to the appropriate Javascript type.
+     * @param callback The result of the javascript function call converted to the appropriate
+     * Java type and passed to the callback.
+     */
     public void callAsync(Object[] params, Callback callback) {
         context.callAsync(this, context.getWindow(), params, callback);
     }
+    
+    /**
+     * Calls the object as a function statically.  The call is made asynchronously  In this case "this" will
+     * be window.
+     * 
+     * <p>E.g.</p>
+     * <code><pre>
+     * JSObject alert = (JSObject)ctx.get("window.alert");
+     * alert.call(new Object[]{"An alert message"});
+     * </pre></code>
+     * <p>The above gets a reference to the alert() function (remember functions are
+     * objects in Javascript).  Then it calls
+     * it via Java, passing it a single string parameter.  This is equivalent 
+     * to the following Javasript:</p>
+     * <p><code><pre>
+     * alert("An alert message");
+     * </pre></code></p>
+     * 
+     * @param params The parameters to pass to the function.  These will be converted
+     * to the appropriate Javascript type.
+     * @param callback The result of the javascript function call converted to the appropriate
+     * Java type and passed to the callback.
+     */
+    public void callAsync(Object[] params, final SuccessCallback callback) {
+        callAsync(params, new CallbackAdapter() {
+
+            @Override
+            public void onSucess(Object value) {
+                callback.onSucess(value);
+            }
+             
+        });
+    }
+
+    /**
+     * Returns the toString from the JavaScript object effectively the equivalent of {@code callString("toString")}
+     * @return the String representation of the JavaScript object
+     */
+    @Override
+    public String toString() {
+        return callString("toString");
+    }
+
     
 }

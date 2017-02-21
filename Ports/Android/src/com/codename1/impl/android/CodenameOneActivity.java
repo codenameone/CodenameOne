@@ -25,21 +25,20 @@ package com.codename1.impl.android;
 
 import android.app.Activity;
 import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.database.Cursor;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.PowerManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Window;
+import android.widget.Toast;
 import com.codename1.payment.Product;
 import com.codename1.payment.PurchaseCallback;
+import com.codename1.payment.Receipt;
 import com.codename1.payments.v3.IabException;
 import com.codename1.payments.v3.IabHelper;
 import com.codename1.payments.v3.IabResult;
@@ -52,14 +51,14 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
-import java.util.StringTokenizer;
+import java.util.UUID;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class CodenameOneActivity extends Activity {
 
@@ -70,6 +69,7 @@ public class CodenameOneActivity extends Activity {
     private boolean waitingForResult;
     private boolean background;
     private Vector intentResult = new Vector();
+    boolean requestForPermission = false;
     
     //private final Object lock = new Object();
     private Inventory inventory;
@@ -102,7 +102,7 @@ public class CodenameOneActivity extends Activity {
         }
     };
     IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {
-        public void onIabPurchaseFinished(final IabResult result, final String sku, Purchase purchase) {
+        public void onIabPurchaseFinished(final IabResult result, final String sku, final Purchase purchase) {
             // if we were disposed of in the meantime, quit.
             if (mHelper == null) {
                 return;
@@ -132,6 +132,24 @@ public class CodenameOneActivity extends Activity {
 
                         @Override
                         public void run() {
+                            // Sandbox transactions have no order ID, so we'll make a dummy transaction ID
+                            // in this case.
+                            String transactionId = (purchase.getOrderId() == null || purchase.getOrderId().isEmpty()) ? 
+                                    "play-sandbox-"+UUID.randomUUID().toString() : purchase.getOrderId();
+                            String purchaseJsonStr = purchase.getOriginalJson();
+                            try {
+                                // In order to verify receipts, we'll need both the order data and the signature
+                                // so we'll pack it all into a single JSON string.
+                                JSONObject purchaseJson = new JSONObject(purchaseJsonStr);
+                                JSONObject rootJson = new JSONObject();
+                                rootJson.put("data", purchaseJson);
+                                rootJson.put("signature", purchase.getSignature());
+                                purchaseJsonStr = rootJson.toString();
+                                
+                            } catch (JSONException ex) {
+                                Logger.getLogger(CodenameOneActivity.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                            com.codename1.payment.Purchase.postReceipt(Receipt.STORE_CODE_PLAY, sku, transactionId, purchase.getPurchaseTime(), purchaseJsonStr);
                             pc.itemPurchased(sku);     
                         }
                     });
@@ -146,7 +164,6 @@ public class CodenameOneActivity extends Activity {
             if (!isConsumable(sku)) {
                 return;
             }
-
             if(purchase.getItemType().equals(IabHelper.ITEM_TYPE_INAPP)){
                 mHelper.consumeAsync(purchase, mConsumeFinishedListener);                
             }
@@ -243,9 +260,8 @@ public class CodenameOneActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        AndroidImplementation.activity = this;
+        AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onResume();
-        waitingForResult = false;
         background = false;
     }
 
@@ -279,9 +295,15 @@ public class CodenameOneActivity extends Activity {
     }
 
     @Override
+    public void onBackPressed() {
+        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
+        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
+    }
+    
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        AndroidImplementation.activity = this;
+        AndroidImplementation.setActivity(this);
         AndroidNativeUtil.onCreate(savedInstanceState);
 
         if (android.os.Build.VERSION.SDK_INT >= 11) {
@@ -331,6 +353,7 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     protected void onStop() {
+        AndroidImplementation.clearAppArg();
         super.onStop();
         background = true;
         unlockScreen();
@@ -378,6 +401,9 @@ public class CodenameOneActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
         super.onPause();
         AndroidNativeUtil.onPause();
     }
@@ -516,7 +542,14 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void setIntentResultListener(IntentResultListener l) {
+        //if the activity is waiting for result don't override the intent listener
+        if(waitingForResult){
+            return;
+        }
         this.intentResultListener = l;
+        if (l != null && l != defaultResultListener) {
+            waitingForResult = true;
+        }
     }
 
     public void setDefaultIntentResultListener(IntentResultListener l) {
@@ -524,19 +557,36 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void restoreIntentResultListener() {
+        waitingForResult = false;
         setIntentResultListener(defaultResultListener);
     }
 
     @Override
     public void startActivityForResult(Intent intent, int requestCode) {
-        waitingForResult = true;
+        Bundle extra = intent.getExtras();
+        if(extra != null && extra.containsKey("WaitForResult") && !extra.getBoolean("WaitForResult")){
+            waitingForResult = false;            
+        }else{
+            waitingForResult = true;
+        }
         intentResult = new Vector();
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
         super.startActivityForResult(intent, requestCode);
     }
 
     @Override
     public void startActivity(Intent intent) {
-        waitingForResult = true;
+        Bundle extra = intent.getExtras();
+        if(extra != null && extra.containsKey("WaitForResult") && !extra.getBoolean("WaitForResult")){
+            waitingForResult = false;            
+        }else{
+            waitingForResult = true;
+        }
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
         super.startActivity(intent);
     }
 
@@ -648,4 +698,29 @@ public class CodenameOneActivity extends Activity {
         return true;
     }
 
+    public void setRequestForPermission(boolean requestForPermission) {
+        this.requestForPermission = requestForPermission;
+    }
+
+    public boolean isRequestForPermission() {
+        return requestForPermission;
+    }
+
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if(grantResults != null || grantResults.length == 0) {
+            requestForPermission = false;
+            return;
+        }
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            Log.i("Codename One", "PERMISSION_GRANTED");
+        } else {
+            // Permission Denied
+            Toast.makeText(this, "Permission is denied", Toast.LENGTH_SHORT).show();
+        }
+        requestForPermission = false;
+    }
+    
+    public boolean hasUI(){
+        return true;
+    }
 }

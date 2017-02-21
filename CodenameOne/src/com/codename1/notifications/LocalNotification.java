@@ -47,13 +47,7 @@ import com.codename1.ui.Image;
  * be repeating).
  * 
  * <h3>Usage</h3>
- * <code><pre>
- * LocalNotification n = new LocalNotification();
- * n.setId("hello"); // An ID for the notification.
- * n.setAlertBody("Some content");  // A description to be displayed for the notification
- * n.setAlertTitle("Hello World");  // Title to be displayed for notification
- * Display.getInstance().sendLocalNotification(n, System.currentTimeMillis() + 10000, LocalNotification.REPEAT_FIFTEEN_MINUTES);
- * </pre></code>
+ * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
  * 
  * @author shannah
  * @see com.codename1.ui.Display#scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) 

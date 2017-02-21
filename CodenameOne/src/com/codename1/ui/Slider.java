@@ -33,10 +33,26 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * The slider component serves both as a slider widget to allow users to select
+ * <p>The slider component serves both as a slider widget to allow users to select
  * a value on a scale via touch/arrows and also to indicate progress. The slider
- * defaults to percentage display but can represent any positive set of values.
+ * defaults to percentage display but can represent any positive set of values.</p>
+ * <img src="https://www.codenameone.com/img/developer-guide/slider.png" alt="Sample Slider" />
+ * 
+ * <p>
+ * {@code Slider} is very versatile and can be used to represent things as diverse as the 5 star ranking UI
+ * demonstrated below. Notice that for the UI to work correctly you need to enclose it in a layout that preserves
+ * its preferred size like flow layout.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/fbdde74e699174a16b31.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-slider.png" alt="Star Ranking Slider" />
  *
+ * <p>
+ * Slider can be used as a progress indicator for network operations when combined with the 
+ * {@link com.codename1.components.SliderBridge} component:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/051bfa054fd3024c8292.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/network-sliderbridge.png" alt="SliderBridge progress for downloading the image in the slow network mode" />
+ * 
  * @author Shai Almog
  */
 public class Slider extends Label {
@@ -250,7 +266,38 @@ public class Slider extends Label {
         }
         return("");
     }
-    
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderFullUnselectedStyle() {
+        return sliderFull;
+    }
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full and selected
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderFullSelectedStyle() {
+        return sliderFullSelected;
+    }
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderEmptyUnselectedStyle() {
+        return super.getUnselectedStyle();
+    }
+
+    /**
+     * Returns the {@link com.codename1.ui.plaf.Style} used to paint the slider when its full and selected
+     * @return the Style object that shows a completely full style.
+     */
+    public Style getSliderEmptySelectedStyle() {
+        return super.getSelectedStyle();
+    }
 
     /**
      * {@inheritDoc}
@@ -302,10 +349,10 @@ public class Slider extends Label {
             }
         }
         if (prefH != 0) {
-            prefH += (style.getPadding(false, Component.TOP) + style.getPadding(false, Component.BOTTOM));
+            prefH += style.getVerticalPadding();
         }
         if (prefW != 0) {
-            prefW += (style.getPadding(isRTL(), Component.RIGHT) + style.getPadding(isRTL(), Component.LEFT));
+            prefW += style.getHorizontalPadding();
         }
         return new Dimension(prefW, prefH);
     }

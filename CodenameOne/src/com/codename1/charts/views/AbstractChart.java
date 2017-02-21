@@ -35,6 +35,7 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle2D;
 import com.codename1.charts.util.ColorUtil;
 import com.codename1.charts.util.MathHelper;
+import com.codename1.ui.plaf.UIManager;
 
 
 
@@ -405,17 +406,20 @@ public abstract class AbstractChart  {
    * @return the text to fit into the space
    */
   private String getFitText(String text, float width, Paint paint) {
-    String newText = text;
-    int length = text.length();
-    int diff = 0;
-    while (paint.measureText(newText) > width && diff < length) {
-      diff++;
-      newText = text.substring(0, length - diff) + "...";
-    }
-    if (diff == length) {
-      newText = "...";
-    }
-    return newText;
+      if(UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points()) {
+        String newText = text;
+        int length = text.length();
+        int diff = 0;
+        while (paint.measureText(newText) > width && diff < length) {
+          diff++;
+          newText = text.substring(0, length - diff) + "...";
+        }
+        if (diff == length) {
+          newText = "...";
+        }
+        return newText;
+      }
+      return text;
   }
 
   /**

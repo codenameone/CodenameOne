@@ -27,7 +27,9 @@ import com.codename1.codescan.CodeScanner;
 import com.codename1.components.FileTree;
 import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
+import com.codename1.db.Cursor;
 import com.codename1.db.Database;
+import com.codename1.db.Row;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
@@ -57,6 +59,9 @@ import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.ImageIO;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -69,7 +74,10 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.Vector;
@@ -339,6 +347,27 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Checks whether the native text editor is currently visible over top of the 
+     * given component (usually a {@code TextArea}
+     * @param c The textarea/component we are checking
+     * @return True if the native editor is visible.
+     */
+    public boolean isNativeEditorVisible(Component c) {
+        return this.isNativeInputSupported() && this.isEditingText(c);
+    }
+    
+    /**
+     * Called when TextArea text is changed.  Can be used by the native 
+     * implementation to trigger an update to the native editor if in async edit
+     * mode.
+     * @param c The TextArea that is being edited.
+     * @param text 
+     */
+    public void updateNativeEditorText(Component c, String text) {
+        
+    }
+    
+    /**
      * In case of scrolling we can hide the text editor unless the user starts typing again,
      * this is only relevant for the async mode...
      */
@@ -382,6 +411,14 @@ public abstract class CodenameOneImplementation {
      */
     public boolean isEditingText(Component c) {
         return editingText == c;
+    }
+    
+    /**
+     * Gets the component that is currently editing text
+     * @return 
+     */
+    public Component getEditingText() {
+        return editingText;
     }
 
     /**
@@ -461,6 +498,38 @@ public abstract class CodenameOneImplementation {
     protected void paintOverlay(Graphics g) {
     }
 
+    /**
+     * Calculates the paintable bounds of a component.  The paintable bounds is 
+     * the bounds (in screen coordinates) that will be vislble on the screen.  This
+     * accounts for possible clipping by parent components.
+     * @param c The component whose paintable bounds we are interested in.
+     * @param out A rectangle to return the bounds in.
+     */
+    private void getPaintableBounds(Component c, Rectangle out) {
+        int x = c.getAbsoluteX() + c.getScrollX();
+        int y = c.getAbsoluteY() + c.getScrollY();
+        int x2 = x + c.getWidth();
+        int y2 = y + c.getHeight();
+        
+        Container parent = null;
+        if ((parent = c.getParent()) != null) {
+            getPaintableBounds(parent, out);
+            x = Math.max(out.getX(), x);
+            y = Math.max(out.getY(), y);
+            x2 = Math.min(out.getX() + out.getWidth(), x2);
+            y2 = Math.min(out.getY() + out.getHeight(), y2);
+            
+            
+        }
+        out.setBounds(x, y, x2-x, y2-y);
+        
+    }
+   
+    /**
+     * For use inside paintDirty() so that we don't have to instantiate
+     * a rectangle each time it is called.
+     */
+    private Rectangle paintDirtyTmpRect = new Rectangle();
     
     /**
      * Invoked by the EDT to paint the dirty regions
@@ -502,12 +571,13 @@ public abstract class CodenameOneImplementation {
                     }
 
                     cmp.paintComponent(wrapper);
-                    int cmpAbsX = cmp.getAbsoluteX() + cmp.getScrollX();
+                    getPaintableBounds(cmp, paintDirtyTmpRect);
+                    int cmpAbsX = paintDirtyTmpRect.getX();
                     topX = Math.min(cmpAbsX, topX);
-                    bottomX = Math.max(cmpAbsX + cmp.getWidth(), bottomX);
-                    int cmpAbsY = cmp.getAbsoluteY() + cmp.getScrollY();
+                    bottomX = Math.max(cmpAbsX + paintDirtyTmpRect.getWidth(), bottomX);
+                    int cmpAbsY = paintDirtyTmpRect.getY();
                     topY = Math.min(cmpAbsY, topY);
-                    bottomY = Math.max(cmpAbsY + cmp.getHeight(), bottomY);
+                    bottomY = Math.max(cmpAbsY + paintDirtyTmpRect.getHeight(), bottomY);
                 } else {
                     bottomX = dwidth;
                     bottomY = dheight;
@@ -546,7 +616,7 @@ public abstract class CodenameOneImplementation {
      * Flush the currently painted drawing onto the screen if using a double buffer
      */
     public abstract void flushGraphics();
-
+    
     /**
      * Returns a graphics object for use by the painting
      * 
@@ -566,6 +636,18 @@ public abstract class CodenameOneImplementation {
         codenameOneGraphics = g;
     }
 
+    /**
+     * A flag that can be overridden by a platform to indicate that native 
+     * peers are rendered behind the main codename one graphics layer.  The main
+     * effect of this is that Graphics will call clearRect() any time a native
+     * component is "painted" to poke a hole through the CN1 layer.
+     * @return 
+     */
+    public boolean paintNativePeersBehind() {
+        return false;
+    }
+    
+    
     /**
      * Installs the display lock allowing implementors to synchronize against the 
      * Display mutex, this method is invoked internally and should not be used.
@@ -895,6 +977,99 @@ public abstract class CodenameOneImplementation {
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
     }
     
+    /**
+     * Returns true if the platform supports a native image cache.  The native image cache
+     * is different than just {@link FileSystemStorage#hasCachesDir()}.  A native image cache
+     * is an image cache that the platform provides that is full transparent to Codename One
+     * with respect to how images are stored, and whether they are cached.  Currently only
+     * the Javascript port supprts a native image cache.
+     * 
+     * <p>This is used by {@link URLImage#createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }
+     * to determine if it should use a cached image, or to defer to its storage and filesystem methods.</p>
+     * @return True on platforms that support a native image cache.  Currently only Javascript.
+     * @see Display#supportsNativeImageCache() 
+     */
+    public boolean supportsNativeImageCache() {
+        return false;
+    }
+    
+    /**
+     * Downloads an image from a URL to the cache. Platforms
+     * that support a native image cache {@link #supportsNativeImageCache() } (e.g. Javascript) override this method to defer to the 
+     * platform's handling of cached images.  Platforms that have a caches directory ({@link FileSystemStorage#hasCachesDir() }
+     * will use that directory to cache the image.  Other platforms will just download to storage.
+     * 
+     * @param url The URL of the image to download.
+     * @param onSuccess Callback on success.
+     * @param onFail Callback on fail.
+     * 
+     * @see URLImage#createToCache(com.codename1.ui.EncodedImage, java.lang.String, com.codename1.ui.URLImage.ImageAdapter) 
+     */
+    public void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail) {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        if (fs.hasCachesDir()) {
+            String name = "cn1_image_cache["+url+"]";
+            name = StringUtil.replaceAll(name, "/", "_");
+            name = StringUtil.replaceAll(name, "\\", "_");
+            name = StringUtil.replaceAll(name, "%", "_");
+            name = StringUtil.replaceAll(name, "?", "_");
+            name = StringUtil.replaceAll(name, "*", "_");
+            name = StringUtil.replaceAll(name, ":", "_");
+            name = StringUtil.replaceAll(name, "=", "_");   
+            
+            String filePath = fs.getCachesDir() + fs.getFileSystemSeparator() + name;
+            
+            // We use Util.downloadImageToFileSystem rather than CodenameOneImplementation.downloadImageToFileSystem
+            // because we want it to try to load from file system first.
+            Util.downloadImageToFileSystem(url, filePath, onSuccess, onFail);
+        } else {
+            // We use Util.downloadImageToStorage rather than CodenameOneImplementation.downloadImageToStorage
+            // because we want it to try to load from storage first.
+            Util.downloadImageToStorage(url, "cn1_image_cache["+url+"]", onSuccess, onFail);
+        }
+    }
+    
+    /**
+     * Downloads an image to storage. This will *not* first check to see if the image is located in storage
+     * already.  It will download and overwrite any existing image at the provided location.
+     * 
+     * <p>Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
+     * the browser cache for downloading the image.</p>
+     * 
+     * @param url The URL of the image to download.
+     * @param fileName The storage key to be used to store the image.
+     * @param onSuccess Callback on success.  Will be executed on EDT.
+     * @param onFail Callback on failure.  Will be executed on EDT.
+     */
+    public void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setDuplicateSupported(true);
+        cr.setUrl(url);
+        cr.downloadImageToStorage(fileName, onSuccess, onFail);
+    }
+    
+    /**
+     * Downloads an image to file system. This will *not* first check to see if the file exists already.  
+     * It will download and overwrite any existing image at the provided location.
+     * 
+     * <p>Some platforms may override this method to use platform-level caching.  E.g. Javascript will use
+     * the browser cache for downloading the image.</p>
+     * 
+     * @param url The URL of the image to download.
+     * @param fileName The storage key to be used to store the image.
+     * @param onSuccess Callback on success.  Will be executed on EDT.
+     * @param onFail Callback on failure.  Will be executed on EDT.
+     */
+    public void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        ConnectionRequest cr = new ConnectionRequest();
+        cr.setPost(false);
+        cr.setFailSilently(true);
+        cr.setDuplicateSupported(true);
+        cr.setUrl(url);
+        cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
+    }
     
     /**
      * Returns the number of softkeys on the device
@@ -1233,6 +1408,16 @@ public abstract class CodenameOneImplementation {
     public abstract void setClip(Object graphics, int x, int y, int width, int height);
 
     /**
+     * Clips the Graphics context to the Shape.
+     * 
+     * @param graphics the graphics context
+     * @param shape The shape to clip.
+     */
+    public void setClip(Object graphics, Shape shape){
+        System.out.println("Shape clip is not supported");
+    }
+
+    /**
      * Changes the current clipping rectangle to subset the current clipping with
      * the given clipping.
      * 
@@ -1309,6 +1494,10 @@ public abstract class CodenameOneImplementation {
      * @param height the height of the rectangle to be filled.
      */
     public abstract void fillRect(Object graphics, int x, int y, int width, int height);
+    
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        System.out.println("clearRect() not implemented on this platform");
+    }
 
     /**
      * Draws a rectangle in the given coordinates
@@ -1488,6 +1677,7 @@ public abstract class CodenameOneImplementation {
      * @param graphics
      * @see isTransformSupported()
      * @see isPerspectiveTransformSupported()
+     * @deprecated Use {@link #getTransform(java.lang.Object, com.codename1.ui.Transform) } instead.
      */
     public Transform getTransform(Object graphics){
         return Transform.makeIdentity();
@@ -1535,6 +1725,16 @@ public abstract class CodenameOneImplementation {
     public boolean isShapeSupported(Object graphics){
         return false;
     }
+    
+    /**
+     * Checks if clipping shapes is supported by the provided graphics context.
+     * @param graphics
+     * @return 
+     */
+    public boolean isShapeClipSupported(Object graphics){
+        return false;
+    }
+    
     
 
     // END METHODS FOR DEALING WITH 2-D Paths
@@ -2236,7 +2436,7 @@ public abstract class CodenameOneImplementation {
                 Object imageGraphics = getNativeGraphics(r);
                 setColor(imageGraphics, endColor);
                 fillRect(imageGraphics, 0, 0, width, height);
-                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size);
+                fillRadialGradientImpl(imageGraphics, startColor, endColor, x2, y2, size, size, 0, 360);
                 drawImage(graphics, r, x, y);
                 if(radialGradientCache == null) {
                     radialGradientCache = new Hashtable();
@@ -2247,7 +2447,7 @@ public abstract class CodenameOneImplementation {
             setColor(graphics, endColor);
             fillRect(graphics, x, y, width, height);
 
-            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size);
+            fillRadialGradientImpl(graphics, startColor, endColor, x + x2, y + y2, size, size, 0, 360);
         }
         if(aa) {
             setAntiAliased(graphics, true);
@@ -2269,10 +2469,31 @@ public abstract class CodenameOneImplementation {
      * @param height the height of the region to be filled
      */
     public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
-        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height);
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, 0, 360);
+    }
+    
+    
+    /**
+     * Draws a radial gradient in the given coordinates with the given colors,
+     * doesn't take alpha into consideration when drawing the gradient.
+     * Notice that a radial gradient will result in a circular shape, to create
+     * a square use fillRect or draw a larger shape and clip to the appropriate size.
+     *
+     * @param graphics the graphics context
+     * @param startColor the starting RGB color
+     * @param endColor  the ending RGB color
+     * @param x the x coordinate
+     * @param y the y coordinate
+     * @param width the width of the region to be filled
+     * @param height the height of the region to be filled
+     * @param startAngle the beginning angle.  Zero is at 3 o'clock.  Positive angles are counter-clockwise.
+     * @param arcAngle the angular extent of the arc, relative to the start angle. Positive angles are counter-clockwise.
+     */
+    public void fillRadialGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        fillRadialGradientImpl(graphics, startColor, endColor, x, y, width, height, startAngle, arcAngle);
     }
 
-    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height) {
+    private void fillRadialGradientImpl(Object graphics, int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
         boolean aa = isAntiAliased(graphics);
         setAntiAliased(graphics, false);
         int sourceR = startColor >> 16 & 0xff;
@@ -2283,14 +2504,22 @@ public abstract class CodenameOneImplementation {
         int destB = endColor & 0xff;
         int oldColor = getColor(graphics);
         int originalHeight = height;
+        boolean outermost = true;
         while (width > 0 && height > 0) {
+            if (outermost) {
+                setAntiAliased(graphics, true);
+            }
             updateGradientColor(graphics, sourceR, sourceG, sourceB, destR,
                     destG, destB, originalHeight, height);
-            fillArc(graphics, x, y, width, height, 0, 360);
+            fillArc(graphics, x, y, width, height, startAngle, arcAngle);
             x++;
             y++;
             width -= 2;
             height -= 2;
+            if (outermost) {
+                outermost = false;
+                setAntiAliased(graphics, false);
+            }
         }
         setColor(graphics, oldColor);
         if(aa) {
@@ -4063,6 +4292,12 @@ public abstract class CodenameOneImplementation {
                 if(o instanceof Writer) {
                     ((Writer) o).close();
                 }
+                if(o instanceof Database) {
+                    ((Database)o).close();
+                }
+                if(o instanceof Cursor) {
+                    ((Cursor)o).close();
+                }
             }
         } catch (Throwable ex) {
             ex.printStackTrace();
@@ -4892,6 +5127,41 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * 
+     * Implementations should override the {@link #getLinkedContactIds(com.codename1.contacts.Contact) } method.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     * @see com.codename1.contacts.ContactsManager#getLinkedContacts(com.codename1.contacts.Contact) 
+     * 
+     */
+    //public final Contact[] getLinkedContacts(Contact c) {
+    //    String[] ids = getLinkedContactIds(c);
+    //    if (ids != null) {
+    //        Contact[] out = new Contact[ids.length];
+    //        int len = ids.length;
+    //        for (int i=0; i< len; i++) {
+    //            out[i] = getContactById(ids[i]);
+    //        }
+    //        return out;
+    //    }
+    //    return new Contact[0];
+    //}
+    
+    
+    /**
+     * Gets the IDs of all contacts that are linked to the provided contact.
+     * @param c The contact
+     * @return Array of IDs for contacts that are linked to {@code c}.
+     */
+    public String[] getLinkedContactIds(Contact c) {
+        if (c == null || c.getId() == null) {
+            return new String[0];
+        }
+        return new String[]{c.getId()};
+    }
+    
+    /**
      * Get a Contact according to it's contact id.
      * @param id unique id of the Contact
      * @return a Contact Object
@@ -4916,6 +5186,9 @@ public abstract class CodenameOneImplementation {
      */
     public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
         String[] arr = getAllContacts(withNumbers);
+        if(arr == null) {
+            return null;
+        }
         Contact[] retVal = new Contact[arr.length];
         int alen = arr.length;
         for(int iter = 0 ; iter  < alen ; iter++) {
@@ -5116,6 +5389,11 @@ public abstract class CodenameOneImplementation {
     public Object makeTransformTranslation(float translateX, float translateY, float translateZ) {
         throw new RuntimeException("Transforms not supported");
     }
+    
+    public void setTransformTranslation(Object nativeTransform, float translateX, float translateY, float translateZ) {
+        setTransformIdentity(nativeTransform);
+        transformTranslate(nativeTransform, translateX, translateY, translateZ);
+    }
 
     /**
      * Makes a new native scale transform.  Each implementation can decide the format
@@ -5130,6 +5408,11 @@ public abstract class CodenameOneImplementation {
      */
     public Object makeTransformScale(float scaleX, float scaleY, float scaleZ) {
         throw new RuntimeException("Transforms not supported");
+    }
+    
+    public void setTransformScale(Object nativeTransform, float scaleX, float scaleY, float scaleZ) {
+        setTransformIdentity(nativeTransform);
+        transformScale(nativeTransform, scaleX, scaleY, scaleZ);
     }
 
     /**
@@ -5146,6 +5429,11 @@ public abstract class CodenameOneImplementation {
      */
     public Object makeTransformRotation(float angle, float x, float y, float z) {
         throw new RuntimeException("Transforms not supported");
+    }
+    
+    public void setTransformRotation(Object nativeTransform, float angle, float x, float y, float z) {
+        setTransformIdentity(nativeTransform);
+        transformRotate(nativeTransform, angle, x, y, z);
     }
 
     /**
@@ -5164,6 +5452,11 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    public void setTransformPerspective(Object nativeTransform, float fovy, float aspect, float zNear, float zFar) {
+        Object persp = makeTransformPerspective(fovy, aspect, zNear, zFar);
+        copyTransform(persp, nativeTransform);
+    }
+    
     /**
      * Makes a new orthographic projection transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5182,6 +5475,11 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    public void setTransformOrtho(Object nativeTransform, float left, float right, float bottom, float top, float near, float far) {
+        Object ortho = makeTransformOrtho(left, right, bottom, top, near, far);
+        copyTransform(ortho, nativeTransform);
+    }
+    
     /**
      * Makes a transform to simulate a camera's perspective at a given location. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5203,6 +5501,11 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    public void setTransformCamera(Object nativeTransform, float eyeX, float eyeY, float eyeZ, float centerX, float centerY, float centerZ, float upX, float upY, float upZ) {
+        Object cam = makeTransformCamera(eyeX, eyeY, eyeZ,  centerX, centerY, centerZ, upX, upY, upZ);
+        copyTransform(cam, nativeTransform);
+    }
+    
     /**
      * Rotates the provided  transform.
      * @param nativeTransform The transform to rotate. Each implementation can decide the format
@@ -5216,7 +5519,8 @@ public abstract class CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public void transformRotate(Object nativeTransform, float angle, float x, float y, float z) {
-       throw new RuntimeException("Transforms not supported");
+       Object rot = makeTransformRotation(angle, x, y, z);
+       concatenateTransform(nativeTransform, rot);
     }
 
     
@@ -5233,7 +5537,8 @@ public abstract class CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public void transformTranslate(Object nativeTransform, float x, float y, float z) {
-        throw new RuntimeException("Transforms not supported");
+        Object tr = makeTransformTranslation(x, y, z);
+        concatenateTransform(nativeTransform, tr);
     }
 
     /**
@@ -5248,7 +5553,8 @@ public abstract class CodenameOneImplementation {
      * @see #isTransformSupported()
      */
     public void transformScale(Object nativeTransform, float x, float y, float z) {
-        throw new RuntimeException("Transforms not supported");
+        Object scale = makeTransformScale(x, y, z);
+        concatenateTransform(nativeTransform, scale);
     }
 
     /**
@@ -5266,6 +5572,10 @@ public abstract class CodenameOneImplementation {
        throw new RuntimeException("Transforms not supported");
     }
     
+    public void setTransformInverse(Object nativeTransform) throws Transform.NotInvertibleException {
+       copyTransform(makeTransformInverse(nativeTransform), nativeTransform);
+    }
+    
     /**
      * Makes a new identity native transform. Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5278,6 +5588,14 @@ public abstract class CodenameOneImplementation {
         throw new RuntimeException("Transforms not supported");
     }
 
+    /**
+     * Sets the given native transform to the identiy transform
+     * @param transform 
+     */
+    public void setTransformIdentity(Object transform) {
+        copyTransform(makeTransformIdentity(), transform);
+    }
+    
     /**
      * Copies the setting of one transform into another.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5295,7 +5613,7 @@ public abstract class CodenameOneImplementation {
      * Concatenates two transforms and sets the first transform to be the result of the concatenation.
      * <p>This can only be used if {@link #isTransformSupported()} returns true.</p>
      * @param t1 The left native transform.  The result will also be stored in this transform.
-     * @param t2 The right native transform.  The result will also be stored in this transform.
+     * @param t2 The right native transform.
      * @see #isTransformSupported()
      */
     public void concatenateTransform(Object t1, Object t2) {
@@ -5316,9 +5634,108 @@ public abstract class CodenameOneImplementation {
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
         throw new RuntimeException("Transforms not supported");
     }
-
-    // END TRANSFORMATION METHODS--------------------------------------------------------------------
     
+    /**
+     * Transforms a set of points using the provided transform.
+     * @param nativeTransform The transform to use for transforming the points
+     * @param pointSize The size of the points (either 2 or 3)
+     * @param in Input array of points.
+     * @param srcPos The start position of the input array
+     * @param out The output array of points
+     * @param destPos The start position of the output array.
+     * @param numPoints The number of points to transform.
+     */
+    public void transformPoints(Object nativeTransform, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        float[] bufIn = new float[pointSize];
+        float[] bufOut = new float[pointSize];
+        int len = numPoints * pointSize;
+        for (int i=0; i<len; i+= pointSize) {
+            System.arraycopy(in, srcPos + i, bufIn, 0, pointSize);
+            transformPoint(nativeTransform, bufIn, bufOut);
+            System.arraycopy(bufOut, 0, out, destPos + i, pointSize);
+        }
+    }
+    
+    /**
+     * Translates a set of points.
+     * @param pointSize The size of each point (2 or 3)
+     * @param tX Size of translation along x-axis
+     * @param tY Size of translation along y-axis
+     * @param tZ Size of translation along z-axis (only used if pointSize == 3)
+     * @param in Input array of points.
+     * @param srcPos Start position in input array
+     * @param out Output array of points
+     * @param destPos Start position in output array
+     * @param numPoints Number of points to translate.
+     */
+    public void translatePoints(int pointSize, float tX, float tY, float tZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        int len = numPoints * pointSize;
+        for (int i=0; i<len; i+=pointSize) {
+            int d0 = destPos + i;
+            int s0 = srcPos + i;
+            out[d0++] = in[s0++] + tX;
+            out[d0++] = in[s0++] + tY;
+            if (pointSize > 2) {
+                out[d0] = in[s0] + tZ;
+            }
+        }
+    }
+    
+    /**
+     * Scales a set of points.
+     * @param pointSize The size of each point (2 or 3)
+     * @param sX Scale factor along x-axis
+     * @param sY Scale factor along y-axis
+     * @param sZ Scale factor along z-axis (only used if pointSize == 3)
+     * @param in Input array of points.
+     * @param srcPos Start position in input array
+     * @param out Output array of points
+     * @param destPos Start position in output array
+     * @param numPoints Number of points to translate.
+     */
+    public void scalePoints(int pointSize, float sX, float sY, float sZ, float[] in, int srcPos, float[] out, int destPos, int numPoints) {
+        int len = numPoints * pointSize;
+        for (int i=0; i<len; i+=pointSize) {
+            int d0 = destPos + i;
+            int s0 = srcPos + i;
+            out[d0++] = in[s0++] * sX;
+            out[d0++] = in[s0++] * sY;
+            if (pointSize > 2) {
+                out[d0] = in[s0] * sZ;
+            }
+        }
+    }
+    
+
+    /**
+     * Clears the addressbook cache.  This is only necessary on iOS since its AddressBookRef is transactional.
+     */
+    public void refreshContacts() {
+        
+    }
+
+    /**
+     * Sets the given transform to the current transform in the given graphics object.
+     * @param nativeGraphics
+     * @param t 
+     */
+    public void getTransform(Object nativeGraphics, Transform t) {
+        t.setIdentity();
+    }
+
+    public boolean isScrollWheeling() {
+        return false;
+    }
+
+    /**
+     * Blocks or enables copy and paste in the entire app.
+     * @param blockCopyPaste True to block copy and paste.  False to enable it.
+     */
+    public void blockCopyPaste(boolean blockCopyPaste) {
+        
+    }
+
+    // END TRANSFORMATION METHODS--------------------------------------------------------------------    
     
     class RPush implements Runnable {
         public void run() {
@@ -5339,7 +5756,7 @@ public abstract class CodenameOneImplementation {
     public void registerPush(Hashtable metaData, boolean noFallback) {
         if(!noFallback) {
             Preferences.set("PollingPush", true);
-            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, getProperty("UDID", ""), getPackageName());
+            registerPushOnServer(getPackageName(), getApplicationKey(), (byte)10, "", getPackageName());
 
             // Call pushCallback's registeredForPush
             Display.getInstance().callSerially(new RPush());
@@ -5401,7 +5818,8 @@ public abstract class CodenameOneImplementation {
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
         Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
-        if(Preferences.get("push_id", (long)-1) == -1) {
+        Preferences.set("push_key", id);
+        /*if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);
             ConnectionRequest r = new ConnectionRequest() {
                 protected void readResponse(InputStream input) throws IOException  {
@@ -5426,7 +5844,7 @@ public abstract class CodenameOneImplementation {
             r.addArgument("r", packageName);
             NetworkManager.getInstance().addToQueueAndWait(r);
             return r.getResponseCode() == 200;
-        }
+        }*/
         return true;
     }
     
@@ -5444,11 +5862,24 @@ public abstract class CodenameOneImplementation {
         registerServerPush(id, applicationKey, pushType, udid, packageName);
     }
     
+    protected final void sendRegisteredForPush(String id) {
+        if (callback != null) {
+            callback.registeredForPush(id);
+        }
+    }
+    
+    
+    protected final void pushReceived(String data) {
+        if (callback != null) {
+            callback.push(data);
+        }
+    }
+    
     /**
      * For use by implementations, stop receiving push notifications from the server
      */
     public static void deregisterPushFromServer() {
-        long i = Preferences.get("push_id", (long)-1);
+        /*long i = Preferences.get("push_id", (long)-1);
         if(i > -1) {
             ConnectionRequest r = new ConnectionRequest();
             r.setPost(false);
@@ -5458,7 +5889,7 @@ public abstract class CodenameOneImplementation {
             NetworkManager.getInstance().addToQueue(r);
             Preferences.delete("push_id");
             Preferences.delete("push_key");
-        }
+        }*/
     }
     
     /**
@@ -5740,6 +6171,14 @@ public abstract class CodenameOneImplementation {
      */ 
     public void openNativeNavigationApp(double latitude, double longitude){    
     }
+
+    /**
+     * Opens the native navigation app with the given search location
+     * @param location the location to search for in the native navigation map
+     */ 
+    public void openNativeNavigationApp(String location) {    
+        execute("http://maps.google.com/?q=" + Util.encodeUrl(location));
+    }
     
     /**
      * Returns the UDID for devices that support it
@@ -5795,6 +6234,23 @@ public abstract class CodenameOneImplementation {
         return home;
     }
 
+     /**
+      * Returns true if the device has a directory dedicated for "cache" files
+      * @return true if a caches style directory exists in this device type
+      */
+     public boolean hasCachesDir() {
+         return false;
+     }
+
+     /**
+      * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+      * is false
+      * @return file URL or null
+      */
+     public String getCachesDir() {
+         return null;
+     }
+    
     /**
      * Uses the native cookie store if applicable, this might break simulator compatibility
      * @return the useNativeCookieStore
@@ -6491,12 +6947,12 @@ public abstract class CodenameOneImplementation {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         drawImage(nativeGraphics, icon, x, y);
                         drawLabelStringValign(nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, iconStringHGap, iconHeight, fontHeight, valign);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, iconStringHGap, iconHeight, fontHeight, valign);
                     } else {
                         iconStringHGap = (fontHeight - iconHeight) / 2;
                         drawImage(nativeGraphics, icon, x, y + iconStringHGap);
                         drawLabelString(nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                     }
                     break;
                 case Label.BOTTOM:
@@ -6505,13 +6961,13 @@ public abstract class CodenameOneImplementation {
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         drawImage(nativeGraphics, icon, x, y);
                         drawLabelString(nativeGraphics, nativeFont, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW,
-                                isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
                         drawImage(nativeGraphics, icon, x + iconStringWGap, y);
 
                         drawLabelString(nativeGraphics, nativeFont, text, x, y + iconHeight + gap, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                     }
                     break;
                 case Label.TOP:
@@ -6519,12 +6975,12 @@ public abstract class CodenameOneImplementation {
                     if (iconWidth > strWidth) { 
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         drawLabelString(nativeGraphics, nativeFont, text, x + iconStringWGap, y, textSpaceW, isTickerRunning,
-                                tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                tickerShiftText, textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                         drawImage(nativeGraphics, icon, x, y + fontHeight + gap);
                     } else {
                         iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
                         drawLabelString(nativeGraphics, nativeFont, text, x, y, textSpaceW, isTickerRunning, tickerShiftText,
-                                textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                                textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                         drawImage(nativeGraphics, icon, x + iconStringWGap, y + fontHeight + gap);
                     }
                     break;
@@ -6737,5 +7193,91 @@ public abstract class CodenameOneImplementation {
     public void cancelLocalNotification(String notificationId) {
     }
     //ENDS METHODS FOR DEALING Local Notifications
+
+    /**
+     * Sets the preferred time interval between background fetches.  This is only a
+     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign 
+     * control over when and if background fetches will be allowed. This number is used
+     * only as a guideline.
+     * 
+     * <p><strong>This method must be called in order to activate background fetch.</strong>></p>
+     * <p>Note: If the platform doesn't support background fetch (i.e. {@link #isBackgroundFetchSupported() } returns {@code false},
+     * then this method does nothing.</p>
+     * @param seconds The time interval in seconds.
+     * 
+     * @see #isBackgroundFetchSupported() 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        if (isBackgroundFetchSupported()) {
+            Preferences.set("$$CN1_BACKGROUND_FETCH_INTERVAL", seconds);
+        }
+    }
     
+    /**
+     * Gets the preferred time (in seconds) between background fetches.
+     * @return The time interval in seconds.
+     * @see #isBackgroundFetchSupported() 
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public int getPreferredBackgroundFetchInterval() {
+        if (isBackgroundFetchSupported()) {
+            return Preferences.get("$$CN1_BACKGROUND_FETCH_INTERVAL", 60 * 60);
+        } else {
+            return -1;
+        }
+    }
+    
+    /**
+     * Checks to see if the current platform supports background fetch.
+     * @return True if the current platform supports background fetch.
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     * @see com.codename1.ui.Display.setPreferredBackgroundFetchInterval(int)
+     */
+    public boolean isBackgroundFetchSupported() {
+        return false;
+    }
+    
+    public Image gaussianBlurImage(Image image, float radius) {
+        return image;
+    }
+
+    public boolean isGaussianBlurSupported() {
+        return false;
+    }
+    
+    /**
+     * Returns true if this device is jailbroken or rooted, false if not or unknown. Notice that this method isn't
+     * accurate and can't detect all jailbreak/rooting cases
+     * @return true if this device is jailbroken or rooted, false if not or unknown. 
+     */
+    public boolean isJailbrokenDevice() {
+        return false;
+    }
+    
+    /**
+     * Returns the build hints for the simulator, this will only work in the debug environment and it's 
+     * designed to allow extensions/API's to verify user settings/build hints exist
+     * @return map of the build hints that isn't modified without the codename1.arg. prefix
+     */
+    public Map<String, String> getProjectBuildHints() {
+        return null;
+    }
+
+    /**
+     * Sets a build hint into the settings while overwriting any previous value. This will only work in the 
+     * debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
+     * Important: this will throw an exception outside of the simulator!
+     * @param key the build hint without the codename1.arg. prefix
+     * @param value the value for the hint
+     */
+    public void setProjectBuildHint(String key, String value) {
+        throw new RuntimeException();
+    }
 }

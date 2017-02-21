@@ -43,17 +43,48 @@ import java.util.Collection;
 import java.util.Vector;
 
 /**
- * A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
- * and are extracted via the {@link com.codename1.ui.list.ListModel}.
- * <p>A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
+ * <p>A set of elements that is rendered using a {@link com.codename1.ui.list.ListCellRenderer}
+ * and are extracted via the {@link com.codename1.ui.list.ListModel}, <b>notice</b> that 
+ * <a href="https://www.codenameone.com/blog/avoiding-lists.html">we strongly
+ * discourage usage of lists</a>.<br>
+ * A list can represent many UI concepts ranging from a carousel to a "todo" checklist, this
  * is made possible thanks to extensive use of Swing's style of MVC. Specifically a list
  * component is relatively simple, it invokes the model in order to extract the displayed/selected
- * information and shows it to the user by invoking the cell renderer.
+ * information and shows it to the user by invoking the cell renderer.</p>
  * <p>The list class itself is completely decoupled from everything, thus it allows us to extract its
  * content from any source (e.g. network, storage etc.) and display the information in any form
- * (e.g. checkboxed elemenents, icons etc.).
+ * (e.g. checkboxed elemenents, icons etc.).</p>
+ * <h3>Important</h3>
+ * <p>
+ * {@code List} is a pretty complex class to use so we generally recommend developers use 
+ * {@link com.codename1.ui.Container}, 
+ * {@link com.codename1.components.InfiniteScrollAdapter} or {@link com.codename1.ui.InfiniteContainer}
+ * coupled with widgets such as {@link com.codename1.components.MultiButton}. Arranging those in a 
+ * {@link com.codename1.ui.layouts.BoxLayout} on the {@link com.codename1.ui.layouts.BoxLayout#Y_AXIS}
+ * can produce the functionality of the {@code List} with better performance and far simpler code!
+ * </p>
+ * <p>
+ * Another simpler alternative although not as attractive is the {@link com.codename1.ui.list.MultiList} class
+ * that removes a lot of the {@link com.codename1.ui.list.ListCellRenderer} related complexities inherent
+ * in building a list.
+ * </p>
+ * 
+ * <h4>Sample Usage</h4>
+ * <p>
+ * The sample below uses the {@link com.codename1.ui.list.GenericListCellRenderer} class instead of the 
+ * {@link com.codename1.ui.list.DefaultListCellRenderer}. We generally recommend using the builtin classes
+ * as the renderer is probably the greatest source of pitfalls in {@code Lists}.
+ * </p>
  *
+ * <script src="https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png" alt="Sample of using the generic list cell renderer" />
+ * 
+ * @see com.codename1.ui.Container
+ * @see com.codename1.ui.InfiniteContainer
+ * @see com.codename1.components.InfiniteScrollAdapter
+ * @see com.codename1.components.MultiButton
  * @see com.codename1.ui.list
+ * @see com.codename1.ui.list.MultiList
  * @author Chen Fishbein
  */
 public class List<T> extends Component {
@@ -463,7 +494,7 @@ public class List<T> extends Component {
         Rectangle pos = new Rectangle();
         Dimension rendererSize = getElementSize(false, true);
         Style style = getStyle();
-        int width = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         calculateComponentPosition(getCurrentSelected(), width, pos, rendererSize, getElementSize(true, true), true);
         pos.setX(pos.getX() + getX());
         pos.setY(pos.getY() + getY());
@@ -1052,8 +1083,8 @@ public class List<T> extends Component {
      */
     private void calculateComponentPosition(int index, int defaultWidth, Rectangle rect, Dimension rendererSize, Dimension selectedSize, boolean beforeSelected) {
         Style style = getStyle();
-        int initialY = style.getPadding(false, TOP);
-        int initialX = style.getPadding(false, LEFT);
+        int initialY = style.getPaddingTop();
+        int initialX = style.getPaddingLeftNoRTL();
 
         boolean rtl = isRTL();
         if (rtl) {
@@ -1077,7 +1108,7 @@ public class List<T> extends Component {
             d.setHeight(height);
             d.setWidth(defaultWidth);
             int y = 0;
-            int listHeight = getHeight() - style.getPadding(false, TOP) - style.getPadding(false, BOTTOM);
+            int listHeight = getHeight() - style.getVerticalPadding();
             int totalHeight = (height + itemGap) * getModel().getSize() + selectedDiff;
             switch (fixedSelection) {
                 case FIXED_CENTER:
@@ -1113,10 +1144,10 @@ public class List<T> extends Component {
             int width = rendererSize.getWidth();
             selectedDiff = selectedSize.getWidth() - width;
             rect.setY(initialY);
-            d.setHeight(getHeight() - style.getPadding(false, TOP) - style.getPadding(false, BOTTOM));
+            d.setHeight(getHeight() - style.getVerticalPadding());
             d.setWidth(width);
             int x = 0;
-            int listWidth = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT);
+            int listWidth = getWidth() - style.getHorizontalPadding();
             int totalWidth = (width + itemGap) * getModel().getSize() + selectedDiff;
             switch (fixedSelection) {
                 case FIXED_CENTER:
@@ -1197,9 +1228,9 @@ public class List<T> extends Component {
         getUIManager().getLookAndFeel().drawList(g, this);
 
         Style style = getStyle();
-        int width = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         if (isScrollableX()) {
-            width = Math.max(width, getScrollDimension().getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap());
+            width = Math.max(width, getScrollDimension().getWidth() - style.getHorizontalPadding() - getSideGap());
         }
         int numOfcomponents = model.getSize();
         if (numOfcomponents == 0) {
@@ -1414,10 +1445,10 @@ public class List<T> extends Component {
      */
     private void renderComponent(Graphics g, Component cmp, int x, int y, int width, int height) {
         Style s = cmp.getStyle();
-        int left = s.getMargin(isRTL(), LEFT);
-        int top =  s.getMargin(false, TOP);
-        cmp.setWidth(width - left - s.getMargin(isRTL(), RIGHT));
-        cmp.setHeight(height - top - s.getMargin(false, BOTTOM));
+        int left = s.getMarginLeft(isRTL());
+        int top =  s.getMarginTop();
+        cmp.setWidth(width - left - s.getMarginRight(isRTL()));
+        cmp.setHeight(height - top - s.getMarginBottom());
         cmp.setX(x + left);
         cmp.setY(y + top);
 
@@ -1439,10 +1470,10 @@ public class List<T> extends Component {
 
     private void renderComponentBackground(Graphics g, Component cmp, int x, int y, int width, int height) {
         Style s = cmp.getStyle();
-        int left = s.getMargin(isRTL(), LEFT);
-        int top =  s.getMargin(false, TOP);
-        cmp.setWidth(width - left - s.getMargin(isRTL(), RIGHT));
-        cmp.setHeight(height - top - s.getMargin(false, BOTTOM));
+        int left = s.getMarginLeft(isRTL());
+        int top =  s.getMarginTop();
+        cmp.setWidth(width - left - s.getMarginRight(isRTL()));
+        cmp.setHeight(height - top - s.getMarginBottom());
         cmp.setX(x + left);
         cmp.setY(y + top);
         int cX = g.getClipX();
@@ -1608,16 +1639,20 @@ public class List<T> extends Component {
     }
 
     /**
-     * The rendering prototype is optionally used in calculating the size of the
+     * <p>The rendering prototype is optionally used in calculating the size of the
      * List and is recommended for performance reasons. You should invoke it with an object
      * representing a theoretical value in the list which will be used to calculate
-     * the size required for each element in the list.
+     * the size required for each element in the list.</p>
      * <p>This allows list size calculations to work across look and feels and allows
-     * developers to predetermin size for list elements.
+     * developers to predetermine size for list elements.</p>
      * <p>e.g. For a list of Strings which you would like to always be 5 characters wide
      * you can use a prototype "XXXXX" which would use the preferred size of the XXXXX
      * String to determine the size of the list element. E.g. for a list of dates you can use
-     * new Date(30, 12, 00) etc..
+     * new Date(30, 12, 00) etc..</p>
+     * <p>The example below was designed for {@link com.codename1.ui.list.MultiList} but
+     * should work for any list. Its goal is to render 2 lines of text with 20 characters and a 
+     * 5mm square icon:</p>
+     * <script src="https://gist.github.com/codenameone/dc9c7f13f6b312d1edc8.js"></script>
      *
      * @param renderingPrototype a value that can be passed to the renderer to indicate the preferred
      * size of a list component.
@@ -1704,8 +1739,8 @@ public class List<T> extends Component {
             height = Math.max(height, d.getHeight());
             if(iter == 0) {
                 Style s = cmp.getStyle();
-                marginY = s.getMargin(TOP) + s.getMargin(BOTTOM);
-                marginX = s.getMargin(LEFT) + s.getMargin(RIGHT);
+                marginY = s.getVerticalMargins();
+                marginX = s.getHorizontalMargins();
             }
         }
         return new Dimension(width + marginX, height + marginY);
@@ -1771,14 +1806,6 @@ public class List<T> extends Component {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-        clearDrag();
-        if(!isDragActivated()) {
-            int selection = pointerSelect(x[0], y[0]);
-            if (selection > -1) {
-                model.setSelectedIndex(selection);
-            }
-        }
-        pointerDraggedImpl(x[0], y[0]);
     }
 
     /**
@@ -1839,7 +1866,7 @@ public class List<T> extends Component {
     public Rectangle getSelectedRect() {
         Style style = getStyle();
         Rectangle pos = new Rectangle();
-        int width = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         Dimension rendererSize = getElementSize(false, true);
         calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);
         pos.setX(pos.getX() + getParent().getAbsoluteX());
@@ -1856,9 +1883,9 @@ public class List<T> extends Component {
         Dimension selectedSize = getElementSize(true, true);
 
         Rectangle pos = new Rectangle();
-        int width = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT) - getSideGap();
+        int width = getWidth() - style.getHorizontalPadding() - getSideGap();
         if (isScrollableX()) {
-            width = Math.max(width, getScrollDimension().getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT) - getSideGap());
+            width = Math.max(width, getScrollDimension().getWidth() - style.getHorizontalPadding() - getSideGap());
         }
         y = y - getAbsoluteY();
         x = x - getAbsoluteX();
@@ -1868,7 +1895,7 @@ public class List<T> extends Component {
 
             if (orientation != HORIZONTAL) {
                 if(y < pos.getY()){
-                    selectedIndex = (y - style.getPadding(false, TOP)) / (rendererSize.getHeight() + itemGap);
+                    selectedIndex = (y - style.getPaddingTop()) / (rendererSize.getHeight() + itemGap);
                 }else{
                     int current = getSelectedIndex();
                     if(y < pos.getY() + selectedSize.getHeight()){
@@ -1896,7 +1923,7 @@ public class List<T> extends Component {
                     }
                 } else {
                     if (x < pos.getX()) {
-                        selectedIndex = (x - style.getPadding(false, LEFT)) / (rendererSize.getWidth() + itemGap);
+                        selectedIndex = (x - style.getPaddingLeftNoRTL()) / (rendererSize.getWidth() + itemGap);
                     } else {
                         int current = getSelectedIndex();
                         if (x < pos.getX() + selectedSize.getWidth()) {
@@ -1939,7 +1966,6 @@ public class List<T> extends Component {
      * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        pointerReleasedImpl(x[0], y[0], true, false);
     }
 
     
@@ -1984,7 +2010,7 @@ public class List<T> extends Component {
                 Component selectionCmp = renderer.getListCellRendererComponent(this, getSelectedItem(), getSelectedIndex(), true);
 
                 Style style = getStyle();
-                int width = getWidth() - style.getPadding(isRTL(), RIGHT) - style.getPadding(isRTL(), LEFT) - getSideGap();
+                int width = getWidth() - style.getHorizontalPadding() - getSideGap();
                 Rectangle pos = new Rectangle();
                 Dimension rendererSize = getElementSize(false, true);
                 calculateComponentPosition(getSelectedIndex(), width, pos, rendererSize, getElementSize(true, true), true);

@@ -206,7 +206,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     }
 
     /**
-     * Inidicates whether the default list cell renderer will show numbers by default
+     * Indicates whether the default list cell renderer will show numbers by default
      * when constructed
      *
      * @param def true to show numbers for all renderers created in the future
@@ -216,7 +216,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
     }
 
     /**
-     * Inidicates whether the default list cell renderer will show numbers by default
+     * Indicates whether the default list cell renderer will show numbers by default
      * when constructed
      *
      * @return true when showing numbers, false otherwise

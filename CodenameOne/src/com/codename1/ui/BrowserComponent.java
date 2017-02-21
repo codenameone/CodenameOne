@@ -33,16 +33,26 @@ import java.io.IOException;
 import java.util.Hashtable;
 
 /**
- * The browser component is an interface to an embeddable native platform browser on platforms
+ * <p>The browser component is an interface to an embeddable native platform browser on platforms
  * that support embedding the native browser in place, if you need wide compatibility and flexibility
  * you should check out the HTMLComponent which provides a lightweight 100% cross platform
- * web component.
+ * web component.<br>
  * This component will only work on platforms that support embedding a native browser which
  * exclude earlier versions of Blackberry devices and J2ME devices.<br>
  * Its recommended that you place this component in a fixed position (none scrollable) on the screen without other
  * focusable components to prevent confusion between focus authority and allow the component to scroll
- * itself rather than CodenameOne making that decision for it.
+ * itself rather than CodenameOne making that decision for it.</p>
  *
+ *  <p>On Android this component might show a native progress indicator dialog. You can disable that functionality
+ * using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.</p>
+ * 
+ * <p>
+ * The following code shows the basic usage of the {@code BrowserComponent}:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/20b6a17463152f90ebbb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-browsercomponent.png" alt="Simple usage of BrowserComponent" />
+ * 
+ * 
  * @author Shai Almog
  */
 public class BrowserComponent extends Container {
@@ -350,4 +360,24 @@ public class BrowserComponent extends Container {
         Display.impl.browserExposeInJavaScript(internal, o, name);
     }
 
+    /**
+     * Toggles debug mode for the browser component which helps detect coding errors in the JavaScript
+     * bridge logic
+     * @param mode true to debug false otherwise, this might have no effect in some platforms
+     */
+    public void setDebugMode(boolean mode) {
+        if(mode) {
+            putClientProperty("BrowserComponent.firebug", Boolean.TRUE);
+        } else {
+            putClientProperty("BrowserComponent.firebug", null);
+        }
+    }
+    
+    /**
+     * Indicates if debug mode is set (might have no effect though)
+     * @return true if debug mode was activated
+     */
+    public boolean isDebugMode() {
+        return getClientProperty("BrowserComponent.firebug") == Boolean.TRUE;
+    }
 }

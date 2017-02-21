@@ -4,8 +4,113 @@
     <title></title>
   </head>
     <body>
+        <h1>XPath based expression language designed to assist in JSON/XML parsing/generating</h1>
         <p>
-            IO Related tools and utilities, e.g. expression language to assist in JSON parsing
+            The {@link com.codename1.processing.Result} class provides a subset of 
+            <a href="http://www.w3schools.com/xsl/xpath_intro.asp">XPath</a>, but it is not limited to just XML 
+            documents, it can also work with JSON documents, and even with raw {@link java.util.Map} objects.
         </p>
+
+        <p>
+            As an example, we'll demonstrate how to process a response from the 
+            <a href="https://developers.google.com/maps/documentation/geocoding/">Google Reverse Geocoder API</a>.  
+            Lets start with this XML snippet:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/6470330d1a30d30760ed.js"></script>
+
+        <p>
+             We want to extract some of the data above into simpler string results. We can do this using:
+        </p>
+
+        <script src="https://gist.github.com/codenameone/966f9061a610330f5d03.js"></script>
+        
+        <p>
+            If you are at all familiar with processing responses from webservices, you will notice that what would 
+            normally require several lines of code of selecting and testing nodes in regular java can now be 
+            done in a single line using the new path expressions.
+        </p>
+
+        <p>
+             In the code above, input can be any of:
+        </p>
+        <ul>
+            <li>{@link java.lang.InputStream} directly from {@link com.codename1.io.ConnectionRequest#readResponse(java.io.InputStream)}</li>
+            <li>XML or JSON document in the form of a {@code String}</li>
+            <li>XML DOM {@link com.codename1.xml.Element} returned from {@link com.codename1.xml.XMLParser}</li>
+            <li>JSON DOM {@link java.util.Map} returned from {@link com.codename1.io.JSONParser}</li>
+        </ul>
+
+        <p>
+            To use the expression processor when calling a webservice, you could use something like the following to 
+            parse JSON (notice this is interchangeable between JSON and XML):
+        </p>
+
+        <script src="https://gist.github.com/codenameone/16c2752f8eebbfe245cc.js"></script>
+        
+        <p>
+            The returned JSON looks something like this (notice it's snipped because the data is too long):
+        </p>
+        
+        <script src="https://gist.github.com/codenameone/58a213197634fb8ea4c3.js"></script>
+        
+        <img src="https://www.codenameone.com/img/developer-guide/processing-package.png" alt="Running the geocode sample above in the simulator">
+
+     
+        <p>The XML processor currently handles global selections by using a double slash anywhere within the 
+            expression, for example:</p>
+
+<script src="https://gist.github.com/codenameone/416f9814dc7922677208.js"></script>
+
+        <blockquote><strong>NOTE:</strong> Notice that Google's JSON webservice uses plural form for each of 
+            the node names in that API  (ie. results, address_components, and types) where they don't in the XML services
+            (ie result, address_component etc.).</blockquote>
+
+        <h2>Example 2</h2>
+        <p>It also possible to do some more complex expressions.  We'll use the following XML fragment for the next batch of examples:</p>
+
+        <script src="https://gist.github.com/codenameone/c51305d0bd2f0a67b861.js"></script>
+        
+        <p>Above, if you want to select the IDs of all players that are ranked in the top 2, you can use an 
+            expression like:</p>
+        <script src="https://gist.github.com/codenameone/a334a5705c37f63d6590.js"></script>
+
+        <p>(Notice above that the expression is using an attribute for selecting both rank and id.  In JSON 
+            documents, if you attempt to select an attribute, it will look for a child node under the attribute name you ask for).</p>
+
+        <p>If a document is ordered, you might want to select nodes by their position, for example:</p>
+        <script src="https://gist.github.com/codenameone/36174cb1e0db7539f46f.js"></script>
+        
+        <p>It is also possible to select parent nodes, by using the ‘..' expression.  For example:</p>
+         <script src="https://gist.github.com/codenameone/dac601cd4ce442e7d082.js"></script>
+
+         <p>Above, we globally find a lastname element with a value of ‘Hewitt', then grab the parent node of 
+             lastname which happens to be the player node, then grab the id attribute from the player node.  
+             Alternatively, you could get the same result from the following simpler statement:</p>
+
+          <script src="https://gist.github.com/codenameone/66f32c76228dd494f2c1.js"></script>
+
+          <p>It is also possible to nest expressions, for example:</p>
+
+          <script src="https://gist.github.com/codenameone/1c02a6178b6004923c36.js"></script>
+
+          <p>In the above example, if the player node had an address object, we'd be selecting all players from Canada.  
+              This is a simple example of a nested expression, but they can get much more complex, which will be 
+              required as the documents themselves get more complex.<br/> Moving on, to select a node based 
+              on the existence of an attribute:</p>
+
+           <script src="https://gist.github.com/codenameone/1ecccc99a5870508ee9c.js"></script>
+
+           <p>Above, we selected the IDs of all ranked players.  Conversely, we can select the non-ranked players like this:</p>
+
+           <script src="https://gist.github.com/codenameone/c3b8bf065f75450a6494.js"></script>
+
+           <p>(Logical not (!) operators currently are not implemented).<br/>You can also select by the existence 
+               of a child node.</p>
+
+            <script src="https://gist.github.com/codenameone/3bdfd6be2cf62af5becd.js"></script>
+            <p> Above, we selected all players that have a middle name.<br/> 
+                    Keep in mind that the Codename One path expression language is not a full implementation of 
+                    XPath 1.0, but does already handle many of the most useful features of the specification. </p>
     </body>
 </html>

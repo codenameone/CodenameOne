@@ -23,15 +23,22 @@
 
 package com.codename1.components;
 
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
 /**
- * Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
+ * <p>Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
  * on a label but more convenient for some special circumstances. One major difference is that preferred size
- * equals the image in this case.
+ * equals the image in this case.<br>
+ * The default UIID for this component is "{@code Label}".
+ * </p>
+ * <script src="https://gist.github.com/codenameone/7289bbe5dad9e279eabb.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-scaleimage.png" alt="ScaleImageButton and ScaleImageLabel samples" />
+
  *
  * @author Shai Almog
  */
@@ -41,8 +48,10 @@ public class ScaleImageLabel extends Label {
      * Default constructor
      */
     public ScaleImageLabel() {
+        setUIID("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
+        getAllStyles().setBgTransparency(255);
     }
     
     /**
@@ -50,8 +59,10 @@ public class ScaleImageLabel extends Label {
      * @param i image
      */
     public ScaleImageLabel(Image i) {
+        setUIID("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
+        getAllStyles().setBgTransparency(255);
         setIcon(i);
     }
     
@@ -79,8 +90,22 @@ public class ScaleImageLabel extends Label {
     @Override
     protected Dimension calcPreferredSize() {
         Image i = getIcon();
+        if(i == null) {
+            return new Dimension();
+        }
+        int dw = Display.getInstance().getDisplayWidth();
+        int iw = i.getWidth();
+        int ih = i.getHeight();
+        
+        // a huge preferred width might be requested that is bigger than screen size. Normally this isn't a problem but in
+        // a scrollable container the vertical height might be granted providing so much space as to make this unrealistic...
+        if(iw > dw) {
+            float ratio = ((float)iw) / ((float)dw);
+            iw = (int) (((float)iw) / ((float)ratio));
+            ih = (int) (((float)ih) / ((float)ratio));
+        }
         Style s = getStyle();
-        return new Dimension(i.getWidth() + s.getPaddingLeft(false) + s.getPaddingRight(false), i.getHeight() +
+        return new Dimension(iw + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(), ih +
                 s.getPaddingTop() + s.getPaddingBottom());
     }
 
@@ -90,9 +115,37 @@ public class ScaleImageLabel extends Label {
      * @param i the image
      */
     public void setIcon(Image i) {
+        setShouldCalcPreferredSize(true);
         getAllStyles().setBgImage(i);
+        if(i !=null && i.isAnimation()) {
+            checkAnimation(i);
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     * 
+     * Overriden to support animations
+     */
+    @Override
+    protected void initComponent() {
+        super.initComponent(); 
+        checkAnimation(getIcon());
     }
     
+    
+    
+    void checkAnimation(Image icon) {
+        if(icon != null && icon.isAnimation()) {
+            Form parent = getComponentForm();
+            if(parent != null) {
+                // animations are always running so the internal animation isn't
+                // good enough. We never want to stop this sort of animation
+                parent.registerAnimated(this);
+            }
+        }
+    }
+        
     /**
      * Returns the background image
      * @return the bg image
@@ -106,6 +159,72 @@ public class ScaleImageLabel extends Label {
      */
     @Override
     public void setText(String text) {
+    }
+    
+    /**
+     * {@inheritDoc} 
+     * Overriden to prevent the setUIID from replacing the code
+     */
+    @Override
+    public void setUIID(String id) {
+        byte type = getBackgroundType();
+        Image icon = getIcon();
+        super.setUIID(id); 
+        setIcon(icon);
+        getAllStyles().setBackgroundType(type);
+        getAllStyles().setBgTransparency(255);
+    }
+
+    @Override
+    protected void refreshTheme(String id, boolean merge) {
+        byte type = getBackgroundType();
+        Image icon = getIcon();
+        super.refreshTheme(id, merge);
+        setIcon(icon);
+        getAllStyles().setBackgroundType(type);
+        getAllStyles().setBgTransparency(255);
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"backgroundType"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] { Byte.class };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"Byte"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("backgroundType")) {
+            return getBackgroundType();
+        }
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("backgroundType")) {
+            setBackgroundType(((Byte)value).byteValue());
+            return null;
+        }
+        return super.setPropertyValue(name, value);
     }
     
 }

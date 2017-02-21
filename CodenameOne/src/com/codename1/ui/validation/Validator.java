@@ -27,6 +27,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -263,7 +264,7 @@ public class Validator {
     /**
      * Indicates the default mode in which validation failures are expressed
      */
-    private static HighlightMode defaultValidationFailureHighlightMode = HighlightMode.UIID;
+    private static HighlightMode defaultValidationFailureHighlightMode = HighlightMode.EMBLEM;
 
     /**
      * Indicates the mode in which validation failures are expressed
@@ -320,6 +321,17 @@ public class Validator {
      * Indicates whether an error message should be shown for the focused component
      */
     private boolean showErrorMessageForFocusedComponent;
+
+    /**
+     * Default constructor
+     */
+    public Validator() {
+        if(defaultValidationFailedEmblem == null) {
+            // initialize the default emblem
+            defaultValidationFailedEmblem = FontImage.createMaterial(FontImage.MATERIAL_CANCEL, "InvalidEmblem", 3);
+            validationFailedEmblem = defaultValidationFailedEmblem;
+        }
+    }
     
     /**
      * Places a constraint on the validator, returns this object so constraint additions can be chained. 
@@ -335,6 +347,10 @@ public class Validator {
             constraintList.put(cmp, new GroupConstraint(c));
         }
         bindDataListener(cmp);
+        boolean isV = isValid();
+        for(Component btn : submitButtons) {
+            btn.setEnabled(isV);
+        }
         return this;
     }
     
@@ -424,8 +440,10 @@ public class Validator {
                                 float height = cmp.getHeight();
                                 xpos += Math.round(width * validationEmblemPositionX);
                                 ypos += Math.round(height * validationEmblemPositionY);
-                                message.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(), 
-                                        validationFailedEmblem.getHeight()));
+                                if(message != null) {
+                                    message.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(), 
+                                            validationFailedEmblem.getHeight()));
+                                }
                             } else {
                                 message.showPopupDialog(cmp);
                             }
@@ -439,7 +457,7 @@ public class Validator {
         }
         if(validateOnEveryKey) {
             if(cmp instanceof TextField) {
-                ((TextField)cmp).addDataChangeListener(new ComponentListener(cmp));
+                ((TextField)cmp).addDataChangedListener(new ComponentListener(cmp));
                 return;
             }
         }
@@ -454,7 +472,7 @@ public class Validator {
         if(cmp instanceof CheckBox || cmp instanceof RadioButton) {
             ((Button)cmp).addActionListener(new ComponentListener(cmp));
             return;
-        }
+        } 
     }
 
     /**
@@ -500,11 +518,16 @@ public class Validator {
     void setValid(Component cmp, boolean v) {
         Boolean b = (Boolean)cmp.getClientProperty(VALID_MARKER);
         if(b != null && b.booleanValue() == v) {
-            for(Component c : submitButtons) {
-                c.setEnabled(b.booleanValue());
+            /*
+            if (!v) {
+                for(Component c : submitButtons) {
+                    c.setEnabled(false);
+                }
             }
+            */
             return;
         }
+        cmp.putClientProperty(VALID_MARKER, v);
         if(!v) {
             // if one component is invalid... just disable the submit buttons
             for(Component c : submitButtons) {
@@ -519,7 +542,7 @@ public class Validator {
                 message.dispose();
             }
         }
-        cmp.putClientProperty(VALID_MARKER, v);
+        
         if(validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
             if(!(cmp.getComponentForm().getGlassPane() instanceof ComponentListener)) {
                 cmp.getComponentForm().setGlassPane(new ComponentListener(null));

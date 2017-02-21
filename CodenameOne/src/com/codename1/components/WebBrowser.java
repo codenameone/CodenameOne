@@ -44,9 +44,12 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 
 /**
- * A simple browser view that encapsulates a usable version of HTMLComponent or BrowserComponent and
+ * <p>A simple browser view that encapsulates a usable version of HTMLComponent or BrowserComponent and
  * automatically picks the right component for the platform preferring BrowserComponent whenever it
  * is supported.
+ * </p>
+ *  <p>On Android this component might show a native progress indicator dialog. You can disable that functionality
+ * using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.</p>
  *
  * @author Shai Almog
  */
@@ -57,6 +60,16 @@ public class WebBrowser extends Container {
     private String page;
     private Loading loading;
 
+    /**
+     * Constructor with a URL
+     * 
+     * @param url the url
+     */
+    public WebBrowser(String url) {
+        this();
+        setURL(url);
+    }
+    
     /**
      * Default constructor
      */

@@ -30,7 +30,7 @@ public class XYValueSeries extends XYSeries {
   /** The minimum value. */
   private double mMinValue = MathHelper.NULL_VALUE;
   /** The maximum value. */
-  private double mMaxValue = -MathHelper.NULL_VALUE;
+  private double mMaxValue = MathHelper.NULL_VALUE;
 
   /**
    * Builds a new XY value series.
@@ -72,8 +72,8 @@ public class XYValueSeries extends XYSeries {
    * @param value the new value
    */
   private void updateRange(double value) {
-    mMinValue = Math.min(mMinValue, value);
-    mMaxValue = Math.max(mMaxValue, value);
+    mMinValue = mMinValue == MathHelper.NULL_VALUE ? value : Math.min(mMinValue, value);
+    mMaxValue = mMaxValue == MathHelper.NULL_VALUE ? value : Math.max(mMaxValue, value);
   }
 
   /**

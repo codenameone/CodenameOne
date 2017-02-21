@@ -29,7 +29,14 @@ import java.io.Reader;
 import java.util.Vector;
 
 /**
- * Simple CSV parser very useful for importing data into applications quickly from a CSV source
+ * <p>The {@code CSVParser} allows importing data into applications quickly from a CSV source.  CSV
+ * is a <a href="https://en.wikipedia.org/wiki/Comma-separated_values" target="_blank">file format</a>
+ * that is supported by all spreadsheets and most databases for data exchange. <br>
+ * The sample below lists a simple hardcoded CSV within the table:
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/e60d45dcd79c91be9d31.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/csv-parsing.png" alt="CSV parsing results, notice the properly escaped parentheses and comma" />
  *
  * @author Shai Almog
  */

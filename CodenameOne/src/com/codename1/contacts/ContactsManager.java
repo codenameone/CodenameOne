@@ -23,11 +23,16 @@
 package com.codename1.contacts;
 
 import com.codename1.ui.Display;
+import java.util.Collection;
+import java.util.Set;
 import java.util.Vector;
 
 /**
- * This class uses as the Contacts manager of the device, it enables the possibility
- * To get the Contacts that are available on the device.
+ * <p>{@code ContactsManager} provides access to the contacts on the device for listing, adding and deleting contacts.<br>
+ * The sample below demonstrates listing all the contacts within the device with their photos</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/15f39e1eef77f6059aff.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/contacts-with-photos.png" alt="Contacts with the default photos on the simulator, on device these will use actual user photos when available" />
  *
  * @author Chen
  */
@@ -161,4 +166,25 @@ public class ContactsManager {
     public static boolean isAllContactsFast() {
         return Display.getInstance().isGetAllContactsFast();
     }
+    
+    /**
+     * Clears the contacts cache to that they will be loaded from the system the next time {@link #getContacts(boolean, boolean, boolean, boolean, boolean, boolean) }
+     * is called.  
+     * 
+     * <p>This is only necessary on platforms that use a transactional address book, if you want to reload contact changes
+     * that have occurred outside the app.  At time of writing, the only platform that does this is iOS.  This method will have no effect on other platforms.</p>
+     */
+    public static void refresh() {
+        Display.getInstance().refreshContacts();
+    }
+    
+    /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     */
+    //public static Contact[] getLinkedContacts(Contact c) {
+    //    return Display.getInstance().getLinkedContacts(c);
+    //}
+    
 }

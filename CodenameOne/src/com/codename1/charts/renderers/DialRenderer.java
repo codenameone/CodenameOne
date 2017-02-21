@@ -32,7 +32,7 @@ public class DialRenderer extends DefaultRenderer {
   /** The start value in dial range. */
   private double mMinValue = MathHelper.NULL_VALUE;
   /** The end value in dial range. */
-  private double mMaxValue = -MathHelper.NULL_VALUE;
+  private double mMaxValue = MathHelper.NULL_VALUE;
   /** The spacing for the minor ticks. */
   private double mMinorTickSpacing = MathHelper.NULL_VALUE;
   /** The spacing for the major ticks. */
@@ -131,7 +131,7 @@ public class DialRenderer extends DefaultRenderer {
    * @return the maximum dial was set or not
    */
   public boolean isMaxValueSet() {
-    return mMaxValue != -MathHelper.NULL_VALUE;
+    return mMaxValue != MathHelper.NULL_VALUE;
   }
 
   /**

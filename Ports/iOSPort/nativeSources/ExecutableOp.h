@@ -58,5 +58,4 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 -(void)execute;
 -(void)executeWithLog;
 -(NSString*)getName;
-
 @end

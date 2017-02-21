@@ -38,10 +38,45 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.Vector;
 
 /**
- * A combo box is a list that allows only one selection at a time, when a user clicks
- * the combo box a popup button with the full list of elements allows the selection of
- * a single element. The combo box is driven by the list model and allows all the renderer
- * features of the List as well. 
+ * <p>A {@code ComboBox} is a list that allows only one selection at a time, when a user clicks
+ * the {@code ComboBox} a popup button with the full list of elements allows the selection of
+ * a single element. The {@code ComboBox} is driven by the list model and allows all the renderer
+ * features of the List as well. <br>
+ * The {@code ComboBox} is notoriously hard to style properly as it relies on a complex dynamic of
+ * popup renderer and instantly visible renderer. The UIID for the {@code ComboBox}  is "{@code ComboBox}"
+ * however if you set it to something else all the other UIID's will also change their prefix. E.g. the "{@code ComboBoxPopup}" 
+ * UIID will become "{@code MyNewUIIDPopup}". <br>
+ * The combo box defines the following UIID's by default: 
+ * </p>
+ * <ul>
+ *  <li>{@code ComboBox}</li>
+ *  <li>{@code ComboBoxItem}</li>
+ *  <li>{@code ComboBoxFocus}</li>
+ *  <li>{@code PopupContentPane}</li>
+ *  <li>{@code PopupItem}</li>
+ *  <li>{@code PopupFocus}</li>
+ * </ul>
+ * <p>
+ * This class also defines theme constants that allow some native themes to manipulate its behavior e.g.:
+ * </p>
+ * <ul>
+ *    <li>popupTitleBool - shows the "label for" value as the title of the popup dialog</li>
+ *    <li>popupCancelBodyBool - Adds a cancel button into the popup dialog</li>
+ *    <li>centeredPopupBool - shows the popup dialog in the center of the screen instead of under the popup</li>
+ *    <li>otherPopupRendererBool - Uses a different list cell render for the popup than the one used for the {@code ComboBox} 
+ * itself. When this is false {@code PopupItem} &amp; {@code PopupFocus}  become irrelevant. Notice that the
+ * Android native theme defines this to true.</li>
+ * </ul>
+ * <p>
+ * <strong>iOS doesn't use combo boxes as part of its UI paradigm</strong>. Its available there mostly in web applications and feels
+ * unnatural in iOS which is why we recommend using the {@link com.codename1.ui.spinner.Picker} class.
+ * </p>
+ * <p>
+ * The sample code below uses the {@link com.codename1.ui.list.GenericListCellRenderer} to create a richer
+ * {@code ComboBox} UI.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/7aa88182d6a7f63cbd4e.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-combobox.png" alt="Rich ComboBox" />
  * 
  * @see List
  * @author Chen Fishbein
@@ -158,7 +193,7 @@ public class ComboBox<T> extends List<T> {
         } else {
             selected = getRenderer().getListCellRendererComponent(this, "XXXXXXXXXXX", 0, true);
         }
-        return getHeight() - getStyle().getPadding(false, BOTTOM) - selected.getStyle().getPadding(false, BOTTOM);
+        return getHeight() - getStyle().getPaddingBottom() - selected.getStyle().getPaddingBottom();
     }
 
     /**
@@ -306,13 +341,11 @@ public class ComboBox<T> extends List<T> {
             Style contentStyle = content.getStyle();
 
             int listH = content.getPreferredH()
-                    + contentStyle.getMargin(false, TOP)
-                    + contentStyle.getMargin(false, BOTTOM);
+                    + contentStyle.getVerticalMargins();
 
             Component title = popupDialog.getTitleArea();
             listH += title.getPreferredH()
-                    + title.getStyle().getMargin(false, TOP)
-                    + title.getStyle().getMargin(false, BOTTOM);
+                    + title.getStyle().getVerticalMargins();
 
             bottom = 0;
             top = getAbsoluteY();
@@ -321,7 +354,7 @@ public class ComboBox<T> extends List<T> {
                 Component c = parentForm.getSoftButton(0).getParent();
                 formHeight -= c.getHeight();
                 Style s = c.getStyle();
-                formHeight -= (s.getMargin(TOP) + s.getMargin(BOTTOM));
+                formHeight -= (s.getVerticalMargins());
             }
 
             if(listH < formHeight) {
@@ -367,7 +400,10 @@ public class ComboBox<T> extends List<T> {
         Dialog popupDialog = createPopupDialog(l);
         int originalSel = getSelectedIndex();
         Form.comboLock = includeSelectCancel;
+        float rr = Dialog.getDefaultBlurBackgroundRadius();
+        Dialog.setDefaultBlurBackgroundRadius(-1);
         Command result = showPopupDialog(popupDialog, l);
+        Dialog.setDefaultBlurBackgroundRadius(rr);
         Form.comboLock = false;
         parentForm.setTintColor(tint);
         if(result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() ||

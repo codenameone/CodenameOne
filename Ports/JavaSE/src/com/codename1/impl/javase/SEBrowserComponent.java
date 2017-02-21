@@ -22,26 +22,36 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
+import java.awt.Point;
 import java.awt.Rectangle;
-import java.awt.image.BufferedImage;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Worker.State;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.event.EventHandler;
-import javafx.scene.image.WritableImage;
+
+import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
+import javax.swing.JComponent;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
+import javax.swing.event.MenuDragMouseEvent;
 
 /**
  *
@@ -58,21 +68,80 @@ public class SEBrowserComponent extends PeerComponent {
     private JPanel cnt;
     private boolean lightweightMode;
     private boolean lightweightModeSet;
-    public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p) {
+    private final JScrollBar hSelector, vSelector;
+    private AdjustmentListener adjustmentListener;
+    private BrowserComponent browserComp;
+    
+    
+    /**
+     * A bridge to inject java methods into the webview.
+     */
+    public class Bridge {
+        
+        /**
+         * A method injected into the webview to provide direct access to the getBrowserNavigationCallback
+         * that is registered.  This is kind of a workaround since there doesn't seem to be any way
+         * to prevent the webview from loading a URL that is set via window.location.href and we need
+         * the browser navigation callback to be executed for the Javascript bridge to work.  So we inject this
+         * here, and the JavascriptContext checks for this hook when trying to send messages.
+         * @param url
+         * @return 
+         */
+        public boolean shouldNavigate(String url) {
+            if (browserComp.getBrowserNavigationCallback() != null) {
+                return browserComp.getBrowserNavigationCallback().shouldNavigate(url);
+            }
+            return true;
+        }        
+    }
+    
+    public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p, final JScrollBar hSelector, JScrollBar vSelector) {
         super(null);
         this.web = web;
         this.instance = instance;
         this.frm = f;
         this.panel = fx;
-
-        web.getEngine().setUserDataDirectory(new File(JavaSEPort.getAppHomeDir()));
+        final JavaSEPort inst = instance;
+        browserComp = p;
+        WebEngine we = web.getEngine();
+        try {
+            Method mtd = we.getClass().getMethod("setUserDataDirectory",java.io.File.class); 
+            mtd.invoke(we, new File(JavaSEPort.getAppHomeDir()));
+        } catch(Throwable t) {
+            System.out.println("It looks like you are running on a version of Java older than Java 8. We recommend upgrading");
+            t.printStackTrace();
+        }
+        
+        we.setOnError(new EventHandler<WebErrorEvent>() {
+            @Override
+            public void handle(WebErrorEvent event) {
+                Log.p("WebError: " + event.toString());
+            }
+        });
         
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                cnt = new JPanel();
+                cnt = new JPanel() {
+                    public void paint(java.awt.Graphics g) {
+                        // We want the native component to be hidden unless
+                        // it is being drawn by Codename One via drawNativePeer()
+                        // This allows the component to be present (respond to events)
+                        // but gives us the flexibility to draw the component
+                        // at the correct depth with the rest of the Codename One
+                        // components.
+                        if (SEBrowserComponent.this.instance.drawingNativePeer) {
+                            super.paint(g);
+                        } else {
+                            
+                        }
+                    }
+                };
+                
+                cnt.setOpaque(false); // <--- Important if container is opaque it will cause
+                                        // all kinds of flicker due to painting conflicts with CN1 pipeline.
                 cnt.setLayout(new BorderLayout());
                 cnt.add(BorderLayout.CENTER, panel);
-                cnt.setVisible(false);
+                //cnt.setVisible(false);
             }
         });
 
@@ -95,9 +164,9 @@ public class SEBrowserComponent extends PeerComponent {
 
             @Override
             public void handle(WebEvent<String> t) {
-                System.out.println(t.getData());
                 String msg = t.getData();
                 if (msg.startsWith("!cn1_message:")) {
+                    System.out.println("Receiving message "+msg);
                     p.fireWebEvent("onMessage", new ActionEvent(msg.substring("!cn1_message:".length())));
                 }
             }
@@ -134,6 +203,15 @@ public class SEBrowserComponent extends PeerComponent {
                     if (!p.isNativeScrollingEnabled()) {
                         web.getEngine().executeScript("document.body.style.overflow='hidden'");
                     }
+                    
+                    // Since I end of injecting firebug nearly every time I have to do some javascript code
+                    // let's just add a client property to the BrowserComponent to enable firebug
+                    if (Boolean.TRUE.equals(p.getClientProperty("BrowserComponent.firebug"))) {
+                        web.getEngine().executeScript("if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}");
+                    }
+                    netscape.javascript.JSObject window = (netscape.javascript.JSObject)web.getEngine().executeScript("window");
+                    window.setMember("cn1application", new Bridge());
+                    //web.getEngine().executeScript("window.addEventListener('unload', function(e){console.log('unloading...');return 'foobar';});");
                     p.fireWebEvent("onLoad", new ActionEvent(url));
                     
                 }
@@ -144,6 +222,7 @@ public class SEBrowserComponent extends PeerComponent {
         web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
             @Override
             public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
+                t1.printStackTrace();
                 if(t1 == null) {
                     if(t == null) {
                         p.fireWebEvent("onError", new ActionEvent("Unknown error", -1));
@@ -166,8 +245,27 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
         });
-    }
+        
+        adjustmentListener = new AdjustmentListener() {
 
+            @Override
+            public void adjustmentValueChanged(AdjustmentEvent e) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        onPositionSizeChange(); 
+                    }
+                });
+                
+            }
+            
+        };
+        
+        this.hSelector = hSelector;
+        this.vSelector = vSelector;
+
+        
+    }
+    
     /**
      * Executes a javascript string and returns the result as a String if
      * appropriate.
@@ -212,19 +310,32 @@ public class SEBrowserComponent extends PeerComponent {
             }
         });
     }
-        
+
     
     private static final Object DEINIT_LOCK = new Object();
     @Override
     protected void deinitialize() {
-        super.deinitialize();
-        lightweightMode = true;
+        //lightweightMode = true;
+        final boolean[] complete = new boolean[1];
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frm.remove(cnt);
-                frm.repaint();
-                init = false;
+                if (init) {
+                    hSelector.removeAdjustmentListener(adjustmentListener);
+                    vSelector.removeAdjustmentListener(adjustmentListener);
+                    lastX=0;
+                    lastY=0;
+                    lastW=0;
+                    lastH=0;
+                    
+                    frm.remove(cnt);
+                    init = false;
+                    complete[0] = true;
+                    frm.repaint();
+                    //SEBrowserComponent.this.repaint();
+                    
+                    
+                }
                 synchronized(DEINIT_LOCK) {
                     DEINIT_LOCK.notify();
                 }
@@ -232,7 +343,7 @@ public class SEBrowserComponent extends PeerComponent {
         });
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
-                while(init && cnt.getParent() != null) {
+                while(!complete[0]) {
                     synchronized(DEINIT_LOCK) {
                         try {
                             DEINIT_LOCK.wait(20);
@@ -241,7 +352,15 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
         });
+        super.deinitialize();
     }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent(); //To change body of generated methods, choose Tools | Templates.
+        init();
+    }
+    
     
     private static final Object INIT_LOCK = new Object();
     private void init() {
@@ -249,34 +368,32 @@ public class SEBrowserComponent extends PeerComponent {
         SwingUtilities.invokeLater(new Runnable() {
 
             public void run() {
-                if (!lightweightMode) {
-                    if (!init) {
-                        init = true;
-                        cnt.setVisible(true);
-                        frm.add(cnt, 0);
-                        onPositionSizeChange();
-                        frm.repaint();
-                    } else {
-                        cnt.setVisible(false);
+                if (!init) {
+
+                    init = true;
+                    frm.add(cnt, 0);
+                    completed[0] = true;
+                    synchronized (INIT_LOCK) {
+                        INIT_LOCK.notify();
                     }
-                } else {
-                    if (init) {
-                        cnt.setVisible(false);
-                    }
+                    onPositionSizeChange();
+                    hSelector.addAdjustmentListener(adjustmentListener);
+                    vSelector.addAdjustmentListener(adjustmentListener);
+                    frm.repaint();
+                    SEBrowserComponent.this.repaint();
+
                 }
-                completed[0] = true;
-                synchronized(INIT_LOCK) {
-                    INIT_LOCK.notify();
-                }
+
             }
         });
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
-                while(!completed[0]) {
-                    synchronized(INIT_LOCK) {
+                while (!completed[0]) {
+                    synchronized (INIT_LOCK) {
                         try {
                             INIT_LOCK.wait(20);
-                        } catch(InterruptedException er) {}
+                        } catch (InterruptedException er) {
+                        }
                     }
                 }
             }
@@ -284,53 +401,13 @@ public class SEBrowserComponent extends PeerComponent {
     }
     
     protected void setLightweightMode(final boolean l) {
-        if(lightweightModeSet && lightweightMode == l) {
-            return;
-        }
-        lightweightModeSet = true;
-        lightweightMode = l;
-        init();
+
     }
 
-    protected com.codename1.ui.Image generatePeerImage() {
-        final com.codename1.ui.Image[] img = new com.codename1.ui.Image[] {null};
-        Platform.runLater(new Runnable() {
-            public void run() {
-                WritableImage w = new WritableImage(getWidth(), getHeight());
-                web.snapshot(null, w);
-                BufferedImage bi = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
-                SwingFXUtils.fromFXImage(w, bi);
-                Image i = com.codename1.ui.Image.createImage(bi);
-                setPeerImage(i);
-                synchronized(img) {
-                    img[0] = i;
-                    img.notify();
-                }
-            }
-        });
-        if(firstTime) {
-            // special case for first time
-            firstTime = false;
-            return com.codename1.ui.Image.createImage(5, 5);
-        }
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            public void run() {
-                synchronized(img) {
-                    while(img[0] == null) {
-                        try {
-                            img.wait(20);
-                        } catch (InterruptedException ex) {
-                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                    }
-                }
-            }
-        });
-        return img[0];
-    }
+    
     
     protected boolean shouldRenderPeerImage() {
-        return lightweightMode || !isInitialized();
+        return false;
     }
     
     @Override
@@ -338,9 +415,12 @@ public class SEBrowserComponent extends PeerComponent {
         return new com.codename1.ui.geom.Dimension((int) web.getWidth(), (int) web.getHeight());
     }
    
+    int lastX, lastY, lastW, lastH;
+    double lastZoom;
     
     @Override
     protected void onPositionSizeChange() {
+        
         if(cnt == null) {
             return;
         }
@@ -348,37 +428,59 @@ public class SEBrowserComponent extends PeerComponent {
         if(cnt.getParent() == null && 
                 f != null && 
                 Display.getInstance().getCurrent() == f){
-            init();
-        }
-        
-        if(SwingUtilities.isEventDispatchThread()) {
-            final int x = getAbsoluteX();
-            final int y = getAbsoluteY();
-            final int w = getWidth();
-            final int h = getHeight();
-
-            cnt.setBounds((int) ((x + getScreenCoordinateX() + instance.canvas.x) * instance.zoomLevel),
-                    (int) ((y + getScreenCoordinateY() + instance.canvas.y) * instance.zoomLevel),
-                    (int) (w * instance.zoomLevel),
-                    (int) (h * instance.zoomLevel));
-            cnt.validate();
+            //();
             return;
         }
-        SwingUtilities.invokeLater(new Runnable() {
+        
+        final int x = getAbsoluteX();
+        final int y = getAbsoluteY();
+        final int w = getWidth();
+        final int h = getHeight();
+
+        if (lastZoom == instance.zoomLevel && x==lastX && y==lastY && w==lastW && h==lastH) {
+            return;
+        }
+        lastX = x;
+        lastY=y;
+        lastW=w;
+        lastH=h;
+        lastZoom = instance.zoomLevel;
+        
+        Runnable r = new Runnable() {
             @Override
             public void run() {
-                final int x = getAbsoluteX();
-                final int y = getAbsoluteY();
-                final int w = getWidth();
-                final int h = getHeight();
-
+                Platform.runLater(new Runnable() {
+                    public void run() {
+                        try {
+                            Method setZoom = web.getClass().getMethod("setZoom", new Class[]{double.class});
+                            setZoom.invoke(web, instance.zoomLevel);
+                        } catch (NoSuchMethodException ex) {
+                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (SecurityException ex) {
+                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (IllegalAccessException ex) {
+                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (IllegalArgumentException ex) {
+                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (InvocationTargetException ex) {
+                            Logger.getLogger(SEBrowserComponent.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                });
+                
                 cnt.setBounds((int) ((x + getScreenCoordinateX() + instance.canvas.x) * instance.zoomLevel),
                         (int) ((y + getScreenCoordinateY() + instance.canvas.y) * instance.zoomLevel),
                         (int) (w * instance.zoomLevel),
                         (int) (h * instance.zoomLevel));
                 cnt.validate();
             }
-        });
+        };
+        
+        if(SwingUtilities.isEventDispatchThread()) {
+            r.run();
+            return;
+        }
+        SwingUtilities.invokeLater(r);
     }
 
     int getScreenCoordinateX() {
@@ -445,5 +547,12 @@ public class SEBrowserComponent extends PeerComponent {
 
     void exposeInJavaScript(Object o, String name) {
     }
-    
+
+    @Override
+    public void paint(Graphics g) {
+        instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+        onPositionSizeChange();
+        
+    }
+   
 }

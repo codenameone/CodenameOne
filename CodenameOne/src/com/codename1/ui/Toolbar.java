@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.animations.Transition;
@@ -30,29 +31,74 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
-import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.list.DefaultListCellRenderer;
 import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
-import com.codename1.ui.util.Resources;
+import java.util.ArrayList;
 import java.util.Vector;
 
 /**
- * Toolbar can replace the default TitleArea component. Toolbar allows
- * customizing the Form title with different commands on the title area, within
- * the side menu or the overflow menu.
- *
+ * <p>Toolbar replaces the default title area with a powerful abstraction that allows functionality ranging
+ * from side menus (hamburger) to title animations and any arbitrary component type. Toolbar allows
+ * customizing the Form title with different commands on the title area, within the side menu or the overflow menu.</p>
+ * 
+ * <p>
+ * The Toolbar allows placing components in one of 4 positions as illustrated by the sample below:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/e72cfa6aedd7fcd1af72.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar.png" alt="Simple usage of Toolbar" />
+ *  
+ * <p>
+ * {@code Toolbar} supports a search mode that implicitly replaces the title with a search field/magnifying glass
+ * effect. The code below demonstrates searching thru the contacts using this API:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
+ * 
+ * <p>
+ * The following code also demonstrates search with a more custom UX where the title
+ * area was replaced dynamically. This code predated the builtin search support above. 
+ * Notice that the {@code TextField} and its hint are styled to look like the title.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/dce6598a226aaf9a3157.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-search.png" alt="Dynamic TextField search using the Toolbar" />
+ * 
+ * <p>
+ * This sample code show off title animations that allow a title to change (and potentially shrink) as the user scrolls
+ * down the UI.  The 3 frames below show a step by step process in the change.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/085e3a8fa1c36829d812.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-1.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-2.png" alt="Toolbar animation stages" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-toolbar-animation-3.png" alt="Toolbar animation stages" />
+ * 
  * @author Chen
  */
 public class Toolbar extends Container {
+
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     * @return the centeredDefault
+     */
+    public static boolean isCenteredDefault() {
+        return centeredDefault;
+    }
+
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     * @param aCenteredDefault the centeredDefault to set
+     */
+    public static void setCenteredDefault(boolean aCenteredDefault) {
+        centeredDefault = aCenteredDefault;
+    }
 
     private Component titleComponent;
 
     private ToolbarSideMenu sideMenu;
 
-    private Vector overflowCommands;
+    private Vector<Command> overflowCommands;
 
     private Button menuButton;
 
@@ -80,6 +126,15 @@ public class Toolbar extends Container {
     
     private Container permanentSideMenuContainer;
 
+    private static boolean globalToolbar;
+    
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     */
+    private static boolean centeredDefault = true;
+
+    private Command searchCommand;
+    
     /**
      * Empty Constructor
      */
@@ -87,8 +142,33 @@ public class Toolbar extends Container {
         setLayout(new BorderLayout());
         setUIID("Toolbar");
         sideMenu = new ToolbarSideMenu();
+        if(centeredDefault && getUnselectedStyle().getAlignment() == CENTER) {
+            setTitleCentered(true);
+        }
     }
-
+    
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant {@code globalToobarBool}. Notice that the name of this method might imply that
+     * one toolbar instance will be used for all forms which isn't the case, separate instances will be used for each form
+     * 
+     * @param gt true to enable the toolbar globally
+     */
+    public static void setGlobalToolbar(boolean gt) {
+        globalToolbar = gt;
+    }
+    
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This flag can be flipped via the 
+     * theme constant {@code globalToobarBool}. Notice that the name of this method might imply that
+     * one toolbar instance will be used for all forms which isn't the case, separate instances will be used for each form
+     * 
+     * @return  true if the toolbar API is turned on by default
+     */
+    public static boolean isGlobalToolbar() {
+        return globalToolbar;
+    }
+    
     /**
      * This constructor places the Toolbar on a different layer on top of the 
      * Content Pane.
@@ -99,6 +179,7 @@ public class Toolbar extends Container {
         this();
         this.layered = layered;
     }
+    
     /**
      * Sets the title of the Toolbar.
      *
@@ -126,7 +207,11 @@ public class Toolbar extends Container {
      * @param cent whether the title should be centered
      */
     public void setTitleCentered(boolean cent) {
-        ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        if(cent) {
+            ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+        } else {
+            ((BorderLayout)getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+        }
     } 
     
     /**
@@ -156,16 +241,27 @@ public class Toolbar extends Container {
     public static boolean isPermanentSideMenu() {
         return permanentSideMenu;
     }
+
+    /**
+     * This is a convenience method to open the side menu bar. It's useful for cases where we want to place the 
+     * menu button in a "creative way" in which case we can bind the side menu to this
+     */
+    public void openSideMenu() {
+        ((SideMenuBar)getMenuBar()).openMenu(null);
+    }
     
     /**
      * Sets the Toolbar title component. This method allow placing any component
-     * in the Toolbar ceneter instead of the regular Label. Can be used to place
+     * in the Toolbar center instead of the regular Label. Can be used to place
      * a TextField to preform search operations
      *
-     * @param titleCmp Comoponent to place in the Toolbar center.
+     * @param titleCmp Component to place in the Toolbar center.
      */
     public void setTitleComponent(Component titleCmp) {
         checkIfInitialized();
+        if(titleComponent != null) {
+            titleComponent.remove();
+        }
         titleComponent = titleCmp;
         addComponent(BorderLayout.CENTER, titleComponent);
     }
@@ -182,17 +278,408 @@ public class Toolbar extends Container {
     /**
      * Adds a Command to the overflow menu
      *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToOverflowMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToOverflowMenu(cmd);
+        return cmd;
+    }
+    
+    /**
+     * The behavior of the back command  in the title
+     */
+    public static enum BackCommandPolicy {
+        /**
+         * Show the back command always within the title bar on the left hand side
+         */
+        ALWAYS,
+        
+        /**
+         * Show the back command always but shows it with the UIID standard UIID
+         */
+        AS_REGULAR_COMMAND,
+
+        /**
+         * Show the back command always as a back arrow image from the material design style
+         */
+        AS_ARROW,
+
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme constant is defined to true which
+         * is the case for iOS themes
+         */
+        ONLY_WHEN_USES_TITLE,
+        
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme constant is defined to true 
+         * on other platforms uses the left arrow material icon
+         */
+        WHEN_USES_TITLE_OTHERWISE_ARROW,
+        
+        /**
+         * Never show the command in the title area and only set the back command to the toolbar
+         */
+        NEVER
+    }
+    
+    /**
+     * Sets the back command in the title bar to an arrow type and maps the back command hardware key
+     * if applicable. This is functionally identical to {@code setBackCommand(title, Toolbar.BackCommandPolicy.AS_ARROW, listener); }
+     * 
+     * @param title command title
+     * @param listener action event for the back command
+     * @return  the created command
+     */
+    public Command setBackCommand(String title, ActionListener<ActionEvent> listener) {
+        Command cmd  = Command.create(title, null, listener);
+        setBackCommand(cmd, BackCommandPolicy.AS_ARROW);
+        return cmd;
+    }
+    
+    /**
+     * Sets the back command in the title bar to an arrow type and maps the back command hardware key
+     * if applicable. This is functionally identical to {@code setBackCommand(cmd, Toolbar.BackCommandPolicy.AS_ARROW); }
+     * 
+     * @param cmd the command 
+     */
+    public void setBackCommand(Command cmd) {
+        setBackCommand(cmd, BackCommandPolicy.AS_ARROW);
+    }
+    
+    /**
+     * Sets the back command in the title bar and in the form, back command behaves based on the given
+     * policy type
+     * 
+     * @param title command title
+     * @param policy the behavior of the back command in the title
+     * @param listener action event for the back command
+     * @return  the created command
+     */
+    public Command setBackCommand(String title, BackCommandPolicy policy, ActionListener<ActionEvent> listener) {
+        Command cmd  = Command.create(title, null, listener);
+        setBackCommand(cmd, policy);
+        return cmd;
+    }
+
+    /**
+     * Sets the back command in the title bar and in the form, back command behaves based on the given
+     * policy type
+     * 
+     * @param cmd the command 
+     * @param policy the behavior of the back command in the title
+     * @param iconSize the size of the back command icon in millimeters
+     */
+    public void setBackCommand(Command cmd, BackCommandPolicy policy, float iconSize) {
+        if(iconSize < 0) {
+            iconSize = 3;
+        }
+        getComponentForm().setBackCommand(cmd);
+        switch(policy) {
+            case ALWAYS:
+                cmd.putClientProperty("uiid", "BackCommand");
+                addCommandToLeftBar(cmd);
+                break;
+            case WHEN_USES_TITLE_OTHERWISE_ARROW:
+                cmd.putClientProperty("uiid", "BackCommand");
+                if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
+                    addCommandToLeftBar(cmd);
+                    break;
+                } 
+                // we now internally fallback to as arrow...
+            case AS_ARROW:
+                cmd.setCommandName("");
+                cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "TitleCommand", iconSize));
+                addCommandToLeftBar(cmd);
+                break;
+            case AS_REGULAR_COMMAND:
+                addCommandToLeftBar(cmd);
+                break;
+            case ONLY_WHEN_USES_TITLE:
+                if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
+                    cmd.putClientProperty("uiid", "BackCommand");
+                    addCommandToLeftBar(cmd);
+                }
+                break;
+            case NEVER:
+                break;
+        }
+    }
+    
+    /**
+     * Sets the back command in the title bar and in the form, back command behaves based on the given
+     * policy type
+     * 
+     * @param cmd the command 
+     * @param policy the behavior of the back command in the title
+     */
+    public void setBackCommand(Command cmd, BackCommandPolicy policy) {
+        setBackCommand(cmd, policy, -1);
+    }
+
+    /**
+     * <p>This method add a search Command on the right bar of the {@code Toolbar}.
+     * When the search Command is invoked the current {@code Toolbar} is replaced with 
+     * a search {@code Toolbar} to perform a search on the Current Form.</p>
+     * <p>The callback ActionListener gets the search string and it's up to developer 
+     * to do the actual filtering on the Form.</>
+     * <p>It is possible to customize the default look of the search {@code Toolbar} with the following 
+     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch} &amp; {@code TextHintSearch}.</>
+     * <script src="https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
+     * 
+     * @param callback gets the search string callbacks
+     * @param iconSize indicates the size of the icons used in the search/back in millimeters
+     */ 
+    public void addSearchCommand(final ActionListener callback, final float iconSize){
+        searchCommand = new Command(""){
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                SearchBar s = new SearchBar(Toolbar.this, iconSize){
+
+                    @Override
+                    public void onSearch(String text) {
+                        callback.actionPerformed(new ActionEvent(text));
+                    }
+                
+                };
+                Form f = (Form)Toolbar.this.getParent();
+                setHidden(true);
+                f.removeComponentFromForm(Toolbar.this);
+                f.setToolbar(s);
+                s.initSearchBar();
+                f.animateLayout(100);
+            }
+        
+        };
+        Image img;
+        if(iconSize > 0) {
+            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"), iconSize);
+        } else {
+            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"));
+        }
+        searchCommand.setIcon(img);
+        addCommandToRightBar(searchCommand);
+    }    
+    
+    /**
+     * Removes a previously installed search command
+     */
+    public void removeSearchCommand() {
+        if(searchCommand != null) {
+            sideMenu.removeCommand(searchCommand);
+            searchCommand = null;
+        }
+    }
+    
+    /**
+     * <p>This method add a search Command on the right bar of the {@code Toolbar}.
+     * When the search Command is invoked the current {@code Toolbar} is replaced with 
+     * a search {@code Toolbar} to perform a search on the Current Form.</p>
+     * <p>The callback ActionListener gets the search string and it's up to developer 
+     * to do the actual filtering on the Form.</>
+     * <p>It is possible to customize the default look of the search {@code Toolbar} with the following 
+     * uiid's: {@code ToolbarSearch}, {@code TextFieldSearch} &amp; {@code TextHintSearch}.</>
+     * <script src="https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg" alt="Dynamic search mode in the Toolbar" />
+     * 
+     * @param callback gets the search string callbacks
+     */ 
+    public void addSearchCommand(final ActionListener callback){
+        addSearchCommand(callback, -1);
+    }
+    
+    /**
+     * Adds a Command to the overflow menu
+     *
      * @param cmd a Command
      */
     public void addCommandToOverflowMenu(Command cmd) {
         checkIfInitialized();
         if (overflowCommands == null) {
-            overflowCommands = new Vector();
+            overflowCommands = new Vector<Command>();
         }
         overflowCommands.add(cmd);
         sideMenu.installRightCommands();
     }
+    
+    /**
+     * Returns the commands within the overflow menu which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getOverflowCommands() {
+        return overflowCommands;
+    }
 
+    /**
+     * Adds a Command to the side navigation menu
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToSideMenu(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the side navigation menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "SideCommand");
+        addCommandToSideMenu(cmd);
+        return cmd;
+    }
+
+    /**
+     * Adds a Command to the side navigation menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "SideCommand");
+        addCommandToSideMenu(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the right side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightBar(String name, char icon, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "TitleCommand");
+        addCommandToRightBar(cmd);
+        return cmd;
+    }    
+
+    /**
+     * Adds a Command to the TitleArea on the right side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size of the icon in millimeters
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightBar(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "TitleCommand");
+        addCommandToRightBar(cmd);
+        return cmd;
+    }    
+    
+    private void setCommandMaterialIcon(Command cmd, char icon, String defaultUIID) {
+        String uiid = (String)cmd.getClientProperty("uiid");
+        if(uiid != null) {
+            FontImage.setMaterialIcon(cmd, icon, uiid);
+        } else {
+            FontImage.setMaterialIcon(cmd, icon, defaultUIID);
+        }
+    }
+    
+    private void setCommandMaterialIcon(Command cmd, char icon, float size, String defaultUIID) {
+        String uiid = (String)cmd.getClientProperty("uiid");
+        if(uiid != null) {
+            FontImage.setMaterialIcon(cmd, icon, uiid, size);
+        } else {
+            FontImage.setMaterialIcon(cmd, icon, defaultUIID, size);
+        }
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the left side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftBar(String name, char icon, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "TitleCommand");
+        addCommandToLeftBar(cmd);
+        return cmd;
+    }    
+
+    /**
+     * Adds a Command to the TitleArea on the left side with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftBar(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "TitleCommand");
+        addCommandToLeftBar(cmd);
+        return cmd;
+    }    
+
+    /**
+     * Adds a Command to the overflow menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToOverflowMenu(String name, char icon, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, "Command");
+        addCommandToOverflowMenu(cmd);
+        return cmd;
+    }
+
+    /**
+     * Adds a Command to the overflow menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToOverflowMenu(String name, char icon, float size, final ActionListener ev) {
+        Command cmd = Command.create(name, null, ev);
+        setCommandMaterialIcon(cmd, icon, size, "Command");
+        addCommandToOverflowMenu(cmd);
+        return cmd;
+    }
+    
     /**
      * Adds a Command to the side navigation menu
      *
@@ -283,6 +770,12 @@ public class Toolbar extends Container {
      * @return the button instance
      */
     public Button findCommandComponent(Command c) {
+        if(permanentSideMenu) {
+            Button b = findCommandComponent(c, permanentSideMenuContainer);
+            if(b != null) {
+                return b;
+            }
+        }
         Button b = sideMenu.findCommandComponent(c);
         if(b != null) {
             return b;
@@ -314,12 +807,40 @@ public class Toolbar extends Container {
     /**
      * Adds a Command to the TitleArea on the right side.
      *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToRightBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToRightBar(cmd);
+        return cmd;
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the right side.
+     *
      * @param cmd a Command
      */
     public void addCommandToRightBar(Command cmd) {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);        
+    }
+    
+    /**
+     * Adds a Command to the TitleArea on the left side.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToLeftBar(String name, Image icon, final ActionListener ev) {
+        Command cmd = Command.create(name, icon, ev);
+        addCommandToLeftBar(cmd);
+        return cmd;
     }
 
     /**
@@ -333,7 +854,51 @@ public class Toolbar extends Container {
         cmd.putClientProperty("Left", Boolean.TRUE);
         sideMenu.addCommand(cmd, 0);
     }
+    
+    /**
+     * Returns the commands within the right bar section which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getRightBarCommands() {
+        return getBarCommands(null);
+    }
 
+    /**
+     * Returns the commands within the left bar section which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getLeftBarCommands() {
+        return getBarCommands(Boolean.TRUE);
+    }
+
+    private Iterable<Command> getBarCommands(Object leftValue) {
+        ArrayList<Command> cmds = new ArrayList<Command>();
+        findAllCommands(this, cmds);
+        int commandCount = cmds.size() - 1;
+        while(commandCount > 0) {
+            Command c = cmds.get(commandCount);
+            if(c.getClientProperty("Left") != leftValue) {
+                cmds.remove(commandCount);
+            }
+            commandCount--;
+        }
+        return cmds;
+    }
+
+    private void findAllCommands(Container cnt, ArrayList<Command> cmds) {
+        for(Component c : cnt) {
+            if(c instanceof Container) {
+                findAllCommands((Container)c, cmds);
+                continue;
+            }
+            if(c instanceof Button) {
+                cmds.add(((Button)c).getCommand());
+            }
+        }
+    }
+    
     /**
      * Returns the associated SideMenuBar object of this Toolbar.
      *
@@ -359,8 +924,7 @@ public class Toolbar extends Container {
         int marginRight = 0;
         Container dialogContentPane = menu.getDialogComponent();
         marginLeft = parent.getWidth() - (dialogContentPane.getPreferredW()
-                + menu.getStyle().getPadding(LEFT)
-                + menu.getStyle().getPadding(RIGHT));
+                + menu.getStyle().getHorizontalPadding());
         marginLeft = Math.max(0, marginLeft);
         if (parent.getSoftButtonCount() > 1) {
             height = parent.getHeight() - parent.getSoftButton(0).getParent().getPreferredH() - dialogContentPane.getPreferredH();
@@ -375,14 +939,37 @@ public class Toolbar extends Container {
         LookAndFeel lf = manager.getLookAndFeel();
         if (lf.getDefaultMenuTransitionIn() != null || lf.getDefaultMenuTransitionOut() != null) {
             transitionIn = lf.getDefaultMenuTransitionIn();
+            if(transitionIn instanceof BubbleTransition){
+                ((BubbleTransition)transitionIn).setComponentName("OverflowButton");
+            }
             transitionOut = lf.getDefaultMenuTransitionOut();
         } else {
-            transitionIn = CommonTransitions.createFade(300);
-            transitionOut = CommonTransitions.createFade(300);
+            transitionIn = CommonTransitions.createEmpty();
+            transitionOut = CommonTransitions.createEmpty();
         }
-        menu.setTransitionOutAnimator(transitionIn);
-        menu.setTransitionInAnimator(transitionOut);
-        return menu.show(th, Math.max(0, height - th), marginLeft, marginRight, true);
+        menu.setTransitionInAnimator(transitionIn);
+        menu.setTransitionOutAnimator(transitionOut);
+        
+        if(isRTL()){
+            marginRight = marginLeft;
+            marginLeft = 0;
+        }
+        int tint = parent.getTintColor();
+        parent.setTintColor(0x00FFFFFF);
+        parent.tint = false;
+        boolean showBelowTitle = manager.isThemeConstant("showMenuBelowTitleBool", true);
+        int topPadding = 0;
+        Component statusBar = ((BorderLayout) getLayout()).getNorth();
+        if (statusBar != null) {
+            topPadding = statusBar.getAbsoluteY() + statusBar.getHeight();
+        }
+        if(showBelowTitle){
+            topPadding = th;
+        }
+        
+        Command r = menu.show(topPadding, Math.max(topPadding, height - topPadding), marginLeft, marginRight, true);
+        parent.setTintColor(tint);
+        return r;
     }
 
     /**
@@ -425,7 +1012,7 @@ public class Toolbar extends Container {
                     + "Form#setToolBar(Toolbar toolbar) before calling this method");
         }
     }
-
+    
     /**
      * Sets the Toolbar to scroll off the screen upon content scroll. This
      * feature can only work if the Form contentPane is scrollableY
@@ -580,6 +1167,35 @@ public class Toolbar extends Container {
         sideMenu.addComponentToSideMenuImpl(menu, cmp);
     }
 
+    /**
+     * Returns the commands within the side menu which can be useful for things like unit testing. Notice
+     * that you should not mutate the commands or the iteratable set in any way!
+     * @return the commands in the overflow menu
+     */
+    public Iterable<Command> getSideMenuCommands() {
+        ArrayList<Command> cmds = new ArrayList<Command>();
+        if(permanentSideMenu) {
+            findAllCommands(permanentSideMenuContainer, cmds);
+            return cmds;
+        }
+        Form f = getComponentForm();
+        int commands = f.getCommandCount();
+        for(int iter = 0 ; iter < commands ; iter++) {
+            cmds.add(f.getCommand(iter));
+        }
+        return cmds;
+    }
+
+    /**
+     * Removes the given overflow menu command, notice that this has no effect on the menu that is currently
+     * showing (if it is currently showing) only on the upcoming iterations.
+     * @param cmd the command to remove from the overflow
+     */
+    public void removeOverflowCommand(Command cmd) {
+        overflowCommands.remove(cmd);
+    }
+
+    
 
     class ToolbarSideMenu extends SideMenuBar {
 
@@ -652,9 +1268,16 @@ public class Toolbar extends Container {
         void installRightCommands() {
             super.installRightCommands();
             if (overflowCommands != null && overflowCommands.size() > 0) {
-                Image i = (Image) UIManager.getInstance().getThemeImageConstant("menuImage");
-                if (i == null) {
-                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"));
+                UIManager uim = UIManager.getInstance();
+                Image i = (Image) uim.getThemeImageConstant("menuImage");
+                if (i == null) { 
+                    float size = 4.5f;
+                    try {
+                        size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
+                    } catch(Throwable t) {
+                        t.printStackTrace();
+                    }
+                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), size);
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 
@@ -664,6 +1287,7 @@ public class Toolbar extends Container {
                 });
                 menuButton.putClientProperty("overflow", Boolean.TRUE);
                 menuButton.setUIID("TitleCommand");
+                menuButton.setName("OverflowButton");
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     BorderLayout bl = (BorderLayout) l;

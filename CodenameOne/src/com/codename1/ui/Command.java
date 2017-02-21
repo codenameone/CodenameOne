@@ -29,9 +29,8 @@ import com.codename1.ui.events.ActionListener;
 import java.util.HashMap;
 
 /**
- * The action placed on the soft buttons and in the Menu on devices, similar to the
- * MIDP command abstraction and Swing's Actions. Unlike the MIDP abstraction this class 
- * can be derived to implement the right behavior
+ * The Command class provides a useful extension to the ActionListener 
+ * interface in cases where the same functionality may be accessed by several controls.
  * 
  * @author Nir Shabi
  */
@@ -309,5 +308,25 @@ public class Command implements ActionListener{
         } else {
             clientProperties.put(key, value);
         }
+    }
+    
+    /**
+     * Creates a new command instance that encapsulates the action listener and details, the main
+     * value of this approach is in our ability to write commands using the shorthand lambda syntax
+     * of Java 8.
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev the even handler
+     * @return a newly created Command instance
+     */
+    public static Command create(String name, Image icon, final ActionListener ev) {
+        Command cmd = new Command(name) {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                ev.actionPerformed(evt);
+            }
+        };
+        cmd.setIcon(icon);
+        return cmd;
     }
 }

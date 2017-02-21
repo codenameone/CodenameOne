@@ -24,10 +24,15 @@
 package com.codename1.ui;
 
 /**
- * This class is used to create a multiple-exclusion scope for a set of 
- * RadioButtons. Creating a set of RadioButtons with the same ButtonGroup object
- * means that only one RadioButton can be selected amoung the ButtonGroup.
- * Initialy all RadioButtons are unselected.
+ * <p>This class is used to create a multiple-exclusion scope for 
+ * {@link com.codename1.ui.RadioButton}.
+ * Creating a set of {@link com.codename1.ui.RadioButton} components with the same {@code ButtonGroup} object
+ * means that only one {@link com.codename1.ui.RadioButton} can be selected among those within 
+ * the specific {@code ButtonGroup}.</p>
+ * 
+ * <script src="https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png" alt="Sample usage of CheckBox/RadioButton/ButtonGroup" />
+ * 
  * 
  * @author Nir Shabi
  */
@@ -41,6 +46,25 @@ public class ButtonGroup {
      * Creates a new instance of ButtonsGroup 
      */
     public ButtonGroup() {
+    }
+
+    /**
+     * Adds all the radio buttons to the group
+     * @param rb 
+     */
+    public ButtonGroup(RadioButton... rb) {
+        addAll(rb);
+    }
+    
+    /**
+     * Adds the RadioButtons to the group
+     * 
+     * @param rb a RadioButtons to add
+     */
+    public void addAll(RadioButton... rb){
+        for(RadioButton r : rb) {
+            add(r);
+        }
     }
     
     /**

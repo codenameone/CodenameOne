@@ -28,6 +28,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -39,8 +40,14 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * This is a Media Player Component with control buttons back, play/pause and 
- * forward buttons
+ * <p>Video playback component with control buttons for back, play/pause and 
+ * forward buttons. In the simulator those controls are implemented locally but on the
+ * device the native playback controls are used.
+ * </p>
+ * 
+ * <script src="https://gist.github.com/codenameone/fb73f5d47443052f8956.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-mediaplayer.png" alt="Media player sample" />
+ * 
  */
 public class MediaPlayer extends Container {
     private Image playIcon;
@@ -61,12 +68,17 @@ public class MediaPlayer extends Container {
      * Empty constructor
      */
     public MediaPlayer() {
+        playIcon = FontImage.createMaterial(FontImage.MATERIAL_PLAY_ARROW, "Button", 3);
+        pauseIcon = FontImage.createMaterial(FontImage.MATERIAL_PAUSE, "Button", 3);
+        fwdIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_FORWARD, "Button", 3);
+        backIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_REWIND, "Button", 3);
     }
-
+    
     /**
      * Empty constructor
      */
     public MediaPlayer(Media video) {
+        this();
         this.video = video;
         initUI();
     }
@@ -84,16 +96,42 @@ public class MediaPlayer extends Container {
      */
     protected void initComponent() {
         if(userSetIcons){
-            playIcon = UIManager.getInstance().getThemeImageConstant("mediaPlayImage");
-            pauseIcon = UIManager.getInstance().getThemeImageConstant("mediaPauseImage");
-            backIcon = UIManager.getInstance().getThemeImageConstant("mediaBackImage");
-            fwdIcon = UIManager.getInstance().getThemeImageConstant("mediaFwdImage");
+            Image play = UIManager.getInstance().getThemeImageConstant("mediaPlayImage");
+            if(play != null){
+                playIcon = play;
+            }
+            Image pause = UIManager.getInstance().getThemeImageConstant("mediaPauseImage");
+            if(pause != null){
+                pauseIcon = pause;
+            }            
+            Image back = UIManager.getInstance().getThemeImageConstant("mediaBackImage");
+            if(back != null){
+                backIcon = back;
+            }
+            Image fwd = UIManager.getInstance().getThemeImageConstant("mediaFwdImage");
+            if(fwd != null){
+                fwdIcon = fwd;
+            }
+            
         }
         if(pendingDataURI != null) {
             setDataSource(pendingDataURI);
             pendingDataURI = null;
         }
         initUI();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        if(autoplay) {
+            if(video != null && video.isPlaying()){
+                video.pause();
+            }
+        }
     }
     
     /**
@@ -187,6 +225,9 @@ public class MediaPlayer extends Container {
      * @return the data source uri
      */
     public String getDataSource() {
+        if(!isInitialized() && dataSource == null) {
+            return pendingDataURI;
+        }        
         return dataSource;
     }
     
@@ -248,12 +289,12 @@ public class MediaPlayer extends Container {
             play.setText("play");
         }
         if(autoplay) {
-            if (getPauseIcon() != null) {
-                play.setIcon(getPauseIcon());
-            } else {
-                play.setText("pause");
-            }
             if(video != null && !video.isPlaying()){
+                if (getPauseIcon() != null) {
+                    play.setIcon(getPauseIcon());
+                } else {
+                    play.setText("pause");
+                }
                 video.play();
             }
         }

@@ -46,12 +46,13 @@ import java.util.Map;
  * <p>Modality indicates that a dialog will block the calling thread even if the
  * calling thread is the EDT. Notice that a dialog will not release the block
  * until dispose is called even if show() from another form is called! Events are still performed thanks
- * to the <code>invokeAndBlock</code> capability of the <code>Display</code> class.</p>
+ * to the {@link com.codename1.ui.Display#invokeAndBlock(java.lang.Runnable)} capability of the 
+ * <code>Display</code> class.</p>
  * <p>To determine the size of the dialog use the show method that accepts 4 integer
  * values, notice that these values accept margin from the four sides rather than x, y, width
  * and height values!</p>
- * <p>To style the dialog its important to either use the <code>getDialogStyle()</code> or 
- * <code>setDialogUIID</code> methods rather than styling the dialog object directly.</p>
+ * <p>It's important to style a <code>Dialog</code> using {@link Dialog#getDialogStyle()} or 
+ * {@link Dialog#setDialogUIID(java.lang.String)} methods rather than styling the dialog object directly.</p>
  * <p>
  * The <code>Dialog</code> class also includes support for popup dialog which is a dialog type that is positioned
  * next to a component or screen area and points an arrow at that location. 
@@ -62,12 +63,12 @@ import java.util.Map;
  * 
  * <p>See this sample for showing a dialog at the bottom of the screen:</p>
  * <script src="https://gist.github.com/codenameone/60ca2cc54eea0cb12ede.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-dialog-modal-south.png" alt="Dialog South" />
  *
  * @author Shai Almog
  * @see Display#invokeAndBlock(java.lang.Runnable) 
  */
 public class Dialog extends Form {
-
     /**
      * Indicates whether the dialog has been disposed
      */
@@ -177,7 +178,7 @@ public class Dialog extends Form {
      * devices without the common softbuttons (e.g. blackberries). 
      * The default value is false
      */
-    private static boolean commandsAsButtons;
+    private static boolean commandsAsButtons = true;
 
     private boolean disposeWhenPointerOutOfBounds = false;
     private boolean pressedOutOfBounds;
@@ -194,6 +195,20 @@ public class Dialog extends Form {
      * its set to a value it biases the system towards a fixed direction for the popup dialog.
      */
     private Boolean popupDirectionBiasPortrait;
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian 
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     */
+    private static float defaultBlurBackgroundRadius = -1;
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian 
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     */
+    private float blurBackgroundRadius = defaultBlurBackgroundRadius;
     
     /**
      * Constructs a Dialog with a title
@@ -204,6 +219,18 @@ public class Dialog extends Form {
         this();
         setTitle(title);
     }
+
+    /**
+     * Constructs a Dialog with a title
+     * 
+     * @param title the title of the dialog
+     * @param lm the layout for the dialog
+     */
+    public Dialog(String title, Layout lm) {
+        this(lm);
+        setTitle(title);
+    }
+    
     
     /**
      * Disabling ad padding for dialogs
@@ -212,16 +239,33 @@ public class Dialog extends Form {
     }
 
     /**
-     * Constructs a Dialog with a title
+     * Constructs a Dialog 
      * 
      */
     public Dialog() {
         this("Dialog", "DialogTitle");
     }
 
+    /**
+     * Constructs a Dialog with a layout
+     * 
+     * @param lm the layout manager
+     */
+    public Dialog(Layout lm) {
+        this("Dialog", "DialogTitle", lm);
+    }
+    
     Dialog(String dialogUIID, String dialogTitleUIID) {
         super();
+        initImpl(dialogUIID, dialogTitleUIID, null);
+    }
 
+    Dialog(String dialogUIID, String dialogTitleUIID, Layout lm) {
+        super();
+        initImpl(dialogUIID, dialogTitleUIID, lm);
+    }
+
+    private void initImpl(String dialogUIID, String dialogTitleUIID, Layout lm) {
         super.getContentPane().setUIID(dialogUIID);
         super.getTitleComponent().setText("");
         super.getTitleComponent().setVisible(false);
@@ -230,7 +274,11 @@ public class Dialog extends Form {
         lockStyleImages(getUnselectedStyle());
         titleArea.setVisible(false);
 
-        dialogContentPane = new Container();
+        if(lm != null) {
+            dialogContentPane = new Container(lm);
+        } else {
+            dialogContentPane = new Container();
+        }
         dialogContentPane.setUIID("DialogContentPane");
         dialogTitle = new Label("", dialogTitleUIID);
         super.getContentPane().setLayout(new BorderLayout());
@@ -244,6 +292,14 @@ public class Dialog extends Form {
         super.getStyle().setBorder(null);
         setSmoothScrolling(false);
         deregisterAnimated(this);
+    }
+    
+    /**
+     * Overriden to disable the toolbar in dialogs <br>
+     * {@inheritDoc}
+     */
+    @Override
+    protected final void initGlobalToolbar() {
     }
 
     public Container getContentPane() {
@@ -1088,8 +1144,8 @@ public class Dialog extends Form {
                 getTitleArea().setPreferredSize(new Dimension(0,0));
                 if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
                     getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
-                    int cpPaddingTop = getContentPane().getStyle().getPadding(TOP);
-                    int titlePT = getTitleComponent().getStyle().getPadding(TOP);
+                    int cpPaddingTop = getContentPane().getStyle().getPaddingTop();
+                    int titlePT = getTitleComponent().getStyle().getPaddingTop();
                     byte[] pu = getContentPane().getStyle().getPaddingUnit();
                     if(pu == null){
                         pu = new byte[4]; 
@@ -1125,6 +1181,8 @@ public class Dialog extends Form {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
+        
+        prefWidth += getUIManager().getLookAndFeel().getVerticalScrollWidth();
         
         int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight  - title.getPreferredH();
         int availableWidth = Display.getInstance().getDisplayWidth();
@@ -1223,7 +1281,7 @@ public class Dialog extends Form {
         if(getSoftButtonCount() > 1) {
             Component menuBar = getSoftButton(0).getParent();
             Style menuStyle = menuBar.getStyle();
-            return menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
+            return menuBar.getPreferredH() + menuStyle.getVerticalMargins();
         }
         return 0;
     }
@@ -1747,7 +1805,7 @@ public class Dialog extends Form {
             if (getSoftButtonCount() > 1) {
                 Component menuBar = getSoftButton(0).getParent();
                 Style menuStyle = menuBar.getStyle();
-                menuHeight = menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
+                menuHeight = menuBar.getPreferredH() + menuStyle.getVerticalMargins();
             }
             prefWidth = Math.min(prefWidth, w);
             h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
@@ -1821,14 +1879,14 @@ public class Dialog extends Form {
 
                     Style s = getDialogStyle();
 
-                    s.setMargin(TOP, (int) (s.getMargin(false, TOP) * ratioH));
-                    s.setMargin(BOTTOM, (int) (s.getMargin(false, BOTTOM) * ratioH));
-                    s.setMargin(LEFT, (int) (s.getMargin(isRTL(), LEFT) * ratioW));
-                    s.setMargin(RIGHT, (int) (s.getMargin(isRTL(), RIGHT) * ratioW));
+                    s.setMargin(TOP, (int) (s.getMarginTop() * ratioH));
+                    s.setMargin(BOTTOM, (int) (s.getMarginBottom() * ratioH));
+                    s.setMargin(LEFT, (int) (s.getMarginLeft(isRTL()) * ratioW));
+                    s.setMargin(RIGHT, (int) (s.getMarginRight(isRTL()) * ratioW));
 
-                    titleStyle.setMargin(TOP, (int) (titleStyle.getMargin(false, TOP) * ratioH));
-                    titleStyle.setMargin(LEFT, (int) (titleStyle.getMargin(isRTL(), LEFT) * ratioW));
-                    titleStyle.setMargin(RIGHT, (int) (titleStyle.getMargin(isRTL(), RIGHT) * ratioW));
+                    titleStyle.setMargin(TOP, (int) (titleStyle.getMarginTop() * ratioH));
+                    titleStyle.setMargin(LEFT, (int) (titleStyle.getMarginLeft(isRTL()) * ratioW));
+                    titleStyle.setMargin(RIGHT, (int) (titleStyle.getMarginRight(isRTL()) * ratioW));
                     return;
                 }
             }
@@ -1859,5 +1917,62 @@ public class Dialog extends Form {
      */
     public boolean wasDisposedDueToRotation() {
         return disposedDueToRotation;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     * @return the blurBackgroundRadius
+     */
+    public float getBlurBackgroundRadius() {
+        return blurBackgroundRadius;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
+     * @param blurBackgroundRadius the blurBackgroundRadius to set
+     */
+    public void setBlurBackgroundRadius(float blurBackgroundRadius) {
+        this.blurBackgroundRadius = blurBackgroundRadius;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used
+     * @return the defaultBlurBackgroundRadius
+     */
+    public static float getDefaultBlurBackgroundRadius() {
+        return defaultBlurBackgroundRadius;
+    }
+
+    /**
+     * Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+     * blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+     * only should be used. Notice that this value can be set using the theme constant: {@code dialogBlurRadiusInt}
+     * @param aDefaultBlurBackgroundRadius the defaultBlurBackgroundRadius to set
+     */
+    public static void setDefaultBlurBackgroundRadius(float aDefaultBlurBackgroundRadius) {
+        defaultBlurBackgroundRadius = aDefaultBlurBackgroundRadius;
+    }
+
+    /**
+     * In case of a blur effect we need to do something different...
+     * {@inheritDoc}
+     */
+    void initDialogBgPainter(Painter p, Form previousForm) {
+        if(getBlurBackgroundRadius() > 0 && Display.impl.isGaussianBlurSupported()) {
+            Image img = Image.createImage(previousForm.getWidth(), previousForm.getHeight());
+            Graphics g = img.getGraphics();
+            previousForm.paintComponent(g, true);
+            img = Display.getInstance().gaussianBlurImage(img, blurBackgroundRadius);
+            getUnselectedStyle().setBgImage(img);
+            getUnselectedStyle().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);
+        } else {
+            super.initDialogBgPainter(p, previousForm);
+        }
     }
 }

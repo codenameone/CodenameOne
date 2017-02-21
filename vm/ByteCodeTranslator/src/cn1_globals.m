@@ -115,17 +115,15 @@ struct clazz class_array3__JAVA_DOUBLE = {
    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_3_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 3, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
-
-struct elementStruct* pop(struct elementStruct* array, int* sp) {
+struct elementStruct* pop(struct elementStruct** sp) {
     --(*sp);
-    struct elementStruct* retVal = &array[*sp];
-    return retVal;
+    return *sp;
 }
 
-void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct* array, int* sp) {
+void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** SP) {
     while(count > 0) {
-        --(*sp);
-        javaTypes t = array[*sp].type;
+        --(*SP);
+        javaTypes t = (*SP)->type;
         if(t == CN1_TYPE_DOUBLE || t == CN1_TYPE_LONG) {
             count -= 2;
         } else {
@@ -683,9 +681,18 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             
             if(threadStateData->heapAllocationSize > 0) {
                 invokedGC = YES;
+                threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
+                threadStateData->nativeAllocationMode = JAVA_FALSE;
                 threadStateData->threadActive = JAVA_FALSE;
                 while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
+                    if (get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
+                        // For some reason the gcThread is dead
+                        threadStateData->nativeAllocationMode = JAVA_TRUE;
+                        java_lang_System_gc__(threadStateData);
+                        threadStateData->nativeAllocationMode = JAVA_FALSE;
+                        threadStateData->threadActive = JAVA_FALSE;
+                    }
                     usleep((JAVA_INT)(1000));
                 }
                 invokedGC = NO;
@@ -1075,10 +1082,25 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     } 
 }
 
+JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return 0;
+}
+
+JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return JAVA_FALSE;
+}
+
 void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {
     JAVA_OBJECT arrayIndexOutOfBoundsException = __NEW_java_lang_ArrayIndexOutOfBoundsException(threadStateData);
     java_lang_ArrayIndexOutOfBoundsException___INIT_____int(threadStateData, arrayIndexOutOfBoundsException, index);
     throwException(threadStateData, arrayIndexOutOfBoundsException);
+}
+
+JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_STATE, int index) {
+    throwArrayIndexOutOfBoundsException(threadStateData, index);
+    return JAVA_FALSE;
 }
 
 void** interfaceVtableGlobal = 0;

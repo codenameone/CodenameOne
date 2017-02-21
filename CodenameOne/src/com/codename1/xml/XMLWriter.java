@@ -1,8 +1,34 @@
 /*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
+ */
+/*
  * Copyright 2013 Paul Harrison Williams. All rights reserved.
  * 
  * Please contact pwillcode@gmail.com if you have licensing questions.
  */
+/*
+* This was contributed as part of this issue: https://github.com/codenameone/CodenameOne/issues/753
+* The original contribution comments were partially modified with the migration from Google Code to github.
+*/
 package com.codename1.xml;
 
 import java.io.IOException;
@@ -12,6 +38,12 @@ import java.util.Hashtable;
 
 import com.codename1.util.StringUtil;
 
+/**
+ * <p>{@code XMLWriter} writes an XML {@link com.codename1.xml.Element} into an XML string/file
+ * this allowing us to serialize previously parsed and modified XML.</p>
+ * 
+ * @author Paul Harrison Williams<pwillcode@gmail.com>
+ */
 public class XMLWriter {
 
     private boolean encodeText;

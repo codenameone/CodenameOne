@@ -39,8 +39,8 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * A component that lets the user switch between a group of components by
- * clicking on a tab with a given title and/or icon.
+ * <p>A component that lets the user switch between a group of components by
+ * clicking on a tab with a given title and/or icon.</p>
  *
  * <p>
  * Tabs/components are added to a <code>Tabs</code> object by using the
@@ -48,13 +48,24 @@ import com.codename1.ui.util.EventDispatcher;
  * A tab is represented by an index corresponding
  * to the position it was added in, where the first tab has an index equal to 0
  * and the last tab has an index equal to the tab count minus 1.
+ * </p>
  * <p>
  * The <code>Tabs</code> uses a <code>SingleSelectionModel</code>
  * to represent the set of tab indices and the currently selected index.
  * If the tab count is greater than 0, then there will always be a selected
  * index, which by default will be initialized to the first tab.
  * If the tab count is 0, then the selected index will be -1.
- * <p>
+ * </p>
+ * <p>A simple {@code Tabs} sample looks a bit like this:</p>
+ * <script src="https://gist.github.com/codenameone/ba27124a0a25e685b123.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs.png" alt="Simple usage of Tabs" />
+ * 
+ * <p>A common use case for {@code Tabs} is the iOS carousel UI where dots are drawn at the bottom of the 
+ * form and swiping is used to move between pages:</p>
+ * <script src="https://gist.github.com/codenameone/e981c3f91f98f1515987.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe1.png" alt="Tabs carousel page 1" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-tabs-swipe2.png" alt="Tabs carousel page 2" />
+ * 
  *
  * @author Chen Fishbein
  *
@@ -142,7 +153,7 @@ public class Tabs extends Container {
             for(int iter = 0 ; iter < getTabCount() ; iter++) {
                 Component c = getTabComponentAt(iter);
                 if(c.isScrollableY()) {
-                    if(c.getStyle().getPadding(BOTTOM) < tabsContainer.getPreferredH()) {
+                    if(c.getStyle().getPaddingBottom() < tabsContainer.getPreferredH()) {
                         c.getStyle().setPadding(BOTTOM, tabsContainer.getPreferredH());
                     }
                 }
@@ -175,8 +186,6 @@ public class Tabs extends Container {
             tabPlacement = tabPlace;
         }
     }
-
-
     
     /**
      * {@inheritDoc}
@@ -257,6 +266,7 @@ public class Tabs extends Container {
                     component.paintLockRelease();
                 }
                 slideToDestMotion = null;
+                enableLayoutOnPaint = true;
                 deregisterAnimatedInternal();
                 setSelectedIndex(active);
             }
@@ -379,6 +389,54 @@ public class Tabs extends Container {
 
     /**
      * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title the title to be displayed in this tab
+     * @param icon the icon to be displayed in this tab
+     * @param pressedIcon the icon shown when the tab is selected
+     * @param component the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     *
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, Image icon, Image pressedIcon, Component component) {
+        int index = tabsContainer.getComponentCount();
+        insertTab(title, icon, component, index);
+        setTabSelectedIcon(index, pressedIcon);
+        return this;
+    }
+    
+    /**
+     * Adds a <code>component</code>
+     * represented by a <code>title</code> and/or <code>icon</code>,
+     * either of which can be <code>null</code>.
+     * Cover method for <code>insertTab</code>.
+     *
+     * @param title the title to be displayed in this tab
+     * @param materialIcon one of the material design icon constants from {@link com.codename1.ui.FontImage}
+     * @param iconSize icon size in millimeters 
+     * @param component the component to be displayed when this tab is clicked
+     * @return this so these calls can be chained
+     *
+     * @see #insertTab
+     * @see #removeTabAt
+     */
+    public Tabs addTab(String title, char materialIcon, float iconSize, Component component) {
+        int index = tabsContainer.getComponentCount();
+        FontImage i = FontImage.createMaterial(materialIcon, "Tab", iconSize);
+        insertTab(title, i, component, index);
+        Style sel = getUIManager().getComponentSelectedStyle("Tab");
+        i = FontImage.createMaterial(materialIcon, sel, iconSize);
+        setTabSelectedIcon(index, i);
+        return this;
+    }
+    
+
+    /**
+     * Adds a <code>component</code>
      * represented by a <code>title</code> and no <code>icon</code>.
      * Cover method for <code>insertTab</code>.
      *
@@ -497,8 +555,10 @@ public class Tabs extends Container {
                     if(tabUIID != null) {
                         selectedTab.setUIID(tabUIID);
                     }
-                    selectedTab.setShouldCalcPreferredSize(true);
-                    selectedTab.repaint();
+                    if(!animateTabSelection) {
+                        selectedTab.setShouldCalcPreferredSize(true);
+                        selectedTab.repaint();
+                    }
                     int previousSelectedIndex = tabsContainer.getComponentIndex(selectedTab);
                     
                     // this might happen if a tab was removed
@@ -517,10 +577,11 @@ public class Tabs extends Container {
                 setSelectedIndex(active, animateTabSelection);
                 initTabsFocus();
                 selectedTab = b;
-                selectedTab.setShouldCalcPreferredSize(true);
-                tabsContainer.revalidate();
+                if(!animateTabSelection) {
+                    selectedTab.setShouldCalcPreferredSize(true);
+                    tabsContainer.revalidate();
+                }
                 tabsContainer.scrollComponentToVisible(selectedTab);
-                contentPane.revalidate();
             }
         });
 
@@ -878,6 +939,12 @@ public class Tabs extends Container {
             }
             activeComponent = index;
             selectTab(tabsContainer.getComponentAt(index));
+            int offset = 0;
+            for(Component c : contentPane) {
+                c.setLightweightMode(offset != index);
+                offset++;
+            }
+            revalidate();
         }
     }
     
@@ -1108,12 +1175,10 @@ public class Tabs extends Container {
                     xOffset -= (activeComponent * tabWidth);
                 }
                 Component component = parent.getComponentAt(i);
-                component.setX(component.getStyle().getMargin(Component.LEFT) + xOffset);
-                component.setY(component.getStyle().getMargin(Component.TOP));
-                component.setWidth(tabWidth - component.getStyle().getMargin(Component.LEFT)
-                        - component.getStyle().getMargin(Component.RIGHT));
-                component.setHeight(parent.getHeight() - component.getStyle().getMargin(Component.TOP)
-                        - component.getStyle().getMargin(Component.BOTTOM));
+                component.setX(component.getStyle().getMarginLeftNoRTL() + xOffset);
+                component.setY(component.getStyle().getMarginTop());
+                component.setWidth(tabWidth - component.getStyle().getHorizontalMargins());
+                component.setHeight(parent.getHeight() - component.getStyle().getVerticalMargins());
             }
 
         }
@@ -1121,10 +1186,10 @@ public class Tabs extends Container {
         public Dimension getPreferredSize(Container parent) {
             // fill
             Dimension dim = new Dimension(0, 0);
-            dim.setWidth(parent.getWidth() + parent.getStyle().getPadding(false, Component.LEFT)
-                    + parent.getStyle().getPadding(false, Component.RIGHT));
-            dim.setHeight(parent.getHeight() + parent.getStyle().getPadding(false, Component.TOP)
-                    + parent.getStyle().getPadding(false, Component.BOTTOM));
+            dim.setWidth(parent.getWidth() + parent.getStyle().getPaddingLeftNoRTL()
+                    + parent.getStyle().getPaddingRightNoRTL());
+            dim.setHeight(parent.getHeight() + parent.getStyle().getPaddingTop()
+                    + parent.getStyle().getPaddingBottom());
             int compCount = contentPane.getComponentCount();
             for(int iter = 0 ; iter < compCount ; iter++) {
                 Dimension d = contentPane.getComponentAt(iter).getPreferredSizeWithMargin();
@@ -1178,13 +1243,15 @@ public class Tabs extends Container {
     
     /**
      * Allows developers to customize the motion object for the slide effect
-     * to provide a linear slide effect.
+     * to provide a linear slide effect. You can use the {@code tabsSlideSpeedInt} 
+     * theme constant to define the time in milliseconds between releasing the swiped
+     * tab and reaching the next tab. This currently defaults to 200.
      * @param start start position
      * @param end end position for the motion
      * @return the motion object
      */
     protected Motion createTabSlideMotion(int start, int end) {
-        return Motion.createSplineMotion(start, end, 250);
+        return Motion.createSplineMotion(start, end, getUIManager().getThemeConstant("tabsSlideSpeedInt", 200));
     }
     
     class SwipeListener implements ActionListener{
@@ -1280,6 +1347,7 @@ public class Tabs extends Container {
                                 component.setX(component.getX() + diffX);
                                 component.paintLock(false);
                             }
+                            enableLayoutOnPaint = false;
                             repaint();
                         }
                     }
@@ -1398,8 +1466,14 @@ public class Tabs extends Container {
         }
         if(name.equals("icons")) {
             Image[] t = (Image[])value;
-            for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
-                setTabTitle(getTabTitle(iter), t[iter], iter);
+            if(t == null) {
+                for(int iter = 0 ; iter < getTabCount() ; iter++) {
+                    setTabTitle(getTabTitle(iter), null, iter);
+                }
+            } else {
+                for(int iter = 0 ; iter < Math.min(getTabCount(), t.length) ; iter++) {
+                    setTabTitle(getTabTitle(iter), t[iter], iter);
+                }
             }
             return null;
         }

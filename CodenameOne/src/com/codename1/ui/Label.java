@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.io.Log;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -32,9 +33,15 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 /**
- * Allows displaying labels and images with different alignment options, this class
+ * <p>Allows displaying a single line of text and icon (both optional) with different alignment options. This class
  * is a base class for several components allowing them to declare alignment/icon
- * look in a similar way.
+ * appearance universally.</p>
+ * <p>
+ * Label text can be positioned in one of 4 locations as such:
+ * </p>
+ * <script src="https://gist.github.com/codenameone/3bfd03a497bc09700128.js"></script>
+ * <img src="https://www.codenameone.com/img/developer-guide/components-label-text-position.png" alt="Label text positioning" />
+ * 
  * 
  * @author Chen Fishbein
  */
@@ -76,6 +83,10 @@ public class Label extends Component {
     private boolean showEvenIfBlank = false;
     private int shiftMillimeters = 1;
     private int stringWidthUnselected = -1;
+    
+    private boolean autoSizeMode;
+    private Font originalFont;
+    private int widthAtLastCheck = -1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -196,8 +207,8 @@ public class Label extends Component {
         Style s = getStyle();
         Font f = s.getFont();
         
-        int innerHeight = height-s.getPadding(TOP)-s.getPadding(BOTTOM);
-        return s.getPadding(TOP)+(innerHeight-f.getHeight())/2+f.getAscent();
+        int innerHeight = height-s.getVerticalPadding();
+        return s.getPaddingTop()+(innerHeight-f.getHeight())/2+f.getAscent();
     }
     
     
@@ -210,6 +221,7 @@ public class Label extends Component {
      * @param text the string that the label presents.
      */
     public void setText(String text){
+        widthAtLastCheck = -1;
         this.text = text;
         localize();
         stringWidthUnselected = -1;
@@ -283,6 +295,7 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
+        widthAtLastCheck = -1;
         if(icon != null) {
             if(icon.requiresDrawImage()) {
                 legacyRenderer = true;
@@ -352,7 +365,7 @@ public class Label extends Component {
 
     /**
      * Returns the vertical alignment of the Label, this will only work when the icon
-     * is in the side of the text and not above or bellow it.
+     * is in the side of the text and not above or below it.
      * <strong>The valign property is only relevant relatively to the icon and not the entire label, this will
      * only work when there is an icon</strong>
      * 
@@ -438,9 +451,15 @@ public class Label extends Component {
      */
     public void paint(Graphics g) {
         if(legacyRenderer) {
+            initAutoResize();
             getUIManager().getLookAndFeel().drawLabel(g, this);
             return;
         }
+        paintImpl(g);
+    }
+
+    void paintImpl(Graphics g) {
+        initAutoResize();
         Object icn = null;
         Image i = getIconFromState();
         if(i != null) {
@@ -458,15 +477,64 @@ public class Label extends Component {
         int cmpWidth = getWidth();
         Style s = getStyle();
         Font f = s.getFont();
-        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, text, 
+        String t = text;
+        if(text == null) { 
+            t = "";
+        }
+        Display.impl.drawLabelComponent(g.getGraphics(), cmpX, cmpY, cmpHeight, cmpWidth, s, t, 
                 icn, null, 0, gap, isRTL(), false, textPosition, getStringWidth(f), tickerRunning, shiftText, 
                 endsWith3Points, valign);
     }
+    
+    void initAutoResize() {
+        if(autoSizeMode) {
+            Style s = getUnselectedStyle();
+            int p = s.getHorizontalPadding();
+            int w = getWidth();
+            if(w > p + 10) {
+                if(originalFont == null) {
+                    originalFont = s.getFont();
+                } else {
+                    if(w == widthAtLastCheck) {
+                        return;
+                    }
+                }
+                
+                Font currentFont = originalFont;
+                float fontSize = currentFont.getPixelSize();
+                if(fontSize < 1) {
+                    Log.p("Autosize disabled probably because component wasn't using native fonts for UIID: " + getUIID());
+                    autoSizeMode = false;
+                    return;
+                }
+                widthAtLastCheck = w;
+                autoSizeMode = false;
+                while(calcPreferredSize().getWidth() < w) {
+                    fontSize++;
+                    currentFont = currentFont.derive(fontSize, currentFont.getStyle());
+                    getAllStyles().setFont(currentFont);
+                }
+                while(calcPreferredSize().getWidth() > w) {
+                    fontSize--;
+                    currentFont = currentFont.derive(fontSize, currentFont.getStyle());
+                    getAllStyles().setFont(currentFont);
+                }
+                autoSizeMode = true;
+            }
+        }
+    }
 
+    void calcSizeAutoSize() {
+        if(autoSizeMode && originalFont != null) {
+            getAllStyles().setFont(originalFont);
+        }
+    }
+    
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
+        calcSizeAutoSize();
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
     }
     
@@ -511,7 +579,7 @@ public class Label extends Component {
 
     int getAvaliableSpaceForText() {
         Style style = getStyle();
-        int textSpaceW = getWidth() - style.getPadding(isRTL(), Label.RIGHT) - style.getPadding(isRTL(), Label.LEFT);
+        int textSpaceW = getWidth() - style.getHorizontalPadding();
         Image icon = getIconFromState();
 
         if (icon != null && (getTextPosition() == Label.RIGHT || getTextPosition() == Label.LEFT)) {
@@ -566,6 +634,10 @@ public class Label extends Component {
      * {@inheritDoc}
      */
     void tryDeregisterAnimated() {
+        if(tickerEnabled || tickerRunning) {
+            return;
+        }
+        super.tryDeregisterAnimated();
     }
 
     /**
@@ -597,9 +669,8 @@ public class Label extends Component {
     }
    
     /**
-     * If the Label text is too long fit the text to the widget and add "..."
-     * points at the end.
-     * By default this is set to true
+     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
+     * points at the end. By default this is set to {@code false} for faster performance.
      * 
      * @param endsWith3Points true if text should add "..." at the end
      */
@@ -608,7 +679,8 @@ public class Label extends Component {
     }
 
     /**
-     * Simple getter
+     * If the Label text is too long fit the text to the widget and adds "{@code ...}"
+     * points at the end. By default this is set to {@code false} for faster performance.
      * 
      * @return true if this Label adds "..." when the text is too long
      */
@@ -911,4 +983,33 @@ public class Label extends Component {
     public void setLegacyRenderer(boolean legacyRenderer) {
         this.legacyRenderer = legacyRenderer;
     }
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+        super.styleChanged(propertyName, source);
+        // If we're using a custom font, we need to use the legacy renderer.
+        if (Style.FONT.equals(propertyName) && source.getFont() instanceof CustomFont) {
+            setLegacyRenderer(true);
+        }
+    }
+
+    /**
+     * Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
+     * a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+     * @return the autoSizeMode
+     */
+    public boolean isAutoSizeMode() {
+        return autoSizeMode;
+    }
+
+    /**
+     * Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
+     * a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+     * @param autoSizeMode the autoSizeMode to set
+     */
+    public void setAutoSizeMode(boolean autoSizeMode) {
+        this.autoSizeMode = autoSizeMode;
+    }
+    
+    
 }

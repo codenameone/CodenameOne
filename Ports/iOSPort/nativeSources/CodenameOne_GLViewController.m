@@ -28,6 +28,7 @@
 #import "ClipRect.h"
 #import "DrawLine.h"
 #import "DrawRect.h"
+#import "ClearRect.h"
 #import "FillPolygon.h"
 #import "DrawString.h"
 #import "DrawPath.h"
@@ -39,6 +40,10 @@
 #import "ResetAffine.h"
 #import "Scale.h"
 #import "Rotate.h"
+#import "PaintOp.h"
+#import "RadialGradientPaint.h"
+#import "CN1UITextView.h"
+#import "CN1UITextField.h"
 #import <AudioToolbox/AudioToolbox.h>
 #import "DrawGradientTextureCache.h"
 #import "DrawStringTextureCache.h"
@@ -58,6 +63,12 @@
 #ifdef INCLUDE_GOOGLE_CONNECT
 #import "GoogleOpenSource.h"
 #endif
+#import "com_codename1_payment_Purchase.h"
+
+// Last touch positions.  Helpful to know on the iPad when some popover stuff
+// needs a source rect that the java API doesn't pass through.
+int CN1lastTouchX=0;
+int CN1lastTouchY=0;
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
@@ -87,6 +98,10 @@ int nextPowerOf2(int val) {
 
 int displayWidth = -1;
 int displayHeight = -1;
+BOOL CN1_blockPaste=NO;
+BOOL CN1_blockCut=NO;
+BOOL CN1_blockCopy=NO;
+
 UIView *editingComponent;
 
 // Currently used only for datepicker but could be used for
@@ -210,7 +225,7 @@ BOOL isVKBAlwaysOpen() {
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste) {
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
@@ -244,7 +259,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
         forceSlideUpField = forceSlideUp;
         CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
         if(isSingleLine) {
-            UITextField* utf = [[UITextField alloc] initWithFrame:rect];
+            CN1UITextField* utf = [[CN1UITextField alloc] initWithFrame:rect];
+            utf.blockPaste = CN1_blockPaste || blockCopyPaste;
+            utf.blockCopy = CN1_blockCopy || blockCopyPaste;
+            utf.blockCut = CN1_blockCut || blockCopyPaste;
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
             
@@ -411,10 +429,14 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 }
             }
         } else {
-            UITextView* utv = [[UITextView alloc] initWithFrame:rect];
+            CN1UITextView* utv = [[CN1UITextView alloc] initWithFrame:rect];
+            utv.blockPaste = CN1_blockPaste || blockCopyPaste;
+            utv.blockCopy = CN1_blockCopy || blockCopyPaste;
+            utv.blockCut = CN1_blockCut || blockCopyPaste;
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
+            [utv setTextColor:UIColorFromRGB(color, 255)];
             editingComponent = utv;
             if(scale != 1) {
                 float s = ((BRIDGE_CAST UIFont*)font).pointSize / scale;
@@ -738,7 +760,7 @@ CGContextRef drawArc(CGContextRef context, int color, int alpha, int x, int y, i
         CGMutablePathRef path = CGPathCreateMutable();
         
         CGAffineTransform t = CGAffineTransformMakeTranslation(cx, cy);
-        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/width), t);
+        t = CGAffineTransformConcat(CGAffineTransformMakeScale(1.0, height/(float)width), t);
         
         CGFloat radius = width/2;
         if (fill){
@@ -773,6 +795,35 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
     }
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl
+(CGContextRef context, RadialGradientPaint* gradient, int x, int y, int width, int height, int startAngle, int angle) {
+    if (angle < 0) {
+        startAngle += angle;
+        angle = -angle;
+    }
+    int scolor = gradient.startColor;
+    int ecolor = gradient.endColor;
+    CGFloat components[8] = {
+        ((float)((scolor >> 16) & 0xff))/255.0, \
+        ((float)((scolor >> 8) & 0xff))/255.0, ((float)(scolor & 0xff))/255.0, 1.0,
+        ((float)((ecolor >> 16) & 0xff))/255.0, \
+        ((float)((ecolor >> 8) & 0xff))/255.0, ((float)(ecolor & 0xff))/255.0, 1.0
+    };
+    size_t num_locations = 2;
+    CGFloat locations[2] = { 0.0, 1.0 };
+    
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGGradientRef myGradient = CGGradientCreateWithColorComponents (colorSpace, components, locations, num_locations);
+    CGColorSpaceRelease(colorSpace); colorSpace = NULL;
+    
+    CGContextSaveGState(context);
+    drawArc(context, gradient.startColor, 1.0, x, y, width, height, startAngle, angle, YES);
+    CGContextClip(context);
+    CGContextDrawRadialGradient(context, myGradient, CGPointMake(gradient.x+gradient.width/2, gradient.y+gradient.height/2), 0, CGPointMake(gradient.x+gradient.width/2, gradient.y+gradient.height/2), gradient.width/2, 0);
+    CGGradientRelease(myGradient), myGradient = NULL;
+    CGContextRestoreGState(context);
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
     CGContextRef context = UIGraphicsGetCurrentContext();
@@ -780,38 +831,16 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl
         CGContextSaveGState(context);
         CGContextConcatCTM(context, currentMutableTransform);
     }
-    CGContextFillPath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, YES));
+    if ([PaintOp getCurrentMutable] != NULL && [[PaintOp getCurrentMutable] isKindOfClass:[RadialGradientPaint class]]) {
+        Java_com_codename1_impl_ios_IOSImplementation_nativeFillRadialGradientMutableImpl(
+            context, (RadialGradientPaint*)[PaintOp getCurrentMutable], x, y, width, height, startAngle, angle
+        );
+    } else {
+        CGContextFillPath(drawArc(context, color, alpha, x, y, width, height, startAngle, angle, YES));
+    }
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-}
-
-void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl(color, alpha, 0, 0, width, height, startAngle, angle);
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    
-    GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height);
-#ifndef CN1_USE_ARC
-    [glu release];
-#endif
-}
-
-void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle) {
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
-    Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableImpl(color, alpha, 0, 0, width, height, startAngle, angle);
-    UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    
-    GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl((BRIDGE_CAST void*)glu, 255, x, y, width, height);
-#ifndef CN1_USE_ARC
-    [glu release];
-#endif
 }
 
 // START ES2 ADDITION: Drawing Shapes ------------------------------------------------------------------------------
@@ -1155,6 +1184,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl finished");
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
+(int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
+{
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    //NSLog(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
+    //if(clipApplied) {
+    CGContextRestoreGState(context);
+    //}
+    CGContextSaveGState(context);
+    CGContextClip(Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_GET_STATE_PASS_ARG numCommands, commands, numPoints, points));
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 (int x, int y, int width, int height, int clipApplied) {
     //    NSLog(@"Native global clipping applied: %i x: %i y: %i width: %i height: %i", clipApplied, x, y, width, height);
@@ -1263,6 +1304,27 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+    CGContextClearRect(context, CGRectMake(x, y, w, h));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
+    
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
+    ClearRect* f = [[ClearRect alloc] initWithArgs:x ypos:y w:w h:h];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height) {
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl started");
@@ -1363,13 +1425,17 @@ void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight) {
+    BOOL currentlyDrawing = NO;
+    BOOL oldCurrentMutableTransformSet = currentMutableTransformSet;
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
+        currentlyDrawing = YES;
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
     // set all pixels to transparent white to solve http://code.google.com/p/codenameone/issues/detail?id=923
-    for(int iter = 0 ; iter < width * height ; iter++) {
+    // This caused a regression in masking for some reason...
+    /*for(int iter = 0 ; iter < width * height ; iter++) {
         arr[iter] = 0xffffff;
-    }
+    }*/
     UIImage* img = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGColorSpaceRef coloSpaceRgb = CGColorSpaceCreateDeviceRGB();
     CGContextRef context = CGBitmapContextCreate(arr, width, height, 8, width * 4,
@@ -1384,7 +1450,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
     
     CGColorSpaceRelease(coloSpaceRgb);
     CGContextRelease(context);
+    if (currentlyDrawing) {
+        Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
+        currentMutableTransformSet = oldCurrentMutableTransformSet;
+    }
 }
+
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
@@ -1493,7 +1564,13 @@ static CodenameOne_GLViewController *sharedSingleton;
     return sharedSingleton->drawTextureSupported;
 }
 
++(BOOL)isCurrentMutableTransformSet {
+    return currentMutableTransformSet;
+}
 
++(CGAffineTransform) currentMutableTransform {
+    return currentMutableTransform;
+}
 
 #ifdef INCLUDE_MOPUB
 @synthesize adView;
@@ -1964,7 +2041,7 @@ BOOL prefersStatusBarHidden = NO;
         CGRect viewFrame = self.view.frame;
         
         if (keyboardFrame.origin.y > 0) {
-            keyboardSlideOffset = keyboardFrame.origin.y - (editCompoentY + editCompoentH);
+            keyboardSlideOffset = keyboardFrame.origin.y - (editCompoentY + editCompoentH + 10);
         } else {
             keyboardSlideOffset = 0;
         }
@@ -2316,11 +2393,11 @@ BOOL prefersStatusBarHidden = NO;
 #endif
             if(comp != NULL) {
 #ifndef NEW_CODENAME_ONE_VM
-                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX__(comp) + editComponentPadLeft) / scaleValue;
-                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY__(comp) + editComponentPadTop) / scaleValue;
+                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX__(comp) + com_codename1_ui_Component_getScrollX__(comp) + editComponentPadLeft) / scaleValue;
+                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY__(comp) + com_codename1_ui_Component_getScrollY__(comp) + editComponentPadTop) / scaleValue;
 #else
-                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadLeft) / scaleValue;
-                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadTop) / scaleValue;
+                float newEditCompoentX = (com_codename1_ui_Component_getAbsoluteX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollX___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadLeft) / scaleValue;
+                float newEditCompoentY = (com_codename1_ui_Component_getAbsoluteY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + com_codename1_ui_Component_getScrollY___R_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_OBJECT)comp) + editComponentPadTop) / scaleValue;
 #endif
                 if(newEditCompoentX != editCompoentX || newEditCompoentY != editCompoentY) {
                     for (UIWindow *window in [[UIApplication sharedApplication] windows])
@@ -2639,10 +2716,14 @@ static BOOL skipNextTouch = NO;
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
             yArray[iter] = (int)currentPoint.y * scaleValue;
+            CN1lastTouchX = (int)currentPoint.x;
+            CN1lastTouchY = (int)currentPoint.y;
         }
     } else {
         xArray[0] = (int)point.x * scaleValue;
         yArray[0] = (int)point.y * scaleValue;
+        CN1lastTouchX = (int)point.x;
+        CN1lastTouchY = (int)point.y;
     }
     pointerPressedC(xArray, yArray, [touches count]);
     POOL_END();
@@ -2737,8 +2818,8 @@ static BOOL skipNextTouch = NO;
         yArray[0] = (int)point.y * scaleValue;
     }
     if(!isVKBAlwaysOpen()) {
-        CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
-        [self foldKeyboard:scaledPoint];
+        //CGPoint scaledPoint = CGPointMake(point.x * scaleValue, point.y * scaleValue);
+        [self foldKeyboard:point];
     }
     pointerReleasedC(xArray, yArray, [touches count]);
     POOL_END();
@@ -2921,6 +3002,23 @@ extern SKPayment *paymentInstance;
             case SKPaymentTransactionStatePurchased:
                 
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                NSData *receipt = nil;
+                if (isIOS7()) {
+                    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+                    receipt = [NSData dataWithContentsOfURL : receiptURL];
+                } else {
+                    receipt = transaction.transactionReceipt;
+                }
+                
+                // Post the receipt
+                com_codename1_payment_Purchase_postReceipt___java_lang_String_java_lang_String_java_lang_String_long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG
+                    get_static_com_codename1_payment_Receipt_STORE_CODE_ITUNES(),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.transactionIdentifier),
+                    (JAVA_LONG)[transaction.transactionDate timeIntervalSince1970] * 1000,
+                    receipt ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [receipt base64EncodedStringWithOptions:0]) : JAVA_NULL
+                );
+                    
                 com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
                 continue;
             case SKPaymentTransactionStateFailed:
@@ -3215,6 +3313,15 @@ extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_
     com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG 0, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
 }
 #endif
+
+- (void)documentInteractionControllerDidEndPreview:(UIDocumentInteractionController *)controller
+{
+}
+
+- (UIViewController *) documentInteractionControllerViewControllerForPreview: (UIDocumentInteractionController *) controller
+{
+    return self;
+}
 @end
 
 

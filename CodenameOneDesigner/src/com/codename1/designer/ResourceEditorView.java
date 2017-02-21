@@ -149,7 +149,7 @@ public class ResourceEditorView extends FrameView {
     private RedoAction redoAction = new RedoAction();
     private HelpAction helpAction = new HelpAction();
     private static final String IMAGE_DIR = "/com/codename1/designer/resources/";
-        
+
     private static EditableResources loadedResources = new EditableResources();
     private Properties projectGeneratorSettings;
     private static String manualIDESettings;
@@ -157,7 +157,7 @@ public class ResourceEditorView extends FrameView {
     private static File loadedFile;
     private File fileToLoad;
     private static File baseResDir;
-    
+
     private String selectedResource = null;
     private HorizontalList themeList;
     private HorizontalList imageList;
@@ -184,7 +184,7 @@ public class ResourceEditorView extends FrameView {
             "Tablet (any)",
             "Phone (any)",
         });
-    
+
     private static final String[] OVERRIDE_NAMES = {
             null,
             "ios",
@@ -199,8 +199,8 @@ public class ResourceEditorView extends FrameView {
             "tablet",
             "phone",
     };
-    
-    
+
+
     public static File getLoadedFile() {
         return loadedFile;
     }
@@ -208,25 +208,25 @@ public class ResourceEditorView extends FrameView {
     public static File getBaseDir(){
         return baseResDir;
     }
-    
+
     public static File getTemporarySaveOfCurrentFile() {
         try {
             File tmp = File.createTempFile("Temp", ".res");
             tmp.deleteOnExit();
 
             FileOutputStream tempOut = new FileOutputStream(tmp);
-            
+
             loadedResources.save(tempOut);
 
             tempOut.close();
-            
+
             return tmp;
         } catch (IOException ex) {
             ex.printStackTrace();
             return null;
         }
     }
-    
+
     public ResourceEditorView(SingleFrameApplication app, File fileToLoad) {
         super(app);
         ToolTipManager.sharedInstance().setInitialDelay(0);
@@ -236,33 +236,33 @@ public class ResourceEditorView extends FrameView {
         AnalyticsService.visit("Startup", "");
         QuitAction.INSTANCE.setResource(loadedResources);
         initComponents();
-                
+
         jMenu7.add(new AbstractAction("560") {
             @Override
             public void actionPerformed(ActionEvent e) {
                 removeDPI(Display.DENSITY_560);
             }
         });
-        
+
         jMenu7.add(new AbstractAction("2HD") {
             @Override
             public void actionPerformed(ActionEvent e) {
                 removeDPI(Display.DENSITY_2HD);
             }
         });
-        
+
         jMenu7.add(new AbstractAction("4k") {
             @Override
             public void actionPerformed(ActionEvent e) {
                 removeDPI(Display.DENSITY_4K);
             }
         });
-        
+
         livePreviewUI.setSelected(Preferences.userNodeForPackage(getClass()).getBoolean("LivePreview", false));
         boolean isXMLEnabled = Preferences.userNodeForPackage(getClass()).getBoolean("XMLFileMode", true);
         EditableResources.setXMLEnabled(isXMLEnabled);
         enableXMLTeamMode.setSelected(isXMLEnabled);
-        
+
         initNativeTheme();
         LocalServer.startServer(mainPanel);
         if(ResourceEditorApp.IS_MAC) {
@@ -271,7 +271,7 @@ public class ResourceEditorView extends FrameView {
             helpMenu.remove(jSeparator8);
             helpMenu.remove(about);
         }
-        
+
         themeList = new HorizontalList(loadedResources, this);
         imageList = new HorizontalList(loadedResources, this, 40) {
             @Override
@@ -430,9 +430,9 @@ public class ResourceEditorView extends FrameView {
                     if(cmp instanceof com.codename1.ui.Dialog){
                         return new ImageIcon(ResourceEditorApp.class.getResource("/D.png"));
                     }else if(cmp instanceof com.codename1.ui.Form){
-                        return new ImageIcon(ResourceEditorApp.class.getResource("/F.png"));                
+                        return new ImageIcon(ResourceEditorApp.class.getResource("/F.png"));
                     }else{
-                        return new ImageIcon(ResourceEditorApp.class.getResource("/C.png"));                                
+                        return new ImageIcon(ResourceEditorApp.class.getResource("/C.png"));
                     }
                 } catch (Exception e) {
                 }
@@ -467,14 +467,14 @@ public class ResourceEditorView extends FrameView {
         dataScroll.setViewportView(dataList);
         userInterfaceScroll.setViewportView(uiList);
         localizationScroll.setViewportView(l10nList);
-        
+
         addActionToToolbar(newResourceAction);
         addActionToToolbar(loadResourceFileAction);
         addActionToToolbar(saveResourceFileAction);
         addActionToToolbar(saveResourceFileAsAction);
         addActionToToolbar(helpAction);
         toolbar.addSeparator();
-        addActionToToolbar(QuitAction.INSTANCE); 
+        addActionToToolbar(QuitAction.INSTANCE);
         toolbar.addSeparator();
         JLabel over = new JLabel("Override In Platform: ");
         toolbar.add(over);
@@ -549,7 +549,7 @@ public class ResourceEditorView extends FrameView {
                 }
             }
         });
-        
+
         refreshRecentMenu();
         loadedResources.clear();
         loadedFile = null;
@@ -579,7 +579,7 @@ public class ResourceEditorView extends FrameView {
         localizationScroll.getViewport().setOpaque(false);
         themeScroll.getViewport().setOpaque(false);
         mainPanel.setOpaque(false);
-        
+
         ButtonGroup bGroup = new ButtonGroup();
         String currentLF = UIManager.getLookAndFeel().getClass().getName();
         crossPlatformLFMenu.setSelected(currentLF.equals(UIManager.getCrossPlatformLookAndFeelClassName()));
@@ -596,10 +596,10 @@ public class ResourceEditorView extends FrameView {
         }
         return false;
     }
-    
+
     public File getPlatformOverrideFile() {
         if(loadedFile != null) {
-            File overrideDir = new File(loadedFile.getParentFile().getParentFile(), "override");        
+            File overrideDir = new File(loadedFile.getParentFile().getParentFile(), "override");
             if(!overrideDir.exists()) {
                 int r = JOptionPane.showConfirmDialog(mainPanel, "The override directory doesn't exist, this feature will only work within a valid\nCodename One project, do you want to continue?", "No Override Folder",JOptionPane.YES_NO_OPTION, JOptionPane.ERROR_MESSAGE);
                 if(r != JOptionPane.YES_OPTION) {
@@ -612,10 +612,10 @@ public class ResourceEditorView extends FrameView {
                 name = name.substring(0, name.length() - 4);
                 return new File(overrideDir, name + "_" + OVERRIDE_NAMES[platformOverrides.getSelectedIndex()] + ".ovr");
             }
-        } 
+        }
         return null;
     }
-    
+
     private void addActionToToolbar(Action a) {
         JButton b = toolbar.add(a);
         b.getAccessibleContext().setAccessibleName((String)a.getValue(Action.NAME));
@@ -666,37 +666,37 @@ public class ResourceEditorView extends FrameView {
                     // set the selected type to none
                     //selectedResourceType = null;
                     break;
-                }                                
+                }
             }
             //removeAnimation.setEnabled(loadedResources.isAnimation(selectedResource));
-        } 
+        }
         refreshAll();
         resourceEditor.repaint();
     }
-    
+
     public String getSelectedResource() {
         return selectedResource;
     }
-    
+
     /**
      * Invoked by the "..." button in the add theme entry dialog, allows us to add
      * an image on the fly while working on a theme
      */
     public void addNewImageWizard() {
         AddResourceDialog addResource = new AddResourceDialog(loadedResources, AddResourceDialog.IMAGE);
-        
-        if(JOptionPane.OK_OPTION == 
+
+        if(JOptionPane.OK_OPTION ==
             JOptionPane.showConfirmDialog(mainPanel, addResource, "Add Image", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)) {
             if(addResource.checkName(loadedResources)) {
                 JOptionPane.showMessageDialog(mainPanel, "A resource with that name already exists", "Add Image", JOptionPane.ERROR_MESSAGE);
                 addNewImageWizard();
                 return;
             }
-            
+
             // show the image editing dialog...
             ImageRGBEditor image = new ImageRGBEditor(loadedResources, null, this);
             image.setImage(com.codename1.ui.Image.createImage(5, 5));
-            if(JOptionPane.OK_OPTION == 
+            if(JOptionPane.OK_OPTION ==
                 JOptionPane.showConfirmDialog(mainPanel, image, "Add Image", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)) {
                 loadedResources.setImage(addResource.getResourceName(), image.getImage());
             }
@@ -709,15 +709,15 @@ public class ResourceEditorView extends FrameView {
      */
     public void addNewFontWizard() {
         AddResourceDialog addResource = new AddResourceDialog(loadedResources, AddResourceDialog.FONT);
-        
-        if(JOptionPane.OK_OPTION == 
+
+        if(JOptionPane.OK_OPTION ==
             JOptionPane.showConfirmDialog(mainPanel, addResource, "Add Font", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)) {
             if(addResource.checkName(loadedResources)) {
                 JOptionPane.showMessageDialog(mainPanel, "A resource with that name already exists", "Add Font", JOptionPane.ERROR_MESSAGE);
                 addNewFontWizard();
                 return;
             }
-            
+
             // show the image editing dialog...
             FontEditor font = new FontEditor(loadedResources,
                         new EditorFont(com.codename1.ui.Font.createSystemFont(com.codename1.ui.Font.FACE_SYSTEM, com.codename1.ui.Font.STYLE_PLAIN, com.codename1.ui.Font.SIZE_MEDIUM),
@@ -726,13 +726,13 @@ public class ResourceEditorView extends FrameView {
                         addResource.getResourceName()
                     );
             font.setFactoryCreation(true);
-            if(JOptionPane.OK_OPTION == 
+            if(JOptionPane.OK_OPTION ==
                 JOptionPane.showConfirmDialog(mainPanel, font, "Add Font", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)) {
                 loadedResources.setFont(addResource.getResourceName(), font.createFont());
             }
         }
     }
-    
+
     private void refreshRecentMenu() {
         recentMenu.removeAll();
         for(String file : recentFiles) {
@@ -754,8 +754,8 @@ public class ResourceEditorView extends FrameView {
         }
         Preferences.userNodeForPackage(getClass()).put("recentFiles", recentFileString);
     }
-    
-    
+
+
     private void updateLoadedFile() {
         if(ResourceEditorApp.IS_MAC) {
             for(java.awt.Window w : java.awt.Frame.getWindows()) {
@@ -765,7 +765,7 @@ public class ResourceEditorView extends FrameView {
             }
         }
     }
-    
+
 
     /** This method is called from within the constructor to
      * initialize the form.
@@ -968,7 +968,7 @@ public class ResourceEditorView extends FrameView {
                 .add(userInterfaceScroll, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 350, Short.MAX_VALUE))
         );
 
-        jTabbedPane1.addTab("GUI Builder", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/GUIBuilder.png")), jPanel1, "GUI Builder"); // NOI18N
+        jTabbedPane1.addTab("Old GUI Builder", new javax.swing.ImageIcon(getClass().getResource("/com/codename1/designer/resources/GUIBuilder.png")), jPanel1, "Old GUI Builder"); // NOI18N
 
         jPanel7.setName("jPanel7"); // NOI18N
 
@@ -1816,7 +1816,7 @@ public class ResourceEditorView extends FrameView {
     public EditableResources getLoadedResources() {
         return loadedResources;
     }
-    
+
 private void addThemeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addThemeActionPerformed
     showAddThemeResourceDialog();
 }//GEN-LAST:event_addThemeActionPerformed
@@ -1832,7 +1832,7 @@ private void addL10NActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
 private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addDataActionPerformed
     //showAddResourceDialog(AddResourceDialog.DATA);
     DataEditor dataEditor = new DataEditor(loadedResources, "Data");
-    dataEditor.selectDataFile(this);    
+    dataEditor.selectDataFile(this);
 }//GEN-LAST:event_addDataActionPerformed
 
     private void removeSelection(String s) {
@@ -1857,7 +1857,7 @@ private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
             for(String themeName : loadedResources.getThemeResourceNames()) {
                 Hashtable theme = loadedResources.getTheme(themeName);
                 if(theme.values().contains(resourceValue)) {
-                    JOptionPane.showMessageDialog(mainPanel, "Image is in use by the theme" + 
+                    JOptionPane.showMessageDialog(mainPanel, "Image is in use by the theme" +
                         "\nYou must remove it from the theme first", "Image In Use", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
@@ -1912,7 +1912,7 @@ private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
         if(value instanceof com.codename1.ui.Image || value instanceof EditableResources.MultiImage) {
             removeImageOrAnimation(element);
             return;
-        } 
+        }
         if(value instanceof com.codename1.ui.Font) {
             removeFont(element);
             return;
@@ -1936,7 +1936,7 @@ private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
         for(String themeName : loadedResources.getThemeResourceNames()) {
             Hashtable theme = loadedResources.getTheme(themeName);
             if(theme.values().contains(resourceValue)) {
-                JOptionPane.showMessageDialog(mainPanel, "Font is in use by the theme: " + 
+                JOptionPane.showMessageDialog(mainPanel, "Font is in use by the theme: " +
                     "\nYou must remove it from the theme first", "Font In Use", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -1944,7 +1944,7 @@ private void addDataActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST
         removeSelection(f);
         fontList.refresh();
     }
-    
+
 private void renameItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_renameItemActionPerformed
     if(selectedResource != null && loadedResources.containsResource(selectedResource)) {
         if(Arrays.asList(loadedResources.getUIResourceNames()).contains(selectedResource)) {
@@ -1983,7 +1983,7 @@ private void addImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
 
 private void systemLFMenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_systemLFMenuActionPerformed
         String plaf = UIManager.getSystemLookAndFeelClassName();
-        updatePLAF(plaf);    
+        updatePLAF(plaf);
 }//GEN-LAST:event_systemLFMenuActionPerformed
 
     private void updatePLAF(String plaf) {
@@ -1993,7 +1993,7 @@ private void systemLFMenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
             SwingUtilities.updateComponentTreeUI(SwingUtilities.windowForComponent(mainPanel));
         } catch(Exception e) {
             e.printStackTrace();
-        }        
+        }
     }
 
 private void crossPlatformLFMenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_crossPlatformLFMenuActionPerformed
@@ -2008,7 +2008,7 @@ private void crossPlatformLFMenuActionPerformed(java.awt.event.ActionEvent evt) 
             // If Nimbus is not available, you can set the GUI to another look and feel.
         }
         String plaf = UIManager.getCrossPlatformLookAndFeelClassName();
-        updatePLAF(plaf);    
+        updatePLAF(plaf);
 }//GEN-LAST:event_crossPlatformLFMenuActionPerformed
 
 private void addUserInterfaceActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addUserInterfaceActionPerformed
@@ -2320,12 +2320,12 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
     String generateStateMachineCode(String uiResourceName, File destFile, boolean promptUserForPackageName) {
         return generateStateMachineCodeImpl(uiResourceName, destFile, promptUserForPackageName, loadedResources, mainPanel);
     }
-    
+
     public static String generateStateMachineCodeEx(String uiResourceName, File destFile, boolean promptUserForPackageName, EditableResources load, java.awt.Component errorParent) {
         loadedResources = load;
         return generateStateMachineCodeImpl(uiResourceName, destFile, promptUserForPackageName, load, errorParent);
     }
-    
+
     private static String generateStateMachineCodeImpl(String uiResourceName, File destFile, boolean promptUserForPackageName, EditableResources loadResources, java.awt.Component errorParent) {
         String packageString = "";
         File currentFile = destFile;
@@ -2363,9 +2363,9 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
         final Map<String, String> allComponents = new HashMap<String, String>();
         initCommandMapAndNameToClassLookup(nameToClassLookup, commandMap, unhandledCommands, actionComponents, allComponents);
 
-        // list all the .ovr files and add them to the nameToClassLookup 
+        // list all the .ovr files and add them to the nameToClassLookup
         if(loadedFile != null && loadedFile.getParentFile() != null) {
-            File overrideDir = new File(loadedFile.getParentFile().getParentFile(), "override");  
+            File overrideDir = new File(loadedFile.getParentFile().getParentFile(), "override");
             if(overrideDir.exists()) {
                 File[] ovrFiles = overrideDir.listFiles(new FilenameFilter() {
                     @Override
@@ -2394,11 +2394,11 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
                         }
                     } catch(IOException ioErr) {
                         ioErr.printStackTrace();
-                    }                
+                    }
                 }
             }
         }
-        
+
         if(promptUserForPackageName) {
             JTextField packageName = new JTextField(packageString);
             JOptionPane.showMessageDialog(errorParent, packageName, "Please Pick The Package Name", JOptionPane.PLAIN_MESSAGE);
@@ -2595,16 +2595,16 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             }
 
             writeFormCallbackCode(w, "    protected void exitForm(Form f) {\n", "f.getName()", "exit", "f", "Form f");
-            writeFormCallbackCode(w, "    protected void beforeShow(Form f) {\n    aboutToShowThisContainer = f;\n", 
+            writeFormCallbackCode(w, "    protected void beforeShow(Form f) {\n    aboutToShowThisContainer = f;\n",
                     "f.getName()", "before", "f", "Form f");
-            writeFormCallbackCode(w, "    protected void beforeShowContainer(Container c) {\n        aboutToShowThisContainer = c;\n", 
+            writeFormCallbackCode(w, "    protected void beforeShowContainer(Container c) {\n        aboutToShowThisContainer = c;\n",
                     "c.getName()", "beforeContainer", "c", "Container c");
             writeFormCallbackCode(w, "    protected void postShow(Form f) {\n", "f.getName()", "post", "f", "Form f");
             writeFormCallbackCode(w, "    protected void postShowContainer(Container c) {\n", "c.getName()", "postContainer", "c", "Container c");
             writeFormCallbackCode(w, "    protected void onCreateRoot(String rootName) {\n", "rootName", "onCreate", "", "");
-            writeFormCallbackCode(w, "    protected Hashtable getFormState(Form f) {\n        Hashtable h = super.getFormState(f);\n", 
+            writeFormCallbackCode(w, "    protected Hashtable getFormState(Form f) {\n        Hashtable h = super.getFormState(f);\n",
                     "f.getName()", "getState", "f, h", "Form f, Hashtable h", "return h;");
-            writeFormCallbackCode(w, "    protected void setFormState(Form f, Hashtable state) {\n        super.setFormState(f, state);\n", 
+            writeFormCallbackCode(w, "    protected void setFormState(Form f, Hashtable state) {\n        super.setFormState(f, state);\n",
                     "f.getName()", "setState", "f, state", "Form f, Hashtable state");
 
             List<String> listComponents = new ArrayList<String>();
@@ -2718,7 +2718,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
     private static void writeFormCallbackCode(Writer w, String methodSig, String getString, String prefix, String args, String argDefinition) throws IOException {
         writeFormCallbackCode(w, methodSig, getString, prefix, args, argDefinition, "return;");
     }
-    
+
     private static void writeFormCallbackCode(Writer w, String methodSig, String getString, String prefix, String args, String argDefinition, String returnStatement) throws IOException {
         w.write(methodSig);
         for(String ui : loadedResources.getUIResourceNames()) {
@@ -2732,7 +2732,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write(normalizeFormName(ui));
             w.write("(");
             w.write(args);
-            w.write(");\n");    
+            w.write(");\n");
             w.write("            aboutToShowThisContainer = null;\n");
             w.write("            ");
             w.write(returnStatement);
@@ -2752,7 +2752,7 @@ private void importResActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIR
             w.write("    }\n\n");
         }
     }
-    
+
 private void deleteUnusedImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteUnusedImagesActionPerformed
     Vector<String> images = new Vector<String>();
     for(String img : loadedResources.getImageResourceNames()) {
@@ -3104,7 +3104,7 @@ private boolean configureOptiPNG() {
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("optiPng", null);
     if(node == null || !new File(node).exists()) {
         JOptionPane.showMessageDialog(mainPanel, "Please select the OptiPng executable in the following dialog\nOptiPng can be downloaded from http://optipng.sourceforge.net/", "Select OptiPNG", JOptionPane.INFORMATION_MESSAGE);
-        File[] result = showOpenFileChooser("OptiPng Executable", "exe", "app");
+        File[] result = showOpenFileChooser("OptiPng Executable", "exe", "app", "");
         if(result != null) {
             Preferences.userNodeForPackage(ResourceEditorView.class).put("optiPng", result[0].getAbsolutePath());
             return true;
@@ -3221,7 +3221,7 @@ private boolean configureOptiPNG() {
     void aboutActionPerformed() {
         aboutActionPerformed(null);
     }
-    
+
     private void aboutActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_aboutActionPerformed
         new About(mainPanel);
     }//GEN-LAST:event_aboutActionPerformed
@@ -3268,7 +3268,7 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
             return;
         }
         themeName = selectedResource;
-    } 
+    }
     ImageBorderWizardTabbedPane iw = new ImageBorderWizardTabbedPane(loadedResources, themeName);
     JDialog dlg = new JDialog(SwingUtilities.windowForComponent(mainPanel), "Border Wizard");
     dlg.setLayout(new java.awt.BorderLayout());
@@ -3305,7 +3305,7 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
             JOptionPane.showMessageDialog(mainPanel, "Error " + ex, "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    
+
     private void initNativeTheme() {
         Preferences p = Preferences.userNodeForPackage(getClass());
         String t = p.get("nativeCN1Theme", "/iPhoneTheme.res");
@@ -3315,23 +3315,23 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
             if(t.equals("/iPhoneTheme.res")) {
                 iosNativeTheme.setSelected(true);
                 return;
-            } 
+            }
             if(t.equals("/iOS7Theme.res")) {
                 ios7NativeTheme.setSelected(true);
                 return;
-            } 
+            }
             if(t.equals("/androidTheme.res")) {
                 android2NativeTheme.setSelected(true);
                 return;
-            } 
+            }
             if(t.equals("/blackberry_theme.res")) {
                 blackberryNativeTheme.setSelected(true);
                 return;
-            } 
+            }
             if(t.equals("/winTheme.res")) {
                 winNativeTheme.setSelected(true);
                 return;
-            } 
+            }
         } else {
             customNativeTheme.setSelected(true);
         }
@@ -3437,7 +3437,7 @@ private void enableXMLTeamModeActionPerformed(java.awt.event.ActionEvent evt) {/
 
     private void removeMultiEntry(String name, EditableResources.MultiImage multi, int dpi) {
         int[] dpis = multi.getDpi();
-        
+
         // don't remove the last DPI!
         if(dpis.length == 1) {
             return;
@@ -3463,9 +3463,9 @@ private void enableXMLTeamModeActionPerformed(java.awt.event.ActionEvent evt) {/
                 loadedResources.setMultiImage(name, multi);
                 return;
             }
-        }        
+        }
     }
-    
+
     private void removeDPI(int dpi) {
         if(loadedResources == null) {
             return;
@@ -3558,7 +3558,7 @@ public static void openInIDE(File f, int lineNumber) {
     File nbProject = new File(loadedFile.getParentFile().getParentFile(), "nbproject");
     File idea = new File(loadedFile.getParentFile().getParentFile(), ".idea");
     boolean isIdea = idea.exists();
-    
+
     // this is an eclipse project
     if(!nbProject.exists() || isIdea) {
         FileOutputStream fs = null;
@@ -3581,7 +3581,7 @@ public static void openInIDE(File f, int lineNumber) {
         }
         return;
     }
-    
+
     String node = Preferences.userNodeForPackage(ResourceEditorView.class).get("netbeansInstall", null);
     if(manualIDESettings != null) {
         node = manualIDESettings;
@@ -3663,7 +3663,7 @@ public static void openInIDE(File f, int lineNumber) {
         }
         return null;
     }
-    
+
     private boolean isUiResourceInUse(final String element, String resource) {
         final boolean[] flag = new boolean[1];
         UIBuilder uib = new UIBuilder() {
@@ -3675,7 +3675,7 @@ public static void openInIDE(File f, int lineNumber) {
         uib.createContainer(loadedResources, resource);
         return flag[0];
     }
-    
+
     /**
      * Returns true if the given image is used by a theme or timeline animation,
      * false otherwise.
@@ -3885,8 +3885,8 @@ public static void openInIDE(File f, int lineNumber) {
     public void showAddResourceDialog(int type) {
         AddResourceDialog addResource = new AddResourceDialog(loadedResources, type, false);
 
-        if(JOptionPane.OK_OPTION == 
-            JOptionPane.showConfirmDialog(mainPanel, addResource, "Select Name", 
+        if(JOptionPane.OK_OPTION ==
+            JOptionPane.showConfirmDialog(mainPanel, addResource, "Select Name",
             JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)) {
             addResource.addResource(loadedResources, this);
         }
@@ -3911,11 +3911,11 @@ public static void openInIDE(File f, int lineNumber) {
     }
 
     public String showAddUiResourceDialog() {
-        
+
         if(!isGuiBuilderApp()){
             JOptionPane.showMessageDialog(mainPanel, "Notice, this is not a visual project type.");
         }
-        
+
         AddUIResource addResource = new AddUIResource(mainPanel, loadedResources);
 
         if(addResource.isOkPressed()) {
@@ -3950,7 +3950,7 @@ public static void openInIDE(File f, int lineNumber) {
         chooser.setMultiSelectionEnabled(false);
         return chooser;
     }
-    
+
     public static File[] showOpenFileChooser() {
         return showOpenFileChooser(false, "Resource Files (*.res)", ".res");
     }
@@ -4026,14 +4026,14 @@ public static void openInIDE(File f, int lineNumber) {
 
                 m = fd.getClass().getMethod("getFiles");
                 File[] files = (File[])m.invoke(fd);
-                
+
                 if(files != null && files.length > 0) {
                     Preferences.userNodeForPackage(ResourceEditorView.class).put("lastDir", files[0].getAbsolutePath());
                     return files;
                 }
-                return null;            
+                return null;
             } catch(Throwable t) {
-                // failed... 
+                // failed...
                 t.printStackTrace();
             }
         }
@@ -4054,7 +4054,7 @@ public static void openInIDE(File f, int lineNumber) {
 
                 }
             });
-            
+
             if(open) {
                 fd.setMode(FileDialog.LOAD);
             } else {
@@ -4073,7 +4073,7 @@ public static void openInIDE(File f, int lineNumber) {
                 Preferences.userNodeForPackage(ResourceEditorView.class).put("lastDir", selection.getAbsolutePath());
                 return new File[] {selection};
             }
-            return null;            
+            return null;
         }
         JFileChooser c = createFileChooser(label, type);
         c.setMultiSelectionEnabled(multi);
@@ -4098,7 +4098,7 @@ public static void openInIDE(File f, int lineNumber) {
         } else {
             if(c.showSaveDialog(JFrame.getFrames()[0]) != JFileChooser.APPROVE_OPTION) {
                 return null;
-            } 
+            }
         }
         Preferences.userNodeForPackage(ResourceEditorView.class).put("lastDir", c.getSelectedFile().getParentFile().getAbsolutePath());
         if(multi) {
@@ -4121,7 +4121,7 @@ public static void openInIDE(File f, int lineNumber) {
         private File selection;
         private Object result;
         private boolean canceled;
-        
+
         public LoadResourceFileAction() {
             EditableResources.setCurrentPassword("");
             putValue(NAME, "Open");
@@ -4129,12 +4129,12 @@ public static void openInIDE(File f, int lineNumber) {
             putValue(SMALL_ICON, new ImageIcon(getClass().getResource(IMAGE_DIR + "open.png")));
             putValue(ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_O, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
         }
-        
+
         public void start() {
             HorizontalList.setBlockRefeshWhileLoading(true);
             // prevent a load from overwriting the current data
             if(loadedResources != null && loadedResources.isModified()) {
-                if(JOptionPane.showConfirmDialog(mainPanel, "File was modified, do you want to discard changes?", 
+                if(JOptionPane.showConfirmDialog(mainPanel, "File was modified, do you want to discard changes?",
                     "Loading File", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION) {
                     canceled = true;
                     return;
@@ -4153,7 +4153,7 @@ public static void openInIDE(File f, int lineNumber) {
                 fileToLoad = null;
             }
         }
-        
+
         public void exectute() {
             if(canceled) {
                 return;
@@ -4173,14 +4173,15 @@ public static void openInIDE(File f, int lineNumber) {
                         InputStream i = new FileInputStream(codenameone_settings);
                         projectGeneratorSettings.load(i);
                         i.close();
-                        if(selection.getName().equals(projectGeneratorSettings.getProperty("guiResource", null))) {
+                        if(selection.getName().equals(projectGeneratorSettings.getProperty("guiResource", null)) &&
+                                projectGeneratorSettings.getProperty("userClass") != null) {
                             projectGeneratorSettings.put("userClassAbs",
                                     new File(codenameone_settings.getParentFile(), projectGeneratorSettings.getProperty("userClass")).getAbsolutePath());
                             if(projectGeneratorSettings.containsKey("netbeans")) {
                                 manualIDESettings = projectGeneratorSettings.getProperty("netbeans");
                             }
                         } else {
-                            projectGeneratorSettings = null;                        
+                            projectGeneratorSettings = null;
                         }
                     } else {
                         projectGeneratorSettings = null;
@@ -4201,7 +4202,7 @@ public static void openInIDE(File f, int lineNumber) {
             }
             result = null;
         }
-        
+
         public void afterComplete() {
             HorizontalList.setBlockRefeshWhileLoading(false);
             loadedResources.fireTreeNodeAdded(null, -1);
@@ -4217,7 +4218,7 @@ public static void openInIDE(File f, int lineNumber) {
             }
             if(result instanceof Exception) {
                 // present the user with an error dialog
-                JOptionPane.showMessageDialog(mainPanel, "An error occured while trying to load the file:\n" + result, 
+                JOptionPane.showMessageDialog(mainPanel, "An error occured while trying to load the file:\n" + result,
                     "IO Error", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -4255,7 +4256,7 @@ public static void openInIDE(File f, int lineNumber) {
             }
         }
     }
-    
+
     void setLoadedFile(File loadedFile) {
         this.loadedFile = loadedFile;
         updateLoadedFile();
@@ -4264,18 +4265,18 @@ public static void openInIDE(File f, int lineNumber) {
 
     private class SaveResourceFileAction extends BlockingAction {
         boolean dialogCanceled;
-        
+
         public SaveResourceFileAction() {
             putValue(NAME, "Save");
             putValue(SHORT_DESCRIPTION, "Save");
             putValue(SMALL_ICON, new ImageIcon(getClass().getResource(IMAGE_DIR + "save.png")));
             putValue(ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_S, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
         }
-        
+
         public void start() {
             checkFile();
         }
-        
+
         protected void checkFile() {
             dialogCanceled = false;
             if(loadedFile == null) {
@@ -4284,7 +4285,7 @@ public static void openInIDE(File f, int lineNumber) {
                     loadedFile = files[0];
                     updateLoadedFile();
                     if(loadedFile.exists()) {
-                        if(JOptionPane.showConfirmDialog(mainPanel, "File Already Exists, do you want to overwrite this file?", 
+                        if(JOptionPane.showConfirmDialog(mainPanel, "File Already Exists, do you want to overwrite this file?",
                             "File Exists", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) == JOptionPane.NO_OPTION) {
                             loadedFile = null;
                             checkFile();
@@ -4307,43 +4308,43 @@ public static void openInIDE(File f, int lineNumber) {
                 FileOutputStream fileOut = null;
                 FileOutputStream tempOut = null;
                 FileInputStream tempIn = null;
-                
+
                 try {
                     // check if the file exists or not
                     if (loadedFile.exists()) {
                         // if the file exists, create a temporary file
                         File tempFile = File.createTempFile("_restmpfile_", null);
-                        
+
                         // make sure the temp file is deleted when the application ends
                         tempFile.deleteOnExit();
-                        
+
                         // save to the temp file
                         tempOut = new FileOutputStream(tempFile);
                         loadedResources.save(tempOut);
-                        
-                        // the save was successful, close the output stream and open an 
+
+                        // the save was successful, close the output stream and open an
                         // input stream
                         tempOut.close();
                         tempIn = new FileInputStream(tempFile);
-                        
+
                         // open a new output stream for the file
                         fileOut = new FileOutputStream(loadedFile);
-                        
+
                         // copy the temp file to the real file
                         while (tempIn.available() > 0) {
                             // get the number of available bytes
                             int num = Math.min(tempIn.available(), 4096);
-                            
+
                             // create an array to contain them
                             byte[] arr = new byte[num];
-                            
+
                             // read the bytes from the temp file
                             tempIn.read(arr);
-                            
+
                             // write the bytes to the real file
-                            fileOut.write(arr);                            
+                            fileOut.write(arr);
                         }
-                    } else {                       
+                    } else {
                         // otherwise, simply save the file
                         fileOut = new FileOutputStream(loadedFile);
                         loadedResources.save(fileOut);
@@ -4387,7 +4388,7 @@ public static void openInIDE(File f, int lineNumber) {
                 }
             }
         }
-        
+
         private void closeSilent(Object o) {
             try {
                 if (o != null) {
@@ -4400,7 +4401,7 @@ public static void openInIDE(File f, int lineNumber) {
             } catch (IOException ex) {}
         }
     }
-    
+
     private class SaveResourceFileAsAction extends SaveResourceFileAction {
         File oldLoadedFile;
         SaveResourceFileAsAction() {
@@ -4452,7 +4453,7 @@ public static void openInIDE(File f, int lineNumber) {
                 loadedResources.setIgnoreSVGMode(false);
                 loadedResources.setIgnorePNGMode(pngMode);
                 getFrame().setTitle(loadedFile.getName() + " - Codename One Designer");
-            } 
+            }
         }
     }
 
@@ -4542,7 +4543,7 @@ public static void openInIDE(File f, int lineNumber) {
                             buildXML.append("createBitmap=\"");
                             buildXML.append(f.isIncludesBitmap());
                             buildXML.append("\" ");
-                            
+
                             if(f.isIncludesBitmap()) {
                                 buildXML.append("charset=\"");
                                 buildXML.append(toXMLString(f.getBitmapFont().getCharset()));
@@ -4783,7 +4784,7 @@ public static void openInIDE(File f, int lineNumber) {
             } catch(IOException ioErr) {
                 ioErr.printStackTrace();
                 JOptionPane.showMessageDialog(mainPanel, "There was an IO error while exporting: " + ioErr, "IO Exception", JOptionPane.ERROR_MESSAGE);
-            }            
+            }
         }
 
         private String toXMLString(String s) {
@@ -4876,7 +4877,7 @@ public static void openInIDE(File f, int lineNumber) {
             return null;
         }
     }
-    
+
     class NewResourceAction extends AbstractAction {
         public NewResourceAction() {
             putValue(NAME, "New");
@@ -4885,7 +4886,7 @@ public static void openInIDE(File f, int lineNumber) {
             putValue(SMALL_ICON, new ImageIcon(getClass().getResource(IMAGE_DIR + "new.png")));
             putValue(ACCELERATOR_KEY, KeyStroke.getKeyStroke(KeyEvent.VK_N, Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
         }
-        
+
         public void actionPerformed(ActionEvent e) {
             if(loadedResources != null && loadedResources.isModified()) {
                 if(JOptionPane.showConfirmDialog(mainPanel, "File was modified, you will lose your changes!\n" +
@@ -4911,7 +4912,7 @@ public static void openInIDE(File f, int lineNumber) {
             //removeResourceAction.setEnabled(false);
         }
     }
-    
+
     private class HelpAction extends BlockingAction {
         public HelpAction() {
             putValue(NAME, "Help");
@@ -4970,7 +4971,7 @@ public static void openInIDE(File f, int lineNumber) {
             refreshSelection(loadedResources.undo());
         }
     }
-    
+
     /**
      * Allow the user to edit resource names in the tree
      */
@@ -4979,13 +4980,13 @@ public static void openInIDE(File f, int lineNumber) {
             // TODO: Fix this...
             setEditable(false);
         }
-        
+
         public boolean isPathEditable(TreePath path) {
             Object value = path.getLastPathComponent();
             return !(value instanceof EditableResources.Node);
         }
     }
-    
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JMenuItem about;

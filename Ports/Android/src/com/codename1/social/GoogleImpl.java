@@ -22,6 +22,7 @@
  */
 package com.codename1.social;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender.SendIntentException;
@@ -32,6 +33,7 @@ import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.impl.android.IntentResultListener;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.io.AccessToken;
+import com.codename1.ui.Display;
 import com.google.android.gms.auth.GoogleAuthException;
 import com.google.android.gms.auth.GoogleAuthUtil;
 import com.google.android.gms.auth.UserRecoverableAuthException;
@@ -46,7 +48,7 @@ import java.io.IOException;
 /**
  * This is an implementation to the google sign in.
  * https://developers.google.com/+/mobile/android/getting-started
- * 
+ *
  * @author Chen
  */
 public class GoogleImpl extends GoogleConnect implements
@@ -72,7 +74,7 @@ public class GoogleImpl extends GoogleConnect implements
 
     @Override
     public boolean nativeIsLoggedIn() {
-        if(mGoogleApiClient != null && mGoogleApiClient.isConnected()){
+        if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
             return getAccessToken() != null;
         }
         return false;
@@ -95,60 +97,17 @@ public class GoogleImpl extends GoogleConnect implements
     }
 
     public void onConnected(Bundle bundle) {
-        AsyncTask<Void, Void, String> task = new AsyncTask<Void, Void, String>() {
-            @Override
-            protected String doInBackground(Void... params) {
-                String token = null;
-
-                try {
-
-                    Context ctx = AndroidNativeUtil.getActivity();
-                    token = GoogleAuthUtil.getToken(
-                            ctx,
-                            Plus.AccountApi.getAccountName(mGoogleApiClient),
-                            "oauth2:"
-                            + scope);
-                    setAccessToken(new AccessToken(token, null));
-
-                } catch (IOException transientEx) {
-                    transientEx.printStackTrace();
-                    // Network or server error, try later
-                    //Log.e(TAG, transientEx.toString());
-                } catch (UserRecoverableAuthException e) {
-                    // Recover (with e.getIntent())
-                    Intent recover = e.getIntent();
-                    AndroidNativeUtil.startActivityForResult(recover, new IntentResultListener() {
-
-                        public void onActivityResult(int requestCode, int resultCode, Intent data) {
-                        }
-                    });
-                } catch (GoogleAuthException authEx) {
-                    authEx.printStackTrace();
-                    // The call is not ever expected to succeed
-                    // assuming you have already verified that 
-                    // Google Play services is installed.
-                }
-
-                return token;
-            }
-
-            @Override
-            protected void onPostExecute(String token) {
-                if (callback != null) {
-                    callback.loginSuccessful();
-                }
-            }
-
-        };
-        task.execute();
+        new RequestTokenTask().execute();
 
     }
 
     public void onConnectionSuspended(int i) {
     }
 
-    public void onConnectionFailed(ConnectionResult cr) {
-
+    public void onConnectionFailed(final ConnectionResult cr) {
+        if (AndroidNativeUtil.getActivity() == null) {
+            return;
+        }
         final CodenameOneActivity main = (CodenameOneActivity) AndroidNativeUtil.getActivity();
 
         if (!mIntentInProgress && cr.hasResolution()) {
@@ -176,7 +135,13 @@ public class GoogleImpl extends GoogleConnect implements
             return;
         }
         if (callback != null) {
-            callback.loginFailed(GooglePlayServicesUtil.getErrorString(cr.getErrorCode()));
+            Display.getInstance().callSerially(new Runnable() {
+
+                @Override
+                public void run() {
+                    callback.loginFailed(GooglePlayServicesUtil.getErrorString(cr.getErrorCode()));
+                }
+            });
         }
     }
 
@@ -184,7 +149,7 @@ public class GoogleImpl extends GoogleConnect implements
     }
 
     public void onResume() {
-        Context ctx = AndroidNativeUtil.getActivity();
+        Context ctx = AndroidNativeUtil.getContext();
         if (mGoogleApiClient == null) {
             mGoogleApiClient = new GoogleApiClient.Builder(ctx)
                     .addConnectionCallbacks(this)
@@ -202,7 +167,7 @@ public class GoogleImpl extends GoogleConnect implements
     public void onDestroy() {
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
             mGoogleApiClient.disconnect();
-        }        
+        }
     }
 
     public void onSaveInstanceState(Bundle b) {
@@ -211,4 +176,58 @@ public class GoogleImpl extends GoogleConnect implements
     public void onLowMemory() {
     }
 
+    private class RequestTokenTask extends AsyncTask<String, Void, String> {
+
+        @Override
+        protected String doInBackground(String... params) {
+            String token = null;
+
+            try {
+                Context ctx = AndroidNativeUtil.getContext();
+                token = GoogleAuthUtil.getToken(
+                        ctx,
+                        Plus.AccountApi.getAccountName(mGoogleApiClient),
+                        "oauth2:"
+                        + scope);
+                setAccessToken(new AccessToken(token, null));
+
+            } catch (IOException transientEx) {
+                transientEx.printStackTrace();
+                // Network or server error, try later
+                //Log.e(TAG, transientEx.toString());
+            } catch (UserRecoverableAuthException e) {
+                // Recover (with e.getIntent())
+                Intent recover = e.getIntent();
+                AndroidNativeUtil.startActivityForResult(recover, new IntentResultListener() {
+
+                    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+                        if (resultCode == Activity.RESULT_OK) {
+                            // We had to sign in - now we can finish off the token request.
+                            new RequestTokenTask().execute();
+                        }
+                    }
+                });
+            } catch (GoogleAuthException authEx) {
+                authEx.printStackTrace();
+                // The call is not ever expected to succeed
+                // assuming you have already verified that 
+                // Google Play services is installed.
+            }
+            return token;
+        }
+
+        @Override
+        protected void onPostExecute(String token) {
+            if (callback != null && token != null) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        callback.loginSuccessful();
+                    }
+                });
+            }
+        }
+
+    }
 }

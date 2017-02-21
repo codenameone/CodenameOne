@@ -25,17 +25,24 @@ package com.codename1.ui.table;
 
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.util.EventDispatcher;
+import java.util.ArrayList;
 
 /**
- * A default implementation of the table model based on a two dimensional array.
+ * <p>A default implementation of the table model based on a two dimensional array.
+ * </p>
  *
+ * <script src="https://gist.github.com/codenameone/6b106772ad1d58c50270.js"></script>
+ * 
+ * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png" alt="Table with customize cells using the pinstripe effect" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png" alt="Picker table cell during edit" />
+ * 
  * @author Shai Almog
  */
 public class DefaultTableModel implements TableModel {
-    Object[][] data;
+    ArrayList<Object[]> data = new ArrayList<Object[]>();
     String[] columnNames;
     private EventDispatcher dispatcher = new EventDispatcher();
-    private boolean editable;
+    boolean editable;
 
     /**
      * Constructs a new table with a 2 dimensional array for row/column data
@@ -56,6 +63,14 @@ public class DefaultTableModel implements TableModel {
      * @see #isCellEditable(int, int) 
      */
     public DefaultTableModel(String[] columnNames, Object[][] data, boolean editable) {
+        for(Object[] o : data) {
+            this.data.add(o);
+        }
+        this.columnNames = columnNames;
+        this.editable = editable;
+    }
+
+    DefaultTableModel(String[] columnNames, ArrayList<Object[]> data, boolean editable) {
         this.data = data;
         this.columnNames = columnNames;
         this.editable = editable;
@@ -65,7 +80,7 @@ public class DefaultTableModel implements TableModel {
      * {@inheritDoc}
      */
     public int getRowCount() {
-        return data.length;
+        return data.size();
     }
 
     /**
@@ -94,7 +109,7 @@ public class DefaultTableModel implements TableModel {
      */
     public Object getValueAt(int row, int column) {
         try {
-            return data[row][column];
+            return data.get(row)[column];
         } catch(ArrayIndexOutOfBoundsException err) {
             // not the best situation but quite useful for the resource editor
             //err.printStackTrace();
@@ -106,7 +121,7 @@ public class DefaultTableModel implements TableModel {
      * {@inheritDoc}
      */
     public void setValueAt(int row, int column, Object o) {
-        data[row][column] = o;
+        data.get(row)[column] = o;
         dispatcher.fireDataChangeEvent(column, row);
     }
 
@@ -124,4 +139,39 @@ public class DefaultTableModel implements TableModel {
         dispatcher.removeListener(d);
     }
 
+    /**
+     * Adds the given row to the table data
+     * 
+     * @param row array or row items, notice that row.length should match the column count exactly!
+     */
+    public void addRow(Object... row) {
+       data.add(row);
+       for(int col = 0 ; col < row.length ; col++) {
+           dispatcher.fireDataChangeEvent(col, data.size() - 1);
+       }
+    }
+
+    /**
+     * Inserts the given row to the table data at the given offset
+     * 
+     * @param offset position within the table that is 0 or larger yet smaller than the row count
+     * @param row array or row items, notice that row.length should match the column count exactly!
+     */
+    public void insertRow(int offset, Object... row) {
+       data.add(offset, row);
+       for(int col = 0 ; col < row.length ; col++) {
+           dispatcher.fireDataChangeEvent(col, data.size() - 1);
+           dispatcher.fireDataChangeEvent(col, offset);
+       }
+    }
+
+    /**
+     * Removes the given row offset from the table
+     * 
+     * @param offset position within the table that is 0 or larger yet smaller than the row count
+     */
+    public void removeRow(int offset) {
+       data.remove(offset);
+       dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);
+    }
 }
