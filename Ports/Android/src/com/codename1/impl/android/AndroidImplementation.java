@@ -2359,7 +2359,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 if (tm!=null && tm.getDeviceId() != null)
                     imei = tm.getDeviceId(); // for phones or 3g tablets
                 else
-                    imei = Secure.getString(getApplicationContext().getContentResolver(), Secure.ANDROID_ID); 
+                    imei = Secure.getString(getContext().getContentResolver(), Secure.ANDROID_ID); 
                 return imei;
             }
             if ("MSISDN".equals(key)) {
