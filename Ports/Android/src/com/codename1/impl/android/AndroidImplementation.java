@@ -2355,7 +2355,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return "";
                 }
                 TelephonyManager tm = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
-                return tm.getDeviceId();
+                String imei = null;
+                if (tm!=null && tm.getDeviceId() != null)
+                    imei = tm.getDeviceId(); // for phones or 3g tablets
+                else
+                    imei = Secure.getString(getApplicationContext().getContentResolver(), Secure.ANDROID_ID); 
+                return imei;
             }
             if ("MSISDN".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
