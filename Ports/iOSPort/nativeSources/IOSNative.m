@@ -7202,11 +7202,11 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_paintComponentBackground___ja
                 return;
             }
             case 20: { //Style.BACKGROUND_IMAGE_ALIGNED_TOP:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
                 return;
             }
             case 21: { //Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
                 return;
             }
             case 22: {//Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
