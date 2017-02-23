@@ -70,7 +70,7 @@ public class Push {
      * @param googleAuthKey authorization key from the google play store
      * @return self for chaining
      */
-    public Push gmsAuth(String googleAuthKey) {
+    public Push gcmAuth(String googleAuthKey) {
         this.googleAuthKey = googleAuthKey;
         return this;
     }
