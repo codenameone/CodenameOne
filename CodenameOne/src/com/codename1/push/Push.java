@@ -40,6 +40,94 @@ import java.util.Map;
  * @author Shai Almog
  */
 public class Push {
+    
+    private final String token;
+    private final String body;
+    private boolean production;
+    private String googleAuthKey="";
+    private String iosCertificateURL="";
+    private String iosCertificatePassword="";
+    private String wnsSID="";
+    private String wnsClientSecret="";
+    private int pushType=1;
+    private final String[] deviceKeys;
+    
+    /**
+     * Creates a new push notification.
+     * @param token the authorization token from the account settings in the CodenameOne website, this is used
+     * to associate push quotas with your app
+     * @param body the body of the message
+     * @param deviceKeys Device keys when sending to specific devices.
+     */
+    public Push(String token, String body, String... deviceKeys) {
+        this.token = token;
+        this.body = body;
+        this.deviceKeys = deviceKeys;
+    }
+    
+    /**
+     * Sets authentication for GMS (Android and Chrome)
+     * @param googleAuthKey authorization key from the google play store
+     * @return self for chaining
+     */
+    public Push gmsAuth(String googleAuthKey) {
+        this.googleAuthKey = googleAuthKey;
+        return this;
+    }
+    
+    /**
+     * Sets authentication for APNS (iOS)
+     * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
+     * @param iosCertificatePassword the password for the push certificate
+     * @param production True if this is a production certificate.  False if this is a development certificate.
+     * @return Self for chaining
+     */
+    public Push apnsAuth(String iosCertificateURL, String iosCertificatePassword, boolean production) {
+        this.iosCertificateURL = iosCertificateURL;
+        this.iosCertificatePassword = iosCertificatePassword;
+        this.production = production;
+        return this;
+    }
+    
+    /**
+     * Sets authenticaton for WNS (Windows 10/UWP)
+     * @param wnsSID The SID from the Windows store.
+     * @param wnsClientSecret The client secret from the windows store
+     * @return self for chaining.
+     */
+    public Push wnsAuth(String wnsSID, String wnsClientSecret) {
+        this.wnsSID = wnsSID;
+        this.wnsClientSecret = wnsClientSecret;
+        return this;
+    }
+    
+    /**
+     * Sets the type of push to use.  See developer guide for details of different push types.  Default is 1
+     * @param pushType
+     * @return Self for chaining.
+     */
+    public Push pushType(int pushType) {
+        this.pushType = pushType;
+        return this;
+    }
+
+    /**
+     * Sends push message.
+     * @return True if the request was successful.
+     */
+    public boolean send() {
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", wnsSID, wnsClientSecret, pushType, deviceKeys);
+        NetworkManager.getInstance().addToQueueAndWait(cr);
+        return cr.successful;
+    }
+    
+    /**
+     * Sends push message asynchronously.
+     */
+    public void sendAsync() {
+        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", wnsSID, wnsClientSecret, pushType, deviceKeys));
+    }
+    
     /**
      * Key for the hashtable argument when pushing to the google play store
      */
@@ -219,10 +307,11 @@ public class Push {
      * @param iosCertificatePassword the password for the push certificate
      * @return true if the message reached the Codename One server successfully, this makes no guarantee
      * of delivery.
+     * @deprecated Please use new builder syntax with {@link #send()} which includes parameters for new platforms such as UWP.
      */
     public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
-        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", 1, deviceKey);
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", "", "", 1, deviceKey);
         NetworkManager.getInstance().addToQueueAndWait(cr);
         return cr.successful;
     }
@@ -245,10 +334,11 @@ public class Push {
      * @param deviceKey set of devices that should receive the push
      * @return true if the message reached the Codename One server successfully, this makes no guarantee
      * of delivery.
+     * @deprecated Please use new builder syntax with {@link #send()} which includes parameters for new platforms such as UWP.
      */
     public static boolean sendPushMessage(String token, String body, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, int pushType, String... deviceKey) {
-        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", pushType, deviceKey);
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", "", "", pushType, deviceKey);
         NetworkManager.getInstance().addToQueueAndWait(cr);
         return cr.successful;
     }
@@ -274,10 +364,11 @@ public class Push {
      * @param bbPort the port of the blackberry push
      * @return true if the message reached the Codename One server successfully, this makes no guarantee
      * of delivery.
+     * @deprecated Please use new builder syntax with {@link #send()} which includes parameters for new platforms such as UWP.
      */
     public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
-        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, 1, deviceKey);
+        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, "", "", 1, deviceKey);
         NetworkManager.getInstance().addToQueueAndWait(cr);
         return cr.successful;
     }
@@ -295,10 +386,11 @@ public class Push {
      * @param googleAuthKey authorization key from the google play store
      * @param iosCertificateURL a URL where you host the iOS certificate for this applications push capabilities. 
      * @param iosCertificatePassword the password for the push certificate
+     * @deprecated Please use new builder syntax with {@link #sendAsync()} which includes parameters for new platforms such as UWP.
      */
     public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword) {
-        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", 1, deviceKey));
+        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, "", "", "", "", "", "", 1, deviceKey));
     }
     
     /**
@@ -319,10 +411,11 @@ public class Push {
      * @param bbApp the application id to authenticate on push for RIM devices
      * @param bbPass the application password credentials authenticate on push for RIM devices
      * @param bbPort the port of the blackberry push
+     * @deprecated Please use new builder syntax with {@link #sendAsync()} which includes parameters for new platforms such as UWP.
      */
     public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey, 
             String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
-        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, 1, deviceKey));
+        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, "", "", 1, deviceKey));
     }
     
     static class PushConnection extends ConnectionRequest {
@@ -355,7 +448,7 @@ public class Push {
     }
 
     private static PushConnection createPushMessage(String token, String body, boolean production, String googleAuthKey, 
-            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort, int type, String... deviceKeys) {
+            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort, String wnsSID, String wnsClientSecret, int type, String... deviceKeys) {
         PushConnection cr = new PushConnection();
         cr.setPost(true);
         cr.setUrl("https://push.codenameone.com/push/push");
@@ -370,6 +463,8 @@ public class Push {
         cr.addArgument("bbAppId", bbApp);
         cr.addArgument("bbPass", bbPass);
         cr.addArgument("bbPort", bbPort);
+        cr.addArgument("sid", wnsSID);
+        cr.addArgument("client_secret", wnsClientSecret);
         if(production) {
             cr.addArgument("production", "true");
         } else {
