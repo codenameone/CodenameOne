@@ -367,9 +367,9 @@ public class BrowserComponent extends Container {
      */
     public void setDebugMode(boolean mode) {
         if(mode) {
-            putClientProperty("BrowserComponent.fireBug", Boolean.TRUE);
+            putClientProperty("BrowserComponent.firebug", Boolean.TRUE);
         } else {
-            putClientProperty("BrowserComponent.fireBug", null);
+            putClientProperty("BrowserComponent.firebug", null);
         }
     }
     
@@ -378,6 +378,6 @@ public class BrowserComponent extends Container {
      * @return true if debug mode was activated
      */
     public boolean isDebugMode() {
-        return getClientProperty("BrowserComponent.fireBug") == Boolean.TRUE;
+        return getClientProperty("BrowserComponent.firebug") == Boolean.TRUE;
     }
 }

@@ -955,7 +955,7 @@ public class JSObject {
      * @return The result of the javascript function call converted to the appropriate
      * Java type.
      */
-    public Object call(Object[] params){
+    public Object call(Object... params){
         JSObject window = (JSObject)context.get("window");
         return context.call(this, window, params);
     }
