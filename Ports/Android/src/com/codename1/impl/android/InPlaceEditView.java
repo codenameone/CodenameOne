@@ -1594,7 +1594,7 @@ public class InPlaceEditView extends FrameLayout{
         Display display = Display.getInstance();
         Runnable task = new Runnable(){
             public void run() {
-                Display.getInstance().getImplementation().setFocusedEditingText(textarea);
+                AndroidImplementation.getInstance().setFocusedEditingText(textarea);
             }
         };
         if (display.isEdt()) {
