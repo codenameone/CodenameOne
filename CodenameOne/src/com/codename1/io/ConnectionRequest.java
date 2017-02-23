@@ -1078,7 +1078,6 @@ public class ConnectionRequest implements IOProgressListener {
         if(destinationFile != null) {
             OutputStream o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
             Util.copy(input, o);
-            Util.cleanup(o);
             
             // was the download killed while we downloaded
             if(isKilled()) {
@@ -1088,7 +1087,6 @@ public class ConnectionRequest implements IOProgressListener {
             if(destinationStorage != null) {
                 OutputStream o = Storage.getInstance().createOutputStream(destinationStorage);
                 Util.copy(input, o);
-                Util.cleanup(o);
             
                 // was the download killed while we downloaded
                 if(isKilled()) {
