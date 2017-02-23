@@ -321,6 +321,21 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
+     * Sets current editingText value and sets it focused.
+     * NB! it not call editString, that is it should be called only internally and
+     * actually the methdo should not be added :)
+     */
+    public void setFocusedEditingText(Component cmp) {
+        editingText = cmp;
+        if (cmp != null) {
+            Form form = cmp.getComponentForm();
+            if (form != null) {
+                form.setFocused(cmp);
+            }
+        }
+    }
+
+    /**
      * Invoked for special cases to stop text editing and clear native editing state
      */
     public void stopTextEditing() {    
