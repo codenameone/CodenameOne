@@ -179,6 +179,34 @@ namespace com.codename1.impl
             }
         }
 
+        static readonly char[] padding = { '=' };
+
+        static string Base64UrlEncode(byte[] arg)
+        {
+
+            return System.Convert.ToBase64String(arg)
+                .TrimEnd(padding)
+                .Replace('+', '-').Replace('/', '_');
+        }
+
+        /*
+        static byte[] Base64UrlDecode(string arg)
+        {
+            string s = arg;
+            s = s.Replace('-', '+'); // 62nd char of encoding
+            s = s.Replace('_', '/'); // 63rd char of encoding
+            switch (s.Length % 4) // Pad with trailing '='s
+            {
+                case 0: break; // No pad chars in this case
+                case 2: s += "=="; break; // Two pad chars
+                case 3: s += "="; break; // One pad char
+                default:
+                    throw new System.Exception(
+             "Illegal base64url string!");
+            }
+            return Convert.FromBase64String(s); // Standard base64 decoder
+        }
+        */
         public override void registerPush(Hashtable metaData, bool noFallback)
         {
 
@@ -190,7 +218,10 @@ namespace com.codename1.impl
                        .CreatePushNotificationChannelForApplicationAsync();
                     if (channel != null && channel.Uri != null)
                     {
-                        Display.getInstance().callSerially(new RegisterServerPushRunnable("cn1-win-" + channel.Uri));
+                        byte[] idBytes = System.Text.Encoding.UTF8.GetBytes(channel.Uri);
+                        var id = Base64UrlEncode(idBytes);
+
+                        Display.getInstance().callSerially(new RegisterServerPushRunnable("cn1-win-" + id));
 
                         channel.PushNotificationReceived += Channel_PushNotificationReceived;
                     }
