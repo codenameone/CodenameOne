@@ -40,6 +40,7 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
 
@@ -85,10 +86,14 @@ public class SignatureComponent extends Container {
         public boolean animate() {
             if (signatureImage != null && signatureImage.animate()) {
                 Style s = getStyle();
-                lead.setIcon(signatureImage.scaledSmallerRatio(
-                        getWidth() - s.getHorizontalPadding(), 
-                        getHeight() - s.getVerticalPadding()
-                ));
+                Image icon = signatureImage;
+                if (icon.getWidth() > getWidth() - s.getHorizontalPadding() || icon.getHeight() > getHeight() - s.getVerticalPadding()) {
+                    icon = signatureImage.scaledSmallerRatio(
+                            getWidth() - s.getHorizontalPadding(), 
+                            getHeight() - s.getVerticalPadding()
+                    );
+                }
+                lead.setIcon(icon);
                 repaint();
                 return true;
             }
@@ -143,6 +148,10 @@ public class SignatureComponent extends Container {
         super.deinitialize();
     }
     
+    private String localize(String key, String defaultVal) {
+        return UIManager.getInstance().localize(key, defaultVal);
+    }
+    
     /**
      * Creates a new signature component.
      */
@@ -169,11 +178,11 @@ public class SignatureComponent extends Container {
 
             
         };
-        lead.setText("Press to sign");
+        lead.setText(localize("SignatureComponent.LeadText","Press to sign"));
         lead.setUIID("SignatureButton");
         lead.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
-                final Dialog dialog = new Dialog("Sign Here");
+                final Dialog dialog = new Dialog(localize("SignatureComponent.DialogTitle", "Sign Here"));
                 final SignatureDialogBody sigBody = new SignatureDialogBody() {
                     @Override
                     protected void onCancel() {
@@ -222,8 +231,18 @@ public class SignatureComponent extends Container {
             signatureImage = img;
             lead.setText("");
             if (img != null) {
-                Image icon = img.scaledSmallerRatio(lead.getWidth() - lead.getStyle().getPaddingLeftNoRTL() - lead.getStyle().getPaddingRightNoRTL(), lead.getHeight() - lead.getStyle().getPaddingTop()- lead.getStyle().getPaddingBottom());
+                int maxW = lead.getWidth() - lead.getStyle().getPaddingLeftNoRTL() - lead.getStyle().getPaddingRightNoRTL();
+                int maxH = lead.getHeight() - lead.getStyle().getPaddingTop()- lead.getStyle().getPaddingBottom();
+                
+                Image icon = img;
+                if (icon.getWidth() > maxW || icon.getHeight() > maxH) {
+                    icon = icon.scaledSmallerRatio(maxW, maxH);
+                }
+                
                 lead.setIcon(icon);
+            } else {
+                lead.setText(localize("SignatureComponent.LeadText","Press to sign"));
+                lead.setIcon(null);
             }
         }
     }
@@ -253,14 +272,19 @@ public class SignatureComponent extends Container {
             setLayout(new BorderLayout());
             signaturePanel = new SignaturePanel();
             addComponent(BorderLayout.CENTER, signaturePanel);
-            doneButton = new Button("Save");
-            resetButton = new Button("Reset");
-            cancelButton = new Button("Cancel");
+            doneButton = new Button(localize("SignatureComponent.SaveButtonLabel", "Save"));
+            resetButton = new Button(localize("SignatureComponent.ResetButtonLabel", "Reset"));
+            cancelButton = new Button(localize("SignatureComponent.CancelButtonLabel", "Cancel"));
 
             doneButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     if (signaturePanel.path.getPointsSize() < 2) {
-                        Dialog.show("Signature Required", "Please draw your signature in the space provided.", "OK", null);
+                        Dialog.show(
+                                localize("SignatureComponent.ErrorDialog.SignatureRequired.Title", "Signature Required"), 
+                                localize("SignatureComponent.ErrorDialog.SignatureRequired.Body", "Please draw your signature in the space provided."), 
+                                localize("SignatureComponent.ErrorDialog.OK", "OK"), 
+                                null
+                        );
                         return;
                     }
                     value = signaturePanel.getImage();
