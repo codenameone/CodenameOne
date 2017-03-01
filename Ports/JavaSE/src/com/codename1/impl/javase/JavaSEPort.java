@@ -172,8 +172,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
-    private boolean takingScreenshot;
-    private float screenshotActualZoomLevel;
+    boolean takingScreenshot;
+    float screenshotActualZoomLevel;
     
     /**
      * When set to true pointer hover events will be called for mouse move events

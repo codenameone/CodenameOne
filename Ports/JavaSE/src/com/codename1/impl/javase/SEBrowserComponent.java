@@ -582,6 +582,11 @@ public class SEBrowserComponent extends PeerComponent {
                     Graphics2D g2 = (Graphics2D)instance.getGraphics(nativeGraphics).create();
                     try {
                         g2.translate(getAbsoluteX(), getAbsoluteY());
+                        if (instance.zoomLevel != 1) {
+                            g2.scale(1/instance.zoomLevel, 1/instance.zoomLevel);
+                        } else if (instance.takingScreenshot && instance.screenshotActualZoomLevel != 1) {
+                            g2.scale(1/instance.screenshotActualZoomLevel, 1/instance.screenshotActualZoomLevel);
+                        }
                         g2.drawImage(peerImage, 0,0, null);
                     } finally {
                         g2.dispose();
