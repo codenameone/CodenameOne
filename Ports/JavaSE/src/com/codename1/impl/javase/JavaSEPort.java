@@ -5683,7 +5683,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private Graphics2D getGraphics(Object nativeG) {
+    Graphics2D getGraphics(Object nativeG) {
         if (nativeG instanceof Graphics2D) {
             Graphics2D g2d = (Graphics2D) nativeG;
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
