@@ -5738,7 +5738,38 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
-        private void sendToCn1(MouseEvent e) {
+
+        @Override
+        protected void processMouseEvent(MouseEvent e) {
+            //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
+            if (!sendToCn1(e)) {
+                super.processMouseEvent(e);
+            }
+            
+        }
+
+        @Override
+        protected void processMouseMotionEvent(MouseEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseMotionEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+            
+        }
+
+        @Override
+        protected void processMouseWheelEvent(MouseWheelEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseWheelEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+        }
+
+        
+        
+        
+        
+        
+        private boolean sendToCn1(MouseEvent e) {
+            
             int cn1X = getCN1X(e);
             int cn1Y = getCN1Y(e);
             if (Display.isInitialized()) {
@@ -5769,10 +5800,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 break;
                                 
                         }
+                        return true;
+                        
+                        
                         //canvas.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, canvas));
                     }
                 }
             }
+            return false;
         }
         
         private int getCN1X(MouseEvent e) {
@@ -5786,7 +5821,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public CN1JFXPanel() {
             final CN1JFXPanel panel = this;
             
-            
+            /*
             panel.addMouseListener(new MouseListener() {
                 
                 
@@ -5839,6 +5874,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
             });
+            */
             
         }
 
