@@ -3497,6 +3497,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 };
+                
+                ((JTextField)t).addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        if (cmp instanceof com.codename1.ui.TextField) {
+                            final com.codename1.ui.TextField tf = (com.codename1.ui.TextField)cmp;
+                            if (tf.getDoneListener() != null) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        if (tf.getDoneListener() != null) {
+                                            tf.fireDoneEvent();
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    
+                });
             }
             swingT = t;
             textCmp = swingT;
@@ -5762,6 +5782,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 super.processMouseWheelEvent(e); //To change body of generated methods, choose Tools | Templates.
             }
         }
+
 
         
         
