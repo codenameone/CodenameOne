@@ -295,7 +295,7 @@ public class SEBrowserComponent extends PeerComponent {
                 while ( !complete[0] ){
                     synchronized(complete){
                         try {
-                            complete.wait(200);
+                            complete.wait(20);
                         } catch (InterruptedException ex) {
                         }
                     }
