@@ -159,8 +159,8 @@ public class EncodedImage extends Image {
             try {
                 ByteArrayOutputStream bo = new ByteArrayOutputStream();
                 io.save(i, bo, format, 0.9f);
-                Util.cleanup(bo);
                 EncodedImage enc = EncodedImage.create(bo.toByteArray());
+                Util.cleanup(bo);
                 enc.width = i.getWidth();
                 enc.height = i.getHeight();
                 if(format == ImageIO.FORMAT_JPEG) {
@@ -207,8 +207,8 @@ public class EncodedImage extends Image {
             try {
                 ByteArrayOutputStream bo = new ByteArrayOutputStream();
                 io.save(i, bo, format, 0.9f);
-                Util.cleanup(bo);
                 EncodedImage enc = EncodedImage.create(bo.toByteArray());
+                Util.cleanup(bo);
                 enc.width = width;
                 enc.height = height;
                 if(jpeg) {
@@ -625,8 +625,8 @@ public class EncodedImage extends Image {
                     // do an image IO scale which is more efficient
                     ByteArrayOutputStream bo = new ByteArrayOutputStream();
                     io.save(new ByteArrayInputStream(getImageData()), bo, format, width, height, 0.9f);
-                    Util.cleanup(bo);
                     EncodedImage img = EncodedImage.create(bo.toByteArray());
+                    Util.cleanup(bo);
                     img.opaque = opaque;
                     img.opaqueChecked = opaqueChecked;
                     if(width > -1 && height > -1) {
