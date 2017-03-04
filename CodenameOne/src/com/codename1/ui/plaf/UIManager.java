@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -281,8 +282,8 @@ public class UIManager {
             return new Style(style);
         } catch(Throwable err) {
             // fail gracefully for an illegal style, this is useful for the resource editor
-            System.out.println("Error creating style " + id + " selected: " + selected + " prefix: " + prefix);
-            err.printStackTrace();
+            Log.p("Error creating style " + id + " selected: " + selected + " prefix: " + prefix);
+            Log.e(err);
             return new Style(defaultStyle);
         }
     }
@@ -921,7 +922,7 @@ public class UIManager {
             try {
                 return Integer.parseInt(v);
             } catch(NumberFormatException err) {
-                err.printStackTrace();
+                Log.e(err);
             }
         }
         return def;
@@ -1061,7 +1062,7 @@ public class UIManager {
                     accessible = a;
                 } catch (Exception ex) {
                     System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: "+th);
-                    ex.printStackTrace();
+                    Log.e(ex);
                 }
             }
         }
@@ -1339,7 +1340,7 @@ public class UIManager {
                     return com.codename1.ui.Font.getBitmapFont(nameStr);
                 } catch (Exception ex) {
                     // illegal argument exception?
-                    ex.printStackTrace();
+                    Log.e(ex);
                 }
             }
         }
@@ -1571,7 +1572,7 @@ public class UIManager {
             Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
-            e.printStackTrace();
+            Log.e(e);
         }
         return null;
     }
@@ -1590,7 +1591,7 @@ public class UIManager {
             Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
-            e.printStackTrace();
+            Log.e(e);
         }
         return null;
     }

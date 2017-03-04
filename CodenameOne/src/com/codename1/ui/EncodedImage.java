@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayInputStream;
@@ -169,7 +170,7 @@ public class EncodedImage extends Image {
                 enc.cache = Display.getInstance().createSoftWeakRef(i);
                 return enc;
             } catch(IOException err) {
-                err.printStackTrace();
+                Log.e(err);
             }            
         }
         return null;
@@ -217,7 +218,7 @@ public class EncodedImage extends Image {
                 enc.cache = Display.getInstance().createSoftWeakRef(i);
                 return enc;
             } catch(IOException err) {
-                err.printStackTrace();
+                Log.e(err);
             }
             
         }
@@ -369,7 +370,7 @@ public class EncodedImage extends Image {
             CodenameOneImplementation impl = Display.impl;
             impl.setImageName(i.getImage(), getImageName());
         } catch(Exception err) {
-            err.printStackTrace();
+            Log.e(err);
             i = Image.createImage(5, 5);
         }
         cache = Display.getInstance().createSoftWeakRef(i);
@@ -418,7 +419,7 @@ public class EncodedImage extends Image {
                             }
                         });
                     } catch(Exception err) {
-                        err.printStackTrace();
+                        Log.e(err);
                     }
                 }
             });
@@ -637,7 +638,7 @@ public class EncodedImage extends Image {
             }
         } catch(IOException err) {
             // normally this shouldn't happen but this will keep falling back to the existing scaled code
-            err.printStackTrace();
+            Log.e(err);
         }
         return null;
     }

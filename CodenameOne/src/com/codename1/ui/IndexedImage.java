@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.geom.Dimension;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -457,7 +458,7 @@ class IndexedImage extends Image {
             input.readFully(arr);
             return new IndexedImage(width, height, palette, arr);
         } catch (IOException ex) {
-            ex.printStackTrace();
+            Log.e(ex);
             return null;
         }
     }

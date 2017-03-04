@@ -751,7 +751,7 @@ public class Resources {
             return r;
         } catch(RuntimeException err) {
             // intercept exceptions since user code might not deal well with runtime exceptions 
-            err.printStackTrace();
+            Log.e(err);
             throw new IOException(err.getMessage());
         }
     }
@@ -1654,7 +1654,7 @@ public class Resources {
         try {
             return open(systemResourceLocation);
         } catch (IOException ex) {
-            ex.printStackTrace();
+            Log.e(ex);
         }
         return null;
     }

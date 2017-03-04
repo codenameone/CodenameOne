@@ -196,7 +196,7 @@ public class JSONParser implements JSONParseCallback {
                                     c = (char) Integer.parseInt(unicode, 16);
                                 } catch (NumberFormatException err) {
                                     // problem in parsing the u notation!
-                                    err.printStackTrace();
+                                    Log.e(err);
                                     System.out.println("Error in parsing \\u" + unicode);
                                 }
                             } else {
@@ -309,7 +309,7 @@ public class JSONParser implements JSONParseCallback {
                                     }
                                     
                                 } catch (NumberFormatException err) {
-                                    err.printStackTrace();
+                                    Log.e(err);
                                     // this isn't a number!
                                 }
                             }

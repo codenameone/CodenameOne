@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
@@ -873,7 +874,7 @@ public class Form extends Container {
             try {
                 menuBar = (MenuBar) laf.getMenuBarClass().newInstance();
             } catch (Exception ex) {
-                ex.printStackTrace();
+                Log.e(ex);
                 menuBar = new MenuBar();
             }
             menuBar.initMenuBar(this);

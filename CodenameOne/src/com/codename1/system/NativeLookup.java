@@ -22,6 +22,7 @@
  */
 package com.codename1.system;
 
+import com.codename1.io.Log;
 import java.util.HashMap;
 
 /**
@@ -81,7 +82,7 @@ public class NativeLookup {
             return (T)Class.forName(c.getName() + "Impl").newInstance();
         } catch (Throwable ex) {
             if(verbose) {
-                ex.printStackTrace();
+                Log.e(ex);
             }
         } 
         return null;
