@@ -1271,6 +1271,46 @@ namespace com.codename1.impl
             tb.InputScope = ins;
         }
 
+        private void OnKeyDownHandler(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Enter)
+            {
+                if (currentlyEditing != null && currentlyEditing is TextField)
+                {
+                    TextField tf = (TextField)currentlyEditing;
+                    if (tf.getDoneListener() != null)
+                    {
+                        Display.getInstance().callSerially(new DoneEditing(tf));
+                    } else
+                    {
+                        commitEditing();
+                    }
+                }
+            }
+
+            
+        }
+
+        public class DoneEditing : java.lang.Runnable
+        {
+            TextField tf;
+
+            public DoneEditing(TextField tf)
+            {
+                this.tf = tf;
+            }
+
+            public void run()
+            {
+                if (tf.getDoneListener() != null)
+                {
+                    tf.fireDoneEvent();
+                    commitEditing();
+                }
+            }
+        }
+
+
         private bool lockEditing;
 
         public override void editString(Component n1, int n2, int n3, string n4, int n5)
@@ -1310,42 +1350,44 @@ namespace com.codename1.impl
                    {
                        textInputInstance = new TextBox();
                        TextBox tb = (TextBox)textInputInstance;
-                       ((TextBox)textInputInstance).IsTextPredictionEnabled = true;
-                       ((TextBox)textInputInstance).TextChanged += textChangedEvent;
+                       tb.KeyDown += new KeyEventHandler(OnKeyDownHandler);
                        
-                       ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
-                       ((TextBox)textInputInstance).MaxLength = n2;
-                       ((TextBox)textInputInstance).IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
+                       tb.IsTextPredictionEnabled = true;
+                       tb.TextChanged += textChangedEvent;
+                       
+                       tb.AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
+                       tb.MaxLength = n2;
+                       tb.IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
                        tb.TextWrapping = currentlyEditing.isSingleLineTextArea() ? TextWrapping.NoWrap : TextWrapping.Wrap;
-                       ((TextBox)textInputInstance).Text = n4;
+                       tb.Text = n4;
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
-                           setConstraint((TextBox)textInputInstance, InputScopeNameValue.NumberFullWidth);
+                           setConstraint(tb, InputScopeNameValue.NumberFullWidth);
                        }
                        else
                        {
                            if ((constraints & TextArea.DECIMAL) == TextArea.DECIMAL)
                            {
-                               setConstraint((TextBox)textInputInstance, InputScopeNameValue.Number);
+                               setConstraint(tb, InputScopeNameValue.Number);
                            }
                            else
                            {
                                if ((constraints & TextArea.EMAILADDR) == TextArea.EMAILADDR)
                                {
-                                   setConstraint((TextBox)textInputInstance, InputScopeNameValue.EmailSmtpAddress);
+                                   setConstraint(tb, InputScopeNameValue.EmailSmtpAddress);
                                }
                                else
                                {
                                    if ((constraints & TextArea.URL) == TextArea.URL)
                                    {
-                                       setConstraint((TextBox)textInputInstance, InputScopeNameValue.Url);
+                                       setConstraint(tb, InputScopeNameValue.Url);
                                    }
                                    else
                                    {
                                        if ((constraints & TextArea.PHONENUMBER) == TextArea.PHONENUMBER)
                                        {
-                                           setConstraint((TextBox)textInputInstance, InputScopeNameValue.TelephoneNumber);
+                                           setConstraint(tb, InputScopeNameValue.TelephoneNumber);
                                        }
                                    }
                                }

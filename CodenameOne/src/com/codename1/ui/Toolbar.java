@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -1275,7 +1276,7 @@ public class Toolbar extends Container {
                     try {
                         size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
                     } catch(Throwable t) {
-                        t.printStackTrace();
+                        Log.e(t);
                     }
                     i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), size);
                 }
