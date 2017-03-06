@@ -2376,6 +2376,8 @@ public class Component implements Animation, StyleListener {
         }        
     }
     
+    
+    
     /**
      * Creates an animation that will transform the current component to the styling of the destination UIID when
      * completed. Notice that fonts will only animate within the truetype and native familiy and we recommend that you
@@ -2388,7 +2390,11 @@ public class Component implements Animation, StyleListener {
     public ComponentAnimation createStyleAnimation(final String destUIID, final int duration) {
         final Style sourceStyle = getUnselectedStyle();
         final Style destStyle = getUIManager().getComponentStyle(destUIID);
+        return createStyleAnimation(sourceStyle, destStyle, duration, destUIID);
         
+    }
+    
+    ComponentAnimation createStyleAnimation(final Style sourceStyle, final Style destStyle, final int duration, final String destUIID) {
         int d = duration;
         
         Motion m = null;
@@ -2396,6 +2402,12 @@ public class Component implements Animation, StyleListener {
             m = Motion.createLinearColorMotion(sourceStyle.getFgColor(), destStyle.getFgColor(), d);
         }
         final Motion fgColorMotion = m;
+        m = null;
+        
+        if(sourceStyle.getOpacity() != destStyle.getOpacity()) {
+            m = Motion.createLinearColorMotion(sourceStyle.getOpacity(), destStyle.getOpacity(), d);
+        }
+        final Motion opacityMotion = m;
         m = null;
         
         if(sourceStyle.getFont().getHeight() != destStyle.getFont().getHeight() && sourceStyle.getFont().isTTFNativeFont()) {
@@ -2517,6 +2529,9 @@ public class Component implements Animation, StyleListener {
                     if(fgColorMotion != null) {
                         fgColorMotion.setCurrentMotionTime(step);
                     }
+                    if(opacityMotion != null) {
+                        opacityMotion.setCurrentMotionTime(step);
+                    }
                     if(fontMotion != null) {
                         fontMotion.setCurrentMotionTime(step);
                     }
@@ -2555,6 +2570,7 @@ public class Component implements Animation, StyleListener {
                 }
                 return stepMode ||
                         !((bgMotion == null || bgMotion.isFinished()) && 
+                        (opacityMotion == null || opacityMotion.isFinished()) &&
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&
                         (paddingLeft == null || paddingLeft.isFinished()) &&
                         (paddingRight == null || paddingRight.isFinished()) &&
@@ -2577,6 +2593,9 @@ public class Component implements Animation, StyleListener {
                     started = true;
                     if(bgMotion != null) {
                         bgMotion.start();
+                    }
+                    if (opacityMotion != null) {
+                        opacityMotion.start();
                     }
                     if(fgColorMotion != null) {
                         fgColorMotion.start();
@@ -2612,8 +2631,13 @@ public class Component implements Animation, StyleListener {
                                 
                 if(!isInProgress()) {
                     finished = true;
-                    setUIID(destUIID);
+                    if (destUIID != null) {
+                        setUIID(destUIID);
+                    }
                 } else {
+                    if (opacityMotion != null) {
+                        sourceStyle.setOpacity(opacityMotion.getValue());
+                    }
                     if(fgColorMotion != null) {
                         sourceStyle.setFgColor(fgColorMotion.getValue());
                     }
@@ -2656,6 +2680,9 @@ public class Component implements Animation, StyleListener {
             public void flush() {
                 if(bgMotion != null) {
                     bgMotion.finish();
+                }
+                if (opacityMotion != null) {
+                    opacityMotion.finish();
                 }
                 if(fgColorMotion != null) {
                     fgColorMotion.finish();
