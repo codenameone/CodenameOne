@@ -321,21 +321,6 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
-     * Sets current editingText value and sets it focused.
-     * NB! it not call editString, that is it should be called only internally and
-     * actually the methdo should not be added :)
-     */
-    public void setFocusedEditingText(Component cmp) {
-        editingText = cmp;
-        if (cmp != null) {
-            Form form = cmp.getComponentForm();
-            if (form != null) {
-                form.setFocused(cmp);
-            }
-        }
-    }
-
-    /**
      * Invoked for special cases to stop text editing and clear native editing state
      */
     public void stopTextEditing() {    
@@ -3876,7 +3861,7 @@ public abstract class CodenameOneImplementation {
             setBrowserPage(browserPeer, htmlText, baseUrl);
             return;
         } catch (IOException ex) {
-            Log.e(ex);
+            ex.printStackTrace();
         }
     }
 
@@ -4315,7 +4300,7 @@ public abstract class CodenameOneImplementation {
                 }
             }
         } catch (Throwable ex) {
-            Log.e(ex);
+            ex.printStackTrace();
         }
     }
 
@@ -4550,7 +4535,7 @@ public abstract class CodenameOneImplementation {
             }
             Util.cleanup(i);
         } catch(IOException err) {
-            Log.e(err);
+            err.printStackTrace();
         }
         return (int)size;
     }
@@ -4983,7 +4968,7 @@ public abstract class CodenameOneImplementation {
                                     thumbs.put(node, data);
                                     Storage.getInstance().writeObject("thumbnails", thumbs);
                                 } catch (IOException ex) {
-                                    Log.e(ex);
+                                    ex.printStackTrace();
                                 }
                             }
                             Image im = Image.createImage(data, 0, data.length);
@@ -5082,7 +5067,7 @@ public abstract class CodenameOneImplementation {
             try {
                 return EncodedImage.create(i);
             } catch (IOException ex) {
-                Log.e(ex);
+                ex.printStackTrace();
             }
         }
         return null;
@@ -5956,14 +5941,14 @@ public abstract class CodenameOneImplementation {
                                 }
                             }
                         } catch (IOException ex) {
-                            Log.e(ex);
+                            ex.printStackTrace();
                         }
                         try {
                             synchronized(callback) {
                                 callback.wait(pollingMillis);
                             }
                         } catch(Throwable t) {
-                            Log.e(t);
+                            t.printStackTrace();
                         }
                     }
                 }

@@ -807,7 +807,7 @@ public final class Display {
                             try {
                                 nextTask.run();                                
                             } catch (Throwable e) {
-                                Log.e(e);
+                                e.printStackTrace();
                             }
                             try {
                                 Thread.sleep(10);
@@ -971,7 +971,7 @@ public final class Display {
                 processSerialCalls();
             }
         } catch(Throwable err) {
-            Log.e(err);
+            err.printStackTrace();
             if(crashReporter != null) {
                 crashReporter.exception(err);
             }
@@ -1001,7 +1001,7 @@ public final class Display {
                 if(!codenameOneRunning) {
                     return;
                 }
-                Log.e(err);
+                err.printStackTrace();
                 if(crashReporter != null) {
                     CodenameOneThread.handleException(err);
                 }
@@ -1047,7 +1047,7 @@ public final class Display {
                 return;
             }
         } catch(Exception ignor) {
-            Log.e(ignor);
+            ignor.printStackTrace();
         }
         long currentTime = System.currentTimeMillis();
         
@@ -1428,7 +1428,7 @@ public final class Display {
                 transition.initTransition();
             }
         } catch (Throwable e) {
-            Log.e(e);
+            e.printStackTrace();
             transition.cleanup();
             animationQueue.remove(transition);
             return false;

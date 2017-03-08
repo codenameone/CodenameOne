@@ -22,7 +22,6 @@
  */
 package com.codename1.location;
 
-import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import java.io.IOException;
 
@@ -115,7 +114,7 @@ public abstract class LocationManager {
                 try {
                     result = getCurrentLocation();
                 } catch(IOException err) {
-                    Log.e(err);
+                    err.printStackTrace();
                     result = null;
                 }
             } else {
@@ -168,7 +167,7 @@ public abstract class LocationManager {
             }
             return getCurrentLocation();
         } catch(IOException err) {
-            Log.e(err);
+            err.printStackTrace();
             return null;
         }
     }

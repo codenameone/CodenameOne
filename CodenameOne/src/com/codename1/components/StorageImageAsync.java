@@ -22,7 +22,6 @@
  */
 package com.codename1.components;
 
-import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.Display;
@@ -100,7 +99,7 @@ public class StorageImageAsync extends EncodedImage {
                             }
                         });
                     } catch (Throwable ex) {
-                        Log.e(ex);
+                        ex.printStackTrace();
                     } finally {
                         queued = false;
                         Util.cleanup(i);

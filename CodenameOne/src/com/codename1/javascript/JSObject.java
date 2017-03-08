@@ -247,7 +247,7 @@ public class JSObject {
      */
     public JSObject(JavascriptContext context, String expr) {
         this.context = context;
-        synchronized (context.browser){
+        synchronized (context){
             String escaped = StringUtil.replaceAll(expr, "\\", "\\\\");
             escaped = StringUtil.replaceAll(escaped, "'", "\\'");
             exec(R1+"=eval('"+escaped+"')");

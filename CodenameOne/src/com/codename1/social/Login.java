@@ -23,7 +23,6 @@
 package com.codename1.social;
 
 import com.codename1.io.AccessToken;
-import com.codename1.io.Log;
 import com.codename1.io.Oauth2;
 import com.codename1.io.Preferences;
 import com.codename1.io.Util;
@@ -106,7 +105,7 @@ public abstract class Login {
                     if (evt.getSource() instanceof Exception) {
                         if(callback != null){
                             Exception e = (Exception) evt.getSource();
-                            Log.e(e);
+                            e.printStackTrace();
                             callback.loginFailed(e.getMessage());
                         }
                         

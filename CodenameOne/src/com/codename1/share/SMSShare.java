@@ -25,7 +25,6 @@ package com.codename1.share;
 import com.codename1.components.MultiButton;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.contacts.ContactsModel;
-import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -103,7 +102,7 @@ public class SMSShare extends ShareService {
                                                 try {
                                                     Display.getInstance().sendSMS(f[0].getTo(), f[0].getMessage());
                                                 } catch (IOException ex) {
-                                                    Log.e(ex);
+                                                    ex.printStackTrace();
                                                     System.out.println("failed to send sms to " + (String)contact.get("phone"));
                                                 }
                                                 finish();

@@ -24,7 +24,6 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayInputStream;
@@ -159,8 +158,8 @@ public class EncodedImage extends Image {
             try {
                 ByteArrayOutputStream bo = new ByteArrayOutputStream();
                 io.save(i, bo, format, 0.9f);
-                EncodedImage enc = EncodedImage.create(bo.toByteArray());
                 Util.cleanup(bo);
+                EncodedImage enc = EncodedImage.create(bo.toByteArray());
                 enc.width = i.getWidth();
                 enc.height = i.getHeight();
                 if(format == ImageIO.FORMAT_JPEG) {
@@ -170,7 +169,7 @@ public class EncodedImage extends Image {
                 enc.cache = Display.getInstance().createSoftWeakRef(i);
                 return enc;
             } catch(IOException err) {
-                Log.e(err);
+                err.printStackTrace();
             }            
         }
         return null;
@@ -207,8 +206,8 @@ public class EncodedImage extends Image {
             try {
                 ByteArrayOutputStream bo = new ByteArrayOutputStream();
                 io.save(i, bo, format, 0.9f);
-                EncodedImage enc = EncodedImage.create(bo.toByteArray());
                 Util.cleanup(bo);
+                EncodedImage enc = EncodedImage.create(bo.toByteArray());
                 enc.width = width;
                 enc.height = height;
                 if(jpeg) {
@@ -218,7 +217,7 @@ public class EncodedImage extends Image {
                 enc.cache = Display.getInstance().createSoftWeakRef(i);
                 return enc;
             } catch(IOException err) {
-                Log.e(err);
+                err.printStackTrace();
             }
             
         }
@@ -370,7 +369,7 @@ public class EncodedImage extends Image {
             CodenameOneImplementation impl = Display.impl;
             impl.setImageName(i.getImage(), getImageName());
         } catch(Exception err) {
-            Log.e(err);
+            err.printStackTrace();
             i = Image.createImage(5, 5);
         }
         cache = Display.getInstance().createSoftWeakRef(i);
@@ -419,7 +418,7 @@ public class EncodedImage extends Image {
                             }
                         });
                     } catch(Exception err) {
-                        Log.e(err);
+                        err.printStackTrace();
                     }
                 }
             });
@@ -625,8 +624,8 @@ public class EncodedImage extends Image {
                     // do an image IO scale which is more efficient
                     ByteArrayOutputStream bo = new ByteArrayOutputStream();
                     io.save(new ByteArrayInputStream(getImageData()), bo, format, width, height, 0.9f);
-                    EncodedImage img = EncodedImage.create(bo.toByteArray());
                     Util.cleanup(bo);
+                    EncodedImage img = EncodedImage.create(bo.toByteArray());
                     img.opaque = opaque;
                     img.opaqueChecked = opaqueChecked;
                     if(width > -1 && height > -1) {
@@ -638,7 +637,7 @@ public class EncodedImage extends Image {
             }
         } catch(IOException err) {
             // normally this shouldn't happen but this will keep falling back to the existing scaled code
-            Log.e(err);
+            err.printStackTrace();
         }
         return null;
     }

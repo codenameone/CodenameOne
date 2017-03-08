@@ -1,6 +1,5 @@
 package com.codename1.ui.layouts.mig;
 
-import com.codename1.io.Log;
 import com.codename1.util.StringUtil;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -934,7 +933,7 @@ public final class ConstraintParser {
                 throw new IllegalArgumentException("Unknown keyword.");
 
             } catch (Exception ex) {
-                Log.e(ex);
+                ex.printStackTrace();
                 throw new IllegalArgumentException("Error parsing Constraint: '" + part + "'");
             }
         }
@@ -1235,7 +1234,7 @@ public final class ConstraintParser {
                 return new UnitValue(value, numParts[1], isHor, oper, cs);
 
             } catch (Exception e) {
-                Log.e(e);
+                e.printStackTrace();
                 throw new IllegalArgumentException("Malformed UnitValue: '" + s + "'");
             }
         }

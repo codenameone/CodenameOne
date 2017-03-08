@@ -13,7 +13,6 @@ namespace UWPApp
         public static bool running;
         public static Windows.Storage.StorageFile appArg;
         public static string appArgStr;
-        public static string pushLaunchArg;
         public Main()
         {
             //@this();
@@ -25,7 +24,6 @@ namespace UWPApp
 
         i = new global::com.codename1.tests.hellowin.HelloWindows();
             //i.@this();
-            com.codename1.impl.SilverlightImplementation.setMainClass(i);
             i.init(this);
         }
         static public void startStatic() {
@@ -66,13 +64,6 @@ Main.running = true;
             }
             
             Main.i.start();
-            if (Main.pushLaunchArg != null)
-            {
-                string arg = Main.pushLaunchArg;
-                Main.pushLaunchArg = null;
-                com.codename1.impl.SilverlightImplementation.instance._handlePushFromLaunchArg(arg);
-                
-            }
         }
     }
     class StopClass : object, java.lang.Runnable {
