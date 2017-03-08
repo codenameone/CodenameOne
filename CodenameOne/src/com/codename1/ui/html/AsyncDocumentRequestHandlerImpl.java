@@ -25,7 +25,6 @@ package com.codename1.ui.html;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.FileSystemStorage;
-import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import java.io.IOException;
 import java.io.InputStream;
@@ -75,7 +74,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
                 return null;
             }
         } catch (IOException ex) {
-            Log.e(ex);
+            ex.printStackTrace();
         }
         final Object[] response = new Object[1];
         

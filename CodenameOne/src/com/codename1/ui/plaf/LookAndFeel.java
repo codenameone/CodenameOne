@@ -23,7 +23,6 @@
  */
 package com.codename1.ui.plaf;
 
-import com.codename1.io.Log;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.BubbleTransition;
@@ -923,7 +922,7 @@ public abstract class LookAndFeel {
                 Label.setDefaultTickerEnabled(true);
             }
         } catch(NumberFormatException err) {
-            Log.e(err);
+            err.printStackTrace();
         }
         defaultFormTintColor = (int)Long.parseLong(manager.getThemeConstant("tintColor", Integer.toHexString(defaultFormTintColor)), 16);
         disableColor = Integer.parseInt(manager.getThemeConstant("disabledColor", Integer.toHexString(disableColor)), 16);

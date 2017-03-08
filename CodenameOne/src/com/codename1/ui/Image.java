@@ -25,7 +25,6 @@ package com.codename1.ui;
 
 import com.codename1.ui.geom.Dimension;
 import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.util.ImageIO;
 import java.io.ByteArrayOutputStream;
@@ -305,7 +304,7 @@ public class Image {
             }
             return applyMask(mask);
         } catch(Throwable t) {
-            Log.e(t);
+            t.printStackTrace();
         }
         return this;
     }

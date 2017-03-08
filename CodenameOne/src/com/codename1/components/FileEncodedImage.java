@@ -26,7 +26,6 @@ package com.codename1.components;
 
 import com.codename1.ui.EncodedImage;
 import com.codename1.io.FileSystemStorage;
-import com.codename1.io.Log;
 import com.codename1.io.Util;
 import java.io.IOException;
 import java.io.InputStream;
@@ -67,7 +66,7 @@ public class FileEncodedImage extends EncodedImage {
             }
             return imageData;
         } catch (IOException ex) {
-            Log.e(ex);
+            ex.printStackTrace();
             return null;
         } finally {
             Util.cleanup(i);

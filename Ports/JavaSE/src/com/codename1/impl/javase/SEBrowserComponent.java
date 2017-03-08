@@ -26,15 +26,12 @@ import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -295,7 +292,7 @@ public class SEBrowserComponent extends PeerComponent {
                 while ( !complete[0] ){
                     synchronized(complete){
                         try {
-                            complete.wait(20);
+                            complete.wait(200);
                         } catch (InterruptedException ex) {
                         }
                     }
@@ -320,27 +317,10 @@ public class SEBrowserComponent extends PeerComponent {
     protected void deinitialize() {
         //lightweightMode = true;
         final boolean[] complete = new boolean[1];
-        
-        synchronized(imageLock) {
-            peerImage = new BufferedImage(cnt.getWidth(), cnt.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            System.out.println("PI width: "+peerImage.getWidth()+ "PI height "+peerImage.getHeight());
-            System.out.println("Creating peer image");
-            Graphics2D imageG = (Graphics2D)peerImage.createGraphics();
-            try {
-                instance.drawingNativePeer = true;
-                cnt.paint(imageG);
-            } catch (Exception ex){
-            } finally {
-                instance.drawingNativePeer = false;
-                imageG.dispose();
-            }
-        }
-        
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
                 if (init) {
-                    
                     hSelector.removeAdjustmentListener(adjustmentListener);
                     vSelector.removeAdjustmentListener(adjustmentListener);
                     lastX=0;
@@ -383,18 +363,13 @@ public class SEBrowserComponent extends PeerComponent {
     
     
     private static final Object INIT_LOCK = new Object();
-    private final Object imageLock = new Object();
-    private BufferedImage peerImage;
     private void init() {
         final boolean[] completed = new boolean[1];
-        synchronized(imageLock) {
-            peerImage = null;
-        }
         SwingUtilities.invokeLater(new Runnable() {
 
             public void run() {
                 if (!init) {
-                    
+
                     init = true;
                     frm.add(cnt, 0);
                     completed[0] = true;
@@ -575,26 +550,6 @@ public class SEBrowserComponent extends PeerComponent {
 
     @Override
     public void paint(Graphics g) {
-        if (!init) {
-            synchronized(imageLock) {
-                if (peerImage != null) {
-                    Object nativeGraphics = Accessor.getNativeGraphics(g);
-                    Graphics2D g2 = (Graphics2D)instance.getGraphics(nativeGraphics).create();
-                    try {
-                        g2.translate(getAbsoluteX(), getAbsoluteY());
-                        if (instance.zoomLevel != 1) {
-                            g2.scale(1/instance.zoomLevel, 1/instance.zoomLevel);
-                        } else if (instance.takingScreenshot && instance.screenshotActualZoomLevel != 1) {
-                            g2.scale(1/instance.screenshotActualZoomLevel, 1/instance.screenshotActualZoomLevel);
-                        }
-                        g2.drawImage(peerImage, 0,0, null);
-                    } finally {
-                        g2.dispose();
-                    }
-                    return;
-                }
-            }
-        }
         instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
         onPositionSizeChange();
         

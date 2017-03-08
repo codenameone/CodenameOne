@@ -22,7 +22,6 @@
  */
 package com.codename1.components;
 
-import com.codename1.io.Log;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.ui.Button;
@@ -213,7 +212,7 @@ public class MediaPlayer extends Container {
                     try {
                         setDataSource(uri, null);
                     } catch(Throwable t) {
-                        Log.e(t);
+                        t.printStackTrace();
                     }
                 }
             }, "Media Thread").start();
@@ -492,7 +491,7 @@ public class MediaPlayer extends Container {
                 try {
                     setDataSource(dataSource, this);
                 } catch(IOException err) {
-                    Log.e(err);
+                    err.printStackTrace();
                 }
             }
         }

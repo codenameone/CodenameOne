@@ -461,12 +461,8 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        boolean res = false;
-        if (!(res = cn1View.onTouchEvent(event))) {
-            return super.dispatchTouchEvent(event);
-        }
-        return res;
-        
+        super.dispatchTouchEvent(event);
+        return cn1View.onTouchEvent(event);
     }
 
     @Override

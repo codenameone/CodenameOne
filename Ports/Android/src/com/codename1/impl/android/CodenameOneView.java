@@ -33,7 +33,6 @@ import android.view.inputmethod.EditorInfo;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.PeerComponent;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -366,9 +365,6 @@ public class CodenameOneView {
         }
     }
 
-    private boolean cn1GrabbedPointer = false;
-    private boolean nativePeerGrabbedPointer = false;
-    
     public boolean onTouchEvent(MotionEvent event) {
 
         if (this.implementation.getCurrentForm() == null) {
@@ -379,8 +375,6 @@ public class CodenameOneView {
              */
             return true;
         }
-        
-        
 
         int[] x = null;
         int[] y = null;
@@ -393,36 +387,6 @@ public class CodenameOneView {
                 y[i] = (int) event.getY(i);
             }
         }
-        if (!cn1GrabbedPointer) {
-            if (x == null) {
-                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
-                if (componentAt != null && (componentAt instanceof PeerComponent)) {
-                    
-                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        nativePeerGrabbedPointer = true;
-                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                        nativePeerGrabbedPointer = false;
-                    }
-                    return false;
-                }
-
-            } else {
-                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
-                if (componentAt != null && (componentAt instanceof PeerComponent)) {
-                    if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        nativePeerGrabbedPointer = true;
-                    } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                        nativePeerGrabbedPointer = false;
-                    }
-                    return false;
-                }
-            }
-        }
-        
-        if (nativePeerGrabbedPointer) {
-            return false;
-        }
-        
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (x == null) {
@@ -430,7 +394,6 @@ public class CodenameOneView {
                 } else {
                     this.implementation.pointerPressed(x, y);
                 }
-                cn1GrabbedPointer = true;
                 break;
             case MotionEvent.ACTION_UP:
                 if (x == null) {
@@ -438,7 +401,6 @@ public class CodenameOneView {
                 } else {
                     this.implementation.pointerReleased(x, y);
                 }
-                cn1GrabbedPointer = false;
                 break;
             case MotionEvent.ACTION_MOVE:
                 if (x == null) {

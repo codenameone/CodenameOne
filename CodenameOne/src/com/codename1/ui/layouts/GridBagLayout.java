@@ -16,7 +16,6 @@
  */
 package com.codename1.ui.layouts;
 
-import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.geom.Dimension;
@@ -154,7 +153,7 @@ public class GridBagLayout extends Layout {
             validate(parent, info);
         } catch (RuntimeException e) {
             // awt.87=PreferredLayoutSize: {0}
-            Log.e(e);
+            e.printStackTrace();
             throw new IllegalArgumentException("PreferredLayoutSize: " + e.getMessage()); //$NON-NLS-1$
         }
         Dimension d = info.grid.preferredSize();

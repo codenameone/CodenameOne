@@ -24,7 +24,6 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
@@ -105,7 +104,7 @@ public class WebBrowser extends Container {
             } 
         } catch(Throwable t) {
             // workaround for issue in the designer related to JavaFX, fallback to lightweight mode...
-            Log.e(t);
+            t.printStackTrace();
         }
         
         isNative = false;
@@ -161,7 +160,7 @@ public class WebBrowser extends Container {
 
                     protected void handleException(Exception err) {
                         System.out.println("Error occured");
-                        Log.e(err);
+                        err.printStackTrace();
                         if(loading != null){
                             loading.unInstall();
                         }

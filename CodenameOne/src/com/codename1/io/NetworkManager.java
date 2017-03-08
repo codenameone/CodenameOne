@@ -287,7 +287,7 @@ public class NetworkManager {
                             }
                         } else {
                             // for the record
-                            Log.e(e);
+                            e.printStackTrace();
                         }
                     } catch(RuntimeException er) {
                         if(!currentRequest.isFailSilently()) {
@@ -296,7 +296,7 @@ public class NetworkManager {
                             }
                         } else {
                             // for the record
-                            Log.e(er);
+                            er.printStackTrace();
                         }
                     } finally {
                         Thread.currentThread().setPriority(Thread.NORM_PRIORITY);

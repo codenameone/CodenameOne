@@ -23,7 +23,6 @@
 package com.codename1.facebook.ui;
 
 import com.codename1.facebook.FaceBookAccess;
-import com.codename1.io.Log;
 import com.codename1.ui.Button;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -84,7 +83,7 @@ public class LikeButton extends Button implements ActionListener {
         try {
             FaceBookAccess.getInstance().postLike(getPostId());
         } catch (IOException ex) {
-            Log.e(ex);
+            ex.printStackTrace();
         }
     }
 

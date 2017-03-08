@@ -23,7 +23,6 @@
  */
 package com.codename1.xml;
 
-import com.codename1.io.Log;
 import com.codename1.ui.html.HTMLUtils;
 import java.io.IOException;
 import java.io.Reader;
@@ -278,7 +277,7 @@ public class XMLParser {
         try {
             parseTagContent(rootElement, is);
         } catch (IOException ioe) {
-            Log.e(ioe);
+            ioe.printStackTrace();
         }
         if (rootElement.getNumChildren()==0) {
             notifyError(ParserCallback.ERROR_NO_ROOTS, null, null, null, "XML document contains no root element.");

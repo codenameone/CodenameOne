@@ -93,7 +93,6 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
-import android.provider.Settings.Secure;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -2356,18 +2355,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return "";
                 }
                 TelephonyManager tm = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
-                String imei = null;
-                if (tm!=null && tm.getDeviceId() != null) {
-                    // for phones or 3g tablets
-                    imei = tm.getDeviceId(); 
-                } else {
-                    try {
-                        imei = Secure.getString(getContext().getContentResolver(), Secure.ANDROID_ID); 
-                    } catch(Throwable t) {
-                        com.codename1.io.Log.e(t);
-                    }
-                }
-                return imei;
+                return tm.getDeviceId();
             }
             if ("MSISDN".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
