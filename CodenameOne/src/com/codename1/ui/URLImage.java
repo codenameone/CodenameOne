@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.ui.events.ActionEvent;
@@ -249,7 +250,7 @@ public class URLImage extends EncodedImage {
                         FileSystemStorage.getInstance().delete(fileSystemFile + IMAGE_SUFFIX);
                     }
                 } catch (IOException ex) {
-                    ex.printStackTrace();
+                    Log.e(ex);
                     return;
                 }
             }

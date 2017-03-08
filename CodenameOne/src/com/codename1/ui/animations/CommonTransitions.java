@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.animations;
 
+import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -784,8 +785,8 @@ public final class CommonTransitions extends Transition {
                     return;
             }
         } catch(Throwable t) {
-            System.out.println("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
-            t.printStackTrace();
+            Log.p("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
+            Log.e(t);
         }
     }
 

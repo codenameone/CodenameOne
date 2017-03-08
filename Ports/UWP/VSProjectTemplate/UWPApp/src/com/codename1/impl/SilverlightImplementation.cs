@@ -49,6 +49,7 @@ using Windows.UI.ViewManagement;
 using Windows.UI.Composition;
 using Microsoft.Graphics.Canvas.UI.Composition;
 using Microsoft.Graphics.Canvas.Brushes;
+using java.util;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -168,6 +169,233 @@ namespace com.codename1.impl
             //compositionTarget.Root = root;
             */
 
+        }
+
+        public static void setMainClass(object o)
+        {
+            if (o is com.codename1.push.PushCallback)
+            {
+                setPushCallback((com.codename1.push.PushCallback)o);
+            }
+        }
+
+        static readonly char[] padding = { '=' };
+
+        static string Base64UrlEncode(byte[] arg)
+        {
+
+            return System.Convert.ToBase64String(arg)
+                .TrimEnd(padding)
+                .Replace('+', '-').Replace('/', '_');
+        }
+
+        /*
+        static byte[] Base64UrlDecode(string arg)
+        {
+            string s = arg;
+            s = s.Replace('-', '+'); // 62nd char of encoding
+            s = s.Replace('_', '/'); // 63rd char of encoding
+            switch (s.Length % 4) // Pad with trailing '='s
+            {
+                case 0: break; // No pad chars in this case
+                case 2: s += "=="; break; // Two pad chars
+                case 3: s += "="; break; // One pad char
+                default:
+                    throw new System.Exception(
+             "Illegal base64url string!");
+            }
+            return Convert.FromBase64String(s); // Standard base64 decoder
+        }
+        */
+        public override void registerPush(Hashtable metaData, bool noFallback)
+        {
+
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                // Get a channel URI from WNS.
+                try {
+                    var channel = await Windows.Networking.PushNotifications.PushNotificationChannelManager
+                       .CreatePushNotificationChannelForApplicationAsync();
+                    if (channel != null && channel.Uri != null)
+                    {
+                        byte[] idBytes = System.Text.Encoding.UTF8.GetBytes(channel.Uri);
+                        var id = Base64UrlEncode(idBytes);
+
+                        Display.getInstance().callSerially(new RegisterServerPushRunnable("cn1-win-" + id));
+
+                        channel.PushNotificationReceived += Channel_PushNotificationReceived;
+                    }
+                    else
+                    {
+                        Display.getInstance().callSerially(new SendPushRegistrationErrorhRunnable("Failed to open push channel", 0));
+                    }
+                } catch (Exception ex)
+                {
+                    Display.getInstance().callSerially(new SendPushRegistrationErrorhRunnable("Failed to open push channel: "+ex.Message, 0));
+                }
+               
+                
+           
+            });
+
+        }
+
+        public void _handlePushFromLaunchArg(string arg)
+        {
+            if (arg.StartsWith("cn1push:"))
+            {
+                arg = arg.Substring(8);
+            }
+            int pushType = Int32.Parse(arg.Substring(0, arg.IndexOf(' ')));
+            arg = arg.Substring(arg.IndexOf(' ') + 1);
+            string uuid = arg.Substring(0, arg.IndexOf(' '));
+            string pushMessage = arg.Substring(arg.IndexOf(' ') + 1);
+            com.codename1.ui.Display.getInstance().setProperty("pushType", "" + pushType);
+            switch (pushType)
+            {
+                case 3:
+                case 6:
+                    {
+                        string[] split = pushMessage.Split(';');
+                        if (split.Length < 2)
+                        {
+                            _pushReceived(uuid, pushMessage);
+                            _pushReceived(uuid + "-hidden", pushMessage);
+                        }
+                        else
+                        {
+                            _pushReceived(uuid, split[0]);
+                            _pushReceived(uuid + "-hidden", split[1]);
+                        }
+                        break;
+
+                    }
+
+                default:
+                    {
+                        _pushReceived(uuid, pushMessage); break;
+                    }
+
+            }
+        }
+
+        public void _pushReceived(string uuid, string data)
+        {
+            long now = java.lang.System.currentTimeMillis();
+            if (!pushLog.ContainsKey(uuid))
+            {
+                pushLog[uuid] = now;
+                base.pushReceived(data);
+            }
+
+            List<string> removals = new List<string>();
+            foreach (string key in pushLog.Keys)
+            {
+                long arrivalTime = pushLog[key];
+                if (arrivalTime < now - 60000)  // 5 minutes
+                {
+                    removals.Add(key);
+                }
+            }
+
+            foreach (string toremove in removals)
+            {
+                pushLog.Remove(toremove);
+            }
+            
+        }
+
+        public static Dictionary<string, long> pushLog = new Dictionary<string, long>();
+
+        private void Channel_PushNotificationReceived(Windows.Networking.PushNotifications.PushNotificationChannel sender, Windows.Networking.PushNotifications.PushNotificationReceivedEventArgs args)
+        {
+            switch (args.NotificationType)
+            {
+                case Windows.Networking.PushNotifications.PushNotificationType.Toast:
+                    {
+                        XmlDocument xml = args.ToastNotification.Content;
+                        Display.getInstance().callSerially(new PushReceivedRunnable(xml.DocumentElement.GetAttribute("launch")));
+                        break;
+                    }
+                case Windows.Networking.PushNotifications.PushNotificationType.Raw:
+                    {
+                        Display.getInstance().callSerially(new PushReceivedRunnable(args.RawNotification.Content));
+                        break;
+                    }
+                default:
+                    {
+                        com.codename1.io.Log.p("Received push notification but type is not handled yet");
+                        break;
+                    }
+
+                    
+            }
+        }
+
+        void _sendPushRegistrationError(String message, int errorCode)
+        {
+            base.sendPushRegistrationError(message, errorCode);
+        }
+
+        void _registerServerPush(string id)
+        {
+            if (registerServerPush(id, getApplicationKey(), (byte)10, "", getPackageName()))
+            {
+                base.sendRegisteredForPush(id);
+            }
+            else
+            {
+                base.sendPushRegistrationError("Failed to register server push", 0);
+            }
+        }
+
+        class PushReceivedRunnable : java.lang.Runnable
+        {
+            private string data;
+
+            public PushReceivedRunnable(string data)
+            {
+                this.data = data;
+            }
+
+            public void run()
+            {
+                //com.codename1.ui.Dialog.show("Hello", "Push received", "ÖK", null);
+                SilverlightImplementation.instance._handlePushFromLaunchArg(this.data);
+            }
+        }
+
+        class RegisterServerPushRunnable :java.lang.Runnable
+        {
+            private string id;
+
+            public RegisterServerPushRunnable(string id)
+            {
+                this.id = id;
+            }
+           
+            public void run()
+            {
+               
+                SilverlightImplementation.instance._registerServerPush(this.id);
+            }
+        }
+
+        class SendPushRegistrationErrorhRunnable : java.lang.Runnable
+        {
+            private string message;
+            private int errorCode;
+
+            public SendPushRegistrationErrorhRunnable(string message, int errorCode)
+            {
+                this.message = message;
+                this.errorCode = errorCode;
+            }
+
+            public void run()
+            {
+                SilverlightImplementation.instance._sendPushRegistrationError(this.message, this.errorCode);
+            }
         }
 
         private static string getDictValue(Dictionary<string, string> aSettings, string aKey, string aDefaultValue)
@@ -1043,6 +1271,46 @@ namespace com.codename1.impl
             tb.InputScope = ins;
         }
 
+        private void OnKeyDownHandler(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Enter)
+            {
+                if (currentlyEditing != null && currentlyEditing is TextField)
+                {
+                    TextField tf = (TextField)currentlyEditing;
+                    if (tf.getDoneListener() != null)
+                    {
+                        Display.getInstance().callSerially(new DoneEditing(tf));
+                    } else
+                    {
+                        commitEditing();
+                    }
+                }
+            }
+
+            
+        }
+
+        public class DoneEditing : java.lang.Runnable
+        {
+            TextField tf;
+
+            public DoneEditing(TextField tf)
+            {
+                this.tf = tf;
+            }
+
+            public void run()
+            {
+                if (tf.getDoneListener() != null)
+                {
+                    tf.fireDoneEvent();
+                    commitEditing();
+                }
+            }
+        }
+
+
         private bool lockEditing;
 
         public override void editString(Component n1, int n2, int n3, string n4, int n5)
@@ -1082,42 +1350,44 @@ namespace com.codename1.impl
                    {
                        textInputInstance = new TextBox();
                        TextBox tb = (TextBox)textInputInstance;
-                       ((TextBox)textInputInstance).IsTextPredictionEnabled = true;
-                       ((TextBox)textInputInstance).TextChanged += textChangedEvent;
+                       tb.KeyDown += new KeyEventHandler(OnKeyDownHandler);
                        
-                       ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
-                       ((TextBox)textInputInstance).MaxLength = n2;
-                       ((TextBox)textInputInstance).IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
+                       tb.IsTextPredictionEnabled = true;
+                       tb.TextChanged += textChangedEvent;
+                       
+                       tb.AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
+                       tb.MaxLength = n2;
+                       tb.IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
                        tb.TextWrapping = currentlyEditing.isSingleLineTextArea() ? TextWrapping.NoWrap : TextWrapping.Wrap;
-                       ((TextBox)textInputInstance).Text = n4;
+                       tb.Text = n4;
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
-                           setConstraint((TextBox)textInputInstance, InputScopeNameValue.NumberFullWidth);
+                           setConstraint(tb, InputScopeNameValue.NumberFullWidth);
                        }
                        else
                        {
                            if ((constraints & TextArea.DECIMAL) == TextArea.DECIMAL)
                            {
-                               setConstraint((TextBox)textInputInstance, InputScopeNameValue.Number);
+                               setConstraint(tb, InputScopeNameValue.Number);
                            }
                            else
                            {
                                if ((constraints & TextArea.EMAILADDR) == TextArea.EMAILADDR)
                                {
-                                   setConstraint((TextBox)textInputInstance, InputScopeNameValue.EmailSmtpAddress);
+                                   setConstraint(tb, InputScopeNameValue.EmailSmtpAddress);
                                }
                                else
                                {
                                    if ((constraints & TextArea.URL) == TextArea.URL)
                                    {
-                                       setConstraint((TextBox)textInputInstance, InputScopeNameValue.Url);
+                                       setConstraint(tb, InputScopeNameValue.Url);
                                    }
                                    else
                                    {
                                        if ((constraints & TextArea.PHONENUMBER) == TextArea.PHONENUMBER)
                                        {
-                                           setConstraint((TextBox)textInputInstance, InputScopeNameValue.TelephoneNumber);
+                                           setConstraint(tb, InputScopeNameValue.TelephoneNumber);
                                        }
                                    }
                                }

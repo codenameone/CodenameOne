@@ -82,6 +82,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                 + "      html { height: 100% }\n"
                 + "      body { height: 100%; margin: 0; padding: 0 }\n"
                 + "      #map-canvas { height: 100% }\n"
+                + "      .gm-style-mtc > div, .gm-style > div, .gm-style-cc > div, .gm-style {font-family:sans-serif !important;}\n"
                 + "    </style>\n"
                 + "    <script type=\"text/javascript\"\n"
                 + "      src=\"https://maps.googleapis.com/maps/api/js?key=AIzaSyA6cHeMqVVOHlZ0i9A2oD3jIg56Slvq0Aw&sensor=false\">\n"
@@ -131,6 +132,8 @@ public class LocationSimulation extends javax.swing.JFrame {
                 + "</html>";
 
         final javafx.embed.swing.JFXPanel webContainer = new javafx.embed.swing.JFXPanel();
+        mapPanel.setLayout(new BorderLayout());
+        mapPanel.add(BorderLayout.CENTER, webContainer);
         Platform.runLater(new Runnable() {
             private boolean firstRun;
 
@@ -141,10 +144,9 @@ public class LocationSimulation extends javax.swing.JFrame {
                 webView = new WebView();
                 root.getChildren().add(webView);
                 webContainer.setScene(new Scene(root));
-                mapPanel.setLayout(new BorderLayout());
-                mapPanel.add(BorderLayout.CENTER, webContainer);
+                
                 webView.getEngine().loadContent(htmlPage);
-                revalidate();
+                //revalidate();
                 firstRun = true;
                 Timer t = new Timer();
                 t.schedule(new TimerTask() {
