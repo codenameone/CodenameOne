@@ -42,7 +42,7 @@ public class TestRunner {
     private String[] testCases;
     private String[] skins; 
     private boolean quietMode;
-    private boolean cleanMode = true;
+    private boolean cleanMode;
     private boolean stopOnFail;
     
     private TestRunner() {
