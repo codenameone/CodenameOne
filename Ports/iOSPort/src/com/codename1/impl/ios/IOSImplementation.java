@@ -4095,7 +4095,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         boolean isShapeSupported(){
-            return associatedImage == null;
+            return true;
         }
         
         boolean isAlphaMaskSupported(){
