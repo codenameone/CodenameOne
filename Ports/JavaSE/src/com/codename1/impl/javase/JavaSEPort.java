@@ -5925,7 +5925,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         final String uri = uriAddress;
         if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
             System.out.println(msg);
             throw new IOException(msg);
         }
@@ -5999,7 +5999,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
             System.out.println(msg);
             throw new IOException(msg);
         }
