@@ -43,27 +43,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * Top level component that serves as the root for the UI, this {@link Container}
- * handles the menus and title while placing content between them. By default a 
- * forms central content (the content pane) is scrollable.
+ *<p> Top level component that serves as the root for the UI, this {@link Container}
+ * subclass works in concert with the {@link Toolbar} to create menus. By default a 
+ * forms main content area (the content pane) is scrollable on the Y axis and has a {@link com.codename1.ui.layouts.FlowLayout} as is the default.</p>
  *
- * Form contains Title bar, MenuBar and a ContentPane.
- * Calling to addComponent on the Form is delegated to the contenPane.addComponent
+ * <p>Form contains a title bar area which in newer application is replaced by the {@link Toolbar}.
+ * Calling {@link #add(com.codename1.ui.Component)} or all similar methods  on the {@code Form} 
+ * delegates to the contenPane so calling {@code form.add(cmp)} is equivalent to 
+ * {@code form.getContentPane().add(cmp)}. Normally this shouldn't matter, however in some cases such as
+ * animation we need to use the content pane directly e.g. {@code form.getContentPane().animateLayout(200)}
+ * will work whereas {@code form.animateLayout(200)} will fail. </p>
  * 
- *<pre>
- *
- *       **************************
- *       *         Title          *
- *       **************************
- *       *                        *
- *       *                        *
- *       *      ContentPane       *
- *       *                        *
- *       *                        *
- *       **************************
- *       *         MenuBar        *
- *       **************************
- *</pre> 
  * @author Chen Fishbein
  */
 public class Form extends Container {
