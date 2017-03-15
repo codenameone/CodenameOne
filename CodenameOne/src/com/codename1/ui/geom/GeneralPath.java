@@ -954,6 +954,9 @@ public final class GeneralPath implements Shape {
                 p.moveTo(_tmp1.x, _tmp1.y);
             }
             _addToPath(p, startAngle, sweepAngle);
+            if (!join && Math.abs(sweepAngle)-Math.PI*2 < 0.001) {
+                p.closePath();
+            }
         }
         
         private void _addToPath(GeneralPath p, double startAngle, double sweepAngle) {
