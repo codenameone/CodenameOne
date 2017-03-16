@@ -663,7 +663,7 @@ public class ConnectionRequest implements IOProgressListener {
                 readErrorCodeHeaders(connection);
                 // redirect to new location
                 if(followRedirects && (responseCode == 301 || responseCode == 302
-                        || responseCode == 303)) {
+                        || responseCode == 303 || responseCode == 307)) {
                     String uri = impl.getHeaderField("location", connection);
 
                     if(!(uri.startsWith("http://") || uri.startsWith("https://"))) {
