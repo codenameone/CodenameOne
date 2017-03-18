@@ -1839,6 +1839,82 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
 
     /**
+     * Appends a child component to the first container in this set.  Same as calling
+     * {@link Container#add(com.codename1.ui.Component) } padding {@literal child} on first container
+     * in this set.
+     * @param child Component to add to container.
+     * @return Self for chaining.
+     */
+    public ComponentSelector append(Component child) {
+        for (Component c : this) {
+            if (c instanceof Container) {
+                Container cnt = (Container)c;
+                cnt.add(child);
+                return this;
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Appends a child component to the first container in this set.  Same as calling
+     * {@link Container#add(java.lang.Object, com.codename1.ui.Component) } padding {@literal child} on first container
+     * in this set.
+     * @param constraint
+     * @param child
+     * @return 
+     */
+    public ComponentSelector append(Object constraint, Component child) {
+        for (Component c : this) {
+            if (c instanceof Container) {
+                Container cnt = (Container)c;
+                cnt.add(constraint, child);
+                return this;
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Append a child element to each container in this set.  The {@literal mapper} callback
+     * will receive a Container as input (that is the parent to be added to), and should return 
+     * a Component that is to be added to it.  If the mapper returns null, then nothing is 
+     * added to that container.
+     * @param mapper
+     * @return 
+     */
+    public ComponentSelector append(ComponentMapper mapper) {
+        for (Component c : this) {
+            if (c instanceof Container) {
+                Component child = mapper.map(c);
+                if (child != null) {
+                    ((Container)c).add(child);
+                }
+            }
+        }
+        return this;
+    }
+    
+    /**
+     * Append a child element to each container in this set.  The {@literal mapper} callback
+     * will receive a Container as input (that is the parent to be added to), and should return 
+     * a Component that is to be added to it.  If the mapper returns null, then nothing is 
+     * added to that container.
+     * @param constraint
+     * @param mapper
+     * @return 
+     */
+    public ComponentSelector append(Object constraint, ComponentMapper mapper) {
+        for (Component c : this) {
+            if (c instanceof Container) {
+                Component child = mapper.map(c);
+                ((Container)c).add(constraint, child);
+            }
+        }
+        return this;
+    }
+    
+    /**
      * Fluent API wrapper for {@link #add(com.codename1.ui.Component) }
      * @param e Component to add to set.
      * @param chain Dummy argument so that this version would have a different signature than {@link Set#add(java.lang.Object) }
