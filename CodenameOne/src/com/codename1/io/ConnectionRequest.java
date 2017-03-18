@@ -1060,6 +1060,34 @@ public class ConnectionRequest implements IOProgressListener {
 
     /**
      * Encapsulates an SSL certificate fingerprint.
+     * 
+     * <h3>SSL Pinning</h3>
+     * 
+     * <p>The recommended approach to SSL Pinning is to override the {@link #checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[]) }
+     * method in your {@link ConnectionRequest } object, and check the certificates that are provided
+     * as a parameter.  This callback if fired before sending data to the server, but after 
+     * the SSL handshake is complete so that you have an opportunity to kill the request before sending 
+     * your POST data.</p>
+     * 
+     * <p>Example: </p>
+     * 
+     * <pre>
+     * {@code
+     * ConnectionRequest req = new ConnectionRequest() {
+     *     @Override
+     *     protected void checkSSLCertificates(ConnectionRequest.SSLCertificate[] certificates) {
+     *         if (!trust(certificates)) {
+     *             // Assume that you've implemented method trust(SSLCertificate[] certs)
+     *             // to tell you whether you trust some certificates.
+     *             this.kill();
+     *         }
+     *     }
+     * };
+     * req.setCheckSSLCertificates(true);
+     * ....
+     * }
+     * </pre>
+     * 
      * @see #getSSLCertificates() 
      * @see #canGetSSLCertificates() 
      * @see #isCheckSSLCertificates() 
