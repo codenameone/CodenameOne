@@ -1506,6 +1506,14 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     POOL_END();
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSSLCertificates___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    JAVA_OBJECT result = [impl getSSLCertificates];
+    POOL_END();
+    return result;
+}
+
 void com_codename1_impl_ios_IOSNative_setChunkedStreamingMode___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT len) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);

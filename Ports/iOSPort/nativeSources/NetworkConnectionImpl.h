@@ -23,13 +23,16 @@
 
 #import <Foundation/Foundation.h>
 
-@interface NetworkConnectionImpl : NSObject {
+#import <CommonCrypto/CommonDigest.h>
+
+@interface NetworkConnectionImpl : NSObject<NSURLConnectionDataDelegate> {
     NSMutableURLRequest *request;
     int contentLength;
     int responseCode;
     NSDictionary* allHeaderFields;
     NSURLConnection *connection;
     int chunkedStreamingLen;
+    NSString* sslCertificates;
 }
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout;
@@ -45,9 +48,12 @@
 - (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response;
 - (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error;
 - (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data;
+//- (void)connection:(NSURLConnection *)connection willSendRequestForAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge;
+-(void)connection:(NSURLConnection *)connection willSendRequestForAuthenticationChallenge:(nonnull NSURLAuthenticationChallenge *)challenge;
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection;
 - (int)getResponseHeaderCount;
 - (NSString*)getResponseHeaderName:(int)offset;
 -(void)setChunkedStreamingLen:(int)len;
+-(JAVA_OBJECT)getSSLCertificates;
 
 @end

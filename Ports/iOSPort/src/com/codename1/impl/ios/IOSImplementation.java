@@ -5983,6 +5983,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
+        private String[] sslCertificates;
         private boolean connected;
         private boolean ensureConnectionLock;
         String error;
@@ -6189,9 +6190,37 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return len;            
             }
         }
+
+        private String[] getSSLCertificates(String url) {
+            if (sslCertificates == null) {
+                try {
+                    com.codename1.io.URL uUrl = new com.codename1.io.URL(url);
+                    String key = uUrl.getHost()+":"+uUrl.getPort();
+                    String certs = nativeInstance.getSSLCertificates(peer);
+                    if (certs == null) {
+                        if (sslCertificatesCache.containsKey(key)) {
+                            sslCertificates = sslCertificatesCache.get(key);
+                        }
+                        if (sslCertificates == null) {
+                            return new String[0];
+                        }
+                        return sslCertificates;
+                    }
+                    sslCertificates = Util.split(certs, ",");
+                    sslCertificatesCache.put(key, sslCertificates);
+                    return sslCertificates;
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    return new String[0];
+                }
+            }
+            return sslCertificates;
+        }
         
     }
 
+    private static Map<String, String[]> sslCertificatesCache = new HashMap<String,String[]>();
+    
     public boolean isTimeoutSupported() {
         return true;
     }
@@ -6209,6 +6238,18 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
         return new NetworkConnection(nativeInstance.openConnection(url, timeout));
+    }
+
+    @Override
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        NetworkConnection conn =  (NetworkConnection)connection;
+        conn.ensureConnection();
+        return conn.getSSLCertificates(url);
+    }
+
+    @Override
+    public boolean canGetSSLCertificates() {
+        return true;
     }
 
     /**

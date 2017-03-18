@@ -4237,6 +4237,25 @@ public abstract class CodenameOneImplementation {
      * @return a URL instance
      */
     public abstract Object connect(String url, boolean read, boolean write) throws IOException;
+    
+    /**
+     * Gets the SSL certificates for a connection
+     * @param connection The connection.
+     * @param url The url of the connection.
+     * @return String array where each certificate is in form {@literal <ALGORITHM>:<FINGERPRINT>}
+     * @throws IOException 
+     */
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        return new String[0];
+    }
+    
+    /**
+     * Checks if the platform supports getting SSL certificates.
+     * @return True if the platform supports SSL certificates.
+     */
+    public boolean canGetSSLCertificates() {
+        return false;
+    }
 
     /**
      * Connects to a given URL, returns a connection object to be used with the implementation
