@@ -68,6 +68,36 @@ public abstract class TimeZone{
     private static native int getTimezoneRawOffset(String name);
     private static native boolean isTimezoneDST(String name, long millis);
 
+    private static long getJuly1() {
+        long july1_2017 = 1498867200000l;
+        long now = System.currentTimeMillis();
+        long july1Ish = july1_2017;
+        int i=1;
+        while (july1Ish < now) {
+            july1Ish += 365 * 24 * 60 * 60 * 1000;
+            if (i % 4  == 0) {
+                july1Ish += 24 * 60 * 60 * 1000; // add a day for leap year every 4 years
+            }
+            i++;
+        }
+        return july1Ish;
+    }
+    
+    private static long getDec30() {
+        long dec30_2016 = 1483056000000l;
+        long now = System.currentTimeMillis();
+        long dec30Ish = dec30_2016;
+        int i=1;
+        while (dec30Ish < now) {
+            dec30Ish += 365 * 24 * 60 * 60 * 1000;
+            if (i % 4  == 0) {
+                dec30Ish += 24 * 60 * 60 * 1000; // add a day for leap year every 4 years
+            }
+            i++;
+        }
+        return dec30Ish;
+    }
+    
     /**
      * Gets the default TimeZone for this host. The source of the default TimeZone may vary with implementation.
      */
@@ -91,8 +121,7 @@ public abstract class TimeZone{
 
                 @Override
                 public boolean useDaylightTime() {
-                    Date now = new Date();
-                    return isTimezoneDST(tzone, now.getTime()) != isTimezoneDST(tzone, now.getTime() + 15724800000l); // 26 weeks
+                    return isTimezoneDST(tzone, getDec30()) != isTimezoneDST(tzone, getJuly1()); // 26 weeks
                 }
             };
             defaultTimeZone.ID = tzone;
@@ -154,8 +183,7 @@ public abstract class TimeZone{
 
                 @Override
                 public boolean useDaylightTime() {
-                    Date now = new Date();
-                    return isTimezoneDST(ID, now.getTime()) != isTimezoneDST(ID, now.getTime() + 15724800000l); // 26 weeks
+                    return isTimezoneDST(ID, getDec30()) != isTimezoneDST(ID, getJuly1()); // 26 weeks
                 }
                 
                 public boolean equals(Object tz) {
