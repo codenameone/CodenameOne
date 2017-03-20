@@ -1097,6 +1097,19 @@ public class InPlaceEditView extends FrameLayout{
     private static void trySetEditMode(final boolean resize) {
         trySetEditMode(resize, 10);
     }
+
+    private static com.codename1.ui.geom.Rectangle getVisibleRect(Component c) {
+        com.codename1.ui.geom.Rectangle r = new com.codename1.ui.geom.Rectangle(c.getAbsoluteX() + c.getScrollX(), c.getAbsoluteY() + c.getScrollY(), c.getWidth(), c.getHeight());
+        while ((c = c.getParent()) != null) {
+            com.codename1.ui.geom.Rectangle.intersection(r.getX(), r.getY(), r.getWidth(), r.getHeight(),
+                    c.getAbsoluteX() + c.getScrollX(), c.getAbsoluteY() + c.getScrollY(), c.getWidth(), c.getHeight(),
+                    r);
+
+        }
+        return r;
+
+    }
+
     /**
      * Wrap the setEditMode method so that it is "safe" to set to resize edit mode.
      * This will try to set to the "resize" edit mode, and will spawn a thread
@@ -1146,11 +1159,14 @@ public class InPlaceEditView extends FrameLayout{
                             if (sInstance == null || sInstance.mEditText == null || sInstance.mEditText.mTextArea == null) {
                                 return;
                             }
+                            com.codename1.ui.Font font = sInstance.mEditText.mTextArea.getStyle().getFont();
+                            float fontSize = (font != null || font.getPixelSize() == 0) ? font.getPixelSize() : Display.getInstance().convertToPixels(4);
+                            com.codename1.ui.geom.Rectangle visibleRect = getVisibleRect(sInstance.mEditText.mTextArea);
                             Rect r = new Rect();
                             AndroidImplementation.getInstance().relativeLayout.getGlobalVisibleRect(r);
                             int rootViewHeight = r.height();
                             int txtY = sInstance.mEditText.mTextArea.getAbsoluteY() + sInstance.mEditText.mTextArea.getScrollY();
-                            if (txtY > rootViewHeight - 20) {
+                            if (txtY > rootViewHeight - 20 || visibleRect.getHeight() < fontSize) {
                                 // We're off the page
                                 //System.out.println("SETTING TO PAN MODE_______");
                                 setEditMode(false);
@@ -1606,8 +1622,11 @@ public class InPlaceEditView extends FrameLayout{
 
     private static boolean isScrollableParent(Component c){
         Container p = c.getParent();
+        Font f = c.getStyle().getFont();
+        float pixelSize = f == null ? Display.getInstance().convertToPixels(4) : f.getPixelSize();
         while( p != null){
-            if(p.isScrollableY()){
+
+            if(p.isScrollableY() && p.getAbsoluteY() + p.getScrollY() < Display.getInstance().getDisplayHeight() / 2 - pixelSize * 2){
                 return true;
             }
             p = p.getParent();
