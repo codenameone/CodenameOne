@@ -399,6 +399,11 @@ public class UIManager {
             themeProps.put("ToastBarMessage.dis#derive", "ToastBarMessage");
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("ChartComponent.derive")) {
+            themeProps.put("ChartComponent.transparency", "0");
+            themeProps.put("ChartComponent.sel#derive", "ChartComponent");
+            themeProps.put("ChartComponent.press#derive", "ChartComponent");
+        }
         
         if(installedTheme == null || !installedTheme.containsKey("Button.derive")) {
             themeProps.put("Button.border", Border.getDefaultBorder());
