@@ -324,16 +324,12 @@ public class PropertyIndex implements Iterable<PropertyBase>{
         for(PropertyBase p : this) {
             if(p instanceof MapProperty) {
                 MapProperty pp = (MapProperty)p;
-                if(pp.get() != null) {
-                    m.put(p.getName(), pp.asExplodedMap());
-                }
+                m.put(p.getName(), pp.asExplodedMap());
                 continue;
             }
             if(p instanceof ListProperty) {
                 ListProperty pp = (ListProperty)p;
-                if(pp.get() != null) {
-                    m.put(p.getName(), pp.asExplodedList());
-                }
+                m.put(p.getName(), pp.asExplodedList());
                 continue;
             }
             if(p instanceof Property) {

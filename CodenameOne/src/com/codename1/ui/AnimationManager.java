@@ -129,7 +129,17 @@ public final class AnimationManager {
      * @param cna the animation to bind to the scroll event
      */
     public void onTitleScrollAnimation(final ComponentAnimation... cna) {
-        parentForm.getContentPane().addScrollListener(new ScrollListener() {
+        onTitleScrollAnimation(parentForm.getContentPane(), cna);
+    }
+
+    /**
+     * Performs a step animation as the user scrolls down/up the page e.g. slowly converting a title UIID from
+     * a big visual representation to a smaller title for easier navigation then back again when scrolling up
+     * @param content the scrollable container representing the body
+     * @param cna the animation to bind to the scroll event
+     */
+    public void onTitleScrollAnimation(Container content, final ComponentAnimation... cna) {
+        content.addScrollListener(new ScrollListener() {
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                 if(scrollY >= 0) {
                     boolean changed = false;
