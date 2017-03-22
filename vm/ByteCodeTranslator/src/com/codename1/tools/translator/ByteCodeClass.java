@@ -958,20 +958,16 @@ public class ByteCodeClass {
     } 
 
     private List<ByteCodeField> buildStaticFieldList(List<ByteCodeField> fieldList) {
-        for(ByteCodeField bf : fields) {
-            if(bf.isStaticField() && !fieldList.contains(bf)) {
-                fieldList.add(bf);
-            } 
+        if (fields != null) {
+            for(ByteCodeField bf : fields) {
+                if(bf.isStaticField() && !fieldList.contains(bf)) {
+                    fieldList.add(bf);
+                } 
+            }
         }
         if(baseInterfacesObject != null) {
             for(ByteCodeClass baseInterface : baseInterfacesObject) {
-                if(baseInterface.fields != null) {
-                    for(ByteCodeField bf : baseInterface.fields) {
-                        if(!fieldList.contains(bf)) {
-                            fieldList.add(bf);
-                        } 
-                    }
-                }
+                baseInterface.buildStaticFieldList(fieldList);
             }
         }
         if(baseClassObject != null) {
