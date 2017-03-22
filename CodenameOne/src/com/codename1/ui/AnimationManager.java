@@ -104,7 +104,7 @@ public final class AnimationManager {
         addAnimation(an);
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
-                while(an.isInProgress()) {
+                while(an.isInProgress() && anims.contains(an)) {
                     Util.wait(LOCK, 50);
                 }
             }
