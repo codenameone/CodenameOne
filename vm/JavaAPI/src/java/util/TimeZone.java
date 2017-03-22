@@ -74,9 +74,9 @@ public abstract class TimeZone{
         long july1Ish = july1_2017;
         int i=1;
         while (july1Ish < now) {
-            july1Ish += 365 * 24 * 60 * 60 * 1000;
+            july1Ish += 31536000000l;
             if (i % 4  == 0) {
-                july1Ish += 24 * 60 * 60 * 1000; // add a day for leap year every 4 years
+                july1Ish += 86400000l; // add a day for leap year every 4 years
             }
             i++;
         }
@@ -89,9 +89,9 @@ public abstract class TimeZone{
         long dec30Ish = dec30_2016;
         int i=1;
         while (dec30Ish < now) {
-            dec30Ish += 365 * 24 * 60 * 60 * 1000;
+            dec30Ish += 31536000000l;
             if (i % 4  == 0) {
-                dec30Ish += 24 * 60 * 60 * 1000; // add a day for leap year every 4 years
+                dec30Ish += 86400000l; // add a day for leap year every 4 years
             }
             i++;
         }
