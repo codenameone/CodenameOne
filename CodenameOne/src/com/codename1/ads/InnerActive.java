@@ -81,7 +81,7 @@ public class InnerActive extends AdsService{
 
     /**
      * If true and no ads exists the network will return house holds ads
-     * @param testAds 
+     * @param test
      */
     public static void setTestAds(boolean test) {
         testAds = test;

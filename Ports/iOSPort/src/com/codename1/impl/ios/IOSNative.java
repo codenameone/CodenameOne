@@ -273,6 +273,7 @@ public final class IOSNative {
     
     native long openConnection(String url, int timeout);
     native void connect(long peer);
+    native String getSSLCertificates(long peer);
     native void setMethod(long peer, String mtd);
     native void setChunkedStreamingMode(long peer, int len);
     native int getResponseCode(long peer);
@@ -615,6 +616,7 @@ public final class IOSNative {
     native void nativeClearRectGlobal(int x, int y, int width, int height);
 
     native void blockCopyPaste(boolean blockCopyPaste);
+
 
 
    

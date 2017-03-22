@@ -807,7 +807,7 @@ public final class Display {
                             try {
                                 nextTask.run();                                
                             } catch (Throwable e) {
-                                e.printStackTrace();
+                                Log.e(e);
                             }
                             try {
                                 Thread.sleep(10);
@@ -971,7 +971,7 @@ public final class Display {
                 processSerialCalls();
             }
         } catch(Throwable err) {
-            err.printStackTrace();
+            Log.e(err);
             if(crashReporter != null) {
                 crashReporter.exception(err);
             }
@@ -1001,7 +1001,7 @@ public final class Display {
                 if(!codenameOneRunning) {
                     return;
                 }
-                err.printStackTrace();
+                Log.e(err);
                 if(crashReporter != null) {
                     CodenameOneThread.handleException(err);
                 }
@@ -1047,7 +1047,7 @@ public final class Display {
                 return;
             }
         } catch(Exception ignor) {
-            ignor.printStackTrace();
+            Log.e(ignor);
         }
         long currentTime = System.currentTimeMillis();
         
@@ -1428,7 +1428,7 @@ public final class Display {
                 transition.initTransition();
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            Log.e(e);
             transition.cleanup();
             animationQueue.remove(transition);
             return false;
@@ -2308,6 +2308,14 @@ public final class Display {
     }
 
     /**
+     * Checks to see if the platform supports a native image cache.
+     * @return True on platforms that support a native image cache.  Currently only Javascript.
+     */
+    boolean supportsNativeImageCache() {
+        return impl.supportsNativeImageCache();
+    }
+    
+    /**
      * Returns the game action code matching the given key combination
      *
      * @param keyCode key code received from the event
@@ -2491,7 +2499,7 @@ public final class Display {
     public boolean isMultiTouch() {
         return impl.isMultiTouch();
     }
-
+    
     /**
      * Indicates whether the device has a double layer screen thus allowing two
      * stages to touch events: click and hover. This is true for devices such

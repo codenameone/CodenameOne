@@ -125,6 +125,7 @@ import java.awt.geom.PathIterator;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
+import java.security.MessageDigest;
 import java.sql.DriverManager;
 import java.text.DateFormat;
 import java.text.NumberFormat;
@@ -145,6 +146,7 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.scene.web.WebView;
 import javafx.util.Duration;
+import javax.net.ssl.HttpsURLConnection;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -172,8 +174,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
-    private boolean takingScreenshot;
-    private float screenshotActualZoomLevel;
+    boolean takingScreenshot;
+    float screenshotActualZoomLevel;
     
     /**
      * When set to true pointer hover events will be called for mouse move events
@@ -3497,6 +3499,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 };
+                
+                ((JTextField)t).addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        if (cmp instanceof com.codename1.ui.TextField) {
+                            final com.codename1.ui.TextField tf = (com.codename1.ui.TextField)cmp;
+                            if (tf.getDoneListener() != null) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        if (tf.getDoneListener() != null) {
+                                            tf.fireDoneEvent();
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    
+                });
             }
             swingT = t;
             textCmp = swingT;
@@ -5683,7 +5705,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private Graphics2D getGraphics(Object nativeG) {
+    Graphics2D getGraphics(Object nativeG) {
         if (nativeG instanceof Graphics2D) {
             Graphics2D g2d = (Graphics2D) nativeG;
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -5697,7 +5719,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         return g2d;
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -5738,7 +5760,39 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
-        private void sendToCn1(MouseEvent e) {
+
+        @Override
+        protected void processMouseEvent(MouseEvent e) {
+            //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
+            if (!sendToCn1(e)) {
+                super.processMouseEvent(e);
+            }
+            
+        }
+
+        @Override
+        protected void processMouseMotionEvent(MouseEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseMotionEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+            
+        }
+
+        @Override
+        protected void processMouseWheelEvent(MouseWheelEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseWheelEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+        }
+
+
+        
+        
+        
+        
+        
+        private boolean sendToCn1(MouseEvent e) {
+            
             int cn1X = getCN1X(e);
             int cn1Y = getCN1Y(e);
             if (Display.isInitialized()) {
@@ -5769,10 +5823,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 break;
                                 
                         }
+                        return true;
+                        
+                        
                         //canvas.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, canvas));
                     }
                 }
             }
+            return false;
         }
         
         private int getCN1X(MouseEvent e) {
@@ -5786,7 +5844,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public CN1JFXPanel() {
             final CN1JFXPanel panel = this;
             
-            
+            /*
             panel.addMouseListener(new MouseListener() {
                 
                 
@@ -5839,6 +5897,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
             });
+            */
             
         }
 
@@ -5868,7 +5927,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         final String uri = uriAddress;
         if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
             System.out.println(msg);
             throw new IOException(msg);
         }
@@ -5942,7 +6001,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
             System.out.println(msg);
             throw new IOException(msg);
         }
@@ -6226,7 +6285,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return con;
     }
-
+   
     /**
      * @inheritDoc
      */
@@ -6234,6 +6293,52 @@ public class JavaSEPort extends CodenameOneImplementation {
         return connect(url, read, write, timeout);
     }
 
+    private static final char[] HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    
+    private static String dumpHex(byte[] data) {
+        final int n = data.length;
+        final StringBuilder sb = new StringBuilder(n * 3 - 1);
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append(' ');
+            }
+            sb.append(HEX_CHARS[(data[i] >> 4) & 0x0F]);
+            sb.append(HEX_CHARS[data[i] & 0x0F]);
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        if (connection instanceof HttpsURLConnection) {
+            HttpsURLConnection conn = (HttpsURLConnection)connection;
+            
+            try {    
+                conn.connect();
+                java.security.cert.Certificate[] certs = conn.getServerCertificates();
+                String[] out = new String[certs.length];
+                int i=0;
+                for (java.security.cert.Certificate cert : certs) {
+                    MessageDigest md = MessageDigest.getInstance("SHA1");
+                    md.update(cert.getEncoded());
+                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                }
+                return out;
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return new String[0];
+        
+    }
+
+    @Override
+    public boolean canGetSSLCertificates() {
+        return true;
+    }
+    
+    
+    
     /**
      * @inheritDoc
      */
@@ -9035,6 +9140,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             } catch(IOException err) {
                 throw new RuntimeException(err);
             }
+            return;
         }
         throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
    }    

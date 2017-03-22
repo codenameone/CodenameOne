@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.table;
 
+import com.codename1.io.Log;
 import com.codename1.ui.layouts.*;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -505,7 +506,7 @@ public class TableLayout extends Layout {
                 }
             }
         } catch(ArrayIndexOutOfBoundsException err) {
-            err.printStackTrace();
+            Log.e(err);
         }
     }
 

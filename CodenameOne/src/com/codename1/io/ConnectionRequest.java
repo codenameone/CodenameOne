@@ -142,6 +142,20 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * @return the checkSSLCertificates
+     */
+    public boolean isCheckSSLCertificates() {
+        return checkSSLCertificates;
+    }
+
+    /**
+     * @param checkSSLCertificates the checkSSLCertificates to set
+     */
+    public void setCheckSSLCertificates(boolean checkSSLCertificates) {
+        this.checkSSLCertificates = checkSSLCertificates;
+    }
+
+    /**
      * There are 4 caching modes: OFF is the default meaning no caching. 
      * SMART means all get requests are cached intelligently and caching is "mostly" seamless
      * MANUAL means that the developer is responsible for the actual caching but the system
@@ -267,6 +281,8 @@ public class ConnectionRequest implements IOProgressListener {
     private int failureErrorCode;
     private String destinationFile;
     private String destinationStorage;
+    private SSLCertificate[] sslCertificates;
+    private boolean checkSSLCertificates;
     
     /**
      * The request body can be used instead of arguments to pass JSON data to a restful request,
@@ -377,6 +393,26 @@ public class ConnectionRequest implements IOProgressListener {
         timeSinceLastUpdate = System.currentTimeMillis();
     }
     
+    /**
+     * A callback that can be overridden by subclasses to check the SSL certificates
+     * for the server, and kill the connection if they don't pass muster.  This can
+     * be used for SSL pinning.
+     * 
+     * <p><strong>NOTE:</strong> This method will only be called if {@link #isCheckSSLCertificates() } is {@literal true} and the platform supports SSL certificates ({@link #canGetSSLCertificates() }.</p>
+     * 
+     * <p><strong>WARNING:</strong>  On iOS it is possible that certificates for a request would not be available even through the
+     * platform supports it, and checking certificates are enabled.  This could happen if the certificates had been cached by the
+     * TLS cache by some network mechanism other than ConnectionRequest (e.g. native code, websockets, etc..).  In such cases
+     * this method would receive an empty array as a parameter.</p>
+     * 
+     * <p>This is called after the SSL handshake, but before any data has been sent.</p>
+     * @param certificates The server's SSL certificates.
+     * @see #setCheckSSLCertificates(boolean) 
+     * @see #isCheckSSLCertificates() 
+     */
+    protected void checkSSLCertificates(SSLCertificate[] certificates) {
+        
+    }
     
     /**
      * Invoked to initialize HTTP headers, cookies etc. 
@@ -601,6 +637,13 @@ public class ConnectionRequest implements IOProgressListener {
                     impl.setHeader(connection, cookieHeader, s);
                 }
             }
+            if (checkSSLCertificates && canGetSSLCertificates()) {
+                sslCertificates = getSSLCertificatesImpl(connection, url);
+                checkSSLCertificates(sslCertificates);
+                    if(shouldStop()) {
+                    return;
+                }
+            }
             if(isWriteRequest()) {
                 progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
                 output = impl.openOutputStream(connection);
@@ -663,7 +706,7 @@ public class ConnectionRequest implements IOProgressListener {
                 readErrorCodeHeaders(connection);
                 // redirect to new location
                 if(followRedirects && (responseCode == 301 || responseCode == 302
-                        || responseCode == 303)) {
+                        || responseCode == 303 || responseCode == 307)) {
                     String uri = impl.getHeaderField("location", connection);
 
                     if(!(uri.startsWith("http://") || uri.startsWith("https://"))) {
@@ -1016,6 +1059,106 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Encapsulates an SSL certificate fingerprint.
+     * 
+     * <h3>SSL Pinning</h3>
+     * 
+     * <p>The recommended approach to SSL Pinning is to override the {@link #checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[]) }
+     * method in your {@link ConnectionRequest } object, and check the certificates that are provided
+     * as a parameter.  This callback if fired before sending data to the server, but after 
+     * the SSL handshake is complete so that you have an opportunity to kill the request before sending 
+     * your POST data.</p>
+     * 
+     * <p>Example: </p>
+     * 
+     * <pre>
+     * {@code
+     * ConnectionRequest req = new ConnectionRequest() {
+     *     @Override
+     *     protected void checkSSLCertificates(ConnectionRequest.SSLCertificate[] certificates) {
+     *         if (!trust(certificates)) {
+     *             // Assume that you've implemented method trust(SSLCertificate[] certs)
+     *             // to tell you whether you trust some certificates.
+     *             this.kill();
+     *         }
+     *     }
+     * };
+     * req.setCheckSSLCertificates(true);
+     * ....
+     * }
+     * </pre>
+     * 
+     * @see #getSSLCertificates() 
+     * @see #canGetSSLCertificates() 
+     * @see #isCheckSSLCertificates() 
+     * @see #setCheckSSLCertificates(boolean) 
+     * @see #checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[]) 
+     */
+    public final class SSLCertificate {
+
+        private String certificateUniqueKey;
+        private String certificateAlgorithm;
+
+        /**
+         * Gets a fingerprint for the SSL certificate encoded using the algorithm
+         * specified by {@link #getCertificteAlgorithm() }
+         * @return 
+         */
+        public String getCertificteUniqueKey() {
+            return certificateUniqueKey;
+        }
+
+        /**
+         * Gets the algorithm used to encode the fingerprint.  Default is {@literal SHA1}
+         * @return The algorithm used to encode the certificate fingerprint.
+         */
+        public String getCertificteAlgorithm() {
+            return certificateAlgorithm;
+        }
+    }
+    
+    /**
+     * Checks to see if the platform supports getting SSL certificates.
+     * @return True if the platform supports getting SSL certificates.
+     */
+    public boolean canGetSSLCertificates() {
+        return Util.getImplementation().canGetSSLCertificates();
+    }
+    
+    /**
+     * Gets the server's SSL certificates for this requests.  If this connection request
+     * does not have any certificates available, it returns an array of size 0.
+     *
+     * @return The server's SSL certificates.   If not available, an empty array.
+     */
+    public SSLCertificate[] getSSLCertificates() throws IOException {
+        if (sslCertificates == null) {
+            sslCertificates = new SSLCertificate[0];
+        }
+        return sslCertificates;
+    }
+    
+    private SSLCertificate[] getSSLCertificatesImpl(Object connection, String url) throws IOException {
+        String[] sslCerts = Util.getImplementation().getSSLCertificates(connection, url);
+        SSLCertificate[] out = new SSLCertificate[sslCerts.length];
+        int i=0;
+        for (String sslCertStr : sslCerts) {
+            if (sslCertStr == null) continue;
+            SSLCertificate sslCert = new SSLCertificate();
+            int splitPos = sslCertStr.indexOf(':');
+            if (splitPos == -1) {
+                continue;
+            }
+            
+            sslCert.certificateAlgorithm = sslCertStr.substring(0, splitPos);
+            sslCert.certificateUniqueKey = sslCertStr.substring(splitPos+1);
+            out[i++] = sslCert;
+        }
+        return out;
+        
+    }
+
+    /**
      * Handles a server response code that is not 200 and not a redirect (unless redirect handling is disabled)
      *
      * @param code the response code from the server
@@ -1078,7 +1221,6 @@ public class ConnectionRequest implements IOProgressListener {
         if(destinationFile != null) {
             OutputStream o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
             Util.copy(input, o);
-            Util.cleanup(o);
             
             // was the download killed while we downloaded
             if(isKilled()) {
@@ -1088,7 +1230,6 @@ public class ConnectionRequest implements IOProgressListener {
             if(destinationStorage != null) {
                 OutputStream o = Storage.getInstance().createOutputStream(destinationStorage);
                 Util.copy(input, o);
-                Util.cleanup(o);
             
                 // was the download killed while we downloaded
                 if(isKilled()) {
@@ -2212,7 +2353,8 @@ public class ConnectionRequest implements IOProgressListener {
             final ActionListener onDownload = new ActionListener<NetworkEvent>() {
 
                 public void actionPerformed(NetworkEvent nevt) {
-                    if (nevt.getResponseCode() == 200) {
+                    int rc = nevt.getResponseCode();
+                    if (rc == 200 || rc == 201 ) {
                         downloadImage(onSuccess, onFail, true);
                     } else {
                         if (nevt.getError() == null) {

@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -224,7 +225,7 @@ public class SideMenuBar extends MenuBar {
             try {
                 size = Float.parseFloat(uim.getThemeConstant("menuImageSize", "4.5"));
             } catch(Throwable t) {
-                t.printStackTrace();
+                Log.e(t);
             }
             FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU, size);
         }

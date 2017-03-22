@@ -2140,6 +2140,12 @@ public class Style {
      * @param l a style listener
      */
     public void addStyleListener(StyleListener l) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.addStyleListener(l);
+            }
+            return;
+        }
         if (listeners == null) {
             listeners = new EventDispatcher();
         }
@@ -2152,6 +2158,12 @@ public class Style {
      * @param l a style listener
      */
     public void removeStyleListener(StyleListener l) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.removeStyleListener(l);
+            }
+            return;
+        }
         if (listeners != null) {
             listeners.removeListener(l);
         }
@@ -2161,6 +2173,12 @@ public class Style {
      * This method removes all Listeners from the Style
      */
     public void removeListeners(){
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.removeListeners();
+            }
+            return;
+        }
         if (listeners != null) {
             listeners = null;
         }

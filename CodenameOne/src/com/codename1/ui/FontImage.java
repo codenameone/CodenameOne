@@ -5227,4 +5227,12 @@ public class FontImage extends Image {
     public boolean requiresDrawImage() {
         return true;
     }
+    
+    /**
+     * Returns the text of the icon
+     * @return the text used to draw the icon
+     */
+    public String getText() {
+        return text;
+    }
 }

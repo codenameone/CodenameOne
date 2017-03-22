@@ -368,7 +368,7 @@ public class TestRecorder extends javax.swing.JFrame {
                                 generatedCode += "        clickButtonByLabel(\"" + btn.getText() + "\");\n";
                             } else {
                                 String pp = getPathToComponent(cmp);
-                                if(pp == null) {
+                                if(pp == null || pp.equals("(String)null")) {
                                     return;
                                 }
                                 generatedCode += "        clickButtonByPath(" + pp + ");\n";

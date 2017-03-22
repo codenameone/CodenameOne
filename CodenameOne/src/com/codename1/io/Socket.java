@@ -112,7 +112,7 @@ public class Socket {
                     }
                 } catch(Exception err) {
                     // instansiating the class has caused a problem
-                    err.printStackTrace();
+                    Log.e(err);
                 }
             }
 

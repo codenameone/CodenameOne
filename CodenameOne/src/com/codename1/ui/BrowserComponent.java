@@ -360,4 +360,24 @@ public class BrowserComponent extends Container {
         Display.impl.browserExposeInJavaScript(internal, o, name);
     }
 
+    /**
+     * Toggles debug mode for the browser component which helps detect coding errors in the JavaScript
+     * bridge logic
+     * @param mode true to debug false otherwise, this might have no effect in some platforms
+     */
+    public void setDebugMode(boolean mode) {
+        if(mode) {
+            putClientProperty("BrowserComponent.firebug", Boolean.TRUE);
+        } else {
+            putClientProperty("BrowserComponent.firebug", null);
+        }
+    }
+    
+    /**
+     * Indicates if debug mode is set (might have no effect though)
+     * @return true if debug mode was activated
+     */
+    public boolean isDebugMode() {
+        return getClientProperty("BrowserComponent.firebug") == Boolean.TRUE;
+    }
 }

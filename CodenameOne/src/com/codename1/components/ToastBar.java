@@ -23,7 +23,6 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
 import com.codename1.ui.Button;
@@ -221,6 +220,11 @@ public class ToastBar {
         private String message;
         
         /**
+         * An action to perform when the ToastBar is tapped {@code ToastBar}.
+         */
+        private ActionListener listener;
+
+        /**
          * Optional progress for the task.  (Not tested or implemented yet).
          */
         private int progress=-2;
@@ -279,6 +283,15 @@ public class ToastBar {
             
         }
         
+        /**
+         * Sets the action listener needed to perform an action when the bar is tapped {@code ToastBar}.
+         *
+         * @param listener
+         */
+        public void setListener(ActionListener listener) {
+            this.listener = listener;
+        }
+
         /**
          * Sets the progress (-1..100) that should be displayed in the progress bar
          * for this status.  When set to -1 it will act as an infinite progress
@@ -361,6 +374,15 @@ public class ToastBar {
          */
         public String getMessage() {
             return message;
+        }
+
+        /**
+         * Returns the listener added to perform a particular action.
+         *
+         * @return the listener
+         */
+        public ActionListener getListener() {
+            return listener;
         }
 
         /**
@@ -457,7 +479,7 @@ public class ToastBar {
      * Updates the ToastBar UI component with the settings of the current status.
      */
     private void updateStatus() {
-        ToastBarComponent c = getToastBarComponent();
+        final ToastBarComponent c = getToastBarComponent();
         if (c != null) {
             if (updatingStatus) {
                 pendingUpdateStatus = true;
@@ -480,6 +502,18 @@ public class ToastBar {
                 Status s = c.currentlyShowing;
 
                 Label l = new Label(s.getMessage() != null ? s.getMessage() : "");
+
+                c.leadButton.getListeners().clear();
+                c.leadButton.addActionListener(s.getListener());
+                c.leadButton.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        if (c.currentlyShowing != null && !c.currentlyShowing.showProgressIndicator) {
+                            c.currentlyShowing.clear();
+                        }
+                        ToastBar.this.setVisible(false);
+                    }
+                }); 
 
                 c.progressLabel.setVisible(s.isShowProgressIndicator());
                 if (c.progressLabel.isVisible()) {
@@ -705,6 +739,11 @@ public class ToastBar {
                 layered.addComponent(position==Component.TOP ? BorderLayout.NORTH : BorderLayout.SOUTH, c);
                 updateStatus();
             }
+            if(position == Component.BOTTOM && f.getInvisibleAreaUnderVKB() > 0) {
+                Style s = c.getAllStyles();
+                s.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+                s.setMarginBottom(f.getInvisibleAreaUnderVKB());
+            }
             return c;
         }
         return null;
@@ -754,14 +793,38 @@ public class ToastBar {
      * @param msg the message
      * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
      * @param timeout the timeout value in milliseconds
+     * @param listener the action to perform when the ToastBar is tapped
      */
-    public static void showMessage(String msg, char icon, int timeout) {
+    public static void showMessage(String msg, char icon, int timeout, ActionListener listener) {
         ToastBar.Status s = ToastBar.getInstance().createStatus();
         Style stl = UIManager.getInstance().getComponentStyle(s.getMessageUIID());
         s.setIcon(FontImage.createMaterial(icon, stl, 4));
         s.setMessage(msg);
+        if (listener != null) {
+            s.setListener(listener);
+        }
         s.setExpires(timeout);
         s.show();
+    }
+
+    /**
+     * Simplifies a common use case of showing a message with an icon that fades out after a few seconds
+     * @param msg the message
+     * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
+     * @param timeout the timeout value in milliseconds
+     */
+    public static void showMessage(String msg, char icon, int timeout) {
+        showMessage(msg, icon, timeout, null);
+    }
+
+    /**
+     * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
+     * @param msg the message
+     * @param icon the material icon to show from {@link com.codename1.ui.FontImage}
+     * @param listener the action to perform when the ToastBar is tapped
+     */
+    public static void showMessage(String msg, char icon, ActionListener listener) {
+        showMessage(msg, icon, 3500, listener);
     }
 
     /**
@@ -837,7 +900,8 @@ public class ToastBar {
                 NetworkManager.getInstance().removeErrorListener(errorListener);
                 NetworkManager.getInstance().removeProgressListener(progListener[0]);
                 s.clear();
-                if (onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
+                int rc = cr.getResponseCode();
+                if (onSuccess != null && (rc == 200 || rc == 201 || rc == 202)) {
                     onSuccess.onSucess(evt);
                 }
             }

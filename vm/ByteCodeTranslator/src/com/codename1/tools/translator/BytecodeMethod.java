@@ -31,6 +31,7 @@ import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.CustomIntruction;
 import com.codename1.tools.translator.bytecodes.CustomInvoke;
 import com.codename1.tools.translator.bytecodes.CustomJump;
+import com.codename1.tools.translator.bytecodes.DupExpression;
 import com.codename1.tools.translator.bytecodes.Field;
 import com.codename1.tools.translator.bytecodes.IInc;
 import com.codename1.tools.translator.bytecodes.Instruction;
@@ -1072,8 +1073,13 @@ public class BytecodeMethod {
         boolean astoreCalls = false;
         boolean hasInstructions = false; 
         
+        boolean hasTryCatch = false;
         for (int iter=0; iter < instructionCount - 1; iter++) {
             Instruction current = instructions.get(iter);
+            if (current instanceof TryCatch) {
+                hasTryCatch = true;
+            }
+            current.setMethod(this);
             if (current.isOptimized()) {
                 continue;
             }
@@ -1100,115 +1106,7 @@ public class BytecodeMethod {
 
             int currentOpcode = current.getOpcode();
             int nextOpcode = next.getOpcode();
-            if(!staticMethod) {
-                // check if this is an aload 0 followed by a get field common for a getter
-                if(currentOpcode == Opcodes.ALOAD && iter + 1 < instructionCount) {
-                    VarOp l = (VarOp)current;
-                    if(nextOpcode == Opcodes.GETFIELD) {
-                        if(l.getIndex() == 0) {
-                            // this is a getter for a field!
-                            // Check if this is also a return in which case we have a simple getter
-                            if(iter + 2 < instructionCount) {
-                                Instruction isThisReturn = instructions.get(iter + 2);
-                                int op = isThisReturn.getOpcode();
-                                if(op == Opcodes.RETURN || op == Opcodes.ARETURN || op == Opcodes.IRETURN || op == Opcodes.LRETURN ||
-                                        op == Opcodes.FRETURN || op == Opcodes.DRETURN) {
-                                    instructions.remove(iter);
-                                    instructions.remove(iter);
-                                    instructions.remove(iter);
-                                    String s = ((Field)next).getFieldFromThis();
-                                    if(((Field)next).isObject()) {
-                                        String varName = "returnValObj" + varCounter;
-                                        varCounter++;
-                                        if(synchronizedMethod) {
-                                            if(staticMethod) {
-                                                instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
-                                                        "    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    " +
-                                                        "RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
-                                            } else {
-                                                instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
-                                                        "    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n" + 
-                                                        "    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
-                                            }
-                                        } else {
-                                            instructions.add(iter, new CustomIntruction("if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    return " + varName + ";\n", 
-                                                        "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    JAVA_OBJECT " + varName + " = " + s + ";\n    " +
-                                                        "    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + ");\n", dependentClasses));
-                                        }
-                                        iter = 0;
-                                        instructionCount = instructions.size();
-                                        continue;
-                                    }
-                                    instructions.add(iter, new CustomIntruction("if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    return " + s + ";\n", 
-                                            "if(!__cn1ThisObject) { throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); }\n    RETURN_AND_RELEASE_FROM_METHOD(" + s + ", " + maxLocals + ");\n", dependentClasses));
-                                    iter = 0;
-                                    instructionCount = instructions.size();
-                                    continue;
-                                } else {
-                                    // this isn't followed by a return just store the field value
-                                    instructions.remove(iter);
-                                    instructions.remove(iter);
-                                    final Field finalNext = (Field)next;
-                                    finalNext.setUseThis(true);
-                                    String s = ((Field)next).pushFieldFromThis();
-                                    instructions.add(iter, new CustomIntruction(s, s, dependentClasses, new AssignableExpression() {
-
-                                        @Override
-                                        public boolean assignTo(String varName, StringBuilder sb) {
-                                            return finalNext.assignTo(varName, sb);
-                                        }
-                                        
-                                    }));
-                                    iter = 0;
-                                    instructionCount = instructions.size();
-                                    continue;
-                                }
-                            }
-                        } 
-                    } else {
-                        if(iter + 2 < instructionCount && !astoreCalls && ((VarOp)current).getIndex() == 0) {
-                            // optimize a setter
-                            Instruction isThisPutField = instructions.get(iter + 2);
-                            boolean isReturn = false;
-                            if(iter + 3 == instructionCount - 1) {
-                                Instruction isThisReturn = instructions.get(iter + 3);
-                                isReturn = isThisReturn.getOpcode() == Opcodes.RETURN;
-                            }
-                            
-                            if(isThisPutField.getOpcode() == Opcodes.PUTFIELD) {
-                                switch(nextOpcode) {
-                                    case Opcodes.LLOAD:
-                                    case Opcodes.DLOAD:
-                                    case Opcodes.FLOAD:
-                                    case Opcodes.ILOAD:
-                                    case Opcodes.ALOAD:
-                                        int localOff = localsOffsetToArgOffset(((VarOp)next).getIndex());
-                                        if(localOff < 0) {
-                                            continue;
-                                        }
-                                        instructions.remove(iter);
-                                        instructions.remove(iter);
-                                        instructions.remove(iter);
-                                        
-                                        // only in the case of a completely blank setter...
-                                        if(isReturn && iter == 0) {
-                                            instructions.remove(iter);
-                                        }
-                                        String s = ((Field)isThisPutField).setFieldFromThis(localOff);
-                                        instructions.add(iter, new CustomIntruction(s, s, dependentClasses));
-                                        iter = 0;
-                                        instructionCount = instructions.size();
-                                        continue;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            
             
             if (ArithmeticExpression.isArithmeticOp(current)) {
                 int addedIndex = ArithmeticExpression.tryReduce(instructions, iter);
@@ -1218,6 +1116,17 @@ public class BytecodeMethod {
                     continue;
                 }
             }
+            
+            if (current instanceof Field) {
+                int newIter = Field.tryReduce(instructions, iter);
+                if (newIter >= 0) {
+                    iter = newIter;
+                    instructionCount = instructions.size();
+                    continue;
+                }
+            }
+            
+            
             
             switch(currentOpcode) {
                 
@@ -1231,6 +1140,15 @@ public class BytecodeMethod {
                     break;
                 }
                    
+                case Opcodes.DUP: {
+                    int newIter = DupExpression.tryReduce(instructions, iter);
+                    if (newIter >= 0) {
+                        iter = newIter;
+                        instructionCount = instructions.size();
+                        continue;
+                    }
+                    break;
+                }
                 
                 case Opcodes.POP: {
                     if (iter > 0) {
@@ -1264,15 +1182,241 @@ public class BytecodeMethod {
                                 instructions.remove(iter-1);
                                 instructions.remove(iter-1);
                                 instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
-                                iter = 0;
+                                iter = iter-1;
                                 instructionCount = instructions.size();
+                                continue;
                             }
                             
+                        } else if (prev instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)prev;
+                            StringBuilder sb = new StringBuilder();
+                            if (currentVarOp.assignFrom(inv, sb)) {
+                                instructions.remove(iter-1);
+                                instructions.remove(iter-1);
+                                instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
+                                iter = iter-1;
+                                instructionCount = instructions.size();
+                                continue;
+                            }
                         }
                     }
                     
                     break;
                 }
+                
+                case Opcodes.IRETURN:
+                case Opcodes.FRETURN:
+                case Opcodes.ARETURN:
+                case Opcodes.LRETURN:
+                case Opcodes.DRETURN: {
+                    if (iter > 0 && current instanceof BasicInstruction) {
+                        Instruction prev = instructions.get(iter-1);
+                        if (prev instanceof AssignableExpression) {
+                            AssignableExpression expr = (AssignableExpression)prev;
+                            StringBuilder sb= new StringBuilder();
+                            if (expr.assignTo(null, sb)) {
+                                instructions.remove(iter-1);
+                                instructions.remove(iter-1);
+                                String exprString = sb.toString().trim();
+                                String retVal = exprString;
+                                sb.setLength(0);
+                                if (!prev.isConstant()) {
+                                    sb.append("\n{\n    ");
+                                    switch (currentOpcode) {
+                                        case Opcodes.IRETURN:
+                                            sb.append("JAVA_INT");
+                                            break;
+                                        case Opcodes.FRETURN:
+                                            sb.append("JAVA_FLOAT");
+                                            break;
+                                        case Opcodes.ARETURN:
+                                            sb.append("JAVA_OBJECT");
+                                            break;
+                                        case Opcodes.LRETURN:
+                                            sb.append("JAVA_LONG");
+                                            break;
+                                        case Opcodes.DRETURN:
+                                            sb.append("JAVA_DOUBLE");
+                                            break;
+                                    }
+                                    sb.append(" ___returnValue=").append(exprString).append(";\n");
+                                    retVal = "___returnValue";
+                                }
+                                if(synchronizedMethod) {
+                                    if(staticMethod) {
+                                        sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                        sb.append(getClsName());
+                                        sb.append(");\n");
+                                    } else {
+                                        sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                    }
+                                }
+                                if(hasTryCatch) {
+                                    sb.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return ").append(retVal).append(";\n");
+                                } else {
+                                    sb.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return ").append(retVal).append(";\n");
+                                }
+                                if (!prev.isConstant()) {
+                                    sb.append("}\n");
+                                }
+                                
+                                instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
+                                iter--;
+                                instructionCount = instructions.size();
+                                continue;
+                                
+                            }
+                        } else if (prev instanceof CustomInvoke) {
+                            
+                            CustomInvoke expr = (CustomInvoke)prev;
+                            String returnType = expr.getReturnValue();
+                            if (returnType != null && !"JAVA_OBJECT".equals(returnType)) {
+                                // We can't safely return a JAVA_OBJECT directly because it needs to be added 
+                                // to the stack for the GC
+                                StringBuilder sb= new StringBuilder();
+                                if (expr.appendExpression(sb)) {
+                                    instructions.remove(iter-1);
+                                    instructions.remove(iter-1);
+                                    String exprString = sb.toString().trim();
+                                    String retVal = exprString;
+                                    sb.setLength(0);
+                                    if (!expr.isConstant()) {
+                                        
+                                        sb.append("\n{\n    ");
+                                        switch (currentOpcode) {
+                                            case Opcodes.IRETURN:
+                                                sb.append("JAVA_INT");
+                                                break;
+                                            case Opcodes.FRETURN:
+                                                sb.append("JAVA_FLOAT");
+                                                break;
+                                            case Opcodes.ARETURN:
+                                                sb.append("JAVA_OBJECT");
+                                                break;
+                                            case Opcodes.LRETURN:
+                                                sb.append("JAVA_LONG");
+                                                break;
+                                            case Opcodes.DRETURN:
+                                                sb.append("JAVA_DOUBLE");
+                                                break;
+                                        }
+                                    
+                                        sb.append(" ___returnValue=").append(exprString).append(";\n");
+                                        retVal = "___returnValue";
+                                    }
+                                    if(synchronizedMethod) {
+                                        if(staticMethod) {
+                                            sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+                                            sb.append(getClsName());
+                                            sb.append(");\n");
+                                        } else {
+                                            sb.append("    monitorExit(threadStateData, __cn1ThisObject);\n");
+                                        }
+                                    }
+                                    if(hasTryCatch) {
+                                        sb.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return ").append(retVal).append(";\n");
+                                    } else {
+                                        sb.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return ").append(retVal).append(";\n");
+                                    }
+                                    if (!expr.isConstant()) {
+                                        sb.append("}\n");
+                                    }
+                                    
+
+                                    instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));
+                                    iter--;
+                                    instructionCount = instructions.size();
+                                    continue;
+
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+                
+                case Opcodes.BASTORE:
+                case Opcodes.SASTORE:
+                case Opcodes.CASTORE:
+                case Opcodes.AASTORE:
+                case Opcodes.IASTORE:
+                case Opcodes.DASTORE:
+                case Opcodes.LASTORE:
+                case Opcodes.FASTORE: {
+                    if (iter > 2 && current instanceof BasicInstruction) {
+                        StringBuilder devNull = new StringBuilder();
+                        String arrayLiteral = null;
+                        String indexLiteral = null;
+                        String valueLiteral = null;
+                        Instruction prev3 = instructions.get(iter-3);
+                        if (prev3 instanceof AssignableExpression) {
+                            if (((AssignableExpression)prev3).assignTo(null, devNull)) {
+                                arrayLiteral = devNull.toString().trim();
+                                
+                            }
+                        }
+                        devNull.setLength(0);
+                        Instruction prev2 = instructions.get(iter-2);
+                        if (prev2 instanceof AssignableExpression) {
+                            if (((AssignableExpression)prev2).assignTo(null, devNull)) {
+                                indexLiteral = devNull.toString().trim();
+                            }
+                        }
+                        devNull.setLength(0);
+                        Instruction prev1 = instructions.get(iter-1);
+                        
+                        if (prev1 instanceof AssignableExpression) {
+                            if (((AssignableExpression)prev1).assignTo(null, devNull)) {
+                                valueLiteral = devNull.toString().trim();
+                            }
+                        } else if (prev1 instanceof CustomInvoke) {
+                            devNull.setLength(0);
+                            if (((CustomInvoke)prev1).appendExpression(devNull)) {
+                                valueLiteral = devNull.toString().trim();
+                            }
+                        }
+                        
+                        if (arrayLiteral != null  && indexLiteral != null && valueLiteral != null) {
+                            String elementType = null;
+                            switch (current.getOpcode()) {
+                                case Opcodes.AASTORE:
+                                    elementType = "OBJECT";break;
+                                case Opcodes.IASTORE:
+                                    elementType = "INT"; break;
+                                case Opcodes.DASTORE:
+                                    elementType = "DOUBLE"; break;
+                                    
+                                case Opcodes.LASTORE:
+                                    elementType = "LONG"; break;
+                                case Opcodes.FASTORE:
+                                    elementType = "FLOAT"; break;
+                                case Opcodes.CASTORE:
+                                    elementType = "CHAR";break;
+                                case Opcodes.BASTORE:
+                                    elementType = "BYTE"; break;
+                                case Opcodes.SASTORE:
+                                    elementType = "SHORT"; break;
+                                    
+                            }
+                            if (elementType == null) {
+                                break;
+                            }
+                            
+                            instructions.remove(iter-3);
+                            instructions.remove(iter-3);
+                            instructions.remove(iter-3);
+                            instructions.remove(iter-3);
+                            String code = "    CN1_SET_ARRAY_ELEMENT_"+elementType+"(" + arrayLiteral + ", "+indexLiteral+", "+valueLiteral+");\n";
+                            instructions.add(iter-3, new CustomIntruction(code, code, dependentClasses));
+                            iter = iter-3;
+                            instructionCount = instructions.size();
+                            continue;
+                        }
+                    }
+                    
+                    break;
+                }
+                    
                 
                 case Opcodes.FALOAD:
                 case Opcodes.BALOAD:
@@ -1315,13 +1459,25 @@ public class BytecodeMethod {
                         if (leftArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
                             if (((AssignableExpression)leftArg).assignTo(null, sb)) {
-                                leftLiteral = sb.toString();
+                                leftLiteral = sb.toString().trim();
+                            }
+                        } else if (leftArg instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)leftArg;
+                            StringBuilder sb = new StringBuilder();
+                            if (!"JAVA_OBJECT".equals(inv.getReturnValue()) && inv.appendExpression(sb)) {
+                                leftLiteral = sb.toString().trim();
                             }
                         }
                         if (rightArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
                             if (((AssignableExpression)rightArg).assignTo(null, sb)) {
-                                rightLiteral = sb.toString();
+                                rightLiteral = sb.toString().trim();
+                            }
+                        } else if (rightArg instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)rightArg;
+                            StringBuilder sb = new StringBuilder();
+                            if (!"JAVA_OBJECT".equals(inv.getReturnValue()) && inv.appendExpression(sb)) {
+                                rightLiteral = sb.toString().trim();
                             }
                         }
                         
@@ -1392,7 +1548,13 @@ public class BytecodeMethod {
                         if (leftArg instanceof AssignableExpression) {
                             StringBuilder sb = new StringBuilder();
                             if (((AssignableExpression)leftArg).assignTo(null, sb)) {
-                                leftLiteral = sb.toString();
+                                leftLiteral = sb.toString().trim();
+                            }
+                        } else if (leftArg instanceof CustomInvoke) {
+                            CustomInvoke inv = (CustomInvoke)leftArg;
+                            StringBuilder sb = new StringBuilder();
+                            if (inv.appendExpression(sb)) {
+                                leftLiteral = sb.toString().trim();
                             }
                         }
                         
@@ -1441,138 +1603,10 @@ public class BytecodeMethod {
                     }
                 break;
                 }   
-                    /* Try to optimize if statements that just use constants
-                   and local variables so that they don't need the intermediate
-                   push and pop from the stack.
-                */
-                case Opcodes.IAND:
-                case Opcodes.IOR:
-                case Opcodes.ISHR:
-                case Opcodes.ISHL:
-                case Opcodes.IMUL:
-                case Opcodes.IDIV:
-                case Opcodes.IADD:
-                case Opcodes.ISUB: {
+                   
                 
-                    if (iter > 1) {
-                        Instruction leftArg = instructions.get(iter-2);
-                        Instruction rightArg = instructions.get(iter-1);
-                        Instruction storeOp = null;
-                        if (iter + 1 < instructions.size()) {
-                            storeOp = instructions.get(iter+1);
-                        }
-                        String leftLiteral = null;
-                        String rightLiteral = null;
-                        String storeLiteral = null;
-                        switch (leftArg.getOpcode()) {
-                            case Opcodes.ICONST_0:
-                                leftLiteral = "0"; break;
-                            case Opcodes.ICONST_1:
-                                leftLiteral = "1"; break;
-                            case Opcodes.ICONST_2:
-                                leftLiteral = "2"; break;
-                            case Opcodes.ICONST_3:
-                                leftLiteral = "3"; break;
-                            case Opcodes.ICONST_4:
-                                leftLiteral = "4"; break;
-                            case Opcodes.ICONST_5:
-                                leftLiteral = "5"; break;
-                            case Opcodes.ICONST_M1:
-                                leftLiteral = "-1"; break;
-                            case Opcodes.ILOAD: {
-                                VarOp varLeft = (VarOp)leftArg;
-                                leftLiteral = "ilocals_"+varLeft.getIndex()+"_";
-                                break;
-                            }
-                                
-                        }
-                        
-                        switch (rightArg.getOpcode()) {
-                            case Opcodes.ICONST_0:
-                                rightLiteral = "0"; break;
-                            case Opcodes.ICONST_1:
-                                rightLiteral = "1"; break;
-                            case Opcodes.ICONST_2:
-                                rightLiteral = "2"; break;
-                            case Opcodes.ICONST_3:
-                                rightLiteral = "3"; break;
-                            case Opcodes.ICONST_4:
-                                rightLiteral = "4"; break;
-                            case Opcodes.ICONST_5:
-                                rightLiteral = "5"; break;
-                            case Opcodes.ICONST_M1:
-                                rightLiteral = "-1"; break;
-                            case Opcodes.ILOAD: {
-                                VarOp varRight = (VarOp)rightArg;
-                                rightLiteral = "ilocals_"+varRight.getIndex()+"_";
-                                break;
-                            }
-                                
-                        }
-                        
-                        if (storeOp != null) {
-                            switch (storeOp.getOpcode()) {
-                                case Opcodes.ISTORE: {
-                                    if (storeOp instanceof VarOp) {
-                                        VarOp varStore = (VarOp)storeOp;
-                                        storeLiteral = "ilocals_"+varStore.getIndex()+"_ = ";
-                                    }
-                                }
-                                    
-                            }
-                        }
-                        if (rightLiteral != null && leftLiteral != null) {
-                            if (storeLiteral != null) {
-                                instructions.remove(iter+1);
-                                
-                            }
-                            instructions.remove(iter-2);
-                            instructions.remove(iter-2);
-                            instructions.remove(iter-2);
-                            
-                            iter-=2;
-                            instructionCount -= 2;
-                            StringBuilder sb = new StringBuilder();
-                            String operator = null;
-                            String opName = null;
-                            switch (currentOpcode) {
-                                case Opcodes.IMUL:
-                                    operator = "*"; opName = "IMUL"; break;
-                                case Opcodes.IDIV:
-                                    operator = "/"; opName = "IDIV"; break;
-                                case Opcodes.IADD:
-                                    operator = "+"; opName = "IADD"; break;
-                                case Opcodes.ISUB:
-                                    operator = "-"; opName = "ISUB"; break;
-                                case Opcodes.IAND:
-                                    operator = "&"; opName = "IAND"; break;
-                                case Opcodes.IOR:
-                                    operator = "|"; opName = "IOR"; break;
-                                case Opcodes.ISHR:
-                                    operator = ">>"; opName = "ISHR"; break;
-                                case Opcodes.ISHL:
-                                    operator = "<<"; opName = "ISHL"; break;
-                                
-                                default :
-                                    throw new RuntimeException("Invalid operator during optimization of binary integer operator");
-                            }
-                            
-                            if (storeLiteral != null) {
-                                sb.append("    "+storeLiteral);
-                            } else {
-                                sb.append("    (*SP).type = CN1_TYPE_INT; (*(SP++)).data.i = ");
-                            }
-                            sb.append(leftLiteral).append(operator).append(rightLiteral)
-                                    .append("; /* ").append(opName).append(" Optimized */\n");
-                            Instruction newInst = new CustomIntruction(sb.toString(), sb.toString(), dependentClasses);
-                            newInst.setOptimized(true);
-                            instructions.add(iter, newInst);
-                            instructionCount = instructions.size();
-                        }
-                        
-                    }
-                break;
-                }
+                
+                
                 
                 case Opcodes.INVOKEVIRTUAL:
                 case Opcodes.INVOKESTATIC:
@@ -1588,15 +1622,31 @@ public class BytecodeMethod {
                         //}
                         if (iter >= numArgs) {
                             String[] argLiterals = new String[numArgs];
+                            StringBuilder devNull = new StringBuilder();
                             for (int i=0; i<numArgs; i++) {
+                                devNull.setLength(0);
                                 Instruction instr = instructions.get(iter-numArgs+i);
-                                if (instr instanceof ArithmeticExpression) {
-                                    argLiterals[i] = ((ArithmeticExpression)instr).getExpressionAsString();
+                                if (instr instanceof AssignableExpression && ((AssignableExpression)instr).assignTo(null, devNull)) {
+                                    argLiterals[i] = devNull.toString().trim();
+                                } else if (instr instanceof CustomInvoke) {
+                                    CustomInvoke cinv = (CustomInvoke)instr;
+                                    devNull.setLength(0);
+                                    if (!"JAVA_OBJECT".equals(cinv.getReturnValue()) && cinv.appendExpression(devNull)) {
+                                        // We can't add invocations that return objects directly
+                                        // because they need to be added to the stack for GC
+                                        argLiterals[i] = devNull.toString().trim();
+                                    }
+                                } else if (instr instanceof ArithmeticExpression) {
+                                    argLiterals[i] = ((ArithmeticExpression)instr).getExpressionAsString().trim();
                                 } else if (instr instanceof VarOp) {
                                     VarOp var = (VarOp)instr;
                                     switch (instr.getOpcode()) {
                                         case Opcodes.ALOAD: {
-                                            argLiterals[i] = "locals["+var.getIndex()+"].data.o";
+                                            if (!isStatic() && var.getIndex() == 0) {
+                                                argLiterals[i] = "__cn1ThisObject";
+                                            } else {
+                                                argLiterals[i] = "locals["+var.getIndex()+"].data.o";
+                                            }
                                             break;
                                         }
                                         case Opcodes.ILOAD: {
@@ -1761,12 +1811,18 @@ public class BytecodeMethod {
                                         }
                                         
                                     } else if (ldTarget instanceof CustomInvoke) {
-                                        // TODO
+                                        // WE Can't pass a custom invoke as the target directly
+                                        // because it the return value needs to be added to the 
+                                        // stack for the GC
                                     } else {
                                         switch (ldTarget.getOpcode()) {
                                             case Opcodes.ALOAD: {
                                                 VarOp v = (VarOp)ldTarget;
-                                                newInvoke.setTargetObjectLiteral("locals["+v.getIndex()+"].data.o");
+                                                if (isStatic() && v.getIndex() == 0) {
+                                                    newInvoke.setTargetObjectLiteral("__cn1ThisObject");
+                                                } else {
+                                                    newInvoke.setTargetObjectLiteral("locals["+v.getIndex()+"].data.o");
+                                                }
                                                 instructions.remove(iter-numArgs-1);
                                                 newIter--;
                                                 break;
@@ -1787,193 +1843,7 @@ public class BytecodeMethod {
                     break;
                 }
                     
-                case Opcodes.ICONST_0:
-                    if(constReturn(Opcodes.IRETURN, 0, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                /*case Opcodes.ACONST_NULL:
-                    if(constReturn(Opcodes.ACONST_NULL, 0, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;*/
-                case Opcodes.ICONST_1:
-                    if(constReturn(Opcodes.IRETURN, 1, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.ICONST_2:
-                    if(constReturn(Opcodes.IRETURN, 2, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.ICONST_3:
-                    if(constReturn(Opcodes.IRETURN, 3, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.ICONST_4:
-                    if(constReturn(Opcodes.IRETURN, 4, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.ICONST_5:
-                    if(constReturn(Opcodes.IRETURN, 5, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.ICONST_M1:
-                    if(constReturn(Opcodes.IRETURN, -1, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.LCONST_0:
-                    if(constReturn(Opcodes.LRETURN, 0, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.LCONST_1:
-                    if(constReturn(Opcodes.LRETURN, 1, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.FCONST_0:
-                    if(constReturn(Opcodes.FRETURN, 0, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.FCONST_1:
-                    if(constReturn(Opcodes.FRETURN, 1, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.DCONST_0:
-                    if(constReturn(Opcodes.DRETURN, 0, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.DCONST_1:
-                    if(constReturn(Opcodes.DRETURN, 1, nextOpcode, iter)) {
-                        iter = 0;
-                        instructionCount = instructions.size();
-                        continue;
-                    }
-                    break;
-                case Opcodes.LDC:
-                    Ldc ldic = (Ldc)current;
-                    switch(nextOpcode) {
-                        case Opcodes.ARETURN:
-                            if(ldic.getValue() instanceof String) {
-                                instructions.remove(iter);
-                                instructions.remove(iter);
-                                String varName = "returnValObj" + varCounter;
-                                varCounter++;
-                                int s = Parser.addToConstantPool((String)ldic.getValue());
-                                //declaration += "    JAVA_OBJECT " + varName + ";\n";
-                                if(synchronizedMethod) {
-                                    if(staticMethod) {
-                                        instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                                "    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    return " + varName + "; }\n", 
-                                                    "    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                                            "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    " +
-                                                    "RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
-                                    } else {
-                                        instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                                "    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    return " + varName + "; }\n", 
-                                                "    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                                "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n" +
-                                                "    RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
-                                    }
-                                } else {
-                                    instructions.add(iter, new CustomIntruction("    { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    return " + varName + "; }\n", 
-                                                "   { JAVA_OBJECT  " + varName + " = STRING_FROM_CONSTANT_POOL_OFFSET(" + s + ");\n    " +
-                                                "RETURN_AND_RELEASE_FROM_METHOD(" + varName + ", " + maxLocals + "); }\n", dependentClasses));
-                                }
-                                iter = 0;
-                                instructionCount = instructions.size();
-                            }
-                            continue;
-                        case Opcodes.DRETURN:
-                        case Opcodes.FRETURN:
-                        case Opcodes.IRETURN:
-                            instructions.remove(iter);
-                            instructions.remove(iter);
-                            Number n = (Number) ldic.getValue();
-                            String asString = n.toString();
-                            if (n instanceof Float) {
-                                Float f = (Float)n;
-                                if(f.isInfinite()) {
-                                    if(f.floatValue() > 0) {
-                                        asString = "1.0f / 0.0f";
-                                    } else {
-                                        asString = "-1.0f / 0.0f";
-                                    }
-                                } else {
-                                    if(f.isNaN()) {
-                                        asString = "0.0/0.0";
-                                    }
-                                }
-                            } else if (n instanceof Double) {
-                                Double d = (Double)n;
-                                if(d.isInfinite()) {
-                                    if(d.floatValue() > 0) {
-                                        asString = "1.0 / 0.0";
-                                    } else {
-                                        asString = "-1.0 / 0.0";
-                                    }
-                                } else {
-                                    if(d.isNaN()) {
-                                        asString = "0.0/0.0";
-                                    }
-                                }
-                            }                            
-                            if(synchronizedMethod) {
-                                if(staticMethod) {
-                                    instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                            "    return " + asString + ";\n",
-                                            "    monitorExit(threadStateData, (JAVA_OBJECT)&class__" + clsName + ");\n" +
-                                            "    RETURN_AND_RELEASE_FROM_METHOD(" + asString + ", " + maxLocals + ")\n", dependentClasses));
-                                } else {
-                                    instructions.add(iter, new CustomIntruction("    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                            "    return " + asString + ";\n",
-                                            "    monitorExit(threadStateData, __cn1ThisObject);\n" +
-                                            "    RETURN_AND_RELEASE_FROM_METHOD(" + asString + ", " + maxLocals + ")\n", dependentClasses));
-                                }
-                            } else {
-                                instructions.add(iter, new CustomIntruction("    return " + asString + ";\n",
-                                        "    RETURN_AND_RELEASE_FROM_METHOD(" + asString + ", " + maxLocals + ")\n", dependentClasses));
-                            }
-                            instructionCount = instructions.size();
-                            iter = 0;
-                            continue;
-                    }                    
-                    break;
+                
             }
             astoreCalls = astoreCalls || currentOpcode == Opcodes.ASTORE || currentOpcode == Opcodes.ISTORE || 
                     currentOpcode == Opcodes.LSTORE || currentOpcode == Opcodes.DSTORE || currentOpcode == Opcodes.FSTORE;

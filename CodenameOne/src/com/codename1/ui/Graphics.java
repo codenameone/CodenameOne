@@ -442,12 +442,15 @@ public final class Graphics {
      * 
      * @param x the x coordinate of the upper-left corner of the arc to be filled.
      * @param y the y coordinate of the upper-left corner of the arc to be filled.
-     * @param width the width of the arc to be filled.
-     * @param height the height of the arc to be filled.
+     * @param width the width of the arc to be filled, must be 1 or more.
+     * @param height the height of the arc to be filled, must be 1 or more.
      * @param startAngle the beginning angle.
      * @param arcAngle the angular extent of the arc, relative to the start angle.
      */
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
+        if(width < 1 || height < 1) {
+            throw new IllegalArgumentException("Width & Height of fillAsrc must be greater than 0");
+        }
         impl.fillArc(nativeGraphics, xTranslate + x, yTranslate + y, width, height, startAngle, arcAngle);
     }
     

@@ -48,6 +48,7 @@ class SearchBar extends Toolbar {
         this.parent = parent;
         this.iconSize = iconSize;
         search = new TextField();
+        search.putClientProperty("searchField", Boolean.TRUE);
         search.setUIID("TextFieldSearch");
         Image img;
         if(iconSize > 0) {
@@ -55,7 +56,8 @@ class SearchBar extends Toolbar {
         } else {
             img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TextHintSearch"));
         }
-        Label hint = new Label("Search", img);
+        String s = getUIManager().localize("m.search", "Search");
+        Label hint = new Label(s, img);
         hint.setUIID("TextHintSearch");
         search.setHintLabelImpl(hint);
         

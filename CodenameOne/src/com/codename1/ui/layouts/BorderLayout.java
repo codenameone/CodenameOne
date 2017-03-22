@@ -688,7 +688,12 @@ public class BorderLayout extends Layout {
      * @return the created component
      */
     public static Container centerEastWest(Component center, Component east, Component west) {
-        Container c = center(center);
+        Container c;
+        if(center != null) {
+            c = center(center);
+        } else {
+            c = new Container(new BorderLayout());
+        }
         if(east != null) {
             c.add(BorderLayout.EAST, east);
         }
@@ -707,7 +712,12 @@ public class BorderLayout extends Layout {
      * @return the created component
      */
     public static Container centerAbsoluteEastWest(Component center, Component east, Component west) {
-        Container c = centerAbsolute(center);
+        Container c;
+        if(center != null) {
+            c = centerAbsolute(center);
+        } else {
+            c = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE));
+        }
         if(east != null) {
             c.add(BorderLayout.EAST, east);
         }
