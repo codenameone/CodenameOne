@@ -41,5 +41,13 @@ public class Exception extends java.lang.Throwable{
     public Exception(java.lang.String s){
          super(s);
     }
+    
+    public Exception(Throwable cause) {
+        super(cause);
+    }
+    
+    public Exception(java.lang.String s, Throwable cause) {
+        super(s, cause);
+    }
 
 }

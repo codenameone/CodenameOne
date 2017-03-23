@@ -42,5 +42,22 @@ public class RuntimeException extends java.lang.Exception{
     public RuntimeException(java.lang.String s){
          //TODO codavaj!!
     }
+    
+    /**
+     * Constructs a RuntimeException with specified cause.
+     * @param cause The cause of the exception.
+     */
+    public RuntimeException(Throwable cause) {
+        //TODO codavaj!!
+    }
+    
+    /**
+     * Constructs a RuntimeException with the specified detail message and cause.
+     * s - the detail message.
+     * cause The cause of the exception.
+     */
+    public RuntimeException(java.lang.String s, Throwable cause) {
+        //TODO codavaj!!
+    }
 
 }

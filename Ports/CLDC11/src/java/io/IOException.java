@@ -42,5 +42,23 @@ public class IOException extends java.lang.Exception{
     public IOException(java.lang.String s){
          //TODO codavaj!!
     }
+    
+    /**
+     * Constructs an IOException with the specified cause.
+     * @param cause 
+     */
+    public IOException(Throwable cause) {
+        //TODO codavaj!!
+    }
+    
+    /**
+     * Constructs an IOException with the specified detail message and cause. The error message string s can later be retrieved by the
+     * method of class java.lang.Throwable.
+     * s - the detail message.
+     * cause - The cause.
+     */
+    public IOException(java.lang.String s, Throwable cause) {
+        //TODO codavaj!!
+    }
 
 }
