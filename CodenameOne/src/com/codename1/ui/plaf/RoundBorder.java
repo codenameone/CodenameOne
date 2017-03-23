@@ -343,7 +343,7 @@ public class RoundBorder extends Border {
                 tg.translate(-iter, -iter);
             }
             if(Display.getInstance().isGaussianBlurSupported()) {
-                Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur);
+                Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur/2);
                 target = Image.createImage(w, h, 0);
                 tg = target.getGraphics();
                 tg.drawImage(blured, 0, 0);
