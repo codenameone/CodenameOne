@@ -781,6 +781,9 @@ public class ToastBar {
         } else {
             Form f = c.getComponentForm();
             if(Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()){
+                if (this.position == Component.BOTTOM) {
+                    c.setY(c.getY() + c.getHeight());
+                }
                 $(c).slideUpAndWait(500);
             } else {
                 c.getParent().revalidate();
