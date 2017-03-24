@@ -753,29 +753,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } else {
             metrics = getContext().getResources().getDisplayMetrics();
         }
-        switch (metrics.densityDpi) {
-            case DisplayMetrics.DENSITY_LOW:
-                return Display.DENSITY_LOW;
-            case DisplayMetrics.DENSITY_HIGH:
-            case 213: // DENSITY_TV 
-                return Display.DENSITY_HIGH;
-            case DisplayMetrics.DENSITY_XHIGH:
-                return Display.DENSITY_VERY_HIGH;
-            case 400: // DisplayMetrics.DENSITY_400
-            case 420: // DisplayMetrics.DENSITY_420
-            case 480: // DisplayMetrics.DENSITY_XXHIGH
-                return Display.DENSITY_HD;
-            case 560: // DisplayMetrics.DENSITY_560
-                return Display.DENSITY_560;
-            case 640: // DisplayMetrics.DENSITY_XXXHIGH 
-                return Display.DENSITY_2HD;
-                 
-            default:
-                if(metrics.densityDpi > 640) {
-                    return Display.DENSITY_4K;
-                }
-                return Display.DENSITY_MEDIUM;
+        
+        if(metrics.densityDpi < 213) {
+            return Display.DENSITY_LOW;
         }
+        
+        // 213 == TV
+        if(metrics.densityDpi >= 213 &&  metrics.densityDpi <= DisplayMetrics.DENSITY_HIGH) {
+            return Display.DENSITY_HIGH;
+        }
+
+        if(metrics.densityDpi > DisplayMetrics.DENSITY_HIGH && metrics.densityDpi < 400) {
+            return Display.DENSITY_VERY_HIGH;
+        }
+
+        if(metrics.densityDpi >= 400 && metrics.densityDpi < 560) {
+            return Display.DENSITY_HD;
+        }
+        
+        if(metrics.densityDpi >= 560 && metrics.densityDpi <= 640) {
+            return Display.DENSITY_2HD;
+        }
+        if(metrics.densityDpi > 640) {
+            return Display.DENSITY_4K;
+        }
+
+        return Display.DENSITY_MEDIUM;
     }
 
     /**

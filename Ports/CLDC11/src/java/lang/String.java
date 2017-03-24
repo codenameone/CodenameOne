@@ -31,7 +31,7 @@ package java.lang;
  * The Java language provides special support for the string concatenation operator (+), and for conversion of other objects to strings. String concatenation is implemented through the StringBuffer class and its append method. String conversions are implemented through the method toString, defined by Object and inherited by all classes in Java. For additional information on string concatenation and conversion, see Gosling, Joy, and Steele, The Java Language Specification.
  * Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(char[]), StringBuffer.append(char[], int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
  */
-public final class String{
+public final class String implements CharSequence {
     /**
      * Initializes a newly created String object so that it represents an empty character sequence.
      */
@@ -488,6 +488,10 @@ public final class String{
      */
     public static java.lang.String valueOf(java.lang.Object obj){
         return null; //TODO codavaj!!
+    }
+
+    public CharSequence subSequence(int start, int end) {
+        return substring(start, end);
     }
 
 }

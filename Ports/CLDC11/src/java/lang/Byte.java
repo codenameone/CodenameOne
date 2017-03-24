@@ -26,7 +26,7 @@ package java.lang;
  * The Byte class is the standard wrapper for byte values.
  * Since: JDK1.1, CLDC 1.0
  */
-public final class Byte{
+public final class Byte extends Number {
     /**
      * The maximum value a Byte can have.
      * See Also:Constant Field Values
@@ -96,5 +96,25 @@ public final class Byte{
      */
     public static Byte valueOf(byte i) {
         return null;
+    }
+
+    @Override
+    public int intValue() {
+        return 0;
+    }
+
+    @Override
+    public long longValue() {
+        return 0l;
+    }
+
+    @Override
+    public float floatValue() {
+        return 0f;
+    }
+
+    @Override
+    public double doubleValue() {
+        return 0.0;
     }
 }

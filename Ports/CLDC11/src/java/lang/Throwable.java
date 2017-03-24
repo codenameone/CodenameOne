@@ -39,9 +39,25 @@ public class Throwable{
     }
 
     /**
+     * Constructs a new throwable with the specified cause and a detail message of (cause==null ? null : cause.toString()) (which typically contains the class and detail message of cause).
+     * @param cause The cause
+     */
+    public Throwable(Throwable cause) {
+        
+    }
+    
+    /**
      * @deprecated DO NOT USE THIS METHOD, its here just to get the compiler working and isn't intended for use
      */
     public Throwable initCause(Throwable cause) {
+        return null;
+    }
+    
+    /**
+     * Returns the cause of this throwable or null if the cause is nonexistent or unknown.
+     * @return 
+     */
+    public Throwable getCause() {
         return null;
     }
     
@@ -52,6 +68,15 @@ public class Throwable{
      */
     public Throwable(java.lang.String message){
          //TODO codavaj!!
+    }
+    
+    /**
+     * Constructs a new throwable with the specified detail message and cause.
+     * @param message The error message.
+     * @param cause The cause
+     */
+    public Throwable(java.lang.String message, Throwable cause) {
+        
     }
 
     /**

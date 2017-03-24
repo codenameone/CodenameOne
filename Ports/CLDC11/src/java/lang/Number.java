@@ -20,34 +20,22 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package java.lang;
+
 /**
- * The class Exception and its subclasses are a form of Throwable that indicates conditions that a reasonable application might want to catch.
- * Since: JDK1.0, CLDC 1.0 See Also:Error
+ *
+ * @author shannah
  */
-public class Exception extends java.lang.Throwable{
-    /**
-     * Constructs an Exception with no specified detail message.
-     */
-    public Exception(){
-         //TODO codavaj!!
-    }
+public abstract class Number {
+    public abstract int intValue();
 
-    /**
-     * Constructs an Exception with the specified detail message.
-     * s - the detail message.
-     */
-    public Exception(java.lang.String s){
-         super(s);
-    }
-    
-    public Exception(Throwable cause) {
-        super(cause);
-    }
-    
-    public Exception(java.lang.String s, Throwable cause) {
-        super(s, cause);
-    }
+    public abstract long longValue();
 
+    public abstract float floatValue();
+
+    public abstract double doubleValue();
+
+    public short shortValue() {
+        return (short) intValue();
+    }
 }

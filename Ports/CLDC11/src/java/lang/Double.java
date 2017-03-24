@@ -27,7 +27,7 @@ package java.lang;
  * In addition, this class provides several methods for converting a double to a String and a String to a double, as well as other constants and methods useful when dealing with a double.
  * Since: JDK1.0, CLDC 1.1
  */
-public final class Double{
+public final class Double extends Number {
     /**
      * The largest positive finite value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7fefffffffffffffL)
      * See Also:Constant Field Values

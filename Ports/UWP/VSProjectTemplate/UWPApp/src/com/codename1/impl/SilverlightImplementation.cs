@@ -3877,6 +3877,11 @@ namespace com.codename1.impl
             {
                 java.lang.Throwable th = (java.lang.Throwable)t;
                 trace = "\n" + th.getStackTraceString();
+
+                if (th.getCause() != null && th.getCause() != th && th.getCause() is java.lang.Throwable)
+                {
+                    trace += "\nCaused by " + th.getCause().ToString() + "\n" + ((java.lang.Throwable)th.getCause()).getStackTraceString();
+                }
             }
             java.lang.System.@out.println("Stack trace is " + trace);
             char[] buf = trace.ToCharArray();
