@@ -36,16 +36,36 @@ import java.util.List;
 public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T> {
     private ArrayList<T> value = new ArrayList<T>();
     
+    public final Class<T> elementType;
+    
     /**
      * Constructs a property with the given name and value
      * @param name the name of the property
      * @param values default values for the property
      */
     public ListProperty(String name, T... values) {
+        this(name, null, values);
+    }
+    
+    /**
+     * Constructs a property with the given name and values by specifying the
+     * type of the elements explicitly. The element type needs to be specified
+     * if the list should contain {@link PropertyBusinessObject}s and needs
+     * to get deserialized properly!
+     * @param name the name of the property
+     * @param elementType subclass of {@link PropertyBusinessObject}
+     * @param values default values for the property
+     */
+    public ListProperty(String name, Class<T> elementType, T... values) {
         super(name);
         for(T t : values) {
             value.add(t);
         }
+        if(elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) 
+            throw new IllegalArgumentException(
+                    "the element type class needs to be a subclass of PropertyBusinessObject");
+        
+        this.elementType = elementType;
     }
     
     /**
@@ -54,6 +74,7 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      */
     public ListProperty(String name) {
         super(name);
+        this.elementType = null;
     }
     
     /**
