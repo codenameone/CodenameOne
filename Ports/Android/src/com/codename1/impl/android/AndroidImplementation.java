@@ -754,7 +754,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             metrics = getContext().getResources().getDisplayMetrics();
         }
         
-        if(metrics.densityDpi >= DisplayMetrics.DENSITY_LOW &&  metrics.densityDpi < 213) {
+        if(metrics.densityDpi < 213) {
             return Display.DENSITY_LOW;
         }
         
