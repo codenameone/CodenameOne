@@ -754,10 +754,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             metrics = getContext().getResources().getDisplayMetrics();
         }
         
-        if(metrics.densityDpi < 213) {
+        if(metrics.densityDpi < DisplayMetrics.DENSITY_MEDIUM) {
             return Display.DENSITY_LOW;
         }
         
+        if(metrics.densityDpi < 213) {
+            return Display.DENSITY_MEDIUM;
+        }
+
         // 213 == TV
         if(metrics.densityDpi >= 213 &&  metrics.densityDpi <= DisplayMetrics.DENSITY_HIGH) {
             return Display.DENSITY_HIGH;
