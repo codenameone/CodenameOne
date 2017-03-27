@@ -253,7 +253,11 @@ public class MultipartRequest extends ConnectionRequest {
                 } else {
                     length += baseBinaryLength;
                     length += key.length();
-                    length += ((String)filenames.get(key)).length();
+                    try { 
+                        length += ((String)filenames.get(key)).getBytes("UTF-8").length;
+                    } catch (UnsupportedEncodingException ex) {
+                        length += ((String)filenames.get(key)).getBytes().length;
+                    }
                     length += ((String)mimeTypes.get(key)).length();
                     length += Long.parseLong((String)filesizes.get(key));
                 }
