@@ -153,13 +153,13 @@ public class Accordion extends Container {
         if(autoClose) {
             for (Component cc : this) {
                 AccordionContent c = (AccordionContent)cc;
-                c.openClose(body == c.body);
+                c.openClose(!(body == c.body));
             }
         } else {
             for (Component cc : this) {
                 AccordionContent c = (AccordionContent)cc;
                 if(body == c.body) {
-                    c.openClose(true);
+                    c.openClose(false);
                 }
             }
         }
@@ -173,7 +173,7 @@ public class Accordion extends Container {
         for (Component cc : this) {
             AccordionContent c = (AccordionContent)cc;
             if(body == c.body) {
-                c.openClose(false);
+                c.openClose(true);
             }
         }
     }    
