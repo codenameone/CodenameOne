@@ -65,6 +65,13 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 #include "com_codename1_ui_plaf_Style.h"
 #import "RadialGradientPaint.h"
+#include "java_io_IOException.h"
+#include "com_codename1_io_Cookie.h"
+#include "com_codename1_ui_plaf_UIManager.h"
+#include "java_io_Writer.h"
+#include "java_util_ArrayList.h"
+#include "com_codename1_ui_Font.h"
+#include "java_util_Vector.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
 

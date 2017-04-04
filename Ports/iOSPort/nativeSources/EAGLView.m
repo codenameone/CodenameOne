@@ -28,6 +28,7 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "xmlvm.h"
 #include "CN1ES2compat.h"
+#include "com_codename1_impl_ios_TextEditUtil.h"
 
 static BOOL firstTime=YES;
 extern float scaleValue;

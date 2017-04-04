@@ -54,6 +54,10 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_impl_CodenameOneImplementation.h"
 #include "com_codename1_ui_Component.h"
+#include "com_codename1_impl_ios_TextEditUtil.h"
+#include "com_codename1_impl_ios_ZoozPurchase.h"
+#include "com_codename1_ui_plaf_UIManager.h"
+#include "com_codename1_payment_Receipt.h"
 #import "CN1ES2compat.h"
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>

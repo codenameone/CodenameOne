@@ -24,6 +24,7 @@
 #import "UIWebViewEventDelegate.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_ui_events_BrowserNavigationCallback.h"
+#include "com_codename1_ui_BrowserComponent.h"
 #include "xmlvm.h"
 #import "CodenameOne_GLViewController.h"
 

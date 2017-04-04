@@ -85,6 +85,7 @@ public class BytecodeMethod {
     private boolean privateMethod;
     private boolean nativeMethod;
     private List<String> dependentClasses = new ArrayList<String>();
+    //private List<String> exportedClasses = new ArrayList<String>();
     private List<Instruction> instructions = new ArrayList<Instruction>();
     private String declaration = ""; 
     private String sourceFile;
@@ -118,7 +119,11 @@ public class BytecodeMethod {
         finalMethod = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
         synchronizedMethod = (access & Opcodes.ACC_SYNCHRONIZED) == Opcodes.ACC_SYNCHRONIZED;
         int pos = desc.lastIndexOf(')');
-        
+        if (!staticMethod) {
+            if (!dependentClasses.contains("java_lang_NullPointerException")) {
+                dependentClasses.add("java_lang_NullPointerException");
+            }
+        } // 
         if(methodName.equals("<init>")) {
             methodName = "__INIT__";
             constructor = true;
@@ -148,6 +153,9 @@ public class BytecodeMethod {
                             if(!dependentClasses.contains(objectType)) {
                                 dependentClasses.add(objectType);
                             }
+                            //if (!this.isPrivate() && !exportedClasses.contains(objectType)) {
+                            //    exportedClasses.add(objectType);
+                            //}
                             returnType = new ByteCodeMethodArg(objectType, dim);
                             break;
                         case 'I':
@@ -195,6 +203,9 @@ public class BytecodeMethod {
                     if(!dependentClasses.contains(objectType)) {
                         dependentClasses.add(objectType);
                     }
+                    //if (!this.isPrivate() && !exportedClasses.contains(objectType)) {
+                    //    exportedClasses.contains(objectType);
+                    //}
                     i = idx;
                     arguments.add(new ByteCodeMethodArg(objectType, currentArrayDim));
                     break;
@@ -368,6 +379,10 @@ public class BytecodeMethod {
     public List<String> getDependentClasses() {
         return dependentClasses;
     }
+    
+    //public List<String> getExportedClasses() {
+    //    return exportedClasses;
+    //}
     
     private void appendCMethodPrefix(StringBuilder b, String prefix) {
         appendCMethodPrefix(b, prefix, clsName);
@@ -1131,6 +1146,9 @@ public class BytecodeMethod {
             switch(currentOpcode) {
                 
                 case Opcodes.ARRAYLENGTH: {
+                    if (!dependentClasses.contains("java_lang_NullPointerException")) {
+                        dependentClasses.add("java_lang_NullPointerException");
+                    }
                     int newIter = ArrayLengthExpression.tryReduce(instructions, iter);
                     if (newIter >= 0) {
                         instructionCount = instructions.size();
