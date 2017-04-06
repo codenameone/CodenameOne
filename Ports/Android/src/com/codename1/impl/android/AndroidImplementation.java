@@ -2232,8 +2232,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
-                                while (attachment.read(buffer) > 0) {
-                                    tmp.write(buffer);
+                                int read = -1;
+                                while ((read = attachment.read(buffer)) > -1) {
+                                    tmp.write(buffer, 0, read);
                                 }
                                 tmp.close();
                                 attachment.close();
@@ -5752,8 +5753,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
-                                while (inputStream.read(buffer) > 0) {
-                                    tmp.write(buffer);
+                                int read = -1;
+                                while ((read = inputStream.read(buffer)) > -1) {
+                                    tmp.write(buffer, 0, read);
                                 }
                                 tmp.close();
                                 inputStream.close();                                                           
