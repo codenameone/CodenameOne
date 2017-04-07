@@ -24,7 +24,6 @@
 package com.codename1.impl.javase;
 
 import com.codename1.background.BackgroundFetch;
-import com.codename1.cloud.CloudObjectConsole;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -2019,20 +2018,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             simulatorMenu.add(locactionSim);
             
             simulatorMenu.add(componentTreeInspector);
-            
-            JMenuItem cloudObjects = new JMenuItem("Cloud Objects Viewer");
-            cloudObjects.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    CloudObjectConsole cloud = new CloudObjectConsole();
-                    cloud.pack();
-                    cloud.setLocationByPlatform(true);
-                    cloud.setVisible(true);
-
-                }
-            });
-            simulatorMenu.add(cloudObjects);
             
 
             JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
