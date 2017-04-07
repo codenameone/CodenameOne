@@ -69,6 +69,10 @@ public class Property<T, K> extends PropertyBase<T, K> {
             this.value = value;
             firePropertyChanged();
         }
+        if(parent == null) {
+            // allows properties to work even if they aren't registered in the index
+            return null;
+        }
         return (K)parent.parent;
     }
         
