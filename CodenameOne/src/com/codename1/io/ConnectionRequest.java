@@ -116,6 +116,22 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Determines the default value for {@link #isReadResponseForErrors()}
+     * @return the readResponseForErrorsDefault
+     */
+    public static boolean isReadResponseForErrorsDefault() {
+        return readResponseForErrorsDefault;
+    }
+
+    /**
+     * Determines the default value for {@link #setReadResponseForErrors(boolean)}
+     * @param aReadResponseForErrorsDefault the readResponseForErrorsDefault to set
+     */
+    public static void setReadResponseForErrorsDefault(boolean aReadResponseForErrorsDefault) {
+        readResponseForErrorsDefault = aReadResponseForErrorsDefault;
+    }
+
+    /**
      * There are 4 caching modes: OFF is the default  meaning no caching.
      * SMART means all get requests are cached intelligently and caching is "mostly" seamless
      * MANUAL means that the developer is responsible for the actual caching but the system
@@ -271,7 +287,8 @@ public class ConnectionRequest implements IOProgressListener {
     private int silentRetryCount = 0;
     private boolean failSilently;
     boolean retrying;
-    private boolean readResponseForErrors;
+    private static boolean readResponseForErrorsDefault = true;
+    private boolean readResponseForErrors = readResponseForErrorsDefault;
     private String responseContentType;
     private boolean redirecting;
     private static boolean cookiesEnabledDefault = true;
