@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.io.Log;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.DefaultLookAndFeel;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -82,6 +83,10 @@ public class Label extends Component {
     private boolean showEvenIfBlank = false;
     private int shiftMillimeters = 1;
     private int stringWidthUnselected = -1;
+    
+    private boolean autoSizeMode;
+    private Font originalFont;
+    private int widthAtLastCheck = -1;
     
     /** 
      * Constructs a new label with the specified string of text, left justified.
@@ -216,6 +221,7 @@ public class Label extends Component {
      * @param text the string that the label presents.
      */
     public void setText(String text){
+        widthAtLastCheck = -1;
         this.text = text;
         localize();
         stringWidthUnselected = -1;
@@ -289,6 +295,7 @@ public class Label extends Component {
         if(this.icon == icon) {
             return;
         }
+        widthAtLastCheck = -1;
         if(icon != null) {
             if(icon.requiresDrawImage()) {
                 legacyRenderer = true;
@@ -444,6 +451,7 @@ public class Label extends Component {
      */
     public void paint(Graphics g) {
         if(legacyRenderer) {
+            initAutoResize();
             getUIManager().getLookAndFeel().drawLabel(g, this);
             return;
         }
@@ -451,6 +459,7 @@ public class Label extends Component {
     }
 
     void paintImpl(Graphics g) {
+        initAutoResize();
         Object icn = null;
         Image i = getIconFromState();
         if(i != null) {
@@ -477,10 +486,55 @@ public class Label extends Component {
                 endsWith3Points, valign);
     }
     
+    void initAutoResize() {
+        if(autoSizeMode) {
+            Style s = getUnselectedStyle();
+            int p = s.getHorizontalPadding();
+            int w = getWidth();
+            if(w > p + 10) {
+                if(originalFont == null) {
+                    originalFont = s.getFont();
+                } else {
+                    if(w == widthAtLastCheck) {
+                        return;
+                    }
+                }
+                
+                Font currentFont = originalFont;
+                float fontSize = currentFont.getPixelSize();
+                if(fontSize < 1) {
+                    Log.p("Autosize disabled probably because component wasn't using native fonts for UIID: " + getUIID());
+                    autoSizeMode = false;
+                    return;
+                }
+                widthAtLastCheck = w;
+                autoSizeMode = false;
+                while(calcPreferredSize().getWidth() < w) {
+                    fontSize++;
+                    currentFont = currentFont.derive(fontSize, currentFont.getStyle());
+                    getAllStyles().setFont(currentFont);
+                }
+                while(calcPreferredSize().getWidth() > w) {
+                    fontSize--;
+                    currentFont = currentFont.derive(fontSize, currentFont.getStyle());
+                    getAllStyles().setFont(currentFont);
+                }
+                autoSizeMode = true;
+            }
+        }
+    }
+
+    void calcSizeAutoSize() {
+        if(autoSizeMode && originalFont != null) {
+            getAllStyles().setFont(originalFont);
+        }
+    }
+    
     /**
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
+        calcSizeAutoSize();
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
     }
     
@@ -937,6 +991,24 @@ public class Label extends Component {
         if (Style.FONT.equals(propertyName) && source.getFont() instanceof CustomFont) {
             setLegacyRenderer(true);
         }
+    }
+
+    /**
+     * Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
+     * a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+     * @return the autoSizeMode
+     */
+    public boolean isAutoSizeMode() {
+        return autoSizeMode;
+    }
+
+    /**
+     * Autosize mode automatically shrinks/grows the font of the label to fit in the available width, it carries
+     * a noticeable performance penalty and we recommend you avoid using it unless absolutely necessary
+     * @param autoSizeMode the autoSizeMode to set
+     */
+    public void setAutoSizeMode(boolean autoSizeMode) {
+        this.autoSizeMode = autoSizeMode;
     }
     
     

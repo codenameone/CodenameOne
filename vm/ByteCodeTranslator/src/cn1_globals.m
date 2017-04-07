@@ -14,6 +14,7 @@
 #include "java_lang_Float.h"
 #include "java_lang_Runnable.h"
 #include "java_lang_System.h"
+#include "java_lang_ArrayIndexOutOfBoundsException.h"
 
 int currentGcMarkValue = 1;
 extern JAVA_BOOLEAN lowMemoryMode;
@@ -1082,10 +1083,25 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     } 
 }
 
+JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return 0;
+}
+
+JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return JAVA_FALSE;
+}
+
 void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {
     JAVA_OBJECT arrayIndexOutOfBoundsException = __NEW_java_lang_ArrayIndexOutOfBoundsException(threadStateData);
     java_lang_ArrayIndexOutOfBoundsException___INIT_____int(threadStateData, arrayIndexOutOfBoundsException, index);
     throwException(threadStateData, arrayIndexOutOfBoundsException);
+}
+
+JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_STATE, int index) {
+    throwArrayIndexOutOfBoundsException(threadStateData, index);
+    return JAVA_FALSE;
 }
 
 void** interfaceVtableGlobal = 0;

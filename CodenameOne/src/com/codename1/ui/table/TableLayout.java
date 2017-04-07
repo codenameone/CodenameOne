@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.table;
 
+import com.codename1.io.Log;
 import com.codename1.ui.layouts.*;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -505,7 +506,7 @@ public class TableLayout extends Layout {
                 }
             }
         } catch(ArrayIndexOutOfBoundsException err) {
-            err.printStackTrace();
+            Log.e(err);
         }
     }
 
@@ -602,19 +603,20 @@ public class TableLayout extends Layout {
         }
         
         int availableSpaceColumn = -1;
-
+        boolean foundExplicitWidth = false;
         for(int iter = 0 ; iter < rows ; iter++) {
             Constraint c = tablePositions[iter * columns + column];
 
             if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanHorizontal > 1) {
                 continue;
             }
-
+            
             // width in percentage of the parent container
             if(c.width > 0 && available > -1) {
                 current = Math.max(current, c.width * percentageOf / 100);
+                foundExplicitWidth = true;
                 modifableColumnSize[column] = false;
-            } else {
+            } else if (!foundExplicitWidth) {
                 // special case, width -2 gives the column the rest of the available space
                 if(c.width == -2 || (growHorizontally && column == columns - 1)) {
                     if(available < 0) {

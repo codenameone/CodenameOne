@@ -242,8 +242,10 @@ public class JavascriptContext  {
     }
     
     
-    private synchronized String exec(String js){
-        return exec(js, false);
+    private  String exec(String js){
+        synchronized (browser) {
+            return exec(js, false);
+        }
     }
     
     /**
@@ -255,17 +257,19 @@ public class JavascriptContext  {
      * @param js
      * @return The string result of executing the Javascript string.
      */
-    private synchronized String exec(String js, boolean async){
-        if ( DEBUG ){
-            Log.p("About to execute("+async+") "+js);
-            //browser.execute("console.log(execute ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE0[0])");
-        }
-        if (async) {
-            
-            browser.execute(installCode()+";("+js+")");
-            return null;
-        } else {
-            return browser.executeAndReturnString(installCode()+";("+js+")");
+    private String exec(String js, boolean async){
+        synchronized (browser) {
+            if ( DEBUG ){
+                Log.p("About to execute("+async+") "+js);
+                //browser.execute("console.log(execute ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE0[0])");
+            }
+            if (async) {
+
+                browser.execute(installCode()+";("+js+")");
+                return null;
+            } else {
+                return browser.executeAndReturnString(installCode()+";("+js+")");
+            }
         }
     }
     
@@ -342,26 +346,36 @@ public class JavascriptContext  {
      * @param javascript The javascript to be executed.
      * @return The result of the javascript expression.
      */
-    public synchronized Object get(String javascript){
-        String js2 = RETURN_VAR+"=("+javascript+")";
-        String res = exec(js2);
-        String typeQuery = "typeof("+RETURN_VAR+")";
-        String type = exec(typeQuery);
-        try {
-            if ( "string".equals(type)){
-                return res;
-            } else if ( "number".equals(type)){
-                return Double.valueOf(res);
-            } else if ( "boolean".equals(type)){
-                return "true".equals(res)?Boolean.TRUE:Boolean.FALSE;
-            } else if ( "object".equals(type) || "function".equals(type)){
-                return new JSObject(this, RETURN_VAR);
-            } else {
-                return null;
+    public Object get(String javascript){
+        synchronized(browser) {
+            
+            String returnVar = RETURN_VAR+"_"+(callId++);
+            try {
+                String js2 = returnVar+"=("+javascript+")";
+                String res = exec(js2);
+                String typeQuery = "typeof("+returnVar+")";
+                String type = browser.executeAndReturnString(typeQuery);
+                
+                try {
+                    if ( "string".equals(type)){
+                        return res;
+                    } else if ( "number".equals(type)){
+                        return Double.valueOf(res);
+                    } else if ( "boolean".equals(type)){
+                        return "true".equals(res)?Boolean.TRUE:Boolean.FALSE;
+                    } else if ( "object".equals(type) || "function".equals(type)){
+                        return new JSObject(this, returnVar);
+                    } else {
+                        return null;
+                    }
+                } catch ( Exception ex){
+
+                    Log.e(new RuntimeException("Failed to get javascript "+js2+".  The error was "+ex.getMessage()+".  The result was "+res+".  The type result was "+type));
+                    return null;
+                }
+            } finally {
+                browser.execute(returnVar+"=undefined");
             }
-        } catch ( Exception ex){
-            Log.e(new RuntimeException("Failed to get javascript "+js2+".  The error was "+ex.getMessage()+".  The result was "+res+".  The type result was "+type+"."));
-            return null;
         }
     }
     
@@ -471,25 +485,28 @@ public class JavascriptContext  {
      * @param value The object or value that is being assigned to the Javascript variable
      * on the left.
      */
-    public synchronized void set(String key, Object value){
-        String lhs = key;
-        String rhs = "undefined";
-      
-        if ( String.class.isInstance(value)){
-            String escaped = StringUtil.replaceAll((String)value, "\\", "\\\\");
-            escaped = StringUtil.replaceAll(escaped, "'", "\\'");
-            rhs = "'"+escaped+"'";
-        } else if ( value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double ){
-            rhs =value.toString();
-        } else if ( JSObject.class.isInstance(value)){
-            rhs = ((JSObject)value).toJSPointer();
-        } else if (value instanceof Boolean){
-            rhs = ((Boolean)value).booleanValue()?"true":"false";
-        } else {
-            rhs = "null";
+    public void set(String key, Object value){
+        synchronized(browser) {
+
+
+            String lhs = key;
+            String rhs = "undefined";
+            if ( String.class.isInstance(value)){
+                String escaped = StringUtil.replaceAll((String)value, "\\", "\\\\");
+                escaped = StringUtil.replaceAll(escaped, "'", "\\'");
+                rhs = "'"+escaped+"'";
+            } else if ( value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double ){
+                rhs =value.toString();
+            } else if ( JSObject.class.isInstance(value)){
+                rhs = ((JSObject)value).toJSPointer();
+            } else if (value instanceof Boolean){
+                rhs = ((Boolean)value).booleanValue()?"true":"false";
+            } else {
+                rhs = "null";
+            }
+
+            exec(lhs+"="+rhs);
         }
-        
-        exec(lhs+"="+rhs);
     }
     
     /**
@@ -708,7 +725,7 @@ public class JavascriptContext  {
                     "url += encodeURIComponent(typeof(val))+'='+encodeURIComponent(strval);"+
                     "if (i < len-1){ url += '&';}"+
                 //"} var iframe=document.createElement('iframe');iframe.src=url;document.body.appendChild(iframe)"+
-                "} window.location.href=url;"+
+                "} if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else {window.location.href=url}"+
                 //"} return 56;"+
                 //"console.log('About to try to load '+url); var el = document.createElement('iframe'); el.setAttribute('src', url); document.body.appendChild(el); el.parentNode.removeChild(el); console.log(el); el = null"+
             "}";
@@ -894,6 +911,8 @@ public class JavascriptContext  {
         });
     }
     
+    long callId = 0;
+    
     /**
      * Calls a Javascript function with the given parameters, and optionally to make the call asynchronously.  This would translate
      * roughly into executing the following javascript:
@@ -911,7 +930,11 @@ public class JavascriptContext  {
      * object type.  This will always return null if {@code async} is {@code true}.
      */
     public Object call(String jsFunc, JSObject self, Object[] params, boolean async, Callback callback){
-        String var = RETURN_VAR+"_call";
+        if (callId > 10000000l) {
+            callId = 0;
+        }
+        
+        String var = RETURN_VAR+"_call_"+(callId++);
         String js = var+"=("+jsFunc+").call("+self.toJSPointer();
         int len = params.length;
         for ( int i=0; i<len; i++){
@@ -943,28 +966,32 @@ public class JavascriptContext  {
         // We need to intialize the var to undefined in case the actual
         // javascript adjusts the window.location or doesn't cause a 
         // result for some reason.
-        try {
-            exec(var+"=undefined", async);
-        } catch (Exception ex){
-            Log.e(new RuntimeException("Failed to execute javascript "+var+"=undefined.  The error was "+ex.getMessage()));
-            return null;
-        }
-        try {
-            exec(js, async);
-        } catch (Exception ex){
-            Log.e(new RuntimeException("Failed to execute javascript "+js+".  The error was "+ex.getMessage()));
-            return null;
-        }
-        try {
-            if (async) {
-                getAsync(var, callback);
+        synchronized (browser){
+            
+            try {
+                exec(js, async);
+            } catch (Exception ex){
+                Log.e(new RuntimeException("Failed to execute javascript "+js+".  The error was "+ex.getMessage()));
                 return null;
-            } else {
-                return get(var);
             }
-        } catch (Exception ex){
-            Log.e(new RuntimeException("Failed to get the javascript variable "+var+".  The error was "+ex.getMessage()));
-            return null;
+            try {
+                if (async) {
+                    getAsync(var, callback);
+                    return null;
+                } else {
+                    Object out = get(var);
+                    try {
+                        exec(var+"=undefined", async);
+                    } catch (Exception ex){
+                        Log.e(new RuntimeException("Failed to execute javascript "+var+"=undefined.  The error was "+ex.getMessage()));
+                        return null;
+                    }
+                    return out;
+                }
+            } catch (Exception ex){
+                Log.e(new RuntimeException("Failed to get the javascript variable "+var+".  The error was "+ex.getMessage()));
+                return null;
+            }
         }
     }
     

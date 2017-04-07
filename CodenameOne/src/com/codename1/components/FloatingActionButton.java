@@ -65,6 +65,22 @@ import java.util.List;
  */
 public class FloatingActionButton extends Button {
 
+    /**
+     * The default icon size for the fab icon in millimeters 
+     * @return the fabDefaultSize
+     */
+    public static float getIconDefaultSize() {
+        return fabDefaultSize;
+    }
+
+    /**
+     * The default icon size for the fab icon in millimeters 
+     * @param aFabDefaultSize the fabDefaultSize to set
+     */
+    public static void setIconDefaultSize(float aFabDefaultSize) {
+        fabDefaultSize = aFabDefaultSize;
+    }
+
     private List<FloatingActionButton> subMenu;
 
     private String text;
@@ -72,7 +88,14 @@ public class FloatingActionButton extends Button {
     private Dialog current;
     private boolean rectangle;
     private boolean isBadge;
+    
+    /**
+     * The default icon size for the fab
+     */
+    private static float fabDefaultSize = 3.8f;
 
+    private float sizeMm = fabDefaultSize;
+    
     /**
      * Constructor
      *
@@ -82,6 +105,7 @@ public class FloatingActionButton extends Button {
      */
     protected FloatingActionButton(char icon, String text, float size) {
         FontImage image = FontImage.createMaterial(icon, "FloatingActionButton", size);
+        sizeMm = size;
         setIcon(image);
         setText("");
         this.text = text;
@@ -90,7 +114,7 @@ public class FloatingActionButton extends Button {
         all.setAlignment(CENTER);
         updateBorder();
     }
-
+        
     /**
      * This constructor is used by text badges
      */
@@ -125,6 +149,11 @@ public class FloatingActionButton extends Button {
         if(propertyName.equals(Style.BG_COLOR)) {
             updateBorder();
         }
+        if(getIcon() instanceof FontImage && propertyName.equals(Style.FG_COLOR)) {
+            FontImage i = (FontImage)getIcon();
+            FontImage image = FontImage.createMaterial(i.getText().charAt(0), "FloatingActionButton", sizeMm);
+            setIcon(image);
+        }
     }    
     
     /**
@@ -143,7 +172,7 @@ public class FloatingActionButton extends Button {
      * @return a FloatingActionButton instance
      */
     public static FloatingActionButton createFAB(char icon) {
-        return new FloatingActionButton(icon, null, 3.8f);
+        return new FloatingActionButton(icon, null, fabDefaultSize);
     }
 
     /**

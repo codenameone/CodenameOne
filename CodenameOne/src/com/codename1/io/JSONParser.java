@@ -76,6 +76,22 @@ public class JSONParser implements JSONParseCallback {
         useLongsDefault = aUseLongsDefault;
     }
 
+    /**
+     * Indicates that the parser will include null values in the parsed output
+     * @return the includeNullsDefault
+     */
+    public static boolean isIncludeNulls() {
+        return includeNullsDefault;
+    }
+
+    /**
+     * Indicates that the parser will include null values in the parsed output
+     * @param aIncludeNullsDefault the includeNullsDefault to set
+     */
+    public static void setIncludeNulls(boolean aIncludeNullsDefault) {
+        includeNullsDefault = aIncludeNullsDefault;
+    }
+
     static class ReaderClass {
         char[] buffer;
         int buffOffset;
@@ -102,6 +118,7 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private static boolean useLongsDefault;
+    private static boolean includeNullsDefault;
     private boolean modern;
     private Map<String, Object> state;
     private java.util.List<Object> parseStack;
@@ -179,7 +196,7 @@ public class JSONParser implements JSONParseCallback {
                                     c = (char) Integer.parseInt(unicode, 16);
                                 } catch (NumberFormatException err) {
                                     // problem in parsing the u notation!
-                                    err.printStackTrace();
+                                    Log.e(err);
                                     System.out.println("Error in parsing \\u" + unicode);
                                 }
                             } else {
@@ -292,7 +309,7 @@ public class JSONParser implements JSONParseCallback {
                                     }
                                     
                                 } catch (NumberFormatException err) {
-                                    err.printStackTrace();
+                                    Log.e(err);
                                     // this isn't a number!
                                 }
                             }
@@ -528,7 +545,7 @@ public class JSONParser implements JSONParseCallback {
             if (currentKey == null) {
                 currentKey = tok;
             } else {
-                if (tok != null) {
+                if (tok != null || isIncludeNulls()) {
                     getStackHash().put(currentKey, tok);
                 }
                 currentKey = null;

@@ -46,6 +46,10 @@ using Windows.Foundation.Metadata;
 using Windows.ApplicationModel.DataTransfer;
 using com.codename1.db;
 using Windows.UI.ViewManagement;
+using Windows.UI.Composition;
+using Microsoft.Graphics.Canvas.UI.Composition;
+using Microsoft.Graphics.Canvas.Brushes;
+using java.util;
 #if WINDOWS_UWP
 using Windows.Graphics.DirectX;
 #else
@@ -116,6 +120,282 @@ namespace com.codename1.impl
             Canvas.SetLeft(screen, 0);
             Canvas.SetTop(screen, 0);
             myView = new WindowsAsyncView(screen);
+            /*
+            Visual hostVisual = Windows.UI.Xaml.Hosting.ElementCompositionPreview.GetElementVisual(cl);
+            var root = hostVisual.Compositor.CreateContainerVisual();
+            Windows.UI.Xaml.Hosting.ElementCompositionPreview.SetElementChildVisual(cl, root);
+            var rect = hostVisual.Compositor.CreateSpriteVisual();
+            rect.Size = new Vector2(100, 100);
+            rect.Brush = hostVisual.Compositor.CreateColorBrush(Windows.UI.Colors.Silver);
+            rect.Offset = new Vector3(100, 100, 0);
+            rect.CenterPoint = new Vector3(100, 100, 0);
+            root.Children.InsertAtTop(rect);
+
+
+            var canvasDevice = CanvasDevice.GetSharedDevice();
+            var graphicsDevice = CanvasComposition.CreateCompositionGraphicsDevice(hostVisual.Compositor, canvasDevice);
+            var drawingVisual = hostVisual.Compositor.CreateSpriteVisual();
+            
+            drawingVisual.Size = new Vector2(400, 400);
+            drawingVisual.Opacity = 0.5f;
+            var execMode = WebView.DefaultExecutionMode;
+
+
+            var drawingSurface = graphicsDevice.CreateDrawingSurface(new Size(400, 400), DirectXPixelFormat.B8G8R8A8UIntNormalized,
+                DirectXAlphaMode.Premultiplied);
+            var brush = hostVisual.Compositor.CreateSurfaceBrush(drawingSurface);
+            drawingVisual.Brush = brush;
+
+            using (var drawingSession = CanvasComposition.CreateDrawingSession(drawingSurface))
+            {
+                drawingSession.FillRectangle(new Rect(200, 200, 200, 50), Windows.UI.Colors.Red);
+                drawingSession.FillRectangle(new Rect(200, 200, 50, 200), Windows.UI.Colors.Red);
+                drawingSession.FillRectangle(new Rect(200, 350, 200, 50), Windows.UI.Colors.Red);
+                drawingSession.FillRectangle(new Rect(350, 200, 50, 200), Windows.UI.Colors.Red);
+                
+                CanvasBlend oldBlend = drawingSession.Blend;
+                drawingSession.Blend = CanvasBlend.Copy;
+                CanvasSolidColorBrush brush2 = new CanvasSolidColorBrush(drawingSession, Windows.UI.Colors.Transparent);
+
+                brush2.Color = Windows.UI.Colors.Transparent;
+                brush2.Opacity = 1;
+                drawingSession.FillRectangle(250, 250, 100, 100, brush2);
+                drawingSession.Blend = oldBlend;
+                
+
+            }
+            root.Children.InsertAtTop(drawingVisual);
+            //var compositionTarget = hostVisual.Compositor.CreateTargetForCurrentView();
+            //compositionTarget.Root = root;
+            */
+
+        }
+
+        public static void setMainClass(object o)
+        {
+            if (o is com.codename1.push.PushCallback)
+            {
+                setPushCallback((com.codename1.push.PushCallback)o);
+            }
+        }
+
+        static readonly char[] padding = { '=' };
+
+        static string Base64UrlEncode(byte[] arg)
+        {
+
+            return System.Convert.ToBase64String(arg)
+                .TrimEnd(padding)
+                .Replace('+', '-').Replace('/', '_');
+        }
+
+        /*
+        static byte[] Base64UrlDecode(string arg)
+        {
+            string s = arg;
+            s = s.Replace('-', '+'); // 62nd char of encoding
+            s = s.Replace('_', '/'); // 63rd char of encoding
+            switch (s.Length % 4) // Pad with trailing '='s
+            {
+                case 0: break; // No pad chars in this case
+                case 2: s += "=="; break; // Two pad chars
+                case 3: s += "="; break; // One pad char
+                default:
+                    throw new System.Exception(
+             "Illegal base64url string!");
+            }
+            return Convert.FromBase64String(s); // Standard base64 decoder
+        }
+        */
+        public override void registerPush(Hashtable metaData, bool noFallback)
+        {
+
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                // Get a channel URI from WNS.
+                try {
+                    var channel = await Windows.Networking.PushNotifications.PushNotificationChannelManager
+                       .CreatePushNotificationChannelForApplicationAsync();
+                    if (channel != null && channel.Uri != null)
+                    {
+                        byte[] idBytes = System.Text.Encoding.UTF8.GetBytes(channel.Uri);
+                        var id = Base64UrlEncode(idBytes);
+
+                        Display.getInstance().callSerially(new RegisterServerPushRunnable("cn1-win-" + id));
+
+                        channel.PushNotificationReceived += Channel_PushNotificationReceived;
+                    }
+                    else
+                    {
+                        Display.getInstance().callSerially(new SendPushRegistrationErrorhRunnable("Failed to open push channel", 0));
+                    }
+                } catch (Exception ex)
+                {
+                    Display.getInstance().callSerially(new SendPushRegistrationErrorhRunnable("Failed to open push channel: "+ex.Message, 0));
+                }
+               
+                
+           
+            });
+
+        }
+
+        public void _handlePushFromLaunchArg(string arg)
+        {
+            if (arg.StartsWith("cn1push:"))
+            {
+                arg = arg.Substring(8);
+            }
+            int pushType = Int32.Parse(arg.Substring(0, arg.IndexOf(' ')));
+            arg = arg.Substring(arg.IndexOf(' ') + 1);
+            string uuid = arg.Substring(0, arg.IndexOf(' '));
+            string pushMessage = arg.Substring(arg.IndexOf(' ') + 1);
+            com.codename1.ui.Display.getInstance().setProperty("pushType", "" + pushType);
+            switch (pushType)
+            {
+                case 3:
+                case 6:
+                    {
+                        string[] split = pushMessage.Split(';');
+                        if (split.Length < 2)
+                        {
+                            _pushReceived(uuid, pushMessage);
+                            _pushReceived(uuid + "-hidden", pushMessage);
+                        }
+                        else
+                        {
+                            _pushReceived(uuid, split[0]);
+                            _pushReceived(uuid + "-hidden", split[1]);
+                        }
+                        break;
+
+                    }
+
+                default:
+                    {
+                        _pushReceived(uuid, pushMessage); break;
+                    }
+
+            }
+        }
+
+        public void _pushReceived(string uuid, string data)
+        {
+            long now = java.lang.System.currentTimeMillis();
+            if (!pushLog.ContainsKey(uuid))
+            {
+                pushLog[uuid] = now;
+                base.pushReceived(data);
+            }
+
+            List<string> removals = new List<string>();
+            foreach (string key in pushLog.Keys)
+            {
+                long arrivalTime = pushLog[key];
+                if (arrivalTime < now - 60000)  // 5 minutes
+                {
+                    removals.Add(key);
+                }
+            }
+
+            foreach (string toremove in removals)
+            {
+                pushLog.Remove(toremove);
+            }
+            
+        }
+
+        public static Dictionary<string, long> pushLog = new Dictionary<string, long>();
+
+        private void Channel_PushNotificationReceived(Windows.Networking.PushNotifications.PushNotificationChannel sender, Windows.Networking.PushNotifications.PushNotificationReceivedEventArgs args)
+        {
+            switch (args.NotificationType)
+            {
+                case Windows.Networking.PushNotifications.PushNotificationType.Toast:
+                    {
+                        XmlDocument xml = args.ToastNotification.Content;
+                        Display.getInstance().callSerially(new PushReceivedRunnable(xml.DocumentElement.GetAttribute("launch")));
+                        break;
+                    }
+                case Windows.Networking.PushNotifications.PushNotificationType.Raw:
+                    {
+                        Display.getInstance().callSerially(new PushReceivedRunnable(args.RawNotification.Content));
+                        break;
+                    }
+                default:
+                    {
+                        com.codename1.io.Log.p("Received push notification but type is not handled yet");
+                        break;
+                    }
+
+                    
+            }
+        }
+
+        void _sendPushRegistrationError(String message, int errorCode)
+        {
+            base.sendPushRegistrationError(message, errorCode);
+        }
+
+        void _registerServerPush(string id)
+        {
+            if (registerServerPush(id, getApplicationKey(), (byte)10, "", getPackageName()))
+            {
+                base.sendRegisteredForPush(id);
+            }
+            else
+            {
+                base.sendPushRegistrationError("Failed to register server push", 0);
+            }
+        }
+
+        class PushReceivedRunnable : java.lang.Runnable
+        {
+            private string data;
+
+            public PushReceivedRunnable(string data)
+            {
+                this.data = data;
+            }
+
+            public void run()
+            {
+                //com.codename1.ui.Dialog.show("Hello", "Push received", "ÖK", null);
+                SilverlightImplementation.instance._handlePushFromLaunchArg(this.data);
+            }
+        }
+
+        class RegisterServerPushRunnable :java.lang.Runnable
+        {
+            private string id;
+
+            public RegisterServerPushRunnable(string id)
+            {
+                this.id = id;
+            }
+           
+            public void run()
+            {
+               
+                SilverlightImplementation.instance._registerServerPush(this.id);
+            }
+        }
+
+        class SendPushRegistrationErrorhRunnable : java.lang.Runnable
+        {
+            private string message;
+            private int errorCode;
+
+            public SendPushRegistrationErrorhRunnable(string message, int errorCode)
+            {
+                this.message = message;
+                this.errorCode = errorCode;
+            }
+
+            public void run()
+            {
+                SilverlightImplementation.instance._sendPushRegistrationError(this.message, this.errorCode);
+            }
         }
 
         private static string getDictValue(Dictionary<string, string> aSettings, string aKey, string aDefaultValue)
@@ -221,16 +501,23 @@ namespace com.codename1.impl
               Windows.Phone.UI.Input.HardwareButtons.BackPressed += page_BackKeyPress;
                isPhone = false;
 #elif WINDOWS_UWP
+              Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
               if (Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons"))
               {
-                  isPhone = false;
-                  Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
+                  isPhone = false; 
               }
 #endif
               cl.SizeChanged += cl_SizeChanged;
               cl.ManipulationMode = ManipulationModes.All;
+              cl.PointerPressed += new PointerEventHandler(Canvas__pointerPressed);
+              //cl.CompositeMode = ElementCompositeMode.MinBlend;
               screen.ManipulationMode = ManipulationModes.All;
+              
               screen.PointerPressed += new PointerEventHandler(LayoutRoot_PointerPressed);
+              screen.Tapped += new TappedEventHandler(LayoutRoot_Tapped);
+              screen.PointerWheelChanged += new PointerEventHandler(LayoutRoot_PointerWheelChanged);
+              //screen.ManipulationMode = ManipulationModes.None;
+              //screen.IsHitTestVisible = false;
               screen.PointerReleased += new PointerEventHandler(LayoutRoot_PointerReleased);
               screen.PointerMoved += new PointerEventHandler(LayoutRoot_PointerMoved);
           }).AsTask().GetAwaiter();
@@ -242,6 +529,56 @@ namespace com.codename1.impl
             }
             Display.getInstance().setTransitionYield(0);
             setDragStartPercentage(3);
+        }
+
+        private void LayoutRoot_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+        {
+            point = e.GetCurrentPoint(screen).Position;
+
+
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
+            {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+
+                        routeWheelEventToWebview(wv, e);
+                        wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[]{ });
+
+                    }
+                }
+                return;
+            }
+        }
+
+        private void LayoutRoot_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            point = e.GetPosition(screen);//.Position;
+
+            
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
+            {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        
+                        routeTapEventToWebview(wv, e, "click");
+                        wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
+                    }
+                }
+                return;
+            }
+        }
+
+        private void Canvas__pointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            //e.S
         }
 #if WINDOWS_UWP
         private void SilverlightImplementation_BackRequested(object sender,Windows.UI.Core.BackRequestedEventArgs e)
@@ -350,6 +687,11 @@ namespace com.codename1.impl
             Application.Current.Exit();
         }
 
+        public override bool paintNativePeersBehind()
+        {
+            return true;
+        }
+
         public override media.Media createMedia(java.io.InputStream n1, string n2, java.lang.Runnable n3)
         {
             object ss = createStorageOutputStream("CN1TempVideodu73aFljhuiw3yrindo87.mp4");
@@ -436,6 +778,21 @@ namespace com.codename1.impl
         {
             var pointerId = e.Pointer;
             point = e.GetCurrentPoint(cl).Position;
+
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
+                        routePointerEventToWebview(wv, e, "mousemove");
+                    }
+                }
+                return;
+            }
+
             var BB = e.GetIntermediatePoints(cl);
             if (pointerId.PointerDeviceType == PointerDeviceType.Touch || pointerId.PointerDeviceType == PointerDeviceType.Mouse || pointerId.PointerDeviceType == PointerDeviceType.Pen)
             {
@@ -456,9 +813,334 @@ namespace com.codename1.impl
             e.Handled = true;
         }
 
+        private bool hitTest(int x, int y)
+        {
+            Form f = Display.getInstance().getCurrent();
+            if (f != null)
+            {
+                Component cmp = f.getComponentAt(x, y);
+                if (cmp != null && cmp is PeerComponent)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private string createJSPointerEventProperties(WebView wv, PointerPoint wvPoint, PointerRoutedEventArgs e)
+        {
+            int button = 0;
+            if (e.Pointer.PointerDeviceType == Windows.Devices.Input.PointerDeviceType.Mouse)
+            {
+                if (wvPoint.Properties.IsLeftButtonPressed)
+                {
+                    button |= 1;
+                }
+                if (wvPoint.Properties.IsMiddleButtonPressed)
+                {
+                    button |= 4;
+                }
+                if (wvPoint.Properties.IsRightButtonPressed)
+                {
+                    button |= 2;
+                }
+
+
+            }
+            return "{isPrimary:true,pointerId:1," +
+                "'bubbles': true," +
+              "'cancelable': true," +
+              "'view': window," +
+              "'detail': 0," +
+              "'screenX': " + point.X + "," +
+              "'screenY': " + point.Y + "," +
+              "'clientX': " + wvPoint.Position.X + "," +
+              "'clientY': " + wvPoint.Position.Y + "," +
+              "'ctrlKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              "'altKey': " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Menu) ? "true" : "false") + "," +
+              "'shiftKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Shift) ? "true" : "false") + "," +
+              "'metaKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              "'button': " + button + "," +
+              "'relatedTarget': null" +
+            "}";
+
+        }
+
+        private string createJSClickEventProperties(WebView wv, Windows.Foundation.Point wvPoint, TappedRoutedEventArgs e)
+        {
+            
+            return "{isPrimary:true, pointerId:1," +
+                "'bubbles': true," +
+              "'cancelable': true," +
+              "'view': window," +
+              "'detail': 0," +
+              "'screenX': " + point.X + "," +
+              "'screenY': " + point.Y + "," +
+              "'clientX': " + wvPoint.X + "," +
+              "'clientY': " + wvPoint.Y + "," +
+              //"'ctrlKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              //"'altKey': " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Menu) ? "true" : "false") + "," +
+              //"'shiftKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Shift) ? "true" : "false") + "," +
+              //"'metaKey':  " + (e.KeyModifiers.HasFlag(Windows.System.VirtualKeyModifiers.Control) ? "true" : "false") + "," +
+              //"'button': " + button + "," +
+              "'relatedTarget': null" +
+            "}";
+
+        }
+
+        static String createCaretRangeJSFuncs()
+        {
+            return "function getMouseEventCaretRange(evt) {\n" +
+                "    var range, x = evt.clientX, y = evt.clientY;\n" +
+                "\n" +
+                "    // Try the simple IE way first\n" +
+                "    if (document.body.createTextRange) {\n" +
+                "        range = document.body.createTextRange();\n" +
+                "        range.moveToPoint(x, y);\n" +
+                "    }\n" +
+                "\n" +
+                "    else if (typeof document.createRange != \"undefined\") {\n" +
+                "        // Try Mozilla's rangeOffset and rangeParent properties,\n" +
+                "        // which are exactly what we want\n" +
+                "        if (typeof evt.rangeParent != \"undefined\") {\n" +
+                "            range = document.createRange();\n" +
+                "            range.setStart(evt.rangeParent, evt.rangeOffset);\n" +
+                "            range.collapse(true);\n" +
+                "        }\n" +
+                "\n" +
+                "        // Try the standards-based way next\n" +
+                "        else if (document.caretPositionFromPoint) {\n" +
+                "            var pos = document.caretPositionFromPoint(x, y);\n" +
+                "            range = document.createRange();\n" +
+                "            range.setStart(pos.offsetNode, pos.offset);\n" +
+                "            range.collapse(true);\n" +
+                "        }\n" +
+                "\n" +
+                "        // Next, the WebKit way\n" +
+                "        else if (document.caretRangeFromPoint) {\n" +
+                "            range = document.caretRangeFromPoint(x, y);\n" +
+                "        }\n" +
+                "    }\n" +
+                "\n" +
+                "    return range;\n" +
+                "}\n" +
+                "\n" +
+                "function selectRange(range) {\n" +
+                "    if (range) {\n" +
+                "        if (typeof range.select != \"undefined\") {\n" +
+                "            range.select();\n" +
+                "        } else if (typeof window.getSelection != \"undefined\") {\n" +
+                "            var sel = window.getSelection();\n" +
+                "            sel.removeAllRanges();\n" +
+                "            sel.addRange(range);\n" +
+                "        }\n" +
+                "    }\n" +
+                "}";
+        }
+
+        private string createJSPointerEvent(WebView wv, PointerRoutedEventArgs e, string eventName)
+        {
+            PointerPoint wvPoint = e.GetCurrentPoint(wv);
+            
+
+            string pointerEventName = null;
+            string touchEventName = null;
+            switch (eventName)
+            {
+                case "mousedown":
+                    pointerEventName = "pointerdown";
+                    touchEventName = "touchstart";
+                    break;
+                case "mouseup":
+                    pointerEventName = "pointerup";
+                    touchEventName = "touchend";
+                    break;
+                case "mousemove":
+                    pointerEventName = "pointermove";
+                    touchEventName = "touchmove";
+                    break;
+            }
+
+            
+            
+
+            string mouseover = "" +
+            "if (!window.cn1__mouseOverOutTrigger) { var currentHoveredElement = null; var currentDraggedElement = null; var dragStarted = false; " +/*
+                "var mouseDown = function(evt) {" +
+                "    var el = document.elementFromPoint(evt.clientX, evt.clientY);" +
+                "    currentDraggedElement = el; dragStarted = false;" +
+                "};" +
+                "window.addEventListener('mousedown', mouseDown, true);" +
+                "var mouseUp = function(evt) {" +
+                "    var el = document.elementFromPoint(evt.clientX, evt.clientY);" +
+                "    if (currentDraggedElement != null) {" +
+                "        var dragEnd = new DragEvent('dragend', {bubbles:true, cancelable:true, view:window, detail:0, screenX:evt.screenX, screenY:evt.screenY, clientX:evt.clientX, clientY:evt.clientY});" +
+                "        currentDraggedElement.dispatchEvent(dragEnd);" +
+                "        currentDraggedElement = null;"+
+                "    }"+
+                "    currentDraggedElement = null;"+
+                "    dragStarted = false;"+
+                "};"+
+                "window.addEventListener('mouseup', mouseUp, true);"+*/
+               
+                "var mouseMove = function(evt) {" +
+                "    var el = document.elementFromPoint(evt.clientX, evt.clientY);"+
+               
+                "    if (el != currentHoveredElement && currentHoveredElement != null) {"+
+                "        var mouseOutEvt = new MouseEvent('mouseout', "+
+                "            {" +
+                "                'bubbles': true," +
+                "                'cancelable': true," +
+                "                'view': window," +
+                "                'detail': 0," +
+                "                'screenX': evt.screenX,"+
+                "                'screenY': evt.screenY,"+
+                "                'clientX': evt.clientX," +
+                "                'clientY': evt.clientY," +
+                "                'relatedTarget': el" +
+                "            }"+
+                "        ); "+
+                "        currentHoveredElement.dispatchEvent(mouseOutEvt);"+
+                "        var pointerOutEvt = new PointerEvent('pointerout', " +
+                "            {" +
+                "                'bubbles': true," +
+                "                'cancelable': true," +
+                "                'view': window," +
+                "                'detail': 0," +
+                "                'screenX': evt.screenX," +
+                "                'screenY': evt.screenY," +
+                "                'clientX': evt.clientX," +
+                "                'clientY': evt.clientY," +
+                "                'relatedTarget': el" +
+                "            }" +
+                "        ); " +
+                "        currentHoveredElement.dispatchEvent(pointerOutEvt);" +
+                "    }" +
+                "    if (el != currentHoveredElement && el != null) {"+
+                "        var mouseOverEvt = new MouseEvent('mouseover', "+
+                "        {" +
+                "            'bubbles': true," +
+                "            'cancelable': true," +
+                "            'view': window," +
+                "            'detail': 0," +
+                "            'screenX': evt.screenX," +
+                "            'screenY': evt.screenY," +
+                "            'clientX': evt.clientX," +
+                "            'clientY': evt.clientY," +
+                "            'relatedTarget': currentHoveredElement" +
+                "         });"+
+                "         el.dispatchEvent(mouseOverEvt); "+
+                "        var pointerOverEvt = new MouseEvent('pointerover', " +
+                "        {" +
+                "            'bubbles': true," +
+                "            'cancelable': true," +
+                "            'view': window," +
+                "            'detail': 0," +
+                "            'screenX': evt.screenX," +
+                "            'screenY': evt.screenY," +
+                "            'clientX': evt.clientX," +
+                "            'clientY': evt.clientY," +
+                "            'relatedTarget': currentHoveredElement" +
+                "         });" +
+                "         el.dispatchEvent(pointerOverEvt); " +
+                "    } " +
+                "    if (currentDraggedElement != null) {"+
+                "        if (!dragStarted) {"+
+                "            dragStarted = true;"+
+                "            var dragStart = new DragEvent('dragstart', {"+
+                "                bubbles: true, cancelable: true, view: window, detail: 0, screenX:evt.screenX, screenY:evt.screenY, clientX:evt.clientX, clientY:evt.clientY"+
+                "            }); currentDraggedElement.dispatchEvent(dragStart);"+
+                "        } else {"+
+                "            var drag = new DragEvent('drag', {"+
+                "                bubbles: true, cancelable: true, view: window, details: 0, screenX:evt.screenX, screenY:evt.screenY, clientX:evt.clientX, clientY:evt.clientY"+
+                "            }); currentDraggedElement.dispatchEvent(drag);"+
+                "        }"+
+                "    }"+
+                "    currentHoveredElement = el;"+
+                "    " +
+                "};"+
+                "window.addEventListener('mousemove', mouseMove, true);"+
+                "window.cn1__mouseOverOutTrigger = mouseMove;" +
+            "}";
+
+            string createEventNewJs = mouseover +
+                "var evt = null;var el = document.elementFromPoint(" + wvPoint.Position.X + ", " + wvPoint.Position.Y + "); " +
+                (pointerEventName != null ? ("var evt = new PointerEvent('" + pointerEventName + "', " + createJSPointerEventProperties(wv, wvPoint, e) + ");" +
+                "if (el != null){ el.dispatchEvent(evt);}") : "") +
+                "evt = new MouseEvent('" + eventName + "', " + createJSPointerEventProperties(wv, wvPoint, e) + ");" +
+                " if (el != null) { el.dispatchEvent(evt);}";// +
+                //(touchEventName != null ?(""+
+                //"evt = document.createEvent('TouchEvent');evt.touches = [{pageX:"+wvPoint.Position.X+", pageY:"+wvPoint.Position.Y+"}];"+
+                //"if (el != null) {el.dispatchEvent(evt);}"
+                //) :(""));
+
+            
+            return createEventNewJs;
+
+        }
+        private string createJSWheelEvent(WebView wv, PointerRoutedEventArgs e)
+        {
+            wv.Focus(FocusState.Pointer);
+            PointerPoint wvPoint = e.GetCurrentPoint(wv);
+
+            int delta = wvPoint.Properties.MouseWheelDelta;
+
+
+            
+
+            string createEventNewJs = 
+                "var evt = null;var el = document.elementFromPoint(" + wvPoint.Position.X + ", " + wvPoint.Position.Y + "); " +
+                "evt = new WheelEvent('wheel', {deltaY: "+delta+", bubbles:true, cancelable:true, view:window, detail:0, screenX:"+wvPoint.Position.X+", screenY:"+wvPoint.Position.Y+", clientX:"+wvPoint.Position.X+", clientY:"+wvPoint.Position.Y+", wheelDelta:"+delta+", wheelDeltaY:"+delta+"});" +
+                " evt.wheelDelta = "+delta+"; if (el != null) { el.dispatchEvent(evt); console.log('dispatching wheel '+evt + 'delta is "+delta+"');}";// +
+                                                             //(touchEventName != null ?(""+
+                                                             //"evt = document.createEvent('TouchEvent');evt.touches = [{pageX:"+wvPoint.Position.X+", pageY:"+wvPoint.Position.Y+"}];"+
+                                                             //"if (el != null) {el.dispatchEvent(evt);}"
+                                                             //) :(""));
+
+
+            return createEventNewJs;
+
+        }
+
+        private string createJSClickEvent(WebView wv, TappedRoutedEventArgs e, string eventName)
+        {
+
+            Windows.Foundation.Point wvPoint = e.GetPosition(wv);
+
+            
+
+
+            string createEventNewJs = ""+
+                "var evt = null;var el = document.elementFromPoint(" + wvPoint.X + ", " + wvPoint.Y + "); " +
+                "evt = new MouseEvent('" + eventName + "', " + createJSClickEventProperties(wv, wvPoint, e) + ");" +
+                " if (el != null) { el.dispatchEvent(evt);el.focus();}";
+            return createEventNewJs;
+
+        }
+
+        private void routePointerEventToWebview(WebView wv, PointerRoutedEventArgs e, string eventName)
+        {
+            string js = "(function(){" + createJSPointerEvent(wv, e, eventName) + "})()";
+            wv.InvokeScriptAsync("eval", new string[] { js });
+        }
+
+        private void routeWheelEventToWebview(WebView wv, PointerRoutedEventArgs e)
+        {
+            string js = "(function(){" + createJSWheelEvent(wv, e) + "})()";
+            wv.InvokeScriptAsync("eval", new string[] { js });
+        }
+
+        private void routeTapEventToWebview(WebView wv, TappedRoutedEventArgs e, string eventName)
+        {
+            string js = "(function(){" + createJSClickEvent(wv, e, eventName) + "})()";
+            wv.InvokeScriptAsync("eval", new string[] { js });
+        }
+
         private void LayoutRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+
             point = e.GetCurrentPoint(cl).Position;
+            
             if (instance.currentlyEditing != null)
             {
                 Form f = instance.currentlyEditing.getComponentForm();
@@ -466,6 +1148,19 @@ namespace com.codename1.impl
                 {
                     return;
                 }
+            }
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
+                        routePointerEventToWebview(wv, e, "mousedown");
+                    }
+                }
+                return;
             }
             pointerPressed(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
             screen.CapturePointer(e.Pointer);
@@ -483,6 +1178,19 @@ namespace com.codename1.impl
                     commitEditing();
                 }
             }
+            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
+                        routePointerEventToWebview(wv, e, "mouseup");
+                    }
+                }
+                return;
+            }
             pointerReleased(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
             e.Handled = true;
             return;
@@ -497,6 +1205,7 @@ namespace com.codename1.impl
         {
             if (displayWidth < 0)
             {
+               
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
                     displayWidth = Convert.ToInt32(cl.ActualWidth * scaleFactor);
@@ -562,6 +1271,46 @@ namespace com.codename1.impl
             tb.InputScope = ins;
         }
 
+        private void OnKeyDownHandler(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == Windows.System.VirtualKey.Enter)
+            {
+                if (currentlyEditing != null && currentlyEditing is TextField)
+                {
+                    TextField tf = (TextField)currentlyEditing;
+                    if (tf.getDoneListener() != null)
+                    {
+                        Display.getInstance().callSerially(new DoneEditing(tf));
+                    } else
+                    {
+                        commitEditing();
+                    }
+                }
+            }
+
+            
+        }
+
+        public class DoneEditing : java.lang.Runnable
+        {
+            TextField tf;
+
+            public DoneEditing(TextField tf)
+            {
+                this.tf = tf;
+            }
+
+            public void run()
+            {
+                if (tf.getDoneListener() != null)
+                {
+                    tf.fireDoneEvent();
+                    commitEditing();
+                }
+            }
+        }
+
+
         private bool lockEditing;
 
         public override void editString(Component n1, int n2, int n3, string n4, int n5)
@@ -600,44 +1349,45 @@ namespace com.codename1.impl
                    else
                    {
                        textInputInstance = new TextBox();
-                       ((TextBox)textInputInstance).IsTextPredictionEnabled = true;
-                       ((TextBox)textInputInstance).TextChanged += textChangedEvent;
-                       ((TextBox)textInputInstance).Text = n4;
-                       ((TextBox)textInputInstance).AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
-                       ((TextBox)textInputInstance).MaxLength = n2;
-
-                       if ((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE)
-                       {
-                           ((TextBox)textInputInstance).InputScope = new InputScope();
-                       }
+                       TextBox tb = (TextBox)textInputInstance;
+                       tb.KeyDown += new KeyEventHandler(OnKeyDownHandler);
+                       
+                       tb.IsTextPredictionEnabled = true;
+                       tb.TextChanged += textChangedEvent;
+                       
+                       tb.AcceptsReturn = !currentlyEditing.isSingleLineTextArea();
+                       tb.MaxLength = n2;
+                       tb.IsTextPredictionEnabled = !((constraints & TextArea.NON_PREDICTIVE) == TextArea.NON_PREDICTIVE);
+                       tb.TextWrapping = currentlyEditing.isSingleLineTextArea() ? TextWrapping.NoWrap : TextWrapping.Wrap;
+                       tb.Text = n4;
 
                        if ((constraints & TextArea.NUMERIC) == TextArea.NUMERIC)
                        {
-                           setConstraint((TextBox)textInputInstance, InputScopeNameValue.NumberFullWidth);
+                           setConstraint(tb, InputScopeNameValue.NumberFullWidth);
                        }
                        else
                        {
                            if ((constraints & TextArea.DECIMAL) == TextArea.DECIMAL)
                            {
-                               setConstraint((TextBox)textInputInstance, InputScopeNameValue.Number);
+                               setConstraint(tb, InputScopeNameValue.Number);
                            }
                            else
                            {
                                if ((constraints & TextArea.EMAILADDR) == TextArea.EMAILADDR)
                                {
-                                   setConstraint((TextBox)textInputInstance, InputScopeNameValue.EmailSmtpAddress);
+                                   setConstraint(tb, InputScopeNameValue.EmailSmtpAddress);
                                }
                                else
                                {
                                    if ((constraints & TextArea.URL) == TextArea.URL)
                                    {
-                                       setConstraint((TextBox)textInputInstance, InputScopeNameValue.Url);
+                                       setConstraint(tb, InputScopeNameValue.Url);
                                    }
                                    else
                                    {
                                        if ((constraints & TextArea.PHONENUMBER) == TextArea.PHONENUMBER)
                                        {
-                                           setConstraint((TextBox)textInputInstance, InputScopeNameValue.TelephoneNumber);
+                                           setConstraint(tb, InputScopeNameValue.TelephoneNumber);
                                        }
                                    }
                                }
@@ -658,7 +1408,7 @@ namespace com.codename1.impl
                    textInputInstance.FontSize = (font.font.FontSize / scaleFactor);
                    int h = Convert.ToInt32((textInputInstance.Height - textInputInstance.FontSize) / 3);
                    textInputInstance.Margin = new Thickness();
-                   textInputInstance.Padding = new Thickness(10, h, 0, 0);
+                   //textInputInstance.Padding = new Thickness(10, h, 0, 0);
                    textInputInstance.Clip = null;
                    textInputInstance.Focus(FocusState.Programmatic);
                    are.Set();
@@ -705,7 +1455,57 @@ namespace com.codename1.impl
             //if the view is not visible make sure the edt won't wait.
             return base.hasPendingPaints();
         }
-      
+
+        List<SilverlightBrowserComponent> renderedBrowserComponents = new List<SilverlightBrowserComponent>();
+
+        public override void beforeComponentPaint(Component c, Graphics g)
+        {
+            if (c is Form)
+            {
+                renderedBrowserComponents.Clear();
+                return;
+            }
+            if (c is SilverlightBrowserComponent)
+            {
+                renderedBrowserComponents.Add((SilverlightBrowserComponent)c);
+                ((SilverlightBrowserComponent)c).setShouldRenderInFront(true);
+                return;
+            }
+            if (renderedBrowserComponents.Count() > 0)
+            {
+                
+                int absX = c.getAbsoluteX();
+                int absY = c.getAbsoluteY();
+                int w = c.getWidth();
+                int h = c.getHeight();
+                foreach (SilverlightBrowserComponent bc in renderedBrowserComponents)
+                {
+                    bool renderInFront = bc.isShouldRenderInFront();
+                    
+                    if (renderInFront && Rectangle.intersects(bc.getAbsoluteX(), bc.getAbsoluteY(), bc.getWidth(), bc.getHeight(),
+                        absX, absY, w, h))
+                    {
+                        //java.lang.System.@out.println("Should render in front NO");
+                        bc.setShouldRenderInFront(false);
+                    }
+                }
+            }
+            base.beforeComponentPaint(c, g);
+        }
+
+        public override void afterComponentPaint(Component c, Graphics g)
+        {
+            if (c is Form)
+            {
+                foreach (SilverlightBrowserComponent bc in renderedBrowserComponents)
+                {
+                    bc.updateZIndex();
+                }
+                    
+            }
+            base.afterComponentPaint(c, g);
+        }
+
         public override void repaint(Animation cmp)
         {
             if (myView != null)
@@ -1564,66 +2364,169 @@ namespace com.codename1.impl
             return true;
         }
 
-        BrowserComponent currentBrowser;
-        public WebView webView;
-        public override PeerComponent createBrowserComponent(object n1)
+        public class SilverlightBrowserComponent : SilverlightPeer
         {
-            SilverlightPeer sp = null;
-            using (AutoResetEvent are = new AutoResetEvent(false))
+            private BrowserComponent bc;
+            private WebView webView;
+            private bool shouldRenderInFront;
+            private bool isRenderedInFront;
+            private string pendingPageContent;
+            private bool initialized;
+
+            public SilverlightBrowserComponent(WebView element, BrowserComponent bc) : base(element)
             {
+                webView = element;
+                this.bc = bc;
+                setZIndex(1);
+                isRenderedInFront = true;
+
+            }
+
+            public bool isBrowserInitialized()
+            {
+                return initialized;
+            }
+
+            public void setPendingPageContent(string content)
+            {
+                pendingPageContent = content;
+            }
+
+            public bool isShouldRenderInFront()
+            {
+                return shouldRenderInFront;
+            }
+
+            public void setShouldRenderInFront(bool b)
+            {
+                this.shouldRenderInFront = b;
+            }
+
+            public void setIsRenderedInFront(bool b)
+            {
+                this.isRenderedInFront = b;
+            }
+
+            public void updateZIndex()
+            {
+                if (shouldRenderInFront != isRenderedInFront)
+                {
+                    isRenderedInFront = shouldRenderInFront;
+                    int zIndex = isRenderedInFront ? 1 : -1;
+                    setZIndex(zIndex);
+                    dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    {
+                        element.SetValue(Canvas.ZIndexProperty, zIndex);
+                    });
+                }
+            }
+
+            //public override void paint(Graphics g)
+            //{
+            //    base.paint(g);
+            //}
+
+            protected override void initComponent()
+            {
+                base.initComponent();
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                 {
-                    webView = new WebView();
-                    currentBrowser = (BrowserComponent)n1;
+                    webView.Opacity = 1f;
+                    //webView.DefaultBackgroundColor = Windows.UI.Colors.Red;
+                    webView.Visibility = Visibility.Visible;
                     webView.DOMContentLoaded += webview_DOMContentLoaded;
                     webView.NavigationStarting += webview_Navigating;
                     webView.ContentLoading += webview_ContentLoading;
                     webView.IsTapEnabled = true;
                     webView.NavigationCompleted += webview_NavigationCompleted;
-                    sp = new SilverlightPeer(webView);
-                    are.Set();
-                }).AsTask().GetAwaiter().GetResult();
-                are.WaitOne();
+                    if (pendingPageContent != null)
+                    {
+                        webView.NavigateToString(pendingPageContent);
+                        pendingPageContent = null;
+                    }
+                    initialized = true;
+                });
+
             }
+
+            protected override void deinitialize()
+            {
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    initialized = false;
+                    webView.DOMContentLoaded -= webview_DOMContentLoaded;
+                    webView.NavigationStarting -= webview_Navigating;
+                    webView.ContentLoading -= webview_ContentLoading;
+                    webView.NavigationCompleted -= webview_NavigationCompleted;
+                });
+
+                base.deinitialize();
+            }
+
+            void webview_DOMContentLoaded(WebView sender, WebViewDOMContentLoadedEventArgs e)
+            {
+                ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
+                bc.fireWebEvent("onLoadResource", ev);
+
+            }
+
+            void webview_NavigationCompleted(WebView sender, WebViewNavigationCompletedEventArgs e)
+            {
+                if (e.IsSuccess == false)
+                {
+                    ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
+                    bc.fireWebEvent("onError", ev);
+                }
+            }
+
+            void webview_ContentLoading(WebView sender, WebViewContentLoadingEventArgs e)
+            {
+                ActionEvent ev = new ActionEvent(e == null ? null : e.Uri == null ? null : e.Uri.OriginalString);
+                string jsInject = createCaretRangeJSFuncs();
+                //jsInject = "(function(){ " + jsInject + "\n window.__cn1__getMouseEventCaretRange = getMouseEventCaretRange; window.__cn1__selectRange = selectRange;"+
+                //    "window.addEventListener('click', function(e){ try { console.log('caret pos: '); console.log(document.caretRangeFromPoint(e.clientX, e.clientY));console.log(e); e.target.focus(); var caretRange = getMouseEventCaretRange(e); console.log(caretRange); window.setTimeout(function(){try {selectRange(caretRange);} catch (e){console.log(e);}}, 0);} catch (e){console.log(e);}}, false);\n})();";
+                //sender.InvokeScriptAsync("eval", new string[] { jsInject });
+                bc.fireWebEvent("onLoad", ev);
+            }
+
+            void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
+            {
+                BrowserNavigationCallback bn = bc.getBrowserNavigationCallback();
+                if (bn != null && e.Uri != null && !bn.shouldNavigate(e.Uri.ToString()))
+                {
+                    e.Cancel = true;
+                }
+                ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
+                bc.fireWebEvent("onStart", ev);
+            }
+        }
+
+        //BrowserComponent currentBrowser;
+        //public WebView webView;
+        public override PeerComponent createBrowserComponent(object n1)
+        {
+            //SilverlightBrowserComponent sp = null;
+            WebView webView = null;
+            //using (AutoResetEvent are = new AutoResetEvent(false))
+            //{
+                dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                {
+                    webView = new WebView();
+                    
+                    //are.Set();
+                }).AsTask().GetAwaiter().GetResult();
+                //are.WaitOne();
+            //}
+            BrowserComponent currentBrowser = (BrowserComponent)n1;
+
+            SilverlightBrowserComponent sp = new SilverlightBrowserComponent(webView, currentBrowser);
             return sp;
         }
+        
 
-        void webview_DOMContentLoaded(WebView sender, WebViewDOMContentLoadedEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-            ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-            currentBrowser.fireWebEvent("onLoadResource", ev);
+       
 
-        }
-
-        void webview_NavigationCompleted(WebView sender, WebViewNavigationCompletedEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-           
-            if (e.IsSuccess == false)
-            {
-                ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-                currentBrowser.fireWebEvent("onError", ev);
-            }
-        }
-
-        void webview_ContentLoading(WebView sender, WebViewContentLoadingEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-            ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-            currentBrowser.fireWebEvent("onLoad", ev);
-        }
-
-        void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
-        {
-            BrowserNavigationCallback bn = currentBrowser.getBrowserNavigationCallback();
-            if (!bn.shouldNavigate(e.Uri.ToString()))
-            {
-                e.Cancel = true;
-            }
-            ActionEvent ev = new ActionEvent(e.Uri.OriginalString);
-            currentBrowser.fireWebEvent("onStart", ev);
-        }
+        
 
         public override string getBrowserTitle(PeerComponent n1)
         {
@@ -1632,7 +2535,7 @@ namespace com.codename1.impl
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
                 {
-                    webView = (WebView)((SilverlightPeer)n1).element;
+                    WebView webView = (WebView)((SilverlightPeer)n1).element;
                     st = await webView.InvokeScriptAsync("eval", new string[] { "document.title.toString()" });
                     are.Set();
                 }).AsTask().GetAwaiter().GetResult();
@@ -1643,9 +2546,10 @@ namespace com.codename1.impl
 
         public override string getBrowserURL(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
-            webView = (WebView)((SilverlightPeer)n1).element;
+                webView = (WebView)((SilverlightPeer)n1).element;
            
            }).AsTask().GetAwaiter().GetResult();
             return webView.Source.OriginalString;
@@ -1653,6 +2557,9 @@ namespace com.codename1.impl
 
         public override void setBrowserURL(PeerComponent browserPeer, string url)
         {
+            WebView webView = null; ;
+            //url = "https://maps.google.com";
+            //url = "https://www.google.com";
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
                webView = (WebView)((SilverlightPeer)browserPeer).element;
@@ -1669,11 +2576,12 @@ namespace com.codename1.impl
                    return;
                }
                webView.Source = new Uri(uri);
-           }).AsTask().GetAwaiter().GetResult();
+           });
         }
  
         public override void browserReload(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1686,6 +2594,7 @@ namespace com.codename1.impl
             bool ret = false;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
+                WebView webView = null;
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                {
                    webView = (WebView)((SilverlightPeer)n1).element;
@@ -1700,6 +2609,7 @@ namespace com.codename1.impl
         public override bool browserHasForward(PeerComponent n1)
         {
             bool ret = false;
+            WebView webView = null;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
@@ -1715,6 +2625,7 @@ namespace com.codename1.impl
 
         public override void browserBack(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1724,6 +2635,7 @@ namespace com.codename1.impl
 
         public override void browserStop(PeerComponent n1)
         {
+            WebView webView = null;
           dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
          {
              webView = (WebView)((SilverlightPeer)n1).element;
@@ -1733,24 +2645,34 @@ namespace com.codename1.impl
 
         public override void browserForward(PeerComponent n1)
         {
+            WebView webView = null;
               dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
          {
             webView = (WebView)((SilverlightPeer)n1).element;
             webView.GoForward();
-         }).AsTask().GetAwaiter().GetResult();
+         });
         }
 
         public override void setBrowserPage(PeerComponent n1, string n2, string n3)
         {
+            SilverlightBrowserComponent bc = (SilverlightBrowserComponent)n1;
+            if (!bc.isBrowserInitialized())
+            {
+                bc.setPendingPageContent(n2);
+                return;
+            }
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
            {
                webView = (WebView)((SilverlightPeer)n1).element;
                webView.NavigateToString(n2);
-           }).AsTask().GetAwaiter();
+           });
         }
+
 
         public override void browserDestroy(PeerComponent n1)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1835,6 +2757,7 @@ namespace com.codename1.impl
         
         public override void browserExecute(PeerComponent n1, string n2)
         {
+            WebView webView = null;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
                 webView = (WebView)((SilverlightPeer)n1).element;
@@ -1845,6 +2768,7 @@ namespace com.codename1.impl
         public override string browserExecuteAndReturnString(PeerComponent n1, string n2)
         {
             string st = null;
+            WebView webView = null;
             using (AutoResetEvent are = new AutoResetEvent(false))
             {
                 dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
@@ -1877,50 +2801,22 @@ namespace com.codename1.impl
 
         public override void sendMessage(string[] n1, string n2, messaging.Message n3)
         {
-
-            string subject = n2;
-            var contactPicker = new ContactPicker();
-            contactPicker.DesiredFieldsWithContactFieldType.Add(ContactFieldType.Email);
-            Contact recipient = contactPicker.PickContactAsync().AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-            if (recipient != null)
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                IList<ContactEmail> fields = recipient.Emails;
+                string subject = n2;
+                Windows.ApplicationModel.Email.EmailMessage emailMessage = new Windows.ApplicationModel.Email.EmailMessage();
+                emailMessage.Body = n3.getContent();
+                emailMessage.Subject = subject;
+                foreach (string addr in n1)
+                {
+                    var emailRecipient = new Windows.ApplicationModel.Email.EmailRecipient(addr);
+                    emailMessage.To.Add(emailRecipient);
+                }
 
-                if (fields.Count > 0)
-                {
-                    if (fields[0].GetType() == typeof(ContactEmail))
-                    {
-                        foreach (ContactEmail email in fields as IList<ContactEmail>)
-                        {
-#if WINDOWS_PHONE_APP
-                            Windows.ApplicationModel.Email.EmailMessage emailMessage = new Windows.ApplicationModel.Email.EmailMessage();
-                             emailMessage.Body = n3.getContent();
-                            emailMessage.Subject = subject;
-                            var emailRecipient = new Windows.ApplicationModel.Email.EmailRecipient(email.Address);
-                            emailMessage.To.Add(emailRecipient);
-                            Windows.ApplicationModel.Email.EmailManager.ShowComposeNewEmailAsync(emailMessage).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                            break;
-#elif WINDOWS_UWP
-                            Windows.ApplicationModel.Email.EmailMessage emailMessage = new Windows.ApplicationModel.Email.EmailMessage();
-                            emailMessage.Body = n3.getContent(); 
-                            emailMessage.Subject = subject;
-                            var emailRecipient = new Windows.ApplicationModel.Email.EmailRecipient(email.Address);
-                            emailMessage.To.Add(emailRecipient);
-                            Windows.ApplicationModel.Email.EmailManager.ShowComposeNewEmailAsync(emailMessage).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-                            break;
-#endif
-                        }
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine("No recipient emailid Contact found");
-                }
-            }
-            else
-            {
-                Debug.WriteLine("No recipient emailid Contact found");
-            }
+                // Todo Add support for attachments
+
+                await Windows.ApplicationModel.Email.EmailManager.ShowComposeNewEmailAsync(emailMessage);
+            }).AsTask().GetAwaiter().GetResult();
         }
 
         public override void sendSMS(string n1, string n2, bool n)
@@ -2163,6 +3059,11 @@ namespace com.codename1.impl
         public override void fillRect(object graphics, int x, int y, int w, int h)
         {
             ((NativeGraphics)graphics).destination.fillRect(x, y, w, h);
+        }
+
+        public override void clearRect(object graphics, int x, int y, int width, int height)
+        {
+            ((NativeGraphics)graphics).destination.clearRect(x, y, width, height);
         }
 
         public override void drawRect(object graphics, int x, int y, int w, int h)
@@ -2976,6 +3877,11 @@ namespace com.codename1.impl
             {
                 java.lang.Throwable th = (java.lang.Throwable)t;
                 trace = "\n" + th.getStackTraceString();
+
+                if (th.getCause() != null && th.getCause() != th && th.getCause() is java.lang.Throwable)
+                {
+                    trace += "\nCaused by " + th.getCause().ToString() + "\n" + ((java.lang.Throwable)th.getCause()).getStackTraceString();
+                }
             }
             java.lang.System.@out.println("Stack trace is " + trace);
             char[] buf = trace.ToCharArray();

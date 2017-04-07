@@ -217,6 +217,10 @@ public class InteractionDialog extends Container {
         getUnselectedStyle().setMargin(LEFT, left);
         getUnselectedStyle().setMargin(RIGHT, right);
         getUnselectedStyle().setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        
+        // might occur when showing the dialog twice...
+        remove();
+        
         getLayeredPane(f).addComponent(BorderLayout.center(this));
         if(animateShow) {
             int x = left + (f.getWidth() - right - left) / 2;

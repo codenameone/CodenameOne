@@ -16,6 +16,7 @@
 #include "java_lang_StringBuilder.h"
 #include "java_util_HashMap.h"
 #include "java_util_HashMap_Entry.h"
+#include "java_lang_NullPointerException.h"
 #import <Foundation/Foundation.h>
 #include <pthread.h>
 #include <unistd.h>

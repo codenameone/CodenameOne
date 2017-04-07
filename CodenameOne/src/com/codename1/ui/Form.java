@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
@@ -42,27 +43,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * Top level component that serves as the root for the UI, this {@link Container}
- * handles the menus and title while placing content between them. By default a 
- * forms central content (the content pane) is scrollable.
+ *<p> Top level component that serves as the root for the UI, this {@link Container}
+ * subclass works in concert with the {@link Toolbar} to create menus. By default a 
+ * forms main content area (the content pane) is scrollable on the Y axis and has a {@link com.codename1.ui.layouts.FlowLayout} as is the default.</p>
  *
- * Form contains Title bar, MenuBar and a ContentPane.
- * Calling to addComponent on the Form is delegated to the contenPane.addComponent
+ * <p>Form contains a title bar area which in newer application is replaced by the {@link Toolbar}.
+ * Calling {@link #add(com.codename1.ui.Component)} or all similar methods  on the {@code Form} 
+ * delegates to the contenPane so calling {@code form.add(cmp)} is equivalent to 
+ * {@code form.getContentPane().add(cmp)}. Normally this shouldn't matter, however in some cases such as
+ * animation we need to use the content pane directly e.g. {@code form.getContentPane().animateLayout(200)}
+ * will work whereas {@code form.animateLayout(200)} will fail. </p>
  * 
- *<pre>
- *
- *       **************************
- *       *         Title          *
- *       **************************
- *       *                        *
- *       *                        *
- *       *      ContentPane       *
- *       *                        *
- *       *                        *
- *       **************************
- *       *         MenuBar        *
- *       **************************
- *</pre> 
  * @author Chen Fishbein
  */
 public class Form extends Container {
@@ -226,7 +217,13 @@ public class Form extends Container {
         return f.getInvisibleAreaUnderVKB();
     }
     
-    int getInvisibleAreaUnderVKB() {
+    /**
+     * In some virtual keyboard implementations (notably iOS) this value is used to determine the height of 
+     * the virtual keyboard
+     * 
+     * @return height in pixels of the virtual keyboard
+     */
+    public int getInvisibleAreaUnderVKB() {
         if(bottomPaddingMode) {
             return 0;
         }
@@ -867,7 +864,7 @@ public class Form extends Container {
             try {
                 menuBar = (MenuBar) laf.getMenuBarClass().newInstance();
             } catch (Exception ex) {
-                ex.printStackTrace();
+                Log.e(ex);
                 menuBar = new MenuBar();
             }
             menuBar.initMenuBar(this);
@@ -1078,14 +1075,10 @@ public class Form extends Container {
      */ 
     private Container getLayeredPaneImpl() {
         if(layeredPane == null){
-            Container parent = new Container(new LayeredLayout());
+            Container parent = contentPane.wrapInLayeredPane();
             layeredPane = new Container(new LayeredLayout());
-            
             // adds the global layered pane
             layeredPane.add(new Container());
-            removeComponentFromForm(contentPane);
-            addComponentToForm(BorderLayout.CENTER, parent);
-            parent.addComponent(contentPane);
             parent.addComponent(layeredPane);
             revalidate();
         }
@@ -2255,6 +2248,7 @@ public class Form extends Container {
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
         dragStopFlag = false;
+        dragged = null;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }

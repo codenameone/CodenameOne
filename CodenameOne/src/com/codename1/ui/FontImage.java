@@ -4759,6 +4759,24 @@ public class FontImage extends Image {
             Style s = new Style(l.getUnselectedStyle());
             s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
+            Style sel = l.getSelectedStyle();
+            Style pre = l.getPressedStyle();
+            Style dis = l.getDisabledStyle();
+            if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+                sel = new Style(sel);
+                sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
+                l.setRolloverIcon(FontImage.create("" + icon, sel));
+            }
+            if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+                pre = new Style(pre);
+                pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
+                l.setPressedIcon(FontImage.create("" + icon, pre));
+            }
+            if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+                dis = new Style(dis);
+                dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
+                l.setDisabledIcon(FontImage.create("" + icon, dis));
+            }
         }
     }
     
@@ -5167,6 +5185,7 @@ public class FontImage extends Image {
     public Image rotate(int degrees) {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;
+        f.opacity = opacity;
         return f;
     }
 
@@ -5207,5 +5226,13 @@ public class FontImage extends Image {
     @Override
     public boolean requiresDrawImage() {
         return true;
+    }
+    
+    /**
+     * Returns the text of the icon
+     * @return the text used to draw the icon
+     */
+    public String getText() {
+        return text;
     }
 }

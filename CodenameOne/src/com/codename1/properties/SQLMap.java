@@ -34,10 +34,10 @@ import java.util.ArrayList;
  * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
  * properly at this time. 
  *
- * @deprecated this API is experimental
  * @author Shai Almog
  */
 public class SQLMap {
+    private boolean verbose = true;
     public static enum SqlType {
         SQL_TEXT("TEXT"),
         SQL_INTEGER("INTEGER") {
@@ -204,7 +204,7 @@ public class SQLMap {
         Cursor cr = null;
         boolean has = false;
         try {
-            cr = db.executeQuery("SELECT * FROM sqlite_master WHERE type='table' AND name='" + tableName +"'");
+            cr = executeQuery("SELECT * FROM sqlite_master WHERE type='table' AND name='" + tableName +"'");
             has = cr.next();
         } finally {
             if(cr != null) {
@@ -236,17 +236,46 @@ public class SQLMap {
         
         createStatement.append(")");
         
-        db.execute(createStatement.toString());
+        execute(createStatement.toString());
         return true;
     }
+
+    private void execute(String stmt) throws IOException {
+        if(verbose) {
+            Log.p(stmt);
+        }
+        db.execute(stmt);
+    }
+
+    private void execute(String stmt, Object[] args) throws IOException {
+        if(verbose) {
+            Log.p(stmt);
+        }
+        db.execute(stmt, args);
+    }
     
+    private Cursor executeQuery(String stmt, Object[] args) throws IOException {
+        if(verbose) {
+            Log.p(stmt);
+        }
+        return db.executeQuery(stmt, args);
+    }
+
+    
+    private Cursor executeQuery(String stmt) throws IOException {
+        if(verbose) {
+            Log.p(stmt);
+        }
+        return db.executeQuery(stmt);
+    }
+
     /**
      * Drop a table matching the given property component
      * @param cmp the business object
      */
     public void dropTable(PropertyBusinessObject cmp) throws IOException {
         String tableName = getTableName(cmp);
-        db.execute("Drop table " + tableName);
+        execute("Drop table " + tableName);
     }
 
     /**
@@ -284,7 +313,7 @@ public class SQLMap {
         
         createStatement.append(")");
         
-        db.execute(createStatement.toString(), values);
+        execute(createStatement.toString(), values);
     }
     
     /**
@@ -326,7 +355,10 @@ public class SQLMap {
         createStatement.append(pkName);
         createStatement.append(" = ?");
         
-        db.execute(createStatement.toString(), values);
+        Property p = (Property)cmp.getPropertyIndex().getIgnoreCase(pkName);
+        values[values.length - 1] = p.get();
+
+        execute(createStatement.toString(), values);
     }
     
     /**
@@ -344,7 +376,8 @@ public class SQLMap {
         if(pkName != null) {
             createStatement.append(pkName);
             createStatement.append(" = ?");
-            db.execute(createStatement.toString(), new Object[]{ cmp.getPropertyIndex().getIgnoreCase(pkName) });
+            Property p = (Property)cmp.getPropertyIndex().getIgnoreCase(pkName);
+            execute(createStatement.toString(), new Object[]{ p.get() });
         } else {
             int count = 0;
             Object[] values = new Object[cmp.getPropertyIndex().getSize()];
@@ -363,7 +396,7 @@ public class SQLMap {
                 createStatement.append(columnName);
                 createStatement.append(" = ?");
             }
-            db.execute(createStatement.toString(), values);
+            execute(createStatement.toString(), values);
         }        
     }
     
@@ -386,7 +419,6 @@ public class SQLMap {
         createStatement.append(" WHERE ");
         boolean found = false;
         for(PropertyBase p : cmp.getPropertyIndex()) {
-            createStatement.append(" WHERE ");
             if(p instanceof Property) {
                 if(((Property)p).get() != null) {
                     if(found) {
@@ -426,7 +458,7 @@ public class SQLMap {
         Cursor c = null;
         try {
             ArrayList<PropertyBusinessObject> response = new ArrayList<PropertyBusinessObject>();
-            c = db.executeQuery(createStatement.toString(), params.toArray());
+            c = executeQuery(createStatement.toString(), params.toArray());
             while(c.next()) {
                 PropertyBusinessObject pb = (PropertyBusinessObject)cmp.getClass().newInstance();
                 for(PropertyBase p : pb.getPropertyIndex()) {
@@ -452,5 +484,13 @@ public class SQLMap {
                 throw new IOException(t.toString());
             }
         }
+    }
+    
+    /**
+     * Toggle verbose mode 
+     * @param verbose 
+     */
+    public void setVerbose(boolean verbose) {
+        this.verbose = verbose;
     }
 }

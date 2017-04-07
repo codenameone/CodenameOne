@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -281,8 +282,8 @@ public class UIManager {
             return new Style(style);
         } catch(Throwable err) {
             // fail gracefully for an illegal style, this is useful for the resource editor
-            System.out.println("Error creating style " + id + " selected: " + selected + " prefix: " + prefix);
-            err.printStackTrace();
+            Log.p("Error creating style " + id + " selected: " + selected + " prefix: " + prefix);
+            Log.e(err);
             return new Style(defaultStyle);
         }
     }
@@ -398,6 +399,11 @@ public class UIManager {
             themeProps.put("ToastBarMessage.dis#derive", "ToastBarMessage");
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("ChartComponent.derive")) {
+            themeProps.put("ChartComponent.transparency", "0");
+            themeProps.put("ChartComponent.sel#derive", "ChartComponent");
+            themeProps.put("ChartComponent.press#derive", "ChartComponent");
+        }
         
         if(installedTheme == null || !installedTheme.containsKey("Button.derive")) {
             themeProps.put("Button.border", Border.getDefaultBorder());
@@ -680,6 +686,11 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("TextField.derive")) {
             themeProps.put("TextField.border", Border.getDefaultBorder());
         }
+        
+        themeProps.put("InvalidEmblem.derive", "Label");
+        themeProps.put("InvalidEmblem.fgColor", "ff0000");
+        themeProps.put("InvalidEmblem.transparency", "0");
+        
         themeProps.put("TextField.sel#derive", "TextField");
         themeProps.put("TextField.dis#derive", "TextField");
         if(installedTheme == null || !installedTheme.containsKey("TextFieldInvalid.derive")) {
@@ -857,9 +868,14 @@ public class UIManager {
             themeProps.put("Badge.press#padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("Badge.press#padding", "0,0,0,0");
             if(Font.isNativeFontSchemeSupported()) {
-                themeProps.put("Badge.font", lightFont.derive(Display.getInstance().convertToPixels(1.5f), Font.STYLE_PLAIN));
+                Font fnt = lightFont.derive(Display.getInstance().convertToPixels(1.5f), Font.STYLE_PLAIN);
+                themeProps.put("Badge.font", fnt);
+                themeProps.put("Badge.sel#font", fnt);
+                themeProps.put("Badge.press#font", fnt);
             }
             themeProps.put("Badge.align", centerAlign);
+            themeProps.put("Badge.sel#align", centerAlign);
+            themeProps.put("Badge.press#align", centerAlign);
         }
         if(installedTheme == null || !installedTheme.containsKey("FloatingActionText.derive")) {
             themeProps.put("FloatingActionText.bgColor", "ffffff");
@@ -911,7 +927,7 @@ public class UIManager {
             try {
                 return Integer.parseInt(v);
             } catch(NumberFormatException err) {
-                err.printStackTrace();
+                Log.e(err);
             }
         }
         return def;
@@ -1051,7 +1067,7 @@ public class UIManager {
                     accessible = a;
                 } catch (Exception ex) {
                     System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: "+th);
-                    ex.printStackTrace();
+                    Log.e(ex);
                 }
             }
         }
@@ -1329,7 +1345,7 @@ public class UIManager {
                     return com.codename1.ui.Font.getBitmapFont(nameStr);
                 } catch (Exception ex) {
                     // illegal argument exception?
-                    ex.printStackTrace();
+                    Log.e(ex);
                 }
             }
         }
@@ -1561,7 +1577,7 @@ public class UIManager {
             Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
-            e.printStackTrace();
+            Log.e(e);
         }
         return null;
     }
@@ -1580,7 +1596,7 @@ public class UIManager {
             Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
-            e.printStackTrace();
+            Log.e(e);
         }
         return null;
     }

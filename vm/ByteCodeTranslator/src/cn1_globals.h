@@ -492,6 +492,8 @@ typedef struct clazz*       JAVA_CLASS;
     } \
     SP[-1].type = CN1_TYPE_INT;
 
+#define CN1_CMP_EXPR(val1, val2) ((val1 == val2) ? 0 : (val1 > val2) ? 1 :  -1)
+
 #define BC_DUP()  { \
         JAVA_LONG plong = SP[-1].data.l; \
         (*SP).type = CN1_TYPE_INVALID; \
@@ -555,20 +557,27 @@ if(SP[-1].type == CN1_TYPE_LONG || SP[-1].type == CN1_TYPE_DOUBLE) {\
 #define BC_I2C() SP[-1].data.i = (SP[-1].data.i & 0xffff)
 
 #define BC_ISHL() SP--; SP[-1].data.i = (SP[-1].data.i << (0x1f & (*SP).data.i))
-
+#define BC_ISHL_EXPR(val1, val2) (val1 << (0x1f & val2))
 #define BC_LSHL() SP--; SP[-1].data.l = (SP[-1].data.l << (0x3f & (*SP).data.l))
+#define BC_LSHL_EXPR(val1, val2) (val1 << (0x3f & val2))
 
 #define BC_ISHR() SP--; SP[-1].data.i = (SP[-1].data.i >> (0x1f & (*SP).data.i))
+#define BC_ISHR_EXPR(val1, val2) (val1 >> (0x1f & val2))
 
 #define BC_LSHR() SP--; SP[-1].data.l = (SP[-1].data.l >> (0x3f & (*SP).data.l))
+#define BC_LSHR_EXPR(val1, val2) (val1 >> (0x3f & val2))
 
-#define BC_IUSHL() SP--; SP[-1].data.i = (((unsigned int)SP[-1]).data.i << (0x1f & ((unsigned int)(*SP).data.i)))
+#define BC_IUSHL() SP--; SP[-1].data.i = (((unsigned int)SP[-1].data.i) << (0x1f & ((unsigned int)(*SP).data.i)))
+#define BC_IUSHL_EXPR(val1, val2) (((unsigned int)val1) << (0x1f & ((unsigned int)val2)))
 
 #define BC_LUSHL() SP--; SP[-1].data.l = (((unsigned long long)SP[-1].data.l) << (0x3f & ((unsigned long long)(*SP).data.l)))
+#define BC_LUSHL_EXPR(val1, val2) (((unsigned long long)val1) << (0x3f & ((unsigned long long)val2)))
 
 #define BC_IUSHR() SP--; SP[-1].data.i = (((unsigned int)SP[-1].data.i) >> (0x1f & ((unsigned int)(*SP).data.i)))
+#define BC_IUSHR_EXPR(val1, val2) (((unsigned int)val1) >> (0x1f & ((unsigned int)val2)))
 
 #define BC_LUSHR() SP--; SP[-1].data.l = (((unsigned long long)SP[-1].data.l) >> (0x3f & ((unsigned long long)(*SP).data.l)))
+#define BC_LUSHR_EXPR(val1, val2) (((unsigned long long)val1) >> (0x3f & ((unsigned long long)val2)))
 
 #define BC_ISUB() SP--; SP[-1].data.i = (SP[-1].data.i - (*SP).data.i)
 
@@ -664,6 +673,11 @@ extern int instanceofFunction(int sourceClass, int destId);
     DOUBLE_ARRAY_LOOKUP((JAVA_ARRAY)SP[-3].data.o, SP[-2].data.i) = SP[-1].data.d; SP-=3
 
 #define BC_AASTORE() CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
+    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
+    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
+    SP-=3; \
+}
+#define BC_AASTORE_WITH_ARGS(array, index, value) CHECK_ARRAY_ACCESS(3, SP[-2].data.i); { \
     JAVA_OBJECT aastoreTmp = SP[-3].data.o; \
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \
     SP-=3; \
@@ -812,12 +826,13 @@ extern JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JA
 
 
 extern void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
-
+extern JAVA_INT  throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
+extern JAVA_BOOLEAN  throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg);
 extern JAVA_OBJECT __NEW_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);
 extern JAVA_OBJECT __NEW_java_lang_ArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE);
 extern JAVA_VOID java_lang_ArrayIndexOutOfBoundsException___INIT_____int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT __cn1Arg1);
 extern void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index);
-
+extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_STATE, int index);
 #define THROW_NULL_POINTER_EXCEPTION()    throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData))
 
 #define THROW_ARRAY_INDEX_EXCEPTION(index)    throwArrayIndexOutOfBoundsException(threadStateData, index)
@@ -829,13 +844,21 @@ extern void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int i
     #ifdef CN1_INCLUDE_ARRAY_BOUND_CHECKS
         #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[- array_pos].data.o == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); } \
             if(bounds < 0 || bounds >= ((JAVA_ARRAY)SP[- array_pos].data.o)->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
+        #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) ((array == JAVA_NULL) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (bounds < 0 || bounds >= ((JAVA_ARRAY)array)->length) ? throwArrayIndexOutOfBoundsException_R_boolean(threadStateData, bounds) : JAVA_TRUE)
+        #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) if(array == JAVA_NULL) { NSLog(@"Throwing NullPointerException!"); throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); } \
+            if(bounds < 0 || bounds >= ((JAVA_ARRAY)array)->length) { THROW_ARRAY_INDEX_EXCEPTION(bounds); }
+           
     #else 
         #define CHECK_ARRAY_ACCESS(array_pos, bounds) if(SP[-array_pos].data.o == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
+        #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) ((array == JAVA_NULL) ? throwException_R_boolean(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : JAVA_TRUE)
+        #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) if(array == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
     #endif
 #else
     #define CHECK_NPE_TOP_OF_STACK()
     #define CHECK_NPE_AT_STACK(pos)
     #define CHECK_ARRAY_ACCESS(array_pos, bounds) 
+    #define CHECK_ARRAY_ACCESS_EXPR(array, bounds) JAVA_TRUE
+    #define CHECK_ARRAY_ACCESS_WITH_ARGS(array, bounds) 
 #endif
 
 #ifdef CN1_INCLUDE_ARRAY_BOUND_CHECKS
@@ -843,6 +866,33 @@ extern void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int i
 #else
     #define CHECK_ARRAY_BOUNDS_AT_STACK(pos, bounds)
 #endif
+
+#define CN1_ARRAY_LENGTH(array) ((array == JAVA_NULL) ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)array)).length)
+
+#define CN1_ARRAY_ELEMENT_INT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_BYTE(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_FLOAT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_DOUBLE(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_LONG(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_OBJECT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_SHORT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_ARRAY_ELEMENT_CHAR(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] : 0)
+#define CN1_SET_ARRAY_ELEMENT_INT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] = value;
+#define CN1_SET_ARRAY_ELEMENT_BYTE(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] = value;
+#define CN1_SET_ARRAY_ELEMENT_FLOAT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] = value;
+#define CN1_SET_ARRAY_ELEMENT_DOUBLE(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_DOUBLE*) (*(JAVA_ARRAY)array).data)[index] = value;
+#define CN1_SET_ARRAY_ELEMENT_LONG(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_LONG*) (*(JAVA_ARRAY)array).data)[index] = value;
+#define CN1_SET_ARRAY_ELEMENT_OBJECT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] = value;
+#define CN1_SET_ARRAY_ELEMENT_SHORT(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_SHORT*) (*(JAVA_ARRAY)array).data)[index] = value;
+#define CN1_SET_ARRAY_ELEMENT_CHAR(array, index, value) CHECK_ARRAY_ACCESS_WITH_ARGS(array, index); \
+    ((JAVA_ARRAY_CHAR*) (*(JAVA_ARRAY)array).data)[index] = value;
 
 extern JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);
 extern JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);

@@ -1852,8 +1852,12 @@ public class Component implements Animation, StyleListener {
     protected void setScrollY(int scrollY) {
         if(this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
+            
             if(ci.isAsyncEditMode() && ci.isEditingText()) {
-                ci.hideTextEditor();
+                Component editingText = ci.getEditingText();
+                if (editingText != null && this instanceof Container && ((Container)this).contains(editingText)) {
+                    ci.hideTextEditor();
+                }
             }
         }
         // the setter must always update the value regardless... 
@@ -2372,6 +2376,8 @@ public class Component implements Animation, StyleListener {
         }        
     }
     
+    
+    
     /**
      * Creates an animation that will transform the current component to the styling of the destination UIID when
      * completed. Notice that fonts will only animate within the truetype and native familiy and we recommend that you
@@ -2384,7 +2390,11 @@ public class Component implements Animation, StyleListener {
     public ComponentAnimation createStyleAnimation(final String destUIID, final int duration) {
         final Style sourceStyle = getUnselectedStyle();
         final Style destStyle = getUIManager().getComponentStyle(destUIID);
+        return createStyleAnimation(sourceStyle, destStyle, duration, destUIID);
         
+    }
+    
+    ComponentAnimation createStyleAnimation(final Style sourceStyle, final Style destStyle, final int duration, final String destUIID) {
         int d = duration;
         
         Motion m = null;
@@ -2392,6 +2402,12 @@ public class Component implements Animation, StyleListener {
             m = Motion.createLinearColorMotion(sourceStyle.getFgColor(), destStyle.getFgColor(), d);
         }
         final Motion fgColorMotion = m;
+        m = null;
+        
+        if(sourceStyle.getOpacity() != destStyle.getOpacity()) {
+            m = Motion.createLinearColorMotion(sourceStyle.getOpacity(), destStyle.getOpacity(), d);
+        }
+        final Motion opacityMotion = m;
         m = null;
         
         if(sourceStyle.getFont().getHeight() != destStyle.getFont().getHeight() && sourceStyle.getFont().isTTFNativeFont()) {
@@ -2513,6 +2529,9 @@ public class Component implements Animation, StyleListener {
                     if(fgColorMotion != null) {
                         fgColorMotion.setCurrentMotionTime(step);
                     }
+                    if(opacityMotion != null) {
+                        opacityMotion.setCurrentMotionTime(step);
+                    }
                     if(fontMotion != null) {
                         fontMotion.setCurrentMotionTime(step);
                     }
@@ -2551,6 +2570,7 @@ public class Component implements Animation, StyleListener {
                 }
                 return stepMode ||
                         !((bgMotion == null || bgMotion.isFinished()) && 
+                        (opacityMotion == null || opacityMotion.isFinished()) &&
                         (fgColorMotion == null || fgColorMotion.isFinished()) &&
                         (paddingLeft == null || paddingLeft.isFinished()) &&
                         (paddingRight == null || paddingRight.isFinished()) &&
@@ -2573,6 +2593,9 @@ public class Component implements Animation, StyleListener {
                     started = true;
                     if(bgMotion != null) {
                         bgMotion.start();
+                    }
+                    if (opacityMotion != null) {
+                        opacityMotion.start();
                     }
                     if(fgColorMotion != null) {
                         fgColorMotion.start();
@@ -2608,8 +2631,13 @@ public class Component implements Animation, StyleListener {
                                 
                 if(!isInProgress()) {
                     finished = true;
-                    setUIID(destUIID);
+                    if (destUIID != null) {
+                        setUIID(destUIID);
+                    }
                 } else {
+                    if (opacityMotion != null) {
+                        sourceStyle.setOpacity(opacityMotion.getValue());
+                    }
                     if(fgColorMotion != null) {
                         sourceStyle.setFgColor(fgColorMotion.getValue());
                     }
@@ -2652,6 +2680,9 @@ public class Component implements Animation, StyleListener {
             public void flush() {
                 if(bgMotion != null) {
                     bgMotion.finish();
+                }
+                if (opacityMotion != null) {
+                    opacityMotion.finish();
                 }
                 if(fgColorMotion != null) {
                     fgColorMotion.finish();
@@ -3391,7 +3422,7 @@ public class Component implements Animation, StyleListener {
             }
             if(dropTargetComponent != null) {
                 p.repaint(x, y, getWidth(), getHeight());
-                getParent().scrollRectToVisible(x, y, getWidth(), getHeight(), getParent());
+                getParent().scrollRectToVisible(getX(), getY(), getWidth(), getHeight(), getParent());
                 if(dropListener != null) {
                     ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerDrag, dropTargetComponent, x, y);
                     dropListener.fireActionEvent(ev);
@@ -5068,6 +5099,7 @@ public class Component implements Animation, StyleListener {
      * Returns the names of the properties within this component that can be bound for persistence,
      * the order of these names mean that the first one will be the first bound
      * @return a string array of property names or null
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public String[] getBindablePropertyNames() {
         return null;
@@ -5076,6 +5108,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Returns the types of the properties that are bindable within this component
      * @return the class for binding
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public Class[] getBindablePropertyTypes() {
         return null;
@@ -5085,6 +5118,7 @@ public class Component implements Animation, StyleListener {
      * Binds the given property name to the given bind target
      * @param prop the property name
      * @param target the target binder
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void bindProperty(String prop, BindTarget target) {
     }
@@ -5093,6 +5127,7 @@ public class Component implements Animation, StyleListener {
      * Removes a bind target from the given property name
      * @param prop the property names
      * @param target the target binder
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void unbindProperty(String prop, BindTarget target) {
     }
@@ -5101,6 +5136,7 @@ public class Component implements Animation, StyleListener {
      * Allows the binding code to extract the value of the property
      * @param prop the property
      * @return the value for the property
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public Object getBoundPropertyValue(String prop) {
         return null;
@@ -5112,6 +5148,7 @@ public class Component implements Animation, StyleListener {
      * 
      * @param prop the property whose value should be set
      * @param value the value
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void setBoundPropertyValue(String prop, Object value) {
     }
@@ -5119,6 +5156,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Indicates the property within this component that should be bound to the cloud object
      * @return the cloudBoundProperty
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public String getCloudBoundProperty() {
         if(noBind && cloudBoundProperty == null) {
@@ -5136,6 +5174,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Indicates the property within this component that should be bound to the cloud object
      * @param cloudBoundProperty the cloudBoundProperty to set
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void setCloudBoundProperty(String cloudBoundProperty) {
         this.cloudBoundProperty = cloudBoundProperty;
@@ -5149,6 +5188,7 @@ public class Component implements Animation, StyleListener {
      * The destination property of the CloudObject
      * 
      * @return the cloudDestinationProperty
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public String getCloudDestinationProperty() {
         if(cloudDestinationProperty == null || cloudDestinationProperty.length() == 0) {
@@ -5160,6 +5200,7 @@ public class Component implements Animation, StyleListener {
     /**
      * The destination property of the CloudObject
      * @param cloudDestinationProperty the cloudDestinationProperty to set
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void setCloudDestinationProperty(String cloudDestinationProperty) {
         this.cloudDestinationProperty = cloudDestinationProperty;

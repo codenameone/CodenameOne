@@ -22,6 +22,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -132,6 +133,8 @@ public class Toolbar extends Container {
      * Indicates whether the toolbar should be properly centered by default
      */
     private static boolean centeredDefault = true;
+
+    private Command searchCommand;
     
     /**
      * Empty Constructor
@@ -433,7 +436,7 @@ public class Toolbar extends Container {
      * @param iconSize indicates the size of the icons used in the search/back in millimeters
      */ 
     public void addSearchCommand(final ActionListener callback, final float iconSize){
-        Command search = new Command(""){
+        searchCommand = new Command(""){
 
             @Override
             public void actionPerformed(ActionEvent evt) {
@@ -445,7 +448,7 @@ public class Toolbar extends Container {
                     }
                 
                 };
-                Form f = (Form)Toolbar.this.getParent();
+                Form f = (Form)Toolbar.this.getComponentForm();
                 setHidden(true);
                 f.removeComponentFromForm(Toolbar.this);
                 f.setToolbar(s);
@@ -460,9 +463,19 @@ public class Toolbar extends Container {
         } else {
             img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"));
         }
-        search.setIcon(img);
-        addCommandToRightBar(search);
+        searchCommand.setIcon(img);
+        addCommandToRightBar(searchCommand);
     }    
+    
+    /**
+     * Removes a previously installed search command
+     */
+    public void removeSearchCommand() {
+        if(searchCommand != null) {
+            sideMenu.removeCommand(searchCommand);
+            searchCommand = null;
+        }
+    }
     
     /**
      * <p>This method add a search Command on the right bar of the {@code Toolbar}.
@@ -1263,7 +1276,7 @@ public class Toolbar extends Container {
                     try {
                         size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
                     } catch(Throwable t) {
-                        t.printStackTrace();
+                        Log.e(t);
                     }
                     i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), size);
                 }

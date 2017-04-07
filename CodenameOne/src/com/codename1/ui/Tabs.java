@@ -941,7 +941,7 @@ public class Tabs extends Container {
             selectTab(tabsContainer.getComponentAt(index));
             int offset = 0;
             for(Component c : contentPane) {
-                c.setLightweightMode(offset == index);
+                c.setLightweightMode(offset != index);
                 offset++;
             }
             revalidate();

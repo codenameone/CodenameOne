@@ -85,6 +85,7 @@ import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -92,6 +93,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.provider.Settings.Secure;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -163,8 +165,10 @@ import com.codename1.util.StringUtil;
 import java.io.*;
 import java.net.CookieHandler;
 import java.net.ServerSocket;
+import java.security.MessageDigest;
 import java.text.ParseException;
 import java.util.*;
+import javax.net.ssl.HttpsURLConnection;
 //import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
@@ -589,6 +593,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             }
 
+            if(Display.getInstance().getProperty("DisableScreenshots", "").equals("true")){
+                getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            }
+
             if (m instanceof CodenameOneActivity) {
                 ((CodenameOneActivity) m).setDefaultIntentResultListener(this);
                 ((CodenameOneActivity) m).setIntentResultListener(this);
@@ -745,29 +753,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } else {
             metrics = getContext().getResources().getDisplayMetrics();
         }
-        switch (metrics.densityDpi) {
-            case DisplayMetrics.DENSITY_LOW:
-                return Display.DENSITY_LOW;
-            case DisplayMetrics.DENSITY_HIGH:
-            case 213: // DENSITY_TV 
-                return Display.DENSITY_HIGH;
-            case DisplayMetrics.DENSITY_XHIGH:
-                return Display.DENSITY_VERY_HIGH;
-            case 400: // DisplayMetrics.DENSITY_400
-            case 420: // DisplayMetrics.DENSITY_420
-            case 480: // DisplayMetrics.DENSITY_XXHIGH
-                return Display.DENSITY_HD;
-            case 560: // DisplayMetrics.DENSITY_560
-                return Display.DENSITY_560;
-            case 640: // DisplayMetrics.DENSITY_XXXHIGH 
-                return Display.DENSITY_2HD;
-                 
-            default:
-                if(metrics.densityDpi > 640) {
-                    return Display.DENSITY_4K;
-                }
-                return Display.DENSITY_MEDIUM;
+        
+        if(metrics.densityDpi < DisplayMetrics.DENSITY_MEDIUM) {
+            return Display.DENSITY_LOW;
         }
+        
+        if(metrics.densityDpi < 213) {
+            return Display.DENSITY_MEDIUM;
+        }
+
+        // 213 == TV
+        if(metrics.densityDpi >= 213 &&  metrics.densityDpi <= DisplayMetrics.DENSITY_HIGH) {
+            return Display.DENSITY_HIGH;
+        }
+
+        if(metrics.densityDpi > DisplayMetrics.DENSITY_HIGH && metrics.densityDpi < 400) {
+            return Display.DENSITY_VERY_HIGH;
+        }
+
+        if(metrics.densityDpi >= 400 && metrics.densityDpi < 560) {
+            return Display.DENSITY_HD;
+        }
+        
+        if(metrics.densityDpi >= 560 && metrics.densityDpi <= 640) {
+            return Display.DENSITY_2HD;
+        }
+        if(metrics.densityDpi > 640) {
+            return Display.DENSITY_4K;
+        }
+
+        return Display.DENSITY_MEDIUM;
     }
 
     /**
@@ -1951,7 +1966,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean isShapeClipSupported(Object graphics){
-        return true;
+        return Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB;
     }
     
     @Override
@@ -2217,8 +2232,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
-                                while (attachment.read(buffer) > 0) {
-                                    tmp.write(buffer);
+                                int read = -1;
+                                while ((read = attachment.read(buffer)) > -1) {
+                                    tmp.write(buffer, 0, read);
                                 }
                                 tmp.close();
                                 attachment.close();
@@ -2350,7 +2366,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return "";
                 }
                 TelephonyManager tm = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
-                return tm.getDeviceId();
+                String imei = null;
+                if (tm!=null && tm.getDeviceId() != null) {
+                    // for phones or 3g tablets
+                    imei = tm.getDeviceId(); 
+                } else {
+                    try {
+                        imei = Secure.getString(getContext().getContentResolver(), Secure.ANDROID_ID); 
+                    } catch(Throwable t) {
+                        com.codename1.io.Log.e(t);
+                    }
+                }
+                return imei;
             }
             if ("MSISDN".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
@@ -2380,9 +2407,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         //these keys/values are from the Application Resources (strings values)
         try {
             int id = getContext().getResources().getIdentifier(key, "string", getContext().getApplicationInfo().packageName);
-            String val = getContext().getResources().getString(id);
-            return val;
-
+            if (id != 0) {
+                String val = getContext().getResources().getString(id);
+                return val;
+            }
         } catch (Exception e) {
         }
         return System.getProperty(key, super.getProperty(key, defaultValue));
@@ -2793,6 +2821,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Media createMediaRecorder(final String path, final String mimeType) throws IOException {
         if (getActivity() == null) {
+            return null;
+        }
+        if(!checkForPermission(Manifest.permission.RECORD_AUDIO, "This is required to record audio")){
             return null;
         }
         final AndroidRecorder[] record = new AndroidRecorder[1];
@@ -3540,72 +3571,81 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         final AndroidImplementation.AndroidBrowserComponent[] bc = new AndroidImplementation.AndroidBrowserComponent[1];
 
         final Object lock = new Object();
-        synchronized (lock) {
-            getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    synchronized (lock) {
-                        WebView wv = new WebView(getActivity()) {
-                            
-                            public boolean onKeyDown(int keyCode, KeyEvent event) {
-                                switch (keyCode) {
-                                    case KeyEvent.KEYCODE_BACK:
-                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                        return true;
-                                    case KeyEvent.KEYCODE_MENU:
-                                        //if the native commands are used don't handle the keycode
-                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                            return true;
-                                        }
-                                }
-                                return super.onKeyDown(keyCode, event);
-                            }
 
-                            public boolean onKeyUp(int keyCode, KeyEvent event) {
-                                switch (keyCode) {
-                                    case KeyEvent.KEYCODE_BACK:
-                                        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                        return true;
-                                    case KeyEvent.KEYCODE_MENU:
-                                        //if the native commands are used don't handle the keycode
-                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
-                                            return true;
-                                        }
-                                }
-                                return super.onKeyUp(keyCode, event);
-                            }
-                        };
-                        wv.setOnTouchListener(new View.OnTouchListener() {
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                synchronized (lock) {
+                    WebView wv = new WebView(getActivity()) {
 
-                            @Override
-                            public boolean onTouch(View v, MotionEvent event) {
-                                switch (event.getAction()) {
-                                    case MotionEvent.ACTION_DOWN:
-                                    case MotionEvent.ACTION_UP:
-                                        if (!v.hasFocus()) {
-                                            v.requestFocus();
-                                        }
-                                        break;
-                                }
-                                return false;
+                        public boolean onKeyDown(int keyCode, KeyEvent event) {
+                            switch (keyCode) {
+                                case KeyEvent.KEYCODE_BACK:
+                                    Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
+                                    return true;
+                                case KeyEvent.KEYCODE_MENU:
+                                    //if the native commands are used don't handle the keycode
+                                    if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                        return true;
+                                    }
                             }
-                        });
-                        wv.getSettings().setDomStorageEnabled(true);
-                        wv.requestFocus(View.FOCUS_DOWN);
-                        wv.setFocusableInTouchMode(true);
-                        bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
-                        lock.notify();
+                            return super.onKeyDown(keyCode, event);
+                        }
+
+                        public boolean onKeyUp(int keyCode, KeyEvent event) {
+                            switch (keyCode) {
+                                case KeyEvent.KEYCODE_BACK:
+                                    Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
+                                    return true;
+                                case KeyEvent.KEYCODE_MENU:
+                                    //if the native commands are used don't handle the keycode
+                                    if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                        return true;
+                                    }
+                            }
+                            return super.onKeyUp(keyCode, event);
+                        }
+                    };
+                    wv.setOnTouchListener(new View.OnTouchListener() {
+
+                        @Override
+                        public boolean onTouch(View v, MotionEvent event) {
+                            switch (event.getAction()) {
+                                case MotionEvent.ACTION_DOWN:
+                                case MotionEvent.ACTION_UP:
+                                    if (!v.hasFocus()) {
+                                        v.requestFocus();
+                                    }
+                                    break;
+                            }
+                            return false;
+                        }
+                    });
+                    wv.getSettings().setDomStorageEnabled(true);
+                    wv.requestFocus(View.FOCUS_DOWN);
+                    wv.setFocusableInTouchMode(true);
+                    bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
+                    lock.notify();
+                }
+            }
+        });
+        Display.getInstance().invokeAndBlock(new Runnable() {
+            public void run() {
+                synchronized (lock) {
+                    while (bc[0] == null) {
+                        try {
+                            lock.wait();
+                        } catch (InterruptedException ex) {
+                            ex.printStackTrace();
+                        }
                     }
                 }
-            });
-            try {
-                lock.wait();
-            } catch (InterruptedException ex) {
-                ex.printStackTrace();
             }
-        }
+
+        });
+
         return bc[0];
     }
 
@@ -3873,6 +3913,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private boolean lightweightMode = false;        
         private ProgressDialog progressBar;
         private boolean hideProgress;
+        private int layerType;
         
         
         public AndroidBrowserComponent(final WebView web, Activity act, Object p) {
@@ -3882,6 +3923,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             parent = (BrowserComponent) p;
             this.web = web;
+            layerType = web.getLayerType();
             web.getSettings().setJavaScriptEnabled(true);
             web.getSettings().setSupportZoom(parent.isPinchToZoomEnabled());
             this.act = act;
@@ -3892,36 +3934,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             web.setWebViewClient(new WebViewClient() {
                 public void onLoadResource(WebView view, String url) {
-                    try {
-                        URI uri = new URI(url);
-                        CookieManager mgr = CookieManager.getInstance();
-                        String cookieStr = mgr.getCookie(url);
-                        if (cookieStr!=null){
-                            String[] cookies = cookieStr.split(";");
-                            int len = cookies.length;
-                            Vector out = new Vector();
-                            String domain = uri.getHost();
-                            for ( int i=0; i<len; i++){
-                                Cookie c = new Cookie();
-                                String[] parts = cookies[i].split("=");
-                                c.setName(parts[0].trim());
-                                if(parts.length > 1){
-                                    c.setValue(parts[1].trim());
-                                }else{
-                                    c.setValue("");                                
+                    if (Display.getInstance().getProperty("syncNativeCookies", "true").equals("true")) {
+                        try {
+                            URI uri = new URI(url);
+                            CookieManager mgr = CookieManager.getInstance();
+                            String cookieStr = mgr.getCookie(url);
+                            if (cookieStr != null) {
+                                String[] cookies = cookieStr.split(";");
+                                int len = cookies.length;
+                                Vector out = new Vector();
+                                String domain = uri.getHost();
+                                for (int i = 0; i < len; i++) {
+                                    Cookie c = new Cookie();
+                                    String[] parts = cookies[i].split("=");
+                                    c.setName(parts[0].trim());
+                                    if (parts.length > 1) {
+                                        c.setValue(parts[1].trim());
+                                    } else {
+                                        c.setValue("");
+                                    }
+                                    c.setDomain(domain);
+                                    out.add(c);
                                 }
-                                c.setDomain(domain);
-                                out.add(c);
+                                Cookie[] cookiesArr = new Cookie[out.size()];
+                                out.toArray(cookiesArr);
+                                AndroidImplementation.this.addCookie(cookiesArr, false);
                             }
-                            Cookie[] cookiesArr = new Cookie[out.size()];
-                            out.toArray(cookiesArr);
-                            AndroidImplementation.this.addCookie(cookiesArr, false);
+
+                        } catch (URISyntaxException ex) {
+
                         }
-
-                    } catch (URISyntaxException ex) {
-
                     }
-                    
                     parent.fireWebEvent("onLoadResource", new ActionEvent(url));
                     super.onLoadResource(view, url);
                     setShouldCalcPreferredSize(true);
@@ -4054,6 +4097,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
         @Override
         protected void initComponent() {
+            if(android.os.Build.VERSION.SDK_INT == 21 && web.getLayerType() != layerType){
+                    act.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            web.setLayerType(layerType, null); //setting layer type to original state
+                        }
+                    });
+            }
             super.initComponent();
             blockNativeFocus(false);
             setPeerImage(null);
@@ -4320,6 +4371,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             });
         }
+
+        @Override
+        protected void deinitialize() {
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if(android.os.Build.VERSION.SDK_INT == 21) { // bugfix for Android 5.0.x
+                        web.setLayerType(View.LAYER_TYPE_SOFTWARE, null); //setting layer type to software to prevent the sigseg 11 crash
+                    }
+                }
+            });
+            super.deinitialize();
+        }
     }
 
     
@@ -4359,6 +4423,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return connect(url, read, write, timeout);
     }
 
+    
+    private static final char[] HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    
+    private static String dumpHex(byte[] data) {
+        final int n = data.length;
+        final StringBuilder sb = new StringBuilder(n * 3 - 1);
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append(' ');
+            }
+            sb.append(HEX_CHARS[(data[i] >> 4) & 0x0F]);
+            sb.append(HEX_CHARS[data[i] & 0x0F]);
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        if (connection instanceof HttpsURLConnection) {
+            HttpsURLConnection conn = (HttpsURLConnection)connection;
+            
+            try {    
+                conn.connect();
+                java.security.cert.Certificate[] certs = conn.getServerCertificates();
+                String[] out = new String[certs.length];
+                int i=0;
+                for (java.security.cert.Certificate cert : certs) {
+                    MessageDigest md = MessageDigest.getInstance("SHA1");
+                    md.update(cert.getEncoded());
+                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                }
+                return out;
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return new String[0];
+        
+    }
+
+    @Override
+    public boolean canGetSSLCertificates() {
+        return true;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -4611,6 +4720,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         return new String[]{Environment.getRootDirectory().getAbsolutePath()};
     }
+
+    @Override
+    public boolean hasCachesDir() {
+        return true;
+    }
+
+    @Override
+    public String getCachesDir() {
+        return getContext().getCacheDir().getAbsolutePath();
+    }
+    
+    
     
     private String[] getStorageDirectories() {
         String [] storageDirs = null;
@@ -5001,7 +5122,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "&body=" + Uri.encode(msg.getContent())));        
         }else{
             if (hasAttachment) {
-                if(msg.getAttachments().size() > 0) {
+                if(msg.getAttachments().size() > 1) {
                     emailIntent = new Intent(android.content.Intent.ACTION_SEND_MULTIPLE);
                     emailIntent.putExtra(android.content.Intent.EXTRA_EMAIL, recipients);
                     emailIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, subject);
@@ -5033,7 +5154,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (msg.getMimeType().equals(Message.MIME_HTML)) {
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));                                
             }else{
-                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
+                /*
+                // Attempted this workaround to fix the ClassCastException that occurs on android when
+                // there are multiple attachments.  Unfortunately, this fixes the stack trace, but 
+                // has the unwanted side-effect of producing a blank message body.
+                // Same workaround for HTML mimetype also fails the same way.
+                // Conclusion, Just live with the stack trace.  It doesn't seem to affect the 
+                // execution of the program... treat it as a warning.
+                // See https://github.com/codenameone/CodenameOne/issues/1782
+                if (msg.getAttachments().size() > 1) {
+                    ArrayList<String> contentArr = new ArrayList<String>();
+                    contentArr.add(msg.getContent());
+                    emailIntent.putStringArrayListExtra(android.content.Intent.EXTRA_TEXT, contentArr);
+                } else {
+                    emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());                    
+                    
+                }*/
+                emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, msg.getContent());
             }
             
         }
@@ -5222,9 +5359,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void share(String text, String image, String mimeType, Rectangle sourceRect){   
-        if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
+        /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to perform share")){
             return;
-        }
+        }*/
         Intent shareIntent = new Intent(android.content.Intent.ACTION_SEND);
         if(image == null){
             shareIntent.setType("text/plain");
@@ -5616,8 +5753,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
-                                while (inputStream.read(buffer) > 0) {
-                                    tmp.write(buffer);
+                                int read = -1;
+                                while ((read = inputStream.read(buffer)) > -1) {
+                                    tmp.write(buffer, 0, read);
                                 }
                                 tmp.close();
                                 inputStream.close();                                                           
@@ -5960,6 +6098,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         String id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
+        if (id == null) {
+            id = Display.getInstance().getProperty("gcm.sender_id", null);
+        }
         if(has) {
             Log.d("Codename One", "Sending async push request for id: " + id);
             ((CodenameOneActivity) getActivity()).registerForPush(id);
@@ -6419,6 +6560,38 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
     }
 
+    public void addCookie(Cookie[] cs, boolean addToWebViewCookieManager, boolean sync) {
+        if(addToWebViewCookieManager) {
+            CookieManager mgr;
+            CookieSyncManager syncer;
+            try {
+                syncer = CookieSyncManager.getInstance();
+                mgr = CookieManager.getInstance();
+            } catch(IllegalStateException ex) {
+                syncer = CookieSyncManager.createInstance(this.getContext());
+                mgr = CookieManager.getInstance();
+            }
+            for (Cookie c : cs) {
+                String cookieString = c.getName() + "=" + c.getValue() +
+                        "; Domain=" + c.getDomain() +
+                        "; Path=" + c.getPath() +
+                        "; " + (c.isSecure() ? "Secure;" : "")
+                        + (c.isHttpOnly() ? "httpOnly;" : "");
+                mgr.setCookie("http" +
+                        (c.isSecure() ? "s" : "") + "://" +
+                        c.getDomain() +
+                        c.getPath(), cookieString);
+            }
+            if(sync) {
+                syncer.sync();
+            }
+        }
+        super.addCookie(cs);
+
+
+
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {
@@ -6440,17 +6613,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     
     public void addCookie(Cookie[] cookiesArray, boolean addToWebViewCookieManager){
-        int len = cookiesArray.length;
-        for ( int i=0; i< len; i++){
-            this.addCookie(cookiesArray[i], addToWebViewCookieManager, false);
-        }
-        if(addToWebViewCookieManager) {
-            try {
-                CookieSyncManager.getInstance().sync();
-            } catch (IllegalStateException ex) {
-                CookieSyncManager.createInstance(getContext()).sync();
-            }
-        }
+        addCookie(cookiesArray, addToWebViewCookieManager, false);
+
     }
     
     
@@ -7642,7 +7806,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             //there is an bug that causes this to not to workhttps://code.google.com/p/android/issues/detail?id=81812
             //intent.putExtra("backgroundClass", getBackgroundLocationListener().getName());
             //an ugly workaround to the putExtra bug 
-            intent.setData(Uri.parse("http://a.com/a?" + getBackgroundFetchListener().getClass().getName()));
+            intent.setData(Uri.parse("http://codenameone.com/a?" + getBackgroundFetchListener().getClass().getName()));
             PendingIntent pendingIntent = PendingIntent.getService(context, 0,
                     intent,
                     PendingIntent.FLAG_UPDATE_CURRENT);
@@ -7798,5 +7962,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
  
-    
+    public boolean isJailbrokenDevice() {
+        try {
+            Runtime.getRuntime().exec("su");
+            return true;
+        } catch(Throwable t) {
+            com.codename1.io.Log.e(t);
+        }
+        return false;
+    }    
 }

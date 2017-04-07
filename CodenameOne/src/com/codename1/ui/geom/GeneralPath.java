@@ -778,10 +778,10 @@ public final class GeneralPath implements Shape {
     }
     
     
-    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
-                                          double startX, double startY, double endX, double endY) {
-        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY, false);
-    }
+//    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+//                                          double startX, double startY, double endX, double endY) {
+//        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY, false);
+//    }
     
     
     /**
@@ -795,81 +795,81 @@ public final class GeneralPath implements Shape {
      * @param endY
      * @param clockwise 
      */
-    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
-                                          double startX, double startY, double endX, double endY, boolean clockwise) {
-        if ( startX != endX || startY != endY ){
-            double ax = startX - cx;
-            double ay = startY - cy;
-            double bx = endX - cx;
-            double by = endY- cy;
-            
-            final double r1s = ax * ax + ay * ay;
-            final double r2s = bx * bx + by * by;
-            double ellipseScaleY = 0;
-            if (Math.abs(r1s - r2s) > 2) {
-                // This is not a circle
-                // Let's get the arc for the circle
-                ellipseScaleY = Math.sqrt(((ax*ax) - (bx*bx)) / (by*by - ay*ay));
-                startY = cy + ellipseScaleY * (startY-cy);
-                endY = cy + ellipseScaleY * (endY-cy);
-                
-                ay = startY - cy;
-                by = endY - cy;
-            } else {
-                double startAngle = MathUtil.atan2(ay, ax);
-                double endAngle = MathUtil.atan2(by, bx);
-                
-                double dist = Math.abs(endAngle - startAngle);
-                if (clockwise) {
-                    if (startAngle > endAngle) {
-                        dist = Math.PI*2-dist;
-                    }
-                } else {
-                    if (startAngle < endAngle) {
-                        dist = Math.PI*2-dist;
-                    }
-                }
-                
-                //System.out.println("dist: "+dist+" startAngle: "+startAngle+" endAngle: "+endAngle);
-                if (dist > Math.PI/3) {
-                    // We bisect
-                    double r = Math.sqrt(r1s);
-                    double bisectAngle = (startAngle + endAngle)/2;
-                    if (clockwise) {
-                        if (startAngle > endAngle) {
-                            bisectAngle += Math.PI;
-                        }
-                    } else {
-                        if (startAngle < endAngle) {
-                            bisectAngle += Math.PI;
-                        }
-                    }
-                    double bisectX = cx + r * Math.cos(bisectAngle);
-                    double bisectY = cy + r * Math.sin(bisectAngle);
-                    addBezierArcToPath(path, cx, cy, startX, startY, bisectX, bisectY, clockwise);
-                    addBezierArcToPath(path, cx, cy, bisectX, bisectY, endX, endY, clockwise);
-                    return;
-                }
-                
-                
-            }
-            
-            final double q1 = r1s;//ax * ax + ay * ay;
-            final double q2 = q1 + ax * bx + ay * by;
-            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
-            final float x2 = (float)(cx + ax - k2 * ay);
-            float y2 = (float)(cy + ay + k2 * ax);
-            final float x3 = (float)(cx + bx + k2 * by);
-             float y3 = (float)(cy + by - k2 * bx);
-            if (ellipseScaleY != 0) {
-                y2 = (float)(cy + (y2-cy)/ellipseScaleY);
-                y3 = (float)(cy + (y3-cy)/ellipseScaleY);
-                endY = (float)(cy + (endY-cy)/ellipseScaleY);
-            }
-            path.curveTo(x2, y2, x3, y3, endX, endY);
-            
-        } 
-    }
+//    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+//                                          double startX, double startY, double endX, double endY, boolean clockwise) {
+//        if ( startX != endX || startY != endY ){
+//            double ax = startX - cx;
+//            double ay = startY - cy;
+//            double bx = endX - cx;
+//            double by = endY- cy;
+//            
+//            final double r1s = ax * ax + ay * ay;
+//            final double r2s = bx * bx + by * by;
+//            double ellipseScaleY = 0;
+//            if (Math.abs(r1s - r2s) > 2) {
+//                // This is not a circle
+//                // Let's get the arc for the circle
+//                ellipseScaleY = Math.sqrt(((ax*ax) - (bx*bx)) / (by*by - ay*ay));
+//                startY = cy + ellipseScaleY * (startY-cy);
+//                endY = cy + ellipseScaleY * (endY-cy);
+//                
+//                ay = startY - cy;
+//                by = endY - cy;
+//            } else {
+//                double startAngle = MathUtil.atan2(ay, ax);
+//                double endAngle = MathUtil.atan2(by, bx);
+//                
+//                double dist = Math.abs(endAngle - startAngle);
+//                if (clockwise) {
+//                    if (startAngle > endAngle) {
+//                        dist = Math.PI*2-dist;
+//                    }
+//                } else {
+//                    if (startAngle < endAngle) {
+//                        dist = Math.PI*2-dist;
+//                    }
+//                }
+//                
+//                //System.out.println("dist: "+dist+" startAngle: "+startAngle+" endAngle: "+endAngle);
+//                if (dist > Math.PI/3) {
+//                    // We bisect
+//                    double r = Math.sqrt(r1s);
+//                    double bisectAngle = (startAngle + endAngle)/2;
+//                    if (clockwise) {
+//                        if (startAngle > endAngle) {
+//                            bisectAngle += Math.PI;
+//                        }
+//                    } else {
+//                        if (startAngle < endAngle) {
+//                            bisectAngle += Math.PI;
+//                        }
+//                    }
+//                    double bisectX = cx + r * Math.cos(bisectAngle);
+//                    double bisectY = cy + r * Math.sin(bisectAngle);
+//                    addBezierArcToPath(path, cx, cy, startX, startY, bisectX, bisectY, clockwise);
+//                    addBezierArcToPath(path, cx, cy, bisectX, bisectY, endX, endY, clockwise);
+//                    return;
+//                }
+//                
+//                
+//            }
+//            
+//            final double q1 = r1s;//ax * ax + ay * ay;
+//            final double q2 = q1 + ax * bx + ay * by;
+//            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
+//            final float x2 = (float)(cx + ax - k2 * ay);
+//            float y2 = (float)(cy + ay + k2 * ax);
+//            final float x3 = (float)(cx + bx + k2 * by);
+//             float y3 = (float)(cy + by - k2 * bx);
+//            if (ellipseScaleY != 0) {
+//                y2 = (float)(cy + (y2-cy)/ellipseScaleY);
+//                y3 = (float)(cy + (y3-cy)/ellipseScaleY);
+//                endY = (float)(cy + (endY-cy)/ellipseScaleY);
+//            }
+//            path.curveTo(x2, y2, x3, y3, endX, endY);
+//            
+//        } 
+//    }
     
     
     static class Ellipse {
@@ -954,12 +954,20 @@ public final class GeneralPath implements Shape {
                 p.moveTo(_tmp1.x, _tmp1.y);
             }
             _addToPath(p, startAngle, sweepAngle);
+            if (!join && Math.abs(Math.abs(sweepAngle)-Math.PI*2) < 0.001) {
+                p.closePath();
+            }
         }
         
         private void _addToPath(GeneralPath p, double startAngle, double sweepAngle) {
-            double _2pi = Math.PI*2;
-            
-            if (Math.abs(sweepAngle) > Math.PI/4) {
+            //double _2pi = Math.PI*2;
+            double absSweepAngle = Math.abs(sweepAngle);
+            if (absSweepAngle < 0.0001) {
+                // Basically zero sweep angle so we won't draw anytything here.
+                // IOS seemed to choke when we tried to draw too small an arc
+                return;
+            }
+            if (absSweepAngle > Math.PI/4) {
                 //double halfAngle = sweepAngle/2;
                 double diff = Math.PI/4;
                 if (sweepAngle < 0) {
@@ -1070,84 +1078,84 @@ public final class GeneralPath implements Shape {
      *
      * @see #createBezierArcDegrees(android.graphics.PointF, float, float, float, int, boolean, android.graphics.Path)
      */
-    private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
-                                              double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
-                                              GeneralPath addToPath, boolean joinPath)
-    {
-        final GeneralPath path = addToPath;
-        if (sweepAngleRadians == 0d) { return; }
- 
-        float radius = radiusX;
-        float yScale = radiusY / radius;
-        
-        if (pointsOnCircle >= 1)
-        {
-            final double threshold = Math.PI * 2d / pointsOnCircle;
-            if (Math.abs(sweepAngleRadians) > threshold)
-            {
-                double angle = normalizeRadians(startAngleRadians);
-                //PointF end, start = pointFromAngleRadians(center, radius, angle);
-                double endX, endY;
-                double startX = cx + radius * Math.cos(angle);
-                double startY = cy + radius * Math.sin(angle) * yScale;
-                if (joinPath) {
-                    path.lineTo(startX, startY);
-                } else {
-                    path.moveTo(startX, startY);
-                }
-                if (overlapPoints)
-                {
-                    final boolean cw = sweepAngleRadians > 0; // clockwise?
-                    final double angleEnd = angle + sweepAngleRadians;
-                    while (true)
-                    {
-                        double next = (cw ? Math.ceil(angle / threshold) : Math.floor(angle / threshold)) * threshold;
-                        if (angle == next) { next += threshold * (cw ? 1d : -1d); }
-                        final boolean isEnd = cw ? angleEnd <= next : angleEnd >= next;
-                        //end = pointFromAngleRadians(center, radius, isEnd ? angleEnd : next);
-                        endX = cx + radius * Math.cos(isEnd ? angleEnd : next);
-                        endY = cy + radius * Math.sin(isEnd ? angleEnd : next) *yScale;
-                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
-                        if (isEnd) { break; }
-                        angle = next;
-                        startX = endX;
-                        startY = endY;
-                    }
-                }
-                else
-                {
-                    final int n = Math.abs((int)Math.ceil(sweepAngleRadians / threshold));
-                    final double sweep = sweepAngleRadians / (double)n;
-                    for (int i = 0;
-                         i < n;
-                         i++, startX = endX, startY = endY)
-                    {
-                        angle += sweep;
-                        //end = pointFromAngleRadians(center, radius, angle);
-                        endX = cx + radius * Math.cos(angle);
-                        endY = cy + radius * Math.sin(angle) * yScale;
-                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
-                    }
-                    
-                }
-                return;
-            }
-        }
- 
-        startAngleRadians = normalizeRadians(startAngleRadians);
-        double startX = cx + radius * Math.cos(startAngleRadians);
-        double startY = cy + radius * Math.sin(startAngleRadians) * yScale;
-        
-        double endX = cx + radius * Math.cos(startAngleRadians + sweepAngleRadians);
-        double endY = cy + radius * Math.sin(startAngleRadians + sweepAngleRadians) * yScale;
-        if (joinPath) {
-            path.lineTo(startX, startY);
-        } else {
-            path.moveTo(startX, startY);
-        }
-        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
-        
-    }
+//    private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
+//                                              double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
+//                                              GeneralPath addToPath, boolean joinPath)
+//    {
+//        final GeneralPath path = addToPath;
+//        if (sweepAngleRadians == 0d) { return; }
+// 
+//        float radius = radiusX;
+//        float yScale = radiusY / radius;
+//        
+//        if (pointsOnCircle >= 1)
+//        {
+//            final double threshold = Math.PI * 2d / pointsOnCircle;
+//            if (Math.abs(sweepAngleRadians) > threshold)
+//            {
+//                double angle = normalizeRadians(startAngleRadians);
+//                //PointF end, start = pointFromAngleRadians(center, radius, angle);
+//                double endX, endY;
+//                double startX = cx + radius * Math.cos(angle);
+//                double startY = cy + radius * Math.sin(angle) * yScale;
+//                if (joinPath) {
+//                    path.lineTo(startX, startY);
+//                } else {
+//                    path.moveTo(startX, startY);
+//                }
+//                if (overlapPoints)
+//                {
+//                    final boolean cw = sweepAngleRadians > 0; // clockwise?
+//                    final double angleEnd = angle + sweepAngleRadians;
+//                    while (true)
+//                    {
+//                        double next = (cw ? Math.ceil(angle / threshold) : Math.floor(angle / threshold)) * threshold;
+//                        if (angle == next) { next += threshold * (cw ? 1d : -1d); }
+//                        final boolean isEnd = cw ? angleEnd <= next : angleEnd >= next;
+//                        //end = pointFromAngleRadians(center, radius, isEnd ? angleEnd : next);
+//                        endX = cx + radius * Math.cos(isEnd ? angleEnd : next);
+//                        endY = cy + radius * Math.sin(isEnd ? angleEnd : next) *yScale;
+//                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//                        if (isEnd) { break; }
+//                        angle = next;
+//                        startX = endX;
+//                        startY = endY;
+//                    }
+//                }
+//                else
+//                {
+//                    final int n = Math.abs((int)Math.ceil(sweepAngleRadians / threshold));
+//                    final double sweep = sweepAngleRadians / (double)n;
+//                    for (int i = 0;
+//                         i < n;
+//                         i++, startX = endX, startY = endY)
+//                    {
+//                        angle += sweep;
+//                        //end = pointFromAngleRadians(center, radius, angle);
+//                        endX = cx + radius * Math.cos(angle);
+//                        endY = cy + radius * Math.sin(angle) * yScale;
+//                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//                    }
+//                    
+//                }
+//                return;
+//            }
+//        }
+// 
+//        startAngleRadians = normalizeRadians(startAngleRadians);
+//        double startX = cx + radius * Math.cos(startAngleRadians);
+//        double startY = cy + radius * Math.sin(startAngleRadians) * yScale;
+//        
+//        double endX = cx + radius * Math.cos(startAngleRadians + sweepAngleRadians);
+//        double endY = cy + radius * Math.sin(startAngleRadians + sweepAngleRadians) * yScale;
+//        if (joinPath) {
+//            path.lineTo(startX, startY);
+//        } else {
+//            path.moveTo(startX, startY);
+//        }
+//        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//        
+//    }
     
      /**
      * Normalize the input radians in the range 360? > x >= 0?.
@@ -1156,14 +1164,14 @@ public final class GeneralPath implements Shape {
      *
      * @return The angle normalized in the range 360? > x >= 0?.
      */
-    private static double normalizeRadians(double radians)
-    {
-        double PI2 = Math.PI*2d;
-        radians %= PI2;
-        if (radians < 0d) { radians += PI2; }
-        if (radians == PI2) { radians = 0d; }
-        return radians;
-    }
+//    private static double normalizeRadians(double radians)
+//    {
+//        double PI2 = Math.PI*2d;
+//        radians %= PI2;
+//        if (radians < 0d) { radians += PI2; }
+//        if (radians == PI2) { radians = 0d; }
+//        return radians;
+//    }
     
     
     /**

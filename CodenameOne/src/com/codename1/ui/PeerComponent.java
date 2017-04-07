@@ -214,6 +214,8 @@ public class PeerComponent extends Component {
             }
         } else {
             super.paint(g);
+            g.drawPeerComponent(this);
+            
         }
     }
     

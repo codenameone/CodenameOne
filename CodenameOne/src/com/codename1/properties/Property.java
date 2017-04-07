@@ -26,11 +26,10 @@ package com.codename1.properties;
 import java.util.ArrayList;
 
 /**
- * Base class for a property, it can store a generic value of any type and broadcast change events to extrenal
- * listeners
+ * Base class for a property, it can store a generic value of any type and broadcast change events to 
+ * external listeners
  *
  * @author Shai Almog
- * @deprecated this API is experimental
  */
 public class Property<T, K> extends PropertyBase<T, K> {
     private T value;
@@ -69,6 +68,10 @@ public class Property<T, K> extends PropertyBase<T, K> {
         if(this.value != value) { 
             this.value = value;
             firePropertyChanged();
+        }
+        if(parent == null) {
+            // allows properties to work even if they aren't registered in the index
+            return null;
         }
         return (K)parent.parent;
     }

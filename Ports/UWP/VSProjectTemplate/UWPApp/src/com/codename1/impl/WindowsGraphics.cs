@@ -169,6 +169,18 @@ namespace com.codename1.impl
                 
         }
 
+        internal virtual void clearRect(int x, int y, int w, int h)
+        {
+            CanvasBlend oldBlend = graphics.Blend;
+            graphics.Blend = CanvasBlend.Copy;
+            CanvasSolidColorBrush brush = new CanvasSolidColorBrush(graphics, Colors.Transparent);
+            
+            brush.Color = Colors.Transparent;
+            brush.Opacity = 1;
+            graphics.FillRectangle(x, y, w, h, brush);
+            graphics.Blend = oldBlend;
+        }
+
         internal virtual void drawRect(int x, int y, int w, int h, int stroke)
         {
             //using (createAlphaLayer())
@@ -270,22 +282,38 @@ namespace com.codename1.impl
                 
         }
 
+        private void drawImageImpl(CanvasBitmap canvasBitmap, int x, int y)
+        {
+            if (isMutable())
+            {
+
+                graphics.DrawImage(image2Premultiply(canvasBitmap), x, y);
+
+            }
+            else
+            {
+                graphics.DrawImage(canvasBitmap, x, y);
+            }
+        }
+
         internal virtual void drawImage(CanvasBitmap canvasBitmap, int x, int y)
         {
-            using (createAlphaLayer())
+            if (alpha == 0)
             {
-                if (isMutable())
+                return;
+            }
+            if (alpha < 255)
+            {
+                using (createAlphaLayer())
                 {
-
-                    graphics.DrawImage(image2Premultiply(canvasBitmap), x, y);
-
-                }
-                else
-                {
-                    graphics.DrawImage(canvasBitmap, x, y);
+                    drawImageImpl(canvasBitmap, x, y);
                 }
             }
-
+            else
+            {
+                drawImageImpl(canvasBitmap, x, y);
+            }
+           
                
  
         }
@@ -298,58 +326,65 @@ namespace com.codename1.impl
             };
         }
 
+        private void drawImageImpl(CanvasBitmap canvasBitmap, int x, int y, int w, int h)
+        {
+            Rect destRect = new Rect();
+            destRect.X = x;
+            destRect.Y = y;
+            destRect.Width = w;
+            destRect.Height = h;
+
+
+            graphics.DrawImage(canvasBitmap, destRect);
+        }
+
         internal virtual void drawImage(CanvasBitmap canvasBitmap, int x, int y, int w, int h)
         {
-            using (createAlphaLayer())
+            if (alpha == 0)
             {
-                /*
-                // This implementation seemed to throw an argument exception if scaling too much
-                // Value does not fall within the expected range.
-                // Changing to just use DrawImage(bitmap, destrect) which doesn't have this
-                // problem... not completely removing this yet in case we hit performance
-                // issues with the new approach.  - SJH Sept. 16, 2016
-                ScaleEffect scale = new ScaleEffect()
-                {
-                    Source = canvasBitmap,
-                    Scale = new Vector2()
-                    {
-                        X = ((float)w) / canvasBitmap.SizeInPixels.Width,
-                        Y = ((float)h) / canvasBitmap.SizeInPixels.Height
-                    }
-                };
-                if (isMutable())
-                {
-                    graphics.DrawImage(image2Premultiply(scale), x, y);
-                }
-                else
-                {
-                    graphics.DrawImage(scale, x, y);
-                }
-                */
-                Rect destRect = new Rect();
-                destRect.X = x;
-                destRect.Y = y;
-                destRect.Width = w;
-                destRect.Height = h;
-
-               
-                graphics.DrawImage(canvasBitmap, destRect);
+                return;
             }
-                
+            if (alpha < 255)
+            {
+                using (createAlphaLayer())
+                {
+                    drawImageImpl(canvasBitmap, x, y, w, h);
+                }
+            } else
+            {
+                drawImageImpl(canvasBitmap, x, y, w, h);
+            }
+ 
+        }
+
+        private void tileImageImpl(CanvasBitmap canvasBitmap, int x, int y, int w, int h)
+        {
+            CanvasImageBrush brush = new CanvasImageBrush(graphics.Device, canvasBitmap);
+            brush.ExtendX = CanvasEdgeBehavior.Wrap;
+            brush.ExtendY = CanvasEdgeBehavior.Wrap;
+            System.Numerics.Matrix3x2 currentTransform = graphics.Transform;
+            graphics.Transform = System.Numerics.Matrix3x2.CreateTranslation(x, y);
+            graphics.FillRectangle(0, 0, w, h, brush);
+            graphics.Transform = currentTransform;
         }
 
         internal virtual void tileImage(CanvasBitmap canvasBitmap, int x, int y, int w, int h)
         {
-            using (createAlphaLayer())
+            if (alpha == 0)
             {
-                CanvasImageBrush brush = new CanvasImageBrush(graphics.Device, canvasBitmap);
-                brush.ExtendX = CanvasEdgeBehavior.Wrap;
-                brush.ExtendY = CanvasEdgeBehavior.Wrap;
-                System.Numerics.Matrix3x2 currentTransform = graphics.Transform;
-                graphics.Transform = System.Numerics.Matrix3x2.CreateTranslation(x, y);
-                graphics.FillRectangle(0, 0, w, h, brush);
-                graphics.Transform = currentTransform;
+                return;
             }
+            if (alpha < 255)
+            {
+                using (createAlphaLayer())
+                {
+                    tileImageImpl(canvasBitmap, x, y, w, h);
+                }
+            } else
+            {
+                tileImageImpl(canvasBitmap, x, y, w, h);
+            }
+            
                 
         }
 

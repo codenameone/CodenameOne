@@ -28,6 +28,7 @@
 #import "ClipRect.h"
 #import "DrawLine.h"
 #import "DrawRect.h"
+#import "ClearRect.h"
 #import "FillPolygon.h"
 #import "DrawString.h"
 #import "DrawPath.h"
@@ -41,6 +42,8 @@
 #import "Rotate.h"
 #import "PaintOp.h"
 #import "RadialGradientPaint.h"
+#import "CN1UITextView.h"
+#import "CN1UITextField.h"
 #import <AudioToolbox/AudioToolbox.h>
 #import "DrawGradientTextureCache.h"
 #import "DrawStringTextureCache.h"
@@ -51,6 +54,10 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_impl_CodenameOneImplementation.h"
 #include "com_codename1_ui_Component.h"
+#include "com_codename1_impl_ios_TextEditUtil.h"
+#include "com_codename1_impl_ios_ZoozPurchase.h"
+#include "com_codename1_ui_plaf_UIManager.h"
+#include "com_codename1_payment_Receipt.h"
 #import "CN1ES2compat.h"
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
@@ -60,6 +67,7 @@
 #ifdef INCLUDE_GOOGLE_CONNECT
 #import "GoogleOpenSource.h"
 #endif
+#import "com_codename1_payment_Purchase.h"
 
 // Last touch positions.  Helpful to know on the iPad when some popover stuff
 // needs a source rect that the java API doesn't pass through.
@@ -94,6 +102,10 @@ int nextPowerOf2(int val) {
 
 int displayWidth = -1;
 int displayHeight = -1;
+BOOL CN1_blockPaste=NO;
+BOOL CN1_blockCut=NO;
+BOOL CN1_blockCopy=NO;
+
 UIView *editingComponent;
 
 // Currently used only for datepicker but could be used for
@@ -217,7 +229,7 @@ BOOL isVKBAlwaysOpen() {
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste) {
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
@@ -251,7 +263,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
         forceSlideUpField = forceSlideUp;
         CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
         if(isSingleLine) {
-            UITextField* utf = [[UITextField alloc] initWithFrame:rect];
+            CN1UITextField* utf = [[CN1UITextField alloc] initWithFrame:rect];
+            utf.blockPaste = CN1_blockPaste || blockCopyPaste;
+            utf.blockCopy = CN1_blockCopy || blockCopyPaste;
+            utf.blockCut = CN1_blockCut || blockCopyPaste;
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
             
@@ -418,7 +433,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 }
             }
         } else {
-            UITextView* utv = [[UITextView alloc] initWithFrame:rect];
+            CN1UITextView* utv = [[CN1UITextView alloc] initWithFrame:rect];
+            utv.blockPaste = CN1_blockPaste || blockCopyPaste;
+            utv.blockCopy = CN1_blockCopy || blockCopyPaste;
+            utv.blockCut = CN1_blockCut || blockCopyPaste;
             [utv setBackgroundColor:[UIColor clearColor]];
             [utv.layer setBorderColor:[[UIColor clearColor] CGColor]];
             [utv.layer setBorderWidth:0];
@@ -1288,6 +1306,27 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
         CGContextRestoreGState(context);
     }
     //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    if (currentMutableTransformSet) {
+        CGContextSaveGState(context);
+        CGContextConcatCTM(context, currentMutableTransform);
+    }
+    CGContextClearRect(context, CGRectMake(x, y, w, h));
+    if (currentMutableTransformSet) {
+        CGContextRestoreGState(context);
+    }
+    
+}
+
+void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h) {
+    ClearRect* f = [[ClearRect alloc] initWithArgs:x ypos:y w:w h:h];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
@@ -2967,6 +3006,23 @@ extern SKPayment *paymentInstance;
             case SKPaymentTransactionStatePurchased:
                 
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
+                NSData *receipt = nil;
+                if (isIOS7()) {
+                    NSURL *receiptURL = [[NSBundle mainBundle] appStoreReceiptURL];
+                    receipt = [NSData dataWithContentsOfURL : receiptURL];
+                } else {
+                    receipt = transaction.transactionReceipt;
+                }
+                
+                // Post the receipt
+                com_codename1_payment_Purchase_postReceipt___java_lang_String_java_lang_String_java_lang_String_long_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG
+                    get_static_com_codename1_payment_Receipt_STORE_CODE_ITUNES(),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier),
+                    fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.transactionIdentifier),
+                    (JAVA_LONG)[transaction.transactionDate timeIntervalSince1970] * 1000,
+                    receipt ? fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [receipt base64EncodedStringWithOptions:0]) : JAVA_NULL
+                );
+                    
                 com_codename1_impl_ios_IOSImplementation_itemPurchased___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier));
                 continue;
             case SKPaymentTransactionStateFailed:

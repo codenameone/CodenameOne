@@ -24,8 +24,7 @@
 package com.codename1.properties;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
@@ -33,10 +32,11 @@ import java.util.List;
  * Base class for a property as a list which can contain multiple elements within
  *
  * @author Shai Almog
- * @deprecated this API is experimental
  */
 public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T> {
     private ArrayList<T> value = new ArrayList<T>();
+    
+    public final Class<T> elementType;
     
     /**
      * Constructs a property with the given name and value
@@ -44,10 +44,28 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      * @param values default values for the property
      */
     public ListProperty(String name, T... values) {
+        this(name, null, values);
+    }
+    
+    /**
+     * Constructs a property with the given name and values by specifying the
+     * type of the elements explicitly. The element type needs to be specified
+     * if the list should contain {@link PropertyBusinessObject}s and needs
+     * to get deserialized properly!
+     * @param name the name of the property
+     * @param elementType subclass of {@link PropertyBusinessObject}
+     * @param values default values for the property
+     */
+    public ListProperty(String name, Class<T> elementType, T... values) {
         super(name);
         for(T t : values) {
             value.add(t);
         }
+        if(elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) 
+            throw new IllegalArgumentException(
+                    "the element type class needs to be a subclass of PropertyBusinessObject");
+        
+        this.elementType = elementType;
     }
     
     /**
@@ -56,6 +74,7 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      */
     public ListProperty(String name) {
         super(name);
+        this.elementType = null;
     }
     
     /**
@@ -79,6 +98,7 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      * Sets the property value and potentially fires a change event
      * @param offset the position for the new value
      * @param v the new value
+     * @return the parent object for chaining
      */
     public K set(int offset, T v) {
         value.set(offset, v);
@@ -86,6 +106,18 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
         return (K)parent.parent;
     }
 
+    /**
+     * Sets the entire content of the property
+     * @param t the collection of elements to set
+     * @return the parent object for chaining
+     */
+    public K setList(Collection<T> t) {
+        value.clear();
+        value.addAll(t);
+        firePropertyChanged();        
+        return (K)parent.parent;
+    } 
+    
     /**
      * Adds a property value and fires a change event
      * @param offset the position for the new value
@@ -155,5 +187,51 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      */
     public List<T> asList() {
         return new ArrayList<T>(value);
+    }
+    
+    /**
+     * Returns a copy of the content as a new list but if the value is a PropertyBusinessObject it will 
+     * be converted to a Map 
+     * @return a list
+     */
+    public List<Object> asExplodedList() {
+        ArrayList<Object> aa = new ArrayList<Object>();
+        for(T t : value) {
+            if(t instanceof PropertyBusinessObject) {
+                aa.add(((PropertyBusinessObject)t).getPropertyIndex().toMapRepresentation());
+            } else {
+                aa.add(t);
+            }
+        }
+        return aa;
+    }
+
+    /**
+     * Remove all the elements from the list
+     */
+    public void clear() {
+        if(value.size() > 0) {
+            value.clear();
+            firePropertyChanged();
+        }
+    }
+
+    /**
+     * Returns true if the given element is contained in the list property  
+     * @param element the element
+     * @return true if the given element is contained in the list property  
+     */
+    public boolean contains(T element) {
+        return value.contains(element);
+    }
+
+
+    /**
+     * Returns the index of the given element in the list property  
+     * @param element the element
+     * @return the index of the given element in the list property  
+     */
+    public int indexOf(T element) {
+        return value.indexOf(element);
     }
 }

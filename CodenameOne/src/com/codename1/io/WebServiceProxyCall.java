@@ -190,7 +190,8 @@ public class WebServiceProxyCall {
     public static Object invokeWebserviceSync(WSDefinition def, Object... arguments) throws IOException {
         WSConnection cr = new WSConnection(def, null, arguments);
         NetworkManager.getInstance().addToQueueAndWait(cr);
-        if(cr.getResponseCode() != 200) {
+        int rc = cr.getResponseCode();
+        if(rc != 200 && rc != 201) {
             throw new IOException("Server error: " + cr.getResponseCode());
         }
         return cr.returnValue;

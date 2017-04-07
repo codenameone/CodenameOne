@@ -27,7 +27,7 @@ package java.lang;
  * In addition, this class provides several methods for converting an int to a String and a String to an int, as well as other constants and methods useful when dealing with an int.
  * Since: JDK1.0, CLDC 1.0
  */
-public final class Integer{
+public final class Integer extends Number {
     private static final char[] DIGITS = {
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
         'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',

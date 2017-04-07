@@ -58,6 +58,7 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Timer;
 
 /**
@@ -544,7 +545,7 @@ public final class Display {
      */
     private Display() {
     }
-
+    
     /**
      * This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
      * This method must be called before any Form is shown
@@ -567,6 +568,7 @@ public final class Display {
             INSTANCE.impl.setDisplayLock(lock);
             INSTANCE.impl.initImpl(m);
             INSTANCE.codenameOneGraphics = new Graphics(INSTANCE.impl.getNativeGraphics());
+            INSTANCE.codenameOneGraphics.paintPeersBehind = INSTANCE.impl.paintNativePeersBehind();
             INSTANCE.impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
             // only enable but never disable the third softbutton
@@ -805,7 +807,7 @@ public final class Display {
                             try {
                                 nextTask.run();                                
                             } catch (Throwable e) {
-                                e.printStackTrace();
+                                Log.e(e);
                             }
                             try {
                                 Thread.sleep(10);
@@ -969,7 +971,7 @@ public final class Display {
                 processSerialCalls();
             }
         } catch(Throwable err) {
-            err.printStackTrace();
+            Log.e(err);
             if(crashReporter != null) {
                 crashReporter.exception(err);
             }
@@ -999,7 +1001,7 @@ public final class Display {
                 if(!codenameOneRunning) {
                     return;
                 }
-                err.printStackTrace();
+                Log.e(err);
                 if(crashReporter != null) {
                     CodenameOneThread.handleException(err);
                 }
@@ -1045,7 +1047,7 @@ public final class Display {
                 return;
             }
         } catch(Exception ignor) {
-            ignor.printStackTrace();
+            Log.e(ignor);
         }
         long currentTime = System.currentTimeMillis();
         
@@ -1426,7 +1428,7 @@ public final class Display {
                 transition.initTransition();
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            Log.e(e);
             transition.cleanup();
             animationQueue.remove(transition);
             return false;
@@ -2306,6 +2308,14 @@ public final class Display {
     }
 
     /**
+     * Checks to see if the platform supports a native image cache.
+     * @return True on platforms that support a native image cache.  Currently only Javascript.
+     */
+    boolean supportsNativeImageCache() {
+        return impl.supportsNativeImageCache();
+    }
+    
+    /**
      * Returns the game action code matching the given key combination
      *
      * @param keyCode key code received from the event
@@ -2489,7 +2499,7 @@ public final class Display {
     public boolean isMultiTouch() {
         return impl.isMultiTouch();
     }
-
+    
     /**
      * Indicates whether the device has a double layer screen thus allowing two
      * stages to touch events: click and hover. This is true for devices such
@@ -2756,6 +2766,8 @@ public final class Display {
      * in this class
      *
      * @return the commandBehavior
+     * @deprecated we recommend migrating to the {@link Toolbar} API. When using the toolbar the command
+     * behavior can't be manipulated
      */
     public int getCommandBehavior() {
         return impl.getCommandBehavior();
@@ -2766,6 +2778,8 @@ public final class Display {
      * in this class
      *
      * @param commandBehavior the commandBehavior to set
+     * @deprecated we recommend migrating to the {@link Toolbar} API. When using the toolbar the command
+     * behavior can't be manipulated
      */
     public void setCommandBehavior(int commandBehavior) {
         impl.setCommandBehavior(commandBehavior);
@@ -2821,11 +2835,13 @@ public final class Display {
             Container.blockOverdraw = true;
             return;
         }
+        if ("blockCopyPaste".equals(key)) {
+            impl.blockCopyPaste("true".equals(value));
+        }
         if(key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
             return;
         }
-        
         if(localProperties == null) {
             localProperties = new HashMap<String, String>();
         }
@@ -4046,5 +4062,34 @@ hi.show();}</pre></noscript>
      */
     public void refreshContacts() {
         impl.refreshContacts();
+    }
+
+    /**
+     * Returns true if this device is jailbroken or rooted, false if not or unknown. Notice that this method isn't
+     * accurate and can't detect all jailbreak/rooting cases
+     * @return true if this device is jailbroken or rooted, false if not or unknown. 
+     */
+    public boolean isJailbrokenDevice() {
+        return impl.isJailbrokenDevice();
+    }
+    
+    /**
+     * Returns the build hints for the simulator, this will only work in the debug environment and it's 
+     * designed to allow extensions/API's to verify user settings/build hints exist
+     * @return map of the build hints that isn't modified without the codename1.arg. prefix
+     */
+    public Map<String, String> getProjectBuildHints() {
+        return impl.getProjectBuildHints();
+    }
+
+    /**
+     * Sets a build hint into the settings while overwriting any previous value. This will only work in the 
+     * debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
+     * Important: this will throw an exception outside of the simulator!
+     * @param key the build hint without the codename1.arg. prefix
+     * @param value the value for the hint
+     */
+    public void setProjectBuildHint(String key, String value) {
+        impl.setProjectBuildHint(key, value);
     }
 }

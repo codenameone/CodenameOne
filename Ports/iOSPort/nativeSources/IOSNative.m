@@ -65,6 +65,13 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 #include "com_codename1_ui_plaf_Style.h"
 #import "RadialGradientPaint.h"
+#include "java_io_IOException.h"
+#include "com_codename1_io_Cookie.h"
+#include "com_codename1_ui_plaf_UIManager.h"
+#include "java_io_Writer.h"
+#include "java_util_ArrayList.h"
+#include "com_codename1_ui_Font.h"
+#include "java_util_Vector.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
 
@@ -225,7 +232,7 @@ extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBIm
 extern void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL dialogHeight, int color, JAVA_LONG imagePeer,
- int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar);
+ int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 
@@ -356,10 +363,10 @@ NSString* toNSString(JAVA_OBJECT str) {
 }
 #endif
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG
                                                                                                                                                                          JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7,
                                                                                                                                                                          JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
-                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar)
+                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar, JAVA_BOOLEAN blockCopyPaste)
 {
     POOL_BEGIN();
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
@@ -367,7 +374,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     char cc[l];
     memcpy(cc, chr, l);
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
-                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
+                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar, blockCopyPaste);
     POOL_END();
 }
 extern float scaleValue;
@@ -644,7 +651,23 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_in
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h);
+//native void clearRectMutable(int x, int y, int width, int height);
+void com_codename1_impl_ios_IOSNative_clearRectMutable___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(x, y, w, h);
+    POOL_END();
+    
+}
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h);
+//native void nativeClearRectGlobal(int x, int y, int width, int height);
+void com_codename1_impl_ios_IOSNative_nativeClearRectGlobal___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(x, y, w, h);
+    POOL_END();
+    
+}
 void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int]
@@ -1490,6 +1513,14 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     POOL_END();
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSSLCertificates___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    JAVA_OBJECT result = [impl getSSLCertificates];
+    POOL_END();
+    return result;
+}
+
 void com_codename1_impl_ios_IOSNative_setChunkedStreamingMode___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT len) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
@@ -1766,7 +1797,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
             }
         } else {
             if([v superview] == nil) {
-                [[CodenameOne_GLViewController instance].view addSubview:v];
+                [[CodenameOne_GLViewController instance].view addPeerComponent:v];
             }
         }
         POOL_END();
@@ -1805,7 +1836,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
         if([v superview] == nil) {
-            [[CodenameOne_GLViewController instance].view addSubview:v];
+            [[CodenameOne_GLViewController instance].view addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
             float scale = scaleValue;
@@ -2313,6 +2344,17 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
         com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
     }];
     com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+}
+
+extern BOOL CN1_blockPaste;
+extern BOOL CN1_blockCopy;
+extern BOOL CN1_blockCut;
+//native void blockCopyPaste(boolean blockCopyPaste);
+void com_codename1_impl_ios_IOSNative_blockCopyPaste___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN blockCopyPaste) {
+    CN1_blockPaste = blockCopyPaste;
+    CN1_blockCut = blockCopyPaste;
+    CN1_blockCopy = blockCopyPaste;
+
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
@@ -6778,13 +6820,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_j
     JAVA_INT i = startPos;
     for (; i < endOffset; i++) {
         if (src[i] == separator) {
-            JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+            if (i > startPos) {
+                JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+
+                java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
+            }
             startPos = i + 1;
-            java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
         }
     }
-    if (i >= startPos) {
+    if (i > startPos) {
         JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
         java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
@@ -7172,11 +7217,11 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_paintComponentBackground___ja
                 return;
             }
             case 20: { //Style.BACKGROUND_IMAGE_ALIGNED_TOP:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
                 return;
             }
             case 21: { //Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
                 return;
             }
             case 22: {//Style.BACKGROUND_IMAGE_ALIGNED_LEFT:

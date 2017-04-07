@@ -42,6 +42,12 @@ public class Simulator {
      * Accepts the classname to launch
      */
     public static void main(final String[] argv) throws Exception {
+        try {
+            // Load the sqlite database Engine JDBC driver in the top level classloader so it's shared
+            // this works around the exception: java.lang.UnsatisfiedLinkError: Native Library sqlite already loaded in another classloader
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException ex) {
+        }
         System.setProperty("NSHighResolutionCapable", "true");
         String skin = System.getProperty("dskin");
         if (skin == null) {
@@ -56,7 +62,9 @@ public class Simulator {
             }
         }
         StringTokenizer t = new StringTokenizer(System.getProperty("java.class.path"), File.pathSeparator);
-        System.setProperty("MainClass", argv[0]);
+        if(argv.length > 0) {
+            System.setProperty("MainClass", argv[0]);
+        }
         File[] files = new File[t.countTokens()];
         for (int iter = 0; iter < files.length; iter++) {
             files[iter] = new File(t.nextToken());

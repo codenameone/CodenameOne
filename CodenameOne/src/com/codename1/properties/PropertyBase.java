@@ -29,7 +29,6 @@ import java.util.ArrayList;
  * Base class for property types
  *
  * @author Shai Almog
- * @deprecated this API is experimental
  */
 public class PropertyBase<T, K> {
     private final String name;
@@ -121,7 +120,23 @@ public class PropertyBase<T, K> {
         }
         return false;
     }
+
+    T get() {
+        return null;
+    }
     
     void setImpl(Object val) {
+    }
+    
+    /**
+     * Default toString that provides easier debug information
+     * @return a formatted representation of the property for debugging
+     */
+    public String toString() {
+        T o = get();
+        if(o == null) {
+            return getName() + " = null";
+        }
+        return getName() + " = '" + o + "' : " +o.getClass().getName();
     }
 }
