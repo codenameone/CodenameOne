@@ -107,6 +107,28 @@ public class SignatureComponent extends Container {
     };
     
     /**
+     * A hook that can be overridden by subclasses to be notified when the user
+     * resets the signature in the signature dialog.
+     * 
+     * <p><strong>NOTE: Use of this hook to clear the current image in the signature
+     * component is discouraged.</strong>  The intention of the signature component's internal
+     * dialog is to provide a staging area for the user to draw their signature.  Changes
+     * should only take effect in the app when the user commits their changes by pressing
+     * "OK" or "Cancel".  The "Reset" button in the signature dialog is intended to only
+     * allow the user to fix a mistake and start over.  Using this hook to cause 
+     * a change in application state (by, for example, calling {@link #setSignatureImage(com.codename1.ui.Image) } with
+     * a {@literal null} argument}) may confuse the user.</p>
+     * 
+     * <p>If you want to provide the user with a mechanism to "clear" the signature
+     * from the signature component, you should add a button to your form which, when
+     * pressed, will remove the image by calling {@link #setSignatureImage(com.codename1.ui.Image) }.</p>
+     */
+    protected void onSignatureReset() {
+        
+    }
+    
+    
+    /**
      * Adds a listener to be notified when the signature image is changed.
      * @param l 
      */
@@ -296,6 +318,7 @@ public class SignatureComponent extends Container {
             resetButton.addActionListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     signaturePanel.clear();
+                    onSignatureReset();
                     repaint();
                 }
             });

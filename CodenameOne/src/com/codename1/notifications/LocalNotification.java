@@ -49,6 +49,14 @@ import com.codename1.ui.Image;
  * <h3>Usage</h3>
  * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
  * 
+ * <p><strong>Android Note:</strong> The default image that is used on the android top status bar
+ * and on the notification itself is the App's icon.  However Android 5 and above will only display
+ * this image as a silhouette using alpha pixels.  This will result in many icons appearing to be
+ * a blank white square.  In such cases you can provide an alternate image to be displayed instead.
+ * Place a 24x24 image named "ic_stat_notify.png" in your project's {@literal native/android} 
+ * directory, and this image will be used instead.
+ * </p>
+ * 
  * @author shannah
  * @see com.codename1.ui.Display#scheduleLocalNotification(LocalNotification n, long firstTime, int repeat) 
  * @see com.codename1.ui.Display#cancelLocalNotification(java.lang.String id) 

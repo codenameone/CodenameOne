@@ -237,8 +237,12 @@ public class PropertyIndex implements Iterable<PropertyBase>{
                                 } 
                                 for(Object e : (Collection)val) {
                                     if(e instanceof Map) {
-                                        PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();
-                                        po.getPropertyIndex().populateFromMap((Map<String, Object>)e, recursiveType);
+                                        Class eType = ((ListProperty) p).elementType;
+                                        // maybe don't use recursiveType here anymore???
+                                        // elementType is usually sufficient... 
+                                        Class type = (eType == null)? recursiveType : eType; 
+                                        PropertyBusinessObject po = (PropertyBusinessObject)type.newInstance();
+                                        po.getPropertyIndex().populateFromMap((Map<String, Object>)e, type);
                                         ((ListProperty)p).add(po);
                                         continue;
                                     }

@@ -140,7 +140,12 @@ public final class AnimationManager {
      */
     public void onTitleScrollAnimation(Container content, final ComponentAnimation... cna) {
         content.addScrollListener(new ScrollListener() {
+            boolean recursion = false;
             public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                if(recursion) {
+                    return;
+                }
+                recursion = true;
                 if(scrollY >= 0) {
                     boolean changed = false;
                     for(ComponentAnimation c : cna) {
@@ -154,6 +159,7 @@ public final class AnimationManager {
                         parentForm.revalidate();
                     }
                 }
+                recursion = false;
             }
         });
     }

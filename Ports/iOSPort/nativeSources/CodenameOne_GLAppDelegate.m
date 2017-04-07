@@ -25,6 +25,7 @@
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "com_codename1_ui_Display.h"
 #ifdef NEW_CODENAME_ONE_VM
 #include "java_lang_System.h"
 int mallocWhileSuspended = 0;
