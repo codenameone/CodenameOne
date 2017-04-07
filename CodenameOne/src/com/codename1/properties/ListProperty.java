@@ -215,4 +215,23 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
             firePropertyChanged();
         }
     }
+
+    /**
+     * Returns true if the given element is contained in the list property  
+     * @param element the element
+     * @return true if the given element is contained in the list property  
+     */
+    public boolean contains(T element) {
+        return value.contains(element);
+    }
+
+
+    /**
+     * Returns the index of the given element in the list property  
+     * @param element the element
+     * @return the index of the given element in the list property  
+     */
+    public int indexOf(T element) {
+        return value.indexOf(element);
+    }
 }
