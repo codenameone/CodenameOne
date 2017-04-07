@@ -7835,7 +7835,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
         try {
-            // Load the HSQL Database Engine JDBC driver
+            // Load the sqlite database Engine JDBC driver
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException ex) {
         }
