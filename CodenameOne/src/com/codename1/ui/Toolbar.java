@@ -448,7 +448,7 @@ public class Toolbar extends Container {
                     }
                 
                 };
-                Form f = (Form)Toolbar.this.getParent();
+                Form f = (Form)Toolbar.this.getComponentForm();
                 setHidden(true);
                 f.removeComponentFromForm(Toolbar.this);
                 f.setToolbar(s);
