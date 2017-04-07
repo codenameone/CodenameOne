@@ -5099,6 +5099,7 @@ public class Component implements Animation, StyleListener {
      * Returns the names of the properties within this component that can be bound for persistence,
      * the order of these names mean that the first one will be the first bound
      * @return a string array of property names or null
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public String[] getBindablePropertyNames() {
         return null;
@@ -5107,6 +5108,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Returns the types of the properties that are bindable within this component
      * @return the class for binding
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public Class[] getBindablePropertyTypes() {
         return null;
@@ -5116,6 +5118,7 @@ public class Component implements Animation, StyleListener {
      * Binds the given property name to the given bind target
      * @param prop the property name
      * @param target the target binder
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void bindProperty(String prop, BindTarget target) {
     }
@@ -5124,6 +5127,7 @@ public class Component implements Animation, StyleListener {
      * Removes a bind target from the given property name
      * @param prop the property names
      * @param target the target binder
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void unbindProperty(String prop, BindTarget target) {
     }
@@ -5132,6 +5136,7 @@ public class Component implements Animation, StyleListener {
      * Allows the binding code to extract the value of the property
      * @param prop the property
      * @return the value for the property
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public Object getBoundPropertyValue(String prop) {
         return null;
@@ -5143,6 +5148,7 @@ public class Component implements Animation, StyleListener {
      * 
      * @param prop the property whose value should be set
      * @param value the value
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void setBoundPropertyValue(String prop, Object value) {
     }
@@ -5150,6 +5156,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Indicates the property within this component that should be bound to the cloud object
      * @return the cloudBoundProperty
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public String getCloudBoundProperty() {
         if(noBind && cloudBoundProperty == null) {
@@ -5167,6 +5174,7 @@ public class Component implements Animation, StyleListener {
     /**
      * Indicates the property within this component that should be bound to the cloud object
      * @param cloudBoundProperty the cloudBoundProperty to set
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void setCloudBoundProperty(String cloudBoundProperty) {
         this.cloudBoundProperty = cloudBoundProperty;
@@ -5180,6 +5188,7 @@ public class Component implements Animation, StyleListener {
      * The destination property of the CloudObject
      * 
      * @return the cloudDestinationProperty
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public String getCloudDestinationProperty() {
         if(cloudDestinationProperty == null || cloudDestinationProperty.length() == 0) {
@@ -5191,6 +5200,7 @@ public class Component implements Animation, StyleListener {
     /**
      * The destination property of the CloudObject
      * @param cloudDestinationProperty the cloudDestinationProperty to set
+     * @deprecated this mapped to an older iteration of properties that is no longer used
      */
     public void setCloudDestinationProperty(String cloudDestinationProperty) {
         this.cloudDestinationProperty = cloudDestinationProperty;
