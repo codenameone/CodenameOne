@@ -808,11 +808,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     public void deinitialize() {
         //activity.getWindowManager().removeView(relativeLayout);
-
+        super.deinitialize();
         if (getActivity() != null) {
 
             Runnable r = new Runnable() {
                 public void run() {
+                    synchronized (AndroidImplementation.this) {
+                        if (!deinitializing) {
+                            return;
+                        }
+                        deinitializing = false;
+                    }
                     if (nativePeers.size() > 0) {
                         for (int i = 0; i < nativePeers.size(); i++) {
                             ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
@@ -823,13 +829,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     relativeLayout = null;
                     myView = null;
-                    deinitializing = false;
                 }
             };
 
             if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
+                deinitializing = true;
                 r.run();
             } else {
+                deinitializing = true;
                 getActivity().runOnUiThread(r);
             }
         } else {
