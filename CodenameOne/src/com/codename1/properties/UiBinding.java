@@ -23,86 +23,507 @@
 
 package com.codename1.properties;
 
+import com.codename1.io.Util;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
+import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
 /**
- * The binding framework can implicitly bind UI elements to properties and provide common UI 
- * capabilities. 
+ * <p>The binding framework can implicitly bind UI elements to properties, this allow seamless 
+ * model to UI mapping. Most cases allow simple binding by just using the
+ * {@link #bind(com.codename1.properties.Property, com.codename1.ui.Component)} method
+ * to seamlessly update a property/component based on changes.</p>
+ * 
+ * <p>It contains the following base concepts:</p>
+ * 
+ * <ol>
+ * <li>{@link com.codename1.properties.UiBinding.ObjectConverter} - a converter converts 
+ * from one type to another. E.g. if we want a {@link com.codename1.ui.TextArea} to map 
+ * to an {@code Integer} property we'd use an 
+ * {@link com.codename1.properties.UiBinding.IntegerConverter} to indicate the desired 
+ * destination value.
+ * <li>{@link com.codename1.properties.UiBinding.ComponentAdapter} - takes two 
+ * {@link com.codename1.properties.UiBinding.ObjectConverter} to convert to/from the
+ * component &amp; property. It provides the API for event binding and value extraction/setting
+ * on the component.
+ * <li>{@link com.codename1.properties.UiBinding.Binding} - the commit mode 
+ * <li>{@link #bind(com.codename1.properties.Property, com.codename1.ui.Component) - 
+ * the {@code bind} helper methods allow us to bind a component easily without exposure
+ * to these complexities.
+ * </ol>
  *
  * @author Shai Almog
  */
-public class UiBinding {
+public class UiBinding {    
+    private boolean autoCommit = true;
+
     /**
-     * Changes to the text area are automatically reflected to the given property and visa versa
-     * @param prop the property value
-     * @param ta the text area
+     * Default value for auto-commit mode, in auto-commit mode changes to the component/property
+     * are instantly reflected otherwise {@link com.codename1.properties.UiBinding.CommitMode#commit()}
+     * should be invoked explicitly
+     * @param b true to enable auto commit mode
      */
-    public void bindString(Property<String, ? extends Object> prop, TextArea ta) {
-        new Binder(prop, ta, String.class);
+    public void setAutoCommit(boolean b) {
+        autoCommit = b;
     }
 
     /**
-     * Changes to the text area are automatically reflected to the given property and visa versa
-     * @param prop the property value
-     * @param ta the text area
+     * Is auto-commit mode on by default see {@link #setAutoCommit(boolean)}
+     * @return true if auto-commit is on
      */
-    public void bindInteger(Property<Integer, ? extends Object> prop, TextArea ta) {
-        new Binder(prop, ta, Integer.class);
+    public boolean isAutoCommit() {
+        return autoCommit;
     }
     
-    class Binder implements ActionListener<ActionEvent>, PropertyChangeListener {
-        private boolean lock;
-        private Property prop;
-        private TextArea tcmp;
-        private Class type;
+    /**
+     * <p>Binding allows us to have commit/auto-commit mode. This allows changes to properties 
+     * to reflect immediately or only when committed, e.g. if a {@code Form} has "OK" &amp; 
+     * "Cancel" buttons you might want to do a commit on OK. We also provide a "rollback" method to 
+     * reset to the original property values.</p>
+     * <p>
+     * {@code UiBinding} has a boolean auto commit flag that can be toggled to set the default for new 
+     * bindings.
+     * </p>
+     * <p>
+     * Binding also provides the ability to disengage a "binding" between a property and a UI component
+     * </p>
+     */
+    public abstract class Binding {
+        private boolean autoCommit = UiBinding.this.autoCommit;
         
-        public Binder(Property prop, TextArea tcmp, Class type) {
-            this.prop = prop;
-            this.tcmp = tcmp;
-            this.type = type;
-            prop.addChangeListener(this);
-            tcmp.addActionListener(this);
+        /**
+         * Toggles auto-commit mode and overrides the {@code UiBinding} autocommit default. 
+         * Autocommit instantly reflects changes to the property or component values.
+         * @param b true to enable auto-commit
+         */
+        public void setAutoCommit(boolean b) {
+            autoCommit = b;
         }
         
-        public void actionPerformed(ActionEvent evt) {
-            if(!lock) {
-                lock = true;
-                if(tcmp != null) {
-                    if(type == String.class) {
-                        String text = tcmp.getText();
-                        prop.set(text);
-                    } else {
-                        if(type == Integer.class) {
-                            Integer inv = (Integer)prop.get();
-                            int val = 0;
-                            if(inv != null) {
-                                val = inv;
-                            }
-                            prop.set(tcmp.getAsInt(val));
-                        }
-                    }
-                }
-                lock = false;
+        /**
+         * Gets the autocommit value see {@link #setAutoCommit(boolean)}
+         * @return true if autocommit is on
+         */
+        public boolean isAutoCommit() {
+            return autoCommit;
+        }
+        
+        /**
+         * Set the value from the component into the property, note that this will throw an exception if
+         * autocommit is on
+         */
+        public abstract void commit();
+        
+        /**
+         * Sets the value from the property into the component, note that this will throw an exception if
+         * autocommit is on 
+         */
+        public abstract void rollback();
+        
+        /**
+         * Clears the listeners and disengages binding, this can be important for GC as binding
+         * can keep object references in RAM
+         */
+        public abstract void disconnect();
+    }
+    
+    /**
+     * Allows us to unbind the property from binding, this is equivalent to calling 
+     * {@link com.codename1.properties.UiBinding.Binding#disconnect()} on all
+     * bindings...
+     * 
+     * @param prop the property
+     */
+    public static void unbind(PropertyBase prop) {
+        for(Object l : prop.getListeners()) {
+            if(l instanceof Binding) {
+                ((Binding)l).disconnect();
+                
+                // prevent a concurrent modification exception by returning and recursing
+                unbind(prop);
+                return;
+            }
+        }
+    }
+    
+    /**
+     * Unbinds all the properties within the business object
+     * @param po the business object
+     */
+    public static void unbind(PropertyBusinessObject po) {
+        for(PropertyBase pb : po.getPropertyIndex()) {
+            unbind(pb);
+        }
+    }
+    
+    /**
+     * Object converter can convert an object from one type to another e.g. a String to an integer an
+     * array to a list model. Use this object converter to keep source/values the same e.g. when converting
+     * using a {@link com.codename1.properties.UiBinding.TextAreaAdapter} to a String property.
+     */
+    public static class ObjectConverter {
+        /**
+         * Converts an object of source type to the type matching this class, the default 
+         * implementation does nothing and can be used as a stand-in
+         * @param source an object or null
+         * @return null or a new object instance
+         */
+        public Object convert(Object source) {
+            return source;
+        }
+    }
+    
+    /**
+     * Converts the source value to a String
+     */
+    public static class StringConverter extends ObjectConverter {
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            return source.toString();
+        }
+    }
+
+    /**
+     * Converts the source value to an Integer
+     */
+    public static class IntegerConverter extends ObjectConverter {
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            return Util.toIntValue(source);
+        }
+    }
+
+    /**
+     * Converts the source value to a Long
+     */
+    public static class LongConverter extends ObjectConverter {
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            return Util.toLongValue(source);
+        }
+    }
+    
+    /**
+     * Converts the source value to a Float
+     */
+    public static class FloatConverter extends ObjectConverter {
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            return Util.toFloatValue(source);
+        }
+    }
+
+    /**
+     * Converts the source value to a Double
+     */
+    public static class DoubleConverter extends ObjectConverter {
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            return Util.toDoubleValue(source);
+        }
+    }
+    
+    /**
+     * Converts the source value to a Boolean
+     */
+    public static class BooleanConverter extends ObjectConverter {
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            if(source instanceof Boolean) {
+                return ((Boolean)source).booleanValue();
+            }
+            if(source instanceof String) {
+                String s = ((String)source).toLowerCase();
+                return s.indexOf("true") > 0 || s.indexOf("yes") > 0 || s.indexOf("1") > 0;
+            }
+            return Util.toIntValue(source) > 0;
+        }
+    }
+
+    /**
+     * Adapters can be extended to allow any component to bind to a property via a converter
+     */
+    public abstract static class ComponentAdapter<PropertyType, ComponentType> {
+        /**
+         * Used by the subclass to convert values from the component to the property
+         */
+        protected final ObjectConverter toPropertyType;
+
+        /**
+         * Used by the subclass to convert values from the property to the component 
+         */
+        protected final ObjectConverter toComponentType;
+
+        /**
+         * Subclasses usually provide the toComponentType and allow their callers to define
+         * the toPropertyType
+         * @param toPropertyType Used by the subclass to convert values from the component to 
+         * the property
+         * @param toComponentType Used by the subclass to convert values from the property to 
+         * the component 
+         */
+        public ComponentAdapter(ObjectConverter toPropertyType, ObjectConverter toComponentType) {
+            this.toPropertyType = toPropertyType;
+            this.toComponentType = toComponentType;
+        }
+        
+        /**
+         * Assigns the value from the property into the component
+         * @param value the value that was returned from the property get method
+         * @param cmp the component instance
+         */
+        public abstract void assignTo(PropertyType value, ComponentType cmp);
+        
+        /**
+         * Returns the value for the set method of the property from the given component
+         * @param cmp the component
+         * @return the value we can place into the set method
+         */
+        public abstract PropertyType getFrom(ComponentType cmp);
+        
+        /**
+         * Binds an action listener to changes in the component
+         * @param cmp the component
+         * @param l listener
+         */
+        public abstract void bindListener(ComponentType cmp, ActionListener<ActionEvent> l);
+        
+        /**
+         * Removes the action listener from changes in the component
+         * @param cmp the component
+         * @param l listener
+         */
+        public abstract void removeListener(ComponentType cmp, ActionListener<ActionEvent> l);
+    }
+    
+    /**
+     * Adapts a {@link com.codename1.ui.TextArea} (and it's subclass 
+     * {@link com.codename1.ui.TextField} to binding
+     * @param <PropertyType> the type of the property generic
+     */
+    class TextAreaAdapter<PropertyType> extends ComponentAdapter<PropertyType, TextArea> {
+        /**
+         * Constructs a new binding
+         * @param toPropertyType the conversion logic to the property
+         */
+        public TextAreaAdapter(ObjectConverter toPropertyType) {
+            super(toPropertyType, new StringConverter());
+        }
+
+        /**
+         * Constructs a new binding assuming a String property
+         */
+        public TextAreaAdapter() {
+            super(new ObjectConverter(), new ObjectConverter());
+        }
+
+        @Override
+        public void assignTo(PropertyType value, TextArea cmp) {
+            cmp.setText((String)toComponentType.convert(value));
+        }
+
+        @Override
+        public PropertyType getFrom(TextArea cmp) {
+            return (PropertyType)toPropertyType.convert(cmp.getText());
+        }
+
+        @Override
+        public void bindListener(TextArea cmp, ActionListener<ActionEvent> l) {
+            cmp.addActionListener(l);
+        }
+
+        @Override
+        public void removeListener(TextArea cmp, ActionListener<ActionEvent> l) {
+            cmp.removeActionListener(l);
+        }
+    }
+
+    /**
+     * Adapts a {@link com.codename1.ui.CheckBox} or 
+     * {@link com.codename1.ui.RadioButton} to binding
+     * @param <PropertyType> the type of the property generic
+     */
+    class CheckBoxRadioSelectionAdapter<PropertyType> extends ComponentAdapter<PropertyType, Button> {
+        /**
+         * Constructs a new binding
+         * @param toPropertyType the conversion logic to the property
+         */
+        public CheckBoxRadioSelectionAdapter(ObjectConverter toPropertyType) {
+                super(toPropertyType, new BooleanConverter());
+        }
+
+        @Override
+        public void assignTo(PropertyType value, Button cmp) {
+            if(cmp instanceof CheckBox) {
+                ((CheckBox)cmp).setSelected((Boolean)toComponentType.convert(value));
+            } else {
+                ((RadioButton)cmp).setSelected((Boolean)toComponentType.convert(value));
             }
         }
 
-        public void propertyChanged(PropertyBase p) {
-            if(!lock) {
-                lock = true;
-                if(tcmp != null) {
-                    Object val = prop.get();
-                    if(val != null) {
-                        tcmp.setText(val.toString());
-                    } else {
-                        tcmp.setText("");
+        @Override
+        public PropertyType getFrom(Button cmp) {
+            return (PropertyType)toPropertyType.convert(cmp.isSelected());
+        }
+
+        @Override
+        public void bindListener(Button cmp, ActionListener<ActionEvent> l) {
+            cmp.addActionListener(l);
+        }
+
+        @Override
+        public void removeListener(Button cmp, ActionListener<ActionEvent> l) {
+            cmp.removeActionListener(l);
+        }
+    }
+
+    private ObjectConverter getPropertyConverter(Property prop) {
+        Class gt = prop.getGenericType();
+        if(gt == null || gt == String.class) {
+            return new StringConverter();
+        }        
+        if(gt == Integer.class) {
+            return new IntegerConverter();
+        }
+        if(gt == Long.class) {
+            return new LongConverter();
+        }
+        if(gt == Double.class) {
+            return new DoubleConverter();
+        }
+        if(gt == Float.class) {
+            return new FloatConverter();
+        }
+        if(gt == Boolean.class) {
+            return new BooleanConverter();
+        }
+        throw new RuntimeException("Unsupported property converter: " + gt.getName());
+    }
+    
+    /**
+     * Binds the given property to the component using default adapters
+     * @param prop the property
+     * @param cmp the component
+     * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
+     */
+    public Binding bind(final Property prop, final Component cmp) {
+        ObjectConverter cnv = getPropertyConverter(prop);
+        if(cmp instanceof TextArea) {
+            return bind(prop, cmp, new TextAreaAdapter(cnv));
+        }
+        if(cmp instanceof CheckBox) {
+            return bind(prop, cmp, new CheckBoxRadioSelectionAdapter(cnv));
+        }
+        if(cmp instanceof RadioButton) {
+            return bind(prop, cmp, new CheckBoxRadioSelectionAdapter(cnv));
+        }
+        throw new RuntimeException("Unsupported binding type: " + cmp.getClass().getName());
+    }
+    
+    /**
+     * Binds the given property to the component using a custom adapter class
+     * @param prop the property
+     * @param cmp the component
+     * @param adapt an implementation of {@link com.codename1.properties.UiBinding.ComponentAdapter}
+     * that allows us to define the way the component maps to/from the property
+     * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
+     */
+    public Binding bind(final Property prop, final Component cmp, final ComponentAdapter adapt) {
+        adapt.assignTo(prop.get(), cmp);
+        
+        class BindingImpl extends Binding implements PropertyChangeListener, ActionListener<ActionEvent> {
+            private boolean lock;
+
+            public void actionPerformed(ActionEvent evt) {
+                if(isAutoCommit()) {
+                    if(lock) {
+                        return;
                     }
+                    lock = true;
+                    prop.set(adapt.getFrom(cmp));
+                    lock = false;
+                } 
+            }
+
+            public void propertyChanged(PropertyBase p) {
+                if(isAutoCommit()) {
+                    if(lock) {
+                        return;
+                    }
+                    lock = true;
+                    adapt.assignTo(prop.get(), cmp);
+                    lock = false;
                 }
-                lock = false;
+            }
+
+            @Override
+            public void commit() {
+                if(isAutoCommit()) {
+                    throw new RuntimeException("Can't commit in autocommit mode");
+                }
+                prop.set(adapt.getFrom(cmp));
+            }
+
+            @Override
+            public void rollback() {
+                if(isAutoCommit()) {
+                    throw new RuntimeException("Can't rollback in autocommit mode");
+                }
+                adapt.assignTo(prop.get(), cmp);
+            }
+
+            @Override
+            public void disconnect() {
+                adapt.removeListener(cmp, this);
+                prop.removeChangeListener(this);
             }
         }
-        
+        BindingImpl b = new BindingImpl();
+        adapt.bindListener(cmp, b);
+        prop.addChangeListener(b);
+        return b;
+    } 
+    
+    
+    /**
+     * Changes to the text area are automatically reflected to the given property and visa versa
+     * @param prop the property value
+     * @param ta the text area
+     * @deprecated this code was experimental we will use the more generic Adapter/bind framework
+     */
+    public void bindString(Property<String, ? extends Object> prop, TextArea ta) {
+        bind(prop, ta);
+    }
+
+    /**
+     * Changes to the text area are automatically reflected to the given property and visa versa
+     * @param prop the property value
+     * @param ta the text area
+     * @deprecated this code was experimental we will use the more generic Adapter/bind framework
+     */
+    public void bindInteger(Property<Integer, ? extends Object> prop, TextArea ta) {
+        bind(prop, ta);
     }
 }

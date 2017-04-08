@@ -24,6 +24,7 @@
 package com.codename1.properties;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Base class for property types
@@ -45,6 +46,17 @@ public class PropertyBase<T, K> {
         this.name = name;
     }
 
+    
+    /**
+     * Provides the internal list of listeners
+     * @return internal list of listeners
+     */
+    List<PropertyChangeListener<T, K>> getListeners() {
+        return listeners;
+    }
+
+    
+    
     /**
      * All properties must have a name, a generic type is helpful
      * @param name the name of the property
