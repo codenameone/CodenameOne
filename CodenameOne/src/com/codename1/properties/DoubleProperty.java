@@ -34,14 +34,14 @@ public class DoubleProperty<K> extends NumericProperty<Double, K>{
      * {@inheritDoc}
      */
     public DoubleProperty(String name) {
-        super(name);
+        super(name, Double.class);
     }
 
     /**
      * {@inheritDoc}
      */
     public DoubleProperty(String name, Double value) {
-        super(name, value);
+        super(name, Double.class, value);
     }    
 
     

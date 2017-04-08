@@ -34,14 +34,14 @@ public class FloatProperty<K> extends NumericProperty<Float, K>{
      * {@inheritDoc}
      */
     public FloatProperty(String name) {
-        super(name);
+        super(name, Float.class);
     }
 
     /**
      * {@inheritDoc}
      */
     public FloatProperty(String name, Float value) {
-        super(name, value);
+        super(name, Float.class, value);
     }    
 
     

@@ -45,6 +45,17 @@ public class Property<T, K> extends PropertyBase<T, K> {
     }
     
     /**
+     * Constructs a property with the given name and value
+     * @param name the name of the property
+     * @param genericType the type of the property
+     * @param value the default value for the property
+     */
+    public Property(String name, Class genericType, T value) {
+        super(name, genericType);
+        this.value = value;
+    }
+
+    /**
      * Constructs a property with null value
      * @param name the name of the property
      */
@@ -52,6 +63,15 @@ public class Property<T, K> extends PropertyBase<T, K> {
         super(name);
     }
     
+    /**
+     * Constructs a property with null value
+     * @param genericType the type of the property
+     * @param name the name of the property
+     */
+    public Property(String name, Class genericType) {
+        super(name, genericType);
+    }
+
     /**
      * Gets the property value
      * @return the property value

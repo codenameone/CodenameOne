@@ -34,14 +34,14 @@ public class IntProperty<K> extends NumericProperty<Integer, K>{
      * {@inheritDoc}
      */
     public IntProperty(String name) {
-        super(name);
+        super(name, Integer.class);
     }
 
     /**
      * {@inheritDoc}
      */
     public IntProperty(String name, Integer value) {
-        super(name, value);
+        super(name, Integer.class, value);
     }    
     
     /**
