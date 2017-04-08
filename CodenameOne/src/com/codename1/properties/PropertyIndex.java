@@ -237,7 +237,7 @@ public class PropertyIndex implements Iterable<PropertyBase>{
                                 } 
                                 for(Object e : (Collection)val) {
                                     if(e instanceof Map) {
-                                        Class eType = ((ListProperty) p).elementType;
+                                        Class eType = ((ListProperty) p).getGenericType();
                                         // maybe don't use recursiveType here anymore???
                                         // elementType is usually sufficient... 
                                         Class type = (eType == null)? recursiveType : eType; 
@@ -324,8 +324,19 @@ public class PropertyIndex implements Iterable<PropertyBase>{
      * @return a map representation of the properties
      */
     public Map<String, Object> toMapRepresentation() {
+        return toMapRepresentationImpl("mapExclude");
+    }
+
+    /**
+     * This is useful in converting a property object to JSON
+     * @return a map representation of the properties
+     */
+    private Map<String, Object> toMapRepresentationImpl(String excludeFlag) {
         HashMap<String, Object> m = new HashMap<String, Object>();
         for(PropertyBase p : this) {
+            if(p.getClientProperty(excludeFlag) != null) {
+                continue;
+            }
             if(p instanceof MapProperty) {
                 MapProperty pp = (MapProperty)p;
                 m.put(p.getName(), pp.asExplodedMap());
@@ -351,7 +362,7 @@ public class PropertyIndex implements Iterable<PropertyBase>{
      * @return a JSON String
      */
     public String toJSON() {
-        return Result.fromContent(toMapRepresentation()).toString();
+        return Result.fromContent(toMapRepresentationImpl("jsonExclude")).toString();
     }
     
     /**
@@ -429,5 +440,48 @@ public class PropertyIndex implements Iterable<PropertyBase>{
         return value;
     }
     
+    /**
+     * Allows us to exclude a specific property from the toJSON process
+     * @param pb the property
+     * @param exclude true to exclude and false to reinclude
+     */
+    public void setExcludeFromJSON(PropertyBase pb, boolean exclude) {
+        if(exclude) {
+            pb.putClientProperty("jsonExclude", Boolean.TRUE);
+        } else {
+            pb.putClientProperty("jsonExclude", null);
+        }
+    }
     
+    /**
+     * Indicates whether the given property is excluded from the {@link #toMapRepresentation()} 
+     * method output
+     * @param pb the property
+     * @return true if the property is excluded and false otherwise
+     */
+    public boolean isExcludeFromMap(PropertyBase pb) {
+        return pb.getClientProperty("mapExclude") != null;
+    }
+
+    /**
+     * Allows us to exclude a specific property from the {@link #toMapRepresentation()} process
+     * @param pb the property
+     * @param exclude true to exclude and false to reinclude
+     */
+    public void setExcludeFromMap(PropertyBase pb, boolean exclude) {
+        if(exclude) {
+            pb.putClientProperty("mapExclude", Boolean.TRUE);
+        } else {
+            pb.putClientProperty("jsonExclude", null);
+        }
+    }
+    
+    /**
+     * Indicates whether the given property is excluded from the {@link #toJSON()} method output
+     * @param pb the property
+     * @return true if the property is excluded and false otherwise
+     */
+    public boolean isExcludeFromJSON(PropertyBase pb) {
+        return pb.getClientProperty("jsonExclude") != null;
+    }
 }
