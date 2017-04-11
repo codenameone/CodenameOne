@@ -182,4 +182,26 @@ public class PropertyBase<T, K> {
     public Class getGenericType() {
         return genericType;
     }
+    
+    /**
+     * The label of the property defaults to its name but can be changed to anything, it can be used
+     * when binding a property to UI elements
+     * @param label the new label value
+     */
+    public void setLabel(String label) {
+        putClientProperty("cn1PropertyLabel", label);
+    }
+    
+    /**
+     * The label of the property defaults to its name but can be changed to anything
+     * 
+     * @return the label for the property
+     */
+    public String getLabel() {
+        String l = (String)getClientProperty("cn1PropertyLabel");
+        if(l == null) {
+            return getName();
+        }
+        return l;
+    }
 }
