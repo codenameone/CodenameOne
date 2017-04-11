@@ -27,6 +27,7 @@ package com.codename1.io;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Externalizable;
+import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
@@ -234,6 +235,13 @@ public class Util {
         out.writeBoolean(true);
         if(o instanceof Externalizable) {
             Externalizable e = (Externalizable)o;
+            out.writeUTF(e.getObjectId());
+            out.writeInt(e.getVersion());
+            e.externalize(out);
+            return;
+        }
+        if(o instanceof PropertyBusinessObject) {
+            Externalizable e = ((PropertyBusinessObject)o).getPropertyIndex().asExternalizable();
             out.writeUTF(e.getObjectId());
             out.writeInt(e.getVersion());
             e.externalize(out);
@@ -657,9 +665,16 @@ public class Util {
             }
             Class cls = (Class) externalizables.get(type);
             if (cls != null) {
-                Externalizable ex = (Externalizable) cls.newInstance();
-                ex.internalize(input.readInt(), input);
-                return ex;
+                Object o = cls.newInstance();
+                if(o instanceof Externalizable) {
+                    Externalizable ex = (Externalizable)o; 
+                    ex.internalize(input.readInt(), input);
+                    return ex;
+                } else {
+                    PropertyBusinessObject pb = (PropertyBusinessObject)o;
+                    pb.getPropertyIndex().asExternalizable().internalize(input.readInt(), input);
+                    return pb;
+                }
             }
             throw new IOException("Object type not supported: " + type);
         } catch (InstantiationException ex1) {
@@ -1425,6 +1440,9 @@ public class Util {
         }
         if(number instanceof Float) {
             return ((Float)number).longValue();
+        }
+        if(number instanceof Date) {
+            return ((Date)number).getTime();
         }
         /*if(number instanceof Short) {
             return ((Short)number).longValue();
