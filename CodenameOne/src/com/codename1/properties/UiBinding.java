@@ -24,13 +24,21 @@
 package com.codename1.properties;
 
 import com.codename1.io.Util;
+import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.spinner.Picker;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 /**
  * <p>The binding framework can implicitly bind UI elements to properties, this allow seamless 
@@ -204,6 +212,22 @@ public class UiBinding {
     }
 
     /**
+     * Converts the source value to a Date
+     */
+    public static class DateConverter extends ObjectConverter {
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            if(source instanceof Date) {
+                return (Date)source;
+            }
+            return new Date(Util.toLongValue(source));
+        }
+    }
+    
+    /**
      * Converts the source value to a Long
      */
     public static class LongConverter extends ObjectConverter {
@@ -262,6 +286,26 @@ public class UiBinding {
         }
     }
 
+    /**
+     * Maps values to other values for conversion in a similar way to a Map this is pretty
+     * useful for API's like picker where we have a list of Strings and we might want a list
+     * of other objects to match every string
+     */
+    public static class MappingConverter extends ObjectConverter {
+        private Map<Object, Object> m;
+        public MappingConverter(Map<Object, Object> m) {
+            this.m = m;
+        }
+        
+        @Override
+        public Object convert(Object source) {
+            if(source == null) {
+                return null;
+            }
+            return m.get(source);
+        }
+    }
+    
     /**
      * Adapters can be extended to allow any component to bind to a property via a converter
      */
@@ -323,7 +367,7 @@ public class UiBinding {
      * {@link com.codename1.ui.TextField} to binding
      * @param <PropertyType> the type of the property generic
      */
-    class TextAreaAdapter<PropertyType> extends ComponentAdapter<PropertyType, TextArea> {
+    public static class TextAreaAdapter<PropertyType> extends ComponentAdapter<PropertyType, TextArea> {
         /**
          * Constructs a new binding
          * @param toPropertyType the conversion logic to the property
@@ -365,7 +409,7 @@ public class UiBinding {
      * {@link com.codename1.ui.RadioButton} to binding
      * @param <PropertyType> the type of the property generic
      */
-    class CheckBoxRadioSelectionAdapter<PropertyType> extends ComponentAdapter<PropertyType, Button> {
+    public static class CheckBoxRadioSelectionAdapter<PropertyType> extends ComponentAdapter<PropertyType, Button> {
         /**
          * Constructs a new binding
          * @param toPropertyType the conversion logic to the property
@@ -399,7 +443,145 @@ public class UiBinding {
         }
     }
 
-    private ObjectConverter getPropertyConverter(Property prop) {
+    /**
+     * Adapts a set of {@link com.codename1.ui.RadioButton} to a selection within a list of values
+     * @param <PropertyType> the type of the property generic
+     */
+    public static class RadioListAdapter<PropertyType> extends ComponentAdapter<PropertyType, RadioButton[]> {
+        private final PropertyType[] values;
+        
+        /**
+         * Constructs a new binding
+         * @param toPropertyType the conversion logic to the property
+         * @param values potential values for the selection
+         */
+        public RadioListAdapter(ObjectConverter toPropertyType, PropertyType... values) {
+                super(toPropertyType, null);
+                this.values = values;
+        }
+
+        @Override
+        public void assignTo(PropertyType value, RadioButton[] cmp) {
+            for(int iter = 0 ; iter < values.length ; iter++) {
+                if(values[iter].equals(value)) {
+                    cmp[iter].setSelected(true);
+                    return;
+                } 
+            }
+                    
+        }
+
+        @Override
+        public PropertyType getFrom(RadioButton[] cmp) {
+            for(int iter = 0 ; iter < values.length ; iter++) {
+                if(cmp[iter].isSelected()) {
+                    return values[iter];
+                } 
+            }
+            return null;
+        }
+
+        @Override
+        public void bindListener(RadioButton[] cmp, ActionListener<ActionEvent> l) {
+            for(RadioButton r : cmp) {
+                r.addActionListener(l);
+            }
+        }
+
+        @Override
+        public void removeListener(RadioButton[] cmp, ActionListener<ActionEvent> l) {
+            for(RadioButton r : cmp) {
+                r.removeActionListener(l);
+            }
+        }
+    }
+    
+    private static ObjectConverter pickerTypeToConverter(int type) {
+        switch(type) {
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+                return new DateConverter();
+            case Display.PICKER_TYPE_TIME:
+                return new IntegerConverter();
+            case Display.PICKER_TYPE_STRINGS:
+                return new StringConverter();
+        }
+        throw new IllegalArgumentException("Unsupported picker type: " + type);
+    }
+
+    /**
+     * Adapts a {@link com.codename1.ui.spinner.Picker} to binding
+     * @param <PropertyType> the type of the property generic
+     */
+    public static class PickerAdapter<PropertyType> extends ComponentAdapter<PropertyType, Picker> {
+        /**
+         * Constructs a new binding
+         * @param toPropertyType the conversion logic to the property
+         * @param pickerType the type of the picker
+         */
+        public PickerAdapter(ObjectConverter toPropertyType, int pickerType) {
+                super(toPropertyType, pickerTypeToConverter(pickerType));
+        }
+
+        /**
+         * Constructs a new binding for mapping back and forth of a String Picker
+         * @param toPropertyType map to convert objects forth
+         * @param toComponentType map to convert objects back
+         */
+        public PickerAdapter(MappingConverter toPropertyType, MappingConverter toComponentType) {
+                super(toPropertyType, toComponentType);
+        }
+        
+        @Override
+        public void assignTo(PropertyType value, Picker cmp) {
+            switch(cmp.getType()) {
+                case Display.PICKER_TYPE_DATE:
+                case Display.PICKER_TYPE_DATE_AND_TIME:
+                    cmp.setDate((Date)toComponentType.convert(value));
+                    break;
+                case Display.PICKER_TYPE_TIME:
+                    cmp.setTime((Integer)toComponentType.convert(value));
+                    break;
+                case Display.PICKER_TYPE_STRINGS:
+                    if(value instanceof Integer) {
+                        cmp.setSelectedStringIndex((Integer)toComponentType.convert(value));
+                    } else {
+                        cmp.setSelectedString((String)toComponentType.convert(value));
+                    }
+                    break;
+            }
+        }
+
+        @Override
+        public PropertyType getFrom(Picker cmp) {
+            switch(cmp.getType()) {
+                case Display.PICKER_TYPE_DATE:
+                case Display.PICKER_TYPE_DATE_AND_TIME:
+                    return (PropertyType)toPropertyType.convert(cmp.getDate());
+                case Display.PICKER_TYPE_TIME:
+                    return (PropertyType)toPropertyType.convert(cmp.getTime());
+                case Display.PICKER_TYPE_STRINGS:
+                    if(toPropertyType instanceof IntegerConverter) {
+                        return (PropertyType)new Integer(cmp.getSelectedStringIndex());
+                    }
+                    return (PropertyType)toPropertyType.convert(cmp.getSelectedString());
+            }
+            throw new RuntimeException("Illegal state for picker binding");
+        }
+
+        @Override
+        public void bindListener(Picker cmp, ActionListener<ActionEvent> l) {
+            cmp.addActionListener(l);
+        }
+
+        @Override
+        public void removeListener(Picker cmp, ActionListener<ActionEvent> l) {
+            cmp.removeActionListener(l);
+        }
+    }
+    
+    
+    private ObjectConverter getPropertyConverter(PropertyBase prop) {
         Class gt = prop.getGenericType();
         if(gt == null || gt == String.class) {
             return new StringConverter();
@@ -419,16 +601,108 @@ public class UiBinding {
         if(gt == Boolean.class) {
             return new BooleanConverter();
         }
+        if(gt == Date.class) {
+            return new DateConverter();
+        }
         throw new RuntimeException("Unsupported property converter: " + gt.getName());
     }
     
+    class GroupBinding extends Binding {
+        private List<Binding> allBindings;
+        public GroupBinding(List<Binding> allBindings) {
+            this.allBindings = allBindings;
+        }
+        
+        @Override
+        public void setAutoCommit(boolean b) {
+            super.setAutoCommit(b);
+            for(Binding bb : allBindings) {
+                bb.setAutoCommit(b);
+            }
+        }
+
+        @Override
+        public void commit() {
+            for(Binding bb : allBindings) {
+                bb.commit();
+            }
+        }
+
+        @Override
+        public void rollback() {
+            for(Binding bb : allBindings) {
+                bb.rollback();
+            }
+        }
+
+        @Override
+        public void disconnect() {
+            for(Binding bb : allBindings) {
+                bb.disconnect();
+            }
+        }
+    }
+    
+    GroupBinding createGroupBinding(List<Binding> allBindings) {
+        return new GroupBinding(allBindings);
+    }
+    
+    /**
+     * Binds a hierarchy of Components to a business object by searching the tree and collecting
+     * the bindings. Components are associated with properties based on their name attribute
+     * @param obj the business object with the properties to bind
+     * @param cnt a container that will be recursed for binding
+     * @return a Binding object that manipulates all of the individual bindings at once
+     */
+    public Binding bind(final PropertyBusinessObject obj, final Container cnt) {
+        ArrayList<Binding> allBindings = new ArrayList<Binding>();
+        bind(obj, cnt, allBindings);
+        
+        return new GroupBinding(allBindings);
+    }
+    
+    private void bind(final PropertyBusinessObject obj, final Container cnt, ArrayList<Binding> allBindings) {
+        for(Component cmp : cnt) {
+            if(cmp instanceof Container && ((Container)cmp).getLeadComponent() == null) {
+                bind(obj, ((Container)cmp), allBindings);
+                continue;
+            }
+            String n = cmp.getName();
+            if(n != null) {
+                PropertyBase b = obj.getPropertyIndex().get(n);
+                if(b != null) {
+                    allBindings.add(bind(b, cmp));
+                }
+            }
+        }
+    }
+
+    /**
+     * Binds the given property to the selected value from the set based on the multiple components. 
+     * This is useful for binding multiple radio buttons to a single property value based on selection
+     * @param prop the property
+     * @param values the values that can be used
+     * @param cmps the components
+     * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
+     */
+    public Binding bindGroup(final PropertyBase prop, final Object[] values, final Component... cmps) {
+        ObjectConverter cnv = getPropertyConverter(prop);
+        if(cmps[0] instanceof RadioButton) {
+            RadioButton[] rb = new RadioButton[cmps.length];
+            System.arraycopy(cmps, 0, rb, 0, cmps.length);
+            return bindImpl(prop, rb, new RadioListAdapter(cnv, values));
+        }
+        throw new RuntimeException("Unsupported binding type: " + cmps[0].getClass().getName());
+    }
+    
+
     /**
      * Binds the given property to the component using default adapters
      * @param prop the property
      * @param cmp the component
      * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
      */
-    public Binding bind(final Property prop, final Component cmp) {
+    public Binding bind(final PropertyBase prop, final Component cmp) {
         ObjectConverter cnv = getPropertyConverter(prop);
         if(cmp instanceof TextArea) {
             return bind(prop, cmp, new TextAreaAdapter(cnv));
@@ -438,6 +712,9 @@ public class UiBinding {
         }
         if(cmp instanceof RadioButton) {
             return bind(prop, cmp, new CheckBoxRadioSelectionAdapter(cnv));
+        }
+        if(cmp instanceof Picker) {
+            return bind(prop, cmp, new PickerAdapter(cnv, ((Picker)cmp).getType()));
         }
         throw new RuntimeException("Unsupported binding type: " + cmp.getClass().getName());
     }
@@ -450,7 +727,12 @@ public class UiBinding {
      * that allows us to define the way the component maps to/from the property
      * @return a binding object that allows us to toggle auto commit mode, commit/rollback and unbind
      */
-    public Binding bind(final Property prop, final Component cmp, final ComponentAdapter adapt) {
+    public Binding bind(final PropertyBase prop, final Component cmp, final ComponentAdapter adapt) {
+        return bindImpl(prop, cmp, adapt);
+    } 
+    
+    
+    private Binding bindImpl(final PropertyBase prop, final Object cmp, final ComponentAdapter adapt) {
         adapt.assignTo(prop.get(), cmp);
         
         class BindingImpl extends Binding implements PropertyChangeListener, ActionListener<ActionEvent> {
@@ -462,7 +744,7 @@ public class UiBinding {
                         return;
                     }
                     lock = true;
-                    prop.set(adapt.getFrom(cmp));
+                    ((Property)prop).set(adapt.getFrom(cmp));
                     lock = false;
                 } 
             }
@@ -483,7 +765,7 @@ public class UiBinding {
                 if(isAutoCommit()) {
                     throw new RuntimeException("Can't commit in autocommit mode");
                 }
-                prop.set(adapt.getFrom(cmp));
+                ((Property)prop).set(adapt.getFrom(cmp));
             }
 
             @Override
@@ -504,8 +786,7 @@ public class UiBinding {
         adapt.bindListener(cmp, b);
         prop.addChangeListener(b);
         return b;
-    } 
-    
+    }     
     
     /**
      * Changes to the text area are automatically reflected to the given property and visa versa

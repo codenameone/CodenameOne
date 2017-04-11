@@ -227,7 +227,7 @@ public class FloatingActionButton extends Button {
         flow.setValign(valign);
 
         Form f = cnt.getComponentForm();
-        if(f != null && f.getContentPane() == cnt) {
+        if(f != null && (f.getContentPane() == cnt || f == cnt)) {
             // special case for content pane installs the button directly on the content pane
             Container layers = f.getLayeredPane(getClass(), true);
             layers.setLayout(flow);

@@ -23,11 +23,14 @@
 
 package com.codename1.properties;
 
+import com.codename1.io.Externalizable;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -46,7 +49,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
-public class PropertyIndex implements Iterable<PropertyBase>{
+public class PropertyIndex implements Iterable<PropertyBase> {
     private final PropertyBase[] properties;
     private static HashMap<String, HashMap<String, Object>> metadata = new HashMap<String, HashMap<String, Object>>();
     PropertyBusinessObject parent;
@@ -483,5 +486,81 @@ public class PropertyIndex implements Iterable<PropertyBase>{
      */
     public boolean isExcludeFromJSON(PropertyBase pb) {
         return pb.getClientProperty("jsonExclude") != null;
+    }
+    
+    /**
+     * Invoking this method will allow a property object to be serialized seamlessly
+     */
+    public void registerExternalizable() {
+        Util.register(getName(), parent.getClass());
+    }
+    
+    /**
+     * Returns an externalizable object for serialization of this business object, unlike regular
+     * externalizables this implementation is robust to changes, additions and removals of 
+     * properties
+     * @return an externalizable instance
+     */
+    public Externalizable asExternalizable() {
+        return new Externalizable() {
+            public int getVersion() {
+                return 1;
+            }
+
+            public void externalize(DataOutputStream out) throws IOException {
+                out.writeInt(getSize());
+                for(PropertyBase b : PropertyIndex.this) {
+                    out.writeUTF(b.getName());
+                    if(b instanceof ListProperty) {
+                        out.writeByte(2);
+                        Util.writeObject(((ListProperty)b).asList(), out);
+                        continue;
+                    }
+                    if(b instanceof MapProperty) {
+                        out.writeByte(3);
+                        Util.writeObject(((MapProperty)b).asMap(), out);
+                        continue;
+                    }
+                    if(b instanceof Property) {
+                        out.writeByte(1);
+                        Util.writeObject(((Property)b).get(), out);
+                        continue;
+                    }
+                }
+            }
+
+            public void internalize(int version, DataInputStream in) throws IOException {
+                int size = in.readInt();
+                for(int iter = 0 ; iter < size ; iter++) {
+                    String pname = in.readUTF();
+                    int type = in.readByte();
+                    Object data = Util.readObject(in);
+                    PropertyBase pb = get(pname);
+                    switch(type) {
+                        case 1: // Property
+                            if(pb instanceof Property) {
+                                ((Property)pb).set(data);
+                            }
+                            break;
+                            
+                        case 2: // ListProperty
+                            if(pb instanceof ListProperty) {
+                                ((ListProperty)pb).setList((List)data);
+                            }
+                            break;
+                            
+                        case 3: // MapProperty
+                            if(pb instanceof MapProperty) {
+                                ((MapProperty)pb).setMap((Map)data);
+                            }
+                            break;
+                    }
+                }
+            }
+
+            public String getObjectId() {
+                return getName();
+            }
+        };
     }
 }

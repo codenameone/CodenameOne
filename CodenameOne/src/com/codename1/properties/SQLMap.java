@@ -31,6 +31,7 @@ import com.codename1.ui.EncodedImage;
 import com.codename1.util.Base64;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 
 /**
  * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
@@ -64,6 +65,20 @@ public class SQLMap {
             @Override
             protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
                 return row.getLong(index);
+            }
+        },
+        SQL_DATE("INTEGER") {
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+                return new Date(row.getLong(index) * 1000);
+            }
+
+            @Override
+            protected Object asUpdateInsertValue(Object data, Property p) {
+                if(data == null) {
+                    return null;
+                }
+                return ((Date)data).getTime() / 1000;
             }
         },
         SQL_SHORT("INTEGER") {
@@ -151,6 +166,16 @@ public class SQLMap {
         cmp.getPropertyIndex().putMetaDataOfClass("cn1$pk", pk.getName());
     }
 
+    
+    /**
+     * Sets the primary key for the component and makes it auto-increment
+     * @param cmp the business object
+     * @param pk the primary key field
+     */
+    public void setPrimaryKeyAutoIncrement(PropertyBusinessObject cmp, Property pk) {
+        cmp.getPropertyIndex().putMetaDataOfClass("cn1$pk", pk.getName());
+        cmp.getPropertyIndex().putMetaDataOfClass("cn1$autoinc", Boolean.TRUE);
+    }
 
     /**
      * Sets the sql type for the column
@@ -191,6 +216,9 @@ public class SQLMap {
                     if(gt == Double.class) {
                         return SqlType.SQL_DOUBLE;
                     }
+                    if(gt == Date.class) {
+                        return SqlType.SQL_DATE;
+                    }
                     return SqlType.SQL_TEXT;
                 }
                 Object val = ((Property)p).get();
@@ -209,6 +237,9 @@ public class SQLMap {
                     }
                     if(val instanceof Double) {
                         return SqlType.SQL_DOUBLE;
+                    }
+                    if(gt == Date.class) {
+                        return SqlType.SQL_DATE;
                     }
                 }
             }
@@ -286,6 +317,7 @@ public class SQLMap {
         createStatement.append(" (");
 
         String pkName = (String)cmp.getPropertyIndex().getMetaDataOfClass("cn1$pk");
+        boolean autoIncrement = cmp.getPropertyIndex().getMetaDataOfClass("cn1$autoinc") != null;
         boolean first = true;
         for(PropertyBase p : cmp.getPropertyIndex()) {
             SqlType tp = getSqlType(p);
@@ -302,6 +334,9 @@ public class SQLMap {
             createStatement.append(tp.dbType);
             if(columnName.equalsIgnoreCase(pkName)) {
                 createStatement.append(" PRIMARY KEY");
+                if(autoIncrement) {
+                    createStatement.append(" AUTOINCREMENT");
+                }
             }
         }
         
