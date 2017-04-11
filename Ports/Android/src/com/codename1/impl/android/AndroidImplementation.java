@@ -7102,6 +7102,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     break;
                 }
             }
+            if (pickInstance.result == -1 && values.length > 0) {
+                // The picker will default to showing the first element anyways
+                // If we don't set the result to 0, then the user has to first
+                // scroll to a different number, then back to the first option
+                // to pick the first option.
+                pickInstance.result = 0;
+            }
 
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
