@@ -6051,7 +6051,7 @@ public abstract class CodenameOneImplementation {
      * Gets the available recording MimeTypes
      */ 
     public String [] getAvailableRecordingMimeTypes(){
-        return new String[]{"audio/amr"};
+        return new String[]{"audio/amr", "audio/aac"};
     }
     
     /**
