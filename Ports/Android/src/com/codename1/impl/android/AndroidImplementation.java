@@ -7813,6 +7813,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             contentIntent.setComponent(getActivity().getComponentName());
         }
         contentIntent.putExtra("LocalNotificationID", notif.getId());
+        
         if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId()) && getBackgroundFetchListener() != null) {
             Context context = AndroidNativeUtil.getContext();
 
@@ -7826,6 +7827,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     PendingIntent.FLAG_UPDATE_CURRENT);
             notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
 
+        } else {
+            contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID="+Uri.encode(notif.getId())));
         }
         PendingIntent pendingContentIntent = PendingIntent.getActivity(getContext(), 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
