@@ -24,24 +24,24 @@
 package com.codename1.properties;
 
 /**
- * This is the long specific version of numeric property
+ * This is the boolean specific version of property
  *
  * @author Shai Almog
  */
-public class LongProperty<K> extends NumericProperty<Long, K>{
+public class BooleanProperty<K> extends Property<Boolean, K>{
 
     /**
      * {@inheritDoc}
      */
-    public LongProperty(String name) {
-        super(name, Long.class);
+    public BooleanProperty(String name) {
+        super(name, Boolean.class);
     }
 
     /**
      * {@inheritDoc}
      */
-    public LongProperty(String name, Long value) {
-        super(name, Long.class, value);
+    public BooleanProperty(String name, Boolean value) {
+        super(name, Boolean.class, value);
     }    
 
     
@@ -49,7 +49,7 @@ public class LongProperty<K> extends NumericProperty<Long, K>{
      * Returns the value as a primitive, if the value is null/nullable this will fail...
      * @return the numeric value
      */
-    public long getLong() {
-        return get().longValue();
+    public boolean getBoolean() {
+        return get().booleanValue();
     }
 }

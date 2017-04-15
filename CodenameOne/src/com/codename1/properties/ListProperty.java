@@ -36,8 +36,6 @@ import java.util.List;
 public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T> {
     private ArrayList<T> value = new ArrayList<T>();
     
-    public final Class<T> elementType;
-    
     /**
      * Constructs a property with the given name and value
      * @param name the name of the property
@@ -57,15 +55,13 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      * @param values default values for the property
      */
     public ListProperty(String name, Class<T> elementType, T... values) {
-        super(name);
+        super(name, elementType);
         for(T t : values) {
             value.add(t);
         }
         if(elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) 
             throw new IllegalArgumentException(
                     "the element type class needs to be a subclass of PropertyBusinessObject");
-        
-        this.elementType = elementType;
     }
     
     /**
@@ -74,7 +70,6 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      */
     public ListProperty(String name) {
         super(name);
-        this.elementType = null;
     }
     
     /**

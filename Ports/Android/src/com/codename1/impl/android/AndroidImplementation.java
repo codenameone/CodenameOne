@@ -808,11 +808,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     public void deinitialize() {
         //activity.getWindowManager().removeView(relativeLayout);
-
+        super.deinitialize();
         if (getActivity() != null) {
 
             Runnable r = new Runnable() {
                 public void run() {
+                    synchronized (AndroidImplementation.this) {
+                        if (!deinitializing) {
+                            return;
+                        }
+                        deinitializing = false;
+                    }
                     if (nativePeers.size() > 0) {
                         for (int i = 0; i < nativePeers.size(); i++) {
                             ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
@@ -823,13 +829,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     relativeLayout = null;
                     myView = null;
-                    deinitializing = false;
                 }
             };
 
             if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
+                deinitializing = true;
                 r.run();
             } else {
+                deinitializing = true;
                 getActivity().runOnUiThread(r);
             }
         } else {
@@ -7095,6 +7102,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     break;
                 }
             }
+            if (pickInstance.result == -1 && values.length > 0) {
+                // The picker will default to showing the first element anyways
+                // If we don't set the result to 0, then the user has to first
+                // scroll to a different number, then back to the first option
+                // to pick the first option.
+                pickInstance.result = 0;
+            }
 
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
@@ -7799,6 +7813,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             contentIntent.setComponent(getActivity().getComponentName());
         }
         contentIntent.putExtra("LocalNotificationID", notif.getId());
+        
         if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId()) && getBackgroundFetchListener() != null) {
             Context context = AndroidNativeUtil.getContext();
 
@@ -7812,6 +7827,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     PendingIntent.FLAG_UPDATE_CURRENT);
             notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
 
+        } else {
+            contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID="+Uri.encode(notif.getId())));
         }
         PendingIntent pendingContentIntent = PendingIntent.getActivity(getContext(), 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 

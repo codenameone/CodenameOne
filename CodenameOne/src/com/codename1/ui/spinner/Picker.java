@@ -304,6 +304,29 @@ public class Picker extends Button {
     }
     
     /**
+     * Returns the index of the selected string
+     * @return the selected string offset or -1
+     */
+    public int getSelectedStringIndex() {
+        int offset = 0;
+        for(String s : (String[])metaData) {
+            if(s == value) {
+                return offset;
+            }
+            offset++;
+        }
+        return -1;
+    }
+
+    /**
+     * Returns the index of the selected string
+     * @param index sets the index of the selected string
+     */
+    public void setSelectedStringIndex(int index) {
+        value = ((String[])metaData)[index];
+    }
+
+    /**
      * Updates the display value of the picker, subclasses can override this to invoke 
      * set text with the right value
      */

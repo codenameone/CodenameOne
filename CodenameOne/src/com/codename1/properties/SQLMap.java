@@ -27,8 +27,11 @@ import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
 import com.codename1.io.Log;
+import com.codename1.ui.EncodedImage;
+import com.codename1.util.Base64;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 
 /**
  * A simple ORM wrapper for property objects. This is a very poor mans ORM that doesn't handle relations
@@ -38,35 +41,88 @@ import java.util.ArrayList;
  */
 public class SQLMap {
     private boolean verbose = true;
+    
     public static enum SqlType {
+        SQL_EXCLUDE(null),
         SQL_TEXT("TEXT"),
         SQL_INTEGER("INTEGER") {
             @Override
-            protected Object getValue(Row row, int index) throws IOException {
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
                 return row.getInteger(index);
+            }
+        },
+        SQL_BOOLEAN("BOOLEAN") {
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+                Integer i = row.getInteger(index);
+                if(i == null) {
+                    return null;
+                }
+                return i.intValue() == 1;
             }
         },
         SQL_LONG("INTEGER") {
             @Override
-            protected Object getValue(Row row, int index) throws IOException {
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
                 return row.getLong(index);
+            }
+        },
+        SQL_DATE("INTEGER") {
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+                return new Date(row.getLong(index) * 1000);
+            }
+
+            @Override
+            protected Object asUpdateInsertValue(Object data, Property p) {
+                if(data == null) {
+                    return null;
+                }
+                return ((Date)data).getTime() / 1000;
             }
         },
         SQL_SHORT("INTEGER") {
             @Override
-            protected Object getValue(Row row, int index) throws IOException {
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
                 return row.getShort(index);
             }
         },
         SQL_FLOAT("REAL") {
             @Override
-            protected Object getValue(Row row, int index) throws IOException {
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
                 return row.getFloat(index);
+            }
+        },
+        SQL_BLOB("TEXT") {
+            @Override
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
+                String s = row.getString(index);
+                if(s == null) {
+                    return null;
+                }
+                byte[] d = Base64.decode(s.getBytes());
+                Class t = base.getGenericType();
+                if(t == EncodedImage.class) {
+                    return EncodedImage.create(d);
+                }
+                return d;
+            }
+
+            @Override
+            protected Object asUpdateInsertValue(Object data, Property p) {
+                if(data == null) {
+                    return null;
+                }
+                Class t = p.getGenericType();
+                if(t == EncodedImage.class) {
+                    return Base64.encode(((EncodedImage)data).getImageData());
+                }
+                return Base64.encode((byte[]) data);
             }
         },
         SQL_DOUBLE("REAL") {
             @Override
-            protected Object getValue(Row row, int index) throws IOException {
+            protected Object getValue(Row row, int index, PropertyBase base) throws IOException {
                 return row.getDouble(index);
             }
         };
@@ -77,11 +133,15 @@ public class SQLMap {
             this.dbType = dbType;
         }
         
-        protected Object getValue(Row row, int index) throws IOException{
+        protected Object getValue(Row row, int index, PropertyBase base) throws IOException{
             return row.getString(index);
         }
+
+        protected Object asUpdateInsertValue(Object data, Property p) {
+            return data;
+        }
     }
-    
+
     private Database db;
     
     private SQLMap() {}
@@ -106,6 +166,16 @@ public class SQLMap {
         cmp.getPropertyIndex().putMetaDataOfClass("cn1$pk", pk.getName());
     }
 
+    
+    /**
+     * Sets the primary key for the component and makes it auto-increment
+     * @param cmp the business object
+     * @param pk the primary key field
+     */
+    public void setPrimaryKeyAutoIncrement(PropertyBusinessObject cmp, Property pk) {
+        cmp.getPropertyIndex().putMetaDataOfClass("cn1$pk", pk.getName());
+        cmp.getPropertyIndex().putMetaDataOfClass("cn1$autoinc", Boolean.TRUE);
+    }
 
     /**
      * Sets the sql type for the column
@@ -126,6 +196,31 @@ public class SQLMap {
         SqlType s = (SqlType)p.getClientProperty("cn1$colType");
         if(s == null) {
             if(p instanceof Property) {
+                Class gt = p.getGenericType();
+                if(gt != null) {
+                    if(gt == Integer.class) {
+                        return SqlType.SQL_INTEGER;
+                    }
+                    if(gt == Boolean.class) {
+                        return SqlType.SQL_BOOLEAN;
+                    }
+                    if(gt == Long.class) {
+                        return SqlType.SQL_LONG;
+                    }
+                    if(gt == Short.class) {
+                        return SqlType.SQL_SHORT;
+                    }
+                    if(gt == Float.class) {
+                        return SqlType.SQL_FLOAT;
+                    }
+                    if(gt == Double.class) {
+                        return SqlType.SQL_DOUBLE;
+                    }
+                    if(gt == Date.class) {
+                        return SqlType.SQL_DATE;
+                    }
+                    return SqlType.SQL_TEXT;
+                }
                 Object val = ((Property)p).get();
                 if(val != null) {
                     if(val instanceof Long) {
@@ -142,6 +237,9 @@ public class SQLMap {
                     }
                     if(val instanceof Double) {
                         return SqlType.SQL_DOUBLE;
+                    }
+                    if(gt == Date.class) {
+                        return SqlType.SQL_DATE;
                     }
                 }
             }
@@ -219,8 +317,13 @@ public class SQLMap {
         createStatement.append(" (");
 
         String pkName = (String)cmp.getPropertyIndex().getMetaDataOfClass("cn1$pk");
+        boolean autoIncrement = cmp.getPropertyIndex().getMetaDataOfClass("cn1$autoinc") != null;
         boolean first = true;
         for(PropertyBase p : cmp.getPropertyIndex()) {
+            SqlType tp = getSqlType(p);
+            if(tp == SqlType.SQL_EXCLUDE) {
+                continue;
+            }
             if(!first) {
                 createStatement.append(",");
             }
@@ -228,9 +331,12 @@ public class SQLMap {
             String columnName = getColumnName(p);
             createStatement.append(columnName);
             createStatement.append(" ");
-            createStatement.append(getSqlType(p).dbType);
+            createStatement.append(tp.dbType);
             if(columnName.equalsIgnoreCase(pkName)) {
                 createStatement.append(" PRIMARY KEY");
+                if(autoIncrement) {
+                    createStatement.append(" AUTOINCREMENT");
+                }
             }
         }
         
@@ -289,16 +395,20 @@ public class SQLMap {
         createStatement.append(" (");
 
         int count = 0;
-        Object[] values = new Object[cmp.getPropertyIndex().getSize()];
+        ArrayList<Object> values = new ArrayList<Object>();
         for(PropertyBase p : cmp.getPropertyIndex()) {
+            SqlType tp = getSqlType(p);
+            if(tp == SqlType.SQL_EXCLUDE) {
+                continue;
+            }
             if(count > 0) {
                 createStatement.append(",");
             }
             if(p instanceof Property) {
-                values[count] = ((Property)p).get();
+                values.add(tp.asUpdateInsertValue(((Property)p).get(), (Property)p));
             } else {
                 // TODO
-                values[count] = null;
+                values.add(null);
             }
             count++;
             String columnName = getColumnName(p);
@@ -307,13 +417,13 @@ public class SQLMap {
         
         createStatement.append(") VALUES (?");
 
-        for(int iter = 1 ; iter < values.length; iter++) {
+        for(int iter = 1 ; iter < values.size(); iter++) {
             createStatement.append(",?");
         }
         
         createStatement.append(")");
         
-        execute(createStatement.toString(), values);
+        execute(createStatement.toString(), values.toArray());
     }
     
     /**
@@ -332,17 +442,20 @@ public class SQLMap {
         createStatement.append(" SET ");
 
         int count = 0;
-        Object[] values;
-        values = new Object[cmp.getPropertyIndex().getSize() + 1];
+        ArrayList<Object> values = new ArrayList<Object>();
         for(PropertyBase p : cmp.getPropertyIndex()) {
+            SqlType tp = getSqlType(p);
+            if(tp == SqlType.SQL_EXCLUDE) {
+                continue;
+            }
             if(count > 0) {
                 createStatement.append(",");
             }
             if(p instanceof Property) {
-                values[count] = ((Property)p).get();
+                values.add(tp.asUpdateInsertValue(((Property)p).get(), (Property)p));
             } else {
                 // TODO
-                values[count] = null;
+                values.add(null);
             }
             count++;
             String columnName = getColumnName(p);
@@ -356,9 +469,9 @@ public class SQLMap {
         createStatement.append(" = ?");
         
         Property p = (Property)cmp.getPropertyIndex().getIgnoreCase(pkName);
-        values[values.length - 1] = p.get();
+        values.add(p.get());
 
-        execute(createStatement.toString(), values);
+        execute(createStatement.toString(), values.toArray());
     }
     
     /**
@@ -464,7 +577,10 @@ public class SQLMap {
                 for(PropertyBase p : pb.getPropertyIndex()) {
                     Row currentRow = c.getRow();
                     SqlType t = getSqlType(p);
-                    Object value = t.getValue(currentRow, c.getColumnIndex(getColumnName(p)));
+                    if(t == SqlType.SQL_EXCLUDE) {
+                        continue;
+                    }
+                    Object value = t.getValue(currentRow, c.getColumnIndex(getColumnName(p)), p);
                     if(p instanceof Property) {
                         ((Property)p).set(value);
                     } 

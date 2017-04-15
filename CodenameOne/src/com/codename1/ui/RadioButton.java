@@ -278,6 +278,14 @@ public class RadioButton extends Button {
     void setButtonGroup(ButtonGroup group) {
         this.group = group;
     }
+    
+    /**
+     * Returns the parent button group
+     * @return the parent button group
+     */
+    public ButtonGroup getButtonGroup() {
+        return group;
+    }
 
     /**
      * {@inheritDoc}
