@@ -23,6 +23,10 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import java.util.ArrayList;
+
 /**
  * <p>This class is used to create a multiple-exclusion scope for 
  * {@link com.codename1.ui.RadioButton}.
@@ -39,7 +43,7 @@ package com.codename1.ui;
 public class ButtonGroup {
     
     
-    private java.util.Vector buttons = new java.util.Vector();
+    private ArrayList<RadioButton> buttons = new ArrayList<RadioButton>();
     private int selectedIndex=-1;
     
     /** 
@@ -76,7 +80,7 @@ public class ButtonGroup {
         if(rb==null)
             return;
         if(!buttons.contains(rb)) {
-            buttons.addElement(rb);
+            buttons.add(rb);
             if(rb.isSelected()) {
                 setSelected(buttons.indexOf(rb));
             }
@@ -92,7 +96,7 @@ public class ButtonGroup {
     public void remove(RadioButton rb){
         if(rb==null)
             return;
-        buttons.removeElement(rb);
+        buttons.remove(rb);
         if(rb.isSelected())
             clearSelection();
         rb.setButtonGroup(null);
@@ -104,7 +108,7 @@ public class ButtonGroup {
     public void clearSelection() {
         if(selectedIndex!=-1) {
             if(selectedIndex < buttons.size()) {
-                ((RadioButton)buttons.elementAt(selectedIndex)).setSelected(false);
+                ((RadioButton)buttons.get(selectedIndex)).setSelected(false);
             }
             selectedIndex=-1;
         }
@@ -148,7 +152,7 @@ public class ButtonGroup {
      */
     public RadioButton getRadioButton(int index) {
         if(index >=0 && index < getButtonCount())
-            return ((RadioButton)buttons.elementAt(index));
+            return ((RadioButton)buttons.get(index));
         return null;
     }
 
@@ -185,9 +189,30 @@ public class ButtonGroup {
 
         if(selectedIndex!=-1) {
             //unselect last selected Radio button
-            ((RadioButton)buttons.elementAt(selectedIndex)).setSelectedImpl(false);
+            ((RadioButton)buttons.get(selectedIndex)).setSelectedImpl(false);
         }
-        ((RadioButton)buttons.elementAt(index)).setSelectedImpl(true);
+        ((RadioButton)buttons.get(index)).setSelectedImpl(true);
         selectedIndex=index;
+    }
+    
+    
+    /**
+     * Adds an action listener to all the buttons in the group
+     * @param al the listener
+     */
+    public void addActionListener(ActionListener<ActionEvent> al) {
+        for(RadioButton rb : buttons) {
+            rb.addActionListener(al);
+        }
+    }
+
+    /**
+     * Removes an action listener from all the buttons in the group
+     * @param al the listener
+     */
+    public void removeActionListener(ActionListener<ActionEvent> al) {
+        for(RadioButton rb : buttons) {
+            rb.removeActionListener(al);
+        }
     }
 }
