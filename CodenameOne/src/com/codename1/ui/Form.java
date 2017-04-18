@@ -2710,6 +2710,23 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
+    public void setScrollVisible(boolean isScrollVisible) {
+        getContentPane().setScrollVisible(isScrollVisible);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isScrollVisible() {
+        return getContentPane().isScrollVisible();
+    }
+    
+
+    /**
+     * {@inheritDoc}
+     */
     public int getComponentIndex(Component cmp) {
         return getContentPane().getComponentIndex(cmp);
     }
