@@ -1568,7 +1568,9 @@ public class SideMenuBar extends MenuBar {
                 isRTLValue = !isRTLValue;
             }
             if (isRTLValue) {
-                shadow = shadow.flipHorizontally(true);
+                if (shadow != null) {
+                    shadow = shadow.flipHorizontally(true);
+                }
             }
 
             motion.start();
