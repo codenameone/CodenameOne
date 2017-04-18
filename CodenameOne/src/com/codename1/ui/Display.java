@@ -699,6 +699,7 @@ public final class Display {
      * Flash the backlight of the device for the given length of time
      *
      * @param duration length of time to flash the backlight
+     * @deprecated this refers to functionality of devices that are no longer sold, not to the devices "flash"
      */
     public void flashBacklight(int duration) {
         impl.flashBacklight(duration);

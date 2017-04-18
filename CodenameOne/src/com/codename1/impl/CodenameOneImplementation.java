@@ -674,7 +674,7 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
-     * Returns a lock object which can be synchrnoized against, this lock is used
+     * Returns a lock object which can be synchronized against, this lock is used
      * by the EDT.
      * 
      * @return a lock object
