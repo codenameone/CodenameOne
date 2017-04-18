@@ -1944,7 +1944,7 @@ public class Container extends Component implements Iterable<Component>{
     protected Dimension calcPreferredSize() {
         Dimension d = layout.getPreferredSize(this);
         Style style = getStyle();
-        if(isVisible() && style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
+        if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
             d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
         }
