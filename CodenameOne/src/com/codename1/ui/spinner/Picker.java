@@ -324,6 +324,7 @@ public class Picker extends Button {
      */
     public void setSelectedStringIndex(int index) {
         value = ((String[])metaData)[index];
+        updateValue();
     }
 
     /**
