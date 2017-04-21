@@ -23,6 +23,7 @@
 package com.codename1.impl.android;
 
 import android.Manifest;
+import android.annotation.TargetApi;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -2492,11 +2493,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String getMimeType(String url){
+        System.out.println("Checking mimetype of url "+url);
         String type = null;
         String extension = MimeTypeMap.getFileExtensionFromUrl(url);
         if (extension != null) {
             MimeTypeMap mime = MimeTypeMap.getSingleton();
+            
             type = mime.getMimeTypeFromExtension(extension);
+            System.out.println("Mimetype is "+type);
+        }
+        if (type == null) {
+            System.out.println("Type was null.  Trying using contentresolver");
+            try {
+                Uri uri = Uri.parse(url);
+                System.out.println("Uri is "+uri);
+                ContentResolver cr = getContext().getContentResolver();
+                type = cr.getType(uri);
+                System.out.println("type after resolving content "+type);
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
         }
         return type;
     }
@@ -2759,8 +2775,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             player.prepare();
             return new Audio(getActivity(), player, stream, onCompletion);
         }
-
-        final File temp = File.createTempFile("mtmp", "dat");
+        String extension = MimeTypeMap.getFileExtensionFromUrl(mimeType);
+        final File temp = File.createTempFile("mtmp", extension == null ? "dat" : extension);
         temp.deleteOnExit();
         OutputStream out = createFileOuputStream(temp);
        
@@ -4098,6 +4114,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // Always grant permission since the app itself requires location
                     // permission and the user has therefore already granted it
                     callback.invoke(origin, true, false);
+                }
+                
+                @Override
+                public void onPermissionRequest(final PermissionRequest request) {
+                    
+                    Log.d("Codename One", "onPermissionRequest");
+                    getActivity().runOnUiThread(new Runnable() {
+                        @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+                        @Override
+                        public void run() {
+                            String allowedOrigins = Display.getInstance().getProperty("android.WebView.grantPermissionsFrom", null);
+                            if (allowedOrigins != null) {
+                                String[] origins = Util.split(allowedOrigins, " ");
+                                boolean allowed = false;
+                                for (String origin : origins) {
+                                    if (request.getOrigin().toString().equals(origin)) {
+                                        allowed = true;
+                                        break;
+                                    }
+                                }
+                                if (allowed) {
+                                    Log.d("Codename One", "Allowing permission for "+Arrays.toString(request.getResources())+" in web view for origin "+request.getOrigin());
+                                    request.grant(request.getResources());
+                                } else {
+                                    Log.d("Codename One", "Denying permission for "+Arrays.toString(request.getResources())+" in web view for origin "+request.getOrigin());
+                                    request.deny();
+                                }
+                            }
+                            
+                        }
+                    });
                 }
             });
         }
@@ -5851,7 +5898,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             final Form current = Display.getInstance().getCurrent();
 
-            final File temp = File.createTempFile("mtmp", "dat");
+            final File temp = File.createTempFile("mtmp", ".3gpp");
             temp.deleteOnExit();
 
             if (recorder != null) {
