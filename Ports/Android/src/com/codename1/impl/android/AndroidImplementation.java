@@ -2493,23 +2493,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private String getMimeType(String url){
-        System.out.println("Checking mimetype of url "+url);
         String type = null;
         String extension = MimeTypeMap.getFileExtensionFromUrl(url);
         if (extension != null) {
             MimeTypeMap mime = MimeTypeMap.getSingleton();
             
             type = mime.getMimeTypeFromExtension(extension);
-            System.out.println("Mimetype is "+type);
         }
         if (type == null) {
-            System.out.println("Type was null.  Trying using contentresolver");
             try {
                 Uri uri = Uri.parse(url);
-                System.out.println("Uri is "+uri);
                 ContentResolver cr = getContext().getContentResolver();
                 type = cr.getType(uri);
-                System.out.println("type after resolving content "+type);
             } catch (Throwable t) {
                 t.printStackTrace();
             }
