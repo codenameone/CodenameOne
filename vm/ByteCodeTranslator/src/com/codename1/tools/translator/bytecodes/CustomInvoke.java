@@ -26,7 +26,6 @@ import com.codename1.tools.translator.ByteCodeClass;
 import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
-import com.codename1.tools.translator.SignatureSet;
 import com.codename1.tools.translator.Util;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +35,7 @@ import org.objectweb.asm.Opcodes;
  *
  * @author shannah
  */
-public class CustomInvoke extends Instruction implements SignatureSet {
+public class CustomInvoke extends Instruction {
     private String owner;
     private String name;
     private String desc;
@@ -306,12 +305,4 @@ public class CustomInvoke extends Instruction implements SignatureSet {
         }
         return count;
     }
-    // for the SignatureSet interface
-	public boolean containsSignature(SignatureSet sig) {
-		return desc.equals(sig.getSignature());
-	}
-	public String getMethodName() {
-		return(name);
-	}
-	public String getSignature() { return(desc); }
 }
