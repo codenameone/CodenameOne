@@ -391,6 +391,17 @@ public class Parser extends ClassVisitor {
                 }
                 bc.setBaseInterfacesObject(lst);
             }
+            boolean foundNewUnitTests = true;
+            while (foundNewUnitTests) {
+                foundNewUnitTests = false;
+                for (ByteCodeClass bc : classes) {
+                    if (!bc.isUnitTest() && bc.getBaseClassObject() != null && bc.getBaseClassObject().isUnitTest()) {
+                        bc.setIsUnitTest(true);
+                        foundNewUnitTests = true;
+                    }
+                }
+            }
+            
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
@@ -682,6 +693,12 @@ public class Parser extends ClassVisitor {
         }
         if((access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL) {
             cls.setFinalClass(true);
+        }
+        if ("com/codename1/testing/UnitTest".equals(superName) || "com/codename1/testing/AbstractTest".equals(superName)) {
+            cls.setIsUnitTest(true);
+        }
+        if ((access & Opcodes.ACC_ENUM) == Opcodes.ACC_ENUM) {
+            cls.setIsEnum(true);
         }
         super.visit(version, access, name, signature, superName, interfaces); 
     }    

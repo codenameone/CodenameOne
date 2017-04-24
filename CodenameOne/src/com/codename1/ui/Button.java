@@ -29,7 +29,6 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.Border;
-import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -105,7 +104,7 @@ public class Button extends Label {
      * @param text label appearing on the button
      */
     public Button(String text) {
-        this(text, null);
+        this(text, null, "Button");
     }
     
     /**
@@ -157,19 +156,40 @@ public class Button extends Label {
     }
     
     /**
+     * Constructor a button with text, image and uiid
+     * 
+     * @param text label appearing on the button
+     * @param icon image appearing on the button
+     * @param id UIID unique identifier for button
+     */
+    public Button(String text, Image icon, String id) {
+        super(text);
+        setUIID(id);
+        setFocusable(true);
+        setIcon(icon);
+        this.pressedIcon = icon;
+        this.rolloverIcon = icon;
+        releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
+    }
+    
+    /**
      * Constructor a button with text and image
      * 
      * @param text label appearing on the button
      * @param icon image appearing on the button
      */
     public Button(String text, Image icon) {
-        super(text);
-        setUIID("Button");
-        setFocusable(true);
-        setIcon(icon);
-        this.pressedIcon = icon;
-        this.rolloverIcon = icon;
-        releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
+        this(text, icon, "Button");
+    }
+    
+    /**
+     * Constructor a button with text and image
+     * 
+     * @param text label appearing on the button
+     * @param id UIID unique identifier for button
+     */
+    public Button(String text, String id) {
+        this(text, null, id);
     }
 
     /**
@@ -394,9 +414,13 @@ public class Button extends Label {
     }
 
     /**
+     * Allows subclasses to override action event behavior 
      * {@inheritDoc}
+     * 
+     * @param x the x position of the click if applicable (can be 0 or -1 otherwise)
+     * @param y the y position of the click if applicable (can be 0 or -1 otherwise)
      */
-    void fireActionEvent(int x, int y){
+    protected void fireActionEvent(int x, int y){
         super.fireActionEvent();
         if(cmd != null) {
             ActionEvent ev = new ActionEvent(cmd, this, x, y);
@@ -439,7 +463,9 @@ public class Button extends Label {
      */
     public void released(int x, int y) {
         state=STATE_ROLLOVER;
-        fireActionEvent(x, y);
+        if (!Display.impl.isScrollWheeling()) {
+            fireActionEvent(x, y);
+        }
         repaint();
     }
     
@@ -502,6 +528,9 @@ public class Button extends Label {
     public void pointerPressed(int x, int y) {
         clearDrag();
         setDragActivated(false);
+        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
+            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
+        }
         pressed();
         Form f = getComponentForm();
         // might happen when programmatically triggering press
@@ -517,6 +546,13 @@ public class Button extends Label {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
+            pointerReleasedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         Form f = getComponentForm();
         // might happen when programmatically triggering press
         if(f != null) {
@@ -546,6 +582,41 @@ public class Button extends Label {
         repaint();
     }
 
+    @Override
+    void initComponentImpl() {
+        super.initComponentImpl(); 
+        if(pressedIcon != null) {
+            pressedIcon.lock();
+        }
+        if(rolloverIcon != null) {
+            rolloverIcon.lock();
+        }
+        if(rolloverPressedIcon != null) {
+            rolloverPressedIcon.lock();
+        }
+        if(disabledIcon != null) {
+            disabledIcon.lock();
+        }
+    }
+
+    @Override
+    void deinitializeImpl() {
+        super.deinitializeImpl(); 
+        if(pressedIcon != null) {
+            pressedIcon.unlock();
+        }
+        if(rolloverIcon != null) {
+            rolloverIcon.unlock();
+        }
+        if(rolloverPressedIcon != null) {
+            rolloverPressedIcon.unlock();
+        }
+        if(disabledIcon != null) {
+            disabledIcon.unlock();
+        }
+    }
+
+    
     /**
      * {@inheritDoc}
      */
@@ -564,6 +635,7 @@ public class Button extends Label {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
+        calcSizeAutoSize();
         return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
     }
     
@@ -706,4 +778,15 @@ public class Button extends Label {
     public void setAutoRelease(boolean autoRelease){
         this.autoRelease = autoRelease;
     }
+
+    @Override
+    public void paint(Graphics g) {
+        if(isLegacyRenderer()) {
+            initAutoResize();
+            getUIManager().getLookAndFeel().drawButton(g, this);
+            return;
+        }
+        super.paintImpl(g);
+    }
+
 }

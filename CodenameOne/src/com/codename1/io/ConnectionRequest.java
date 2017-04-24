@@ -32,6 +32,7 @@ import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.CallbackDispatcher;
@@ -44,9 +45,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -95,6 +100,108 @@ public class ConnectionRequest implements IOProgressListener {
     public static final byte PRIORITY_REDUNDANT = (byte)0;
 
     /**
+     * The default value for the cacheMode property see {@link #getCacheMode()}
+     * @return the defaultCacheMode
+     */
+    public static CachingMode getDefaultCacheMode() {
+        return defaultCacheMode;
+    }
+
+    /**
+     * The default value for the cacheMode property see {@link #getCacheMode()}
+     * @param aDefaultCacheMode the defaultCacheMode to set
+     */
+    public static void setDefaultCacheMode(CachingMode aDefaultCacheMode) {
+        defaultCacheMode = aDefaultCacheMode;
+    }
+
+    /**
+     * Determines the default value for {@link #isReadResponseForErrors()}
+     * @return the readResponseForErrorsDefault
+     */
+    public static boolean isReadResponseForErrorsDefault() {
+        return readResponseForErrorsDefault;
+    }
+
+    /**
+     * Determines the default value for {@link #setReadResponseForErrors(boolean)}
+     * @param aReadResponseForErrorsDefault the readResponseForErrorsDefault to set
+     */
+    public static void setReadResponseForErrorsDefault(boolean aReadResponseForErrorsDefault) {
+        readResponseForErrorsDefault = aReadResponseForErrorsDefault;
+    }
+
+    /**
+     * There are 4 caching modes: OFF is the default  meaning no caching.
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     * @return the cacheMode
+     */
+    public CachingMode getCacheMode() {
+        return cacheMode;
+    }
+
+    /**
+     * There are 4 caching modes: OFF is the default meaning no caching.
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     * @param cacheMode the cacheMode to set
+     */
+    public void setCacheMode(CachingMode cacheMode) {
+        this.cacheMode = cacheMode;
+    }
+
+    /**
+     * @return the checkSSLCertificates
+     */
+    public boolean isCheckSSLCertificates() {
+        return checkSSLCertificates;
+    }
+
+    /**
+     * @param checkSSLCertificates the checkSSLCertificates to set
+     */
+    public void setCheckSSLCertificates(boolean checkSSLCertificates) {
+        this.checkSSLCertificates = checkSSLCertificates;
+    }
+
+    /**
+     * There are 4 caching modes: OFF is the default meaning no caching. 
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     */
+    public static enum CachingMode {
+        OFF,
+        MANUAL,
+        SMART,
+        OFFLINE
+    }
+    
+    /**
+     * The default value for the cacheMode property see {@link #getCacheMode()}
+     */
+    private static CachingMode defaultCacheMode = CachingMode.OFF;
+    
+    /**
+     * There are 4 caching modes: OFF is the default meaning no caching. 
+     * SMART means all get requests are cached intelligently and caching is "mostly" seamless
+     * MANUAL means that the developer is responsible for the actual caching but the system
+     * will not do a request on a resource that's already "fresh"
+     * OFFLINE will fetch data from the cache and wont try to go to the server. It will generate
+     * a 404 error if data isn't available
+     */
+    private CachingMode cacheMode = defaultCacheMode;
+    
+    /**
      * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
      * customize the name of the cookie header to Cookie
      * @return the cookieHeader
@@ -132,6 +239,8 @@ public class ConnectionRequest implements IOProgressListener {
     private EventDispatcher actionListeners;
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @return the defaultFollowRedirects
      */
     public static boolean isDefaultFollowRedirects() {
@@ -139,6 +248,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @param aDefaultFollowRedirects the defaultFollowRedirects to set
      */
     public static void setDefaultFollowRedirects(boolean aDefaultFollowRedirects) {
@@ -147,7 +258,7 @@ public class ConnectionRequest implements IOProgressListener {
 
     private byte priority = PRIORITY_NORMAL;
     private long timeSinceLastUpdate;
-    private Hashtable requestArguments;
+    private LinkedHashMap requestArguments;
 
     private boolean post = true;
     private String contentType = "application/x-www-form-urlencoded; charset=UTF-8";
@@ -165,7 +276,7 @@ public class ConnectionRequest implements IOProgressListener {
     private OutputStream output;
     private int progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
     private int contentLength = -1;
-    private boolean duplicateSupported;
+    private boolean duplicateSupported = true;
     private EventDispatcher responseCodeListeners;
     private Hashtable userHeaders;
     private Dialog showOnInit;
@@ -176,7 +287,8 @@ public class ConnectionRequest implements IOProgressListener {
     private int silentRetryCount = 0;
     private boolean failSilently;
     boolean retrying;
-    private boolean readResponseForErrors;
+    private static boolean readResponseForErrorsDefault = true;
+    private boolean readResponseForErrors = readResponseForErrorsDefault;
     private String responseContentType;
     private boolean redirecting;
     private static boolean cookiesEnabledDefault = true;
@@ -186,6 +298,18 @@ public class ConnectionRequest implements IOProgressListener {
     private int failureErrorCode;
     private String destinationFile;
     private String destinationStorage;
+    private SSLCertificate[] sslCertificates;
+    private boolean checkSSLCertificates;
+    
+    /**
+     * The request body can be used instead of arguments to pass JSON data to a restful request,
+     * it can't be used in a get request and will fail if you have arguments
+     */
+    private String requestBody;
+    
+    // Flag to indicate if the contentType was explicitly set for this 
+    // request
+    private boolean contentTypeSetExplicitly;
     
     /**
      * Workaround for https://bugs.php.net/bug.php?id=65633 allowing developers to
@@ -285,7 +409,28 @@ public class ConnectionRequest implements IOProgressListener {
     void prepare() {
         timeSinceLastUpdate = System.currentTimeMillis();
     }
-
+    
+    /**
+     * A callback that can be overridden by subclasses to check the SSL certificates
+     * for the server, and kill the connection if they don't pass muster.  This can
+     * be used for SSL pinning.
+     * 
+     * <p><strong>NOTE:</strong> This method will only be called if {@link #isCheckSSLCertificates() } is {@literal true} and the platform supports SSL certificates ({@link #canGetSSLCertificates() }.</p>
+     * 
+     * <p><strong>WARNING:</strong>  On iOS it is possible that certificates for a request would not be available even through the
+     * platform supports it, and checking certificates are enabled.  This could happen if the certificates had been cached by the
+     * TLS cache by some network mechanism other than ConnectionRequest (e.g. native code, websockets, etc..).  In such cases
+     * this method would receive an empty array as a parameter.</p>
+     * 
+     * <p>This is called after the SSL handshake, but before any data has been sent.</p>
+     * @param certificates The server's SSL certificates.
+     * @see #setCheckSSLCertificates(boolean) 
+     * @see #isCheckSSLCertificates() 
+     */
+    protected void checkSSLCertificates(SSLCertificate[] certificates) {
+        
+    }
+    
     /**
      * Invoked to initialize HTTP headers, cookies etc. 
      * 
@@ -300,12 +445,39 @@ public class ConnectionRequest implements IOProgressListener {
             impl.setHeader(connection, "User-Agent", getUserAgent());
         }
 
-        if(getContentType() != null) {
-            impl.setHeader(connection, "Content-Type", getContentType());
+        if (getContentType() != null) {
+            // UWP will automatically filter out the Content-Type header from GET requests
+            // Historically, CN1 has always included this header even though it has no meaning
+            // for GET requests.  it would be be better if CN1 did not include this header 
+            // with GET requests, but for backward compatibility, I'll leave it on as
+            // the default, and add a property to turn it off.
+            //  -- SJH Sept. 15, 2016
+            boolean shouldAddContentType = contentTypeSetExplicitly || 
+                    Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "true").equals("false");
+
+            if (isPost() || (getHttpMethod() != null && !"get".equals(getHttpMethod().toLowerCase()))) {
+                shouldAddContentType = true;
+            }
+
+            if(shouldAddContentType) {
+                impl.setHeader(connection, "Content-Type", getContentType());
+            }
         }
         
         if(chunkedStreamingLen > -1){
             impl.setChunkedStreamingMode(connection, chunkedStreamingLen);
+        }
+        
+        if(!post && (cacheMode == CachingMode.MANUAL || cacheMode == CachingMode.SMART)) {
+            String msince = Preferences.get("cn1MSince" + createRequestURL(), null);
+            if(msince != null) {
+                impl.setHeader(connection, "If-Modified-Since", msince);
+            } else {
+                String etag = Preferences.get("cn1Etag" + createRequestURL(), null);
+                if(etag != null) {
+                    impl.setHeader(connection, "If-None-Match", etag);
+                } 
+            }
         }
 
         if(userHeaders != null) {
@@ -319,10 +491,117 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * This method should be overriden in CacheMode.MANUAL to provide offline caching. The default
+     * implementation will work as expected in the CacheMode.SMART mode.
+     * @return the offline cached data or null/exception if unavailable
+     */
+    protected InputStream getCachedData() throws IOException{
+        if(destinationFile != null) {
+            if(FileSystemStorage.getInstance().exists(destinationFile)) {
+                return FileSystemStorage.getInstance().openInputStream(destinationFile);
+            }
+            return null;
+        } 
+        
+        if(destinationStorage != null) {
+            if(Storage.getInstance().exists(destinationFile)) {
+                return Storage.getInstance().createInputStream(destinationFile);
+            }
+            return null;
+        } 
+        
+        String s = getCacheFileName();
+        if(FileSystemStorage.getInstance().exists(s)) {
+            return FileSystemStorage.getInstance().openInputStream(s);
+        }
+        return null;
+    }
+    
+    /**
+     * Deletes the cache file if it exists, notice that this will not work for download files 
+     */
+    public void purgeCache() {
+        FileSystemStorage.getInstance().delete(getCacheFileName());
+    }
+    
+    /**
+     * This callback is invoked on a 304 server response indicating the data in the server matches the result
+     * we currently have in the cache. This method can be overriden to detect this case 
+     */
+    protected void cacheUnmodified() throws IOException {
+        if(destinationFile != null || destinationStorage != null) {
+            if(hasResponseListeners() && !isKilled()) {
+                if(destinationFile != null) {
+                    data = Util.readInputStream(FileSystemStorage.getInstance().openInputStream(destinationFile));
+                } else {
+                    data = Util.readInputStream(Storage.getInstance().createInputStream(destinationStorage));
+                }
+                fireResponseListener(new NetworkEvent(this, data));
+            }
+            return;
+        }
+        InputStream is = FileSystemStorage.getInstance().openInputStream(getCacheFileName());
+        readResponse(is);
+        Util.cleanup(is);
+        
+    }
+    
+    /**
+     * Purges all locally cached files
+     */
+    public static void purgeCacheDirectory() throws IOException {
+        Set<String> s = Preferences.keySet();
+        Iterator<String> i = s.iterator();
+        ArrayList<String> remove = new ArrayList<String>();
+        while(i.hasNext()) {
+            String ss = i.next();
+            if(ss.startsWith("cn1MSince") || ss.startsWith("cn1Etag")) {
+                remove.add(ss);
+            }
+        }
+        for(String ss : remove) {
+            Preferences.set(ss, null);
+        }
+        String root;
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        if(fs.hasCachesDir()) {
+            root = fs.getCachesDir() + "cn1ConCache/";
+        } else {
+            root = fs.getAppHomePath()+ "cn1ConCache/";
+        }
+
+        for(String ss : fs.listFiles(root)) {
+            fs.delete(ss);
+        }
+    }
+    
+    private String getCacheFileName() {
+        String root;
+        if(FileSystemStorage.getInstance().hasCachesDir()) {
+            root = FileSystemStorage.getInstance().getCachesDir() + "cn1ConCache/";
+        } else {
+            root = FileSystemStorage.getInstance().getAppHomePath()+ "cn1ConCache/";
+        }
+        FileSystemStorage.getInstance().mkdir(root);
+        return root + Base64.encodeNoNewline(createRequestURL().getBytes()).replace('/', '-').replace('+', '_');
+    }
+    
+    /**
      * Performs the actual network request on behalf of the network manager
      */
     void performOperation() throws IOException {
         if(shouldStop()) {
+            return;
+        }
+        if(cacheMode == CachingMode.OFFLINE) {
+            InputStream is = getCachedData();
+            if(is != null) {
+                readResponse(is);
+                Util.cleanup(is);
+            } else {
+                responseCode = 404;
+                throw new IOException("File unavilable in cache");
+            }
             return;
         }
         CodenameOneImplementation impl = Util.getImplementation();
@@ -344,39 +623,48 @@ public class ConnectionRequest implements IOProgressListener {
             if(httpMethod != null) {
                 impl.setHttpMethod(connection, httpMethod);
             }
-            Vector v = impl.getCookiesForURL(actualUrl);
-            if(v != null) {
-                int c = v.size();
-                if(c > 0) {
-                    StringBuilder cookieStr = new StringBuilder();
-                    Cookie first = (Cookie)v.elementAt(0);
-                    cookieSent(first);
-                    cookieStr.append(first.getName());
-                    cookieStr.append("=");
-                    cookieStr.append(first.getValue());
-                    for(int iter = 1 ; iter < c ; iter++) {
-                        Cookie current = (Cookie)v.elementAt(iter);
-                        cookieStr.append(";");
-                        cookieStr.append(current.getName());
+            if (isCookiesEnabled()) {
+                Vector v = impl.getCookiesForURL(actualUrl);
+                if(v != null) {
+                    int c = v.size();
+                    if(c > 0) {
+                        StringBuilder cookieStr = new StringBuilder();
+                        Cookie first = (Cookie)v.elementAt(0);
+                        cookieSent(first);
+                        cookieStr.append(first.getName());
                         cookieStr.append("=");
-                        cookieStr.append(current.getValue());
-                        cookieSent(current);
+                        cookieStr.append(first.getValue());
+                        for(int iter = 1 ; iter < c ; iter++) {
+                            Cookie current = (Cookie)v.elementAt(iter);
+                            cookieStr.append(";");
+                            cookieStr.append(current.getName());
+                            cookieStr.append("=");
+                            cookieStr.append(current.getValue());
+                            cookieSent(current);
+                        }
+                        impl.setHeader(connection, cookieHeader, initCookieHeader(cookieStr.toString()));
+                    } else {
+                        String s = initCookieHeader(null);
+                        if(s != null) {
+                            impl.setHeader(connection, cookieHeader, s);
+                        }
                     }
-                    impl.setHeader(connection, cookieHeader, initCookieHeader(cookieStr.toString()));
                 } else {
                     String s = initCookieHeader(null);
                     if(s != null) {
                         impl.setHeader(connection, cookieHeader, s);
                     }
                 }
-            } else {
-                String s = initCookieHeader(null);
-                if(s != null) {
-                    impl.setHeader(connection, cookieHeader, s);
+            }
+            if (checkSSLCertificates && canGetSSLCertificates()) {
+                sslCertificates = getSSLCertificatesImpl(connection, url);
+                checkSSLCertificates(sslCertificates);
+                    if(shouldStop()) {
+                    return;
                 }
             }
             if(isWriteRequest()) {
-            	progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
+                progress = NetworkEvent.PROGRESS_TYPE_OUTPUT;
                 output = impl.openOutputStream(connection);
                 if(shouldStop()) {
                     return;
@@ -384,7 +672,16 @@ public class ConnectionRequest implements IOProgressListener {
                 if(NetworkManager.getInstance().hasProgressListeners() && output instanceof BufferedOutputStream) {
                     ((BufferedOutputStream)output).setProgressListener(this);
                 }
-                buildRequestBody(output);
+                if(requestBody != null) {
+                    if(shouldWriteUTFAsGetBytes()) {
+                        output.write(requestBody.getBytes("UTF-8"));
+                    } else {
+                        OutputStreamWriter w = new OutputStreamWriter(output, "UTF-8");
+                        w.write(requestBody);
+                    }
+                } else {
+                    buildRequestBody(output);
+                }
                 if(shouldStop()) {
                     return;
                 }
@@ -419,11 +716,16 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             
+            if(responseCode == 304 && cacheMode != CachingMode.OFF) {
+                cacheUnmodified();
+                return;
+            }
+            
             if(responseCode - 200 < 0 || responseCode - 200 > 100) {
                 readErrorCodeHeaders(connection);
                 // redirect to new location
                 if(followRedirects && (responseCode == 301 || responseCode == 302
-                        || responseCode == 303)) {
+                        || responseCode == 303 || responseCode == 307)) {
                     String uri = impl.getHeaderField("location", connection);
 
                     if(!(uri.startsWith("http://") || uri.startsWith("https://"))) {
@@ -460,6 +762,13 @@ public class ConnectionRequest implements IOProgressListener {
                 }
             }
             responseContentType = getHeader(connection, "Content-Type");
+            
+            if(cacheMode == CachingMode.SMART || cacheMode == CachingMode.MANUAL) {
+                String last = getHeader(connection, "Last-Modified");
+                String etag = getHeader(connection, "ETag");
+                Preferences.set("cn1MSince" + createRequestURL(), last);
+                Preferences.set("cn1Etag" + createRequestURL(), etag);
+            }
             readHeaders(connection);
             contentLength = impl.getContentLength(connection);
             timeSinceLastUpdate = System.currentTimeMillis();
@@ -476,7 +785,15 @@ public class ConnectionRequest implements IOProgressListener {
                     }
                     ((BufferedInputStream)input).setYield(getYield());
                 }
-                readResponse(input);
+                if(!post && cacheMode == CachingMode.SMART && destinationFile == null && destinationStorage == null) {
+                    byte[] d = Util.readInputStream(input);
+                    OutputStream os = FileSystemStorage.getInstance().openOutputStream(getCacheFileName());
+                    os.write(d);
+                    os.close();
+                    readResponse(new ByteArrayInputStream(d));
+                } else {
+                    readResponse(input);
+                }
                 if(shouldAutoCloseResponse()) {
                     input.close();
                 }
@@ -761,6 +1078,106 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Encapsulates an SSL certificate fingerprint.
+     * 
+     * <h3>SSL Pinning</h3>
+     * 
+     * <p>The recommended approach to SSL Pinning is to override the {@link #checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[]) }
+     * method in your {@link ConnectionRequest } object, and check the certificates that are provided
+     * as a parameter.  This callback if fired before sending data to the server, but after 
+     * the SSL handshake is complete so that you have an opportunity to kill the request before sending 
+     * your POST data.</p>
+     * 
+     * <p>Example: </p>
+     * 
+     * <pre>
+     * {@code
+     * ConnectionRequest req = new ConnectionRequest() {
+     *     @Override
+     *     protected void checkSSLCertificates(ConnectionRequest.SSLCertificate[] certificates) {
+     *         if (!trust(certificates)) {
+     *             // Assume that you've implemented method trust(SSLCertificate[] certs)
+     *             // to tell you whether you trust some certificates.
+     *             this.kill();
+     *         }
+     *     }
+     * };
+     * req.setCheckSSLCertificates(true);
+     * ....
+     * }
+     * </pre>
+     * 
+     * @see #getSSLCertificates() 
+     * @see #canGetSSLCertificates() 
+     * @see #isCheckSSLCertificates() 
+     * @see #setCheckSSLCertificates(boolean) 
+     * @see #checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[]) 
+     */
+    public final class SSLCertificate {
+
+        private String certificateUniqueKey;
+        private String certificateAlgorithm;
+
+        /**
+         * Gets a fingerprint for the SSL certificate encoded using the algorithm
+         * specified by {@link #getCertificteAlgorithm() }
+         * @return 
+         */
+        public String getCertificteUniqueKey() {
+            return certificateUniqueKey;
+        }
+
+        /**
+         * Gets the algorithm used to encode the fingerprint.  Default is {@literal SHA1}
+         * @return The algorithm used to encode the certificate fingerprint.
+         */
+        public String getCertificteAlgorithm() {
+            return certificateAlgorithm;
+        }
+    }
+    
+    /**
+     * Checks to see if the platform supports getting SSL certificates.
+     * @return True if the platform supports getting SSL certificates.
+     */
+    public boolean canGetSSLCertificates() {
+        return Util.getImplementation().canGetSSLCertificates();
+    }
+    
+    /**
+     * Gets the server's SSL certificates for this requests.  If this connection request
+     * does not have any certificates available, it returns an array of size 0.
+     *
+     * @return The server's SSL certificates.   If not available, an empty array.
+     */
+    public SSLCertificate[] getSSLCertificates() throws IOException {
+        if (sslCertificates == null) {
+            sslCertificates = new SSLCertificate[0];
+        }
+        return sslCertificates;
+    }
+    
+    private SSLCertificate[] getSSLCertificatesImpl(Object connection, String url) throws IOException {
+        String[] sslCerts = Util.getImplementation().getSSLCertificates(connection, url);
+        SSLCertificate[] out = new SSLCertificate[sslCerts.length];
+        int i=0;
+        for (String sslCertStr : sslCerts) {
+            if (sslCertStr == null) continue;
+            SSLCertificate sslCert = new SSLCertificate();
+            int splitPos = sslCertStr.indexOf(':');
+            if (splitPos == -1) {
+                continue;
+            }
+            
+            sslCert.certificateAlgorithm = sslCertStr.substring(0, splitPos);
+            sslCert.certificateUniqueKey = sslCertStr.substring(splitPos+1);
+            out[i++] = sslCert;
+        }
+        return out;
+        
+    }
+
+    /**
      * Handles a server response code that is not 200 and not a redirect (unless redirect handling is disabled)
      *
      * @param code the response code from the server
@@ -799,6 +1216,8 @@ public class ConnectionRequest implements IOProgressListener {
 
     /**
      * This is a callback method that been called when there is a redirect.
+     * <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      *
      * @param url the url to be redirected
      * @return true if the implementation would like to handle this by itself
@@ -821,7 +1240,6 @@ public class ConnectionRequest implements IOProgressListener {
         if(destinationFile != null) {
             OutputStream o = FileSystemStorage.getInstance().openOutputStream(destinationFile);
             Util.copy(input, o);
-            Util.cleanup(o);
             
             // was the download killed while we downloaded
             if(isKilled()) {
@@ -831,7 +1249,6 @@ public class ConnectionRequest implements IOProgressListener {
             if(destinationStorage != null) {
                 OutputStream o = Storage.getInstance().createOutputStream(destinationStorage);
                 Util.copy(input, o);
-                Util.cleanup(o);
             
                 // was the download killed while we downloaded
                 if(isKilled()) {
@@ -864,19 +1281,19 @@ public class ConnectionRequest implements IOProgressListener {
     protected String createRequestURL() {
         if(!post && requestArguments != null) {
             StringBuilder b = new StringBuilder(url);
-            Enumeration e = requestArguments.keys();
-            if(e.hasMoreElements()) {
+            Iterator e = requestArguments.keySet().iterator();
+            if(e.hasNext()) {
                 b.append("?");
             }
-            while(e.hasMoreElements()) {
-                String key = (String)e.nextElement();
+            while(e.hasNext()) {
+                String key = (String)e.next();
                 Object requestVal = requestArguments.get(key);
                 if(requestVal instanceof String) {
                     String value = (String)requestVal;
                     b.append(key);
                     b.append("=");
                     b.append(value);
-                    if(e.hasMoreElements()) {
+                    if(e.hasNext()) {
                         b.append("&");
                     }
                     continue;
@@ -892,7 +1309,7 @@ public class ConnectionRequest implements IOProgressListener {
                 b.append(key);
                 b.append("=");
                 b.append(val[vlen - 1]);
-                if(e.hasMoreElements()) {
+                if(e.hasNext()) {
                     b.append("&");
                 }
             }
@@ -910,16 +1327,16 @@ public class ConnectionRequest implements IOProgressListener {
     protected void buildRequestBody(OutputStream os) throws IOException {
         if(post && requestArguments != null) {
             StringBuilder val = new StringBuilder();
-            Enumeration e = requestArguments.keys();
-            while(e.hasMoreElements()) {
-                String key = (String)e.nextElement();
+            Iterator e = requestArguments.keySet().iterator();
+            while(e.hasNext()) {
+                String key = (String)e.next();
                 Object requestVal = requestArguments.get(key);
                 if(requestVal instanceof String) {
                     String value = (String)requestVal;
                     val.append(key);
                     val.append("=");
                     val.append(value);
-                    if(e.hasMoreElements()) {
+                    if(e.hasNext()) {
                         val.append("&");
                     }
                     continue;
@@ -935,7 +1352,7 @@ public class ConnectionRequest implements IOProgressListener {
                 val.append(key);
                 val.append("=");
                 val.append(valArray[vlen - 1]);
-                if(e.hasMoreElements()) {
+                if(e.hasNext()) {
                     val.append("&");
                 }
             }
@@ -1052,11 +1469,18 @@ public class ConnectionRequest implements IOProgressListener {
      * @param value the value for the argument
      */
     private void addArg(String key, Object value) {
+        if(requestBody != null) {
+            throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
+        }
         if(requestArguments == null) {
-            requestArguments = new Hashtable();
+            requestArguments = new LinkedHashMap();
         }
         if(value == null || key == null){
             return;
+        }
+        if(post) {
+            // this needs to be implicit for a post request with arguments
+            setWriteRequest(true);
         }
         requestArguments.put(key, value);
     }
@@ -1104,6 +1528,40 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public void addArgumentNoEncoding(String key, String value) {
         addArg(key, value);
+    }
+
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key, notice that this doesn't implicitly
+     * encode the value
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgumentNoEncoding(String key, String[] value) {
+        if(value == null || value.length == 0) {
+            return;
+        }
+        if(value.length == 1) {
+            addArgumentNoEncoding(key, value[0]);
+            return;
+        }
+        // copying the array to prevent mutation
+        String[] v = new String[value.length];
+        System.arraycopy(value, 0, v, 0, value.length);
+        addArg(key, v);
+    }
+    
+    /**
+     * Add an argument to the request response as an array of elements, this will
+     * trigger multiple request entries with the same key, notice that this doesn't implicitly
+     * encode the value
+     *
+     * @param key the key of the argument
+     * @param value the value for the argument
+     */
+    public void addArgumentNoEncodingArray(String key, String... value) {
+        addArgumentNoEncoding(key, (String[])value);
     }
 
     /**
@@ -1182,6 +1640,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @param contentType the contentType to set
      */
     public void setContentType(String contentType) {
+        contentTypeSetExplicitly = true;
         this.contentType = contentType;
     }
 
@@ -1288,6 +1747,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @return the followRedirects
      */
     public boolean isFollowRedirects() {
@@ -1295,6 +1756,8 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Enables/Disables automatic redirects globally and returns the 302 error code, <strong>IMPORTANT</strong>
+     * this feature doesn't work on all platforms and currently doesn't work on iOS which always implicitly redirects
      * @param followRedirects the followRedirects to set
      */
     public void setFollowRedirects(boolean followRedirects) {
@@ -1506,9 +1969,9 @@ public class ConnectionRequest implements IOProgressListener {
             if(r.url == url) {
                 if(requestArguments != null) {
                     if(r.requestArguments != null && requestArguments.size() == r.requestArguments.size()) {
-                        Enumeration e = requestArguments.keys();
-                        while(e.hasMoreElements()) {
-                            Object key = e.nextElement();
+                        Iterator e = requestArguments.keySet().iterator();
+                        while(e.hasNext()) {
+                            Object key = e.next();
                             Object value = requestArguments.get(key);
                             Object otherValue = r.requestArguments.get(key);
                             if(otherValue == null || !value.equals(otherValue)) {
@@ -1874,7 +2337,7 @@ public class ConnectionRequest implements IOProgressListener {
                         FileSystemStorage fs = FileSystemStorage.getInstance();
                         if (fs.exists(file)) {
                             try {
-                                EncodedImage img = EncodedImage.create(fs.openInputStream(file));
+                                EncodedImage img = EncodedImage.create(fs.openInputStream(file), (int)fs.getLength(file));
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }
@@ -1890,7 +2353,7 @@ public class ConnectionRequest implements IOProgressListener {
                         Storage fs = Storage.getInstance();
                         if (fs.exists(file)) {
                             try {
-                                EncodedImage img = EncodedImage.create(fs.createInputStream(file));
+                                EncodedImage img = EncodedImage.create(fs.createInputStream(file), fs.entrySize(file));
                                 if (img == null) {
                                     throw new IOException("Failed to load image at "+file);
                                 }
@@ -1909,7 +2372,8 @@ public class ConnectionRequest implements IOProgressListener {
             final ActionListener onDownload = new ActionListener<NetworkEvent>() {
 
                 public void actionPerformed(NetworkEvent nevt) {
-                    if (nevt.getResponseCode() == 200) {
+                    int rc = nevt.getResponseCode();
+                    if (rc == 200 || rc == 201 ) {
                         downloadImage(onSuccess, onFail, true);
                     } else {
                         if (nevt.getError() == null) {
@@ -1926,5 +2390,28 @@ public class ConnectionRequest implements IOProgressListener {
             NetworkManager.getInstance().addToQueue(this);
         }
         
+    }
+
+    /**
+     * The request body can be used instead of arguments to pass JSON data to a restful request,
+     * it can't be used in a get request and will fail if you have arguments
+     * @return the requestBody
+     */
+    public String getRequestBody() {
+        return requestBody;
+    }
+
+    /**
+     * <p>The request body can be used instead of arguments to pass JSON data to a restful request,
+     * it can't be used in a get request and will fail if you have arguments.</p>
+     * <p>Notice that invoking this method blocks the {@link #buildRequestBody(java.io.OutputStream)} method
+     * callback.</p>
+     * @param requestBody a string to pass in the post body
+     */
+    public void setRequestBody(String requestBody) {
+        if(requestArguments != null) {
+            throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
+        }
+        this.requestBody = requestBody;
     }
 }

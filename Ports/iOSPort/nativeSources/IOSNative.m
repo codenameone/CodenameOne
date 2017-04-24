@@ -55,7 +55,6 @@
 #include <sqlite3.h>
 #include "OpenUDID.h"
 #import "StoreKit/StoreKit.h"
-#import "ScanCodeImpl.h"
 #include "com_codename1_contacts_Contact.h"
 #include "com_codename1_contacts_Address.h"
 #include "java_util_Hashtable.h"
@@ -65,7 +64,14 @@
 #import "com_codename1_ui_geom_Rectangle.h"
 #import <MobileCoreServices/MobileCoreServices.h>
 #include "com_codename1_ui_plaf_Style.h"
-
+#import "RadialGradientPaint.h"
+#include "java_io_IOException.h"
+#include "com_codename1_io_Cookie.h"
+#include "com_codename1_ui_plaf_UIManager.h"
+#include "java_io_Writer.h"
+#include "java_util_ArrayList.h"
+#include "com_codename1_ui_Font.h"
+#include "java_util_Vector.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
 
@@ -181,12 +187,6 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcMutableIm
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcMutableImpl
 (int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
 
-extern void Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
-
-extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl
-(int color, int alpha, int x, int y, int width, int height, int startAngle, int angle);
-
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height);
 
@@ -232,7 +232,7 @@ extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBIm
 extern void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL dialogHeight, int color, JAVA_LONG imagePeer,
- int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar);
+ int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 
@@ -363,10 +363,10 @@ NSString* toNSString(JAVA_OBJECT str) {
 }
 #endif
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG
                                                                                                                                                                          JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7,
                                                                                                                                                                          JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
-                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar)
+                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar, JAVA_BOOLEAN blockCopyPaste)
 {
     POOL_BEGIN();
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
@@ -374,7 +374,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     char cc[l];
     memcpy(cc, chr, l);
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
-                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar);
+                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar, blockCopyPaste);
     POOL_END();
 }
 extern float scaleValue;
@@ -391,8 +391,8 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
 
             editCompoentX = (x + padLeft) / scale;
             editCompoentY = (y + padTop) / scale;
-            editComponentPadTop = padTop / scale;
-            editComponentPadLeft = padLeft / scale;
+            editComponentPadTop = padTop;
+            editComponentPadLeft = padLeft;
             if (scale > 1) {
                 editCompoentY -= 1.5;
             } else {
@@ -401,13 +401,68 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
             editCompoentW = (w - padLeft - padRight) / scale;
             editCompoentH = (h - padTop - padBottom) / scale;
             CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
-            editingComponent.frame = rect;
+            //NSLog(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+            if (fabs(existingBounds.size.width - rect.size.width) > 1 || fabs(existingBounds.size.height - rect.size.height) > 1 ||
+                fabs(existingBounds.origin.x - rect.origin.x) > 1 || fabs(existingBounds.origin.y - 1.5 - rect.origin.y) > 1
+                ) {
+                //NSLog(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+                editingComponent.frame = rect;
+            }
+            
+            
         }
         POOL_END();
     });
     
     POOL_END();
 }
+
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+typedef void (^CN1BackgroundFetchBlockType)(UIBackgroundFetchResult);
+
+extern CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler;
+#endif
+
+void com_codename1_impl_ios_IOSNative_fireUIBackgroundFetchResultFailed__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    cn1UIBackgroundFetchResultCompletionHandler(UIBackgroundFetchResultFailed);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_fireUIBackgroundFetchResultNoData__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    cn1UIBackgroundFetchResultCompletionHandler(UIBackgroundFetchResultNoData);
+#endif
+}
+void com_codename1_impl_ios_IOSNative_fireUIBackgroundFetchResultNewData__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    cn1UIBackgroundFetchResultCompletionHandler(UIBackgroundFetchResultNewData);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBackgroundFetchSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    return YES;
+#else
+    return NO;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_setPreferredBackgroundFetchInterval___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT seconds) {
+#ifdef INCLUDE_CN1_BACKGROUND_FETCH
+    NSTimeInterval interval = seconds;
+    if (interval < 0) {
+        interval = UIApplicationBackgroundFetchIntervalNever;
+    }
+    if (interval < 3600) {
+        // Minimum fetch interval appears to be between 10 minutes and 35 minutes
+        // Setting custom intervals seem to give unpredictable results, so for low values (< 1 hour)
+        // it is best to just use minimum interval and let the system work it out.
+        interval = UIApplicationBackgroundFetchIntervalMinimum;
+    }
+    [[UIApplication sharedApplication] setMinimumBackgroundFetchInterval:interval];
+#endif
+}
+
 
 void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5)
 {
@@ -596,7 +651,23 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_in
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h);
+//native void clearRectMutable(int x, int y, int width, int height);
+void com_codename1_impl_ios_IOSNative_clearRectMutable___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(x, y, w, h);
+    POOL_END();
+    
+}
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y, int w, int h);
+//native void nativeClearRectGlobal(int x, int y, int width, int height);
+void com_codename1_impl_ios_IOSNative_nativeClearRectGlobal___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(x, y, w, h);
+    POOL_END();
+    
+}
 void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int_int]
@@ -678,23 +749,7 @@ void com_codename1_impl_ios_IOSNative_nativeDrawArcMutable___int_int_int_int_int
     //XMLVM_END_WRAPPER
 }
 
-void com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
-{
-    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeFillArcGlobal___int_int_int_int_int_int_int_int]
-    POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeFillArcGlobalImpl(n1, n2, n3, n4, n5, n6, n7, n8);
-    POOL_END();
-    //XMLVM_END_WRAPPER
-}
 
-void com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_INT n7, JAVA_INT n8)
-{
-    //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_nativeDrawArcGlobal___int_int_int_int_int_int_int_int]
-    POOL_BEGIN();
-    Java_com_codename1_impl_ios_IOSImplementation_nativeDrawArcGlobalImpl(n1, n2, n3, n4, n5, n6, n7, n8);
-    POOL_END();
-    //XMLVM_END_WRAPPER
-}
 
 
 extern CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_STATE_MULTI_ARG JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr);
@@ -717,12 +772,16 @@ void com_codename1_impl_ios_IOSNative_nativeFillShapeMutable___int_int_int_byte_
     POOL_END();
     
 }
-//native void nativeDrawShapeMutable(int color, int alpha, int commandsLen, byte[] commandsArr, int pointsLen, float[] pointsArr, float lineWidth, int capStyle, int joinStyle, float miterLimit);
+
 void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_1ARRAY_int_float_1ARRAY_float_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_INT commandsLen, JAVA_OBJECT commandsArr, JAVA_INT pointsLen, JAVA_OBJECT pointsArr, JAVA_FLOAT lineWidth, JAVA_INT capStyle, JAVA_INT joinStyle, JAVA_FLOAT mitreLimit) {
     POOL_BEGIN();
-    
+    if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
+        CGContextSaveGState(UIGraphicsGetCurrentContext());
+        CGContextConcatCTM(UIGraphicsGetCurrentContext(), [CodenameOne_GLViewController currentMutableTransform]);
+    }
     CGContextRef context = drawPath(CN1_THREAD_STATE_PASS_ARG commandsLen, commandsArr, pointsLen, pointsArr);
     CGContextSaveGState(context);
+
     [UIColorFromRGB(color, alpha) set];
     CGContextSetLineWidth(context, lineWidth);
     CGLineCap cap = kCGLineCapButt;
@@ -765,6 +824,9 @@ void com_codename1_impl_ios_IOSNative_nativeDrawShapeMutable___int_int_int_byte_
     
     CGContextStrokePath(context);
     CGContextRestoreGState(context);
+    if ([CodenameOne_GLViewController isCurrentMutableTransformSet]) {
+        CGContextRestoreGState(context);
+    }
     POOL_END();
 }
 
@@ -1451,6 +1513,14 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     POOL_END();
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSSLCertificates___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    JAVA_OBJECT result = [impl getSSLCertificates];
+    POOL_END();
+    return result;
+}
+
 void com_codename1_impl_ios_IOSNative_setChunkedStreamingMode___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT len) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
@@ -1609,6 +1679,7 @@ void com_codename1_impl_ios_IOSNative_execute___java_lang_String(CN1_THREAD_STAT
         if([ns hasPrefix:@"file:"]) {
             ns = [ns substringFromIndex:5];
             UIDocumentInteractionController* preview = [UIDocumentInteractionController interactionControllerWithURL:[NSURL fileURLWithPath:ns]];
+            preview.delegate = [CodenameOne_GLViewController instance];
             [preview presentPreviewAnimated:YES];
         } else {
             [[UIApplication sharedApplication] openURL:[NSURL URLWithString:ns]];
@@ -1726,7 +1797,7 @@ void com_codename1_impl_ios_IOSNative_peerSetVisible___long_boolean(CN1_THREAD_S
             }
         } else {
             if([v superview] == nil) {
-                [[CodenameOne_GLViewController instance].view addSubview:v];
+                [[CodenameOne_GLViewController instance].view addPeerComponent:v];
             }
         }
         POOL_END();
@@ -1765,7 +1836,7 @@ void com_codename1_impl_ios_IOSNative_peerInitialized___long_int_int_int_int(CN1
         POOL_BEGIN();
         UIView* v = (BRIDGE_CAST UIView*)((void *)peer);
         if([v superview] == nil) {
-            [[CodenameOne_GLViewController instance].view addSubview:v];
+            [[CodenameOne_GLViewController instance].view addPeerComponent:v];
         }
         if(w > 0 && h > 0) {
             float scale = scaleValue;
@@ -1877,7 +1948,7 @@ void com_codename1_impl_ios_IOSNative_cleanupAudio___long(CN1_THREAD_STATE_MULTI
         POOL_BEGIN();
         AudioPlayer* pl = (BRIDGE_CAST AudioPlayer*)((void *)peer);
         if([pl isPlaying]) {
-            return;
+            [pl stop];
         }
 #ifndef CN1_USE_ARC
         [pl release];
@@ -2016,6 +2087,60 @@ void com_codename1_impl_ios_IOSNative_fillLinearGradientMutable___int_int_int_in
     POOL_END();
 }
 
+/*
+  native void applyRadialGradientPaintMutable(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintMutable();
+
+    native void applyRadialGradientPaintGlobal(int startColor, int endColor, int x, int y, int width, int height);
+
+    native void clearRadialGradientPaintGlobal();
+ */
+void com_codename1_impl_ios_IOSNative_applyRadialGradientPaintGlobal___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, 
+        JAVA_INT startColor,
+        JAVA_INT endColor,
+        JAVA_INT x,
+        JAVA_INT y,
+        JAVA_INT width,
+        JAVA_INT height)
+{
+    RadialGradientPaint *f = [[RadialGradientPaint alloc] initWithArgs:x y:y width:width height:height startColor:startColor endColor:endColor];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+
+void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintGlobal__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) 
+{
+    RadialGradientPaint *f = [[RadialGradientPaint alloc] initClear];
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_applyRadialGradientPaintMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject,
+        JAVA_INT startColor,
+        JAVA_INT endColor,
+        JAVA_INT x,
+        JAVA_INT y,
+        JAVA_INT width,
+        JAVA_INT height)
+{
+    RadialGradientPaint *f = [[RadialGradientPaint alloc] initWithArgs:x y:y width:width height:height startColor:startColor endColor:endColor];
+    [PaintOp setCurrentMutable:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_clearRadialGradientPaintMutable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) 
+{
+    [PaintOp setCurrentMutable:NULL];
+}
+
 void com_codename1_impl_ios_IOSNative_releasePeer___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
 #ifndef CN1_USE_ARC
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -2038,7 +2163,8 @@ UIWebView* com_codename1_impl_ios_IOSNative_createBrowserComponent = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createBrowserComponent___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT obj) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         com_codename1_impl_ios_IOSNative_createBrowserComponent = [[UIWebView alloc] initWithFrame:CGRectMake(3000, 0, 200, 200)];
-        com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor whiteColor];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.backgroundColor = [UIColor clearColor];
+        com_codename1_impl_ios_IOSNative_createBrowserComponent.opaque = NO;
         com_codename1_impl_ios_IOSNative_createBrowserComponent.autoresizesSubviews = YES;
         UIWebViewEventDelegate *del = [[UIWebViewEventDelegate alloc] initWithCallback:obj];
         com_codename1_impl_ios_IOSNative_createBrowserComponent.delegate = del;
@@ -2218,6 +2344,17 @@ void registerVideoCallback(CN1_THREAD_STATE_MULTI_ARG MPMoviePlayerController *m
         com_codename1_impl_ios_IOSImplementation_fireMediaCallback___int(CN1_THREAD_GET_STATE_PASS_ARG callbackId);
     }];
     com_codename1_impl_ios_IOSImplementation_bindNSObserverPeerToMediaCallback___long_int(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)((BRIDGE_CAST void*)observer), callbackId);
+}
+
+extern BOOL CN1_blockPaste;
+extern BOOL CN1_blockCopy;
+extern BOOL CN1_blockCut;
+//native void blockCopyPaste(boolean blockCopyPaste);
+void com_codename1_impl_ios_IOSNative_blockCopyPaste___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN blockCopyPaste) {
+    CN1_blockPaste = blockCopyPaste;
+    CN1_blockCut = blockCopyPaste;
+    CN1_blockCopy = blockCopyPaste;
+
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
@@ -3127,6 +3264,47 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getContactCount___boolean(CN1_THREAD_S
     return MAX(nPeople, 0);
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_countLinkedContacts___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
+    POOL_BEGIN();
+    ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), recId);
+    NSArray *linkedRecordsArray = (__bridge NSArray *)ABPersonCopyArrayOfAllLinkedPeople(i);
+    int numLinked = [linkedRecordsArray count];
+    [linkedRecordsArray release];
+    POOL_END();
+    return numLinked;
+}
+
+#ifdef NEW_CODENAME_ONE_VM
+JAVA_INT com_codename1_impl_ios_IOSNative_countLinkedContacts___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT recId) {
+    return com_codename1_impl_ios_IOSNative_countLinkedContacts___int(CN1_THREAD_STATE_PASS_ARG instanceObject, recId);
+}
+#endif
+
+
+
+void com_codename1_impl_ios_IOSNative_getLinkedContactIds___int_int_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT num, JAVA_INT refId, JAVA_OBJECT out) {
+    POOL_BEGIN();
+#ifndef NEW_CODENAME_ONE_VM
+    org_xmlvm_runtime_XMLVMArray* iArray = intArray;
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)iArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    int size = iArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+    JAVA_ARRAY_INT* data = (JAVA_ARRAY_INT*)((JAVA_ARRAY)out)->data;
+    int size = ((JAVA_ARRAY)out)->length;
+#endif
+    ABRecordRef i = ABAddressBookGetPersonWithRecordID(getAddressBook(), refId);
+    NSArray *linkedRecordsArray = (__bridge NSArray *)ABPersonCopyArrayOfAllLinkedPeople(i);
+    JAVA_INT minNum = MIN(num, [linkedRecordsArray count]);
+    minNum = MIN(minNum, size);
+    for (int iter=0; iter < minNum; iter++) {
+        ABRecordRef ref = (__bridge ABRecordRef)[linkedRecordsArray objectAtIndex:iter];
+        data[iter] = ABRecordGetRecordID(ref);
+    }
+    [linkedRecordsArray release];
+    POOL_END();
+}
+
+
 void com_codename1_impl_ios_IOSNative_getContactRefIds___int_1ARRAY_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT intArray, JAVA_BOOLEAN includeNumbers) {
     POOL_BEGIN();
 #ifndef NEW_CODENAME_ONE_VM
@@ -3339,7 +3517,9 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
                 [zip release];
                 [country release];
                 CFRelease(dict);
-                CFRelease(typeTmp);
+                if(typeTmp != 0) {
+                    CFRelease(typeTmp);
+                }
                 CFRelease(labeltype);
                 java_util_Hashtable_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CN1_THREAD_STATE_PASS_ARG addressesHash, fromNSString(CN1_THREAD_STATE_PASS_ARG (NSString*)labeltype), addr);
             }
@@ -4350,56 +4530,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(CN1_THREAD_STAT
 }
 
 void com_codename1_impl_ios_IOSNative_scanBarCode__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-#if !TARGET_IPHONE_SIMULATOR
-    dispatch_async(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        CVZBarReaderViewController *reader = [CVZBarReaderViewController new];
-        ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
-        reader.readerDelegate = scanCall;
-        reader.supportedOrientationsMask = ZBarOrientationMaskAll;
-        
-        //ZBAR_CONFIGURATIONS
-        
-        ZBarImageScanner *scanner = reader.scanner;
-        // TODO: (optional) additional reader configuration here
-        
-        // EXAMPLE: disable rarely used I2/5 to improve performance
-        [scanner setSymbology: ZBAR_I25
-                       config: ZBAR_CFG_ENABLE
-                           to: 0];
-        
-        // present and release the controller
-        [[CodenameOne_GLViewController instance] presentModalViewController:reader animated:NO];
-#ifndef CN1_USE_ARC
-        [reader release];
-#endif
-        POOL_END();
-    });
-#endif
 }
 
 void com_codename1_impl_ios_IOSNative_scanQRCode__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    /*dispatch_sync(dispatch_get_main_queue(), ^{
-     ScanCodeImpl* scanCall = [[ScanCodeImpl alloc] init];
-     ZXingWidgetController *widController = [[ZXingWidgetController alloc] initWithDelegate:scanCall showCancel:YES OneDMode:NO];
-     
-     NSMutableSet *readers = [[NSMutableSet alloc ] init];
-     
-     QRCodeReader* qrcodeReader = [[QRCodeReader alloc] init];
-     [readers addObject:qrcodeReader];
-     #ifndef CN1_USE_ARC
-     [qrcodeReader release];
-     #endif
-     
-     widController.readers = readers;
-     #ifndef CN1_USE_ARC
-     [readers release];
-     #endif
-     
-     [[CodenameOne_GLViewController instance] presentModalViewController:widController animated:YES];
-     [widController release];
-     });*/
-    com_codename1_impl_ios_IOSNative_scanBarCode__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 #ifdef NEW_CODENAME_ONE_VM
@@ -4990,10 +5123,28 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 }
 
 
-void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeight) {
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg) {
+    __block JAVA_INT preferredHeight = preferredHeightArg;
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
+    if (preferredWidth == 0) {
+        preferredWidth = 320 * scaleValue;
+    }
+
+    // There are only 3 valid heights for the picker in iPad
+    //http://stackoverflow.com/a/7672577/2935174
+    if (preferredHeight == 0) {
+        preferredHeight = 216 * scaleValue;
+    } else if (preferredHeight <= 162) {
+        preferredHeight = 162;
+    } else if (preferredHeight <= 180) {
+        preferredHeight = 180;
+    } else {
+        preferredHeight = 216;
+    }
+    
+    
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         NSDate* date = [NSDate dateWithTimeIntervalSince1970:(time / 1000)];
@@ -5039,6 +5190,8 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             [toolbar setBarStyle:UIBarStyleBlackTranslucent];
             [toolbar sizeToFit];
             
+            preferredHeight += (int)toolbar.frame.size.height;
+            
             //add a space filler to the left:
             UIBarButtonItem *flexButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:
                                            UIBarButtonSystemItemFlexibleSpace target: nil action:nil];
@@ -5072,6 +5225,7 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             
             UIPopoverController* uip = [[UIPopoverController alloc] initWithContentViewController:vc];
             popoverControllerInstance = uip;
+            uip.popoverContentSize = CGSizeMake(preferredWidth/scaleValue, preferredHeight/scaleValue);
             
             uip.delegate = [CodenameOne_GLViewController instance];
             [uip presentPopoverFromRect:CGRectMake(x / scaleValue, y / scaleValue, w / scaleValue, h / scaleValue) inView:[CodenameOne_GLViewController instance].view permittedArrowDirections:UIPopoverArrowDirectionAny animated:YES];
@@ -5255,6 +5409,24 @@ void com_codename1_impl_ios_IOSNative_setNativeEditingComponentVisible___boolean
         }
         POOL_END();
     });
+}
+
+void com_codename1_impl_ios_IOSNative_updateNativeEditorText___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text) {
+    if (editingComponent == nil) {
+        return;
+    }
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        if(editingComponent != nil) {
+            NSString* nsText = toNSString(CN1_THREAD_GET_STATE_PASS_ARG text);
+            NSString* currText = ((UITextView*)editingComponent).text;
+            if (![nsText isEqualToString:currText]) {
+                ((UITextView*)editingComponent).text = nsText;
+            }
+        }
+        POOL_END();
+    });
+    
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_connectSocket___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT host, JAVA_INT port) {
@@ -5718,6 +5890,87 @@ void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_floa
 #endif
 }
 
+
+//public static native void transformPoints(float[] data, int pointSize, float[] in, int srcPos, float[] out, int destPos, int numPoints);
+JAVA_VOID com_codename1_impl_ios_Matrix_MatrixUtil_transformPoints___float_1ARRAY_int_float_1ARRAY_int_float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG
+JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT out, JAVA_INT destPos, JAVA_INT numPoints
+) {
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)m)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)in)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+#else
+    JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)m)->data;
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+#endif
+    GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData);
+    JAVA_INT len = numPoints * pointSize;
+    for (JAVA_INT i=0; i<len; i+=pointSize) {
+        JAVA_INT s0 = srcPos + i;
+        GLKVector4 inputVector = GLKVector4Make(inData[s0], inData[s0+1], 0, 1);
+        if (pointSize==3) {
+            inputVector.v[2]= inData[s0+2];
+        }
+        GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
+        
+        int d0 = destPos + i;
+        outData[d0++] = outputVector.v[0];
+        outData[d0++] = outputVector.v[1];
+        if (pointSize==3) {
+            outData[d0] = outputVector.v[2];
+        }     
+    }
+    
+}
+
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_translatePoints___int_float_float_float_float_1ARRAY_int_float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance,
+    JAVA_INT pointSize, JAVA_FLOAT tX, JAVA_FLOAT tY, JAVA_FLOAT tZ, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT out, JAVA_INT destPos, JAVA_INT numPoints
+) {
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)in)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+#else
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+#endif
+    JAVA_INT len = numPoints * pointSize;
+    for (JAVA_INT i=0; i<len; i+= pointSize) {
+        JAVA_INT s0 = srcPos + i;
+        JAVA_INT d0 = destPos + i;
+        outData[d0++] = inData[s0++] + tX;
+        outData[d0++] = inData[s0++] + tY;
+        if (pointSize == 3) {
+            outData[d0] = inData[s0] + tZ;
+        }
+    }
+}
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_scalePoints___int_float_float_float_float_1ARRAY_int_float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instance,
+    JAVA_INT pointSize, JAVA_FLOAT sX, JAVA_FLOAT sY, JAVA_FLOAT sZ, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT out, JAVA_INT destPos, JAVA_INT numPoints
+) {
+#ifndef NEW_CODENAME_ONE_VM
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)in)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)out)->fields.org_xmlvm_runtime_XMLVMArray.array_;
+    
+#else
+    JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
+    JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
+#endif
+    JAVA_INT len = numPoints * pointSize;
+    for (JAVA_INT i=0; i<len; i+= pointSize) {
+        JAVA_INT s0 = srcPos + i;
+        JAVA_INT d0 = destPos + i;
+        outData[d0++] = inData[s0++] * sX;
+        outData[d0++] = inData[s0++] * sY;
+        if (pointSize == 3) {
+            outData[d0] = inData[s0] * sZ;
+        }
+    }
+}
 
 JAVA_BOOLEAN com_codename1_impl_ios_Matrix_MatrixUtil_invertM___float_1ARRAY_int_float_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT mInv, JAVA_INT mInvOffset, JAVA_OBJECT m, JAVA_INT mOffset)
 {
@@ -6567,13 +6820,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_j
     JAVA_INT i = startPos;
     for (; i < endOffset; i++) {
         if (src[i] == separator) {
-            JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+            if (i > startPos) {
+                JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+
+                java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
+            }
             startPos = i + 1;
-            java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
         }
     }
-    if (i >= startPos) {
+    if (i > startPos) {
         JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
         java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
@@ -6961,11 +7217,11 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_paintComponentBackground___ja
                 return;
             }
             case 20: { //Style.BACKGROUND_IMAGE_ALIGNED_TOP:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
                 return;
             }
             case 21: { //Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
                 return;
             }
             case 22: {//Style.BACKGROUND_IMAGE_ALIGNED_LEFT:
@@ -7361,8 +7617,8 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
                 } else {
                     iconStringHGap = (fontHeight - iconHeight) / 2;
                     com_codename1_impl_ios_IOSImplementation_drawImage___java_lang_Object_java_lang_Object_int_int(threadStateData, __cn1ThisObject, nativeGraphics, icon, x, y + iconStringHGap);
-                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW, isTickerRunning,
-                                    tickerShiftText, textDecoration, rtl, endsWith3Points, iconWidth, fontHeight);
+                    drawLabelString(threadStateData, __cn1ThisObject, nativeGraphics, nativeFont, text, x + iconWidth + gap, y, textSpaceW,
+                                    isTickerRunning, tickerShiftText, textDecoration, rtl, endsWith3Points, strWidth, fontHeight);
                 }
                 break;
             case 2: /* Label.BOTTOM: */
@@ -7397,4 +7653,27 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_drawLabelComponent___java_lan
         }
     }
 }
-                 
+   
+JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask__(JAVA_OBJECT instanceObject)
+{
+    __block UIBackgroundTaskIdentifier bgTask = UIBackgroundTaskInvalid;
+    bgTask = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
+        // Clean up any unfinished task business by marking where you
+        // stopped or ending the task outright.
+        [[UIApplication sharedApplication] endBackgroundTask:bgTask];
+        bgTask = UIBackgroundTaskInvalid;
+    }];
+    return (JAVA_LONG)((BRIDGE_CAST void*)bgTask);
+}
+
+#ifdef NEW_CODENAME_ONE_VM
+JAVA_LONG com_codename1_impl_ios_IOSNative_beginBackgroundTask___R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
+{
+    return com_codename1_impl_ios_IOSNative_beginBackgroundTask__(instanceObject);
+}
+#endif
+
+JAVA_VOID com_codename1_impl_ios_IOSNative_endBackgroundTask___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG bgTask)
+{
+    [[UIApplication sharedApplication] endBackgroundTask:(UIBackgroundTaskIdentifier)bgTask];
+}

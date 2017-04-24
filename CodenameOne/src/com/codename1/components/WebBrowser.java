@@ -24,6 +24,7 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
@@ -61,6 +62,16 @@ public class WebBrowser extends Container {
     private Loading loading;
 
     /**
+     * Constructor with a URL
+     * 
+     * @param url the url
+     */
+    public WebBrowser(String url) {
+        this();
+        setURL(url);
+    }
+    
+    /**
      * Default constructor
      */
     public WebBrowser() {
@@ -94,7 +105,7 @@ public class WebBrowser extends Container {
             } 
         } catch(Throwable t) {
             // workaround for issue in the designer related to JavaFX, fallback to lightweight mode...
-            t.printStackTrace();
+            Log.e(t);
         }
         
         isNative = false;
@@ -150,7 +161,7 @@ public class WebBrowser extends Container {
 
                     protected void handleException(Exception err) {
                         System.out.println("Error occured");
-                        err.printStackTrace();
+                        Log.e(err);
                         if(loading != null){
                             loading.unInstall();
                         }

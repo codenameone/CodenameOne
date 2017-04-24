@@ -22,12 +22,14 @@
  */
 package com.codename1.components;
 
+import com.codename1.io.Log;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -67,12 +69,17 @@ public class MediaPlayer extends Container {
      * Empty constructor
      */
     public MediaPlayer() {
+        playIcon = FontImage.createMaterial(FontImage.MATERIAL_PLAY_ARROW, "Button", 3);
+        pauseIcon = FontImage.createMaterial(FontImage.MATERIAL_PAUSE, "Button", 3);
+        fwdIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_FORWARD, "Button", 3);
+        backIcon = FontImage.createMaterial(FontImage.MATERIAL_FAST_REWIND, "Button", 3);
     }
-
+    
     /**
      * Empty constructor
      */
     public MediaPlayer(Media video) {
+        this();
         this.video = video;
         initUI();
     }
@@ -90,16 +97,42 @@ public class MediaPlayer extends Container {
      */
     protected void initComponent() {
         if(userSetIcons){
-            playIcon = UIManager.getInstance().getThemeImageConstant("mediaPlayImage");
-            pauseIcon = UIManager.getInstance().getThemeImageConstant("mediaPauseImage");
-            backIcon = UIManager.getInstance().getThemeImageConstant("mediaBackImage");
-            fwdIcon = UIManager.getInstance().getThemeImageConstant("mediaFwdImage");
+            Image play = UIManager.getInstance().getThemeImageConstant("mediaPlayImage");
+            if(play != null){
+                playIcon = play;
+            }
+            Image pause = UIManager.getInstance().getThemeImageConstant("mediaPauseImage");
+            if(pause != null){
+                pauseIcon = pause;
+            }            
+            Image back = UIManager.getInstance().getThemeImageConstant("mediaBackImage");
+            if(back != null){
+                backIcon = back;
+            }
+            Image fwd = UIManager.getInstance().getThemeImageConstant("mediaFwdImage");
+            if(fwd != null){
+                fwdIcon = fwd;
+            }
+            
         }
         if(pendingDataURI != null) {
             setDataSource(pendingDataURI);
             pendingDataURI = null;
         }
         initUI();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        if(autoplay) {
+            if(video != null && video.isPlaying()){
+                video.pause();
+            }
+        }
     }
     
     /**
@@ -180,7 +213,7 @@ public class MediaPlayer extends Container {
                     try {
                         setDataSource(uri, null);
                     } catch(Throwable t) {
-                        t.printStackTrace();
+                        Log.e(t);
                     }
                 }
             }, "Media Thread").start();
@@ -193,6 +226,9 @@ public class MediaPlayer extends Container {
      * @return the data source uri
      */
     public String getDataSource() {
+        if(!isInitialized() && dataSource == null) {
+            return pendingDataURI;
+        }        
         return dataSource;
     }
     
@@ -254,12 +290,12 @@ public class MediaPlayer extends Container {
             play.setText("play");
         }
         if(autoplay) {
-            if (getPauseIcon() != null) {
-                play.setIcon(getPauseIcon());
-            } else {
-                play.setText("pause");
-            }
             if(video != null && !video.isPlaying()){
+                if (getPauseIcon() != null) {
+                    play.setIcon(getPauseIcon());
+                } else {
+                    play.setText("pause");
+                }
                 video.play();
             }
         }
@@ -456,7 +492,7 @@ public class MediaPlayer extends Container {
                 try {
                     setDataSource(dataSource, this);
                 } catch(IOException err) {
-                    err.printStackTrace();
+                    Log.e(err);
                 }
             }
         }

@@ -28,9 +28,10 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "xmlvm.h"
 #include "CN1ES2compat.h"
+#include "com_codename1_impl_ios_TextEditUtil.h"
 
 static BOOL firstTime=YES;
-
+extern float scaleValue;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
 extern UIView *editingComponent;
 extern BOOL isVKBAlwaysOpen();
@@ -44,6 +45,7 @@ extern void repaintUI();
 @implementation EAGLView
 
 @synthesize context;
+@synthesize peerComponentsLayer;
 
 // You must implement this method
 + (Class)layerClass
@@ -54,11 +56,47 @@ extern void repaintUI();
 extern BOOL isRetina();
 extern BOOL isRetinaBug();
 
+-(BOOL)isPaintPeersBehindEnabled {
+    return com_codename1_impl_ios_IOSImplementation_isPaintPeersBehindEnabled___R_boolean(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+// Adds a peer component to the view.  Peer components are added to the peerComponentsLayer subview
+-(void) addPeerComponent:(UIView*) view {
+    if ([self isPaintPeersBehindEnabled]) {
+        if (self.peerComponentsLayer == nil) {
+            
+            self.peerComponentsLayer = [[UIView alloc] initWithFrame:self.bounds];
+            self.peerComponentsLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            self.peerComponentsLayer.opaque = TRUE;
+            self.peerComponentsLayer.userInteractionEnabled = TRUE;
+            CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
+            eaglLayer.opaque = FALSE;
+            self.opaque = FALSE;
+            self.backgroundColor = [UIColor clearColor];
+            UIView* parent = [self superview];
+            [parent insertSubview: self.peerComponentsLayer belowSubview:self];
+        }
+        [self.peerComponentsLayer addSubview:view];
+    } else {
+        [self addSubview:view];
+    }
+    
+}
+
+-(BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event
+{
+    if ([self isPaintPeersBehindEnabled]) {
+        return com_codename1_impl_ios_IOSImplementation_hitTest___int_int_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG point.x * scaleValue, point.y * scaleValue);
+    } else {
+        return YES;
+    }
+}
+
 //The EAGL view is stored in the nib file. When it's unarchived it's sent -initWithCoder:.
 - (id)initWithCoder:(NSCoder*)coder
 {
     self = [super initWithCoder:coder];
-	if (self) {
+    if (self) {
         self.clearsContextBeforeDrawing = NO;
         if ([[UIScreen mainScreen] respondsToSelector:@selector(scale)] && isRetina()) {
             if(isRetinaBug()) {
@@ -85,7 +123,7 @@ extern BOOL isRetinaBug();
 #ifndef CN1_USE_ARC
     [context release];
     [super dealloc];
-#endif    
+#endif
 }
 
 - (void)setContext:(EAGLContext *)newContext
@@ -119,7 +157,7 @@ extern BOOL isRetinaBug();
         GLErrorLog;
         glBindRenderbuffer(GL_RENDERBUFFER, colorRenderbuffer);
         GLErrorLog;
-
+        
         [context renderbufferStorage:GL_RENDERBUFFER fromDrawable:(CAEAGLLayer *)self.layer];
         GLErrorLog;
         glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &framebufferWidth);
@@ -148,20 +186,20 @@ extern BOOL isRetinaBug();
                                      GL_RENDERBUFFER_OES, stencil);
         GLErrorLog;
         /*
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, framebufferWidth, framebufferHeight);
-        GLErrorLog;
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
-        GLErrorLog;
-
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
-        */
-         glClearStencil(0x0);
+         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8_OES, framebufferWidth, framebufferHeight);
+         GLErrorLog;
+         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
+         GLErrorLog;
+         
+         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, defaultDepthBuffer);
+         */
+        glClearStencil(0x0);
         GLErrorLog;
         glClear(GL_COLOR_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
         GLErrorLog;
         //glClearStencil(0x1);
         //GLErrorLog;
-         
+        
         
         
         
@@ -304,6 +342,7 @@ extern BOOL isRetinaBug();
     } else {
         stringEdit(NO, -1, ((UITextField*)editingComponent).text);
     }
+    com_codename1_impl_ios_IOSImplementation_resizeNativeTextComponentCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 -(void)textFieldDidChange {
@@ -316,6 +355,8 @@ extern BOOL isRetinaBug();
     } else {
         stringEdit(NO, -1, ((UITextField*)editingComponent).text);
     }
+    
+    com_codename1_impl_ios_IOSImplementation_resizeNativeTextComponentCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 extern int currentlyEditingMaxLength;

@@ -16,6 +16,7 @@
  */
 package com.codename1.io;
 
+import com.codename1.util.CaseInsensitiveOrder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -24,6 +25,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
@@ -172,7 +174,7 @@ public class Properties extends HashMap<String, String> {
         if (in == null) {
             throw new NullPointerException("in == null");
         }
-        load(new InputStreamReader(in, "ISO-8859-1"));
+        load(new InputStreamReader(in, "UTF-8"));
     }
 
     /**
@@ -448,7 +450,7 @@ public class Properties extends HashMap<String, String> {
      * @throws ClassCastException if a key or value is not a string
      */
     public synchronized void store(OutputStream out, String comment) throws IOException {
-        store(new OutputStreamWriter(out, "ISO-8859-1"), comment);
+        store(new OutputStreamWriter(out, "UTF-8"), comment);
     }
 
     /**
@@ -462,21 +464,22 @@ public class Properties extends HashMap<String, String> {
      * @since 1.6
      */
     public synchronized void store(Writer writer, String comment) throws IOException {
-        if (comment != null) {
+        if (comment != null && comment.length() > 0) {
             writer.write("#");
             writer.write(comment);
             writer.write("\n");
+            writer.write("#");
+            writer.write(new Date().toString());
+            writer.write("\n");
         }
-        writer.write("#");
-        writer.write(new Date().toString());
-        writer.write("\n");
 
         StringBuilder sb = new StringBuilder(200);
-        for (Map.Entry<String, String> entry : entrySet()) {
-            String key = (String) entry.getKey();
+        ArrayList<String> k = new ArrayList<String>(keySet());
+        Collections.sort(k, new CaseInsensitiveOrder());
+        for (String key : k) {
             dumpString(sb, key, true);
             sb.append('=');
-            dumpString(sb, (String) entry.getValue(), false);
+            dumpString(sb, (String) get(key), false);
             sb.append("\n");
             writer.write(sb.toString());
             sb.setLength(0);

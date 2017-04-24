@@ -28,6 +28,7 @@ import com.codename1.ui.Component;
  * Allows binding arbitrary components to data storage
  *
  * @author Shai Almog
+ * @deprecated this mapped to an older iteration of properties that is no longer used
  */
 public interface BindTarget {
     /**

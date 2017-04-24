@@ -26,9 +26,19 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.List;
 import com.codename1.ui.list.ContainerList;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JOptionPane;
 import javax.swing.JTree;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.event.TreeModelListener;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
@@ -43,11 +53,70 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class ComponentTreeInspector extends javax.swing.JFrame {
+    private List<String> themePaths = new ArrayList<String>();
+    private List<String> themeNames = new ArrayList<String>();
     
+    private Component currentComponent; 
     /** Creates new form ComponentTreeInspector */
     public ComponentTreeInspector() {
         initComponents();
+        
+        File[] resFiles = new File("src").listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.getName().endsWith(".res");
+            }
+        });
+        themes.removeAllItems();
+        
+        for(File r : resFiles) {
+            try {
+                Resources rr = Resources.open("/" + r.getName());
+                for(String themeName : rr.getThemeResourceNames()) {
+                    themes.addItem(r.getName() + " - " + themeName);
+                    themePaths.add(r.getAbsolutePath());
+                    themeNames.add(themeName);
+                }
+            } catch(IOException err) {
+                err.printStackTrace();
+            }
+        }
+        
         refreshComponentTree();
+        
+        componentUIID.getDocument().addDocumentListener(new DocumentListener() {
+
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateUiid();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateUiid();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateUiid();
+            }
+
+            private void updateUiid() {
+                final String uiidText = componentUIID.getText();
+                if(currentComponent != null && uiidText.length() > 0) {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            if(currentComponent != null && !currentComponent.getUIID().equals(uiidText)) {
+                                currentComponent.setUIID(uiidText);
+                                Display.getInstance().getCurrent().revalidate();
+                            }
+                        }
+                    });
+                }  
+            }
+        });
+        
         componentTree.setCellRenderer(new DefaultTreeCellRenderer() {
 
             @Override
@@ -69,6 +138,7 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                 if(e.getPath() != null) {
                     Component c = (Component)e.getPath().getLastPathComponent();
                     if(c != null) {
+                        currentComponent = c;
                         componentClass.setText(c.getClass().getName());
                         componentName.setText("" + c.getName());
                         componentUIID.setText("" + c.getUIID());
@@ -139,6 +209,8 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         jLabel10 = new javax.swing.JLabel();
         padding = new javax.swing.JTextField();
         margin = new javax.swing.JTextField();
+        unselected = new javax.swing.JButton();
+        themes = new javax.swing.JComboBox();
         jToolBar1 = new javax.swing.JToolBar();
         refreshTree = new javax.swing.JButton();
 
@@ -162,8 +234,6 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
         componentClass.setEditable(false);
 
         componentName.setEditable(false);
-
-        componentUIID.setEditable(false);
 
         componentSelected.setEnabled(false);
 
@@ -193,6 +263,11 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
 
         margin.setEditable(false);
 
+        unselected.setText("Edit");
+        unselected.addActionListener(formListener);
+
+        themes.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
         jPanel1Layout.setHorizontalGroup(
@@ -213,16 +288,23 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                             .addComponent(jLabel10))
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(componentSelected)
-                            .addComponent(componentClass, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(componentName, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(componentUIID, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(layout, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(constraint, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(coordinates, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(preferredSize, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(padding, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE)
-                            .addComponent(margin, javax.swing.GroupLayout.DEFAULT_SIZE, 283, Short.MAX_VALUE))))
+                            .addComponent(componentClass)
+                            .addComponent(componentName)
+                            .addComponent(layout)
+                            .addComponent(constraint)
+                            .addComponent(coordinates)
+                            .addComponent(preferredSize)
+                            .addComponent(padding)
+                            .addComponent(margin)
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(componentSelected)
+                                .addGap(0, 0, Short.MAX_VALUE))
+                            .addGroup(jPanel1Layout.createSequentialGroup()
+                                .addComponent(componentUIID, javax.swing.GroupLayout.PREFERRED_SIZE, 192, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(themes, 0, 162, Short.MAX_VALUE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(unselected, javax.swing.GroupLayout.PREFERRED_SIZE, 94, javax.swing.GroupLayout.PREFERRED_SIZE)))))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
@@ -238,7 +320,9 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel3)
-                    .addComponent(componentUIID, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(componentUIID, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(unselected)
+                    .addComponent(themes, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel4)
@@ -267,7 +351,7 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel10)
                     .addComponent(margin, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap(33, Short.MAX_VALUE))
         );
 
         jSplitPane1.setRightComponent(jPanel1);
@@ -296,12 +380,72 @@ public class ComponentTreeInspector extends javax.swing.JFrame {
             if (evt.getSource() == refreshTree) {
                 ComponentTreeInspector.this.refreshTreeActionPerformed(evt);
             }
+            else if (evt.getSource() == unselected) {
+                ComponentTreeInspector.this.unselectedActionPerformed(evt);
+            }
         }
     }// </editor-fold>//GEN-END:initComponents
 
 private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshTreeActionPerformed
     refreshComponentTree();
 }//GEN-LAST:event_refreshTreeActionPerformed
+
+    private void unselectedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_unselectedActionPerformed
+        editStyle();
+    }//GEN-LAST:event_unselectedActionPerformed
+    
+    private void editStyle() {
+        File cn1dir = new File(System.getProperty("user.home"), ".codenameone");
+        if(!cn1dir.exists()) {
+            JOptionPane.showMessageDialog(this, "Please open the designer once by opening the theme.res file", "Error Opening Designer", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        File resourceEditor = new File(cn1dir, "designer_1.jar");
+        if(!resourceEditor.exists()) {
+            resourceEditor = new File(cn1dir, "designer.jar");
+        }
+        if(!resourceEditor.exists()) {
+            JOptionPane.showMessageDialog(this, "Please open the designer once by opening the theme.res file", "Error Opening Designer", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        File javaBin = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java.exe");
+        if(!javaBin.exists()) {
+            javaBin = new File(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
+        }
+        final File javaExe = javaBin;
+        final File resourceEditorFinal = resourceEditor;
+        final String themeFile = themePaths.get(themes.getSelectedIndex());
+        final String themeName = themeNames.get(themes.getSelectedIndex());
+        final String uiid = componentUIID.getText();
+        
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    ProcessBuilder pb = new ProcessBuilder(javaExe.getAbsolutePath(), "-jar", 
+                                    resourceEditorFinal.getAbsolutePath(), "-style", themeFile, uiid, themeName).inheritIO();
+                    Process proc = pb.start();
+                    proc.waitFor();
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                Resources res = Resources.open(new FileInputStream(themeFile));
+                                UIManager.getInstance().addThemeProps(res.getTheme(themeName));
+                                Display.getInstance().getCurrent().refreshTheme();
+                                Display.getInstance().getCurrent().revalidate();
+                            } catch(Exception err) {
+                                err.printStackTrace();
+                            }
+                        }
+                    });
+                } catch(Exception err) {
+                    err.printStackTrace();
+                }
+            }
+        }.start();
+    }
     
     
     // Variables declaration - do not modify//GEN-BEGIN:variables
@@ -331,5 +475,7 @@ private void refreshTreeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
     private javax.swing.JTextField padding;
     private javax.swing.JTextField preferredSize;
     private javax.swing.JButton refreshTree;
+    private javax.swing.JComboBox themes;
+    private javax.swing.JButton unselected;
     // End of variables declaration//GEN-END:variables
 }

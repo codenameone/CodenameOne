@@ -25,6 +25,7 @@
 package com.codename1.components;
 
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.ui.tree.TreeModel;
 import java.util.Vector;
 
@@ -116,7 +117,7 @@ public class FileTreeModel implements TreeModel {
                 }
             }
         } catch(Throwable err) {
-            err.printStackTrace();
+            Log.e(err);
             return new Vector();
         }
         return response;

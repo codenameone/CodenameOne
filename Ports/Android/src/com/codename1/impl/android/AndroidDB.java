@@ -100,7 +100,7 @@ public class AndroidDB extends Database {
     }
 
     @Override
-    public void execute(String sql, Object[] params) throws IOException {
+    public void execute(String sql, Object... params) throws IOException {
         try {
             SQLiteStatement s = db.compileStatement(sql);
             for (int i = 0; i < params.length; i++) {

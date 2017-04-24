@@ -28,6 +28,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import java.io.InputStream;
 import java.util.Vector;
@@ -113,7 +114,7 @@ public class FileEncodedImageAsync extends EncodedImage {
                             }
                         });
                     } catch (Throwable ex) {
-                        ex.printStackTrace();
+                        Log.e(ex);
                     } finally {
                         queued = false;
                         Util.cleanup(i);

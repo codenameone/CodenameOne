@@ -41,6 +41,7 @@ int connections = 0;
         request = nil;
         allHeaderFields = nil;
         connection = nil;
+        sslCertificates = nil;
     }
     
     return self;
@@ -133,6 +134,55 @@ int connections = 0;
 #endif
 }
 
+- (JAVA_OBJECT) getSSLCertificates {
+    if (sslCertificates == nil) {
+        return JAVA_NULL;
+    }
+    return fromNSString(getThreadLocalData(), sslCertificates);
+}
+
+//- (void) connection: (NSURLConnection*)connection willSendRequestForAuthenticationChallenge: (NSURLAuthenticationChallenge*)challenge {
+-(void) connection: (NSURLConnection*)connection willSendRequestForAuthenticationChallenge:(nonnull NSURLAuthenticationChallenge *)challenge {
+    SecTrustRef trustRef = [[challenge protectionSpace] serverTrust];
+    SecTrustEvaluate(trustRef, NULL);
+    NSMutableString* certs = [NSMutableString string];
+    //    [challenge.sender continueWithoutCredentialForAuthenticationChallenge:challenge];
+    //[connection cancel];
+    
+    CFIndex count = SecTrustGetCertificateCount(trustRef);
+    for (int i=0; i<count; i++) {
+        SecCertificateRef certRef = SecTrustGetCertificateAtIndex(trustRef, i);
+        if (i>0) {
+            [certs appendString:@","];
+        }
+        [certs appendString:@"SHA1:"];
+        [certs appendString:[self getFingerprint:certRef]];
+        
+    }
+    sslCertificates = [[NSString stringWithString:certs] retain];
+    [challenge.sender performDefaultHandlingForAuthenticationChallenge:challenge];
+}
+
+- (NSString*) getFingerprint: (SecCertificateRef) cert {
+    NSData* certData = (__bridge NSData*) SecCertificateCopyData(cert);
+    unsigned char sha1Bytes[CC_SHA1_DIGEST_LENGTH];
+    CC_SHA1(certData.bytes, (int)certData.length, sha1Bytes);
+    NSMutableString *fingerprint = [NSMutableString stringWithCapacity:CC_SHA1_DIGEST_LENGTH * 3];
+    for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; ++i) {
+        [fingerprint appendFormat:@"%02x ", sha1Bytes[i]];
+    }
+    return [fingerprint stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+}
+
+- (NSURLRequest *)connection:(NSURLConnection *)connection
+             willSendRequest:(NSURLRequest *)_request
+            redirectResponse:(NSHTTPURLResponse *)response {
+    if (response.statusCode >= 300 && response.statusCode < 400) {
+        return nil;
+    }
+    return _request;
+}
+
 extern void connectionComplete(void* peer);
 
 extern void connectionReceivedData(void* peer, NSData* data);
@@ -176,6 +226,9 @@ extern void connectionError(void* peer, NSString* message);
     }
     if(connection != nil) {
         [connection release];
+    }
+    if (sslCertificates != nil) {
+       [sslCertificates release];
     }
     [request release];
 	[super dealloc];

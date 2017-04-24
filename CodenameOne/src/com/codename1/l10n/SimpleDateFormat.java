@@ -135,7 +135,7 @@ public class SimpleDateFormat extends DateFormat {
      */
     private static final int MILLIS_TO_MINUTES = 60000;
     /**
-     * Pattern characters recognised by this implementation (same as JDK 1.6).
+     * Pattern characters recognized by this implementation (same as JDK 1.6).
      */
     private static final String PATTERN_LETTERS = "adDEFGHhKkMmsSwWyzZ";
     /**

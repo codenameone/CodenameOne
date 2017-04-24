@@ -24,7 +24,9 @@ package com.codename1.ui;
 
 import com.codename1.components.MultiButton;
 import com.codename1.components.SpanButton;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.ImageIO;
 
 /**
@@ -4549,38 +4551,136 @@ public class FontImage extends Image {
 
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
-     * styling of the label</p>
+     * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
+     * will be set appropriately.</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * 
      * @param l a label or subclass (e.g. Button etc.)
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(Label l, char icon) {
-        if(Font.isTrueTypeFileSupported()) {
-            Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
-            l.setIcon(FontImage.create("" + icon, s));
+        setMaterialIcon(l, icon, -1);
+    }
+    
+    private static int rightSize(Style s, float size) {
+        if(size > 0) {
+            return Display.getInstance().convertToPixels(size);
         }
+        return s.getFont().getHeight();
+    }
+    
+    /**
+     * Helper method that generalizes icon setting code for various component types
+     * @param cmp the component, currently supports Labels, MultiButton &amp; SpanButton. If the type isn't supported 
+     * this method return false
+     * @param icon the material icon
+     * @param size the size of the icon
+     * @return false if the type isn't supported
+     */
+    public static boolean setMaterialIcon(Component cmp, char icon, float size) {
+        if(cmp instanceof Label) {
+            setMaterialIcon((Label)cmp, icon, size);
+            return true;
+        }
+        if(cmp instanceof MultiButton) {
+            setMaterialIcon((MultiButton)cmp, icon, size);
+            return true;
+        }
+        if(cmp instanceof SpanButton) {
+            setMaterialIcon((SpanButton)cmp, icon, size);
+            return true;
+        }
+        return false;
     }
 
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given label using the 
-     * styling of the label</p>
+     * styling of the label. Notice that when the argument is a button the pressed/selected &amp; disabled states
+     * will be set appropriately.</p>
      * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
      * 
      * @param l a label or subclass (e.g. Button etc.)
      * @param icon one of the MATERIAL_* icons
-     * @param size in millimeters for the icon
+     * @param size the size of the icon in millimeters
      */
     public static void setMaterialIcon(Label l, char icon, float size) {
         if(Font.isTrueTypeFileSupported()) {
             Style s = new Style(l.getUnselectedStyle());
-            int sizePixels = Display.getInstance().convertToPixels(size);
-            s.setFont(getMaterialDesignFont().derive(sizePixels, Font.STYLE_PLAIN));
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
+            if(l instanceof Button) {
+                Button b = (Button)l;
+                Style sel = b.getSelectedStyle();
+                Style pre = b.getPressedStyle();
+                Style dis = b.getDisabledStyle();
+                if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+                    sel = new Style(sel);
+                    sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
+                    b.setRolloverIcon(FontImage.create("" + icon, sel));
+                }
+                if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+                    pre = new Style(pre);
+                    pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
+                    b.setPressedIcon(FontImage.create("" + icon, pre));
+                    b.setRolloverPressedIcon(FontImage.create("" + icon, pre));
+                }
+                if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+                    dis = new Style(dis);
+                    dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
+                    b.setDisabledIcon(FontImage.create("" + icon, dis));
+                }
+            }
         }
     }
 
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given command using the 
+     * given UIID. Notice that the pressed/selected &amp; disabled states will be set appropriately.</p>
+     * 
+     * @param c a command 
+     * @param icon one of the MATERIAL_* icons
+     * @param uiid the UIID for the command (e.g. TitleCommand)
+     */
+    public static void setMaterialIcon(Command c, char icon, String uiid) {
+        setMaterialIcon(c, icon, uiid, -1);
+    }
+
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icon constants) to the given command using the 
+     * given UIID. Notice that the pressed/selected &amp; disabled states will be set appropriately.</p>
+     * 
+     * @param c a command 
+     * @param icon one of the MATERIAL_* icons
+     * @param uiid the UIID for the command (e.g. TitleCommand)
+     * @param size the size of the icon in millimeters
+     */
+    public static void setMaterialIcon(Command c, char icon, String uiid, float size) {
+        if(Font.isTrueTypeFileSupported()) {
+            UIManager uim = UIManager.getInstance();
+            Style s = uim.getComponentStyle(uiid);
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
+            c.setIcon(FontImage.create("" + icon, s));
+            Style sel = uim.getComponentSelectedStyle(uiid);
+            Style pre = uim.getComponentCustomStyle(uiid, "press");
+            Style dis = uim.getComponentCustomStyle(uiid, "dis");;
+            if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+                sel = new Style(sel);
+                sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
+                c.setRolloverIcon(FontImage.create("" + icon, sel));
+            }
+            if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+                pre = new Style(pre);
+                pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
+                c.setPressedIcon(FontImage.create("" + icon, pre));
+            }
+            if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+                dis = new Style(dis);
+                dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
+                c.setDisabledIcon(FontImage.create("" + icon, dis));
+            }
+        }
+    }
+    
     /**
      * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
      * styling of the label</p>
@@ -4589,9 +4689,48 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(MultiButton l, char icon) {
+        setMaterialIcon(l, icon, -1);
+    }
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a multibutton
+     * @param icon one of the MATERIAL_* icons
+     * @param size the size of the icon in millimeters
+     */
+    public static void setMaterialIcon(MultiButton l, char icon, float size) {
         if(Font.isTrueTypeFileSupported()) {
             Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
+            l.setIcon(FontImage.create("" + icon, s));
+        }
+    }
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanLabel
+     * @param icon one of the MATERIAL_* icons
+     */
+    public static void setMaterialIcon(SpanLabel l, char icon) {
+        setMaterialIcon(l, icon, -1);
+    }    
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanLabel
+     * @param icon one of the MATERIAL_* icons
+     * @param size the size of the icon in millimeters
+     */
+    public static void setMaterialIcon(SpanLabel l, char icon, float size) {
+        if(Font.isTrueTypeFileSupported()) {
+            Style s = new Style(l.getUnselectedStyle());
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
         }
     }
@@ -4604,10 +4743,40 @@ public class FontImage extends Image {
      * @param icon one of the MATERIAL_* icons
      */
     public static void setMaterialIcon(SpanButton l, char icon) {
+        setMaterialIcon(l, icon, -1);
+    }    
+    
+    /**
+     * <p>Applies a material design icon (one of the MATERIAL_* icons above) to the given component using the 
+     * styling of the label</p>
+     * <script src="https://gist.github.com/codenameone/8cf6f70188959524474b.js"></script>
+     * @param l a SpanButton
+     * @param icon one of the MATERIAL_* icons
+     * @param size the size of the icon in millimeters
+     */
+    public static void setMaterialIcon(SpanButton l, char icon, float size) {
         if(Font.isTrueTypeFileSupported()) {
             Style s = new Style(l.getUnselectedStyle());
-            s.setFont(getMaterialDesignFont().derive(s.getFont().getHeight(), Font.STYLE_PLAIN));
+            s.setFont(getMaterialDesignFont().derive(rightSize(s, size), Font.STYLE_PLAIN));
             l.setIcon(FontImage.create("" + icon, s));
+            Style sel = l.getSelectedStyle();
+            Style pre = l.getPressedStyle();
+            Style dis = l.getDisabledStyle();
+            if(sel.getFgColor() != s.getFgColor() || (sel.getBgColor() != s.getBgColor()) || (sel.getBgTransparency() != s.getBgTransparency())) {
+                sel = new Style(sel);
+                sel.setFont(getMaterialDesignFont().derive(rightSize(sel, size), Font.STYLE_PLAIN));
+                l.setRolloverIcon(FontImage.create("" + icon, sel));
+            }
+            if(pre.getFgColor() != s.getFgColor() || (pre.getBgColor() != s.getBgColor()) || (pre.getBgTransparency() != s.getBgTransparency())) {
+                pre = new Style(pre);
+                pre.setFont(getMaterialDesignFont().derive(rightSize(pre, size), Font.STYLE_PLAIN));
+                l.setPressedIcon(FontImage.create("" + icon, pre));
+            }
+            if(dis.getFgColor() != s.getFgColor() || (dis.getBgColor() != s.getBgColor()) || (dis.getBgTransparency() != s.getBgTransparency())) {
+                dis = new Style(dis);
+                dis.setFont(getMaterialDesignFont().derive(rightSize(dis, size), Font.STYLE_PLAIN));
+                l.setDisabledIcon(FontImage.create("" + icon, dis));
+            }
         }
     }
     
@@ -4700,6 +4869,31 @@ public class FontImage extends Image {
     }
 
     /**
+     * <p>Creates a font image with a fixed size/appearance</p>
+     *
+     * <script src="https://gist.github.com/codenameone/9c881350e1d142081aba.js"></script>
+     * <img src="https://www.codenameone.com/img/developer-guide/graphics-fontimage-fixed.png" alt="Icon font from material design icons created with the fixed size of display width" />
+     * 
+     * @param text the text of the font image
+     * @param fnt the font
+     * @param color the color for the image foreground
+     * @param width the width in pixels
+     * @param height the height in pixels
+     * @param padding the padding size in pixels
+     * @return the image instance
+     */
+    public static FontImage createFixed(String text, Font fnt, int color, int width, int height, int padding) {
+        FontImage f = new FontImage();
+        f.text = text;
+        f.color = color;
+        f.width = width;
+        f.fnt = sizeFont(fnt, Math.min(width, height), padding);
+        f.height = height;
+        f.padding = padding;
+        return f;
+    }
+    
+    /**
      * <p>Creates the font image based on the given style, the font in the style is assumed to be an icon font</p>
      *  
      * <script src="https://gist.github.com/codenameone/da3912b9ccef03f58058.js"></script>
@@ -4754,6 +4948,21 @@ public class FontImage extends Image {
         return create("" + icon, s, f);
     }
     
+    /**
+     * <p>Creates a material design icon font for the given style but size it in millimeters based
+     * on the size argument and not the font</p>
+     * <script src="https://gist.github.com/codenameone/34fd9e519ec3d305a015.js"></script>
+     * 
+     * @param icon the icon, one of the MATERIAL_* constants
+     * @param style the style to use, notice the font in the style only matters in terms of size and nothing else
+     * @param size the size in millimeters
+     * @return a new icon
+     */
+    public static FontImage createMaterial(char icon, String style, float size) {
+        Style s = UIManager.getInstance().getComponentStyle(style);
+        return createMaterial(icon, s, size);
+    }
+
     /**
      * <p>Creates a material design icon font for the given style</p>
      * <script src="https://gist.github.com/codenameone/34fd9e519ec3d305a015.js"></script>
@@ -4928,7 +5137,12 @@ public class FontImage extends Image {
     }
 
     Image scaledImpl(int width, int height) {
-        return createFixed(text, fnt, color, width, height);
+        FontImage i = createFixed(text, fnt, color, width, height);
+        i.backgroundColor = backgroundColor;
+        i.backgroundOpacity = backgroundOpacity;
+        i.padding = padding;
+        i.rotated = rotated;
+        return i;
     }
 
     /**
@@ -4971,6 +5185,7 @@ public class FontImage extends Image {
     public Image rotate(int degrees) {
         FontImage f = createFixed(text, fnt, color, width, height);
         f.rotated = degrees;
+        f.opacity = opacity;
         return f;
     }
 
@@ -5011,5 +5226,13 @@ public class FontImage extends Image {
     @Override
     public boolean requiresDrawImage() {
         return true;
+    }
+    
+    /**
+     * Returns the text of the icon
+     * @return the text used to draw the icon
+     */
+    public String getText() {
+        return text;
     }
 }

@@ -41,6 +41,7 @@ public class ByteCodeClass {
     private List<ByteCodeField> fullFieldList;
     private List<ByteCodeField> staticFieldList;
     private Set<String> dependsClassesInterfaces = new TreeSet<String>();
+    private Set<String> exportsClassesInterfaces = new TreeSet<String>();
     private List<BytecodeMethod> methods = new ArrayList<BytecodeMethod>();
     private List<ByteCodeField> fields = new ArrayList<ByteCodeField>();
     private String clsName;
@@ -49,6 +50,8 @@ public class ByteCodeClass {
     private boolean isInterface;
     private boolean isAbstract;
     private boolean usedByNative;
+    private static boolean saveUnitTests;
+    private boolean isUnitTest;
 
     private static Set<String> arrayTypes = new TreeSet<String>();
     
@@ -63,6 +66,7 @@ public class ByteCodeClass {
     private boolean marked;
     private static ByteCodeClass mainClass;
     private boolean finalClass;
+    private boolean isEnum;
     
     public ByteCodeClass(String clsName) {
         this.clsName = clsName;
@@ -70,6 +74,11 @@ public class ByteCodeClass {
     static ByteCodeClass getMainClass() {
 		return mainClass;
     }
+    
+    static void setSaveUnitTests(boolean save) {
+        saveUnitTests = save;
+    }
+    
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
             if (mainClass == null) {
@@ -128,6 +137,9 @@ public class ByteCodeClass {
                 bc.markDependent(lst);
             }
             if(!bc.marked && bc.isUsedByNative()){
+                bc.markDependent(lst);
+            }
+            if(!bc.marked && saveUnitTests && bc.isUnitTest) {
                 bc.markDependent(lst);
             }
         }
@@ -213,12 +225,15 @@ public class ByteCodeClass {
     
     public void updateAllDependencies() {
         dependsClassesInterfaces.clear();
+        exportsClassesInterfaces.clear();
+        dependsClassesInterfaces.add("java_lang_NullPointerException");
         setBaseClass(baseClass);
         for(String s : baseInterfaces) {
             s = s.replace('/', '_').replace('$', '_');
             if(!dependsClassesInterfaces.contains(s)) {
                 dependsClassesInterfaces.add(s);
             }
+            exportsClassesInterfaces.add(s);
         }
         if(virtualMethodList != null) {
             virtualMethodList.clear();
@@ -235,6 +250,9 @@ public class ByteCodeClass {
                     dependsClassesInterfaces.add(s);
                 }
             }
+            //for (String s : m.getExportedClasses()) {
+            //    exportsClassesInterfaces.add(s);
+            //}
         }
         for(ByteCodeField m : fields) {
             for(String s : m.getDependentClasses()) {
@@ -242,6 +260,9 @@ public class ByteCodeClass {
                     dependsClassesInterfaces.add(s);
                 }
             }
+            //for (String s : m.getExportedClasses()) {
+            //    exportsClassesInterfaces.add(s);
+            //}
         }
     }
     
@@ -298,6 +319,19 @@ public class ByteCodeClass {
         b.append("#include \"");
         b.append(clsName);
         b.append(".h\"\n");
+        
+        for(String s : dependsClassesInterfaces) {
+            if (exportsClassesInterfaces.contains(s)) {
+                continue;
+            }
+            if(s.startsWith("java_lang_annotation") || s.startsWith("java_lang_Deprecated") || 
+                    s.startsWith("java_lang_Override") || s.startsWith("java_lang_SuppressWarnings")) {
+                continue;
+            }
+            b.append("#include \"");
+            b.append(s);
+            b.append(".h\"\n");
+        }
         
         b.append("const struct clazz *base_interfaces_for_");
         b.append(clsName);
@@ -381,6 +415,13 @@ public class ByteCodeClass {
         
         // vtable 
         b.append(", 0\n");
+        
+        if (isEnum) {
+            b.append(", &__VALUE_OF_");
+            b.append(clsName);
+        } else {
+            b.append(", 0");
+        }
         
         b.append("};\n\n");
 
@@ -765,19 +806,26 @@ public class ByteCodeClass {
             b.append("}\n\n");
         }
         
+        if (isEnum) {
+            b.append("JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value) {\n    ");
+            b.append("    JAVA_ARRAY values = (JAVA_ARRAY)get_static_").append(clsName).append("__VALUES(threadStateData);\n");
+            b.append("    JAVA_ARRAY_OBJECT* data = (JAVA_ARRAY_OBJECT*)values->data;\n");
+            b.append("    int len = values->length;\n");
+            b.append("    for (int i=0; i<len; i++) {\n");
+            b.append("        JAVA_OBJECT name = get_field_").append(clsName).append("_name(data[i]);\n");
+            b.append("        if (name != JAVA_NULL && java_lang_String_equals___java_lang_Object_R_boolean(threadStateData, name, value)) { return data[i];}\n");
+            b.append("    }\n");
+            b.append("    return JAVA_NULL;\n");
+            b.append("}\n\n");
+        }
+        
         // insert static initializer
+        b.append("static int __").append(clsName).append("_LOADED__=0;\n");
         b.append("void __STATIC_INITIALIZER_");
         b.append(clsName);
-        b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(class__");
-        b.append(clsName);
-        b.append(".initialized) return;\n\n    ");
+        b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__").append(clsName).append("_LOADED__) return;\n\n    ");
 
-        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
-            b.append("class_array1__");
-            b.append(clsName);
-            b.append(".vtable = initVtableForInterface();\n    ");
-        }
-
+        
         b.append("monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
         
         b.append(clsName);
@@ -786,6 +834,13 @@ public class ByteCodeClass {
         b.append(".initialized) {\n        monitorExit(threadStateData, (JAVA_OBJECT)&class__");
         b.append(clsName);
         b.append(");\n        return;\n    }\n\n");
+        
+        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+            b.append("class_array1__");
+            b.append(clsName);
+            b.append(".vtable = initVtableForInterface();\n    ");
+        }
+
         
         // create the vtable
         b.append("    class__");
@@ -848,16 +903,18 @@ public class ByteCodeClass {
         }
         b.append("    class__");
         b.append(clsName);
-        b.append(".initialized = JAVA_TRUE;\n    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
-        b.append(clsName);
-        b.append(");\n");
-
+        b.append(".initialized = JAVA_TRUE;\n");
         // init static fields and invoke the static initializer code block
         if(clInitMethod != null) {
             b.append("    ");
             b.append(clInitMethod);
             b.append("(threadStateData);\n");
         }
+        b.append("monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+        b.append(clsName);
+        b.append(");\n");
+
+        b.append("__").append(clsName).append("_LOADED__=1;\n");
         
         b.append("}\n\n");
         
@@ -924,20 +981,16 @@ public class ByteCodeClass {
     } 
 
     private List<ByteCodeField> buildStaticFieldList(List<ByteCodeField> fieldList) {
-        for(ByteCodeField bf : fields) {
-            if(bf.isStaticField() && !fieldList.contains(bf)) {
-                fieldList.add(bf);
-            } 
+        if (fields != null) {
+            for(ByteCodeField bf : fields) {
+                if(bf.isStaticField() && !fieldList.contains(bf)) {
+                    fieldList.add(bf);
+                } 
+            }
         }
         if(baseInterfacesObject != null) {
             for(ByteCodeClass baseInterface : baseInterfacesObject) {
-                if(baseInterface.fields != null) {
-                    for(ByteCodeField bf : baseInterface.fields) {
-                        if(!fieldList.contains(bf)) {
-                            fieldList.add(bf);
-                        } 
-                    }
-                }
+                baseInterface.buildStaticFieldList(fieldList);
             }
         }
         if(baseClassObject != null) {
@@ -974,7 +1027,7 @@ public class ByteCodeClass {
 
         b.append("#include \"cn1_globals.h\"\n");
         
-        for(String s : dependsClassesInterfaces) {
+        for(String s : exportsClassesInterfaces) {
             if(s.startsWith("java_lang_annotation") || s.startsWith("java_lang_Deprecated") || 
                     s.startsWith("java_lang_Override") || s.startsWith("java_lang_SuppressWarnings")) {
                 continue;
@@ -1034,6 +1087,10 @@ public class ByteCodeClass {
                 b.append(clsName);
                 b.append("(CODENAME_ONE_THREAD_STATE);\n");
             }
+        }
+        
+        if (isEnum) {
+            b.append("extern JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value);\n");
         }
                 
         if(arrayTypes.contains("1_" + clsName)) {
@@ -1227,6 +1284,7 @@ public class ByteCodeClass {
             if(!dependsClassesInterfaces.contains(b)) {
                 dependsClassesInterfaces.add(b);
             }
+            exportsClassesInterfaces.add(b);
         }
     }
     
@@ -1238,6 +1296,7 @@ public class ByteCodeClass {
                 if(!dependsClassesInterfaces.contains(s)) {
                     dependsClassesInterfaces.add(s);
                 }
+                exportsClassesInterfaces.add(s);
             }
         }
     }
@@ -1399,6 +1458,10 @@ public class ByteCodeClass {
     public void setIsInterface(boolean isInterface) {
         this.isInterface = isInterface;
     }
+    
+    public void setIsUnitTest(boolean isUnitTest) {
+        this.isUnitTest = isUnitTest;
+    }
 
     /**
      * @return the isAbstract
@@ -1526,6 +1589,14 @@ public class ByteCodeClass {
             }
         }
         return usedByNative;
+    }
+
+    boolean isUnitTest() {
+        return isUnitTest;
+    }
+
+    void setIsEnum(boolean b) {
+        this.isEnum = b;
     }
 
     

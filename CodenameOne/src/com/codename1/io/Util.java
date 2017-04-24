@@ -27,11 +27,13 @@ package com.codename1.io;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Externalizable;
+import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.util.Base64;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.SuccessCallback;
@@ -105,21 +107,32 @@ public class Util {
     }
 
     /**
+     * Copy the input stream into the output stream, without closing the streams when done
+     *
+     * @param i source
+     * @param o destination
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
+     */
+    public static void copyNoClose(InputStream i, OutputStream o, int bufferSize) throws IOException {
+        byte[] buffer = new byte[bufferSize];
+        int size = i.read(buffer);
+        while(size > -1) {
+            o.write(buffer, 0, size);
+            size = i.read(buffer);
+        }
+    }
+    
+    /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
      * a case of an exception
      *
      * @param i source
      * @param o destination
-     * @param bufferSize the size of the buffer, which should be a power of 2 large enoguh
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
      */
     public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
         try {
-            byte[] buffer = new byte[bufferSize];
-            int size = i.read(buffer);
-            while(size > -1) {
-                o.write(buffer, 0, size);
-                size = i.read(buffer);
-            }
+            copyNoClose(i, o, bufferSize);
         } finally {
             Util.getImplementation().cleanup(o);
             Util.getImplementation().cleanup(i);
@@ -222,6 +235,13 @@ public class Util {
         out.writeBoolean(true);
         if(o instanceof Externalizable) {
             Externalizable e = (Externalizable)o;
+            out.writeUTF(e.getObjectId());
+            out.writeInt(e.getVersion());
+            e.externalize(out);
+            return;
+        }
+        if(o instanceof PropertyBusinessObject) {
+            Externalizable e = ((PropertyBusinessObject)o).getPropertyIndex().asExternalizable();
             out.writeUTF(e.getObjectId());
             out.writeInt(e.getVersion());
             e.externalize(out);
@@ -645,16 +665,23 @@ public class Util {
             }
             Class cls = (Class) externalizables.get(type);
             if (cls != null) {
-                Externalizable ex = (Externalizable) cls.newInstance();
-                ex.internalize(input.readInt(), input);
-                return ex;
+                Object o = cls.newInstance();
+                if(o instanceof Externalizable) {
+                    Externalizable ex = (Externalizable)o; 
+                    ex.internalize(input.readInt(), input);
+                    return ex;
+                } else {
+                    PropertyBusinessObject pb = (PropertyBusinessObject)o;
+                    pb.getPropertyIndex().asExternalizable().internalize(input.readInt(), input);
+                    return pb;
+                }
             }
             throw new IOException("Object type not supported: " + type);
         } catch (InstantiationException ex1) {
-            ex1.printStackTrace();
+            Log.e(ex1);
             throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
         } catch (IllegalAccessException ex1) {
-            ex1.printStackTrace();
+            Log.e(ex1);
             throw new IOException(ex1.getClass().getName() + ": " + ex1.getMessage());
         } 
     }
@@ -1246,12 +1273,7 @@ public class Util {
      * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
-        ConnectionRequest cr = new ConnectionRequest();
-        cr.setPost(false);
-        cr.setFailSilently(true);
-        cr.setDuplicateSupported(true);
-        cr.setUrl(url);
-        cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
+        implInstance.downloadImageToFileSystem(url, fileName, onSuccess, onFail);
     }
     
     /**
@@ -1280,12 +1302,12 @@ public class Util {
      * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback) 
      */
     public static void downloadImageToStorage(String url, String fileName, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
-        ConnectionRequest cr = new ConnectionRequest();
-        cr.setPost(false);
-        cr.setFailSilently(true);
-        cr.setDuplicateSupported(true);
-        cr.setUrl(url);
-        cr.downloadImageToStorage(fileName, onSuccess, onFail);
+        implInstance.downloadImageToStorage(url, fileName, onSuccess, onFail);
+    }
+    
+    public static void downloadImageToCache(String url, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
+        implInstance.downloadImageToCache(url, onSuccess, onFail);
+        
     }
     
     /**
@@ -1328,7 +1350,8 @@ public class Util {
         } else {
             NetworkManager.getInstance().addToQueueAndWait(cr);
         }
-        return cr.getResponseCode() == 200;
+        int rc = cr.getResponseCode();
+        return rc == 200 || rc == 201;
     }
     
     /**
@@ -1357,4 +1380,200 @@ public class Util {
             }
         }
     }    
+    
+    /**
+     * Returns the number object as an int
+     * @param number this can be a String or any number type
+     * @return an int value or an exception
+     */
+    public static int toIntValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Integer) {
+            return ((Integer)number).intValue();
+        }
+        if(number instanceof String) {
+            return Integer.parseInt((String)number);
+        }
+        if(number instanceof Double) {
+            return ((Double)number).intValue();
+        }
+        if(number instanceof Float) {
+            return ((Float)number).intValue();
+        }
+        if(number instanceof Long) {
+            return ((Long)number).intValue();
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).intValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).intValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
+
+    /**
+     * Returns the number object as a long
+     * @param number this can be a String or any number type
+     * @return a long value or an exception
+     */
+    public static long toLongValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Long) {
+            return ((Long)number).longValue();
+        }
+        if(number instanceof Integer) {
+            return ((Integer)number).longValue();
+        }
+        if(number instanceof String) {
+            return Long.parseLong((String)number);
+        }
+        if(number instanceof Double) {
+            return ((Double)number).longValue();
+        }
+        if(number instanceof Float) {
+            return ((Float)number).longValue();
+        }
+        if(number instanceof Date) {
+            return ((Date)number).getTime();
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).longValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).longValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
+
+    /**
+     * Returns the number object as a float
+     * @param number this can be a String or any number type
+     * @return a float value or an exception
+     */
+    public static float toFloatValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Float) {
+            return ((Float)number).floatValue();
+        }
+        if(number instanceof Long) {
+            return ((Long)number).floatValue();
+        }
+        if(number instanceof Integer) {
+            return ((Integer)number).floatValue();
+        }
+        if(number instanceof String) {
+            return Float.parseFloat((String)number);
+        }
+        if(number instanceof Double) {
+            return ((Double)number).floatValue();
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).floatValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).floatValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
+
+    /**
+     * Returns the number object as a double
+     * @param number this can be a String or any number type
+     * @return a double value or an exception
+     */
+    public static double toDoubleValue(Object number) {
+        // we should convert this to use Number
+        if(number instanceof Double) {
+            return ((Double)number).doubleValue();
+        }
+        if(number instanceof Float) {
+            return ((Float)number).doubleValue();
+        }
+        if(number instanceof Long) {
+            return ((Long)number).doubleValue();
+        }
+        if(number instanceof Integer) {
+            return ((Integer)number).doubleValue();
+        }
+        if(number instanceof String) {
+            return Double.parseDouble((String)number);
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).doubleValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).doubleValue();
+        }*/
+        if(number instanceof Boolean) {
+            Boolean b = (Boolean)number;
+            if(b.booleanValue()) {
+                return 1;
+            }
+            return 0;
+        }
+        throw new IllegalArgumentException("Not a number: " + number);
+    }
+    
+    /**
+     * Encodes a string in a way that makes it harder to read it "as is" this makes it possible for Strings to be 
+     * "encoded" within the app and thus harder to discover by a casual search.
+     * 
+     * @param s the string to decode
+     * @return the decoded string
+     */
+    public  static String xorDecode(String s) {
+        try { 
+            byte[] dat = Base64.decode(s.getBytes("UTF-8"));
+            for(int iter = 0 ; iter < dat.length ; iter++) {
+                dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
+            }
+            return new String(dat, "UTF-8");
+        } catch(UnsupportedEncodingException err) {
+            // will never happen damn stupid exception
+            err.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * The inverse method of xorDecode, this is normally unnecessary and is here mostly for completeness
+     * 
+     * @param s a regular string
+     * @return a String that can be used in the xorDecode method
+     */
+    public static String xorEncode(String s) {
+        try { 
+            byte[] dat = s.getBytes("UTF-8");
+            for(int iter = 0 ; iter < dat.length ; iter++) {
+                dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
+            }
+            return Base64.encodeNoNewline(dat);
+        } catch(UnsupportedEncodingException err) {
+            // will never happen damn stupid exception
+            err.printStackTrace();
+            return null;
+        }
+    }
 }

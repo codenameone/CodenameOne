@@ -69,7 +69,7 @@ class HTMLEventsListener implements ActionListener,FocusListener {
                         }
                     }
                 };
-                tf.addDataChangeListener(dcl);
+                tf.addDataChangedListener(dcl);
                 listeners.put(cmp, dcl);
             }
         }

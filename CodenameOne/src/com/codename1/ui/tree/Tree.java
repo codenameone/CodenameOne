@@ -28,6 +28,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.animations.CommonTransitions;
@@ -267,7 +268,11 @@ public class Tree extends Container {
             c = p;
         }
         c.putClientProperty(KEY_EXPANDED, "true");
-        setNodeIcon(openFolder, c);
+        if(openFolder == null) {
+            FontImage.setMaterialIcon(c, FontImage.MATERIAL_FOLDER, 3);
+        } else {
+            setNodeIcon(openFolder, c);
+        }
         int depth = ((Integer)c.getClientProperty(KEY_DEPTH)).intValue();
         Container parent = c.getParent();
         Object o = c.getClientProperty(KEY_OBJECT);
@@ -286,8 +291,13 @@ public class Tree extends Container {
         return dest;
     }
     
-    private boolean isExpanded(Component c) {
-        Object e = c.getClientProperty(KEY_EXPANDED);
+    /**
+     * This method returns true if the given node is expanded.
+     * @param node a Component that represents a tree node.
+     * @return true if this tree node is expanded
+     */ 
+    protected boolean isExpanded(Component node) {
+        Object e = node.getClientProperty(KEY_EXPANDED);
         return e != null && e.equals("true");
     }
     
@@ -295,7 +305,8 @@ public class Tree extends Container {
         int cc = parent.getComponentCount();
         for(int iter = 0 ; iter < cc ; iter++) {
             Component current = parent.getComponentAt(iter);
-            if(current instanceof Container) {
+            if(!model.isLeaf(current)){
+            //if(current instanceof Container) {
                 BorderLayout bl = (BorderLayout)((Container)current).getLayout();
 
                 // the tree component is always at north expanded or otherwise
@@ -438,9 +449,17 @@ public class Tree extends Container {
         Button cmp = new Button(childToDisplayLabel(node));
         cmp.setUIID("TreeNode");
         if(model.isLeaf(node)) {
-            cmp.setIcon(nodeImage);
+            if(nodeImage == null) {
+                FontImage.setMaterialIcon(cmp, FontImage.MATERIAL_DESCRIPTION, 3);
+            } else {
+                cmp.setIcon(nodeImage);
+            }
         } else {
-            cmp.setIcon(folder);
+            if(folder == null) {
+                FontImage.setMaterialIcon(cmp, FontImage.MATERIAL_FOLDER, 3);
+            } else {
+                cmp.setIcon(folder);
+            }
         }
         updateNodeComponentStyle(cmp.getSelectedStyle(), depth);
         updateNodeComponentStyle(cmp.getUnselectedStyle(), depth);

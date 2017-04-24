@@ -254,6 +254,16 @@ public class ImageRGBEditor extends BaseForm {
         return i;
     }
 
+    public static com.codename1.ui.Image createImageStatic(File selection) throws IOException {
+        byte[] data = new byte[(int) selection.length()];
+        DataInputStream di = new DataInputStream(new FileInputStream(selection));
+        di.readFully(data);
+        di.close();
+        com.codename1.ui.Image i = com.codename1.ui.EncodedImage.create(data);
+        di.close();
+        return i;
+    }
+    
     protected File[] createChooser() {
         return ResourceEditorView.showOpenFileChooser("Images", ".gif", ".png", ".jpg");
     }

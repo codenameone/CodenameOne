@@ -16,6 +16,7 @@
 #include "java_lang_StringBuilder.h"
 #include "java_util_HashMap.h"
 #include "java_util_HashMap_Entry.h"
+#include "java_lang_NullPointerException.h"
 #import <Foundation/Foundation.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -763,6 +764,15 @@ JAVA_OBJECT java_lang_Class_newInstanceImpl___R_java_lang_Object(CODENAME_ONE_TH
     return f(threadStateData);
 }
 
+JAVA_OBJECT java_lang_Enum_valueOf___java_lang_Class_java_lang_String_R_java_lang_Enum(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT value) {
+    struct clazz* clz = (struct clazz*)cls;
+    enumValueOfFunctionPointer f = clz->enumValueOfFp;
+    if (f == 0) {
+        return JAVA_NULL;
+    }
+    return f(threadStateData, value);
+}
+
 JAVA_OBJECT java_lang_Object_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     char s[32];
     sprintf(s, "Obj[%i]", ((int)obj));
@@ -1088,15 +1098,17 @@ void* threadRunner(void *x)
     d->threadActive = JAVA_TRUE;
     d->currentThreadObject = t;
     
+    if(threadsToDelete == 0) {
+        threadsToDelete = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+        memset(threadsToDelete, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
+    }
+    
     java_lang_Thread_runImpl___long(d, t, currentThreadId());
     
     // we remove the thread here since this is the only place we can do this
     // we add the thread in the getThreadLocalData() method to handle native threads
     // too. Hopefully we won't spawn too many of those...
-    if(threadsToDelete == 0) {
-        threadsToDelete = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-        memset(threadsToDelete, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-    }
+    
     lockCriticalSection();
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         if(allThreads[iter] == d) {

@@ -25,6 +25,7 @@ package com.codename1.share;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.facebook.FaceBookAccess;
 import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
 import com.codename1.io.MultipartRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
@@ -52,7 +53,17 @@ public class FacebookShare extends ShareService {
      * Default Constructor
      */
     public FacebookShare() {
-        super("Facebook", Resources.getSystemResource().getImage("facebook.png"));
+        super("Facebook", null);
+    }
+
+    @Override
+    public Image getIcon() {
+        Image i = super.getIcon();
+        if(i == null) {
+            i = Resources.getSystemResource().getImage("facebook.png");
+            setIcon(i);
+        }
+        return i;
     }
 
     /**
@@ -106,7 +117,7 @@ public class FacebookShare extends ShareService {
                                 });
 
                             } catch (IOException ex) {
-                                ex.printStackTrace();
+                                Log.e(ex);
                                 System.out.println("failed to share " + ex.getMessage());
                             }
                         }
@@ -148,7 +159,7 @@ public class FacebookShare extends ShareService {
                                 req.addData("source", is, FileSystemStorage.getInstance().getLength(image), mime);
                                 NetworkManager.getInstance().addToQueue(req);
                             } catch (IOException ioe) {
-                                ioe.printStackTrace();
+                                Log.e(ioe);
                             }
                         }
                     });

@@ -191,6 +191,12 @@ public class TextArea extends Component {
     
     private boolean endsWith3Points = false;
 
+    /**
+     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds 
+     * this might make it slower as a result
+     */
+    private boolean actAsLabel;
+    
     
     // problematic  maxSize = 20; //maximum size (number of characters) that can be stored in this TextField.
     
@@ -413,6 +419,7 @@ public class TextArea extends Component {
      * @param t new value for the text area
      */
     public void setText(String t) {
+        String old = this.text;
         this.text = (t != null) ? t : "";
         setShouldCalcPreferredSize(true);
         if(maxSize < text.length()) {
@@ -423,8 +430,12 @@ public class TextArea extends Component {
             //zero the ArrayList in order to initialize it on the next paint
             rowStrings=null; 
         }
+        
         // while native editing we don't need the cursor animations
         if(Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {
+            if (!text.equals(old)) {
+                Display.impl.updateNativeEditorText(this, text);
+            }
             return;
         }
         repaint();
@@ -721,7 +732,7 @@ public class TextArea extends Component {
     }
     
     private ArrayList getRowStrings() {
-        if(rowStrings == null || widthForRowCalculations != getWidth() - getUnselectedStyle().getPadding(false, RIGHT) - getUnselectedStyle().getPadding(false, LEFT)){
+        if(rowStrings == null || widthForRowCalculations != getWidth() - getUnselectedStyle().getHorizontalPadding()){
             initRowString();
             setShouldCalcPreferredSize(true);
         }
@@ -802,10 +813,10 @@ public class TextArea extends Component {
                 rowStrings.add(getText());
                 return;
             }
-        }
+        }        
         Style style = getUnselectedStyle();
         rowStrings= new ArrayList();
-        widthForRowCalculations = getWidth() - style.getPadding(false, RIGHT) - style.getPadding(false, LEFT);
+        widthForRowCalculations = getWidth() - style.getHorizontalPadding();
         // single line text area is essentially a text field, we call the method
         // to allow subclasses to override it
         if (isSingleLineTextArea()) {
@@ -820,13 +831,27 @@ public class TextArea extends Component {
         if(text == null || text.equals("")){
             return;
         }
+        Font font = style.getFont();
+        if(actAsLabel && text.length() <= columns && text.indexOf('\n') < 0) {
+            int w = font.stringWidth(text);
+            if(w <= getWidth()) {
+                if(rowStrings == null) {
+                    rowStrings = new ArrayList();
+                    rowStrings.add(getText());
+                    return;
+                } else {
+                    rowStrings.clear();
+                    rowStrings.add(getText());
+                    return;
+                }
+            }
+        }
         char[] text = preprocess(getText());
         int rows = this.rows;
         if(growByContent) {
             rows = Math.max(rows, getLines());
         }
         
-        Font font = style.getFont();
         int charWidth = font.charWidth(widestChar);
         Style selectedStyle = getSelectedStyle();
         if(selectedStyle.getFont() != style.getFont()) {
@@ -837,7 +862,7 @@ public class TextArea extends Component {
             }
         }
         style = getStyle();
-        int tPadding = style.getPadding(false, RIGHT) + style.getPadding(false, LEFT);
+        int tPadding = style.getHorizontalPadding();
         int textAreaWidth = getWidth() - tPadding;
         /*if(textAreaWidth <= 0) {
             if(columns < 1) {
@@ -895,7 +920,7 @@ public class TextArea extends Component {
             rowText="";
             int maxLength = to;
 
-            if(useStringWidth) {
+            if(useStringWidth || actAsLabel) {
                 // fix for an infinite loop issue: http://forums.java.net/jive/thread.jspa?messageID=482802
                 //currentRowWidth = 0;
                 String currentRow = "";
@@ -1283,7 +1308,7 @@ public class TextArea extends Component {
      * @deprecated use Style.setAlignment instead
      */
     public void setAlignment(int align) {
-        getStyle().setAlignment(align);
+        getAllStyles().setAlignment(align);
     }
 
     /**
@@ -1710,6 +1735,24 @@ public class TextArea extends Component {
             return getSelectedStyle();
         }
         return super.getStyle(); 
+    }
+
+    /**
+     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+     * this might make it slower as a result
+     * @return the actAsLabel
+     */
+    public boolean isActAsLabel() {
+        return actAsLabel;
+    }
+
+    /**
+     * This flag indicates that the text area should try to act as a label and try to fix more accurately within it's bounds
+     * this might make it slower as a result
+     * @param actAsLabel the actAsLabel to set
+     */
+    public void setActAsLabel(boolean actAsLabel) {
+        this.actAsLabel = actAsLabel;
     }
     
     

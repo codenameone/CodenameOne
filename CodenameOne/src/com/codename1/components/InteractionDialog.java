@@ -33,6 +33,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
@@ -178,6 +179,16 @@ public class InteractionDialog extends Container {
         this.title.setText(title);
     }
     
+    private Container getLayeredPane(Form f) {
+        //return f.getLayeredPane();
+        Container c= (Container)f.getLayeredPane(InteractionDialog.class, false);
+        if (!(c.getLayout() instanceof LayeredLayout)) {
+            c.setLayout(new LayeredLayout());
+        }
+        
+        return c;
+    }
+    
     /**
      * This method shows the form as a modal alert allowing us to produce a behavior
      * of an alert/dialog box. This method will block the calling thread even if the
@@ -193,6 +204,36 @@ public class InteractionDialog extends Container {
      * @param right space in pixels between the right of the screen and the form
      */
     public void show(int top, int bottom, int left, int right) {
+        
+        Form f = Display.getInstance().getCurrent();
+        //getLayeredPane(f).setLayout(new BorderLayout());
+        
+        //getLayeredPane(f).getAllStyles().setMargin(0,0,0,0);
+        //getLayeredPane(f).getAllStyles().setPadding(0,0,0,0);
+        //getLayeredPane(f).setX(0);
+        //getLayer
+        getUnselectedStyle().setMargin(TOP, top);
+        getUnselectedStyle().setMargin(BOTTOM, bottom);
+        getUnselectedStyle().setMargin(LEFT, left);
+        getUnselectedStyle().setMargin(RIGHT, right);
+        getUnselectedStyle().setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        
+        // might occur when showing the dialog twice...
+        remove();
+        
+        getLayeredPane(f).addComponent(BorderLayout.center(this));
+        if(animateShow) {
+            int x = left + (f.getWidth() - right - left) / 2;
+            int y = top + (f.getHeight() - bottom - top) / 2;
+            setX(x);
+            setY(y);
+            setWidth(1);
+            setHeight(1);
+            getLayeredPane(f).animateLayout(400);
+        } else {
+            getLayeredPane(f).revalidate();
+        }
+        /*
         Form f = Display.getInstance().getCurrent();
         f.getLayeredPane().setLayout(new BorderLayout());
         getUnselectedStyle().setMargin(TOP, top);
@@ -212,6 +253,7 @@ public class InteractionDialog extends Container {
         } else {
             f.getLayeredPane().revalidate();
         }
+        */
     }
     
     
@@ -307,8 +349,8 @@ public class InteractionDialog extends Container {
                 titleArea.setPreferredSize(new Dimension(0,0));
                 if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
                     getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
-                    int cpPaddingTop = getContentPane().getStyle().getPadding(TOP);
-                    int titlePT = getTitleComponent().getStyle().getPadding(TOP);
+                    int cpPaddingTop = getContentPane().getStyle().getPaddingTop();
+                    int titlePT = getTitleComponent().getStyle().getPaddingTop();
                     byte[] pu = getContentPane().getStyle().getPaddingUnit();
                     if(pu == null){
                         pu = new byte[4]; 
@@ -338,6 +380,7 @@ public class InteractionDialog extends Container {
                 restoreArrow = true;
             }
         }
+        calcPreferredSize();
         int prefHeight = getPreferredH();
         int prefWidth = getPreferredW();
         if(contentPaneStyle.getBorder() != null) {
@@ -346,8 +389,8 @@ public class InteractionDialog extends Container {
         }
         
         Form f = Display.getInstance().getCurrent();
-        int availableHeight = f.getLayeredPane().getHeight();
-        int availableWidth = f.getLayeredPane().getWidth();
+        int availableHeight = getLayeredPane(f).getParent().getHeight();
+        int availableWidth =getLayeredPane(f).getParent().getWidth();
         int width = Math.min(availableWidth, prefWidth);
         int x = 0;
         int y = 0;
@@ -385,9 +428,9 @@ public class InteractionDialog extends Container {
                 show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
             } else {
                 // popup upwards
-                int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
-                y = rect.getY() + rect.getHeight() + - height;
-                show(y, Math.max(0, availableHeight - height - y), x, Math.max(0, availableWidth - width - x));
+                int height = Math.min(prefHeight, rect.getY() - getLayeredPane(f).getAbsoluteY());
+                y = rect.getY() - height - getLayeredPane(f).getAbsoluteY();
+                show(y, Math.max(0, getLayeredPane(f).getComponentForm().getHeight() - rect.getY()), x, Math.max(0, availableWidth - width - x));
             }
         } else {
             int height = Math.min(prefHeight, availableHeight);

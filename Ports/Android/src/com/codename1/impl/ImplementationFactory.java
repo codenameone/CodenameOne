@@ -66,6 +66,9 @@ public class ImplementationFactory {
      * @return a newly created implementation instance
      */
     public Object createImplementation() {
+        if (AndroidImplementation.getInstance() != null) {
+            return AndroidImplementation.getInstance();
+        }
         return new AndroidImplementation();
     }
 }

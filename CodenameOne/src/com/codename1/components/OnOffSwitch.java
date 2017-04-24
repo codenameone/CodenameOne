@@ -80,6 +80,12 @@ public class OnOffSwitch extends Container {
      */
     protected Dimension calcPreferredSize() {
         if(iosMode) {
+            if(switchMaskImage == null) {
+                switchMaskImage = UIManager.getInstance().getThemeImageConstant("switchMaskImage");
+                if(switchMaskImage == null) {
+                    return super.calcPreferredSize();
+                }
+            }
             return new Dimension(switchMaskImage.getWidth(), switchMaskImage.getHeight());
         }
         return super.calcPreferredSize();
@@ -193,8 +199,8 @@ public class OnOffSwitch extends Container {
                 switchButtonPadInt *= 2;
             }
             Style s = getStyle();
-            int x = getX() + s.getPadding(LEFT);
-            int y = getY() + s.getPadding(TOP);
+            int x = getX() + s.getPaddingLeftNoRTL();
+            int y = getY() + s.getPaddingTop();
             if(!value) {
                 if(deltaX > 0) {
                     dragged = false;

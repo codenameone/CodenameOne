@@ -181,23 +181,9 @@ public class CodenameOneThread extends Thread {
     }
     
     public static void handleException(Throwable err) {
-        Thread t = Thread.currentThread();
-        if(t instanceof CodenameOneThread) {
-            Log.p(err.toString());
-            Log.p(((CodenameOneThread)t).getStack(err));
-            Preferences.set("$CN1Uncaught", true);
-            CrashReport r = Display.getInstance().getCrashReporter();
-            if(r != null) {
-                r.exception(err);
-            }
-        } else {
-            Log.p(err.toString());
+        if(Log.isCrashBound()) {
             Log.e(err);
-            Preferences.set("$CN1Uncaught", true);
-            CrashReport r = Display.getInstance().getCrashReporter();
-            if(r != null) {
-                r.exception(err);
-            }
+            Log.sendLog();
         }
     }
 }

@@ -29,8 +29,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -42,11 +40,15 @@ public class SEDatabase extends Database{
     
     public SEDatabase(java.sql.Connection conn) {
         this.conn = conn;
+        try {
+            conn.setAutoCommit(true);
+        } catch(SQLException err) {}
     }
 
     
     @Override
     public void beginTransaction() throws IOException {
+        System.out.println("**** Database.beginTransaction() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         try {
             conn.setAutoCommit(false);
         } catch (SQLException ex) {
@@ -57,6 +59,7 @@ public class SEDatabase extends Database{
 
     @Override
     public void commitTransaction() throws IOException {
+        System.out.println("**** Database.commitTransaction() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         try {
             conn.commit();
             conn.setAutoCommit(true);
@@ -84,21 +87,34 @@ public class SEDatabase extends Database{
         }
     }
 
+    private void cleanup(PreparedStatement ps) {
+        try {
+            if(ps != null) {
+                ps.close();
+            }
+        } catch (SQLException ex) {
+        }
+    }
+    
     @Override
     public void execute(String sql) throws IOException {
+        PreparedStatement s = null;
         try {
-            PreparedStatement s =  conn.prepareStatement(sql);  
+            s =  conn.prepareStatement(sql);  
             s.execute();
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
+        } finally {
+            cleanup(s);
         }
     }
 
     @Override
     public void execute(String sql, String[] params) throws IOException {
+        PreparedStatement s = null;
         try {
-            PreparedStatement s =  conn.prepareStatement(sql);  
+            s =  conn.prepareStatement(sql);  
             
             if(params != null){
                 for (int i = 0; i < params.length; i++) {
@@ -109,14 +125,16 @@ public class SEDatabase extends Database{
             s.execute();
         } catch (SQLException ex) {
             ex.printStackTrace();
+            cleanup(s);
             throw new IOException(ex.getMessage());
         }
     }
     
     @Override
-    public void execute(String sql, Object[] params) throws IOException {
+    public void execute(String sql, Object... params) throws IOException {
+        PreparedStatement s = null;
         try {
-            PreparedStatement s =  conn.prepareStatement(sql);  
+            s =  conn.prepareStatement(sql);  
             
             if(params != null){
                 for (int i = 0; i < params.length; i++) {
@@ -132,12 +150,17 @@ public class SEDatabase extends Database{
                             s.setDouble(i + 1, ((Double) p).doubleValue());
                         } else if (p instanceof Long) {
                             s.setLong(i + 1, ((Long) p).longValue());
+                        } else if (p instanceof Integer) {
+                            s.setInt(i + 1, ((Integer) p).intValue());
+                        } else {
+                            s.setString(i + 1, (String) p.toString());
                         }
                     }                    
                 }
             }
             s.execute();
         } catch (SQLException ex) {
+            cleanup(s);
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
         }
@@ -146,8 +169,9 @@ public class SEDatabase extends Database{
 
     @Override
     public Cursor executeQuery(String sql, String[] params) throws IOException {
+        PreparedStatement s = null;
         try {
-            PreparedStatement s =  conn.prepareStatement(sql);  
+            s =  conn.prepareStatement(sql);  
 
             if(params != null){
                 for (int i = 0; i < params.length; i++) {
@@ -158,6 +182,7 @@ public class SEDatabase extends Database{
             ResultSet resultSet =  s.executeQuery();
             return new SECursor(resultSet);
         } catch (SQLException ex) {
+            cleanup(s);
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
         }
@@ -165,11 +190,13 @@ public class SEDatabase extends Database{
 
     @Override
     public Cursor executeQuery(String sql) throws IOException {
+        PreparedStatement s = null;
         try {
-            PreparedStatement s =  conn.prepareStatement(sql);              
+            s =  conn.prepareStatement(sql);              
             ResultSet resultSet =  s.executeQuery();
             return new SECursor(resultSet);
         } catch (SQLException ex) {
+            cleanup(s);
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
         }
@@ -177,6 +204,7 @@ public class SEDatabase extends Database{
 
     @Override
     public void rollbackTransaction() throws IOException {
+        System.out.println("**** Database.rollbackTransaction() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         try {
             conn.rollback();
         } catch (SQLException ex) {

@@ -23,12 +23,14 @@
 package com.codename1.impl.android;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.os.Bundle;
 import android.view.View;
 import com.codename1.impl.android.AndroidImplementation;
+import static com.codename1.impl.android.AndroidImplementation.checkForPermission;
 import com.codename1.ui.Display;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -128,15 +130,21 @@ public class AndroidNativeUtil {
      * Get the main activity
      */ 
     public static Activity getActivity(){
-        return AndroidImplementation.activity;
+        return AndroidImplementation.getActivity();
+    }
+    
+    public static Context getContext() {
+        return AndroidImplementation.getContext();
     }
     
     /**
      * Start an intent for result
      */ 
     public static void startActivityForResult(Intent intent, final IntentResultListener listener){
+        if (getActivity() == null) {
+            throw new RuntimeException("Cannot start activity for result when running in background.");
+        }
         final CodenameOneActivity act = (CodenameOneActivity) getActivity();
-        act.startActivityForResult(intent, 2000);
         act.setIntentResultListener(new IntentResultListener() {
 
             @Override
@@ -145,6 +153,7 @@ public class AndroidNativeUtil {
                 act.restoreIntentResultListener();
             }
         });
+        act.startActivityForResult(intent, 2000);
     }
     
     private static HashMap<Class, BitmapViewRenderer> viewRendererMap;
@@ -184,5 +193,18 @@ public class AndroidNativeUtil {
     
     public static interface BitmapViewRenderer {
         public Bitmap renderViewOnBitmap(View v, int w, int h);
+    }
+    
+    /**
+     * Check for a dangerous permission, if the permission is already granted return true, 
+     * otherwise ask the user for the permission.
+     * This method is blocking until a response is returned
+     * 
+     * @param permission the Permission to Ask
+     * @param description show a description to the user why this is needed
+     * @return true if granted false otherwise
+     */
+    public static boolean checkForPermission(String permission, String description){
+        return AndroidImplementation.checkForPermission(permission, description, false);
     }
 }

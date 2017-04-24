@@ -14,6 +14,7 @@
 #include "java_lang_Float.h"
 #include "java_lang_Runnable.h"
 #include "java_lang_System.h"
+#include "java_lang_ArrayIndexOutOfBoundsException.h"
 
 int currentGcMarkValue = 1;
 extern JAVA_BOOLEAN lowMemoryMode;
@@ -681,9 +682,18 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
             
             if(threadStateData->heapAllocationSize > 0) {
                 invokedGC = YES;
+                threadStateData->nativeAllocationMode = JAVA_TRUE;
                 java_lang_System_gc__(threadStateData);
+                threadStateData->nativeAllocationMode = JAVA_FALSE;
                 threadStateData->threadActive = JAVA_FALSE;
                 while(threadStateData->threadBlockedByGC || threadStateData->heapAllocationSize > 0) {
+                    if (get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
+                        // For some reason the gcThread is dead
+                        threadStateData->nativeAllocationMode = JAVA_TRUE;
+                        java_lang_System_gc__(threadStateData);
+                        threadStateData->nativeAllocationMode = JAVA_FALSE;
+                        threadStateData->threadActive = JAVA_FALSE;
+                    }
                     usleep((JAVA_INT)(1000));
                 }
                 invokedGC = NO;
@@ -1073,10 +1083,25 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
     } 
 }
 
+JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return 0;
+}
+
+JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return JAVA_FALSE;
+}
+
 void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {
     JAVA_OBJECT arrayIndexOutOfBoundsException = __NEW_java_lang_ArrayIndexOutOfBoundsException(threadStateData);
     java_lang_ArrayIndexOutOfBoundsException___INIT_____int(threadStateData, arrayIndexOutOfBoundsException, index);
     throwException(threadStateData, arrayIndexOutOfBoundsException);
+}
+
+JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_STATE, int index) {
+    throwArrayIndexOutOfBoundsException(threadStateData, index);
+    return JAVA_FALSE;
 }
 
 void** interfaceVtableGlobal = 0;

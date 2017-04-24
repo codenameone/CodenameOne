@@ -33,7 +33,7 @@ package java.lang;
  * Every string buffer has a capacity. As long as the length of the character sequence contained in the string buffer does not exceed the capacity, it is not necessary to allocate a new internal buffer array. If the internal buffer overflows, it is automatically made larger.
  * Since: JDK1.0, CLDC 1.0 See Also:ByteArrayOutputStream, String
  */
-public final class StringBuffer{
+public final class StringBuffer implements CharSequence {
     private StringBuilder internal;
     /**
      * Constructs a string buffer with no characters in it and an initial capacity of 16 characters.
@@ -354,6 +354,10 @@ public final class StringBuffer{
     public StringBuffer insert(final int offset, final CharSequence cs, final int start, final int end) {
         internal.insert(offset, cs, start, end);
         return this;
+    }
+
+    public CharSequence subSequence(int start, int end) {
+        return new StringBuffer(toString().substring(start, end));
     }
 
 

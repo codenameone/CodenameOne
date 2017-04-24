@@ -30,7 +30,9 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import com.codename1.util.Callback;
+import com.codename1.util.CallbackAdapter;
 import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
 import java.util.Hashtable;
 import java.util.ArrayList; 
 import java.util.HashMap; 
@@ -240,8 +242,10 @@ public class JavascriptContext  {
     }
     
     
-    private synchronized String exec(String js){
-        return exec(js, false);
+    private  String exec(String js){
+        synchronized (browser) {
+            return exec(js, false);
+        }
     }
     
     /**
@@ -253,17 +257,19 @@ public class JavascriptContext  {
      * @param js
      * @return The string result of executing the Javascript string.
      */
-    private synchronized String exec(String js, boolean async){
-        if ( DEBUG ){
-            Log.p("About to execute("+async+") "+js);
-            //browser.execute("console.log(execute ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE0[0])");
-        }
-        if (async) {
-            
-            browser.execute(installCode()+";("+js+")");
-            return null;
-        } else {
-            return browser.executeAndReturnString(installCode()+";("+js+")");
+    private String exec(String js, boolean async){
+        synchronized (browser) {
+            if ( DEBUG ){
+                Log.p("About to execute("+async+") "+js);
+                //browser.execute("console.log(execute ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE0[0])");
+            }
+            if (async) {
+
+                browser.execute(installCode()+";("+js+")");
+                return null;
+            } else {
+                return browser.executeAndReturnString(installCode()+";("+js+")");
+            }
         }
     }
     
@@ -340,29 +346,43 @@ public class JavascriptContext  {
      * @param javascript The javascript to be executed.
      * @return The result of the javascript expression.
      */
-    public synchronized Object get(String javascript){
-        String js2 = RETURN_VAR+"=("+javascript+")";
-        String res = exec(js2);
-        String typeQuery = "typeof("+RETURN_VAR+")";
-        String type = exec(typeQuery);
-        try {
-            if ( "string".equals(type)){
-                return res;
-            } else if ( "number".equals(type)){
-                return Double.valueOf(res);
-            } else if ( "boolean".equals(type)){
-                return "true".equals(res)?Boolean.TRUE:Boolean.FALSE;
-            } else if ( "object".equals(type) || "function".equals(type)){
-                return new JSObject(this, RETURN_VAR);
-            } else {
-                return null;
+    public Object get(String javascript){
+        synchronized(browser) {
+            
+            String returnVar = RETURN_VAR+"_"+(callId++);
+            try {
+                String js2 = returnVar+"=("+javascript+")";
+                String res = exec(js2);
+                String typeQuery = "typeof("+returnVar+")";
+                String type = browser.executeAndReturnString(typeQuery);
+                
+                try {
+                    if ( "string".equals(type)){
+                        return res;
+                    } else if ( "number".equals(type)){
+                        return Double.valueOf(res);
+                    } else if ( "boolean".equals(type)){
+                        return "true".equals(res)?Boolean.TRUE:Boolean.FALSE;
+                    } else if ( "object".equals(type) || "function".equals(type)){
+                        return new JSObject(this, returnVar);
+                    } else {
+                        return null;
+                    }
+                } catch ( Exception ex){
+
+                    Log.e(new RuntimeException("Failed to get javascript "+js2+".  The error was "+ex.getMessage()+".  The result was "+res+".  The type result was "+type));
+                    return null;
+                }
+            } finally {
+                browser.execute(returnVar+"=undefined");
             }
-        } catch ( Exception ex){
-            Log.e(new RuntimeException("Failed to get javascript "+js2+".  The error was "+ex.getMessage()+".  The result was "+res+".  The type result was "+type+"."));
-            return null;
         }
     }
     
+    /**
+     * Returns a reference to the Javascript "window" object.
+     * @return The window object.
+     */
     public JSObject getWindow() {
         if (window == null) {
             window = (JSObject)this.get("window");
@@ -370,6 +390,11 @@ public class JavascriptContext  {
         return window;
     }
     
+    /**
+     * Returns the result of the provided javascript expression asynchronously.
+     * @param javascript A javascript expression.
+     * @param callback Callback to be called with the result of the expression.
+     */
     public void getAsync(String javascript, final Callback callback) {
         final String callbackMethod = "callback$$"+callbackId;
         getWindow().set(callbackMethod, new JSFunction() {
@@ -378,12 +403,24 @@ public class JavascriptContext  {
                 callback.onSucess(args[0]);
                 getWindow().set(callbackMethod, null, true);
             }
-            
         });
         String js2 = callbackMethod+"("+javascript+")";
         exec(js2, true);
-        
-        
+    }
+    
+    /**
+     * Returns the result of the provided javascript expression asynchronously.
+     * @param javascript A javascript expression.
+     * @param callback Callback to be called with the result of the expression.
+     */
+    public void getAsync(String javascript, final SuccessCallback callback) {
+        getAsync(javascript, new CallbackAdapter() {
+
+            @Override
+            public void onSucess(Object value) {
+                callback.onSucess(value);
+            }
+        });
     }
     
     /**
@@ -444,31 +481,44 @@ public class JavascriptContext  {
      *     // Should be "New name"
      * 
      * </pre></code>
-     * @param key A javascript expression whose result is being assigned the value.
+     * @param key A Javascript expression whose result is being assigned the value.
      * @param value The object or value that is being assigned to the Javascript variable
-     * on the left.</p>
+     * on the left.
      */
-    public synchronized void set(String key, Object value){
-        String lhs = key;
-        String rhs = "undefined";
-      
-        if ( String.class.isInstance(value)){
-            String escaped = StringUtil.replaceAll((String)value, "\\", "\\\\");
-            escaped = StringUtil.replaceAll(escaped, "'", "\\'");
-            rhs = "'"+escaped+"'";
-        } else if ( value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double ){
-            rhs =value.toString();
-        } else if ( JSObject.class.isInstance(value)){
-            rhs = ((JSObject)value).toJSPointer();
-        } else if (value instanceof Boolean){
-            rhs = ((Boolean)value).booleanValue()?"true":"false";
-        } else {
-            rhs = "null";
+    public void set(String key, Object value){
+        synchronized(browser) {
+
+
+            String lhs = key;
+            String rhs = "undefined";
+            if ( String.class.isInstance(value)){
+                String escaped = StringUtil.replaceAll((String)value, "\\", "\\\\");
+                escaped = StringUtil.replaceAll(escaped, "'", "\\'");
+                rhs = "'"+escaped+"'";
+            } else if ( value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double ){
+                rhs =value.toString();
+            } else if ( JSObject.class.isInstance(value)){
+                rhs = ((JSObject)value).toJSPointer();
+            } else if (value instanceof Boolean){
+                rhs = ((Boolean)value).booleanValue()?"true":"false";
+            } else {
+                rhs = "null";
+            }
+
+            exec(lhs+"="+rhs);
         }
-        
-        exec(lhs+"="+rhs);
     }
     
+    /**
+     * Sets a Javascript value given a compatible Java object value.  This is an abstraction
+     * upon javascript to execute <code>key = value</code>.  See  {@link #set(java.lang.String, java.lang.Object) for a full description.
+     * @param key A Javascript expression whose result is being assigned the value.
+     * @param value The object or value that is being assigned to the Javascript variable
+     * on the left.
+     * @param async If true, the call is made asynchronously.
+     * @see #set(java.lang.String, java.lang.Object) 
+     * @see #setAsync(java.lang.String, java.lang.Object) 
+     */
     public void set(String key, Object value, boolean async) {
         if (async) {
             setAsync(key, value);
@@ -478,6 +528,13 @@ public class JavascriptContext  {
         }
     }
     
+    /**
+     * Sets a Javascript value given a compatible Java object value asynchronously.
+     * @param key A Javascript expression whose result is being assigned the value.
+     * @param value The object or value that is being assigned to the Javascript variable
+     * on the left.
+     * @see #set(java.lang.String, java.lang.Object) 
+     */
     public void setAsync(String key, Object value) {
         String lhs = key;
         String rhs = "undefined";
@@ -668,7 +725,7 @@ public class JavascriptContext  {
                     "url += encodeURIComponent(typeof(val))+'='+encodeURIComponent(strval);"+
                     "if (i < len-1){ url += '&';}"+
                 //"} var iframe=document.createElement('iframe');iframe.src=url;document.body.appendChild(iframe)"+
-                "} window.location.href=url;"+
+                "} if (window.cn1application && window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else {window.location.href=url}"+
                 //"} return 56;"+
                 //"console.log('About to try to load '+url); var el = document.createElement('iframe'); el.setAttribute('src', url); document.body.appendChild(el); el.parentNode.removeChild(el); console.log(el); el = null"+
             "}";
@@ -749,9 +806,40 @@ public class JavascriptContext  {
         return call(func.toJSPointer(), self, params);
     }
     
+    /**
+     * Calls a Javascript function (encapsulated in a JSObject) with a specified
+     * Javascript Object as the "this" context for the function call.
+     * @param func The Javascript function object that is being called.
+     * @param self Javascript Object that should act as "this" for the function call.
+     * @param params The parameters that should be passed to the function.  These
+     * parameters should be passed as Java objects but will be converted into their
+     * associated Javascript version.
+     * @param callback The callback to pass the return value to.
+     */
     public void callAsync(JSObject func, JSObject self, Object[] params, Callback callback) {
         callAsync(func.toJSPointer(), self, params, callback);
     }
+    
+    /**
+     * Calls a Javascript function (encapsulated in a JSObject) with a specified
+     * Javascript Object as the "this" context for the function call.
+     * @param func The Javascript function object that is being called.
+     * @param self Javascript Object that should act as "this" for the function call.
+     * @param params The parameters that should be passed to the function.  These
+     * parameters should be passed as Java objects but will be converted into their
+     * associated Javascript version.
+     * @param callback The callback to pass the return value to.
+     */
+    public void callAsync(JSObject func, JSObject self, Object[] params, final SuccessCallback callback) {
+        callAsync(func, self, params, new CallbackAdapter() {
+
+            @Override
+            public void onSucess(Object value) {
+                callback.onSucess(value);
+            }
+        });
+    }
+    
     /**
      * Calls a Javascript function with the given parameters.  This would translate
      * roughly into executing the following javascript:
@@ -774,12 +862,79 @@ public class JavascriptContext  {
         
     }
     
+    /**
+     * Calls a Javascript function with the given parameters asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     * 
+     * <code>jsFunc.call(self, param1, param1, ..., paramn)</code>
+     * 
+     * 
+     * 
+     * @param jsFunc A javascript expression that resolves to a function object that
+     * is to be called.
+     * @param self The Javascript object that is used as "this" for the method call.
+     * @param params Array of the Javascript parameters, as Java objects.  These use
+     * the same conversions as are described in the docs for set().
+     * 
+     * @param callback Callback to pass the return value converted to the corresponding Java
+     * object type.
+     */
     public void callAsync(String jsFunc, JSObject self, Object[] params, Callback callback) {
         call(jsFunc, self, params, true, callback);
     }
     
+    /**
+     * Calls a Javascript function with the given parameters asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     * 
+     * <code>jsFunc.call(self, param1, param1, ..., paramn)</code>
+     * 
+     * 
+     * 
+     * @param jsFunc A javascript expression that resolves to a function object that
+     * is to be called.
+     * @param self The Javascript object that is used as "this" for the method call.
+     * @param params Array of the Javascript parameters, as Java objects.  These use
+     * the same conversions as are described in the docs for set().
+     * 
+     * @param callback Callback to pass the return value converted to the corresponding Java
+     * object type.
+     */
+    public void callAsync(String jsFunc, JSObject self, Object[] params, final SuccessCallback callback) {
+        callAsync(jsFunc, self, params, new CallbackAdapter() {
+
+            @Override
+            public void onSucess(Object value) {
+                callback.onSucess(value);
+            }
+            
+        });
+    }
+    
+    long callId = 0;
+    
+    /**
+     * Calls a Javascript function with the given parameters, and optionally to make the call asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     * 
+     * <code>jsFunc.call(self, param1, param1, ..., paramn)</code>
+
+     * @param jsFunc A javascript expression that resolves to a function object that
+     * is to be called.
+     * @param self The Javascript object that is used as "this" for the method call.
+     * @param params Array of the Javascript parameters, as Java objects.  These use
+     * the same conversions as are described in the docs for set().
+     * @param async If true, the call will be made asynchronously.
+     * @param callback Used if {@code async} is true to pass the return value.
+     * @return Returns the return value converted to the corresponding Java
+     * object type.  This will always return null if {@code async} is {@code true}.
+     */
     public Object call(String jsFunc, JSObject self, Object[] params, boolean async, Callback callback){
-        String var = RETURN_VAR+"_call";
+        if (callId > 10000000l) {
+            callId = 0;
+        }
+        
+        String var = RETURN_VAR+"_call_"+(callId++);
         String js = var+"=("+jsFunc+").call("+self.toJSPointer();
         int len = params.length;
         for ( int i=0; i<len; i++){
@@ -811,32 +966,59 @@ public class JavascriptContext  {
         // We need to intialize the var to undefined in case the actual
         // javascript adjusts the window.location or doesn't cause a 
         // result for some reason.
-        try {
-            exec(var+"=undefined", async);
-        } catch (Exception ex){
-            Log.e(new RuntimeException("Failed to execute javascript "+var+"=undefined.  The error was "+ex.getMessage()));
-            return null;
-        }
-        try {
-            exec(js, async);
-        } catch (Exception ex){
-            Log.e(new RuntimeException("Failed to execute javascript "+js+".  The error was "+ex.getMessage()));
-            return null;
-        }
-        try {
-            if (async) {
-                getAsync(var, callback);
+        synchronized (browser){
+            
+            try {
+                exec(js, async);
+            } catch (Exception ex){
+                Log.e(new RuntimeException("Failed to execute javascript "+js+".  The error was "+ex.getMessage()));
                 return null;
-            } else {
-                return get(var);
             }
-        } catch (Exception ex){
-            Log.e(new RuntimeException("Failed to get the javascript variable "+var+".  The error was "+ex.getMessage()));
-            return null;
+            try {
+                if (async) {
+                    getAsync(var, callback);
+                    return null;
+                } else {
+                    Object out = get(var);
+                    try {
+                        exec(var+"=undefined", async);
+                    } catch (Exception ex){
+                        Log.e(new RuntimeException("Failed to execute javascript "+var+"=undefined.  The error was "+ex.getMessage()));
+                        return null;
+                    }
+                    return out;
+                }
+            } catch (Exception ex){
+                Log.e(new RuntimeException("Failed to get the javascript variable "+var+".  The error was "+ex.getMessage()));
+                return null;
+            }
         }
     }
     
-    
-    
-    
+    /**
+     * Calls a Javascript function with the given parameters, and optionally to make the call asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     * 
+     * <code>jsFunc.call(self, param1, param1, ..., paramn)</code>
+
+     * @param jsFunc A javascript expression that resolves to a function object that
+     * is to be called.
+     * @param self The Javascript object that is used as "this" for the method call.
+     * @param params Array of the Javascript parameters, as Java objects.  These use
+     * the same conversions as are described in the docs for set().
+     * @param async If true, the call will be made asynchronously.
+     * @param callback Used if {@code async} is true to pass the return value.
+     * @return Returns the return value converted to the corresponding Java
+     * object type.  This will always return null if {@code async} is {@code true}.
+     */
+    public Object call(String jsFunc, JSObject self, Object[] params, boolean async, final SuccessCallback callback){
+        return call(jsFunc, self, params, async, new CallbackAdapter() {
+
+            @Override
+            public void onSucess(Object value) {
+                callback.onSucess(value);
+            }
+            
+        });
+    }
 }

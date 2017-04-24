@@ -31,6 +31,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
+import android.util.Log;
+
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
@@ -41,7 +43,7 @@ import java.util.Vector;
  *
  * @author Chen
  */
-public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener {
+public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.OnInfoListener, AudioManager.OnAudioFocusChangeListener {
     private static final int MEDIA_INFO_BUFFERING_START = 701;
     private static final int MEDIA_INFO_BUFFERING_END = 702;
     private MediaPlayer player;
@@ -52,6 +54,7 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
     private Activity activity;
     private boolean buffering;
     private boolean disposeOnComplete = true;
+    private int tempVolume = -1;
     
     private static Vector currentPlayingAudio = new Vector();
     private static PhoneStateListener phoneStateListener;
@@ -62,6 +65,10 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         this.stream = stream;
         this.onComplete = onComplete;
         bindPlayerCleanupOnComplete();
+
+        AudioManager audioManager = (AudioManager) activity.getSystemService(Context.AUDIO_SERVICE);
+        int result = audioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN);
     }
 
     private void cleanVars() {
@@ -78,7 +85,6 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
                 }
                 stream = null;
             }
-            removeFromCurrentPlaying();
             System.gc();
         }
     }
@@ -151,7 +157,6 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         try {
             if (player != null) {
                 player.start();
-                addToCurrentPlaying();
             }
         } catch(Throwable t) {
             // some exceptions might occur here, with all the various illegal states they rarely matter
@@ -164,7 +169,6 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         try {
             if (player != null) {
                 player.pause();
-                removeFromCurrentPlaying();
             }
         } catch(Throwable t) {
             // some exceptions might occur here, with all the various illegal states they rarely matter
@@ -316,79 +320,44 @@ public class Audio implements Runnable, com.codename1.media.Media, MediaPlayer.O
         } 
         return false;
     }
-    private void addToCurrentPlaying() {
-        if (currentPlayingAudio.size() == 0) {
-            Handler mHandler = new Handler(Looper.getMainLooper());
-            mHandler.post(new Runnable() {
 
-                public void run() {
-                    try {
-                        TelephonyManager mgr = (TelephonyManager) activity.getSystemService(TELEPHONY_SERVICE);
-                        if (mgr != null) {
-                            phoneStateListener = new PhoneStateListener() {
-
-                                @Override
-                                public void onCallStateChanged(int state, String incomingNumber) {
-                                    try {
-                                        if (state == TelephonyManager.CALL_STATE_RINGING) {
-                                            //Incoming call: Pause music
-                                            for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                                Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                                if (m.isPlaying() && m.player != null) {
-                                                    m.player.pause();
-                                                }
-                                            }
-                                        } else if (state == TelephonyManager.CALL_STATE_IDLE) {
-                                            //Not in call: Play music
-                                            for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                                Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                                if (!m.isPlaying() && m.player != null) {
-                                                    m.player.start();
-                                                }
-                                            }
-                                        } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
-                                            //A call is dialing, active or on hold
-                                            for (int i = 0; i < currentPlayingAudio.size(); i++) {
-                                                Audio m = (Audio) currentPlayingAudio.elementAt(i);
-                                                if (m.isPlaying() && m.player != null) {
-                                                    m.player.pause();
-                                                }
-                                            }
-                                        }
-                                        super.onCallStateChanged(state, incomingNumber);
-
-                                    } catch (Throwable t) {
-                                        // some exceptions might occur here, with all the various illegal states they rarely matter
-                                        t.printStackTrace();
-                                    }
-                                }
-
-                            };
-                            mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
-                        }
-                    } catch (Throwable t) {
-                        t.printStackTrace();
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        switch (focusChange) {
+            case AudioManager.AUDIOFOCUS_GAIN:
+                // resume playback
+                if (!isPlaying() && player != null) {
+                    player.start();
+                    if(tempVolume > -1) {
+                        setVolume(tempVolume);
+                        tempVolume = -1;
                     }
                 }
-            });
-        }
-        currentPlayingAudio.add(this);
-    }
+                break;
 
-    private void removeFromCurrentPlaying() {
-        currentPlayingAudio.remove(this);
-        if (currentPlayingAudio.size() == 0) {
-            Handler mHandler = new Handler(Looper.getMainLooper());
-            mHandler.post(new Runnable() {
+            case AudioManager.AUDIOFOCUS_LOSS:
+                // Lost focus for an unbounded amount of time: stop playback and release media player
+                cleanup();
+                break;
 
-                public void run() {
-                    TelephonyManager mgr = (TelephonyManager) activity.getSystemService(TELEPHONY_SERVICE);
-                    if (mgr != null) {
-                        mgr.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
-                    }
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                Log.d("CN1", "AUDIOFOCUS_LOSS_TRANSIENT");
+                // Lost focus for a short time, but we have to stop
+                // playback. We don't release the media player because playback
+                // is likely to resume
+                if (isPlaying()) {
+                    pause();
                 }
-            });
+                break;
+
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                // Lost focus for a short time, but it's ok to keep playing
+                // at an attenuated level
+                if (isPlaying()) {
+                    tempVolume = getVolume();
+                    setVolume(10);
+                }
+                break;
         }
     }
-
 }

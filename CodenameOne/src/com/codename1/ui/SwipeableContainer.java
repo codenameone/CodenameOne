@@ -84,11 +84,13 @@ public class SwipeableContainer extends Container {
         bottomLeftWrapper = new Container(new BorderLayout());
         if(bottomLeft != null){
             bottomLeftWrapper.addComponent(BorderLayout.WEST, bottomLeft);
+            bottomLeftWrapper.setVisible(false);
         }
 
         bottomRightWrapper = new Container(new BorderLayout());
         if(bottomRight != null){
             bottomRightWrapper.addComponent(BorderLayout.EAST, bottomRight);
+            bottomRightWrapper.setVisible(false);
         }
 
         topWrapper = new Container(new BorderLayout());
@@ -144,6 +146,7 @@ public class SwipeableContainer extends Container {
         if(bottomRightWrapper.getComponentCount() > 0){
             bottomRightWrapper.setVisible(false);
         }
+        bottomLeftWrapper.setVisible(true);
         
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(topX, bottom.getWidth(), 300);
@@ -169,6 +172,7 @@ public class SwipeableContainer extends Container {
         if(bottomLeftWrapper.getComponentCount() > 0){
             bottomLeftWrapper.setVisible(false);
         }
+        bottomRightWrapper.setVisible(true);
         
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(-topX, bottom.getWidth(), 300);
@@ -219,11 +223,11 @@ public class SwipeableContainer extends Container {
             repaint();
             boolean finished = openCloseMotion.isFinished();
             if (finished) {
-                getComponentForm().deregisterAnimated(this);
+                //getComponentForm().deregisterAnimated(this);
                 openCloseMotion = null;
                 if(!open){
-                    bottomRightWrapper.setVisible(true);
-                    bottomLeftWrapper.setVisible(true);
+                    bottomRightWrapper.setVisible(false);
+                    bottomLeftWrapper.setVisible(false);
                     openedToLeft = false;
                     openedToRight = false;
                 }else{
@@ -309,7 +313,7 @@ public class SwipeableContainer extends Container {
             }
             final int x = evt.getX();
             final int y = evt.getY();
-            if (!topWrapper.contains(x, y)) {
+            if (!waitForRelease && !topWrapper.contains(x, y)) {
                 return;
             }
             Component bottomL;
@@ -374,9 +378,6 @@ public class SwipeableContainer extends Container {
                     break;
                 }
                 case RELEASE: {
-                    if(topWrapper.getX() != 0){
-                        evt.consume();
-                    }
                     if (waitForRelease) {
                         initialX = -1;
                         //if (!isOpen()) {

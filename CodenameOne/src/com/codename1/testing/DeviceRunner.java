@@ -23,6 +23,7 @@
 package com.codename1.testing;
 
 import com.codename1.io.Log;
+import com.codename1.ui.Display;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,6 +43,11 @@ public abstract class DeviceRunner {
     public void runTests() {
         try {
             InputStream is = getClass().getResourceAsStream("/tests.dat");
+            
+            if (is == null) {
+                is = Display.getInstance().getResourceAsStream(null, "/tests.dat");
+            }
+            
             if(is == null) {
                 Log.p("Test data not found in the file, make sure the ant task was executed in full");
                 System.exit(2);

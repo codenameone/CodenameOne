@@ -41,12 +41,21 @@ public class Throwable{
     public Throwable(){
     }
 
+    public Throwable(Throwable cause) {
+        this.cause = cause;
+        this.message = cause == null ? null : cause.toString();
+    }
+    
     /**
      * @deprecated DO NOT USE THIS METHOD, its here just to get the compiler working and isn't intended for use
      */
     public Throwable initCause(Throwable cause) {
         this.cause = cause;
         return this;
+    }
+    
+    public Throwable getCause() {
+        return cause;
     }
     
     /**
@@ -57,6 +66,12 @@ public class Throwable{
     public Throwable(java.lang.String message){
         this.message = message;
     }
+    
+    public Throwable(java.lang.String message, Throwable cause) {
+        this.message = message;
+        this.cause = cause;
+    }
+    
 
     /**
      * Returns the error message string of this Throwable object.
@@ -78,6 +93,10 @@ public class Throwable{
      */
     public void printStackTrace(){
         System.out.println(stack);
+        if (cause != null) {
+            System.out.println("Caused by ");
+            cause.printStackTrace();
+        }
     }
 
     /**

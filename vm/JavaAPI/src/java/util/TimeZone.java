@@ -68,6 +68,36 @@ public abstract class TimeZone{
     private static native int getTimezoneRawOffset(String name);
     private static native boolean isTimezoneDST(String name, long millis);
 
+    private static long getJuly1() {
+        long july1_2017 = 1498867200000l;
+        long now = System.currentTimeMillis();
+        long july1Ish = july1_2017;
+        int i=1;
+        while (july1Ish < now) {
+            july1Ish += 31536000000l;
+            if (i % 4  == 0) {
+                july1Ish += 86400000l; // add a day for leap year every 4 years
+            }
+            i++;
+        }
+        return july1Ish;
+    }
+    
+    private static long getDec30() {
+        long dec30_2016 = 1483056000000l;
+        long now = System.currentTimeMillis();
+        long dec30Ish = dec30_2016;
+        int i=1;
+        while (dec30Ish < now) {
+            dec30Ish += 31536000000l;
+            if (i % 4  == 0) {
+                dec30Ish += 86400000l; // add a day for leap year every 4 years
+            }
+            i++;
+        }
+        return dec30Ish;
+    }
+    
     /**
      * Gets the default TimeZone for this host. The source of the default TimeZone may vary with implementation.
      */
@@ -91,13 +121,15 @@ public abstract class TimeZone{
 
                 @Override
                 public boolean useDaylightTime() {
-                    return true;
+                    return isTimezoneDST(tzone, getDec30()) != isTimezoneDST(tzone, getJuly1()); // 26 weeks
                 }
             };
             defaultTimeZone.ID = tzone;
         }
         return defaultTimeZone;
     }
+    
+    
 
     int getDSTSavings() {
         return useDaylightTime() ? 3600000 : 0;
@@ -128,9 +160,44 @@ public abstract class TimeZone{
     /**
      * Gets the TimeZone for the given ID.
      */
-    public static java.util.TimeZone getTimeZone(java.lang.String ID){
-        // TODO
-        return getDefault();
+    public static java.util.TimeZone getTimeZone(final java.lang.String ID){
+        if(ID != null && ID.equalsIgnoreCase("gmt")) {
+            return GMT;
+        } else if (ID.equalsIgnoreCase(getTimezoneId())) {
+            return getDefault();
+        } else {
+            TimeZone out = new TimeZone() {
+                @Override
+                public int getOffset(int era, int year, int month, int day, int dayOfWeek, int timeOfDayMillis) {
+                    return getTimezoneOffset(ID, year, month + 1, day, timeOfDayMillis);
+                }
+
+                @Override
+                public int getRawOffset() {
+                    return getTimezoneRawOffset(ID);
+                }
+
+                boolean inDaylightTime(Date time) {
+                    return isTimezoneDST(ID, time.getTime());
+                }
+
+                @Override
+                public boolean useDaylightTime() {
+                    return isTimezoneDST(ID, getDec30()) != isTimezoneDST(ID, getJuly1()); // 26 weeks
+                }
+                
+                public boolean equals(Object tz) {
+                    return (tz instanceof TimeZone && ID.equalsIgnoreCase(((TimeZone)tz).ID));
+                }
+
+                public int hashCode() {
+                    return ID.hashCode();
+                }
+                
+            };
+            out.ID = ID;
+            return out;
+        }
     }
 
     /**

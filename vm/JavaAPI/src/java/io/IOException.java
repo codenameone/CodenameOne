@@ -42,5 +42,13 @@ public class IOException extends java.lang.Exception{
     public IOException(java.lang.String s){
          super(s);
     }
+    
+    public IOException(Throwable cause) {
+        super(cause);
+    }
+    
+    public IOException(java.lang.String s, Throwable cause) {
+        super(s, cause);
+    }
 
 }

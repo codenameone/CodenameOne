@@ -178,7 +178,7 @@ public class Dialog extends Form {
      * devices without the common softbuttons (e.g. blackberries). 
      * The default value is false
      */
-    private static boolean commandsAsButtons;
+    private static boolean commandsAsButtons = true;
 
     private boolean disposeWhenPointerOutOfBounds = false;
     private boolean pressedOutOfBounds;
@@ -219,6 +219,18 @@ public class Dialog extends Form {
         this();
         setTitle(title);
     }
+
+    /**
+     * Constructs a Dialog with a title
+     * 
+     * @param title the title of the dialog
+     * @param lm the layout for the dialog
+     */
+    public Dialog(String title, Layout lm) {
+        this(lm);
+        setTitle(title);
+    }
+    
     
     /**
      * Disabling ad padding for dialogs
@@ -227,16 +239,33 @@ public class Dialog extends Form {
     }
 
     /**
-     * Constructs a Dialog with a title
+     * Constructs a Dialog 
      * 
      */
     public Dialog() {
         this("Dialog", "DialogTitle");
     }
 
+    /**
+     * Constructs a Dialog with a layout
+     * 
+     * @param lm the layout manager
+     */
+    public Dialog(Layout lm) {
+        this("Dialog", "DialogTitle", lm);
+    }
+    
     Dialog(String dialogUIID, String dialogTitleUIID) {
         super();
+        initImpl(dialogUIID, dialogTitleUIID, null);
+    }
 
+    Dialog(String dialogUIID, String dialogTitleUIID, Layout lm) {
+        super();
+        initImpl(dialogUIID, dialogTitleUIID, lm);
+    }
+
+    private void initImpl(String dialogUIID, String dialogTitleUIID, Layout lm) {
         super.getContentPane().setUIID(dialogUIID);
         super.getTitleComponent().setText("");
         super.getTitleComponent().setVisible(false);
@@ -245,7 +274,11 @@ public class Dialog extends Form {
         lockStyleImages(getUnselectedStyle());
         titleArea.setVisible(false);
 
-        dialogContentPane = new Container();
+        if(lm != null) {
+            dialogContentPane = new Container(lm);
+        } else {
+            dialogContentPane = new Container();
+        }
         dialogContentPane.setUIID("DialogContentPane");
         dialogTitle = new Label("", dialogTitleUIID);
         super.getContentPane().setLayout(new BorderLayout());
@@ -260,9 +293,13 @@ public class Dialog extends Form {
         setSmoothScrolling(false);
         deregisterAnimated(this);
     }
-
+    
+    /**
+     * Overriden to disable the toolbar in dialogs <br>
+     * {@inheritDoc}
+     */
     @Override
-    void initGlobalToolbar() {
+    protected final void initGlobalToolbar() {
     }
 
     public Container getContentPane() {
@@ -1107,8 +1144,8 @@ public class Dialog extends Form {
                 getTitleArea().setPreferredSize(new Dimension(0,0));
                 if(getContentPane().getClientProperty("$ENLARGED_POP") == null) {
                     getContentPane().putClientProperty("$ENLARGED_POP", Boolean.TRUE);
-                    int cpPaddingTop = getContentPane().getStyle().getPadding(TOP);
-                    int titlePT = getTitleComponent().getStyle().getPadding(TOP);
+                    int cpPaddingTop = getContentPane().getStyle().getPaddingTop();
+                    int titlePT = getTitleComponent().getStyle().getPaddingTop();
                     byte[] pu = getContentPane().getStyle().getPaddingUnit();
                     if(pu == null){
                         pu = new byte[4]; 
@@ -1144,6 +1181,8 @@ public class Dialog extends Form {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);
         }
+        
+        prefWidth += getUIManager().getLookAndFeel().getVerticalScrollWidth();
         
         int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight  - title.getPreferredH();
         int availableWidth = Display.getInstance().getDisplayWidth();
@@ -1242,7 +1281,7 @@ public class Dialog extends Form {
         if(getSoftButtonCount() > 1) {
             Component menuBar = getSoftButton(0).getParent();
             Style menuStyle = menuBar.getStyle();
-            return menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
+            return menuBar.getPreferredH() + menuStyle.getVerticalMargins();
         }
         return 0;
     }
@@ -1766,7 +1805,7 @@ public class Dialog extends Form {
             if (getSoftButtonCount() > 1) {
                 Component menuBar = getSoftButton(0).getParent();
                 Style menuStyle = menuBar.getStyle();
-                menuHeight = menuBar.getPreferredH() + menuStyle.getMargin(false, TOP) + menuStyle.getMargin(false, BOTTOM);
+                menuHeight = menuBar.getPreferredH() + menuStyle.getVerticalMargins();
             }
             prefWidth = Math.min(prefWidth, w);
             h = h - menuHeight - title.getPreferredH();// - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);
@@ -1840,14 +1879,14 @@ public class Dialog extends Form {
 
                     Style s = getDialogStyle();
 
-                    s.setMargin(TOP, (int) (s.getMargin(false, TOP) * ratioH));
-                    s.setMargin(BOTTOM, (int) (s.getMargin(false, BOTTOM) * ratioH));
-                    s.setMargin(LEFT, (int) (s.getMargin(isRTL(), LEFT) * ratioW));
-                    s.setMargin(RIGHT, (int) (s.getMargin(isRTL(), RIGHT) * ratioW));
+                    s.setMargin(TOP, (int) (s.getMarginTop() * ratioH));
+                    s.setMargin(BOTTOM, (int) (s.getMarginBottom() * ratioH));
+                    s.setMargin(LEFT, (int) (s.getMarginLeft(isRTL()) * ratioW));
+                    s.setMargin(RIGHT, (int) (s.getMarginRight(isRTL()) * ratioW));
 
-                    titleStyle.setMargin(TOP, (int) (titleStyle.getMargin(false, TOP) * ratioH));
-                    titleStyle.setMargin(LEFT, (int) (titleStyle.getMargin(isRTL(), LEFT) * ratioW));
-                    titleStyle.setMargin(RIGHT, (int) (titleStyle.getMargin(isRTL(), RIGHT) * ratioW));
+                    titleStyle.setMargin(TOP, (int) (titleStyle.getMarginTop() * ratioH));
+                    titleStyle.setMargin(LEFT, (int) (titleStyle.getMarginLeft(isRTL()) * ratioW));
+                    titleStyle.setMargin(RIGHT, (int) (titleStyle.getMarginRight(isRTL()) * ratioW));
                     return;
                 }
             }

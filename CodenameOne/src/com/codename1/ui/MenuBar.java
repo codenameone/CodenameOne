@@ -445,6 +445,9 @@ public class MenuBar extends Container implements ActionListener {
      */
     public void setBackCommand(Command backCommand) {
         this.backCommand = backCommand;
+        if(parent.getToolbar() != null) {
+            return;
+        }
         if(backCommand != null && UIManager.getInstance().isThemeConstant("hideBackCommandBool", false)) {
             removeCommand(backCommand);
         }
@@ -690,7 +693,11 @@ public class MenuBar extends Container implements ActionListener {
         final Dialog d = new Dialog("Menu", "");
         d.setDisposeWhenPointerOutOfBounds(true);
         d.setMenu(true);
-
+        d.addOrientationListener(new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                d.dispose();
+            }
+        });
         d.setTransitionInAnimator(transitionIn);
         d.setTransitionOutAnimator(transitionOut);
         d.setLayout(new BorderLayout());
@@ -1471,8 +1478,7 @@ public class MenuBar extends Container implements ActionListener {
         if (pref) {
             Container dialogContentPane = menu.getDialogComponent();
             marginLeft = parent.getWidth() - (dialogContentPane.getPreferredW()
-                    + menu.getStyle().getPadding(LEFT)
-                    + menu.getStyle().getPadding(RIGHT));
+                    + menu.getStyle().getHorizontalPadding());
             marginLeft = Math.max(0, marginLeft);
             if (parent.getSoftButtonCount() > 1) {
                 height = parent.getHeight() - parent.getSoftButton(0).getParent().getPreferredH() - dialogContentPane.getPreferredH();
@@ -1536,7 +1542,7 @@ public class MenuBar extends Container implements ActionListener {
             // bidi doesn't matter since this is just a summary of width
             maxWidth = Math.max(maxWidth,
                     c.getPreferredW()
-                    + s.getMargin(false, LEFT) + s.getMargin(false, RIGHT));
+                    + s.getHorizontalMargins());
         }
         return Math.max(2, Display.getInstance().getDisplayWidth() / maxWidth);
     }

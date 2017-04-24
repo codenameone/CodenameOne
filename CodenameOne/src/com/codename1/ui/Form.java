@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
@@ -42,27 +43,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * Top level component that serves as the root for the UI, this {@link Container}
- * handles the menus and title while placing content between them. By default a 
- * forms central content (the content pane) is scrollable.
+ *<p> Top level component that serves as the root for the UI, this {@link Container}
+ * subclass works in concert with the {@link Toolbar} to create menus. By default a 
+ * forms main content area (the content pane) is scrollable on the Y axis and has a {@link com.codename1.ui.layouts.FlowLayout} as is the default.</p>
  *
- * Form contains Title bar, MenuBar and a ContentPane.
- * Calling to addComponent on the Form is delegated to the contenPane.addComponent
+ * <p>Form contains a title bar area which in newer application is replaced by the {@link Toolbar}.
+ * Calling {@link #add(com.codename1.ui.Component)} or all similar methods  on the {@code Form} 
+ * delegates to the contenPane so calling {@code form.add(cmp)} is equivalent to 
+ * {@code form.getContentPane().add(cmp)}. Normally this shouldn't matter, however in some cases such as
+ * animation we need to use the content pane directly e.g. {@code form.getContentPane().animateLayout(200)}
+ * will work whereas {@code form.animateLayout(200)} will fail. </p>
  * 
- *<pre>
- *
- *       **************************
- *       *         Title          *
- *       **************************
- *       *                        *
- *       *                        *
- *       *      ContentPane       *
- *       *                        *
- *       *                        *
- *       **************************
- *       *         MenuBar        *
- *       **************************
- *</pre> 
  * @author Chen Fishbein
  */
 public class Form extends Container {
@@ -179,8 +170,8 @@ public class Form extends Container {
         setVisible(false);
         Style formStyle = getStyle();
         Display d = Display.getInstance();
-        int w = d.getDisplayWidth() - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
-        int h = d.getDisplayHeight() - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
+        int w = d.getDisplayWidth() - (formStyle.getHorizontalMargins());
+        int h = d.getDisplayHeight() - (formStyle.getVerticalMargins());
 
         setWidth(w);
         setHeight(h);
@@ -210,7 +201,10 @@ public class Form extends Container {
         initGlobalToolbar();
     }
     
-    void initGlobalToolbar() {
+    /**
+     * Allows subclasses to disable the global toolbar for a specific form by overriding this method
+     */
+    protected void initGlobalToolbar() {
         if(Toolbar.isGlobalToolbar()) {
             setToolbar(new Toolbar());
         }
@@ -223,7 +217,13 @@ public class Form extends Container {
         return f.getInvisibleAreaUnderVKB();
     }
     
-    int getInvisibleAreaUnderVKB() {
+    /**
+     * In some virtual keyboard implementations (notably iOS) this value is used to determine the height of 
+     * the virtual keyboard
+     * 
+     * @return height in pixels of the virtual keyboard
+     */
+    public int getInvisibleAreaUnderVKB() {
         if(bottomPaddingMode) {
             return 0;
         }
@@ -275,31 +275,51 @@ public class Form extends Container {
     }
     
     /**
+     * This method returns the value of the theme constant {@code paintsTitleBarBool} and it is
+     * invoked internally in the code. You can override this method to toggle the appearance of the status
+     * bar on a per-form basis
+     * @return the value of the {@code paintsTitleBarBool} theme constant
+     */
+    protected boolean shouldPaintStatusBar() {
+        return getUIManager().isThemeConstant("paintsTitleBarBool", false);
+    }
+    
+    /**
+     * Subclasses can override this method to control the creation of the status bar component.
+     * Notice that this method will only be invoked if the paintsTitleBarBool theme constant is true
+     * which it is on iOS by default
+     * @return a Component that represents the status bar if the OS requires status bar spacing
+     */
+    protected Component createStatusBar() {
+        if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
+            Button bar = new Button();
+            bar.setShowEvenIfBlank(true);
+            bar.setUIID("StatusBar");
+            bar.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    Component c = findScrollableChild(getContentPane());
+                    if(c != null) {
+                        c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
+                    }
+                }
+            });
+            return bar;
+        } else {
+            Container bar = new Container();
+            bar.setUIID("StatusBar");
+            return bar;
+        }
+    }
+    
+    /**
      * Here so dialogs can disable this
      */
     void initTitleBarStatus() {
-        if(getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
+        if(shouldPaintStatusBar()) {
             // check if its already added:
             if(((BorderLayout)titleArea.getLayout()).getNorth() == null) {
-                if(getUIManager().isThemeConstant("statusBarScrollsUpBool", true)) {
-                    Button bar = new Button();
-                    bar.setShowEvenIfBlank(true);
-                    bar.setUIID("StatusBar");
-                    titleArea.addComponent(BorderLayout.NORTH, bar);
-                    bar.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(ActionEvent evt) {
-                            Component c = findScrollableChild(getContentPane());
-                            if(c != null) {
-                                c.scrollRectToVisible(new Rectangle(0, 0, 10, 10), c);
-                            }
-                        }
-                    });
-                } else {
-                    Container bar = new Container();
-                    bar.setUIID("StatusBar");
-                    titleArea.addComponent(BorderLayout.NORTH, bar);
-                }
+                titleArea.addComponent(BorderLayout.NORTH, createStatusBar());
             }
         }
     }
@@ -514,8 +534,8 @@ public class Form extends Container {
         int oldHeight = getHeight();        
         sizeChanged(w, h);
         Style formStyle = getStyle();
-        w = w - (formStyle.getMargin(isRTL(), Component.LEFT) + formStyle.getMargin(isRTL(), Component.RIGHT));
-        h = h - (formStyle.getMargin(false, Component.TOP) + formStyle.getMargin(false, Component.BOTTOM));
+        w = w - (formStyle.getHorizontalMargins());
+        h = h - (formStyle.getVerticalMargins());
         setSize(new Dimension(w, h));
         setShouldCalcPreferredSize(true);
         doLayout();
@@ -844,7 +864,7 @@ public class Form extends Container {
             try {
                 menuBar = (MenuBar) laf.getMenuBarClass().newInstance();
             } catch (Exception ex) {
-                ex.printStackTrace();
+                Log.e(ex);
                 menuBar = new MenuBar();
             }
             menuBar.initMenuBar(this);
@@ -859,6 +879,13 @@ public class Form extends Container {
      */
     void setDraggedComponent(Component dragged) {
         this.dragged = dragged;
+    }
+    
+    /**
+     * Gets the current dragged Component
+     */
+    Component getDraggedComponent() {
+        return dragged;
     }
 
     /**
@@ -1048,14 +1075,10 @@ public class Form extends Container {
      */ 
     private Container getLayeredPaneImpl() {
         if(layeredPane == null){
-            Container parent = new Container(new LayeredLayout());
+            Container parent = contentPane.wrapInLayeredPane();
             layeredPane = new Container(new LayeredLayout());
-            
             // adds the global layered pane
             layeredPane.add(new Container());
-            removeComponentFromForm(contentPane);
-            addComponentToForm(BorderLayout.CENTER, parent);
-            parent.addComponent(contentPane);
             parent.addComponent(layeredPane);
             revalidate();
         }
@@ -1158,6 +1181,13 @@ public class Form extends Container {
      * @return returns the form title
      */
     public String getTitle() {
+        if(toolbar != null) {
+            Component cmp = toolbar.getTitleComponent();
+            if(cmp instanceof Label) {
+                return ((Label)cmp).getText();
+            }
+            return null;
+        }
         return title.getText();
     }
 
@@ -1395,19 +1425,21 @@ public class Form extends Container {
         
         super.refreshTheme(merge);
 
-        // when  changing the theme the menu behavior might also change
-        hideMenu();
-        restoreMenu();
-        Command[] cmds = new Command[getCommandCount()];
-        for (int iter = 0; iter < cmds.length; iter++) {
-            cmds[iter] = getCommand(iter);
-        }
-        removeAllCommands();
-        for (int iter = 0; iter < cmds.length; iter++) {
-            addCommand(cmds[iter], getCommandCount());
-        }
-        if (getBackCommand() != null) {
-            setBackCommand(getBackCommand());
+        if (toolbar == null) {
+            // when  changing the theme the menu behavior might also change
+            hideMenu();
+            restoreMenu();
+            Command[] cmds = new Command[getCommandCount()];
+            for (int iter = 0; iter < cmds.length; iter++) {
+                cmds[iter] = getCommand(iter);
+            }
+            removeAllCommands();
+            for (int iter = 0; iter < cmds.length; iter++) {
+                addCommand(cmds[iter], getCommandCount());
+            }
+            if (getBackCommand() != null) {
+                setBackCommand(getBackCommand());
+            }
         }
 
         revalidate();
@@ -1982,14 +2014,14 @@ public class Form extends Container {
         //if selected style is different then unselected style there is a good 
         //chance we need to trigger a revalidate
         if (!selected.getFont().equals(unselected.getFont())
-                || selected.getPadding(false, Component.TOP) != unselected.getPadding(false, Component.TOP)
-                || selected.getPadding(false, Component.BOTTOM) != unselected.getPadding(false, Component.BOTTOM)
-                || selected.getPadding(isRTL(), Component.RIGHT) != unselected.getPadding(isRTL(), Component.RIGHT)
-                || selected.getPadding(isRTL(), Component.LEFT) != unselected.getPadding(isRTL(), Component.LEFT)
-                || selected.getMargin(false, Component.TOP) != unselected.getMargin(false, Component.TOP)
-                || selected.getMargin(false, Component.BOTTOM) != unselected.getMargin(false, Component.BOTTOM)
-                || selected.getMargin(isRTL(), Component.RIGHT) != unselected.getMargin(isRTL(), Component.RIGHT)
-                || selected.getMargin(isRTL(), Component.LEFT) != unselected.getMargin(isRTL(), Component.LEFT)) {
+                || selected.getPaddingTop() != unselected.getPaddingTop()
+                || selected.getPaddingBottom() != unselected.getPaddingBottom()
+                || selected.getPaddingRight(isRTL()) != unselected.getPaddingRight(isRTL())
+                || selected.getPaddingLeft(isRTL()) != unselected.getPaddingLeft(isRTL())
+                || selected.getMarginTop() != unselected.getMarginTop()
+                || selected.getMarginBottom() != unselected.getMarginBottom()
+                || selected.getMarginRight(isRTL()) != unselected.getMarginRight(isRTL())
+                || selected.getMarginLeft(isRTL()) != unselected.getMarginLeft(isRTL())) {
             trigger = true;
         }
         int prefW = 0;
@@ -2216,6 +2248,7 @@ public class Form extends Container {
     public void pointerPressed(int x, int y) {
         stickyDrag = null;
         dragStopFlag = false;
+        dragged = null;
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
@@ -2462,11 +2495,7 @@ public class Form extends Container {
         Container actual = getActualPane();
         Component cmp = actual.getComponentAt(x[0], y[0]);
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
-                setFocused(cmp);
-            }
             cmp.pointerHoverReleased(x, y);
-            cmp.repaint();
         }
     }
 
@@ -2481,7 +2510,6 @@ public class Form extends Container {
                 setFocused(cmp);
             }
             cmp.pointerHoverPressed(x, y);
-            cmp.repaint();
         }
     }
 
@@ -2496,13 +2524,14 @@ public class Form extends Container {
         }
 
         Container actual = getActualPane();
-        Component cmp = actual.getComponentAt(x[0], y[0]);
-        if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
-                setFocused(cmp);
+        if(actual != null) {
+            Component cmp = actual.getComponentAt(x[0], y[0]);
+            if (cmp != null) {
+                if (cmp.isFocusable() && cmp.isEnabled()) {
+                    setFocused(cmp);
+                }
+                cmp.pointerHover(x, y);
             }
-            cmp.pointerHover(x, y);
-            cmp.repaint();
         }
     }
 
@@ -2677,6 +2706,23 @@ public class Form extends Container {
     public void setScrollableX(boolean scrollableX) {
         getContentPane().setScrollableX(scrollableX);
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setScrollVisible(boolean isScrollVisible) {
+        getContentPane().setScrollVisible(isScrollVisible);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isScrollVisible() {
+        return getContentPane().isScrollVisible();
+    }
+    
 
     /**
      * {@inheritDoc}

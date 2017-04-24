@@ -151,6 +151,8 @@ class GregorianCalendar extends Calendar {
         if (!isCached
             && newTime != 0x7fffffffffffffffL
             && newTime != 0x8000000000000000L
+            && cachedFields != null // This is necessary if computeFields() is called 
+                // in the superclass constructor before cachedFields has been initialized
             && (!timeZone.useDaylightTime() || timeZone instanceof SimpleTimeZone)) {
             int cacheMillis = 0;
             

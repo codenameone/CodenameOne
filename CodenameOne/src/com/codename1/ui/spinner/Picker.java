@@ -58,7 +58,7 @@ public class Picker extends Button {
     private Object value = new Date();
     private boolean showMeridiem;
     private Object metaData;
-    private Object renderingPrototype;
+    private Object renderingPrototype = "XXXXXXXXXXXXXX";
     private SimpleDateFormat formatter;
     private int preferredPopupWidth;
     private int preferredPopupHeight;
@@ -105,7 +105,11 @@ public class Picker extends Button {
                             break;
                         case Display.PICKER_TYPE_DATE:
                             DateSpinner ds = new DateSpinner();
-                            cld.setTime((Date)value);
+                            if(value == null) {
+                                cld.setTime(new Date());
+                            } else {
+                                cld.setTime((Date)value);
+                            }
                             ds.setStartYear(1900);
                             ds.setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));
                             ds.setCurrentMonth(cld.get(Calendar.MONTH) + 1);
@@ -130,8 +134,18 @@ public class Picker extends Button {
                             }
                             ts.setCurrentMinute(minute);
                             showDialog(pickerDlg, ts);
-                            if(isShowMeridiem() && ts.isCurrentMeridiem()) {
-                                hour = ts.getCurrentHour() + 12;
+                            if(isShowMeridiem()) {
+                                int offset = 0;
+                                if(ts.getCurrentHour() == 12) {
+                                    if(!ts.isCurrentMeridiem()) {
+                                        offset = 12;
+                                    }
+                                } else {
+                                    if(ts.isCurrentMeridiem()) {
+                                        offset = 12;
+                                    }
+                                }
+                                hour = ts.getCurrentHour() + offset;
                             } else {
                                 hour = ts.getCurrentHour();
                             }
@@ -290,6 +304,30 @@ public class Picker extends Button {
     }
     
     /**
+     * Returns the index of the selected string
+     * @return the selected string offset or -1
+     */
+    public int getSelectedStringIndex() {
+        int offset = 0;
+        for(String s : (String[])metaData) {
+            if(s == value) {
+                return offset;
+            }
+            offset++;
+        }
+        return -1;
+    }
+
+    /**
+     * Returns the index of the selected string
+     * @param index sets the index of the selected string
+     */
+    public void setSelectedStringIndex(int index) {
+        value = ((String[])metaData)[index];
+        updateValue();
+    }
+
+    /**
      * Updates the display value of the picker, subclasses can override this to invoke 
      * set text with the right value
      */
@@ -323,7 +361,7 @@ public class Picker extends Button {
                     } else {
                         text = "am";
                     }
-                    setText(twoDigits(hour % 13 + 1) + ":" + twoDigits(minute) + text);
+                    setText(twoDigits(hour <= 12 ? hour : hour - 12) + ":" + twoDigits(minute) + text);
                 } else {
                     setText(twoDigits(hour) + ":" + twoDigits(minute));
                 }
@@ -430,7 +468,7 @@ public class Picker extends Button {
      * be used on devices where the popup width and height are configurable, such 
      * as the iPad or tablets.  On iPhone, the picker always spans the width of the 
      * screen along the bottom.
-     * @param width The preferred width of the popup.
+     * @param height The preferred height of the popup.
      */
     public void setPreferredPopupHeight(int height) {
         this.preferredPopupHeight = height;
@@ -457,4 +495,47 @@ public class Picker extends Button {
     public int getPreferredPopupHeight() {
         return preferredPopupHeight;
     }
+    
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"Strings"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] { String[].class };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String []"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("Strings")) {
+            return getStrings();
+        }
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("Strings")) {
+            setStrings((String[])value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
+    
 }

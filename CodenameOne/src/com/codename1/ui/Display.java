@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.codescan.CodeScanner;
 import com.codename1.contacts.Contact;
+import com.codename1.contacts.ContactsManager;
 import com.codename1.db.Database;
 import com.codename1.location.LocationManager;
 import com.codename1.messaging.Message;
@@ -57,6 +58,7 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.Timer;
 
 /**
@@ -536,12 +538,14 @@ public final class Display {
 
     private boolean multiKeyMode;
     
+    private ActionListener virtualKeyboardListener;
+    
     /**
      * Private constructor to prevent instanciation
      */
     private Display() {
     }
-
+    
     /**
      * This is the INTERNAL Display initialization method, it will be removed in future versions of the API.
      * This method must be called before any Form is shown
@@ -564,6 +568,7 @@ public final class Display {
             INSTANCE.impl.setDisplayLock(lock);
             INSTANCE.impl.initImpl(m);
             INSTANCE.codenameOneGraphics = new Graphics(INSTANCE.impl.getNativeGraphics());
+            INSTANCE.codenameOneGraphics.paintPeersBehind = INSTANCE.impl.paintNativePeersBehind();
             INSTANCE.impl.setCodenameOneGraphics(INSTANCE.codenameOneGraphics);
 
             // only enable but never disable the third softbutton
@@ -681,9 +686,10 @@ public final class Display {
     }
 
     /**
-     * Vibrates the device for the given length of time
+     * Vibrates the device for the given length of time, notice that this might ignore the time value completely 
+     * on some OS's where this level of control isn't supported e.g. iOS see: https://github.com/codenameone/CodenameOne/issues/1904
      *
-     * @param duration length of time to vibrate
+     * @param duration length of time to vibrate (might be ignored)
      */
     public void vibrate(int duration) {
         impl.vibrate(duration);
@@ -693,6 +699,7 @@ public final class Display {
      * Flash the backlight of the device for the given length of time
      *
      * @param duration length of time to flash the backlight
+     * @deprecated this refers to functionality of devices that are no longer sold, not to the devices "flash"
      */
     public void flashBacklight(int duration) {
         impl.flashBacklight(duration);
@@ -801,7 +808,7 @@ public final class Display {
                             try {
                                 nextTask.run();                                
                             } catch (Throwable e) {
-                                e.printStackTrace();
+                                Log.e(e);
                             }
                             try {
                                 Thread.sleep(10);
@@ -965,7 +972,7 @@ public final class Display {
                 processSerialCalls();
             }
         } catch(Throwable err) {
-            err.printStackTrace();
+            Log.e(err);
             if(crashReporter != null) {
                 crashReporter.exception(err);
             }
@@ -995,7 +1002,7 @@ public final class Display {
                 if(!codenameOneRunning) {
                     return;
                 }
-                err.printStackTrace();
+                Log.e(err);
                 if(crashReporter != null) {
                     CodenameOneThread.handleException(err);
                 }
@@ -1041,7 +1048,7 @@ public final class Display {
                 return;
             }
         } catch(Exception ignor) {
-            ignor.printStackTrace();
+            Log.e(ignor);
         }
         long currentTime = System.currentTimeMillis();
         
@@ -1169,13 +1176,12 @@ public final class Display {
 
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
-     * edt it will still be blocked however a separate thread would be launched
-     * to perform the duties of the EDT while it is blocked. Once blocking is finished
-     * the EDT would be restored to its original position. This is very similar to the
-     * "foxtrot" Swing toolkit and allows coding "simpler" logic that requires blocking
-     * code in the middle of event sensitive areas.
-     *
-     * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
+     * EDT it will still be blocked in a way that doesn't break event dispatch .
+     * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
+     * See <a href="https://www.codenameone.com/manual/edt.html#_invoke_and_block">
+     * this section</a> in the developer guide for further information.
+     * 
+     * @param r runnable (NOT A THREAD!) that will be invoked synchronously by this method
      * @param dropEvents indicates if the display should drop all events
      * while this runnable is running
      */
@@ -1228,11 +1234,10 @@ public final class Display {
 
     /**
      * Invokes runnable and blocks the current thread, if the current thread is the
-     * edt it will still be blocked however a separate thread would be launched
-     * to perform the duties of the EDT while it is blocked. Once blocking is finished
-     * the EDT would be restored to its original position. This is very similar to the
-     * "foxtrot" Swing toolkit and allows coding "simpler" logic that requires blocking
-     * code in the middle of event sensitive areas.
+     * EDT it will still be blocked in a way that doesn't break event dispatch .
+     * <b>Important:</b> calling this method spawns a new thread that shouldn't access the UI!<br />
+     * See <a href="https://www.codenameone.com/manual/edt.html#_invoke_and_block">
+     * this section</a> in the developer guide for further information.
      *
      * @param r runnable (NOT A THREAD!) that will be invoked synchroniously by this method
      */
@@ -1241,11 +1246,10 @@ public final class Display {
     }
 
     /**
-     * Indicates if this is a touch screen device that will return pen events,
-     * defaults to true if the device has pen events but can be overriden by
-     * the developer.
+     * The name of this method is misleading due to it's legacy. It will return true on the desktop too where
+     * the mouse sends pointer events.
      *
-     * @return true if this device supports touch events
+     * @return true if this device supports touch/pointer events
      */
     public boolean isTouchScreenDevice() {
         return touchScreen;
@@ -1425,7 +1429,7 @@ public final class Display {
                 transition.initTransition();
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            Log.e(e);
             transition.cleanup();
             animationQueue.remove(transition);
             return false;
@@ -2152,7 +2156,7 @@ public final class Display {
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged ) || (isMinimized() && !hasNoSerialCallsPending());
+                && !longPointerCharged ) || (isMinimized() && hasNoSerialCallsPending());
     }
 
 
@@ -2305,6 +2309,14 @@ public final class Display {
     }
 
     /**
+     * Checks to see if the platform supports a native image cache.
+     * @return True on platforms that support a native image cache.  Currently only Javascript.
+     */
+    boolean supportsNativeImageCache() {
+        return impl.supportsNativeImageCache();
+    }
+    
+    /**
      * Returns the game action code matching the given key combination
      *
      * @param keyCode key code received from the event
@@ -2435,7 +2447,29 @@ public final class Display {
         }
         return (VirtualKeyboardInterface)virtualKeyboards.get(selectedVirtualKeyboard);
     }
+    
+    /**
+     * Sets a listener for VirtualKeyboard hide/show events.
+     * The Listener will get an event once the keyboard is opened/closed with 
+     * a Boolean value that represents the state of the keyboard true for open 
+     * and false for closed getSource() on the ActionEvent will return the 
+     * Boolean value.
+     * 
+     * @param l the listener 
+     */
+    public void setVirtualKeyboardListener(ActionListener l){
+        virtualKeyboardListener = l;
+    }
 
+    /**
+     * Gets the VirtualKeyboardListener Objects of exists.
+     * 
+     * @return a Listener Object or null if not exists
+     */ 
+    public ActionListener getVirtualKeyboardListener() {
+        return virtualKeyboardListener;
+    }
+    
     /**
      * Returns the type of the input device one of:
      * KEYBOARD_TYPE_UNKNOWN, KEYBOARD_TYPE_NUMERIC, KEYBOARD_TYPE_QWERTY,
@@ -2466,7 +2500,7 @@ public final class Display {
     public boolean isMultiTouch() {
         return impl.isMultiTouch();
     }
-
+    
     /**
      * Indicates whether the device has a double layer screen thus allowing two
      * stages to touch events: click and hover. This is true for devices such
@@ -2733,6 +2767,8 @@ public final class Display {
      * in this class
      *
      * @return the commandBehavior
+     * @deprecated we recommend migrating to the {@link Toolbar} API. When using the toolbar the command
+     * behavior can't be manipulated
      */
     public int getCommandBehavior() {
         return impl.getCommandBehavior();
@@ -2743,6 +2779,8 @@ public final class Display {
      * in this class
      *
      * @param commandBehavior the commandBehavior to set
+     * @deprecated we recommend migrating to the {@link Toolbar} API. When using the toolbar the command
+     * behavior can't be manipulated
      */
     public void setCommandBehavior(int commandBehavior) {
         impl.setCommandBehavior(commandBehavior);
@@ -2798,11 +2836,13 @@ public final class Display {
             Container.blockOverdraw = true;
             return;
         }
+        if ("blockCopyPaste".equals(key)) {
+            impl.blockCopyPaste("true".equals(value));
+        }
         if(key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
             return;
         }
-        
         if(localProperties == null) {
             localProperties = new HashMap<String, String>();
         }
@@ -3363,6 +3403,13 @@ hi.show();}</pre></noscript>
         impl.openNativeNavigationApp(latitude, longitude);
     }
     
+    /**
+     * Opens the native navigation app with the given search location
+     * @param location the location to search for in the native navigation map
+     */ 
+    public void openNativeNavigationApp(String location) {    
+        impl.openNativeNavigationApp(location);
+    }
     
     /**
      * Gets all contacts from the address book of the device
@@ -3402,6 +3449,25 @@ hi.show();}</pre></noscript>
      */
     public boolean isGetAllContactsFast() {
         return impl.isGetAllContactsFast();
+    }
+    
+    /**
+     * Gets all of the contacts that are linked to this contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return Array of Contacts.  Should never be null, but may be a zero-sized array.
+     * @see ContactsManager#getLinkedContacts(com.codename1.contacts.Contact) 
+     */
+    //public Contact[] getLinkedContacts(Contact c) {
+    //    return impl.getLinkedContacts(c);
+    //}
+    
+    /**
+     * Gets IDs of all contacts that are linked to a given contact.  Some platforms, like iOS, allow for multiple distinct contact records to be "linked" to indicate that they refer to the same person.
+     * @param c The contact whose "linked" contacts are to be retrieved.
+     * @return IDs of linked contacts.
+     */
+    public String[] getLinkedContactIds(Contact c) {
+        return impl.getLinkedContactIds(c);
     }
     
     /**
@@ -3907,6 +3973,47 @@ hi.show();}</pre></noscript>
     public void cancelLocalNotification(String notificationId) {
         impl.cancelLocalNotification(notificationId);
     }
+    
+    /**
+     * Sets the preferred time interval between background fetches.  This is only a
+     * preferred interval and is not guaranteed.  Some platforms, like iOS, maintain sovereign 
+     * control over when and if background fetches will be allowed. This number is used
+     * only as a guideline.
+     * 
+     * <p><strong>This method must be called in order to activate background fetch.</strong>></p>
+     * <p>Note: If the platform doesn't support background fetch (i.e. {@link #isBackgroundFetchSupported() } returns {@code false},
+     * then this method does nothing.</p>
+     * @param seconds The time interval in seconds.
+     * 
+     * @see #isBackgroundFetchSupported() 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     */
+    public void setPreferredBackgroundFetchInterval(int seconds) {
+        impl.setPreferredBackgroundFetchInterval(seconds);
+    }
+    
+    /**
+     * Gets the preferred time (in seconds) between background fetches.
+     * @return The time interval in seconds.
+     * @see #isBackgroundFetchSupported() 
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see com.codename1.background.BackgroundFetch
+     */
+    public int getPreferredBackgroundFetchInterval(int seconds) {
+        return impl.getPreferredBackgroundFetchInterval();
+    }
+    
+    /**
+     * Checks to see if the current platform supports background fetch.
+     * @return True if the current platform supports background fetch.
+     * @see #setPreferredBackgroundFetchInterval(int) 
+     * @see #getPreferredBackgroundFetchInterval() 
+     * @see com.codename1.background.BackgroundFetch
+     */
+    public boolean isBackgroundFetchSupported() {
+        return impl.isBackgroundFetchSupported();
+    }
 
     /**
      * Allows detecting development mode so debugging code and special cases can be used to simplify flow
@@ -3956,5 +4063,34 @@ hi.show();}</pre></noscript>
      */
     public void refreshContacts() {
         impl.refreshContacts();
+    }
+
+    /**
+     * Returns true if this device is jailbroken or rooted, false if not or unknown. Notice that this method isn't
+     * accurate and can't detect all jailbreak/rooting cases
+     * @return true if this device is jailbroken or rooted, false if not or unknown. 
+     */
+    public boolean isJailbrokenDevice() {
+        return impl.isJailbrokenDevice();
+    }
+    
+    /**
+     * Returns the build hints for the simulator, this will only work in the debug environment and it's 
+     * designed to allow extensions/API's to verify user settings/build hints exist
+     * @return map of the build hints that isn't modified without the codename1.arg. prefix
+     */
+    public Map<String, String> getProjectBuildHints() {
+        return impl.getProjectBuildHints();
+    }
+
+    /**
+     * Sets a build hint into the settings while overwriting any previous value. This will only work in the 
+     * debug environment and it's designed to allow extensions/API's to verify user settings/build hints exist.
+     * Important: this will throw an exception outside of the simulator!
+     * @param key the build hint without the codename1.arg. prefix
+     * @param value the value for the hint
+     */
+    public void setProjectBuildHint(String key, String value) {
+        impl.setProjectBuildHint(key, value);
     }
 }

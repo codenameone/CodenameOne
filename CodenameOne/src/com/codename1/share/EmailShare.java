@@ -46,7 +46,17 @@ public class EmailShare extends ShareService {
      * Default Constructor
      */
     public EmailShare() {
-        super("Email", Resources.getSystemResource().getImage("mail.png"));
+        super("Email", null);
+    }
+    
+    @Override
+    public Image getIcon() {
+        Image i = super.getIcon();
+        if(i == null) {
+            i = Resources.getSystemResource().getImage("mail.png");
+            setIcon(i);
+        }
+        return i;
     }
 
     /**

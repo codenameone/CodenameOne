@@ -165,9 +165,9 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
 
   public void initAxesRangeForScale(int i) {
     mMinX[i] = MathHelper.NULL_VALUE;
-    mMaxX[i] = -MathHelper.NULL_VALUE;
+    mMaxX[i] = MathHelper.NULL_VALUE;
     mMinY[i] = MathHelper.NULL_VALUE;
-    mMaxY[i] = -MathHelper.NULL_VALUE;
+    mMaxY[i] = MathHelper.NULL_VALUE;
     double[] range = new double[] { mMinX[i], mMaxX[i], mMinY[i], mMaxY[i] };
     initialRange.put(i, range);
     mYTitle[i] = "";
@@ -455,7 +455,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    * @return the maxX was set or not
    */
   public boolean isMaxXSet(int scale) {
-    return mMaxX[scale] != -MathHelper.NULL_VALUE;
+    return mMaxX[scale] != MathHelper.NULL_VALUE;
   }
 
   /**
@@ -521,7 +521,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    * @return the maxY was set or not
    */
   public boolean isMaxYSet(int scale) {
-    return mMaxY[scale] != -MathHelper.NULL_VALUE;
+    return mMaxY[scale] != MathHelper.NULL_VALUE;
   }
 
   /**
@@ -942,7 +942,16 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
   }
 
   /**
-   * Returns the zoom limits.
+   * Returns the zoom limits as a 4-element array, or {@literal null} if there
+   * are no limits applied.  
+   * 
+   * <p>Array elements are:</p>
+   * <ul>
+   *   <li>{@literal 0} : Minimum distance between X-Axis min and max values.  Same as {@link #getZoomInLimitX() }</li>
+   *   <li>{@literal 1} : Maximum distance between X-Axis min and max values.</li>
+   *   <li>{@literal 2} : Minimum distance between Y-Axis min and max values.  Same as {@link #getZoomInLimitY() }</li>
+   *   <li>{@literal 3} : Maximum distance between Y-Axis min and max values.</li>
+   * </ul>
    * 
    * @return the zoom limits
    */
@@ -951,14 +960,30 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
   }
 
   /**
-   * Sets the zoom limits as an array of 4 values. Setting it to null or a
-   * different size array will disable the zooming limitation. Values:
-   * [zoomMinimumX, zoomMaximumX, zoomMinimumY, zoomMaximumY]
+   * Sets the zoom limits as an array of 4 values.
+   * 
+   * <p>Array elements are:</p>
+   * <ul>
+   *   <li>{@literal 0} : Minimum distance between X-Axis min and max values.  Same as {@link #getZoomInLimitX() }</li>
+   *   <li>{@literal 1} : Maximum distance between X-Axis min and max values.</li>
+   *   <li>{@literal 2} : Minimum distance between Y-Axis min and max values.  Same as {@link #getZoomInLimitY() }</li>
+   *   <li>{@literal 3} : Maximum distance between Y-Axis min and max values.</li>
+   * </ul>
+   * 
+   * <p>Setting this value as {@literal null} will turn off all limits so that, if zoom is enabled, users
+   * can zoom and and out as much as they like.</p>
    * 
    * @param zoomLimits the zoom limits
    */
   public void setZoomLimits(double[] zoomLimits) {
     mZoomLimits = zoomLimits;
+    if (mZoomLimits != null && mZoomLimits.length == 4) {
+        mZoomInLimitX = mZoomLimits[0];
+        mZoomInLimitY = mZoomLimits[2];
+    } else {
+        mZoomInLimitX = 0;
+        mZoomInLimitY = 0;
+    }
   }
 
   /**
@@ -1015,6 +1040,12 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
     mPointSize = size;
   }
 
+  /**
+   * Sets the axes range values.
+   * 
+   * @param range an array having the values in this order: minX, maxX, minY,
+   *          maxY   
+   */
   public void setRange(double[] range) {
     setRange(range, 0);
   }
@@ -1286,7 +1317,8 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
   }
 
   /**
-   * Returns the zoom in limit permitted in the axis X.
+   * Returns the zoom in limit permitted in the axis X.  This is interpreted as 
+   * the maximum distance between {@link #getXAxisMin() } and {@link #getXAxisMax() }.
    *
    * @return the maximum zoom in permitted in the axis X
    *
@@ -1308,10 +1340,16 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    */
   public void setZoomInLimitX(double zoomInLimitX) {
     this.mZoomInLimitX = zoomInLimitX;
+    if (mZoomLimits == null) {
+        mZoomLimits = new double[]{mZoomInLimitX, 0, 0, 0};
+    } else {
+        mZoomLimits[0] = mZoomInLimitX;
+    }
   }
 
   /**
-   * Returns the zoom in limit permitted in the axis Y.
+   * Returns the zoom in limit permitted in the axis Y.  This is interpreted as 
+   * the maximum difference between {@link #getYAxisMin() } and {@link #getYAxisMax() }.
    *
    * @return the maximum in zoom permitted in the axis Y
    *
@@ -1333,6 +1371,11 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
    */
   public void setZoomInLimitY(double zoomInLimitY) {
     this.mZoomInLimitY = zoomInLimitY;
+    if (mZoomLimits == null) {
+        mZoomLimits = new double[]{0, 0, mZoomInLimitY, 0};
+    } else {
+        mZoomLimits[2] = mZoomInLimitY;
+    }
   }
 
   public int getScalesCount() {

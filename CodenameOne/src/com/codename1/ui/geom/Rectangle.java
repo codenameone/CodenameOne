@@ -24,6 +24,7 @@
 package com.codename1.ui.geom;
 
 import com.codename1.ui.Transform;
+import java.util.ArrayList;
 
 /**
  * Represents a Rectangle position (x, y) and {@link Dimension} (width, height),
@@ -37,6 +38,47 @@ public class Rectangle implements Shape {
     private int y;
     private Dimension size;
     private GeneralPath path;
+    
+    private static final int MAX_POOL_SIZE = 20;
+    private static ArrayList<Rectangle> pool;
+    
+    /**
+     * Creates a rectangle from a Rectangle object pool.  This is handy if you 
+     * need to create a temporary Rectangle that you wish to recycle later.
+     * 
+     * <p>When you are done with this object you should return it to the pool using
+     * {@link #recycle(com.codename1.ui.geom.Rectangle) }.
+     * @param x The x coordinate of the rect.
+     * @param y The y coordinate of the rect.
+     * @param w The width of the rect.
+     * @param h The height of the rect.
+     * @return A rectangle with the given dimensions.
+     * @see #recycle(com.codename1.ui.geom.Rectangle) 
+     */
+    public static synchronized Rectangle createFromPool(int x, int y, int w, int h) {
+        if (pool == null) {
+            pool = new ArrayList<Rectangle>();
+        }
+        if (pool.isEmpty()) {
+            return new Rectangle(x, y, w, h);
+        } else {
+            Rectangle r = pool.remove(pool.size()-1);
+            r.setBounds(x, y, w, h);
+            return r;
+        }
+    }
+    
+    /**
+     * Returns the given rectangle to the object pool.
+     * @param r The rectangle to recycle.
+     * @see #createFromPool(int, int, int, int) 
+     */
+    public static synchronized void recycle(Rectangle r) {
+        if (pool.size() >= MAX_POOL_SIZE || r == null) {
+            return;
+        }
+        pool.add(r);
+    }
 
     /** 
      * Creates a new instance of Rectangle 
@@ -248,7 +290,8 @@ public class Rectangle implements Shape {
     }
 
     /**
-     * Returns a rectangle that intersects the given rectangle with this rectangle
+     * Returns a rectangle that intersects the given rectangle with this rectangle.  If they
+     * don't intersect, the resulting rectangle will have a negative width or height.
      *
      * @param rX rectangle to intersect with this rectangle
      * @param rY rectangle to intersect with this rectangle
@@ -257,6 +300,7 @@ public class Rectangle implements Shape {
      * @return the intersection
      */
     public Rectangle intersection(int rX, int rY, int rW, int rH) {
+        
         int tx1 = this.x;
         int ty1 = this.y;
         int rx1 = rX;
@@ -288,6 +332,7 @@ public class Rectangle implements Shape {
         if (ty2 < Integer.MIN_VALUE) {
             ty2 = Integer.MIN_VALUE;
         }
+        
         return new Rectangle(tx1, ty1, tx2, ty2);
     }
     
@@ -323,6 +368,8 @@ public class Rectangle implements Shape {
         if (ty2 < Integer.MIN_VALUE) {
             ty2 = Integer.MIN_VALUE;
         }
+        tx2 = Math.max(0, tx2);
+        ty2 = Math.max(0, ty2);
         output.setBounds(tx1, ty1, tx2, ty2);
     }
 

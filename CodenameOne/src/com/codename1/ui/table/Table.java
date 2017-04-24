@@ -122,9 +122,9 @@ public class Table extends Container {
      * @param model the model underlying this table
      */
     public Table(TableModel model) {
+        setUIID("Table");
         this.model = model;
         updateModel();
-        setUIID("Table");
     }
 
     /**
@@ -355,17 +355,17 @@ public class Table extends Container {
                             Component comp=t.getComponentAt(row, col);
                             if ((comp.isVisible()) &&
                                     ((drawEmptyCellsBorder) ||
-                                     ((comp.getWidth()-comp.getStyle().getPadding(false, Component.RIGHT) - comp.getStyle().getPadding(false, Component.LEFT)>0) &&
-                                      (comp.getHeight()-comp.getStyle().getPadding(false, Component.TOP) - comp.getStyle().getPadding(false, Component.BOTTOM)>0)))) {
-                                int rightMargin=comp.getStyle().getMargin(Component.RIGHT);
-                                int bottomMargin=comp.getStyle().getMargin(Component.BOTTOM);
+                                     ((comp.getWidth()-comp.getStyle().getPaddingRightNoRTL() - comp.getStyle().getPaddingLeftNoRTL()>0) &&
+                                      (comp.getHeight()-comp.getStyle().getPaddingTop() - comp.getStyle().getPaddingBottom()>0)))) {
+                                int rightMargin=comp.getStyle().getMarginRightNoRTL();
+                                int bottomMargin=comp.getStyle().getMarginBottom();
                                 if (col==0) {
                                     rightMargin*=2; // Since the first cell includes margins from both sides (left/right) so the next cell location is farther away - but we don't want to paint the border up to it
                                 }
                                 if (row==0) {
                                     bottomMargin*=2;
                                 }
-                                g.drawRect(x+comp.getStyle().getMargin(Component.LEFT), y+comp.getStyle().getMargin(Component.TOP), w-2-rightMargin, h-2-bottomMargin);
+                                g.drawRect(x+comp.getStyle().getMarginLeftNoRTL(), y+comp.getStyle().getMarginTop(), w-2-rightMargin, h-2-bottomMargin);
                             }
                         }
                     }
@@ -745,7 +745,23 @@ public class Table extends Container {
      */
     public Object getPropertyValue(String name) {
         if(name.equals("data")) {
-            return ((DefaultTableModel)model).data;
+            String[][] result = new String[((DefaultTableModel)model).data.size()][];
+            for(int iter = 0 ; iter < result.length ; iter++) {
+                Object[] o = ((DefaultTableModel)model).data.get(iter);
+                String[] arr = new String[o.length];
+                result[iter] = arr;
+                for(int ai = 0 ; ai < arr.length ; ai++) {
+                    Object current = o[ai];
+                    if(current instanceof String) {
+                        arr[ai] = (String)current;
+                    } else {
+                        if(current != null) {
+                            arr[iter] = current.toString();
+                        }
+                    }
+                }
+            }
+            return result;
         }
         if(name.equals("header")) {
             return ((DefaultTableModel)model).columnNames;
@@ -758,7 +774,7 @@ public class Table extends Container {
      */
     public String setPropertyValue(String name, Object value) {
         if(name.equals("data")) {
-            setModel(new DefaultTableModel(((DefaultTableModel)model).columnNames, (String[][])value));
+            setModel(new DefaultTableModel(((DefaultTableModel)model).columnNames, (Object[][])value));
             return null;
         }
         if(name.equals("header")) {
@@ -775,6 +791,12 @@ public class Table extends Container {
          * {@inheritDoc}
          */
         public final void dataChanged(int row, int column) {
+            if(row == Integer.MIN_VALUE) {
+                // special case... Rebuild the table
+                updateModel();
+                revalidate();
+                return;
+            }
             // prevents the table from rebuilding on every text field edit which makes the table 
             // more usable on iOS devices with the VKB/Native editing
             if(editingColumn == column && editingRow == row) {
