@@ -44,3 +44,5 @@ Ports/iOSPort/nbproject/private/private.properties
 /Ports/JavaSEWithSVGSupport/nbproject/private/
 /Ports/JavaSEWithSVGSupport/build/
 /Ports/JavaSEWithSVGSupport/dist/
+*.bak
+vm/ByteCodeTranslator/src/com/codename1/tools/translator/ByteCodeTranslator.java
