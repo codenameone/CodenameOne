@@ -1151,7 +1151,7 @@ public class Container extends Component implements Iterable<Component>{
         setShouldCalcPreferredSize(true);
         Form root = getComponentForm();
         
-        if (root != null) {
+        if (root != null && root != this) {
             root.layoutContainer();
             root.repaint();
             
