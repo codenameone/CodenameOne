@@ -498,30 +498,27 @@ public class ByteCodeTranslator {
     // process for large projects.  
     //
     private static void replaceInFile(File sourceFile, String... values) throws IOException {
-    	StringBuilder str =readFileAsStringBuilder(sourceFile);
-    	int totchanges = 0;
+        StringBuilder str = readFileAsStringBuilder(sourceFile);
+        int totchanges = 0;
     	// perform the mutations on stringbuilder, which ought to implement
-    	// these operations efficiently.
-        for(int iter = 0 ; iter < values.length ; iter += 2) 
-        {
-        	String target = values[iter];
-        	String replacement = values[iter + 1];
-           	int found = 0;
-           	int index = 0;
-           	while((index=str.indexOf(target))>=0)
-           	{	int targetSize = target.length();
-           		str.replace(index, index+targetSize,replacement);
-           		index += replacement.length()-targetSize;
-           		found++;
-           		totchanges++;
-           	}
-           	if(found==0)
-        		{throw new Error("target string "+target+" is missing"); }
+        // these operations efficiently.
+        for (int iter = 0; iter < values.length; iter += 2) {
+            String target = values[iter];
+            String replacement = values[iter + 1];
+            int found = 0;
+            int index = 0;
+            while ((index = str.indexOf(target, index)) >= 0) {
+                int targetSize = target.length();
+                str.replace(index, index + targetSize, replacement);
+                index += replacement.length() - targetSize;
+                found++;
+                totchanges++;
+            }
         }
         //
         // don't start the output file until all the processing is done
         //
-        System.out.println("Rewrite "+sourceFile+" with "+totchanges+" changes");
+        System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
         FileWriter fios = new FileWriter(sourceFile);
         fios.write(str.toString());
         fios.close();
