@@ -24,16 +24,13 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.BytecodeMethod;
-import com.codename1.tools.translator.SignatureSet;
-
 import java.util.List;
 
 /**
  *
  * @author Shai Almog
  */
-public abstract class Instruction implements SignatureSet
-{
+public abstract class Instruction {
     static boolean hasInstructions;
     private boolean optimized=false;
     private BytecodeMethod method;
@@ -80,16 +77,6 @@ public abstract class Instruction implements SignatureSet
 
     public String getMethodUsed() {
         return null;
-    }
-    // default methods for SignatureSet interface
-    public String getSignature() {	
-    	return null;
-    }
-    public String getMethodName() {
-    	return null;
-    }
-    public boolean containsSignature(SignatureSet s) {
-    	return(false);
     }
     
     /**

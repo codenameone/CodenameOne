@@ -27,7 +27,6 @@ import com.codename1.tools.translator.ByteCodeClass;
 import com.codename1.tools.translator.ByteCodeMethodArg;
 import com.codename1.tools.translator.BytecodeMethod;
 import com.codename1.tools.translator.Parser;
-import com.codename1.tools.translator.SignatureSet;
 import com.codename1.tools.translator.Util;
 import java.util.ArrayList;
 import java.util.List;
@@ -354,14 +353,9 @@ public class Invoke extends Instruction {
         }
         return stackOutputTypes;
     }
-    // for the SignatureSet interface
-	public boolean containsSignature(SignatureSet sig) {
-		return desc.equals(sig.getSignature());
-	}
-	public String getMethodName() {
-		return(name);
-	}
-	public String getSignature() { return(desc); }
+    
+    
+    
     
     
 }
