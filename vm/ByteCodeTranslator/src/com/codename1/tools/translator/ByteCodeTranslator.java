@@ -123,7 +123,27 @@ public class ByteCodeTranslator {
             }
         }
     }
-    
+    //
+    // make sure a directory is clean.  This is applied
+    // to output directories, and should normally be a no-op
+    // .. except if some accident occurred or this is a reliberate
+    // re-run of a failed build.
+    // the underlying purpose is to make repeated builds produce the same result.
+    //
+    private static void cleanDir(File dir)
+    {	//
+    	// this recursively deletes everything, so be cautious about this!
+    	// this is called only on directories we supposedly have just created.
+    	// 
+    	File [] current = dir.listFiles();
+    	if(current.length>0) { // unusual and worth a mention
+    		System.out.println("cleanup before build, removing "+current.length+" files in "+dir);
+    		for(File cf : current) 
+    			{ if(cf.isDirectory()) { cleanDir(cf); }
+    			  cf.delete(); 
+    			}
+    	}
+    }
     /**
      * @param args the command line arguments
      */
@@ -165,7 +185,7 @@ public class ByteCodeTranslator {
         }
         File dest = new File(args[2]);
         if(!dest.exists() && dest.isDirectory()) {
-            System.out.println("Source directory doesn't exist: " + dest.getAbsolutePath());
+            System.out.println("Dest directory doesn't exist: " + dest.getAbsolutePath());
             System.exit(3);
             return;
         }
@@ -174,26 +194,38 @@ public class ByteCodeTranslator {
         if(output == OutputType.OUTPUT_TYPE_IOS) {
             File root = new File(dest, "dist");
             root.mkdirs();
-            System.out.println("Root is: " + root.getAbsolutePath());
+             System.out.println("Root is: " + root.getAbsolutePath());
             File srcRoot = new File(root, appName + "-src");
             srcRoot.mkdirs();
+            cleanDir(srcRoot);
+  
             System.out.println("srcRoot is: " + srcRoot.getAbsolutePath() );
             
             File imagesXcassets = new File(srcRoot, "Images.xcassets");
             imagesXcassets.mkdirs();
+            cleanDir(imagesXcassets);
+
             File  launchImageLaunchimage = new File(imagesXcassets, "LaunchImage.launchimage");
             launchImageLaunchimage.mkdirs();
+            cleanDir(launchImageLaunchimage);
+            
             copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new FileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
 
             File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
             appIconAppiconset.mkdirs();
+            cleanDir(appIconAppiconset);
+
             copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new FileOutputStream(new File(appIconAppiconset, "Contents.json")));
             
             
             File xcproj = new File(root, appName + ".xcodeproj");
             xcproj.mkdirs();
+            cleanDir(xcproj);
+           
             File projectXCworkspace = new File(xcproj, "project.xcworkspace");
             projectXCworkspace.mkdirs();
+            cleanDir(projectXCworkspace);
+            
             /*File xcsharedData = new File(projectXCworkspace, "xcshareddata");
             xcsharedData.mkdirs();*/
             
@@ -505,13 +537,11 @@ public class ByteCodeTranslator {
         for (int iter = 0; iter < values.length; iter += 2) {
             String target = values[iter];
             String replacement = values[iter + 1];
-            int found = 0;
             int index = 0;
             while ((index = str.indexOf(target, index)) >= 0) {
                 int targetSize = target.length();
                 str.replace(index, index + targetSize, replacement);
                 index += replacement.length() - targetSize;
-                found++;
                 totchanges++;
             }
         }
@@ -523,6 +553,8 @@ public class ByteCodeTranslator {
         fios.write(str.toString());
         fios.close();
     }
+    
+
     
 
     /**
