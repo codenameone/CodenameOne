@@ -147,13 +147,15 @@ public class UiBinding {
      * @param prop the property
      */
     public static void unbind(PropertyBase prop) {
-        for(Object l : prop.getListeners()) {
-            if(l instanceof Binding) {
-                ((Binding)l).disconnect();
-                
-                // prevent a concurrent modification exception by returning and recursing
-                unbind(prop);
-                return;
+        if(prop.getListeners() != null) {
+            for(Object l : prop.getListeners()) {
+                if(l instanceof Binding) {
+                    ((Binding)l).disconnect();
+
+                    // prevent a concurrent modification exception by returning and recursing
+                    unbind(prop);
+                    return;
+                }
             }
         }
     }

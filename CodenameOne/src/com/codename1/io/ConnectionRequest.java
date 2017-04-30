@@ -623,35 +623,37 @@ public class ConnectionRequest implements IOProgressListener {
             if(httpMethod != null) {
                 impl.setHttpMethod(connection, httpMethod);
             }
-            Vector v = impl.getCookiesForURL(actualUrl);
-            if(v != null) {
-                int c = v.size();
-                if(c > 0) {
-                    StringBuilder cookieStr = new StringBuilder();
-                    Cookie first = (Cookie)v.elementAt(0);
-                    cookieSent(first);
-                    cookieStr.append(first.getName());
-                    cookieStr.append("=");
-                    cookieStr.append(first.getValue());
-                    for(int iter = 1 ; iter < c ; iter++) {
-                        Cookie current = (Cookie)v.elementAt(iter);
-                        cookieStr.append(";");
-                        cookieStr.append(current.getName());
+            if (isCookiesEnabled()) {
+                Vector v = impl.getCookiesForURL(actualUrl);
+                if(v != null) {
+                    int c = v.size();
+                    if(c > 0) {
+                        StringBuilder cookieStr = new StringBuilder();
+                        Cookie first = (Cookie)v.elementAt(0);
+                        cookieSent(first);
+                        cookieStr.append(first.getName());
                         cookieStr.append("=");
-                        cookieStr.append(current.getValue());
-                        cookieSent(current);
+                        cookieStr.append(first.getValue());
+                        for(int iter = 1 ; iter < c ; iter++) {
+                            Cookie current = (Cookie)v.elementAt(iter);
+                            cookieStr.append(";");
+                            cookieStr.append(current.getName());
+                            cookieStr.append("=");
+                            cookieStr.append(current.getValue());
+                            cookieSent(current);
+                        }
+                        impl.setHeader(connection, cookieHeader, initCookieHeader(cookieStr.toString()));
+                    } else {
+                        String s = initCookieHeader(null);
+                        if(s != null) {
+                            impl.setHeader(connection, cookieHeader, s);
+                        }
                     }
-                    impl.setHeader(connection, cookieHeader, initCookieHeader(cookieStr.toString()));
                 } else {
                     String s = initCookieHeader(null);
                     if(s != null) {
                         impl.setHeader(connection, cookieHeader, s);
                     }
-                }
-            } else {
-                String s = initCookieHeader(null);
-                if(s != null) {
-                    impl.setHeader(connection, cookieHeader, s);
                 }
             }
             if (checkSSLCertificates && canGetSSLCertificates()) {

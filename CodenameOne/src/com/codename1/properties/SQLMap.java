@@ -219,6 +219,9 @@ public class SQLMap {
                     if(gt == Date.class) {
                         return SqlType.SQL_DATE;
                     }
+                    if(gt == EncodedImage.class || gt == byte[].class) {
+                        return SqlType.SQL_BLOB;
+                    }
                     return SqlType.SQL_TEXT;
                 }
                 Object val = ((Property)p).get();

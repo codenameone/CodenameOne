@@ -313,6 +313,9 @@ public class UIManager {
     private void resetThemeProps(Hashtable installedTheme) {
         themeProps = new HashMap<String, Object>();
         wasThemeInstalled = false;
+        if(current == null) {
+            current = new DefaultLookAndFeel(this);    
+        }
         String disabledColor = Integer.toHexString(getLookAndFeel().getDisableColor());
         Integer centerAlign = new Integer(Component.CENTER);
         Integer rightAlign = new Integer(Component.RIGHT);

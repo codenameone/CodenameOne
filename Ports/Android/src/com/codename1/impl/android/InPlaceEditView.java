@@ -810,7 +810,7 @@ public class InPlaceEditView extends FrameLayout{
             }
 		}
         if (!isEditedFieldSwitch) {
-        mEditText.addTextChangedListener(mEditText.mTextWatcher);
+            mEditText.addTextChangedListener(mEditText.mTextWatcher);
         }
         mEditText.setBackgroundDrawable(null);
 
@@ -870,7 +870,7 @@ public class InPlaceEditView extends FrameLayout{
             mEditText.setHint(textArea.getHint());
         }
         if (!isEditedFieldSwitch) {
-        addView(mEditText, mEditLayoutParams);
+            addView(mEditText, mEditLayoutParams);
         }
         invalidate();
         setVisibility(VISIBLE);
@@ -1353,6 +1353,7 @@ public class InPlaceEditView extends FrameLayout{
 
         final TextArea textArea = (TextArea) component;
         final String initialText = textArea.getText();
+        textArea.putClientProperty("InPlaceEditView.initialText", initialText);
         Dimension prefSize = textArea.getPreferredSize();
 
 
@@ -1428,37 +1429,55 @@ public class InPlaceEditView extends FrameLayout{
 
                 if (impl.isAsyncEditMode()) {
                     isEditedFieldSwitch = true;
+                    final String[] out = new String[1];
+                    TextArea prevTextArea = null;
+                    if(sInstance != null && sInstance.mLastEditText != null) {
+                        prevTextArea = sInstance.mLastEditText.getTextArea();
+                    }
+
+                    if (prevTextArea != null) {
+                        final TextArea fPrevTextArea = prevTextArea;
+                        final String retVal = sInstance.mLastEditText.getText().toString();
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                Display.getInstance().onEditingComplete(fPrevTextArea, retVal);
+                            }
+                        });
+                    }
+
+
                     InPlaceEditView.setEditedTextField(textArea);
+
                     nextTextArea = null;
                 } else {
                     isEditedFieldSwitch = false;
 
-                final InPlaceEditView instance = sInstance;
-                if (instance != null && instance.mEditText != null && instance.mEditText.mTextArea == textArea) {
-                    instance.showTextEditorAgain();
-                    return;
-                }
-                if (!isClosing && sInstance != null && sInstance.mEditText != null) {
-                    isClosing = true;
+                    final InPlaceEditView instance = sInstance;
+                    if (instance != null && instance.mEditText != null && instance.mEditText.mTextArea == textArea) {
+                        instance.showTextEditorAgain();
+                        return;
+                    }
+                    if (!isClosing && sInstance != null && sInstance.mEditText != null) {
+                        isClosing = true;
 
-                    impl.getActivity().runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            instance.endEditing(REASON_UNDEFINED, true);
-                        }
-                    });
-                }
-
-                afterClose = new Runnable() {
-
-                    @Override
-                    public void run() {
-                        impl.callHideTextEditor();
-                        Display.getInstance().editString(component, textArea.getMaxSize(), inputType, textArea.getText());
+                        impl.getActivity().runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                instance.endEditing(REASON_UNDEFINED, true);
+                            }
+                        });
                     }
 
-                };
-                return;
+                    afterClose = new Runnable() {
+
+                        @Override
+                        public void run() {
+                            impl.callHideTextEditor();
+                            Display.getInstance().editString(component, textArea.getMaxSize(), inputType, textArea.getText());
+                        }
+
+                    };
+                    return;
                 }
             } else {
                 isEditedFieldSwitch = false;
@@ -1485,30 +1504,33 @@ public class InPlaceEditView extends FrameLayout{
             @Override
             public void run() {
 				if (!isEditedFieldSwitch) {
-                releaseEdit();
+                    releaseEdit();
 
-                if (sInstance == null) {
-                    sInstance = new InPlaceEditView(impl);
-                    impl.relativeLayout.addView(sInstance);
-                }
+                    if (sInstance == null) {
+                        sInstance = new InPlaceEditView(impl);
+                        impl.relativeLayout.addView(sInstance);
+                    }
 
-                // Let's try something new here
-                // We'll ALWAYS try resize edit mode (since it just works better)
-                // But we'll detect whether the field is still covered by the keyboard
-                // and switch to pan mode if necessary.
+                    // Let's try something new here
+                    // We'll ALWAYS try resize edit mode (since it just works better)
+                    // But we'll detect whether the field is still covered by the keyboard
+                    // and switch to pan mode if necessary.
 
 
+
+				}
                 if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
                     setEditMode(true);
                 }else{
                     trySetEditMode(true);
                 }
-				}
                 sInstance.startEditing(impl.getActivity(), textAreaData, initialText, inputType, isEditedFieldSwitch);
             }
         });
 
         final String[] out = new String[1];
+
+
 
 
         // In order to reuse the code the runs after edit completion, we will wrap it in a runnable
@@ -1662,10 +1684,14 @@ public class InPlaceEditView extends FrameLayout{
 
     }
 
-    private class EditView extends AutoCompleteTextView {
+    class EditView extends AutoCompleteTextView {
 
         private InPlaceEditView mInPlaceEditView;
         private TextArea mTextArea = null;
+
+        TextArea getTextArea() {
+            return mTextArea;
+        }
         private ResetableTextWatcher mTextWatcher = new ResetableTextWatcher() {
 
             private boolean started = false;
