@@ -1060,6 +1060,10 @@ JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA
 }
 
 JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadStruct) {
+    // if a thread object was created and never started, it will still become garbage
+    // and will still be finalized.  In that case, it never had resources allocated at all.
+    if(nativeThreadStruct!=0)
+    {
     struct ThreadLocalData *head = (struct ThreadLocalData *)nativeThreadStruct;
     free(head->blocks);
     free(head->threadObjectStack);
@@ -1069,6 +1073,7 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     free(head->pendingHeapAllocations);
     free(head);
     nThreadsToKill--;
+    }
 }
 
 JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
