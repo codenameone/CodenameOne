@@ -725,6 +725,7 @@ struct ThreadLocalData {
     JAVA_BOOLEAN threadActive;
     JAVA_BOOLEAN threadBlockedByGC;
     JAVA_BOOLEAN nativeAllocationMode;
+    JAVA_BOOLEAN threadRemoved;
 
     // used by the GC to traverse the objects pointed to by this thread
     struct elementStruct* threadObjectStack;
@@ -744,6 +745,7 @@ struct ThreadLocalData {
     
     char* utf8Buffer;
     int utf8BufferSize;
+    JAVA_BOOLEAN threadKilled;      // we don't expect to see this in the GC
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
