@@ -1382,6 +1382,20 @@ public class Util {
     }    
     
     /**
+     * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
+     * includes the synchronized block to further reduce code clutter
+     * @param o the object to wait on
+     */
+    public static void wait(Object o) {
+        synchronized(o) {
+            try {
+                o.wait();
+            } catch(InterruptedException e) {
+            }
+        }
+    }    
+    
+    /**
      * Returns the number object as an int
      * @param number this can be a String or any number type
      * @return an int value or an exception
