@@ -38,6 +38,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
 
+import com.codename1.tools.translator.bytecodes.LabelInstruction;
+
 /**
  *
  * @author Shai Almog
@@ -47,6 +49,11 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    public static void cleanup() {
+    	nativeSources = null;
+    	classes.clear();
+    	LabelInstruction.cleanup();
+    }
     public static void parse(File sourceFile) throws Exception {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
@@ -436,6 +443,7 @@ public class Parser extends ClassVisitor {
                 throw (RuntimeException)t;
             }
         }
+        finally { cleanup(); }
     }
     
     private static void readNativeFiles(File outputDirectory) throws IOException {
