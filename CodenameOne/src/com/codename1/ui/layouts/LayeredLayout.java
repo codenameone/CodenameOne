@@ -326,6 +326,7 @@ public class LayeredLayout extends Layout {
         tmpLaidOut.add(cmp);
         LayeredLayoutConstraint constraint = (LayeredLayoutConstraint) getComponentConstraint(cmp);
         if (constraint != null) {
+            constraint.fixDependencies(parent);
             for (LayeredLayoutConstraint.Inset inset : constraint.insets) {
                 if (inset.referenceComponent != null && inset.referenceComponent.getParent() == parent) {
                     layoutComponent(parent, inset.referenceComponent, top, left, bottom, right);
@@ -370,6 +371,7 @@ public class LayeredLayout extends Layout {
         tmpLaidOut.add(cmp);
         LayeredLayoutConstraint constraint = (LayeredLayoutConstraint) getComponentConstraint(cmp);
         if (constraint != null) {
+            constraint.fixDependencies(cmp.getParent());
             for (LayeredLayoutConstraint.Inset inset : constraint.insets) {
                 if (inset.referenceComponent != null && inset.referenceComponent.getParent() == cmp.getParent()) {
                     calcPreferredValues(inset.referenceComponent);
@@ -510,6 +512,23 @@ public class LayeredLayout extends Layout {
         
         private LayeredLayout outer() {
             return LayeredLayout.this;
+        }
+        
+        /**
+         * Recursively fixes all dependencies so that they are contained inside
+         * the provided parent.
+         * @param parent
+         * @return 
+         */
+        private LayeredLayoutConstraint fixDependencies(Container parent) {
+            for (Inset inset : insets) {
+                inset.fixDependencies(parent);
+            }
+            return this;
+        }
+        
+        public boolean hasCircularDependency(Component start) {
+            return dependsOn(start);
         }
         
         public Inset getInset(int inset) {
@@ -1159,6 +1178,53 @@ public class LayeredLayout extends Layout {
                 return null;
             }
             
+            /**
+             * Fixes dependencies in this inset recursively so that all reference
+             * components are children of the given parent container.  If a reference
+             * component is not in the parent, then it will first check to find a
+             * child of {@literal parent} with the same name as the reference component. 
+             * Failing that, it will try to find a child of {@literal parent} with the 
+             * same index. 
+             * 
+             * If an appropriate match is found, it will replace the referenceComponent
+             * with the match.
+             * 
+             * 
+             * @param parent The container in which all reference components should reside.
+             * @return Self for chaining.
+             */
+            private Inset fixDependencies(Container parent) {
+                Container refParent;
+                if (referenceComponent != null && (refParent = referenceComponent.getParent()) != parent) {
+                    // The reference component is not in this parent
+                    String name = referenceComponent.getName();
+                    boolean found = false;
+                    if (name != null && name.length() > 0) {
+                        for (Component child : parent) {
+                            if (name.equals(child.getName())) {
+                                referenceComponent = child;
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!found && refParent != null) {
+                        int index = refParent.getComponentIndex(referenceComponent);
+                        if (parent.getComponentCount() > index) {
+                            referenceComponent = parent.getComponentAt(index);
+                            found = true;
+                        }
+                    }
+                    
+                    if (found) {
+                        LayeredLayoutConstraint refCnst = getOrCreateConstraint(referenceComponent);
+                        refCnst.getInset(side).fixDependencies(parent);
+                    }
+                    
+                }
+                return this;
+            }
+            
             public Inset setValueAsString(String value) {
                 setValue(value);
                 return this;
@@ -1594,7 +1660,18 @@ public class LayeredLayout extends Layout {
                 } else {
                     // In both auto and percent cases, we'll use the existing calculated value as our base
                     float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
-                    return calculatedValue / pixelsPerDip;
+                    int calc = calculatedValue;
+                    if (referenceComponent != null) {
+                        Container parent = referenceComponent.getParent();
+                        int top = parent.getInnerY();
+                        int left = parent.getInnerX();
+                        int bottom = top + parent.getInnerHeight();
+                        int right = left + parent.getInnerWidth();
+                        
+                        calc -= calcBaseValue(top, left, bottom, right);
+                    }
+                    return calc / pixelsPerDip;
+                    
                 }
             }
             
@@ -1605,7 +1682,17 @@ public class LayeredLayout extends Layout {
                     return (int)value;
                 } else {
                     // In both auto and percent cases, we'll use the existing calculated value as our source.
-                    return calculatedValue;
+                    int calc = calculatedValue;
+                    if (referenceComponent != null) {
+                        Container parent = referenceComponent.getParent();
+                        int top = parent.getInnerY();
+                        int left = parent.getInnerX();
+                        int bottom = top + parent.getInnerHeight();
+                        int right = left + parent.getInnerWidth();
+                        
+                        calc -= calcBaseValue(top, left, bottom, right);
+                    }
+                    return calc;
                 }
             }
             
@@ -1638,19 +1725,21 @@ public class LayeredLayout extends Layout {
                     // and be done
                     referenceComponent(newRef).referencePosition(pos);
                 } else {
-                    if (newRef != referenceComponent && pos != referencePosition) {
+                    if (newRef != referenceComponent || pos != referencePosition) {
                         LayeredLayoutConstraint cpy = constraint().copy();
                         cpy.insets[side].referenceComponent(newRef).referencePosition(pos);
                         
                         Container parent = context.getParent();
-                        int top = parent.getInnerY();
-                        int left = parent.getInnerX();
-                        int bottom = top + parent.getInnerHeight();
-                        int right = left + parent.getInnerWidth();
-
+                        
+                        
+                        Style s = parent.getStyle();
+                        int top = s.getPaddingTop();
+                        int bottom = parent.getLayoutHeight() - parent.getBottomGap() - s.getPaddingBottom();
+                        int left = s.getPaddingLeft(parent.isRTL());
+                        int right = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL());
                         int newBase = cpy.insets[side].calcBaseValue(top, left, bottom, right);
                         int oldBase = calcBaseValue(top, left, bottom, right);
-
+                        
                         translatePixels(oldBase - newBase, true, context);
                         referenceComponent(newRef).referencePosition(pos);
                     }
@@ -1674,10 +1763,11 @@ public class LayeredLayout extends Layout {
              */
             public int getAbsolutePixels(Component cmp) {
                 Container parent = cmp.getParent();
-                int top = parent.getInnerY();
-                int left = parent.getInnerX();
-                int bottom = top + parent.getInnerHeight();
-                int right = left + parent.getInnerWidth();
+                Style s = parent.getStyle();
+                int top = s.getPaddingTop();
+                int bottom = parent.getLayoutHeight() - parent.getBottomGap() - s.getPaddingBottom();
+                int left = s.getPaddingLeft(parent.isRTL());
+                int right = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL());
                 int baseValue = calcBaseValue(top, left, bottom, right);
                 //Rectangle baseRect = getReferenceBox(cmp.getParent(), cmp);
                 
@@ -1739,10 +1829,11 @@ public class LayeredLayout extends Layout {
                     case UNIT_PERCENT: {
                         Container parent = cmp.getParent();
                         //Style parentStyle = parent.getStyle();
-                        int top = parent.getInnerY();
-                        int left = parent.getInnerX();
-                        int bottom = top + parent.getInnerHeight();
-                        int right = left + parent.getInnerWidth();
+                        Style s = parent.getStyle();
+                        int top = s.getPaddingTop();
+                        int bottom = parent.getLayoutHeight() - parent.getBottomGap() - s.getPaddingBottom();
+                        int left = s.getPaddingLeft(parent.isRTL());
+                        int right = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL());
                         int baseValue = calcBaseValue(top, left, bottom, right);
                         int oppositeBaseValue = getOppositeInset().calcBaseValue(top, left, bottom, right);
                         if (isVerticalInset()) {
