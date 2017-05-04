@@ -66,6 +66,8 @@ public class Form extends Container {
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
+    private boolean enableCursors;
+    
     ArrayList<Component> buttonsAwatingRelease;
     
     private AnimationManager animMananger = new AnimationManager(this);
@@ -199,6 +201,14 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+    }
+    
+    public boolean isEnableCursors() {
+        return enableCursors;
+    }
+    
+    public void setEnableCursors(boolean e) {
+        this.enableCursors = e;
     }
     
     /**
@@ -2255,6 +2265,9 @@ public class Form extends Container {
         //check if the click is relevant to the menu bar.
         if (menuBar.contains(x, y)) {
             Component cmp = menuBar.getComponentAt(x, y);
+            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                cmp = cmp.getParent();
+            }
             if (cmp != null && cmp.isEnabled()) {
                 cmp.pointerPressed(x, y);
                 tactileTouchVibe(x, y, cmp);
@@ -2264,6 +2277,9 @@ public class Form extends Container {
         Container actual = getActualPane();
         if (y >= actual.getY() && x >= actual.getX()) {
             Component cmp = actual.getComponentAt(x, y);
+            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                cmp = cmp.getParent();
+            }
             if (cmp != null) {
                 cmp.initDragAndDrop(x, y);
                 if (cmp.hasLead) {
@@ -2303,6 +2319,9 @@ public class Form extends Container {
         } else {
             if(y < actual.getY()) {
                 Component cmp = getTitleArea().getComponentAt(x, y);
+                while (cmp != null && cmp.isIgnorePointerEvents()) {
+                    cmp = cmp.getParent();
+                }
                 if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
                     cmp.pointerPressed(x, y);
                     tactileTouchVibe(x, y, cmp);
@@ -2311,6 +2330,9 @@ public class Form extends Container {
                 Component cmp = ((BorderLayout)super.getLayout()).getWest();
                 if(cmp != null) {
                     cmp = ((Container)cmp).getComponentAt(x, y);
+                    while (cmp != null && cmp.isIgnorePointerEvents()) {
+                        cmp = cmp.getParent();
+                    }
                     if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
                         if(cmp.hasLead) {
                             Container leadParent;
@@ -2405,6 +2427,9 @@ public class Form extends Container {
             Component cmp = ((BorderLayout)super.getLayout()).getWest();
             if(cmp != null) {
                 cmp = ((Container)cmp).getComponentAt(x, y);
+                while (cmp != null && cmp.isIgnorePointerEvents()) {
+                    cmp = cmp.getParent();
+                }
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
@@ -2416,6 +2441,9 @@ public class Form extends Container {
             return;
         }
         Component cmp = actual.getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
@@ -2456,6 +2484,9 @@ public class Form extends Container {
             Component cmp = ((BorderLayout)super.getLayout()).getWest();
             if(cmp != null) {
                 cmp = ((Container)cmp).getComponentAt(x[0], y[0]);
+                while (cmp != null && cmp.isIgnorePointerEvents()) {
+                    cmp = cmp.getParent();
+                }
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
@@ -2467,6 +2498,9 @@ public class Form extends Container {
             return;
         }
         Component cmp = actual.getComponentAt(x[0], y[0]);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
@@ -2494,6 +2528,9 @@ public class Form extends Container {
 
         Container actual = getActualPane();
         Component cmp = actual.getComponentAt(x[0], y[0]);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
             cmp.pointerHoverReleased(x, y);
         }
@@ -2505,6 +2542,9 @@ public class Form extends Container {
     public void pointerHoverPressed(int[] x, int[] y) {
         Container actual = getActualPane();
         Component cmp = actual.getComponentAt(x[0], y[0]);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
             if (cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
@@ -2526,6 +2566,9 @@ public class Form extends Container {
         Container actual = getActualPane();
         if(actual != null) {
             Component cmp = actual.getComponentAt(x[0], y[0]);
+            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                cmp = cmp.getParent();
+            }
             if (cmp != null) {
                 if (cmp.isFocusable() && cmp.isEnabled()) {
                     setFocused(cmp);
@@ -2623,6 +2666,9 @@ public class Form extends Container {
                 Container actual = getActualPane();
                 if (y >= actual.getY() && x >= actual.getX()) {
                     Component cmp = actual.getComponentAt(x, y);
+                    while (cmp != null && cmp.isIgnorePointerEvents()) {
+                        cmp = cmp.getParent();
+                    }
                     if (cmp != null && cmp.isEnabled()) {
                         if (cmp.hasLead) {
                             Container leadParent;
@@ -2646,6 +2692,9 @@ public class Form extends Container {
                 } else {
                     if(y < actual.getY()) {
                         Component cmp = getTitleArea().getComponentAt(x, y);
+                        while (cmp != null && cmp.isIgnorePointerEvents()) {
+                            cmp = cmp.getParent();
+                        }
                         if (cmp != null && cmp.isEnabled()) {
                             cmp.pointerReleased(x, y);
                         }
@@ -2653,6 +2702,9 @@ public class Form extends Container {
                         Component cmp = ((BorderLayout)super.getLayout()).getWest();
                         if(cmp != null) {
                             cmp = ((Container)cmp).getComponentAt(x, y);
+                            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                                cmp = cmp.getParent();
+                            }
                             if (cmp != null && cmp.isEnabled()) {                                
                                 if(cmp.hasLead) {
                                     Container leadParent;

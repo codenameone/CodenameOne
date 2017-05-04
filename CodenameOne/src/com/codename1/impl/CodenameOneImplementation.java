@@ -4338,6 +4338,10 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    public boolean isSetCursorSupported() {
+        return false;
+    }
+    
     /**
      * Returns the content length for this connection
      * 

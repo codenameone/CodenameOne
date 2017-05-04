@@ -5189,6 +5189,16 @@ public class FontImage extends Image {
         return f;
     }
 
+    @Override
+    public Image rotate90Degrees(boolean maintainOpacity) {
+        FontImage f = createFixed(text, fnt, color, width, height);
+        f.rotated = 90;
+        f.opacity = maintainOpacity ? opacity : 255;
+        return f; 
+    }
+    
+    
+
     /**
      * Converts the icon image to an encoded image if possible
      *

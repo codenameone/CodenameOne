@@ -58,6 +58,80 @@ import java.util.HashMap;
  * @author Chen Fishbein
  */
 public class Component implements Animation, StyleListener {
+    
+    /**
+     * The default cursor
+     */
+    public static final int DEFAULT_CURSOR = 0;
+
+    /**
+     * The crosshair cursor type.
+     */
+    public static final int CROSSHAIR_CURSOR = 1;
+
+    /**
+     * The text cursor type.
+     */
+    public static final int TEXT_CURSOR = 2;
+
+    /**
+     * The wait cursor type.
+     */
+    public static final int WAIT_CURSOR = 3;
+
+    /**
+     * The south-west-resize cursor type.
+     */
+    public static final int SW_RESIZE_CURSOR = 4;
+
+    /**
+     * The south-east-resize cursor type.
+     */
+    public static final int SE_RESIZE_CURSOR = 5;
+
+    /**
+     * The north-west-resize cursor type.
+     */
+    public static final int NW_RESIZE_CURSOR = 6;
+
+    /**
+     * The north-east-resize cursor type.
+     */
+    public static final int NE_RESIZE_CURSOR = 7;
+
+    /**
+     * The north-resize cursor type.
+     */
+    public static final int N_RESIZE_CURSOR = 8;
+
+    /**
+     * The south-resize cursor type.
+     */
+    public static final int S_RESIZE_CURSOR = 9;
+
+    /**
+     * The west-resize cursor type.
+     */
+    public static final int W_RESIZE_CURSOR = 10;
+
+    /**
+     * The east-resize cursor type.
+     */
+    public static final int E_RESIZE_CURSOR = 11;
+
+    /**
+     * The hand cursor type.
+     */
+    public static final int HAND_CURSOR = 12;
+
+    /**
+     * The move cursor type.
+     */
+    public static final int MOVE_CURSOR = 13;
+    
+    private int cursor;
+
+
     /**
      * Used by getDragRegionStatus to indicate no dragability
      */
@@ -208,6 +282,7 @@ public class Component implements Animation, StyleListener {
 
     private boolean hideInPortrait;
     private int scrollOpacity = 0xff;
+    private boolean ignorePointerEvents;
             
     /**
      * Indicates the decrement units for the scroll opacity
@@ -318,6 +393,14 @@ public class Component implements Animation, StyleListener {
         return dragAndDropInitialized;
     }
 
+    public void setCursor(int cursor) {
+        this.cursor = cursor;
+    }
+    
+    public int getCursor() {
+        return this.cursor;
+    }
+    
     /**
      * This is identical to invoking {@link #sameWidth} followed by {@link #sameHeight}
      * 
@@ -356,6 +439,10 @@ public class Component implements Animation, StyleListener {
                 cc.sameWidth = c;
             }
         }
+    }
+    
+    public static boolean isSetCursorSupported() {
+        return Display.getInstance().getImplementation().isSetCursorSupported();
     }
     
     /**
@@ -498,6 +585,14 @@ public class Component implements Animation, StyleListener {
     public int getX() {
         return bounds.getX();
     }
+    
+    public int getOuterX() {
+        return getX() - getStyle().getMarginLeftNoRTL();
+    }
+    
+    public int getInnerX() {
+        return getX() + getStyle().getMarginLeftNoRTL();
+    }
 
     /**
      * Returns the component y location relatively to its parent container
@@ -506,6 +601,14 @@ public class Component implements Animation, StyleListener {
      */
     public int getY() {
         return bounds.getY();
+    }
+    
+    public int getOuterY() {
+        return getY() - getStyle().getMarginTop();
+    }
+    
+    public int getInnerY() {
+        return getY() + getStyle().getPaddingTop();
     }
 
     /**
@@ -619,6 +722,14 @@ public class Component implements Animation, StyleListener {
     public int getWidth() {
         return bounds.getSize().getWidth();
     }
+    
+    public int getOuterWidth() {
+        return getWidth() + getStyle().getHorizontalMargins();
+    }
+    
+    public int getInnerWidth() {
+        return getWidth() - getStyle().getHorizontalPadding();
+    }
 
     /**
      * Returns the component height
@@ -628,6 +739,15 @@ public class Component implements Animation, StyleListener {
     public int getHeight() {
         return bounds.getSize().getHeight();
     }
+    
+    public int getOuterHeight() {
+        return getHeight() + getStyle().getVerticalMargins();
+    }
+    
+    public int getInnerHeight() {
+        return getHeight() - getStyle().getVerticalPadding();
+    }
+    
 
     /**
      * Sets the Component x location relative to the parent container, this method
@@ -870,6 +990,22 @@ public class Component implements Animation, StyleListener {
      */
     public int getPreferredH() {
         return getPreferredSize().getHeight();
+    }
+    
+    public int getOuterPreferredH() {
+        return getPreferredH() + getStyle().getVerticalMargins();
+    }
+    
+    public int getInnerPreferredH() {
+        return getPreferredH() - getStyle().getVerticalPadding();
+    }
+    
+    public int getOuterPreferredW() {
+        return getPreferredW() + getStyle().getHorizontalMargins();
+    }
+    
+    public int getInnerPreferredW() {
+        return getPreferredW() - getStyle().getHorizontalPadding();
     }
 
     /**
@@ -2338,6 +2474,20 @@ public class Component implements Animation, StyleListener {
         if(blockLead) {
             hasLead = false;
         }
+    }
+
+    /**
+     * @return the ignorePointerEvents
+     */
+    public boolean isIgnorePointerEvents() {
+        return ignorePointerEvents;
+    }
+
+    /**
+     * @param ignorePointerEvents the ignorePointerEvents to set
+     */
+    public void setIgnorePointerEvents(boolean ignorePointerEvents) {
+        this.ignorePointerEvents = ignorePointerEvents;
     }
 
     class AnimationTransitionPainter implements Painter{

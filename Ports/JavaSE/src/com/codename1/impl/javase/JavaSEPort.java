@@ -633,6 +633,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         nativeThemeRes = resFile;
     }
 
+    @Override
+    public boolean isSetCursorSupported() {
+        return true;
+    }
+
+    
+    
     public static Resources getNativeTheme() {
         return nativeThemeRes;
     }
@@ -1116,7 +1123,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
         private Cursor defaultCursor = Cursor.getDefaultCursor();
-
+        
+        private int currentCursor = 0;
         public void mouseMoved(MouseEvent e) {
             e.consume();
             if (!isEnabled()) {
@@ -1127,14 +1135,45 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     JavaSEPort.this.pointerHover(x, y);
-                }  
+                }
+                
+                
+            }
+            Form f = Display.getInstance().getCurrent();
+            if (f != null && f.isEnableCursors()) {
+                int x = scaleCoordinateX(e.getX());
+                int y = scaleCoordinateY(e.getY());
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                    Component cmp = f.getComponentAt(x, y);
+                    if (cmp != null) {
+                        int cursor = cmp.getCursor();
+                        if (cursor != currentCursor) {
+                            currentCursor = cursor;
+                            setCursor(Cursor.getPredefinedCursor(cursor));
+                        }
+                    } else {
+                        if (currentCursor != 0) {
+                            currentCursor = 0;
+                            setCursor(defaultCursor);
+                        }
+                    }
+                } else {
+                    if (currentCursor != 0) {
+                        setCursor(defaultCursor);
+                    }
+                            
+                }
+            } else {
+                if (currentCursor != 0) {
+                    setCursor(defaultCursor);
+                }
             }
             if (getSkinHotspots() != null) {
                 java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
                 if (getSkinHotspots().containsKey(p)) {
                     setCursor(handCursor);
                 } else {
-                    setCursor(defaultCursor);
+                    setCursor(currentCursor == 0 ? defaultCursor : Cursor.getPredefinedCursor(currentCursor));
                 }
             } 
         }

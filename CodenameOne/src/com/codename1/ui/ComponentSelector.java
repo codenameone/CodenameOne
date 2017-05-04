@@ -2871,6 +2871,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
     
+    
+    public ComponentSelector setIgnorePointerEvents(boolean ignore) {
+        for (Component c : this) {
+            c.setIgnorePointerEvents(ignore);
+        }
+        return this;
+    }
+    
+    public boolean isIgnorePointerEvents() {
+        for (Component c : this) {
+            return c.isIgnorePointerEvents();
+        }
+        return false;
+    }
+    
     /**
      * Wraps {@link Component#setFlatten(boolean)}
      * @param f
@@ -4682,6 +4697,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                 style.setFont(curr);
             }
                 
+        }
+        return this;
+    }
+    
+    public ComponentSelector setCursor(int cursor) {
+        for (Component c : this) {
+            c.setCursor(cursor);
         }
         return this;
     }
