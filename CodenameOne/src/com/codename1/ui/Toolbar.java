@@ -840,7 +840,9 @@ public class Toolbar extends Container {
             });
             
             sidemenuDialog = new InteractionDialog(new BorderLayout());
-            sidemenuDialog.setFormMode(true);
+            
+            // change this to true when stable
+            sidemenuDialog.setFormMode(false);
             sidemenuDialog.setUIID("Container");
             sidemenuDialog.setDialogUIID("Container");
             sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
