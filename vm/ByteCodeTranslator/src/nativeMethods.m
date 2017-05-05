@@ -1153,7 +1153,10 @@ JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
     pthread_t pt;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	// create the thread detached, as we never join.  This
+	// fixes the "error 35" problem that occurred after a 
+	// finite number of threads. [ddyer 5/2017]
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     int rc = pthread_create(&pt, &attr, threadRunner, (void *)th);
     if (rc != 0) {
         printf("ERROR creating thread. Return code: %i", rc);
