@@ -54,17 +54,34 @@ import com.codename1.ui.plaf.UIManager;
 public class InteractionDialog extends Container {
     private final Label title = new Label();
     private final Container titleArea = new Container(new BorderLayout());
-    private final Container contentPane = new Container();
+    private final Container contentPane;
     private boolean animateShow = true;
+    private boolean repositionAnimation = true;
+    
+    /**
+     * Whether the interaction dialog uses the form layered pane of the regular layered pane
+     */
+    private boolean formMode;
     
     /**
      * Default constructor with no title
      */
     public InteractionDialog() {
         super(new BorderLayout());
+        contentPane = new Container();
         init();
     }
 
+    /**
+     * Default constructor with layout
+     * @param l layout
+     */
+    public InteractionDialog(Layout l) {
+        super(new BorderLayout());
+        contentPane = new Container(l);
+        init();
+    }
+    
     /**
      * Constructor with dialog title
      * 
@@ -72,6 +89,20 @@ public class InteractionDialog extends Container {
      */
     public InteractionDialog(String title) {
         super(new BorderLayout());
+        contentPane = new Container();
+        this.title.setText(title);
+        init();
+    }
+
+    /**
+     * Constructor with dialog title
+     * 
+     * @param title the title of the dialog
+     * @param l the layout for the content pane
+     */
+    public InteractionDialog(String title, Layout l) {
+        super(new BorderLayout());
+        contentPane = new Container(l);
         this.title.setText(title);
         init();
     }
@@ -181,7 +212,12 @@ public class InteractionDialog extends Container {
     
     private Container getLayeredPane(Form f) {
         //return f.getLayeredPane();
-        Container c= (Container)f.getLayeredPane(InteractionDialog.class, false);
+        Container c;
+        if(formMode) {
+            c = (Container)f.getFormLayeredPane(InteractionDialog.class, false);
+        } else {
+            c = (Container)f.getLayeredPane(InteractionDialog.class, false);
+        }
         if (!(c.getLayout() instanceof LayeredLayout)) {
             c.setLayout(new LayeredLayout());
         }
@@ -206,12 +242,6 @@ public class InteractionDialog extends Container {
     public void show(int top, int bottom, int left, int right) {
         
         Form f = Display.getInstance().getCurrent();
-        //getLayeredPane(f).setLayout(new BorderLayout());
-        
-        //getLayeredPane(f).getAllStyles().setMargin(0,0,0,0);
-        //getLayeredPane(f).getAllStyles().setPadding(0,0,0,0);
-        //getLayeredPane(f).setX(0);
-        //getLayer
         getUnselectedStyle().setMargin(TOP, top);
         getUnselectedStyle().setMargin(BOTTOM, bottom);
         getUnselectedStyle().setMargin(LEFT, left);
@@ -225,10 +255,19 @@ public class InteractionDialog extends Container {
         if(animateShow) {
             int x = left + (f.getWidth() - right - left) / 2;
             int y = top + (f.getHeight() - bottom - top) / 2;
-            setX(x);
-            setY(y);
-            setWidth(1);
-            setHeight(1);
+            if(repositionAnimation) {
+                getParent().setX(x);
+                getParent().setY(y);
+                getParent().setWidth(1);
+                getParent().setHeight(1);
+            } else {
+                getParent().setX(getX());
+                getParent().setY(getY());
+                setX(0);
+                setY(0);
+                getParent().setWidth(getWidth());
+                getParent().setHeight(getHeight());
+            }
             getLayeredPane(f).animateLayout(400);
         } else {
             getLayeredPane(f).revalidate();
@@ -258,23 +297,58 @@ public class InteractionDialog extends Container {
     
     
     /**
-     * {@inheritDoc}
+     * Removes the interaction dialog from view
      */
     public void dispose() {
         Container p = getParent();
         if(p != null) {
-            if(animateShow) {
-                setX(getX() + getWidth() / 2);
-                setY(getY() + getHeight()/ 2);
-                setWidth(1);
-                setHeight(1);
-                p.animateUnlayoutAndWait(400, 100);
+            Form f = p.getComponentForm();
+            if(f != null) {
+                if(animateShow) {
+                    if(repositionAnimation) {
+                        setX(getX() + getWidth() / 2);
+                        setY(getY() + getHeight()/ 2);
+                        setWidth(1);
+                        setHeight(1);
+                    }
+                    p.animateUnlayoutAndWait(400, 100);
+                }
+                Container pp = getLayeredPane(f);
+                remove();
+                p.remove();
+                pp.removeAll();
+                pp.revalidate();
+            } else {
+                p.remove();
             }
-            p.removeComponent(this);
-            p.revalidate();
         }
     }
 
+    /**
+     * Removes the interaction dialog from view with an animation to the left
+     */
+    public void disposeToTheLeft() {
+        Container p = getParent();
+        if(p != null) {
+            Form f = p.getComponentForm();
+            if(f != null) {
+                setX(-getWidth());
+                if(animateShow) {
+                    p.animateUnlayoutAndWait(400, 255);
+                } else {
+                    p.revalidate();
+                }
+                Container pp = getLayeredPane(f);
+                remove();
+                p.remove();
+                pp.removeAll();
+                pp.revalidate();
+            } else {
+                remove();
+            }
+        }
+    }
+    
     /**
      * Will return true if the dialog is currently showing
      * @return true if showing
@@ -496,5 +570,37 @@ public class InteractionDialog extends Container {
      */
     public Style getDialogStyle(){
         return getContentPane().getStyle();
+    }
+
+    /**
+     * Repositions the component so the animation will "grow/shrink" when showing/disposing
+     * @return the repositionAnimation
+     */
+    public boolean isRepositionAnimation() {
+        return repositionAnimation;
+    }
+
+    /**
+     * Repositions the component so the animation will "grow/shrink" when showing/disposing
+     * @param repositionAnimation the repositionAnimation to set
+     */
+    public void setRepositionAnimation(boolean repositionAnimation) {
+        this.repositionAnimation = repositionAnimation;
+    }
+
+    /**
+     * Whether the interaction dialog uses the form layered pane of the regular layered pane
+     * @return the formMode
+     */
+    public boolean isFormMode() {
+        return formMode;
+    }
+
+    /**
+     * Whether the interaction dialog uses the form layered pane of the regular layered pane
+     * @param formMode the formMode to set
+     */
+    public void setFormMode(boolean formMode) {
+        this.formMode = formMode;
     }
 }
