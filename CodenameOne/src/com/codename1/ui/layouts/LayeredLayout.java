@@ -145,7 +145,7 @@ public class LayeredLayout extends Layout {
     
     @Override
     public void removeLayoutComponent(Component comp) {
-        uninstallConstraint(comp);
+        //uninstallConstraint(comp);
     }
     
     private void uninstallConstraint(Component cmp) {
@@ -1337,6 +1337,7 @@ public class LayeredLayout extends Layout {
 
             int preferredValue;
             int calculatedValue;
+            int calculatedBaseValue;
 
             /**
              * Calculate the preferred value of this inset.
@@ -1441,7 +1442,7 @@ public class LayeredLayout extends Layout {
                                 baseValue = (right - getOuterWidth(referenceComponent) - getOuterX(referenceComponent)) + (int)(getOuterWidth(referenceComponent)* referencePosition);
                                 break;
                         }
-                    
+                    calculatedBaseValue = baseValue;
                     return baseValue;
                 }
                         
@@ -1463,6 +1464,7 @@ public class LayeredLayout extends Layout {
                             throw new RuntimeException("Illegal side for inset: " + side);
                     }
                 }
+                calculatedBaseValue = baseValue;
                 return baseValue;
             }
             
@@ -1487,12 +1489,10 @@ public class LayeredLayout extends Layout {
              * @return The actual value of this inset.
              */
             private int calculate(Component cmp, int top, int left, int bottom, int right) {
-                
                 int w = right - left;
                 int h = bottom - top;
-                //System.out.println("w="+w+", h="+h);
                 int baseValue = calcBaseValue(top, left, bottom ,right);
-                //System.out.println("Base value is "+baseValue);
+                
                 switch (unit) {
                     case UNIT_PIXELS:
                         calculatedValue = baseValue + (int) value;
@@ -1513,9 +1513,8 @@ public class LayeredLayout extends Layout {
                     }
                     case UNIT_AUTO: {
                         Inset oppositeInset = getOppositeInset();
-                        
                         int oppositeBaseValue = oppositeInset.calcBaseValue(top, left, bottom, right);
-                        //ntln("Opposite base value is "+oppositeBaseValue);
+                        
                         if (oppositeInset.unit == UNIT_AUTO) {
                             if (isVerticalInset()) {
                                 calculatedValue = baseValue + (h - oppositeBaseValue - baseValue - getOuterPreferredH(cmp))/2;
@@ -1529,52 +1528,26 @@ public class LayeredLayout extends Layout {
                             } else {
                                 calculatedValue = w - oppositeInset.calculate(cmp, top, left, bottom, right) - getOuterPreferredW(cmp);
                             }
-                            /*
-                            switch (side) {
-                                case Component.TOP:
-                                    calculatedValue -= cmp.getStyle().getMarginBottom();
-                                    break;
-                                case Component.BOTTOM:
-                                    calculatedValue -= cmp.getStyle().getMarginTop();
-                                    break;
-                                case Component.LEFT:
-                                    calculatedValue -= cmp.getStyle().getMarginRightNoRTL();
-                                    break;
-                                case Component.RIGHT:
-                                    calculatedValue -= cmp.getStyle().getMarginLeftNoRTL();
-                                    break;
-                                           
-                            }
-                                    */
                         }
                         break;
                     }
                     default:
                         throw new RuntimeException("Invalid unit " + unit);
                 }
-                //System.out.println("Calculated value for side "+side+"="+calculatedValue);
-                /*
-                switch (side) {
-                    case Component.TOP:
-                        calculatedValue -= cmp.getStyle().getMarginTop();
-                        break;
-                    case Component.BOTTOM:
-                        calculatedValue -= cmp.getStyle().getMarginBottom();
-                        break;
-                    case Component.LEFT:
-                        calculatedValue -= cmp.getStyle().getMarginLeftNoRTL();
-                        break;
-                    case Component.RIGHT:
-                        calculatedValue -= cmp.getStyle().getMarginRightNoRTL();
-                }
-                        */
+
                 return calculatedValue;
             }
 
-            private void getDependencies(Set<Component> deps) {
+            public Set<Component> getDependencies(Set<Component> deps) {
                 if (referenceComponent != null) {
                     deps.add(referenceComponent);
+                    getOrCreateConstraint(referenceComponent).getDependencies(deps);
                 }
+                return deps;
+            }
+            
+            public Set<Component> getDependencies() {
+                return getDependencies(new HashSet<Component>());
             }
 
             private Inset getOppositeInset() {
@@ -1617,7 +1590,9 @@ public class LayeredLayout extends Layout {
             }
             
             public Inset copyTo(Inset dest) {
+                
                 dest.calculatedValue = calculatedValue;
+                dest.calculatedBaseValue = calculatedBaseValue;
                 dest.preferredValue = preferredValue;
                 
                 dest.value = value;
@@ -1661,16 +1636,13 @@ public class LayeredLayout extends Layout {
                     // In both auto and percent cases, we'll use the existing calculated value as our base
                     float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
                     int calc = calculatedValue;
+                    System.out.println("Calculated value of side "+side+" = "+calc);
                     if (referenceComponent != null) {
-                        Container parent = referenceComponent.getParent();
-                        int top = parent.getInnerY();
-                        int left = parent.getInnerX();
-                        int bottom = top + parent.getInnerHeight();
-                        int right = left + parent.getInnerWidth();
-                        
-                        calc -= calcBaseValue(top, left, bottom, right);
+                        calc -= calculatedBaseValue;
                     }
-                    return calc / pixelsPerDip;
+                    float out = calc / pixelsPerDip;
+                    System.out.println("calc="+out+"mm");
+                    return out;
                     
                 }
             }
@@ -1684,13 +1656,8 @@ public class LayeredLayout extends Layout {
                     // In both auto and percent cases, we'll use the existing calculated value as our source.
                     int calc = calculatedValue;
                     if (referenceComponent != null) {
-                        Container parent = referenceComponent.getParent();
-                        int top = parent.getInnerY();
-                        int left = parent.getInnerX();
-                        int bottom = top + parent.getInnerHeight();
-                        int right = left + parent.getInnerWidth();
                         
-                        calc -= calcBaseValue(top, left, bottom, right);
+                        calc -= calculatedBaseValue;
                     }
                     return calc;
                 }
@@ -1834,8 +1801,8 @@ public class LayeredLayout extends Layout {
                         int bottom = parent.getLayoutHeight() - parent.getBottomGap() - s.getPaddingBottom();
                         int left = s.getPaddingLeft(parent.isRTL());
                         int right = parent.getLayoutWidth() - parent.getSideGap() - s.getPaddingRight(parent.isRTL());
-                        int baseValue = calcBaseValue(top, left, bottom, right);
-                        int oppositeBaseValue = getOppositeInset().calcBaseValue(top, left, bottom, right);
+                        int baseValue = calculatedBaseValue;
+                        int oppositeBaseValue = getOppositeInset().calculatedBaseValue;
                         if (isVerticalInset()) {
                             float relH = bottom - top - baseValue - oppositeBaseValue;
                             if (Math.abs(relH) < 1f) {
@@ -1843,6 +1810,7 @@ public class LayeredLayout extends Layout {
                             }
                             float percentDelta = delta / relH * 100f;
                             value += percentDelta;
+                            
                         } else {
                             float relH = right - left - baseValue - oppositeBaseValue;
                             //System.out.println("relH="+relH+" delta="+delta);
@@ -1862,15 +1830,16 @@ public class LayeredLayout extends Layout {
                         // by making it fixed
                         unit = preferMM ? UNIT_DIPS : UNIT_PIXELS;
                         if (unit == UNIT_PIXELS) {
-                            value = calculatedValue + delta;
+                            value = calculatedValue + delta - calculatedBaseValue;
                         } else {
                             float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
-                            value = (calculatedValue + delta) / pixelsPerDip;
+                            value = (calculatedValue + delta - calculatedBaseValue) / pixelsPerDip;
                         }
                         break;
                     }
                         
                 }
+                calculatedValue += delta;
                 return this;
             }
             
