@@ -232,9 +232,6 @@ public abstract class CodenameOneImplementation {
      * Some implementations might need to perform initializations of the EDT thread
      */
     public void initEDT() {
-        if(Preferences.get("PollingPush", false) && callback != null) {
-            registerPollingFallback();
-        }
     }
 
     /**
