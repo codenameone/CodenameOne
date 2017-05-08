@@ -177,7 +177,7 @@ public class SplitPane extends Container {
         
         if (px < 0) {
             // Make sure that the divider is fully visible
-            getDividerInset().translatePixels(px, true, divider);
+            getDividerInset().translatePixels(px, true, divider.getParent());
             isExpanded = true;
             isCollapsed = false;
 
@@ -489,9 +489,9 @@ public class SplitPane extends Container {
             LayeredLayout ll = (LayeredLayout)SplitPane.this.getLayout();
             LayeredLayoutConstraint cnst = pressedConstraint.copy();
             if (orientation == HORIZONTAL_SPLIT) {
-                cnst.left().translatePixels(draggedX - pressedX, false, this);
+                cnst.left().translatePixels(draggedX - pressedX, false, getParent());
             } else {
-                cnst.top().translatePixels(draggedY - pressedY, false, this);
+                cnst.top().translatePixels(draggedY - pressedY, false, getParent());
             }
             cnst.copyTo(ll.getOrCreateConstraint(this));
             cnst.copyTo(preferredInset);

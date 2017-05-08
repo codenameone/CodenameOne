@@ -587,7 +587,7 @@ public class LayeredLayout extends Layout {
             return getReferenceBox(parent, cmp, new Rectangle());
         }
         
-        public LayeredLayoutConstraint translatePixels(int x, int y, boolean preferMM, Component cmp) {
+        public LayeredLayoutConstraint translatePixels(int x, int y, boolean preferMM, Container parent) {
             if (y != 0) {
                 if (top().isFlexible() && bottom().isFlexible()) {
                     // Both top and bottom are flexible... we need to make one of these 
@@ -595,16 +595,16 @@ public class LayeredLayout extends Layout {
                     if (y > 0) {
                         // we're moving it to toward the bottom, so we'll choose the bottom 
                         // as an anchor point.
-                        bottom().translatePixels(-y, preferMM, cmp);
+                        bottom().translatePixels(-y, preferMM, parent);
                     } else {
-                        top().translatePixels(y, preferMM, cmp);
+                        top().translatePixels(y, preferMM, parent);
                     }
                 } else {
                     if (top().isFixed()) {
-                        top().translatePixels(y, preferMM, cmp);
+                        top().translatePixels(y, preferMM, parent);
                     }
                     if (bottom().isFixed()) {
-                        bottom().translatePixels(-y, preferMM, cmp);
+                        bottom().translatePixels(-y, preferMM, parent);
                     }
                 }
             }
@@ -615,23 +615,23 @@ public class LayeredLayout extends Layout {
                     if (x > 0) {
                         // we're moving it to toward the bottom, so we'll choose the bottom 
                         // as an anchor point.
-                        right().translatePixels(-x, preferMM, cmp);
+                        right().translatePixels(-x, preferMM, parent);
                     } else {
-                        left().translatePixels(x, preferMM, cmp);
+                        left().translatePixels(x, preferMM, parent);
                     }
                 } else {
                     if (left().isFixed()) {
-                        left().translatePixels(x, preferMM, cmp);
+                        left().translatePixels(x, preferMM, parent);
                     }
                     if (right().isFixed()) {
-                        right().translatePixels(-x, preferMM, cmp);
+                        right().translatePixels(-x, preferMM, parent);
                     }
                 }
             }
             return this;
         }
         
-        public LayeredLayoutConstraint translateMM(float x, float y, boolean preferMM, Component cmp) {
+        public LayeredLayoutConstraint translateMM(float x, float y, boolean preferMM, Container parent) {
             if (y != 0) {
                 if (top().isFlexible() && bottom().isFlexible()) {
                     // Both top and bottom are flexible... we need to make one of these 
@@ -639,16 +639,16 @@ public class LayeredLayout extends Layout {
                     if (y > 0) {
                         // we're moving it to toward the bottom, so we'll choose the bottom 
                         // as an anchor point.
-                        bottom().translateMM(-y, preferMM, cmp);
+                        bottom().translateMM(-y, preferMM, parent);
                     } else {
-                        top().translateMM(y, preferMM, cmp);
+                        top().translateMM(y, preferMM, parent);
                     }
                 } else {
                     if (top().isFixed()) {
-                        top().translateMM(y, preferMM, cmp);
+                        top().translateMM(y, preferMM, parent);
                     }
                     if (bottom().isFixed()) {
-                        bottom().translateMM(-y, preferMM, cmp);
+                        bottom().translateMM(-y, preferMM, parent);
                     }
                 }
             }
@@ -659,16 +659,16 @@ public class LayeredLayout extends Layout {
                     if (x > 0) {
                         // we're moving it to toward the bottom, so we'll choose the bottom 
                         // as an anchor point.
-                        right().translateMM(-x, preferMM, cmp);
+                        right().translateMM(-x, preferMM, parent);
                     } else {
-                        left().translateMM(x, preferMM, cmp);
+                        left().translateMM(x, preferMM, parent);
                     }
                 } else {
                     if (left().isFixed()) {
-                        left().translateMM(x, preferMM, cmp);
+                        left().translateMM(x, preferMM, parent);
                     }
                     if (right().isFixed()) {
-                        right().translateMM(-x, preferMM, cmp);
+                        right().translateMM(-x, preferMM, parent);
                     }
                 }
             }
@@ -1686,7 +1686,7 @@ public class LayeredLayout extends Layout {
                 return this;
             }
             
-            public Inset changeReference(Component context, Component newRef, float pos) {
+            public Inset changeReference(Container parent, Component newRef, float pos) {
                 if (isFlexible()) {
                     // we are flexible, so we'll just set the new reference
                     // and be done
@@ -1696,7 +1696,7 @@ public class LayeredLayout extends Layout {
                         LayeredLayoutConstraint cpy = constraint().copy();
                         cpy.insets[side].referenceComponent(newRef).referencePosition(pos);
                         
-                        Container parent = context.getParent();
+                        //Container parent = context.getParent();
                         
                         
                         Style s = parent.getStyle();
@@ -1707,7 +1707,7 @@ public class LayeredLayout extends Layout {
                         int newBase = cpy.insets[side].calcBaseValue(top, left, bottom, right);
                         int oldBase = calcBaseValue(top, left, bottom, right);
                         
-                        translatePixels(oldBase - newBase, true, context);
+                        translatePixels(oldBase - newBase, true, parent);
                         referenceComponent(newRef).referencePosition(pos);
                     }
                 }
@@ -1780,7 +1780,7 @@ public class LayeredLayout extends Layout {
                 
             }
             
-            public Inset translatePixels(int delta, boolean preferMM, Component cmp) {
+            public Inset translatePixels(int delta, boolean preferMM, Container parent) {
                 
                 switch (unit) {
                     case UNIT_PIXELS :
@@ -1794,7 +1794,7 @@ public class LayeredLayout extends Layout {
                         break;
                     }
                     case UNIT_PERCENT: {
-                        Container parent = cmp.getParent();
+                        //Container parent = cmp.getParent();
                         //Style parentStyle = parent.getStyle();
                         Style s = parent.getStyle();
                         int top = s.getPaddingTop();
@@ -1843,8 +1843,8 @@ public class LayeredLayout extends Layout {
                 return this;
             }
             
-            public Inset translateMM(float delta, boolean preferMM, Component cmp) {
-                return translatePixels(Display.getInstance().convertToPixels(delta), preferMM, cmp);
+            public Inset translateMM(float delta, boolean preferMM, Container parent) {
+                return translatePixels(Display.getInstance().convertToPixels(delta), preferMM, parent);
                 /*
                 switch (unit) {
                     case UNIT_DIPS :
