@@ -35,7 +35,7 @@ import java.util.ArrayList;
  */
 public class EasyThread {
     private Thread t;
-    private boolean running;
+    private boolean running = true;
     private ArrayList<Object> queue = new ArrayList<Object>();
     private static final Object LOCK = new Object();
     private EasyThread(String name) {
@@ -66,6 +66,7 @@ public class EasyThread {
                 }
             }
         }, name);
+        t.start();
     }
     
     /**
