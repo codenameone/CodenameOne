@@ -53,6 +53,7 @@ import java.io.OutputStreamWriter;
  * using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.</p>
  *
  * @author Shai Almog
+ * @deprecated Use{@link com.codename1.ui.BrowserComponent} instead. The original purpose of this class was to work as an interim solution for platforms where {@link com.codename1.ui.BrowserComponent} isn't supported however all currently supported platforms work with {@code BrowserComponent} so there is no real reason to use this class
  */
 public class WebBrowser extends Container {
 

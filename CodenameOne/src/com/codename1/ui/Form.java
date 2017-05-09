@@ -61,6 +61,7 @@ public class Form extends Container {
     static int activePeerCount;
     private Painter glassPane;
     private Container layeredPane;
+    private Container formLayeredPane;
     private Container contentPane;
     Container titleArea = new Container(new BorderLayout());
     private Label title = new Label("", "Title");
@@ -1071,6 +1072,46 @@ public class Form extends Container {
             getLayeredPaneImpl().add(cnt);
         } else {
             getLayeredPaneImpl().addComponent(0, cnt);            
+        }
+        cnt.putClientProperty("cn1$_cls", n);
+        return cnt;
+    }
+
+    /**
+     * Returns the layered pane for the class and if one doesn't exist a new one is created 
+     * dynamically and returned. This version of the method returns a layered pane on the whole
+     * form
+     * @param c the class with which this layered pane is associated, null for the global layered pane which
+     * is always on the bottom
+     * @param top if created this indicates whether the layered pane should be added on top or bottom
+     * @return the layered pane instance
+     */
+    public Container getFormLayeredPane(Class c, boolean top) {
+        if(formLayeredPane == null) {
+            formLayeredPane = new Container(new LayeredLayout());
+            addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
+        }
+        if(c == null) {
+             for(Component cmp : formLayeredPane) {
+                 if(cmp.getClientProperty("cn1$_cls") == null) {
+                     return (Container)cmp;
+                 }
+             } 
+             Container cnt = new Container();
+             formLayeredPane.add(cnt);
+             return cnt;
+        }
+        String n = c.getName();
+        for(Component cmp : formLayeredPane) {
+            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container)cmp;
+            }
+        } 
+        Container cnt = new Container();
+        if(top) {
+            formLayeredPane.add(cnt);
+        } else {
+            formLayeredPane.addComponent(0, cnt);            
         }
         cnt.putClientProperty("cn1$_cls", n);
         return cnt;

@@ -680,9 +680,6 @@ public class Parser extends ClassVisitor {
 
     @Override
     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-        if(name.indexOf("DynaCCSmsServiceConstants") > -1) {
-            System.out.println("Break");
-        }
         cls.setBaseClass(superName);
         cls.setBaseInterfaces(interfaces);
         if((access & Opcodes.ACC_ABSTRACT) == Opcodes.ACC_ABSTRACT) {
