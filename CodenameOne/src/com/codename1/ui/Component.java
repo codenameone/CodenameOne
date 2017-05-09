@@ -167,6 +167,21 @@ public class Component implements Animation, StyleListener {
      */
     public static final int DRAG_REGION_LIKELY_DRAG_XY = 23;
     
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_X = 31;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_Y = 32;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_XY = 33;
+    
     private String selectText;
     private boolean alwaysTensile;
     private int tensileLength = -1;

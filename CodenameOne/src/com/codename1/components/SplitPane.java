@@ -508,6 +508,16 @@ public class SplitPane extends Container {
         protected void drawDraggedImage(Graphics g, Image img, int x, int y) {
             
         }
+
+        @Override
+        protected int getDragRegionStatus(int x, int y) {
+            switch (orientation) {
+                case HORIZONTAL_SPLIT:
+                    return Component.DRAG_REGION_IMMEDIATELY_DRAG_X;
+                default:
+                    return Component.DRAG_REGION_IMMEDIATELY_DRAG_Y;
+            }
+        }
         
         
         

@@ -605,6 +605,9 @@ public class Form extends Container {
         }
         Container actual = getActualPane();
         Component c = actual.getComponentAt(x, y);
+        while (c != null && c.isIgnorePointerEvents()) {
+            c = c.getParent();
+        }
         return c != null && c.isDragRegion(x, y);
     }
     
@@ -627,6 +630,9 @@ public class Form extends Container {
         // no idea how this can happen
         if(actual != null) {
             Component c = actual.getComponentAt(x, y);
+            while (c != null && c.isIgnorePointerEvents()) {
+                c = c.getParent();
+            }
             if(c != null) {
                 return c.getDragRegionStatus(x, y);
             }

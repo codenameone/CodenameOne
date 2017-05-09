@@ -520,7 +520,7 @@ public class LayeredLayout extends Layout {
          * @param parent
          * @return 
          */
-        private LayeredLayoutConstraint fixDependencies(Container parent) {
+        public LayeredLayoutConstraint fixDependencies(Container parent) {
             for (Inset inset : insets) {
                 inset.fixDependencies(parent);
             }
@@ -589,6 +589,12 @@ public class LayeredLayout extends Layout {
         
         public LayeredLayoutConstraint translatePixels(int x, int y, boolean preferMM, Container parent) {
             if (y != 0) {
+                if (top().isFlexible() && top().autoIsClipped) {
+                    top().changeUnits(preferMM ? UNIT_DIPS : UNIT_PIXELS);
+                }
+                if (bottom().isFlexible() && bottom().autoIsClipped) {
+                    bottom().changeUnits(preferMM ? UNIT_DIPS : UNIT_PIXELS);
+                }
                 if (top().isFlexible() && bottom().isFlexible()) {
                     // Both top and bottom are flexible... we need to make one of these 
                     // fixed
@@ -609,6 +615,13 @@ public class LayeredLayout extends Layout {
                 }
             }
             if (x != 0) {
+                if (left().isFlexible() && left().autoIsClipped) {
+                    left().changeUnits(preferMM ? UNIT_DIPS : UNIT_PIXELS);
+                    
+                }
+                if (right().isFlexible() && right().autoIsClipped) {
+                    right().changeUnits(preferMM ? UNIT_DIPS : UNIT_PIXELS);
+                }
                 if (left().isFlexible() && right().isFlexible()) {
                     // Both top and bottom are flexible... we need to make one of these 
                     // fixed
@@ -774,6 +787,7 @@ public class LayeredLayout extends Layout {
         }
         
         public String getReferenceComponentIndicesAsString(boolean withLabels) {
+            
             StringBuilder sb = new StringBuilder();
             if (withLabels) {
                 if (top().referenceComponent != null) {
@@ -1312,7 +1326,9 @@ public class LayeredLayout extends Layout {
             public float getReferencePosition() {
                 return referencePosition;
             }
-                    
+            
+            
+            
             
             /**
              * One of
@@ -1338,6 +1354,7 @@ public class LayeredLayout extends Layout {
             int preferredValue;
             int calculatedValue;
             int calculatedBaseValue;
+            boolean autoIsClipped;
 
             /**
              * Calculate the preferred value of this inset.
@@ -1521,6 +1538,10 @@ public class LayeredLayout extends Layout {
                             } else {
                                 calculatedValue = baseValue + (w - oppositeBaseValue - baseValue - getOuterPreferredW(cmp))/2;
                             }
+                            if (calculatedValue < 0) {
+                                autoIsClipped = true;
+                            }
+                            calculatedValue = Math.max(0, calculatedValue);
                         } else {
                             if (isVerticalInset()) {
                                 calculatedValue = h - oppositeInset.calculate(cmp, top, left, bottom, right) - getOuterPreferredH(cmp);
@@ -1528,6 +1549,10 @@ public class LayeredLayout extends Layout {
                             } else {
                                 calculatedValue = w - oppositeInset.calculate(cmp, top, left, bottom, right) - getOuterPreferredW(cmp);
                             }
+                            if (calculatedValue < 0) {
+                                autoIsClipped = true;
+                            }
+                            calculatedValue = Math.max(0, calculatedValue);
                         }
                         break;
                     }
@@ -1590,7 +1615,7 @@ public class LayeredLayout extends Layout {
             }
             
             public Inset copyTo(Inset dest) {
-                
+                dest.autoIsClipped = autoIsClipped;
                 dest.calculatedValue = calculatedValue;
                 dest.calculatedBaseValue = calculatedBaseValue;
                 dest.preferredValue = preferredValue;
