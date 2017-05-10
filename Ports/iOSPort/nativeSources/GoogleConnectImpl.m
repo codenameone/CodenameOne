@@ -40,6 +40,7 @@
 #include "com_codename1_social_GoogleConnect.h"
 #include "com_codename1_social_LoginCallback.h"
 #include "com_codename1_social_GoogleImpl.h"
+#include "com_codename1_ui_Display.h"
 
 #ifdef NEW_CODENAME_ONE_VM
 extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
