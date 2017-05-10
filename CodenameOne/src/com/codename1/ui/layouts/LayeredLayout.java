@@ -477,15 +477,6 @@ public class LayeredLayout extends Layout {
     }
     
     
-    private static int getInnerWidth(Component cmp) {
-        Style s = cmp.getStyle();
-        return cmp.getWidth() - s.getPaddingLeftNoRTL() - s.getPaddingRightNoRTL();
-    }
-    
-    private static int getInnerPreferredW(Component cmp) {
-        Style s= cmp.getStyle();
-        return cmp.getPreferredW() - s.getHorizontalPadding();
-    }
     
     private static int getOuterX(Component cmp) {
         return cmp.getX() - cmp.getStyle().getMarginLeftNoRTL();
@@ -566,7 +557,7 @@ public class LayeredLayout extends Layout {
             }
             
             if (right().getReferenceComponent() == null) {
-                box.setWidth(parent.getWidth() - box.getX() - parentStyle.getPaddingRightNoRTL());
+                box.setWidth(parent.getWidth() - box.getX() - parentStyle.getPaddingRightNoRTL() - parent.getSideGap());
             } else {
                 Component ref = right().getReferenceComponent();
                 int refX = (int)(getOuterX(ref) + getOuterWidth(ref) - (right().getReferencePosition() * getOuterWidth(ref)));
@@ -574,7 +565,7 @@ public class LayeredLayout extends Layout {
             }
             
             if (bottom().getReferenceComponent() == null) {
-                box.setHeight(parent.getHeight() - box.getY() - parentStyle.getPaddingBottom());
+                box.setHeight(parent.getHeight() - box.getY() - parentStyle.getPaddingBottom() - parent.getBottomGap());
             } else {
                 Component ref = bottom().getReferenceComponent();
                 int refY = (int)(getOuterY(ref) + getOuterHeight(ref) - (bottom().getReferencePosition() * getOuterHeight(ref)));
@@ -1509,7 +1500,7 @@ public class LayeredLayout extends Layout {
                 int w = right - left;
                 int h = bottom - top;
                 int baseValue = calcBaseValue(top, left, bottom ,right);
-                
+                autoIsClipped = false;
                 switch (unit) {
                     case UNIT_PIXELS:
                         calculatedValue = baseValue + (int) value;
@@ -1533,10 +1524,21 @@ public class LayeredLayout extends Layout {
                         int oppositeBaseValue = oppositeInset.calcBaseValue(top, left, bottom, right);
                         
                         if (oppositeInset.unit == UNIT_AUTO) {
+                            
                             if (isVerticalInset()) {
-                                calculatedValue = baseValue + (h - oppositeBaseValue - baseValue - getOuterPreferredH(cmp))/2;
+                                if (cmp.getPreferredH() <= 0) {
+                                    calculatedValue = baseValue;
+                                    autoIsClipped = true;
+                                } else {
+                                    calculatedValue = baseValue + (h - oppositeBaseValue - baseValue - getOuterPreferredH(cmp))/2;
+                                }
                             } else {
-                                calculatedValue = baseValue + (w - oppositeBaseValue - baseValue - getOuterPreferredW(cmp))/2;
+                                if (cmp.getPreferredW() <= 0) {
+                                    calculatedValue = baseValue;
+                                    autoIsClipped = true;
+                                } else {
+                                    calculatedValue = baseValue + (w - oppositeBaseValue - baseValue - getOuterPreferredW(cmp))/2;
+                                }
                             }
                             if (calculatedValue < 0) {
                                 autoIsClipped = true;
@@ -1544,10 +1546,20 @@ public class LayeredLayout extends Layout {
                             calculatedValue = Math.max(0, calculatedValue);
                         } else {
                             if (isVerticalInset()) {
-                                calculatedValue = h - oppositeInset.calculate(cmp, top, left, bottom, right) - getOuterPreferredH(cmp);
+                                if (cmp.getPreferredH() <= 0) {
+                                    calculatedValue = baseValue;
+                                    autoIsClipped = true;
+                                } else {
+                                    calculatedValue = h - oppositeInset.calculate(cmp, top, left, bottom, right) - getOuterPreferredH(cmp);
+                                }
                                 
                             } else {
-                                calculatedValue = w - oppositeInset.calculate(cmp, top, left, bottom, right) - getOuterPreferredW(cmp);
+                                if (cmp.getPreferredW() <= 0) {
+                                    calculatedValue = baseValue;
+                                    autoIsClipped = true;
+                                } else {
+                                    calculatedValue = w - oppositeInset.calculate(cmp, top, left, bottom, right) - getOuterPreferredW(cmp);
+                                }
                             }
                             if (calculatedValue < 0) {
                                 autoIsClipped = true;
