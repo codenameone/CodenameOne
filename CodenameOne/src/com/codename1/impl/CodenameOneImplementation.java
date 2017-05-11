@@ -5407,9 +5407,21 @@ public abstract class CodenameOneImplementation {
     }
     
     public boolean transformEqualsImpl(Transform t1, Transform t2){
-        throw new RuntimeException("Transforms not supported");
+        Object o1 = null;
+        if(t1 != null) {
+            o1 = t1.getNativeTransform();
+        }
+        Object o2 = null;
+        if(t2 != null) {
+            o2 = t2.getNativeTransform();
+        }
+        return transformNativeEqualsImpl(o1, o2);
     }
     
+    public boolean transformNativeEqualsImpl(Object t1, Object t2){
+        throw new RuntimeException("Transforms not supported");
+    }
+
     /**
      * Makes a new native translation transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
