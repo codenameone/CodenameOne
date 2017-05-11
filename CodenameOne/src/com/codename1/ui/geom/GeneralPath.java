@@ -239,30 +239,32 @@ public final class GeneralPath implements Shape {
      */
     private static final int BUFFER_CAPACITY = 10;
 
+    // These are package protected for ODD
+    
     /**
      * The point's types buffer
      */
-    private byte[] types;
+    byte[] types;
 
     /**
      * The points buffer
      */
-    private float[] points;
+    float[] points;
 
     /**
      * The point's type buffer size
      */
-    private int typeSize;
+    int typeSize;
 
     /**
      * The points buffer size
      */
-    private int pointSize;
+    int pointSize;
 
     /**
      * The path rule
      */
-    private int rule;
+    int rule;
     
     
 
