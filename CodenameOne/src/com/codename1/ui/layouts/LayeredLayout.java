@@ -235,6 +235,11 @@ public class LayeredLayout extends Layout {
         return this;
     }
     
+    public LayeredLayout setReferenceComponents(Component cmp, String refs) {
+        getOrCreateConstraint(cmp).setReferenceComponentIndices(cmp.getParent(), refs);
+        return this;
+    }
+    
     public LayeredLayout setReferenceComponentTop(Component cmp, Component referenceComponent) {
         getOrCreateConstraint(cmp).top().referenceComponent(referenceComponent);
         return this;
@@ -258,6 +263,11 @@ public class LayeredLayout extends Layout {
     
     public LayeredLayout setReferencePositions(Component cmp, float... referencePositions) {
         getOrCreateConstraint(cmp).setReferencePositions(referencePositions);
+        return this;
+    }
+    
+    public LayeredLayout setReferencePositions(Component cmp, String positions) {
+        getOrCreateConstraint(cmp).setReferencePositions(positions);
         return this;
     }
     
@@ -717,6 +727,7 @@ public class LayeredLayout extends Layout {
         
         
         public LayeredLayoutConstraint setReferencePositions(String positionsStr) {
+            positionsStr = positionsStr.trim();
             LayeredLayoutConstraint cnst = this;
             if (positionsStr.indexOf(":") != -1) {
                 String[] parts = Util.split(positionsStr, ";");
@@ -839,6 +850,7 @@ public class LayeredLayout extends Layout {
         }
         
         public LayeredLayoutConstraint setReferenceComponentIndices(Container parent, String indices) {
+            indices = indices.trim();
             LayeredLayoutConstraint cnst = this;
             if (indices.indexOf(":") != -1) {
                 String[] parts = Util.split(indices, ";");
@@ -954,12 +966,12 @@ public class LayeredLayout extends Layout {
                         cmp = parent.getComponentAt(i2);
                     }
                     
-                    left().referenceComponent = cmp;
+                    bottom().referenceComponent = cmp;
                     cmp = null;
                     if (i3 != -1) {
                         cmp = parent.getComponentAt(i3);
                     }
-                    bottom().referenceComponent = cmp;
+                    left().referenceComponent = cmp;
                 }
             }
             return this;
