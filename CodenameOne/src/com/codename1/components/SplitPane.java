@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *  
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ * 
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
+ * need additional information or have any questions.
  */
 package com.codename1.components;
 
@@ -26,27 +43,95 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- *
- * @author shannah
+ * A Split Pane component.
+ * <p>A split pane can either be horizontal or vertical, and provides a draggable divider
+ * between two components.  If the {@link #orientation} is {@link #HORIZONTAL_SPLIT}, then the 
+ * child components will be laid out horizontally (side by side with a vertical bar as a divider).
+ * If the {@link #orientation} is {@link #VERTICAL_SPLIT}, then the components are laid out vertically (one above 
+ * the other.</p>
+ * 
+ * <p>The bar divider bar includes arrows to collapse and expand the divider also.</p>
+ * 
+ * <p><strong>Splitpane UI</strong></p>
+ * <p>The following is an example of a UI that is built around a split pane.  This has an outer "horizontal" split pane,
+ * and the left side has a vertical split pane.</p>
+ * <p><img src="https://raw.githubusercontent.com/wiki/codenameone/CodenameOne/img/developer-guide/splitpane-1.png"/></p>
+ * <p>Collapsed:</p>
+ * <p><img src="https://raw.githubusercontent.com/wiki/codenameone/CodenameOne/img/developer-guide/splitpane-collapsed.png"/></p>
+ * <p>Expanded:</p>
+ * <p><img src="https://raw.githubusercontent.com/wiki/codenameone/CodenameOne/img/developer-guide/splitpane-expanded.png"/></p>
+ * 
+ * @author Steve Hannah
  */
 public class SplitPane extends Container {
+    
+    /**
+     * The orientation.  One of {@link #HORIZONTAL_SPLIT} or {@link #VERTICAL_SPLIT}
+     */
     private final int orientation;
+    
+    /**
+     * Constant used for orientation.
+     */
     public static final int HORIZONTAL_SPLIT = 0;
+    
+    /**
+     * Constant used for orientation.
+     */
     public static final int VERTICAL_SPLIT = 1;
     
+    /**
+     * Container for the top or left component.
+     */
     private final Container topOrLeft;
+    
+    /**
+     * Container for the bottom or right component.
+     */
     private final Container bottomOrRight;
+    
+    /**
+     * The draggable divider.
+     */
     private final Divider divider;
     
+    /**
+     * The minimum allowable inset for the divider.
+     */
     private LayeredLayoutConstraint minInset;
+    
+    /**
+     * The maximum allowable inset for the divider.
+     */
     private LayeredLayoutConstraint maxInset;
+    
+    /**
+     * The starting preferred inset for the divider.  This will be changed over the life of the 
+     * split pane.  Any time the user explicitly drags the divider to a new location, that location
+     * will become the new preferred inset.
+     */
     private LayeredLayoutConstraint preferredInset;
     
+    /**
+     * Flag to indicate that the split pane is expanded.
+     */
     private boolean isExpanded;
+    
+    /**
+     * Flag to indicate that the split pane is collapsed.
+     */
     private boolean isCollapsed;
 
     
-    
+    /**
+     * Creates a new SplitPane.
+     * @param orientation Either {@link #HORIZONTAL_SPLIT} or {@link #VERTICAL_SPLIT}
+     * @param topOrLeft The component to place in the "top" (for vertical), or "left" (for horizontal).
+     * @param bottomOrRight The component to place in the "bottom" (for vertical) or "right" (for horizontal).
+     * @param minInset The minimum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "200px".
+     * @param preferredInset The default preferred inset for the divider.  The inset should be expressed as a string with both value and unit.  E.g. "75%", "50mm", "20px".
+     * @param maxInset The maximum allowable inset for the divider.  The inset should be expressed as a string with both a value and a unit.  E.g. "75%", "50mm", "20px".
+     */
     public SplitPane(int orientation, Component topOrLeft, Component bottomOrRight, String minInset, String preferredInset, String maxInset) {
         super(new LayeredLayout());
         
@@ -94,11 +179,20 @@ public class SplitPane extends Container {
         return getFixedInset(cnst);
     }
     
+    /**
+     * Gets the inset of the divider that is flexible.
+     * @return 
+     */
     private Inset getAutoInset() {
         LayeredLayoutConstraint cnst = ((LayeredLayout)getLayout()).getOrCreateConstraint(divider);
         return getAutoInset(cnst);
     }
     
+    /**
+     * Gets the inset of the provided constraint that is fixed.
+     * @param cnst
+     * @return 
+     */
     private Inset getFixedInset(LayeredLayoutConstraint cnst) {
         switch (orientation) {
             case VERTICAL_SPLIT :
@@ -190,28 +284,49 @@ public class SplitPane extends Container {
         topOrLeft.add(BorderLayout.CENTER, cmp);
     }
     
+    /**
+     * Sets the component that should be placed in the top section of the split pane.
+     * @param cmp The component to place on top.
+     */
     public void setTop(Component cmp) {
         setTopOrLeftComponent(cmp);
     }
     
+    /**
+     * Sets the component that should be placed in the left section of the split pane.
+     * @param cmp The component to place on the left.
+     */
     public void setLeft(Component cmp) {
         setTopOrLeftComponent(cmp);
     }
+    
     
     private void setBottomOrRightComponent(Component cmp) {
         bottomOrRight.removeAll();
         bottomOrRight.add(BorderLayout.CENTER, cmp);
     }
     
-    
+    /**
+     * Sets the component to be placed on the bottom of the split pane.
+     * @param cmp The component to place on the bottom.
+     */
     public void setBottom(Component cmp) {
         setBottomOrRightComponent(cmp);
     }
     
+    /**
+     * Sets the component to be placed on the right of the split pane.
+     * @param cmp The component to place on the right.
+     */
     public void setRight(Component cmp) {
         setBottomOrRightComponent(cmp);
     }
    
+    /**
+     * Toggles the split pane between collapsed state and preferred state.  E.g. If the inset is currently
+     * not collapsed, it will collapse it.  If it is collapsed, it will open to the last position that the user
+     * selected.
+     */
     public void toggleCollapsePreferred() {
         if (isCollapsed) {
             expand();
@@ -222,6 +337,10 @@ public class SplitPane extends Container {
         }
     }
     
+    /**
+     * Toggles the split pane between expanded state and preferred state.  E.g. If the inset is currently expanded,
+     * then it will be moved to the last position that the user selected.  If it is not expanded, it will expand it all the way.
+     */
     public void toggleExpandPreferred() {
         if (isExpanded) {
             collapse();
@@ -232,10 +351,20 @@ public class SplitPane extends Container {
         }
     }
     
+    /**
+     * Expands the split pane.  If it is currently completely collapsed, it will transition to the preferred 
+     * position.  If it is in the preferred position, it will expand all the way.
+     */
     public void expand() {
         expand(false);
     }
     
+    /**
+     * Expands the split pane. It will either expand it to the preferred position, or the maximum position
+     * depending on the value of the {@literal force} parameter.
+     * @param force If this is true, then it will only expand "all the way".  It will skip the preferred position if it is
+     * currently in collapsed state.
+     */
     public void expand(boolean force) {
         if (isCollapsed && !force) {
             getFixedInset(preferredInset).copyTo(getDividerInset());
@@ -252,10 +381,18 @@ public class SplitPane extends Container {
         }
     }
     
+    /**
+     * Collapses the aplit pane.  If it is currently expanded, then it will shift to the preferred posiiton.  If it is
+     * already in the preferred position, it will collapse all the way to the minimum position.
+     */
     public void collapse() {
         collapse(false);
     }
     
+    /**
+     * Collapses the split pane.
+     * @param force True to force it to collapse to minimum position (skipping preferred position if it is in expanded state).
+     */
     public void collapse(boolean force) {
         if (isCollapsed) {
             // do nothing
@@ -273,6 +410,13 @@ public class SplitPane extends Container {
         
     }
     
+    /**
+     * Sets the inset of the divider explicitly.  This The inset is measured from the top for
+     * vertical split panes and the left for horizontal split panes.  Setting this to "50%" will
+     * move the divider to the middle point.  Setting it to "0" would set it all the way to the 
+     * left/top.  This will clamp the value at the minimum and maximum offsets.
+     * @param inset 
+     */
     public void setInset(String inset) {
         getDividerInset().setValueAsString(inset);
         isExpanded = false;
@@ -280,18 +424,38 @@ public class SplitPane extends Container {
         clampInset();
     }
     
+    /**
+     * Sets the preferred inset of this split pane.  The preferred inset will be automatically 
+     * changed whenever the user explicitly moves the divider to a new position.
+     * @param inset The inset.  E.g. "2mm", "25%", "200px".
+     */
     public void setPreferredInset(String inset) {
         getFixedInset(preferredInset).setValueAsString(inset);
     }
     
+    /**
+     * Sets the minimum inset allowed for the divider.
+     * @param inset The inset.  E.g. "2mm", "10%", "200px"
+     */
     public void setMinInset(String inset) {
         getFixedInset(minInset).setValueAsString(inset);
     }
     
+    /**
+     * Sets the maximum inset allowed for the divider.
+     * @param inset The inset.  E.g. "2mm", "10%", "200px"
+     */
     public void setMaxInset(String inset) {
         getFixedInset(maxInset).setValueAsString(inset);
     }
     
+    /**
+     * Internal component used as the divider.  This responds to drag events and 
+     * updates its own insets.  The parent layout is layerd layout, and the left and
+     * right containers are anchored to the divider so they are automatically resized
+     * according to the divider's location.
+     * 
+     */
     private class Divider extends Container {
         int pressedX, pressedY, draggedX, draggedY;
         LayeredLayoutConstraint pressedConstraint;

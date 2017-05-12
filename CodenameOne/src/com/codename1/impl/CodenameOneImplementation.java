@@ -4352,6 +4352,13 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    /**
+     * Checks if this platform supports custom cursors.  
+     * @return True if the platform supports custom cursors.
+     * @see Form#setEnableCursors(boolean) 
+     * @see Component#setCursor(int) 
+     * @see ComponentSelector#setCursor(int) 
+     */
     public boolean isSetCursorSupported() {
         return false;
     }
