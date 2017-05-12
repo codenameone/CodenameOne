@@ -411,10 +411,15 @@ public class Component implements Animation, StyleListener {
     /**
      * Sets a custom cursor for this component.  This will only be used if the platform supports custom cursors.  
      * You can call {@link #isSetCursorSupported() } to find out.
+     * 
+     * <p><strong>Note:</strong> Since cursors incur some overhead, they are turned off at the form level by default.
+     * If you want your custom cursors to be used, then you'll need to enable cursors in the form using {@link Form#setEnableCursors(boolean) }.</p>
      * @param cursor The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
      * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
      * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
      * 
+     * @see Form#setEnableCursors(boolean) 
+     * @see Form#isEnableCursors() 
      * 
      */
     public void setCursor(int cursor) {

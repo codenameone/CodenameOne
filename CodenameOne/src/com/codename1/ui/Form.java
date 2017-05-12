@@ -204,10 +204,22 @@ public class Form extends Container {
         initGlobalToolbar();
     }
     
+    /**
+     * Checks if custom cursors are enabled on this form.  They are turned off by default since 
+     * they incur some overhead.
+     * @return True if cursors are enabled on this form.
+     * @see #setEnableCursors(boolean) 
+     * @see Component#setCursor(int) 
+     */
     public boolean isEnableCursors() {
         return enableCursors;
     }
     
+    /**
+     * Enable or disable custom cursors on this form.  They are turned off by default since they incur some overhead.
+     * @param e True to enable cursors.  False to disable them.
+     * @see Component#setCursor(int) 
+     */
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
     }
