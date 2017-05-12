@@ -555,5 +555,12 @@ public class Picker extends Button {
         }
         return super.setPropertyValue(name, value);
     }
-    
+
+    /**
+     * Returns the value which works for all picker types
+     * @return the value object
+     */
+    public Object getValue() {
+        return value;
+    }
 }

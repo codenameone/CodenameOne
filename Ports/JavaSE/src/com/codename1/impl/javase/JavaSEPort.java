@@ -5091,12 +5091,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return in;
     }
-    
+
     @Override
-    public boolean transformEqualsImpl(Transform t1, Transform t2) {
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
         if ( t1 != null ){
-            AffineTransform at1 = (AffineTransform)t1.getNativeTransform();
-            AffineTransform at2 = (AffineTransform)t2.getNativeTransform();
+            AffineTransform at1 = (AffineTransform)t1;
+            AffineTransform at2 = (AffineTransform)t2;
             return at1.equals(at2);
             
         } else {
