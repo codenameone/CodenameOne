@@ -2199,8 +2199,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     public ComponentSelector putClientProperty(String key, Object value) {
         for (Component c : this) {
             c.putClientProperty(key, value);
+            
         }
         return this;
+    }
+    
+    /**
+     * Gets a client property from the first component in the set.  Wraps {@link Component#getClientProperty(java.lang.String) }
+     * @param key The key of the client property to retrieve.
+     * @return The value of the client property.
+     */
+    public Object getClientProperty(String key) {
+        for (Component c : this) {
+            return c.getClientProperty(key);
+        }
+        return null;
     }
     
     /**

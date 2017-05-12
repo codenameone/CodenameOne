@@ -167,6 +167,21 @@ public class Component implements Animation, StyleListener {
      */
     public static final int DRAG_REGION_LIKELY_DRAG_XY = 23;
     
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_X = 31;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_Y = 32;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_XY = 33;
+    
     private String selectText;
     private boolean alwaysTensile;
     private int tensileLength = -1;
@@ -393,10 +408,28 @@ public class Component implements Animation, StyleListener {
         return dragAndDropInitialized;
     }
 
+    /**
+     * Sets a custom cursor for this component.  This will only be used if the platform supports custom cursors.  
+     * You can call {@link #isSetCursorSupported() } to find out.
+     * @param cursor The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
+     * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
+     * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
+     * 
+     * 
+     */
     public void setCursor(int cursor) {
         this.cursor = cursor;
     }
     
+    /**
+     * Gets the custom cursor for this component.  This will only be used if the platform supports custom cursors.  
+     * You can call {@link #isSetCursorSupported() } to find out.
+     * @return The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
+     * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
+     * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
+     * 
+     * 
+     */
     public int getCursor() {
         return this.cursor;
     }
@@ -441,6 +474,11 @@ public class Component implements Animation, StyleListener {
         }
     }
     
+    /**
+     * Checks to see if this platform supports cursors.  If the platform doesn't support cursors then any cursors
+     * set with {@link #setCursor(int) } will simply be ignored.
+     * @return True if the platform supports custom cursors.
+     */
     public static boolean isSetCursorSupported() {
         return Display.getInstance().getImplementation().isSetCursorSupported();
     }
@@ -586,10 +624,20 @@ public class Component implements Animation, StyleListener {
         return bounds.getX();
     }
     
+    /**
+     * Gets the x-coordinate of the outer bounds of this component.  The outer bounds are formed
+     * by the bounds outside the margin of the component.  (i.e. {@code x - leftMargin}).
+     * @return The outer X bound.
+     */
     public int getOuterX() {
         return getX() - getStyle().getMarginLeftNoRTL();
     }
     
+    /**
+     * Gets x-coordinate of the inner bounds of this component.  The inner bounds are formed by 
+     * the bounds of the padding of the component.  i.e. {@code x + leftPadding}.
+     * @return The inner x bound.
+     */
     public int getInnerX() {
         return getX() + getStyle().getMarginLeftNoRTL();
     }
@@ -603,10 +651,20 @@ public class Component implements Animation, StyleListener {
         return bounds.getY();
     }
     
+    /**
+     * Gets the Y-coordinate of the outer bounds of this component.  The outer bounds are formed
+     * by the bound of the margin of the component.  i.e. {@code y - leftMargin}.
+     * @return The outer y bound.
+     */
     public int getOuterY() {
         return getY() - getStyle().getMarginTop();
     }
     
+    /**
+     * Gets the inner y-coordinate of the inner bounds of this component. The inner bounds are formed
+     * by the bound of the padding of the component.  i.e. {@code y + leftPadding}.
+     * @return The inner y bound.
+     */
     public int getInnerY() {
         return getY() + getStyle().getPaddingTop();
     }
@@ -723,10 +781,18 @@ public class Component implements Animation, StyleListener {
         return bounds.getSize().getWidth();
     }
     
+    /**
+     * Gets the outer width of this component. This is the width of the component including horizontal margins.
+     * @return The outer width.
+     */
     public int getOuterWidth() {
         return getWidth() + getStyle().getHorizontalMargins();
     }
     
+    /**
+     * Gets the inner width of this component.  This is the width of the component removing horizontal padding.
+     * @return The inner width.
+     */
     public int getInnerWidth() {
         return getWidth() - getStyle().getHorizontalPadding();
     }
@@ -740,10 +806,18 @@ public class Component implements Animation, StyleListener {
         return bounds.getSize().getHeight();
     }
     
+    /**
+     * Gets the outer height of this component.  This is the height of the component including vertical margins.
+     * @return The outer height.
+     */
     public int getOuterHeight() {
         return getHeight() + getStyle().getVerticalMargins();
     }
     
+    /**
+     * Gets the inner height of this component.  This is the height of the component removing vertical padding.
+     * @return The inner height.
+     */
     public int getInnerHeight() {
         return getHeight() - getStyle().getVerticalPadding();
     }
@@ -992,18 +1066,34 @@ public class Component implements Animation, StyleListener {
         return getPreferredSize().getHeight();
     }
     
+    /**
+     * Gets the preferred height including the vertical margins.
+     * @return The preferred outer height.
+     */
     public int getOuterPreferredH() {
         return getPreferredH() + getStyle().getVerticalMargins();
     }
     
+    /**
+     * Gets the preferred height removing vertical padding.
+     * @return The preferred inner height.
+     */
     public int getInnerPreferredH() {
         return getPreferredH() - getStyle().getVerticalPadding();
     }
     
+    /**
+     * Gets the preferred width including horizontal margins.
+     * @return The preferred outer width.
+     */
     public int getOuterPreferredW() {
         return getPreferredW() + getStyle().getHorizontalMargins();
     }
     
+    /**
+     * Gets the preferred width removing horizontal padding.
+     * @return 
+     */
     public int getInnerPreferredW() {
         return getPreferredW() - getStyle().getHorizontalPadding();
     }

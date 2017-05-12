@@ -2244,6 +2244,20 @@ public abstract class CodenameOneImplementation {
                 startX = 0.9f;
                 startY = 0.9f;
                 break;
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_X:
+                startX = 0f;
+                startY = Math.max(5, startY);
+                break;
+                
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_Y:
+                startY = 0f;
+                startX = Math.max(5, startX);
+                break;
+                
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_XY:
+                startX = 0f;
+                startY = 0f;
+                break;
             case Component.DRAG_REGION_POSSIBLE_DRAG_X:
                 startY = Math.max(5, startY);
                 startX = Math.min(startY, 2f);
@@ -4338,6 +4352,13 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    /**
+     * Checks if this platform supports custom cursors.  
+     * @return True if the platform supports custom cursors.
+     * @see Form#setEnableCursors(boolean) 
+     * @see Component#setCursor(int) 
+     * @see ComponentSelector#setCursor(int) 
+     */
     public boolean isSetCursorSupported() {
         return false;
     }
