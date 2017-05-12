@@ -90,6 +90,87 @@ import java.util.Set;
  * the behavior of peer components. Sample of peer components include the
  * {@link com.codename1.ui.BrowserComponent}, video playback etc.
  * </p>
+ * 
+ * <h3>Insets</h3>
+ * 
+ * <p>This layout optionally supports insets for laying out its children. Use of insets can allow you to 
+ * achieve precise placement of components while adjusting properly to screen resizing.</p>
+ * 
+ * <p>Insets may be either fixed or flexible.  Fixed insets may be specified in pixels ({@link #UNIT_PIXELS}), 
+ * millimetres ({@link #UNIT_DIPS}), or percentage ({@link #UNIT_PERCENT}).  Insets may also be specified as just "auto" ({@link #UNIT_AUTO}),
+ * in which case it is considered to be flexible (it will adapt to the component size and other insets).</p>
+ * 
+ * <p>Insets may also be anchored to a "reference component" so that it will always be measured from that reference component.</p>
+ * 
+ * <h4>Insets Example</h4>
+ * 
+ * <p>Adding a button to the top right of the parent:</p>
+ * <pre>
+ * {@code
+ * Container cnt = new Container(new LayeredLayout());
+ * LayeredLayout ll = (LayeredLayout)cnt.getLayout();
+ * Button btn = new Button("My Button");
+ * cnt.add(btn);
+ * ll.setInsets(btn, "0 0 auto auto");
+ *     // NOTE: Insets are expressed in same order as "margin" in CSS.  Clockwise starting on top.
+ * }
+ * </pre>
+ * 
+ * <p>Changing top inset to 2mm, and right inset to 1mm:</p>
+ * <pre>{@code ll.setInsets(btn, "2mm 1mm auto auto");}</pre>
+ * 
+ * <p>Using percentage insets:</p>
+ * <pre>{@code ll.setInsets(btn, "25% 25% auto auto");}</pre>
+ * 
+ * <p><strong>NOTE:</strong> When using percent units, the percentage is always in terms of the "reference box" of the component.
+ * The "reference box" is the bounding rectangle from which the insets are measured.  If none of the insets 
+ * is anchored to a reference component, then the bounding box will simply be the inner bounds of the parent container (i.e.
+ * the bounds of the inside padding in the container.</p>
+ * 
+ * <p><strong>Using "auto" insets</strong></p>
+ * <p>An "auto" inset is an inset that is flexible.  If all 4 insets are set to auto, then the component will tend to the
+ * centre of the parent component, and its size will be the component's preferred size (though the size will be bounded by the size of the component's reference box).
+ * If one inset is fixed, and the opposite inset is "auto", then the fixed inset and the component's preferred size will dictate the'
+ * calculated size of the inset.
+ * </p>
+ * 
+ * <h4>Reference Components</h4>
+ * 
+ * <p>Insets may also have reference componnents.  E.g. If you want a button to be anchored to the right side of a search field, you could 
+ * make the button's left inset "reference" the text field.  This would be achieved as follows:
+ * 
+ * <pre>
+ * {@code
+ * Container cnt = new Container(new LayeredLayout());
+ * LayeredLayout ll = (LayeredLayout)cnt.getLayout();
+ * TextField searchField = new TextField();
+ * Button btn = new Button("Search");
+ * cnt.add(searchField).add(btn);
+ * ll
+ *   .setInsets(searchField, "1mm auto auto auto")
+ *   .setInsets(btn, "0 auto auto 0")
+ *   .setReferenceComponentLeft(btn, searchField, 1f)
+ *   .setReferenceComponentTop(btn, searchField, 0);
+ * }
+ * </pre>
+ * 
+ * <p>In the above example we set the search field to be anchored to the top of its parent (1mm inset),
+ * but for all other insets to be auto.  This will result it being centered horizontally in its parent.  We then
+ * anchor the button to the left and top of the search field so that the top and left insets of button will always be
+ * calculated relative to the position of searchField.  In particular since the button has top and left insets of 0,
+ * the button will always be placed just to the right of the search field, with its top edge aligned with the top edge
+ * of search field.</p>
+ * 
+ * <p><strong>Reference Positions</strong></p>
+ * <p>The second parameter of {@code setReferenceComponentLeft(btn, searchField, 1f)} is the reference position and it dictates
+ * which edge of the reference component ({@literal searchField}) the inset should be anchored to.  A value of {@literal 1} indicates that
+ * it should anchor to the opposite side of the inset  (e.g. in this case it is the "left" inset we are setting, so the {@literal 1}
+ * value dictates that it is anchored to the "right" side of the text field.  A value of {@literal 0} indicates that it should anchor
+ * to the same side as the inset.  This is why we used {@literal 0} in the subsequent call to {@code .setReferenceComponentTop(btn, searchField, 0);},
+ * because we want to anchor the "top" inset of {@literal button} to the "top" edge of {@literal searchField}.</p>
+ * 
+ * 
+ * 
  *
  * @see com.codename1.ui.Form#getLayeredPane()
  * @see com.codename1.ui.Form#getLayeredPane(java.lang.Class, boolean)
@@ -1899,97 +1980,205 @@ public class LayeredLayout extends Layout {
                 return this;
             }
             
+            /**
+             * Sets the value of this inset as a string.  E.g. "2mm", or "2px", or "3%", or "auto".
+             * @param value The value of this inset.
+             * @return Self for chaining.
+             */
             public Inset setValueAsString(String value) {
                 setValue(value);
                 return this;
             }
             
+            /**
+             * Gets the left inset in this constraint.
+             * @return The left inset of the constraint.
+             */
             public Inset left() {
                 return constraint().left();
             }
             
+            /**
+             * Gets the right inset in the constraint.
+             * @return The right inset of the constraint.
+             */
             public Inset right() {
                 return constraint().right();
             }
             
+            /**
+             * Gets the top inset in this constraint.
+             * @return The top inset in this constraint.
+             */
             public Inset top() {
                 return constraint().top();
             }
             
+            /**
+             * Gets the bottom inset in this constraint.
+             * @return The bottom inset.
+             */
             public Inset bottom() {
                 return constraint().bottom();
             }
             
+            /**
+             * Gets the constraint that contains this inset.
+             * @return The parent constraint of this inset.
+             */
             public LayeredLayoutConstraint constraint() {
                 return LayeredLayoutConstraint.this;
             }
             
+            /**
+             * Sets the unit for this constraint.  This doesn't perform any recalculation
+             * on the value.  Just sets the unit.
+             * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
+             * @return Self for chaining.
+             * @see #setAuto() 
+             * @see #setDips() 
+             * @see #setPixels() 
+             * @see #setPercent() 
+             * @see #changeUnits(byte) To change units while recalculating the value to be effectively equivalent.
+             */
             public Inset unit(byte unit) {
                 this.unit = unit;
                 return this;
             }
             
+            /**
+             * Sets the units to "auto" (i.e. makes the inset flexible).  Doesn't perform any calculations
+             * on the value.
+             * @return Self for chaining.
+             * @see #unit(byte) 
+             * 
+             */
             public Inset setAuto() {
                 return unit(UNIT_AUTO);
             }
             
+            /**
+             * Sets the units to "dips" (millimetres).  Doesn't perform any calculations on the value.
+             * @return Self for chaining.
+             * @see #unit(byte) 
+             */
             public Inset setDips() {
                 return unit(UNIT_DIPS);
             }
             
+            /**
+             * Sets the units to percent.  Doesn't perform any calculations on the value.
+             * @return Self for chaining.
+             * @see #unit(byte) 
+             */
             public Inset setPercent() {
                 return unit(UNIT_PERCENT);
             }
             
+            /**
+             * Sets the units to pixels.  Doesn't perform any calculations on the value.
+             * @return Self for chaining.
+             */
             public Inset setPixels() {
                 return unit(UNIT_PIXELS);
             }
             
+            /**
+             * Sets the inset value to the provided number of pixels.  This will chnage the unit
+             * to pixels.
+             * @param px The pixel value of the inset.
+             * @return Self for chaining.
+             */
             public Inset setPixels(int px) {
                 this.value = px;
                 return unit(UNIT_PIXELS);
             }
             
+            /**
+             * Sets the inset value to the provided dips/millimetre value. This will change 
+             * the unit to millimetres.
+             * @param dips The inset value in millimetres.
+             * @return Self for chaining.
+             */
             public Inset setDips(float dips) {
                 this.value = dips;
                 return unit(UNIT_DIPS);
             }
             
+            /**
+             * Sets the inset value in percentage.  This will change the unit to percentage.
+             * @param percent The inset value as a percentage.
+             * @return Self for chaining.
+             */
             public Inset setPercent(float percent) {
                 this.value = percent;
                 return unit(UNIT_PERCENT);
             }
             
+            /**
+             * Sets the reference component for this inset.
+             * @param cmp The reference component. (I.e. the component that the inset is "anchored" to).
+             * @return Self for chaining.
+             * @see #referencePosition(float) 
+             * @see LayeredLayoutConstraint#setReferenceComponents(com.codename1.ui.Component...) 
+             */
             public Inset referenceComponent(Component cmp) {
                 referenceComponent = cmp;
                 return this;
             }
             
+            /**
+             * Sets the reference position for this inset.  A value of {@literal 0} indicates that the inset
+             * is anchored to the same side of the reference component (e.g. right inset anchored to right edge of reference component, 
+             * left inset anchored to left edge of reference component).  A value of {@literal 1} indicates that the 
+             * inset is anchored to the opposite side of the reference component. E.g. right inset to left edge.
+             * @param position The reference position.
+             * @return Self for chaining.
+             * @see #setReferencePositions(java.lang.String) 
+             * @see #setReferencePositions(com.codename1.ui.Component, java.lang.String) 
+             * @see #setReferencePositions(com.codename1.ui.Component, float...) 
+             */
             public Inset referencePosition(float position) {
                 this.referencePosition = position;
                 return this;
             }
             
+            /**
+             * Sets the value of this inset.  The interpretation of the value will depend on the {@link #unit}.
+             * If the unit is {@link #UNIT_DIPS}, then this value is interpreted in millimetres, etc..
+             * @param value The value to set this inset to.
+             * @return Self for chaining.
+             */
             public Inset value(float value) {
                 this.value = value;
                 return this;
             }
             
+            /**
+             * Gets the side of this inset. One of {@link Component#TOP}, {@link Component#Bottom}, {@link Component#LEFT}, {@link Component#RIGHT}
+             * @return The side of this inset.  One of {@link Component#TOP}, {@link Component#Bottom}, {@link Component#LEFT}, {@link Component#RIGHT}
+             */
             public int getSide() {
                 return side;
             }
             
+            /**
+             * Gets the reference component for this inset.
+             * @return The reference component for this inset.
+             * @see #referenceComponent(com.codename1.ui.Component) 
+             */
             public Component getReferenceComponent() {
                 return referenceComponent;
             }
             
+            /**
+             * Gets the reference position for this inset.
+             * @return The reference position for this inset.
+             */
             public float getReferencePosition() {
                 return referencePosition;
             }
-            
-            
-            
-            
+
             /**
              * One of
              * {@link Component#TOP}, {@link Component#Bottom}, {@link Component#LEFT}, {@link Component#RIGHT}
@@ -2007,14 +2196,44 @@ public class LayeredLayout extends Layout {
              */
             private float referencePosition;
 
-            float value;
+            /**
+             * The value of this inset. Interpreted in {@link #unit} units.
+             */
+            private float value;
 
-            byte unit = UNIT_PIXELS;
+            /**
+             * The unit of this inset.
+             */
+            private byte unit = UNIT_PIXELS;
 
-            int preferredValue;
-            int calculatedValue;
-            int calculatedBaseValue;
-            boolean autoIsClipped;
+            /**
+             * Caches the preferred value of this inset last time it was calculated.
+             */
+            private int preferredValue;
+            
+            /**
+             * The calculated value of this inset in pixels.  This is calculated in the {@link #calculate(com.codename1.ui.Component, int, int, int, int) }
+             * method which is only called during layout.  It will be the absolute size of the inset in pixels 
+             * including all reference components.
+             */
+            private int calculatedValue;
+            
+            /**
+             * The calculated base value of this inset in pixels.  This is calculated during the layout step, so
+             * this will always be the pixel "base" value the last time layout was performed.  The base value
+             * is the absolute value of the reference box inset.  E.g. if this inset has no reference component,
+             * then this will always be zero.  If there is a reference componnet, then this will be the value
+             * of the "zero" point for measuing the inset.  {@link #calculatedValue} - {@link #calculatedBaseValue} should
+             * be equal to {@link #value} (if value is in pixels).
+             */
+            private int calculatedBaseValue;
+            
+            /**
+             * Tracks whether the size of the component was clipped during the last layout.  This will occur
+             * when the preferred size of the component would have it overflowing the reference box.  In such cases
+             * the component is "clipped" to not obtain its full preferred value.
+             */
+            private boolean autoIsClipped;
 
             /**
              * Calculate the preferred value of this inset.
@@ -2095,9 +2314,11 @@ public class LayeredLayout extends Layout {
 
             /**
              * Calculates the "base" value off of which the inset's value should be calculated.
-             * It is assumed that the reference component has already been 
-             * @param w
-             * @param h
+             * 
+             * @param top The top "y" coordinate within the parent container from which insets are measured.
+             * @param left The left "x" coordinate within the parent container from which insets are measured.
+             * @param bottom The bottom "y" coordinate within the parent container from which insets are measured.
+             * @param right The right "x" coordinate within the parent container from which insets are measured.
              * @return 
              */
             private int calcBaseValue(int top, int left, int bottom, int right) {//, int paddingTop, int paddingLeft, int paddingBottom, int paddingRight) {
@@ -2145,10 +2366,18 @@ public class LayeredLayout extends Layout {
                 return baseValue;
             }
             
+            /**
+             * True if this is top or bottom.
+             * @return 
+             */
             private boolean isVerticalInset() {
                 return side == Component.TOP || side == Component.BOTTOM;
             }
             
+            /**
+             * True if this is left or right.
+             * @return 
+             */
             private boolean isHorizontalInset() {
                 return side == Component.LEFT || side == Component.RIGHT;
             }
@@ -2244,6 +2473,11 @@ public class LayeredLayout extends Layout {
                 return calculatedValue;
             }
 
+            /**
+             * Recursively gets all of the reference components of this inset.
+             * @param deps An "out" parameter.  The set that will hold the dependencies.
+             * @return The set of all reference components (crawled recursively of this inset.
+             */
             public Set<Component> getDependencies(Set<Component> deps) {
                 if (referenceComponent != null) {
                     if (deps.contains(referenceComponent)) {
@@ -2255,10 +2489,19 @@ public class LayeredLayout extends Layout {
                 return deps;
             }
             
+            /**
+             * Recursively gets all of the reference components of this inset.
+             * @return The set of all reference components (crawled recursively of this inset.
+             */
             public Set<Component> getDependencies() {
                 return getDependencies(new HashSet<Component>());
             }
 
+            /**
+             * Gets the opposite inset of this inset within its parent constraint.  E.g. if this is the
+             * left inset, it will get the associated right inset.
+             * @return The opposite inset.
+             */
             private Inset getOppositeInset() {
                 LayeredLayoutConstraint cnst = LayeredLayoutConstraint.this;
                 if (cnst != null) {
@@ -2282,6 +2525,10 @@ public class LayeredLayout extends Layout {
                 return null;
             }
             
+            /**
+             * Sets the value of this inset.  E.g. "2mm", "1px", "25%", or "auto".
+             * @param val 
+             */
             private void setValue(String val) {
                 int pos;
                 if ((pos=val.indexOf("mm")) != -1) {
@@ -2298,6 +2545,11 @@ public class LayeredLayout extends Layout {
                 }
             }
             
+            /**
+             * Copies this inset into another inset.
+             * @param dest The inset to copy to.
+             * @return The copied inset.
+             */
             public Inset copyTo(Inset dest) {
                 dest.autoIsClipped = autoIsClipped;
                 dest.calculatedValue = calculatedValue;
@@ -2312,29 +2564,55 @@ public class LayeredLayout extends Layout {
                 return dest;
             }
             
+            /**
+             * Copies this inset to the corresponding inset of the provided constraint.
+             * @param dest The constraint to copy the inset into.
+             * @return The corresponding inset in {@literal dest} that we copied the inset into.
+             */
             public Inset copyTo(LayeredLayoutConstraint dest) {
                 copyTo(dest.insets[side]);
-                return this;
+                return dest.insets[side];
             }
             
+            /**
+             * Copies this inset into the corresponding inset of the provided component.
+             * @param cmp The component that we are copying the inset into.
+             * @return The copied inset.
+             */
             public Inset copyTo(Component cmp) {
                 copyTo(getOrCreateConstraint(cmp));
                 return this;
             }
             
+            /**
+             * Creates a copy of this inset.
+             * @return 
+             */
             public Inset copy() {
                 return copyTo(new Inset(side));
             }
             
-            
+            /**
+             * Gets the unit of this inset. 
+             * @return One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
+             */
             public byte getUnit() {
                 return unit;
             }
             
+            /**
+             * Checks if this is a fixed inset. An inset is considered "fixed" if its unit is not {@link #UNIT_AUTO}
+             * @return True if the inset is fixed.
+             */
             public boolean isFixed() {
                 return unit != UNIT_AUTO;
             }
             
+            /**
+             * Gets the current value of this inset in millimetres.  If the inset uses a different unit, then 
+             * this will calculate the corresponding value.
+             * @return 
+             */
             public float getCurrentValueMM() {
                 if (unit == UNIT_DIPS) {
                     return value;
@@ -2356,6 +2634,11 @@ public class LayeredLayout extends Layout {
                 }
             }
             
+            /**
+             * Gets the current value of this inset in pixels.  If the inset uses a different unit
+             * then this will calculate the corresponding value.
+             * @return The value of this inset in pixels.
+             */
             public int getCurrentValuePx() {
                 if (unit == UNIT_DIPS) {
                     return Display.getInstance().convertToPixels(value);
@@ -2372,14 +2655,28 @@ public class LayeredLayout extends Layout {
                 }
             }
             
+            /**
+             * True if this is a vertical inset (top or bottom).
+             * @return 
+             */
             public boolean isVertical() {
                 return side == Component.TOP || side == Component.BOTTOM;
             }
             
+            /**
+             * True if this is a horizontal inset (left or right).
+             * @return 
+             */
             public boolean isHorizontal() {
                 return side == Component.LEFT || side == Component.RIGHT;
             }
             
+            /**
+             * Changes the units of this inset, and updates the value to remain 
+             * the same as the current value. 
+             * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
+             * @return Self for chaining.
+             */
             public Inset changeUnits(byte unit) {
                 if (unit != this.unit) {
                     if (unit == UNIT_PIXELS) {
@@ -2395,6 +2692,14 @@ public class LayeredLayout extends Layout {
                 return this;
             }
             
+            /**
+             * Changes the reference component, while updating the value to remain in the same
+             * absolute position.
+             * @param parent The parent container.
+             * @param newRef The new reference component.
+             * @param pos The reference position.
+             * @return Self for chaining.
+             */
             public Inset changeReference(Container parent, Component newRef, float pos) {
                 if (isFlexible()) {
                     // we are flexible, so we'll just set the new reference
@@ -2426,6 +2731,11 @@ public class LayeredLayout extends Layout {
                 
             }
             
+            /**
+             * Checks if this is a flexible inset.  An inset is considered flexible if its unit is {@link #UNIT_AUTO}.
+             * @return True if this is a flexible inset.
+             * @see #isFixed() 
+             */
             public boolean isFlexible() {
                 return unit == UNIT_AUTO;
             }
@@ -2489,6 +2799,14 @@ public class LayeredLayout extends Layout {
                 
             }
             
+            /**
+             * Translates the inset by {@literal delta} pixels.
+             * @param delta Pixels to translate this inset by.
+             * @param preferMM If this is a flexible inset, then translating it will require changing it to fixed.  {@literal true} to use millimetres.  {@literal false} to use pixels.
+             * @param parent The parent container used for calculating equivalent percent if this is a percent inset.
+             * @return Self for chaining.
+             * @see #translateMM(float, boolean, com.codename1.ui.Container) 
+             */
             public Inset translatePixels(int delta, boolean preferMM, Container parent) {
                 
                 switch (unit) {
@@ -2552,36 +2870,16 @@ public class LayeredLayout extends Layout {
                 return this;
             }
             
+            /**
+             * Translates the inset by {@literal delta} millimetres.
+             * @param delta Pixels to translate this inset by.
+             * @param preferMM If this is a flexible inset, then translating it will require changing it to fixed.  {@literal true} to use millimetres.  {@literal false} to use pixels.
+             * @param parent The parent container used for calculating equivalent percent if this is a percent inset.
+             * @return Self for chaining.
+             */
             public Inset translateMM(float delta, boolean preferMM, Container parent) {
                 return translatePixels(Display.getInstance().convertToPixels(delta), preferMM, parent);
-                /*
-                switch (unit) {
-                    case UNIT_DIPS :
-                        value += delta;
-                        break;
-                    case UNIT_PIXELS : {
-                        value += Display.getInstance().convertToPixels(delta);
-                        break;
-                    }
-                    case UNIT_PERCENT: {
-                        return translatePixels(Display.getInstance().convertToPixels(delta), preferMM, cmp);
-                    }
-                    case UNIT_AUTO : {
-                        // If this is auto then we'll need to make it fixed... but we'll start
-                        // by making it fixed
-                        unit = preferMM ? UNIT_DIPS : UNIT_PIXELS;
-                        if (unit == UNIT_PIXELS) {
-                            value = calculatedValue + Display.getInstance().convertToPixels(delta);
-                        } else {
-                            float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
-                            value = calculatedValue / pixelsPerDip + delta;
-                        }
-                        break;
-                    }
-                        
-                }
-                return this;
-                        */
+               
             }
 
         }
