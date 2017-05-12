@@ -98,12 +98,43 @@ import java.util.Set;
  */
 public class LayeredLayout extends Layout {
 
+    /**
+     * Unit used for insets.  Millimetres.
+     * 
+     * @see Inset#unit(byte) 
+     * @see Inset#changeUnits(byte) 
+     */
     public static final byte UNIT_DIPS = Style.UNIT_TYPE_DIPS;
+    
+    /**
+     * Unit used for insets.  Pixels.
+     * 
+     * @see Inset#unit(byte) 
+     * @see Inset#changeUnits(byte) 
+     */
     public static final byte UNIT_PIXELS = Style.UNIT_TYPE_PIXELS;
+    
+    /**
+     * Unit used for insets.  Percent.
+     * 
+     * @see Inset#unit(byte) 
+     * @see Inset#changeUnits(byte) 
+     */
     public static final byte UNIT_PERCENT = Style.UNIT_TYPE_SCREEN_PERCENTAGE;
+    
+    /**
+     * Unit used for insets.  Auto.  Auto unit type for an inset indicates the 
+     * the inset will be automatically determined at layout time.
+     * 
+     * @see Inset#unit(byte) 
+     * @see Inset#changeUnits(byte) 
+     */
     public static final byte UNIT_AUTO = 100;
 
-    
+    /**
+     * Temp collection to keep track of which components in the container
+     * have been laid out.
+     */
     private HashSet<Component> tmpLaidOut = new HashSet<Component>();
 
     @Override
@@ -117,10 +148,22 @@ public class LayeredLayout extends Layout {
         }
     }
     
+    /**
+     * Wraps {@link #getComponentConstraint(com.codename1.ui.Component) } and casts it
+     * directly to {@link LayeredLayoutConstraint}.
+     * @param cmp The component whose constraint we want to retrieve.
+     * @return The layered layout constraint for this component.
+     */
     public LayeredLayoutConstraint getLayeredLayoutConstraint(Component cmp) {
-        return (LayeredLayoutConstraint)getLayeredLayoutConstraint(cmp);
+        return (LayeredLayoutConstraint)getComponentConstraint(cmp);
     }
     
+    /**
+     * Installs the given constraint in the provided component.
+     * @param constraint
+     * @param cmp
+     * @return 
+     */
     private LayeredLayoutConstraint installConstraint(LayeredLayoutConstraint constraint, Component cmp) {
         
         if (constraint.outer() != this || (constraint.cmp != null && constraint.cmp != cmp)) {
@@ -133,6 +176,11 @@ public class LayeredLayout extends Layout {
         return constraint;
     }
 
+    /**
+     * Makes a copy of the given constraint.
+     * @param constraint The constraint to copy.
+     * @return The copied constraint.
+     */
     @Override
     public Object cloneConstraint(Object constraint) {
         if (constraint instanceof LayeredLayoutConstraint) {
@@ -142,12 +190,11 @@ public class LayeredLayout extends Layout {
     }
 
     
-    
-    @Override
-    public void removeLayoutComponent(Component comp) {
-        //uninstallConstraint(comp);
-    }
-    
+   
+    /*
+    // We don't see to use this right now so commenting out.  However
+    // it is conceivable that we might want to reintroduce this ability later, so
+    // I'm leaving the code here.
     private void uninstallConstraint(Component cmp) {
         LayeredLayoutConstraint constraint = (LayeredLayoutConstraint)getComponentConstraint(cmp);
         if (constraint != null) {
@@ -155,18 +202,37 @@ public class LayeredLayout extends Layout {
         }
         cmp.putClientProperty("$$LayeredLayoutConstraint", null);
     }
+    */
 
+    /**
+     * Gets the LayeredLayoutConstraint associated with the given component.
+     * 
+     * May return null if there is no constraint.
+     * @param comp
+     * @return 
+     */
     @Override
     public Object getComponentConstraint(Component comp) {
         return comp.getClientProperty("$$LayeredLayoutConstraint");
     }
 
-    
+    /**
+     * Creates a default layered layout constraint.  Default constraint
+     * has zero insets on all four sides.
+     * @param constraint
+     * @return 
+     */
     public LayeredLayoutConstraint createConstraint(String constraint) {
         return new LayeredLayoutConstraint().setInsets(constraint);
     }
     
-    
+    /**
+     * If the given component already has a LayeredLayoutConstraint, then this 
+     * will return it. Otherwise it will create a constraint, install it in {@literal cmp}
+     * and return the constraint for inspection or manipulation.
+     * @param cmp The component whose constraint we wish to retrieve.
+     * @return The constraint for a given component.
+     */
     public LayeredLayoutConstraint getOrCreateConstraint(Component cmp) {
         LayeredLayoutConstraint constraint = (LayeredLayoutConstraint)getComponentConstraint(cmp);
         if (constraint == null) {
@@ -177,135 +243,390 @@ public class LayeredLayout extends Layout {
         return constraint;
     }
     
-    
-    
+    /**
+     * Gets an {@link Inset} associated with the provided component
+     * @param cmp The component whose inset we wish to retrieve.
+     * @param side The side of the inset.  One of {@link Component#TOP}, {@link Component#LEFT}, {@link Component#BOTTOM} 
+     * or {@link Component#RIGHT}.
+     * @return The {@link Inset} for the given side of the component.
+     */
     public Inset getInset(Component cmp, int side) {
         return getOrCreateConstraint(cmp).insets[side];
     }
     
+    /**
+     * Returns the insets for the given component as a string.  This can return the 
+     * insets in one of two formats depending on the value of the {@literal withLabels} 
+     * parameter.
+     * @param cmp The component whose insets we wish to retrieve.
+     * @param withLabels If {@literal false}, then this returns a string of the format {@code "top right bottom left"}
+     * e.g {@code "2mm 2mm 2mm 2mm"}.  If {@literal true}, then it will be formatted like CSS properties: {@code "top:2mm; right:2mm; bottom:2mm; left:2mm"}. 
+     * @return The insets associated with {@literal cmp} as a string. Each inset will include the unit.   E.g.:
+     * <ul><li>{@literal 2mm} = 2 millimetres/dips</li><li>{@literal 2px} = 2 pixels</li><li>{@literal 25%} = 25%</li><li>{@literal auto} = Flexible inset</li></ul>
+     * 
+     */
     public String getInsetsAsString(Component cmp, boolean withLabels) {
         return getOrCreateConstraint(cmp).getInsetsAsString(withLabels);
     }
     
+    /**
+     * Gets the top inset as a string. Return value will include the unit, so the following
+     * are possible values:
+     * <p>
+     * <ul><li>{@literal 2mm} = 2 millimetres</li>
+     * <li>{@literal 2px} = 2 pixels</li>
+     * <li>{@literal 25%} = 25%</li>
+     * <li>{@literal auto} = Flexible Inset</li>
+     * </ul>
+     * </p>
+     * @param cmp The component whose inset we wish to retrieve.
+     * @return The inset formatted as a string with the unit abbreviation ("mm", "px", or "%") suffixed.
+     */
     public String getTopInsetAsString(Component cmp) {
         return getOrCreateConstraint(cmp).top().getValueAsString();
     }
     
+    /**
+     * Gets the bottom inset as a string. Return value will include the unit, so the following
+     * are possible values:
+     * <p>
+     * <ul><li>{@literal 2mm} = 2 millimetres</li>
+     * <li>{@literal 2px} = 2 pixels</li>
+     * <li>{@literal 25%} = 25%</li>
+     * <li>{@literal auto} = Flexible Inset</li>
+     * </ul>
+     * </p>
+     * @param cmp The component whose inset we wish to retrieve.
+     * @return The inset formatted as a string with the unit abbreviation ("mm", "px", or "%") suffixed.
+     */
     public String getBottomInsetAsString(Component cmp) {
         return getOrCreateConstraint(cmp).bottom().getValueAsString();
     }
     
+    /**
+     * Gets the left inset as a string. Return value will include the unit, so the following
+     * are possible values:
+     * <p>
+     * <ul><li>{@literal 2mm} = 2 millimetres</li>
+     * <li>{@literal 2px} = 2 pixels</li>
+     * <li>{@literal 25%} = 25%</li>
+     * <li>{@literal auto} = Flexible Inset</li>
+     * </ul>
+     * </p>
+     * @param cmp The component whose inset we wish to retrieve.
+     * @return The inset formatted as a string with the unit abbreviation ("mm", "px", or "%") suffixed.
+     */
     public String getLeftInsetAsString(Component cmp) {
         return getOrCreateConstraint(cmp).left().getValueAsString();
     }
     
+    /**
+     * Gets the right inset as a string. Return value will include the unit, so the following
+     * are possible values:
+     * <p>
+     * <ul><li>{@literal 2mm} = 2 millimetres</li>
+     * <li>{@literal 2px} = 2 pixels</li>
+     * <li>{@literal 25%} = 25%</li>
+     * <li>{@literal auto} = Flexible Inset</li>
+     * </ul>
+     * </p>
+     * @param cmp The component whose inset we wish to retrieve.
+     * @return The inset formatted as a string with the unit abbreviation ("mm", "px", or "%") suffixed.
+     */
     public String getRightInsetAsString(Component cmp) {
         return getOrCreateConstraint(cmp).right().getValueAsString();
     }
     
+    /**
+     * Sets the insets for the component {@literal cmp} to the values specified in {@literal insets}.
+     * @param cmp The component whose insets we wish to set.
+     * @param insets The insets expressed as a string.  See {@link LayeredLayoutConstraint#setInsets(java.lang.String) } for 
+     * details on the format of this parameter.
+     * @return Self for chaining.
+     * @see LayeredLayoutConstraint#setInsets(java.lang.String) For details on the {@literal insets} parameter
+     * format.
+     */
     public LayeredLayout setInsets(Component cmp, String insets) {
         getOrCreateConstraint(cmp).setInsets(insets);
         return this;
     }
     
+    /**
+     * Sets the top inset for this component to the prescribed value.
+     * @param cmp The component whose inset we wish to set.
+     * @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the 
+     * following insets values would all be acceptable:
+     * <p>
+     * <ul>
+     *   <li>{@code "2mm"} = 2 millimetres</li>
+     *   <li>{@code "2px"} = 2 pixels</li>
+     *   <li>{@code "25%"} = 25 percent.</li>
+     *   <li>{@code "auto"} = Flexible inset</li>
+     * </ul>
+     * </p>
+     * @return Self for chaining.
+     */
     public LayeredLayout setInsetTop(Component cmp, String inset) {
         getOrCreateConstraint(cmp).top().setValue(inset);
         return this;
     }
     
+    /**
+     * Sets the top inset for this component to the prescribed value.
+     * @param cmp The component whose inset we wish to set.
+     * @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the 
+     * following insets values would all be acceptable:
+     * <p>
+     * <ul>
+     *   <li>{@code "2mm"} = 2 millimetres</li>
+     *   <li>{@code "2px"} = 2 pixels</li>
+     *   <li>{@code "25%"} = 25 percent.</li>
+     *   <li>{@code "auto"} = Flexible inset</li>
+     * </ul>
+     * </p>
+     * @return Self for chaining.
+     */
     public LayeredLayout setInsetBottom(Component cmp, String inset) {
         getOrCreateConstraint(cmp).bottom().setValue(inset);
         return this;
     }
     
+    /**
+     * Sets the left inset for this component to the prescribed value.
+     * @param cmp The component whose inset we wish to set.
+     * @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the 
+     * following insets values would all be acceptable:
+     * <p>
+     * <ul>
+     *   <li>{@code "2mm"} = 2 millimetres</li>
+     *   <li>{@code "2px"} = 2 pixels</li>
+     *   <li>{@code "25%"} = 25 percent.</li>
+     *   <li>{@code "auto"} = Flexible inset</li>
+     * </ul>
+     * </p>
+     * @return Self for chaining.
+     */
     public LayeredLayout setInsetLeft(Component cmp, String inset) {
        getOrCreateConstraint(cmp).left().setValue(inset);
        return this;
     }
     
+    /**
+     * Sets the right inset for this component to the prescribed value.
+     * @param cmp The component whose inset we wish to set.
+     * @param inset The inset value, including unit.  Units are Percent (%), Millimetres (mm), Pixels (px), and "auto".  E.g. the 
+     * following insets values would all be acceptable:
+     * <p>
+     * <ul>
+     *   <li>{@code "2mm"} = 2 millimetres</li>
+     *   <li>{@code "2px"} = 2 pixels</li>
+     *   <li>{@code "25%"} = 25 percent.</li>
+     *   <li>{@code "auto"} = Flexible inset</li>
+     * </ul>
+     * </p>
+     * @return Self for chaining.
+     */
     public LayeredLayout setInsetRight(Component cmp, String inset) {
        getOrCreateConstraint(cmp).right().setValue(inset);
        return this;
     }
     
     
-    
+    /**
+     * Sets the reference components for the insets of {@literal cmp}. See {@link LayeredLayoutConstraint#setReferenceComponents(com.codename1.ui.Component...) }
+     * for a full description of the parameters.
+     * @param cmp The component whose reference components we wish to check.
+     * @param referenceComponents The reference components.  This var arg may contain 1 to 4 values.  See {@link LayeredLayoutConstraint#setReferenceComponents(com.codename1.ui.Component...) } 
+     * for a full description.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferenceComponents(Component cmp, Component... referenceComponents) {
         getOrCreateConstraint(cmp).setReferenceComponents(referenceComponents);
         return this;
     }
     
+    /**
+     * Sets the reference components for this component as a string of 1 to 4 component indices separated by spaces. An 
+     * index of {@literal -1} indicates no reference for the corresponding inset.  See {@link LayeredLayoutConstraint#setReferenceComponentIndices(com.codename1.ui.Container, java.lang.String) }
+     * for a description of the {@literal refs} parameter.
+     * @param cmp The component whose references we're setting.
+     * @param refs Reference components as a string of component indices in the parent.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferenceComponents(Component cmp, String refs) {
         getOrCreateConstraint(cmp).setReferenceComponentIndices(cmp.getParent(), refs);
         return this;
     }
     
+    /**
+     * Sets the reference component for the top inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to anchor the inset to.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferenceComponentTop(Component cmp, Component referenceComponent) {
         getOrCreateConstraint(cmp).top().referenceComponent(referenceComponent);
         return this;
     }
     
+    /**
+     * Sets the reference component for the bottom inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to anchor the inset to.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferenceComponentBottom(Component cmp, Component referenceComponent) {
         getOrCreateConstraint(cmp).bottom().referenceComponent(referenceComponent);
         return this;
     }
     
+    /**
+     * Sets the reference component for the left inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to anchor the inset to.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferenceComponentLeft(Component cmp, Component referenceComponent) {
         getOrCreateConstraint(cmp).left().referenceComponent(referenceComponent);
         return this;
     }
     
+    /**
+     * Sets the reference component for the right inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to anchor the inset to.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferenceComponentRight(Component cmp, Component referenceComponent) {
         getOrCreateConstraint(cmp).top().referenceComponent(referenceComponent);
         return this;
     }
     
-    
+    /**
+     * Sets the reference positions for reference components.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a description of the parameters.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referencePositions The reference positions for the reference components. See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a full description of this parameter.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferencePositions(Component cmp, float... referencePositions) {
         getOrCreateConstraint(cmp).setReferencePositions(referencePositions);
         return this;
     }
     
+    /**
+     * Sets the reference positions for reference components.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a description of the parameters.
+     * @param cmp The component whose insets we are manipulating.
+     * @param positions The reference positions for the reference components. See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a full description of this parameter.
+     * @return Self for chaining.
+     */
     public LayeredLayout setReferencePositions(Component cmp, String positions) {
         getOrCreateConstraint(cmp).setReferencePositions(positions);
         return this;
     }
     
+    /**
+     * Sets the top inset reference position.  Only applicable if the top inset has a reference
+     * component specified. 
+     * @param cmp The component whose insets were are manipulating.
+     * @param position The position.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) } for a full
+     * description of the possible values here.
+     * @return 
+     */
     public LayeredLayout setReferencePositionTop(Component cmp, float position) {
         getOrCreateConstraint(cmp).top().referencePosition(position);
         return this;
     }
     
+    /**
+     * Sets the reference component for the top inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to which the inset should be anchored.
+     * @param position The position of the reference anchor.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a full description of reference positions.
+     * @return 
+     */
     public LayeredLayout setReferenceComponentTop(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).top().referenceComponent(referenceComponent).referencePosition(position);
         return this;
     }
     
+    /**
+     * Sets the bottom inset reference position.  Only applicable if the top inset has a reference
+     * component specified. 
+     * @param cmp The component whose insets were are manipulating.
+     * @param position The position.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) } for a full
+     * description of the possible values here.
+     * @return 
+     */
     public LayeredLayout setReferencePositionBottom(Component cmp, float position) {
         getOrCreateConstraint(cmp).bottom().referencePosition(position);
         return this;
     }
     
+    /**
+     * Sets the reference component for the bottom inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to which the inset should be anchored.
+     * @param position The position of the reference anchor.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a full description of reference positions.
+     * @return 
+     */
     public LayeredLayout setReferenceComponentBottom(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).bottom().referenceComponent(referenceComponent).referencePosition(position);
         return this;
     }
     
+    /**
+     * Sets the left inset reference position.  Only applicable if the top inset has a reference
+     * component specified. 
+     * @param cmp The component whose insets were are manipulating.
+     * @param position The position.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) } for a full
+     * description of the possible values here.
+     * @return 
+     */
     public LayeredLayout setReferencePositionLeft(Component cmp, float position) {
         getOrCreateConstraint(cmp).left().referencePosition(position);
         return this;
     }
     
+    /**
+     * Sets the reference component for the left inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to which the inset should be anchored.
+     * @param position The position of the reference anchor.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a full description of reference positions.
+     * @return 
+     */
     public LayeredLayout setReferenceComponentLeft(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).left().referenceComponent(referenceComponent).referencePosition(position);
         return this;
     }
     
+    /**
+     * Sets the right inset reference position.  Only applicable if the top inset has a reference
+     * component specified. 
+     * @param cmp The component whose insets were are manipulating.
+     * @param position The position.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) } for a full
+     * description of the possible values here.
+     * @return 
+     */
     public LayeredLayout setReferencePositionRight(Component cmp, float position) {
         getOrCreateConstraint(cmp).right().referencePosition(position);
         return this;
     }
     
+    /**
+     * Sets the reference component for the right inset of the given component.
+     * @param cmp The component whose insets we are manipulating.
+     * @param referenceComponent The component to which the inset should be anchored.
+     * @param position The position of the reference anchor.  See {@link LayeredLayoutConstraint#setReferencePositions(float...) }
+     * for a full description of reference positions.
+     * @return 
+     */
     public LayeredLayout setReferenceComponentRight(Component cmp, Component referenceComponent, float position) {
         getOrCreateConstraint(cmp).right().referenceComponent(referenceComponent).referencePosition(position);
         return this;
@@ -329,6 +650,15 @@ public class LayeredLayout extends Layout {
 
     }
 
+    /**
+     * Lays out the specific component within the container.  This will first lay out any components that it depends on.
+     * @param parent The parent container being laid out.
+     * @param cmp The component being laid out.
+     * @param top 
+     * @param left
+     * @param bottom
+     * @param right 
+     */
     private void layoutComponent(Container parent, Component cmp, int top, int left, int bottom, int right) {
         if (tmpLaidOut.contains(cmp)) {
             return;
@@ -452,6 +782,10 @@ public class LayeredLayout extends Layout {
         return Container.encloseIn(new LayeredLayout(), cmps);
     }
     
+    /**
+     * Creates a new {@link LayeredLayoutConstraint}
+     * @return 
+     */
     public LayeredLayoutConstraint createConstraint() {
         return new LayeredLayoutConstraint();
     }
@@ -504,12 +838,27 @@ public class LayeredLayout extends Layout {
         return cmp.getY() + cmp.getStyle().getPaddingTop();
     }
     
+    /**
+     * A class that encapsulates the insets for a component in layered layout.
+     */
     public class LayeredLayoutConstraint {
-        Component cmp;
         
+        /**
+         * The component that this constraint belongs to.  If you try to add
+         * this constraint to a different component, then it will cause a copy
+         * to be made rather than using the same component so that constraints
+         * to bleed into other components.
+         */
+        private Component cmp;
+        
+        /**
+         * Gets the insets as a string.
+         * @return 
+         */
         public String toString() {
             return getInsetsAsString(true);
         }
+        
         
         private LayeredLayout outer() {
             return LayeredLayout.this;
@@ -517,9 +866,10 @@ public class LayeredLayout extends Layout {
         
         /**
          * Recursively fixes all dependencies so that they are contained inside
-         * the provided parent.
-         * @param parent
-         * @return 
+         * the provided parent.  A dependency is a "referenceComponent".
+         * @param parent The parent container within which all dependencies should reside.
+         * @return Self for chaining.
+         * @see #setReferenceComponents(com.codename1.ui.Component...) 
          */
         public LayeredLayoutConstraint fixDependencies(Container parent) {
             for (Inset inset : insets) {
@@ -528,18 +878,41 @@ public class LayeredLayout extends Layout {
             return this;
         }
         
+        /**
+         * Checks to see if this constraint has any circular dependencies.  E.g.
+         * Component A has an inset that has Component B as a reference, which has
+         * an inset that depends on Component A. 
+         * 
+         * @param start The start component to check.
+         * @return True this forms a circular dependency.
+         */
         public boolean hasCircularDependency(Component start) {
             return dependsOn(start);
         }
         
+        /**
+         * Gets the inset for a particular side.  
+         * @param inset One of {@link Component#TOP}, {@link Component#BOTTOM }, {@link Component#LEFT} or
+         * {@link Component#RIGHT}.
+         * @return The inset.
+         */
         public Inset getInset(int inset) {
             return insets[inset];
         }
         
+        /**
+         * Makes a full copy of this inset. 
+         * @return 
+         */
         public LayeredLayoutConstraint copy() {
             return copyTo(new LayeredLayoutConstraint());
         }
         
+        /**
+         * Copies the settings of this constraint into another constraint.
+         * @param dest The inset to copy to.
+         * @return Self for chaining.
+         */
         public LayeredLayoutConstraint copyTo(LayeredLayoutConstraint dest) {
             for (int i=0; i<4; i++) {
                 //Inset inset = new Inset(i);
@@ -548,6 +921,15 @@ public class LayeredLayout extends Layout {
             return dest;
         }
         
+        /**
+         * Returns a reference box within which insets of the given component are calculated.  If 
+         * {@link cmp} has no reference components in any of its insets, then the resulting box will
+         * just bee the inner box of the parent (e.g. the parent's inner bounds.
+         * @param parent The parent container.
+         * @param cmp The component whose reference box we are obtaining.
+         * @param box An out parameter.  This will store the bounds of the box.
+         * @return The reference box.  (This will be the same object that is passed in the {@literal box} parameter.
+         */
         public Rectangle getReferenceBox(Container parent, Component cmp, Rectangle box) {
             Style parentStyle = parent.getStyle();
             //Style cmpStyle = cmp.getStyle();
@@ -584,10 +966,29 @@ public class LayeredLayout extends Layout {
             return box;
         }
         
+        /**
+         * Returns a reference box within which insets of the given component are calculated.  If 
+         * {@link cmp} has no reference components in any of its insets, then the resulting box will
+         * just bee the inner box of the parent (e.g. the parent's inner bounds.
+         * @param parent The parent container.
+         * @param cmp The component whose reference box we are obtaining.
+         * @return The reference box.  
+         */
         public Rectangle getReferenceBox(Container parent, Component cmp) {
             return getReferenceBox(parent, cmp, new Rectangle());
         }
         
+        /**
+         * Shifts the constraint by the specified number of pixels while maintaining the same units.  This is
+         * used mainly in the GUI builder to facilitate dragging and resizing of the component.
+         * @param x The number of pixels that the insets should be shifted on the x axis.
+         * @param y The number of pixels that the insets should be shifted on the y axis.
+         * @param preferMM If an inset needs to be switched from flexible to fixed, then this indicates where it will
+         * be changed to millimetres or pixels.  {@literal true} for millimetres.
+         * @param parent The parent container in which calculations should be performed. 
+         * @return Self for chaining.
+         * @see #translateMM(float, float, boolean, com.codename1.ui.Container) 
+         */
         public LayeredLayoutConstraint translatePixels(int x, int y, boolean preferMM, Container parent) {
             if (y != 0) {
                 if (top().isFlexible() && top().autoIsClipped) {
@@ -645,7 +1046,20 @@ public class LayeredLayout extends Layout {
             return this;
         }
         
+        /**
+         * Shifts the constraint by the specified number of millimetres while maintaining the same units.  This is
+         * used mainly in the GUI builder to facilitate dragging and resizing of the component.
+         * @param x The number of pixels that the insets should be shifted on the x axis.
+         * @param y The number of pixels that the insets should be shifted on the y axis.
+         * @param preferMM If an inset needs to be switched from flexible to fixed, then this indicates where it will
+         * be changed to millimetres or pixels.  {@literal true} for millimetres.
+         * @param parent The parent container in which calculations should be performed. 
+         * @return Self for chaining.
+         * @see #translatePixels(int, int, boolean, com.codename1.ui.Container) 
+         */
         public LayeredLayoutConstraint translateMM(float x, float y, boolean preferMM, Container parent) {
+            return translatePixels(Display.getInstance().convertToPixels(x), Display.getInstance().convertToPixels(y), preferMM, parent);
+            /*
             if (y != 0) {
                 if (top().isFlexible() && bottom().isFlexible()) {
                     // Both top and bottom are flexible... we need to make one of these 
@@ -687,8 +1101,14 @@ public class LayeredLayout extends Layout {
                 }
             }
             return this;
+            */
         }
         
+        /**
+         * Gets the set of insets on this constraint that are fixed.  An inset is 
+         * considered fixed if it's unit is NOT {@link #UNIT_AUTO}.
+         * @return 
+         */
         public Collection<Inset> getFixedInsets() {
             ArrayList<Inset> out = new ArrayList<Inset>();
             for (Inset i : insets) {
@@ -699,6 +1119,11 @@ public class LayeredLayout extends Layout {
             return out;
         }
         
+        /**
+         * Gets the set of insets in this constraint that are flexible.  An inset is 
+         * considered flexible if it's unit is {@link #UNIT_AUTO}.
+         * @return 
+         */
         public Collection<Inset> getFlexibleInsets() {
             ArrayList<Inset> out = new ArrayList<Inset>();
             for (Inset i : insets) {
@@ -709,6 +1134,12 @@ public class LayeredLayout extends Layout {
             return out;
         }
         
+        /**
+         * Gets the reference positions of this constraint as a string.
+         * @param withLabels True to return the string in CSS format:  e.g. {@code "top:1.0; right:0; bottom:1.0; left:1.0"}  {@literal false}
+         * to return as a space-delimited string of inset reference positions in the order "top right bottom left".  E.g. {@literal "1.0 0 1.0 1.0"}
+         * @return The reference positions as a string.
+         */
         public String getReferencePositionsAsString(boolean withLabels) {
             StringBuilder sb = new StringBuilder();
             if (withLabels) {
@@ -725,7 +1156,51 @@ public class LayeredLayout extends Layout {
             return sb.toString();
         }
         
-        
+        /**
+         * Sets the reference component positions for this constraint from a string.  The string format 
+         * may be either using labels following the same output format of {@literal getReferencePositionsAsString(true)}
+         * or as a space-delimited string (e.g. {@literal getReferencePositionsAsString(false)}.  When using the label
+         * format, you may provide one or more inset values in the string.  E.g. the following are all acceptable:
+         * <p>
+         * <ul><li>{@literal top:1.0; left:0; right:0; bottom:1.0}</li>
+         * <li>{@literal left:0.5}</li>
+         * <li>{@literal left:1.0; right:0.5}</li>
+         * </ul>
+         * </p>
+         * <p>
+         * If you provide the positions as a space-delimited string, then they are expected to follow the same format
+         * as is used in CSS for providing <a href="https://developer.mozilla.org/en/docs/Web/CSS/margin">margin</a>. To summarize:
+         * </p>
+         * <p>
+         * {@code 
+//Apply to all four sides 
+1.0
+
+//vertical | horizontal
+1.0 0
+
+// top | horizontal | bottom 
+1.0 0.0 0.5
+
+// top | right | bottom | left 
+1.0 1.0 1.0 1.0
+}
+         * </p>
+         * 
+         * <p><strong>Interpretation of Reference Positions:</strong></p>
+         * <p>When an inset includes a reference component, that means that the inset is "anchored" to that
+         * reference component.  I.e. An inset of {@literal 1mm} is measured 1mm from the outer edge of the
+         * reference component.  By default it chooses the edge of on the <em>same side</em> as the inset.  So
+         * if this is a "left" inset, then it will measure against the "left" outer edge of the reference component.
+         * This is the meaning of a {@literal 0} value for the associated reference positions.</p>
+         * 
+         * <p>A reference position of {@literal 1.0} will start measuring from the opposite edge.  So for a "left" inset,
+         * it will measure from the "right" outer edge of the reference component.  You can choose any real value for the
+         * reference position, and it will cause the measurement to be scaled accordingly.  E.g. {@literal 0.5.} would measure
+         * from the center point of the reference component.</p>
+         * @param positionsStr The reference positions.
+         * @return Self for chaining.
+         */
         public LayeredLayoutConstraint setReferencePositions(String positionsStr) {
             positionsStr = positionsStr.trim();
             LayeredLayoutConstraint cnst = this;
@@ -788,56 +1263,82 @@ public class LayeredLayout extends Layout {
             return this;
         }
         
-        public String getReferenceComponentIndicesAsString(boolean withLabels) {
-            
+        /**
+         * Gets the reference component indexes within the provided {@literal parent} container as a string.
+         * If an inset doesn't have a reference component, then the corresponding index will be {@literal -1}.
+         * <p>
+         * Use the {@literal withLabels} parameter to choose whether to include labels with the indices or not.  E.g:
+         * 
+         * {@code
+         * String indices = getReferenceComponentIndicesAsString(parent, true);
+         * // Would return something like
+         * // "top:-1; right:2; bottom:-1; left: 0"
+         * 
+         * indices = getReferenceComponentIndicesAsString(parent, false);
+         * // Would return something like:
+         * // "-1 2 -1 0"  (i.e. Top Right Bottom Left)
+         * 
+         * // Interpretation: 
+         * //   Top inset has no reference component
+         * //   Right inset has component with index 2 (i.e. parent.getComponentIndex(rightReferenceComponent) == 2)
+         * //   Bottom inset has no reference component
+         * //   Left inset has component with index 0 as a reference component.
+         * }
+         * </p>
+         * @param parent
+         * @param withLabels
+         * @return 
+         */
+        public String getReferenceComponentIndicesAsString(Container parent, boolean withLabels) {
+            fixDependencies(parent);
             StringBuilder sb = new StringBuilder();
             if (withLabels) {
-                if (top().referenceComponent != null) {
+                if (top().referenceComponent != null && top().referenceComponent.getParent() != null) {
                     Component cmp = top().referenceComponent;
                     sb.append("top:").append(cmp.getParent().getComponentIndex(cmp)).append("; ");
                 } else {
                     sb.append("top:-1; ");
                 }
-                if (right().referenceComponent != null) {
+                if (right().referenceComponent != null && right().referenceComponent.getParent() != null) {
                     Component cmp = right().referenceComponent;
                     sb.append("right:").append(cmp.getParent().getComponentIndex(cmp)).append("; ");
                 } else {
                     sb.append("right:-1; ");
                 }
-                if (bottom().referenceComponent != null) {
+                if (bottom().referenceComponent != null && bottom().referenceComponent.getParent() != null) {
                     Component cmp = bottom().referenceComponent;
                     sb.append("bottom:").append(cmp.getParent().getComponentIndex(cmp)).append("; ");
                 } else {
                     sb.append("bottom:-1; ");
                 }
 
-                if (left().referenceComponent != null) {
+                if (left().referenceComponent != null && left().referenceComponent.getParent() != null) {
                     Component cmp = left().referenceComponent;
                     sb.append("left:").append(cmp.getParent().getComponentIndex(cmp)).append("; ");
                 } else {
                     sb.append("left:-1");
                 }
             } else {
-                if (top().referenceComponent != null) {
+                if (top().referenceComponent != null && top().referenceComponent.getParent() != null) {
                     Component cmp = top().referenceComponent;
                     sb.append(cmp.getParent().getComponentIndex(cmp)).append(" ");
                 } else {
                     sb.append("-1 ");
                 }
-                if (right().referenceComponent != null) {
+                if (right().referenceComponent != null && right().referenceComponent.getParent() != null) {
                     Component cmp = right().referenceComponent;
                     sb.append(cmp.getParent().getComponentIndex(cmp)).append(" ");
                 } else {
                     sb.append("-1 ");
                 }
-                if (bottom().referenceComponent != null) {
+                if (bottom().referenceComponent != null && bottom().referenceComponent.getParent() != null) {
                     Component cmp = bottom().referenceComponent;
                     sb.append(cmp.getParent().getComponentIndex(cmp)).append(" ");
                 } else {
                     sb.append("-1 ");
                 }
 
-                if (left().referenceComponent != null) {
+                if (left().referenceComponent != null && left().referenceComponent.getParent() != null) {
                     Component cmp = left().referenceComponent;
                     sb.append(cmp.getParent().getComponentIndex(cmp)).append(" ");
                 } else {
@@ -849,6 +1350,44 @@ public class LayeredLayout extends Layout {
             
         }
         
+        /**
+         * Sets the reference components of the insets of this constraint as indices of the provided parent
+         * container.
+         * @param parent The parent container whose children are to be used as reference components.
+         * @param indices The indices to set as the reference components.
+         * <p>The string format 
+         * may be either using labels following the same output format of {@literal cnst.getReferenceComponentIndicesAsString(true)}
+         * or as a space-delimited string (e.g. {@literal cnst.getReferenceComponentIndicesAsString(false)}.  When using the label
+         * format, you may provide one or more inset values in the string.  E.g. the following are all acceptable:</p>
+         * <p>
+         * <ul><li>{@literal top:-1; left:0; right:0; bottom:1}</li>
+         * <li>{@literal left:1}</li>
+         * <li>{@literal left:10; right:-1}</li>
+         * </ul>
+         * </p>
+         * <p>
+         * If you provide the positions as a space-delimited string, then they are expected to follow the same format
+         * as is used in CSS for providing <a href="https://developer.mozilla.org/en/docs/Web/CSS/margin">margin</a>. To summarize:
+         * </p>
+         * <p>
+         * {@code 
+//Set component at index 0 as reference for all 4 insets.
+0
+
+//vertical insets use component index 2 | horizontal insets use component index 1
+2 1
+
+// top | horizontal | bottom 
+-1 3 10
+
+// top | right | bottom | left 
+-1 -1 -1 -1
+}
+*           
+         * </p>
+         * <p><strong>Note: An index of {@literal -1} means that the corresponding inset has no reference component.</strong></p>
+         * @return 
+         */
         public LayeredLayoutConstraint setReferenceComponentIndices(Container parent, String indices) {
             indices = indices.trim();
             LayeredLayoutConstraint cnst = this;
@@ -977,6 +1516,16 @@ public class LayeredLayout extends Layout {
             return this;
         }
         
+        /**
+         * Gets the insets of this constraint as a string. If {@literal withLabels} is {@literal true}, then it
+         * will return a string of the format:
+         * <p>{@literal top:2mm; right:0; bottom:10%; left:auto}</p>
+         * <p>If {@literal withLabels} is {@literal false} then it will return a space-delimited string with 
+         * the inset values ordered "top right bottom left" (the same as for CSS margins) order.</p>
+         * 
+         * @param withLabels
+         * @return 
+         */
         public String getInsetsAsString(boolean withLabels) {
             StringBuilder sb = new StringBuilder();
             if (withLabels) {
@@ -993,6 +1542,15 @@ public class LayeredLayout extends Layout {
             return sb.toString();
         }
         
+        /**
+         * Sets the reference components for the constraint.
+         * @param refs May contain 1, 2, 3, or 4 values.  If only 1 value is passed, then it is
+         * set on all 4 insets.  If two values are passed, then the first is set on the top and bottom
+         * insets, and the 2nd is set on the left and right insets (i.e. vertical | horizontal).
+         * If 3 values are passed, then, they are used for top, horizontal, and bottom.
+         * If 4 values are passed, then they are used for top, right, bottom, left (in that order).
+         * @return Self for chaining.
+         */
         public LayeredLayoutConstraint setReferenceComponents(Component... refs) {
             if (refs.length == 1) {
                 top().referenceComponent = refs[0];
@@ -1019,7 +1577,27 @@ public class LayeredLayout extends Layout {
         }
         
         
-        
+        /**
+         * Sets the reference positions for the constraint.
+         * <p><strong>Interpretation of Reference Positions:</strong></p>
+         * <p>When an inset includes a reference component, that means that the inset is "anchored" to that
+         * reference component.  I.e. An inset of {@literal 1mm} is measured 1mm from the outer edge of the
+         * reference component.  By default it chooses the edge of on the <em>same side</em> as the inset.  So
+         * if this is a "left" inset, then it will measure against the "left" outer edge of the reference component.
+         * This is the meaning of a {@literal 0} value for the associated reference positions.</p>
+         * 
+         * <p>A reference position of {@literal 1.0} will start measuring from the opposite edge.  So for a "left" inset,
+         * it will measure from the "right" outer edge of the reference component.  You can choose any real value for the
+         * reference position, and it will cause the measurement to be scaled accordingly.  E.g. {@literal 0.5.} would measure
+         * from the center point of the reference component.</p>
+         * 
+         * @param p May contain 1, 2, 3, or 4 values.  If only 1 value is passed, then it is
+         * set on all 4 insets.  If two values are passed, then the first is set on the top and bottom
+         * insets, and the 2nd is set on the left and right insets (i.e. vertical | horizontal).
+         * If 3 values are passed, then, they are used for top, horizontal, and bottom.
+         * If 4 values are passed, then they are used for top, right, bottom, left (in that order).
+         * @return Self for chaining.
+         */
         public LayeredLayoutConstraint setReferencePositions(float... p) {
             if (p.length == 1) {
                 for (Inset i : insets) {
@@ -1072,6 +1650,32 @@ public class LayeredLayout extends Layout {
             return this;
         }
         
+        /**
+         * Sets the insets for this constraint as a string.  The string may include labels
+         * or it may be a space delimited string of values with "top right bottom left" order.
+         * 
+         * <p>
+         * If providing as a space-delimited string of inset values, then you can provide 1, 2, 3, or 4
+         * values.  If only 1 value is passed, then it is
+         * set on all 4 insets.  If two values are passed, then the first is set on the top and bottom
+         * insets, and the 2nd is set on the left and right insets (i.e. vertical | horizontal).
+         * If 3 values are passed, then, they are used for top, horizontal, and bottom.
+         * If 4 values are passed, then they are used for top, right, bottom, left (in that order).
+         * </p>
+         * <p>
+         * <strong>Example Inputs</strong>
+         * </p>
+         * <p>
+         * <ul>
+         *   <li>{@literal "0 0 0 0"} = all 4 insets are zero pixels</li>
+         *   <li>{@literal "0 1mm"} = Vertical insets are zero.  Horizontal insets are 1mm</li>
+         *   <li>{@literal "10% auto 20%"} = Top inset is 10%.  Horizontal insets are flexible.  Bottom is 20%</li>
+         *   <li>{@literal "1mm 2mm 3mm 4mm"} = Top=1mm, Right=2mm, Bottom=3mm, Left=4mm</li>
+         * </ul>
+         * </p>
+         * @param insetStr
+         * @return Self for chaining.
+         */
         public LayeredLayoutConstraint setInsets(String insetStr) {
             
             LayeredLayoutConstraint cnst = this;
@@ -1124,27 +1728,49 @@ public class LayeredLayout extends Layout {
             return this;
         }
         
+        /**
+         * Gets the left inset.
+         * @return The left inset
+         */
         public Inset left() {
             return insets[Component.LEFT];
         }
         
+        /**
+         * Gets the right inset.
+         * @return The right inset.
+         */
         public Inset right() {
             return insets[Component.RIGHT];
         }
         
+        /**
+         * Gets the top inset
+         * @return The top inset
+         */
         public Inset top() {
             return insets[Component.TOP];
         }
         
+        /**
+         * Gets the bottom inset.
+         * @return The bottom inset
+         */
         public Inset bottom() {
             return insets[Component.BOTTOM];
         }
         
+        /**
+         * Gets the constraint itself.
+         * @return 
+         */
         public LayeredLayoutConstraint constraint() {
             return this;
         }
         
-        
+        /**
+         * The insets for this constraint.
+         */
         private final Inset[] insets = new Inset[]{
             new Inset(Component.TOP),
             new Inset(Component.LEFT),
@@ -1154,6 +1780,11 @@ public class LayeredLayout extends Layout {
 
         //private Rectangle preferredBounds;
 
+        /**
+         * Gets the dependencies (i.e. recursively gets  all reference components).
+         * @param deps A set to add the dependencies to. (An "out" parameter).
+         * @return The set of dependencies.  Same as {@literal dep} parameter.
+         */
         public Set<Component> getDependencies(Set<Component> deps) {
             for (Inset inset : insets) {
                 inset.getDependencies(deps);
@@ -1161,21 +1792,42 @@ public class LayeredLayout extends Layout {
             return deps;
         }
         
+        /**
+         * Gets the dependencies (i.e. recursively gets  all reference components).
+         * @return The set of dependencies. 
+         */
         public Set<Component> getDependencies() {
             return getDependencies(new HashSet<Component>());
         }
         
+        /**
+         * Checks to see if this constraint has the given component in its set of dependencies.
+         * @param cmp The component to check.
+         * @return True if {@literal cmp} is a reference component of some inset in this
+         * constraint (recursively).
+         */
         public boolean dependsOn(Component cmp) {
             return getDependencies().contains(cmp);
         }
 
+        /**
+         * Encapsulates an inset.
+         */
         public class Inset {
 
             
+            /**
+             * Creates a new inset for the given side.
+             * @param side One of {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, or {@link Component#RIGHT}.
+             */
             public Inset(int side) {
                 this.side = side;
             }
 
+            /**
+             * Prints this inset as a string.
+             * @return 
+             */
             public String toString() {
                 switch (side) {
                     case Component.TOP : return "top="+getValueAsString();
@@ -1185,6 +1837,11 @@ public class LayeredLayout extends Layout {
                 }
             }
             
+            /**
+             * Gets the value of this inset as a string. Values will be in the format {@literal <value><unit>}, e.g.
+             * {@literal 2mm}, {@literal 15%}, {@literal 5px}, {@literal auto} (meaning it is flexible.
+             * @return The value of this inset as a string.
+             */
             public String getValueAsString() {
                 switch (unit) {
                     case UNIT_DIPS: return value +"mm";
@@ -1589,6 +2246,9 @@ public class LayeredLayout extends Layout {
 
             public Set<Component> getDependencies(Set<Component> deps) {
                 if (referenceComponent != null) {
+                    if (deps.contains(referenceComponent)) {
+                        return deps;
+                    }
                     deps.add(referenceComponent);
                     getOrCreateConstraint(referenceComponent).getDependencies(deps);
                 }
