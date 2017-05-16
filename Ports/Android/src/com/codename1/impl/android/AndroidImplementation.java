@@ -3884,7 +3884,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                r.run();
+                try {
+                    r.run();
+                } catch(Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
                 completed[0] = true;
                 synchronized(completed) {
                     completed.notify();
