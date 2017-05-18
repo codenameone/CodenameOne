@@ -1437,33 +1437,6 @@ public class UIManager {
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
                 }
-                String vkbInputMode = (String)resourceBundle.get("@vkb");
-                if(vkbInputMode != null && vkbInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
-                    VirtualKeyboard.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String[][] res = getInputMode("@vkb-", tokenized[iter], resourceBundle);
-                        if(res != null) {
-                            VirtualKeyboard.addDefaultInputMode(val, res);
-                        }
-                    }
-                }
-                String textFieldInputMode = (String)resourceBundle.get("@im");
-                if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
-                    TextField.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String actual = (String)resourceBundle.get("@im-" + val);
-                        // val can be null for builtin input mode types...
-                        if(actual != null) {
-                            TextField.addInputMode(val, parseTextFieldInputMode(actual), Character.isUpperCase(val.charAt(0)));
-                        }
-                    }
-                }
                 bundle = new HashMap<String, String>((Hashtable<String, String>)resourceBundle);
             } else {
                 bundle = null;
