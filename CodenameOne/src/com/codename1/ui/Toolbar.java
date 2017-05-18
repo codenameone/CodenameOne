@@ -873,14 +873,14 @@ public class Toolbar extends Container {
                 if(v < 0) {
                     v = dw * 2 / 3;
                 } else {
-                    v = dw / 100 * v;                        
+                    v = dw * (100 - v) / 100;
                 }
             } else {
                 v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
                 if(v < 0) {
                     v = dw - Display.getInstance().convertToPixels(10);
                 } else {
-                    v = dw / 100 * v;                        
+                    v = dw * (100 - v) / 100;
                 }
             }
         } else {
@@ -889,14 +889,14 @@ public class Toolbar extends Container {
                 if(v < 0) {
                     v = dw * 3 / 4;
                 } else {
-                    v = dw / 100 * v;                        
+                    v = dw * (100 - v) / 100;
                 }
             } else {
                 v = getUIManager().getThemeConstant("sideMenuSizeLandscapeInt", -1);
                 if(v < 0) {
                     v = dw * 4 / 10;
                 } else {
-                    v = dw / 100 * v;                        
+                    v = dw * (100 - v) / 100;                        
                 }
             }
         }
