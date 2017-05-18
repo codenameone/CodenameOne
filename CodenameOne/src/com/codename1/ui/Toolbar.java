@@ -931,6 +931,8 @@ public class Toolbar extends Container {
         s.setBgTransparency((int)f);
         s.setBgColor(0);
         
+        // prevent events from propogating downwards 
+        sidemenuDialog.getContentPane().setFocusable(true);
         sidemenuDialog.show(0, 0, 0, dw - v);
     }
     
