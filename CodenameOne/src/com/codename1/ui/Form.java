@@ -1843,9 +1843,9 @@ public class Form extends Container {
                     }
                 }
             }
-
-            previousForm.tint = true;
         }
+
+        previousForm.tint = true;
         Painter p = getStyle().getBgPainter();
         if (top > 0 || bottom > 0 || left > 0 || right > 0) {
             if (!title.isVisible()) {
