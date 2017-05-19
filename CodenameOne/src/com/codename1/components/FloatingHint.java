@@ -97,14 +97,12 @@ public class FloatingHint extends Container {
 
             public void focusLost(Component cmp) {
                 focusLostImpl();
-                
             }
         };
         tf.addFocusListener(fl);
     }
 
     private void focusGainedImpl() {
-        System.out.println("Focus gained");
         if(isInitialized()) {
             if(!hintButton.isVisible()) {
                 hintButton.setVisible(true);
@@ -129,9 +127,7 @@ public class FloatingHint extends Container {
     }
     
     private void focusLostImpl() {
-        System.out.println("Focus lost");
         if(isInitialized()) {
-            
             if(tf.getText().length() == 0) {
                 hintLabel.setVisible(true);
                 if(getComponentForm().grabAnimationLock()) {
@@ -142,16 +138,13 @@ public class FloatingHint extends Container {
                 tf.getComponentForm().revalidate();
                 revalidate();
                 tf.setEditable(false);
-
             } 
-            
         } else {
             boolean t = tf.getText() == null || tf.getText().length() == 0;
             hintButton.setVisible(!t);
             hintLabel.setVisible(t);
             revalidate();
         }
-        
     }
     
     @Override
