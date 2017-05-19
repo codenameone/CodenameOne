@@ -337,6 +337,17 @@ public abstract class CodenameOneImplementation {
      */
     public void stopTextEditing() {    
     }
+    
+    /**
+     * Using invokeAndBlock inside EditString creates peculiar behaviour that needs
+     * to be worked around.  Ideally no port should use invokeAndBlock for this
+     * but currently JavaSE and UWP both do.  Need to be able to detect this
+     * for workarounds.
+     * @return 
+     */
+    public boolean usesInvokeAndBlockForEditString() {
+        return false;
+    }
 
     /**
      * Encapsulates the editing code which is specific to the platform, some platforms

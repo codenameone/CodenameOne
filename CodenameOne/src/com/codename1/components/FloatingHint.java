@@ -25,6 +25,7 @@ package com.codename1.components;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
@@ -49,16 +50,21 @@ import com.codename1.ui.layouts.LayeredLayout;
  * @author Shai Almog
  */
 public class FloatingHint extends Container {
+    private final TextField tf;
+    private final Button hintButton;
+    private final Label hintLabel;
+    
     /**
      * Wraps a text field in a floating hint
      * @param tf the text field
      */
     public FloatingHint(final TextField tf) {
         super(new LayeredLayout());
+        this.tf = tf;
         Container content = new Container(new BorderLayout());
         add(content);
-        final Button hintButton = new Button(tf.getHint());
-        final Label hintLabel = new Label(tf.getHint());
+        hintButton = new Button(tf.getHint());
+        hintLabel = new Label(tf.getHint());
         tf.setHint("");
         hintButton.setFocusable(false);
         hintButton.setUIID("FloatingHint");
@@ -86,45 +92,78 @@ public class FloatingHint extends Container {
         }
         FocusListener fl = new FocusListener() {
             public void focusGained(Component cmp) {
-                if(isInitialized()) {
-                    if(!hintButton.isVisible()) {
-                        hintButton.setVisible(true);
-                        if(getComponentForm().grabAnimationLock()) {
-                            morphAndWait(hintLabel, hintButton, 150);
-                            getComponentForm().releaseAnimationLock();
-                        }
-                        hintLabel.setVisible(false);
-                        tf.getComponentForm().revalidate();
-                        tf.startEditingAsync();
-                    } else {
-                        tf.startEditingAsync();
-                    }
-                } else {
-                    boolean t = tf.getText() == null || tf.getText().length() == 0;
-                    hintButton.setVisible(t);
-                    hintLabel.setVisible(!t);
-                }
+                focusGainedImpl();
             }
 
             public void focusLost(Component cmp) {
-                if(isInitialized()) {
-                    if(tf.getText().length() == 0) {
-                        hintLabel.setVisible(true);
-                        if(getComponentForm().grabAnimationLock()) {
-                            morphAndWait(hintButton, hintLabel, 150);
-                            getComponentForm().releaseAnimationLock();
-                        }
-                        hintButton.setVisible(false);
-                        tf.getComponentForm().revalidate();
-                        revalidate();
-                    }
-                } else {
-                    boolean t = tf.getText() == null || tf.getText().length() == 0;
-                    hintButton.setVisible(!t);
-                    hintLabel.setVisible(t);
-                }
+                focusLostImpl();
+                
             }
         };
         tf.addFocusListener(fl);
     }
+
+    private void focusGainedImpl() {
+        System.out.println("Focus gained");
+        if(isInitialized()) {
+            if(!hintButton.isVisible()) {
+                hintButton.setVisible(true);
+                if(getComponentForm().grabAnimationLock()) {
+                    morphAndWait(hintLabel, hintButton, 150);
+                    getComponentForm().releaseAnimationLock();
+                }
+                hintLabel.setVisible(false);
+                tf.getComponentForm().revalidate();
+                tf.setEditable(true);
+                tf.startEditingAsync();
+            } else {
+                tf.setEditable(true);
+                tf.startEditingAsync();
+            }
+        } else {
+            boolean t = tf.getText() == null || tf.getText().length() == 0;
+            hintButton.setVisible(t);
+            hintLabel.setVisible(!t);
+            revalidate();
+        }
+    }
+    
+    private void focusLostImpl() {
+        System.out.println("Focus lost");
+        if(isInitialized()) {
+            
+            if(tf.getText().length() == 0) {
+                hintLabel.setVisible(true);
+                if(getComponentForm().grabAnimationLock()) {
+                    morphAndWait(hintButton, hintLabel, 150);
+                    getComponentForm().releaseAnimationLock();
+                }
+                hintButton.setVisible(false);
+                tf.getComponentForm().revalidate();
+                revalidate();
+                tf.setEditable(false);
+
+            } 
+            
+        } else {
+            boolean t = tf.getText() == null || tf.getText().length() == 0;
+            hintButton.setVisible(!t);
+            hintLabel.setVisible(t);
+            revalidate();
+        }
+        
+    }
+    
+    @Override
+    protected void initComponent() {
+        super.initComponent(); 
+        if (tf.hasFocus()) {
+            focusGainedImpl();
+        }
+        
+    }
+
+    
+    
+    
 }

@@ -3472,6 +3472,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         Display.getInstance().invokeAndBlock(l);
     }
 
+    @Override
+    public void stopTextEditing() {
+        if (textCmp != null && textCmp.getParent() != null) {
+            canvas.remove(textCmp);
+        }
+    }
+
+    @Override
+    public boolean usesInvokeAndBlockForEditString() {
+        return true;
+    }
+    
+    
+    
     
     /**
      * @inheritDoc
@@ -3619,7 +3633,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         textCmp.setBorder(null);
         textCmp.setOpaque(false);
-        
+                
         canvas.add(textCmp);
         int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
         int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
@@ -3746,7 +3760,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             ((JTextField) tf).addActionListener(l);
         }
         ((JTextComponent) tf).getDocument().addDocumentListener(l);
-
+        
 
         tf.addKeyListener(l);
         tf.addFocusListener(l);
