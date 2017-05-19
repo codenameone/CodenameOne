@@ -724,6 +724,18 @@ public class Toolbar extends Container {
         return cmd;
     }
     
+    boolean isComponentInOnTopSidemenu(Component cmp) {
+        if(cmp != null) {
+            while(cmp.getParent() != null) {
+                cmp = cmp.getParent();
+                if(cmp == permanentSideMenuContainer || cmp == this) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
     /**
      * Adds a Command to the side navigation menu
      *
@@ -794,7 +806,14 @@ public class Toolbar extends Container {
                             parent.putClientProperty("cn1$ignorRelease", Boolean.TRUE);
                             evt.consume();
                         } else {
-                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                            if(evt.getX() + Display.getInstance().convertToPixels(8) > sidemenuDialog.getWidth()) {
+                                parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                            } else {
+                                parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                            }
+                            if(!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                evt.consume();
+                            }
                         }
                     } else {
                         int displayWidth = Display.getInstance().getDisplayWidth();
@@ -804,6 +823,7 @@ public class Toolbar extends Container {
                             evt.consume();
                         } else {
                             parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                            permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
                         }
                     }
                 }
@@ -815,6 +835,11 @@ public class Toolbar extends Container {
                         parent.putClientProperty("cn1$sidemenuActivated", Boolean.TRUE);
                         showOnTopSidemenu(evt.getX(), false);
                         evt.consume();
+                    } else {
+                        if(sidemenuDialog.isShowing()) {
+                            permanentSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
+                            evt.consume();                        
+                        }                        
                     }
                 }
             });
@@ -835,6 +860,13 @@ public class Toolbar extends Container {
                             showOnTopSidemenu(-1, true);
                         }
                         evt.consume();
+                    } else {
+                        if(sidemenuDialog.isShowing()) {
+                            if(!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                evt.consume();
+                            }
+                            permanentSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
+                        }
                     }
                 }
             });
@@ -932,7 +964,7 @@ public class Toolbar extends Container {
         s.setBgColor(0);
         
         // prevent events from propogating downwards 
-        sidemenuDialog.getContentPane().setFocusable(true);
+        //sidemenuDialog.getContentPane().setFocusable(true);
         sidemenuDialog.show(0, 0, 0, dw - v);
     }
     
