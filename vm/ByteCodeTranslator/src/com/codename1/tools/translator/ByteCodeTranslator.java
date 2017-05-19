@@ -510,7 +510,7 @@ public class ByteCodeTranslator {
             while ((index = str.indexOf(target, index)) >= 0) {
                 int targetSize = target.length();
                 str.replace(index, index + targetSize, replacement);
-                index += replacement.length() - targetSize;
+                index += replacement.length();
                 found++;
                 totchanges++;
             }
