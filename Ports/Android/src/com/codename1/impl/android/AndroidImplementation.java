@@ -2519,8 +2519,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (url.startsWith("intent")) {
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
-                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
-                    return null;
+                if(url.startsWith("/") || url.startsWith("file:")) {
+                    if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
+                        return null;
+                    }
                 }
                 url = fixAttachmentPath(url);
                 intent = new Intent();
@@ -3884,7 +3886,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                r.run();
+                try {
+                    r.run();
+                } catch(Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
                 completed[0] = true;
                 synchronized(completed) {
                     completed.notify();

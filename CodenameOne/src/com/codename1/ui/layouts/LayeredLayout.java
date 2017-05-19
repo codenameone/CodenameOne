@@ -923,6 +923,7 @@ public class LayeredLayout extends Layout {
      * A class that encapsulates the insets for a component in layered layout.
      */
     public class LayeredLayoutConstraint {
+       
         
         /**
          * The component that this constraint belongs to.  If you try to add
@@ -1895,7 +1896,7 @@ public class LayeredLayout extends Layout {
          * Encapsulates an inset.
          */
         public class Inset {
-
+            int delta;
             
             /**
              * Creates a new inset for the given side.
@@ -2469,7 +2470,7 @@ public class LayeredLayout extends Layout {
                     default:
                         throw new RuntimeException("Invalid unit " + unit);
                 }
-
+                delta = 0;
                 return calculatedValue;
             }
 
@@ -2553,12 +2554,14 @@ public class LayeredLayout extends Layout {
             public Inset copyTo(Inset dest) {
                 dest.autoIsClipped = autoIsClipped;
                 dest.calculatedValue = calculatedValue;
+                dest.delta = delta;
                 dest.calculatedBaseValue = calculatedBaseValue;
                 dest.preferredValue = preferredValue;
                 
                 dest.value = value;
                 dest.unit = unit;
-                dest.side = side;
+                // We won't copy the side since that allows us to f things up
+                //dest.side = side;
                 dest.referenceComponent = referenceComponent;
                 dest.referencePosition = referencePosition;
                 return dest;
@@ -2623,13 +2626,14 @@ public class LayeredLayout extends Layout {
                     // In both auto and percent cases, we'll use the existing calculated value as our base
                     float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
                     int calc = calculatedValue;
-                    System.out.println("Calculated value of side "+side+" = "+calc);
+                    //System.out.println("Calculated value of side "+side+" = "+calc);
+                    //new RuntimeException("Foobar").printStackTrace();
                     if (referenceComponent != null) {
                         calc -= calculatedBaseValue;
                     }
                     float out = calc / pixelsPerDip;
-                    System.out.println("calc="+out+"mm");
-                    return out;
+                    //System.out.println("calc="+out+"mm");
+                    return out + (delta / pixelsPerDip);
                     
                 }
             }
@@ -2651,7 +2655,7 @@ public class LayeredLayout extends Layout {
                         
                         calc -= calculatedBaseValue;
                     }
-                    return calc;
+                    return calc + delta;
                 }
             }
             
@@ -2678,13 +2682,30 @@ public class LayeredLayout extends Layout {
              * @return Self for chaining.
              */
             public Inset changeUnits(byte unit) {
+                return changeUnits(unit, cmp);
+                
+            }
+            
+            /**
+             * Changes the units of this inset, and updates the value to remain 
+             * the same as the current value. 
+             * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
+             * @param cmp The component for which the inset is applying.
+             * @return Self for chaining.
+             */
+            public Inset changeUnits(byte unit, Component cmp) {
                 if (unit != this.unit) {
                     if (unit == UNIT_PIXELS) {
                         setPixels(getCurrentValuePx());
                     } else if (unit == UNIT_DIPS) {
                         setDips(getCurrentValueMM());
                     } else if (unit == UNIT_PERCENT) {
-                        setDips(getCurrentValueMM());
+                        if (cmp != null && cmp.getParent() != null) {
+                            Rectangle refBox = constraint().getReferenceBox(cmp.getParent(), cmp);
+                            setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
+                        } else {
+                            throw new IllegalArgumentException("Cannot change unit to percent without specifying the target component.");
+                        }
                     } else {
                         unit(unit);
                     }
@@ -2701,6 +2722,12 @@ public class LayeredLayout extends Layout {
              * @return Self for chaining.
              */
             public Inset changeReference(Container parent, Component newRef, float pos) {
+                if (newRef != null) {
+                    LayeredLayoutConstraint refCnst = getOrCreateConstraint(newRef);
+                    if (cmp != null && refCnst.dependsOn(cmp)) {
+                        throw new IllegalArgumentException("Attempted to set a reference that would produce a circular dependency in LayeredLayout");
+                    }
+                }
                 if (isFlexible()) {
                     // we are flexible, so we'll just set the new reference
                     // and be done
@@ -2866,7 +2893,12 @@ public class LayeredLayout extends Layout {
                     }
                         
                 }
-                calculatedValue += delta;
+                //calculatedValue += delta;
+                
+                this.delta += delta;
+                if (getOppositeInset().isFlexible()) {
+                    getOppositeInset().delta -= delta;
+                }
                 return this;
             }
             

@@ -34,7 +34,6 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
-import com.codename1.ui.VirtualKeyboard;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -2473,11 +2472,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void itemStateChanged(ItemEvent ie) {
                     useNativeInput = !useNativeInput;
-                    if (useNativeInput) {
-                        Display.getInstance().setDefaultVirtualKeyboard(null);
-                    } else {
-                        Display.getInstance().setDefaultVirtualKeyboard(new VirtualKeyboard());
-                    }
                 }
             });
             
