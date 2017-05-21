@@ -652,14 +652,23 @@ public class SplitPane extends Container {
         private void updateInsets() {
             LayeredLayout ll = (LayeredLayout)SplitPane.this.getLayout();
             LayeredLayoutConstraint cnst = pressedConstraint.copy();
+            int diff = 0;
             if (orientation == HORIZONTAL_SPLIT) {
-                cnst.left().translatePixels(draggedX - pressedX, false, getParent());
+                diff = draggedX - pressedX;
+                cnst.left().translatePixels(diff, false, getParent());
+                
             } else {
-                cnst.top().translatePixels(draggedY - pressedY, false, getParent());
+                diff = draggedY - pressedY;
+                cnst.top().translatePixels(diff, false, getParent());
             }
             cnst.copyTo(ll.getOrCreateConstraint(this));
-            cnst.copyTo(preferredInset);
+            if (diff > Display.getInstance().convertToPixels(3)) {
+                cnst.copyTo(preferredInset);
+            }
             clampInset();
+            isCollapsed = false;
+            isExpanded = false;
+            
             
         }
 
