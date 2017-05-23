@@ -58,9 +58,16 @@ public interface JSONParseCallback {
 
     /**
      * Submits a numeric token from the JSON data
+     * @param tok the token value
      */
     public void numericToken(double tok);
 
+    /**
+     * Submits a boolean token from the JSON data
+     * @param tok the token value
+     */
+    public void booleanToken(boolean tok);
+    
     /**
      * Submits a numeric token from the JSON data
      */
