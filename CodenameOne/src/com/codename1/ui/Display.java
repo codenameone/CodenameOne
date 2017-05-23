@@ -3627,7 +3627,7 @@ hi.show();}</pre></noscript>
      * @param noFallback some devices don't support an efficient push API and will resort to polling 
      * to provide push like functionality. If this flag is set to true no polling will occur and 
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
-     * @deprecated use the version that doesn't take an id argument this argument is effectively ignored!
+     * @deprecated use {@link #registerPush()} the Android push id should be set with the build hint {@code gcm.sender_id} which will work for Chrome JavaScript builds too
      */
     public void registerPush(String id, boolean noFallback) {
         Hashtable h = new Hashtable();
