@@ -49,14 +49,14 @@ public class TestRunner {
     }
     
     private void printUsage() {
-        System.out.println("Usage: TestRunner mainClass [-testCases testCase1,testCase2...] [-skins skin1,skin2...] [-quiet] [-cleanMode]"
+        System.out.println("Usage: TestRunner mainClass [-testCases testCase1,testCase2...] [-skins skin1,skin2...] [-quiet] [-noCleanMode]"
                 + "[-stopOnFail]\n\n"
                 + "mainClass - the main application class which is being tested, this is the full name for the lifecycle class.\n"
                 + "testCases - optional set of test cases to run using the full package/class name syntax and comma delimited. If "
                 + "ommitted all test cases will be executed.\n"
                 + "skins - the skins on which the test cases should be executed. If ommitted the default simulator skin is used.\n"
                 + "quietMode - when set the skin running the tests will not appear and the tests will be executed in the background\n"
-                + "cleanMode - clean mode executes every test in complete isolation from the previous test restarting the Classloader"
+                + "noCleanMode - when set executes every test without isolation from the previous test (by default, without this flag, it executes every test in complete isolation from the previous test restarting the Classloader)"
                 + "completely. Clean mode can't be used on the device so its only useful for debugging\n"
                 + "stopOnFail - indicates that execution should stop the moment a failure occured");
     }
@@ -92,12 +92,11 @@ public class TestRunner {
                         continue;
                     }
 
-                    if(s.equalsIgnoreCase("-cleanMode")) {
-                        cleanMode = true;
+                    if(s.equalsIgnoreCase("-noCleanMode")) {
+                        cleanMode = false;
                         pos++;
                         continue;
                     }
-
                     System.out.println("Unrecognized argument: " + s);
                     printUsage();
                     System.exit(1);
