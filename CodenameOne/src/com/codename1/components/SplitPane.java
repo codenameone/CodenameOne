@@ -253,7 +253,8 @@ public class SplitPane extends Container {
     private void clampInset() {
         
         int px = getDividerInset().getAbsolutePixels(divider);
-        
+        isCollapsed = false;
+        isExpanded = false;
         Inset minInset = getMinDividerInset();
         if (minInset.getAbsolutePixels(divider) >= px) {
             minInset.copyTo(getDividerInset());
@@ -458,6 +459,7 @@ public class SplitPane extends Container {
      */
     private class Divider extends Container {
         int pressedX, pressedY, draggedX, draggedY;
+        LayeredLayoutConstraint pressedPreferredConstraint;
         LayeredLayoutConstraint pressedConstraint;
         private final Button btnCollapse;
         private final Button btnExpand;
@@ -617,6 +619,7 @@ public class SplitPane extends Container {
             pressedX = x;
             pressedY = y;
             pressedConstraint = ((LayeredLayout)getLayout()).getOrCreateConstraint(this).copy();
+            pressedPreferredConstraint = preferredInset.copy();
             inDrag = true;
             pointerDragged(x, y);
         }
@@ -643,7 +646,10 @@ public class SplitPane extends Container {
 
         @Override
         protected void dragFinished(int x, int y) {
-            super.dragFinished(x, y); 
+            super.dragFinished(x, y);
+            if (!isExpanded && !isCollapsed) {
+                getDividerInset().constraint().copyTo(preferredInset);
+            }
             inDrag = false;
         }
         
@@ -662,12 +668,8 @@ public class SplitPane extends Container {
                 cnst.top().translatePixels(diff, false, getParent());
             }
             cnst.copyTo(ll.getOrCreateConstraint(this));
-            if (diff > Display.getInstance().convertToPixels(3)) {
-                cnst.copyTo(preferredInset);
-            }
             clampInset();
-            isCollapsed = false;
-            isExpanded = false;
+            
             
             
         }
