@@ -840,6 +840,7 @@ public class AddAndScaleMultiImage extends javax.swing.JPanel {
                 mediumHeight.setValue((int)(((Integer)mediumWidth.getValue()).intValue() * aspect));
                 highHeight.setValue((int)(((Integer)highWidth.getValue()).intValue() * aspect));
                 hdHeight.setValue((int)(((Integer)hdWidth.getValue()).intValue() * aspect));
+                veryHighHeight.setValue((int)(((Integer)veryHighWidth.getValue()).intValue() * aspect));
                 
                 hd560Height.setValue((int)(((Integer)hd560Width.getValue()).intValue() * aspect));
                 hd2Height.setValue((int)(((Integer)hd2Width.getValue()).intValue() * aspect));
