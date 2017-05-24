@@ -3891,8 +3891,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 } catch(Throwable t) {
                     com.codename1.io.Log.e(t);
                 }
-                completed[0] = true;
                 synchronized(completed) {
+                    completed[0] = true;
                     completed.notify();
                 }
             }
