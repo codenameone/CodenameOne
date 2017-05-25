@@ -78,7 +78,7 @@ import java.util.Timer;
  *
  * @author Chen Fishbein, Shai Almog
  */
-public final class Display {
+public final class Display extends CN1Constants {
     private CrashReport crashReporter;
     private EventDispatcher errorHandler;
     boolean codenameOneExited;
@@ -139,40 +139,6 @@ public final class Display {
      * Half QWERTY which needs software assistance for completion
      */
     public static final int KEYBOARD_TYPE_HALF_QWERTY = 4;
-    /**
-     * Used by getSMSSupport to indicate that SMS is not supported
-     */
-    public static final int SMS_NOT_SUPPORTED = 1;
-    
-    /**
-     * Used by getSMSSupport to indicate that SMS is sent in the background without a compose UI
-     */
-    public static final int SMS_SEAMLESS = 2;
-    
-    /**
-     * Used by getSMSSupport to indicate that SMS triggers the native SMS app which will show a compose UI
-     */
-    public static final int SMS_INTERACTIVE = 3;
-    
-    /**
-     * Used by getSMSSupport to indicate that SMS can be sent in either seamless or interactive mode
-     */
-    public static final int SMS_BOTH = 4;
-    
-    /**
-     * Used by openGallery 
-     */
-    public static final int GALLERY_IMAGE = 0;
-    
-    /**
-     * Used by openGallery 
-     */
-    public static final int GALLERY_VIDEO = 1;
-
-    /**
-     * Used by openGallery 
-     */
-    public static final int GALLERY_ALL = 2;
     
     private static final int POINTER_PRESSED = 1;
     private static final int POINTER_RELEASED = 2;
@@ -190,71 +156,6 @@ public final class Display {
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
     
-    /**
-     * Very Low Density 176x220 And Smaller
-     */
-    public static final int DENSITY_VERY_LOW = 10;
-
-    /**
-     * Low Density Up To 240x320
-     */
-    public static final int DENSITY_LOW = 20;
-
-    /**
-     * Medium Density Up To 360x480
-     */
-    public static final int DENSITY_MEDIUM = 30;
-
-    /**
-     * Hi Density Up To 480x854
-     */
-    public static final int DENSITY_HIGH = 40;
-
-    /**
-     * Very Hi Density Up To 1440x720
-     */
-    public static final int DENSITY_VERY_HIGH = 50;
-
-    /**
-     * HD Up To 1920x1080
-     */
-    public static final int DENSITY_HD = 60;
-
-    /**
-     * Intermediate density for screens that sit somewhere between HD to 2HD
-     */
-    public static final int DENSITY_560 = 65;
-    
-    /**
-     * Double the HD level density
-     */
-    public static final int DENSITY_2HD = 70;
-
-    /**
-     * 4K level density 
-     */
-    public static final int DENSITY_4K = 80;
-
-
-    /**
-     * Date native picker type, it returns a java.util.Date result.
-     */
-    public static final int PICKER_TYPE_DATE = 1;
-
-    /**
-     * Time native picker type, it returns an integer with minutes since midnight.
-     */
-    public static final int PICKER_TYPE_TIME = 2;
-
-    /**
-     * Date and time native picker type, it returns a java.util.Date result.
-     */
-    public static final int PICKER_TYPE_DATE_AND_TIME = 3;
-
-    /**
-     * Strings native picker type, it returns a String result and accepts a String array.
-     */
-    public static final int PICKER_TYPE_STRINGS = 4;
 
     /**
      * A pure touch device has no focus showing when the user is using the touch
@@ -363,7 +264,7 @@ public final class Display {
      */
     public static final int KEY_POUND = '#';
 
-    private static final Display INSTANCE = new Display();
+    static final Display INSTANCE = new Display();
 
     static int transitionDelay = -1;
 
@@ -3577,7 +3478,7 @@ hi.show();}</pre></noscript>
      * 
      * @param text String to share.
      * @param image file path to the image or null
-     * @param mime type of the image or null if no image to share
+     * @param mimeType type of the image or null if no image to share
      */
     public void share(String text, String image, String mimeType){
         share(text, image, mimeType, null);
