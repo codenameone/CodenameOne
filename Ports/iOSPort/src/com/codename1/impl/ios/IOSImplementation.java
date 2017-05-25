@@ -796,7 +796,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             });
             
             if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
-                cmp.getComponentForm().revalidate();
+                Form form = cmp.getComponentForm();
+                if (form != null) {
+                    form.revalidate();
+                }
             }
             if(editNext) {
                 editNext = false;
