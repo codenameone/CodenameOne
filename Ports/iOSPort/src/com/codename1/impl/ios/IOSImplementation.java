@@ -7620,8 +7620,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 c.set(java.util.Calendar.HOUR_OF_DAY, ((Integer)currentValue).intValue() / 60);
                 c.set(java.util.Calendar.MINUTE, ((Integer)currentValue).intValue() % 60);
                 time = c.getTime().getTime();
-            } else {
+            } else if (currentValue != null) {
                 time = ((java.util.Date)currentValue).getTime();
+            } else {
+                time = new java.util.Date().getTime();
             }
             nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight);
         }
