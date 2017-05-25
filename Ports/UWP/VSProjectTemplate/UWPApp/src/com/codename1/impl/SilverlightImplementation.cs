@@ -751,18 +751,19 @@ namespace com.codename1.impl
             return true;
         }
 
-        public override void installNativeTheme()
+         public override void installNativeTheme()
         {
            ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
             ui.plaf.UIManager uim = ui.plaf.UIManager.getInstance();
             string[] themeNames = r.getThemeResourceNames();
             java.util.Hashtable props = r.getTheme((string)themeNames[0]);
-            if (isDesktop() || isTablet())
+            bool isHardwareButtonsAPIPresent = Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons");
+            if (!isHardwareButtonsAPIPresent)
             {
-                props.put("hideBackCommandBool", false);
+                props.put("@hideBackCommandBool", "false");
             } else 
             {
-                props.put("hideBackCommandBool", true);
+                props.put("@hideBackCommandBool", "true");
             } 
             uim.setThemeProps(props);
             ui.plaf.DefaultLookAndFeel dl = (ui.plaf.DefaultLookAndFeel)uim.getLookAndFeel();
