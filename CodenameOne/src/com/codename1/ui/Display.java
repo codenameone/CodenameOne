@@ -1484,6 +1484,46 @@ public final class Display extends CN1Constants {
     }
     
     /**
+     * Checks if the control key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isControlKeyDown() {
+        return impl.isControlKeyDown();
+    }
+    
+    /**
+     * Checks if the meta key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isMetaKeyDown() {
+        return impl.isMetaKeyDown();
+    }
+    
+    /**
+     * Checks if the alt key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isAltKeyDown() {
+        return impl.isAltKeyDown();
+    }
+    
+    /**
+     * Checks if the altgraph key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isAltGraphKeyDown() {
+        return impl.isAltGraphKeyDown();
+    }
+    
+    /**
+     * Checks if shift key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isShiftKeyDown() {
+        return impl.isShiftKeyDown();
+    }
+    
+    /**
      * Pushes a key press event with the given keycode into Codename One
      *
      * @param keyCode keycode of the key event
