@@ -113,6 +113,7 @@ import com.codename1.util.Callback;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.event.TextEvent;
@@ -174,6 +175,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static String fontFaceSystem;
     boolean takingScreenshot;
     float screenshotActualZoomLevel;
+    private InputEvent lastInputEvent;
     
     /**
      * When set to true pointer hover events will be called for mouse move events
@@ -684,6 +686,46 @@ public class JavaSEPort extends CodenameOneImplementation {
         softkeyCount = aSoftkeyCount;
     }
 
+    @Override
+    public boolean isShiftKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isShiftDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isAltKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isAltDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isAltGraphKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isAltGraphDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isControlKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isControlDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isMetaKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isMetaDown();
+        }
+        return false;
+    }
+    
     class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
         private BufferedImage buffer;
         boolean painted;
@@ -947,6 +989,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
@@ -962,6 +1005,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
@@ -997,6 +1041,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
@@ -1050,6 +1095,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -1084,6 +1130,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -1129,6 +1176,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if(invokePointerHover) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -1227,6 +1275,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             final int x = scaleCoordinateX(e.getX());
             final int y = scaleCoordinateY(e.getY());
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {

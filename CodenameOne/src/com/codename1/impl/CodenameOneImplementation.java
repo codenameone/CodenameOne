@@ -2060,6 +2060,50 @@ public abstract class CodenameOneImplementation {
     protected void keyReleased(final int keyCode) {
         Display.getInstance().keyReleased(keyCode);
     }
+    
+    /**
+     * Checks whether the alt key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the shift key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isShiftKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the altgraph key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltGraphKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the control key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isControlKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the meta key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isMetaKeyDown() {
+        return false;
+    }
+    
+    
+    
+   
 
     /**
      * Subclasses should invoke this method, it delegates the event to the display and into
