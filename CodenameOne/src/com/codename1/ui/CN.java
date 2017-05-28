@@ -24,14 +24,17 @@
 package com.codename1.ui;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Storage;
 import com.codename1.messaging.Message;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Rectangle;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Hashtable;
 
 /**
@@ -767,7 +770,7 @@ public class CN extends  CN1Constants {
      *
      * @param e callback to remove
      */
-    public static void removeErrorListener(ActionListener<NetworkEvent> e) {
+    public static void removeNetworkErrorListener(ActionListener<NetworkEvent> e) {
         NetworkManager.getInstance().removeErrorListener(e);
     }
 
@@ -785,7 +788,7 @@ public class CN extends  CN1Constants {
      *
      * @param al action listener
      */
-    public static void removeProgressListener(ActionListener<NetworkEvent> al) {
+    public static void removeNetworkProgressListener(ActionListener<NetworkEvent> al) {
         NetworkManager.getInstance().removeProgressListener(al);
     }
 
@@ -796,4 +799,323 @@ public class CN extends  CN1Constants {
     public static void updateNetworkThreadCount(int threadCount) {
         NetworkManager.getInstance().updateThreadCount(threadCount);
     }
+
+    /**
+     * Storage is cached for faster access, however this might cause a problem with refreshing
+     * objects since they are not cloned. Clearing the cache allows to actually reload from the
+     * storage file.
+     */
+    public static void clearStorageCache() {
+        Storage.getInstance().clearCache();
+    }
+    
+    /**
+     * Flush the storage cache allowing implementations that cache storage objects
+     * to store
+     */
+    public static void flushStorageCache() {
+        Storage.getInstance().flushStorageCache();
+    }
+
+    /**
+     * Deletes the given file name from the storage
+     *
+     * @param name the name of the storage file
+     */
+    public static void deleteStorageFile(String name) {
+        Storage.getInstance().deleteStorageFile(name);
+    }
+
+    /**
+     * Deletes all the files in the application storage
+     */
+    public static void clearStorage() {
+        Storage.getInstance().clearStorage();
+    }
+
+    /**
+     * Creates an output stream to the storage with the given name
+     *
+     * @param name the storage file name
+     * @return an output stream of limited capacity
+     */
+    public static OutputStream createStorageOutputStream(String name) throws IOException {
+        return Storage.getInstance().createOutputStream(name);
+    }
+
+    /**
+     * Creates an input stream to the given storage source file
+     *
+     * @param name the name of the source file
+     * @return the input stream
+     */
+    public static InputStream createStorageInputStream(String name) throws IOException {
+        return Storage.getInstance().createInputStream(name);
+    }
+
+    /**
+     * Returns true if the given storage file exists
+     *
+     * @param name the storage file name
+     * @return true if it exists
+     */
+    public static boolean existsInStorage(String name) {
+        return Storage.getInstance().exists(name);
+    }
+
+    /**
+     * Lists the names of the storage files
+     *
+     * @return the names of all the storage files
+     */
+    public static String[] listStorageEntries() {
+        return Storage.getInstance().listEntries();
+    }
+
+    /**
+     * Returns the size in bytes of the given entry
+     * @param name the name of the entry
+     * @return the size in bytes
+     */
+    public static int storageEntrySize(String name) {
+        return Storage.getInstance().entrySize(name);
+    }
+    
+    /**
+     * <p>Writes the given object to storage assuming it is an externalizable type
+     * or one of the supported types.</p>
+     * 
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
+     *
+     * @param name store name
+     * @param o object to store
+     * @return true for success, false for failure
+     */
+    public static boolean writeObjectToStorage(String name, Object o) {
+        return Storage.getInstance().writeObject(name, o);
+    }
+
+    /**
+     * <p>Reads the object from the storage, returns null if the object isn't there</p>
+     * <p>
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * </p>
+     * <script src="https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js"></script>
+     *
+     *
+     * @param name name of the store
+     * @return object stored under that name
+     */
+    public static Object readObjectFromStorage(String name) {
+        return Storage.getInstance().readObject(name);
+    }
+
+
+    /**
+     * Returns the filesystem roots from which the structure of the file system
+     * can be traversed
+     *
+     * @return the roots of the filesystem
+     */
+    public static String[] getFileSystemRoots() {
+        return FileSystemStorage.getInstance().getRoots();
+    }
+
+    /**
+     * Returns the type of the root often by guessing
+     *
+     * @param root the root whose type we are checking
+     * @return one of the type constants above
+     */
+    public static int getFileSystemRootType(String root) {
+        return FileSystemStorage.getInstance().getRootType(root);
+    }
+
+
+    /**
+     * Lists the files within the given directory, returns relative file names and not
+     * full file names.
+     *
+     * @param directory the directory in which files should be listed
+     * @return array of file names
+     */
+    public static String[] listFiles(String directory) throws IOException {
+        return FileSystemStorage.getInstance().listFiles(directory);
+    }
+
+    /**
+     * Returns the size of the given root directory
+     *
+     * @param root the root directory in the filesystem
+     * @return the byte size of the directory
+     */
+    public static long getFileSystemRootSizeBytes(String root) {
+        return FileSystemStorage.getInstance().getRootSizeBytes(root);
+    }
+
+    /**
+     * Returns the available space in the given root directory
+     *
+     * @param root the root directory in the filesystem
+     * @return the bytes available in the directory
+     */
+    public static long getFileSystemRootAvailableSpace(String root) {
+        return FileSystemStorage.getInstance().getRootAvailableSpace(root);
+    }
+
+    /**
+     * Creates the given directory
+     *
+     * @param directory the directory name to create
+     */
+    public static void mkdir(String directory) {
+        FileSystemStorage.getInstance().mkdir(directory);
+    }
+    
+
+    /**
+     * Deletes the specific file or empty directory.
+     *
+     * @param file file or empty directory to delete
+     */
+    public static void delete(String file) {
+        FileSystemStorage.getInstance().delete(file);
+    }
+
+
+    /**
+     * Indicates whether a file exists
+     *
+     * @param file the file to check
+     * @return true if the file exists and false otherwise
+     */
+    public static boolean existsInFileSystem(String file) {
+        return FileSystemStorage.getInstance().exists(file);
+    }
+
+    /**
+     * Indicates the hidden state of the file
+     *
+     * @param file file
+     * @return true for a hidden file
+     */
+    public static boolean isHiddenFile(String file) {
+        return FileSystemStorage.getInstance().isHidden(file);
+    }
+
+    /**
+     * Toggles the hidden state of the file
+     *
+     * @param file file
+     * @param h hidden state
+     */
+    public static void setHiddenFile(String file, boolean h) {
+        FileSystemStorage.getInstance().setHidden(file, h);
+    }
+
+    /**
+     * Renames a file to the given name, expects the new name to be relative to the
+     * current directory
+     *
+     * @param file absolute file name
+     * @param newName relative new name
+     */
+    public static void renameFile(String file, String newName) {
+        FileSystemStorage.getInstance().rename(file, newName);
+    }
+
+    /**
+     * Returns the length of the file
+     *
+     * @param file file
+     * @return length of said file
+     */
+    public static long getFileLength(String file) {
+        return FileSystemStorage.getInstance().getLength(file);
+    }
+
+    /**
+     * Returns the time that the file denoted by this abstract pathname was 
+     * last modified.
+     * @return A long value representing the time the file was last modified, 
+     * measured in milliseconds
+     */ 
+    public static long getFileLastModifiedFile(String file) {
+        return FileSystemStorage.getInstance().getLastModified(file);
+    }
+    
+    /**
+     * Indicates whether the given file is a directory
+     *
+     * @param file file
+     * @return true if its a directory
+     */
+    public static boolean isDirectory(String file) {
+        return FileSystemStorage.getInstance().isDirectory(file);
+    }
+
+    /**
+     * Opens an output stream to the given file
+     * 
+     * @param file the file
+     * @return the output stream
+     */
+    public static OutputStream openFileOutputStream(String file) throws IOException {
+        return FileSystemStorage.getInstance().openOutputStream(file);
+    }
+
+    /**
+     * Opens an input stream to the given file
+     *
+     * @param file the file
+     * @return the input stream
+     */
+    public static InputStream openFileInputStream(String file) throws IOException {
+        return FileSystemStorage.getInstance().openInputStream(file);
+    }
+
+    /**
+     * Opens an output stream to the given file
+     *
+     * @param file the file
+     * @param offset position in the file
+     * @return the output stream
+     */
+    public static OutputStream openFileOutputStream(String file, int offset) throws IOException {
+        return FileSystemStorage.getInstance().openOutputStream(file, offset);
+    }
+
+    /**
+     * <p>The application home directory is a "safe place" to store files for this application in a portable way.
+     * On some platforms such as Android  &amp; iOS this path may be visible only to the 
+     * application itself, other apps won't have permission to access this path.<br>
+     * The sample below uses the app home directory to save a file so we can share it using the {@link com.codename1.components.ShareButton}:</p>
+     * 
+     *  <script src="https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js"></script>
+     * 
+     * @return a writable directory that represent the application home directory
+     */
+     public static String getAppHomePath(){
+        return FileSystemStorage.getInstance().getAppHomePath();
+    }
+     
+     /**
+      * Returns true if the device has a directory dedicated for "cache" files
+      * @return true if a caches style directory exists in this device type
+      */
+     public static boolean hasCachesDir() {
+        return FileSystemStorage.getInstance().hasCachesDir();
+     }
+
+     /**
+      * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+      * is false
+      * @return file URL or null
+      */
+     public static String getCachesDir() {
+        return FileSystemStorage.getInstance().getCachesDir();
+     }
 }
