@@ -57,6 +57,7 @@ int connections = 0;
     request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
                                               cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                               timeoutInterval:time];
+    request.HTTPShouldHandleCookies = NO;
 #ifndef CN1_USE_ARC
     [request retain];
 #endif
