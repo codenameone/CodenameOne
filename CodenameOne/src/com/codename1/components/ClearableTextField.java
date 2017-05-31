@@ -27,6 +27,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -43,16 +44,21 @@ public class ClearableTextField extends Container {
     private ClearableTextField() {
         super(new BorderLayout());
     }
-    
+
     /**
      * Wraps the given text field with a UI that will allow us to clear it
      * @param tf the text field
+     * @param iconSize size in millimeters for the clear icon, -1 for default size
      * @return a Container that should be added to the UI instead of the actual text field
      */
-    public static ClearableTextField wrap(final TextField tf) {
+    public static ClearableTextField wrap(final TextArea tf, float iconSize) {
         ClearableTextField cf = new ClearableTextField();
         Button b = new Button("", tf.getUIID());
-        FontImage.setMaterialIcon(b, FontImage.MATERIAL_CLEAR);
+        if(iconSize > 0) {
+            FontImage.setMaterialIcon(b, FontImage.MATERIAL_CLEAR, iconSize);
+        } else {
+            FontImage.setMaterialIcon(b, FontImage.MATERIAL_CLEAR);
+        }
         removeCmpBackground(tf);
         removeCmpBackground(b);
         cf.setUIID(tf.getUIID());
@@ -65,7 +71,16 @@ public class ClearableTextField extends Container {
                 tf.startEditingAsync();
             }
         });
-        return cf;
+        return cf;        
+    }
+    
+    /**
+     * Wraps the given text field with a UI that will allow us to clear it
+     * @param tf the text field
+     * @return a Container that should be added to the UI instead of the actual text field
+     */
+    public static ClearableTextField wrap(final TextArea tf) {
+        return wrap(tf, -1);
     }
     
     private static void removeCmpBackground(Component cmp) {
