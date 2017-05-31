@@ -44,6 +44,8 @@ import java.util.Vector;
  * to Google+/Facbook apps navigation
  *
  * @author Chen
+ * @deprecated this class is still used internally but code should be migrated to use the 
+ *              {@link com.codename1.ui.Toolbar}
  */
 public class SideMenuBar extends MenuBar {
 
