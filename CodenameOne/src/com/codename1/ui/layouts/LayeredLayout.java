@@ -1008,11 +1008,25 @@ public class LayeredLayout extends Layout {
          * {@link cmp} has no reference components in any of its insets, then the resulting box will
          * just bee the inner box of the parent (e.g. the parent's inner bounds.
          * @param parent The parent container.
-         * @param cmp The component whose reference box we are obtaining.
+         * @param parent
          * @param box An out parameter.  This will store the bounds of the box.
          * @return The reference box.  (This will be the same object that is passed in the {@literal box} parameter.
          */
-        public Rectangle getReferenceBox(Container parent, Component cmp, Rectangle box) {
+        public Rectangle getReferenceBox(Container parent, Rectangle box) {
+            return getReferenceBox(parent, null, box);
+            
+        }
+        /**
+         * Returns a reference box within which insets of the given component are calculated.  If 
+         * {@link cmp} has no reference components in any of its insets, then the resulting box will
+         * just bee the inner box of the parent (e.g. the parent's inner bounds.
+         * @param parent The parent container.
+         * @param cmp The component whose reference box we are obtaining.  Not used.  May be null.
+         * @param box An out parameter.  This will store the bounds of the box.
+         * @return The reference box.  (This will be the same object that is passed in the {@literal box} parameter.
+         * @deprecated Use {@link #getReferenceBox(com.codename1.ui.Container, com.codename1.ui.geom.Rectangle) } instead.
+         */
+        public Rectangle getReferenceBox(Container parent, Component cmp2, Rectangle box) {
             Style parentStyle = parent.getStyle();
             //Style cmpStyle = cmp.getStyle();
             
@@ -1054,10 +1068,22 @@ public class LayeredLayout extends Layout {
          * just bee the inner box of the parent (e.g. the parent's inner bounds.
          * @param parent The parent container.
          * @param cmp The component whose reference box we are obtaining.
-         * @return The reference box.  
+         * @return The reference box. 
+         * @deprecated Use {@link #getReferenceBox(com.codename1.ui.Container) 
          */
         public Rectangle getReferenceBox(Container parent, Component cmp) {
             return getReferenceBox(parent, cmp, new Rectangle());
+        }
+        
+        /**
+         * Returns a reference box within which insets of the given component are calculated.  If 
+         * {@link cmp} has no reference components in any of its insets, then the resulting box will
+         * just bee the inner box of the parent (e.g. the parent's inner bounds.
+         * @param parent The parent container.
+         * @return The reference box.  
+         */
+        public Rectangle getReferenceBox(Container parent) {
+            return getReferenceBox(parent, (Component)null);
         }
         
         /**
@@ -2680,6 +2706,7 @@ public class LayeredLayout extends Layout {
              * the same as the current value. 
              * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
              * @return Self for chaining.
+             * @deprecated Use {@link #changeUnitsTo(byte, com.codename1.ui.Container) }
              */
             public Inset changeUnits(byte unit) {
                 return changeUnits(unit, cmp);
@@ -2692,16 +2719,28 @@ public class LayeredLayout extends Layout {
              * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
              * @param cmp The component for which the inset is applying.
              * @return Self for chaining.
+             * @deprecated Use {@link #changeUnitsTo(byte, com.codename1.ui.Container) }
              */
             public Inset changeUnits(byte unit, Component cmp) {
+                return changeUnitsTo(unit, cmp.getParent());
+            }
+            
+            /**
+             * Changes the units of this inset, and updates the value to remain 
+             * the same as the current value. 
+             * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
+             * @param parent The container in which the layout applies.
+             * @return Self for chaining.
+             */
+            public Inset changeUnitsTo(byte unit, Container parent) {
                 if (unit != this.unit) {
                     if (unit == UNIT_PIXELS) {
                         setPixels(getCurrentValuePx());
                     } else if (unit == UNIT_DIPS) {
                         setDips(getCurrentValueMM());
                     } else if (unit == UNIT_PERCENT) {
-                        if (cmp != null && cmp.getParent() != null) {
-                            Rectangle refBox = constraint().getReferenceBox(cmp.getParent(), cmp);
+                        if (parent != null) {
+                            Rectangle refBox = constraint().getReferenceBox(parent);
                             setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
                         } else {
                             throw new IllegalArgumentException("Cannot change unit to percent without specifying the target component.");
@@ -2728,12 +2767,25 @@ public class LayeredLayout extends Layout {
                         throw new IllegalArgumentException("Attempted to set a reference that would produce a circular dependency in LayeredLayout");
                     }
                 }
-                if (isFlexible()) {
-                    // we are flexible, so we'll just set the new reference
-                    // and be done
-                    referenceComponent(newRef).referencePosition(pos);
-                } else {
+                //if (isFlexible()) {
+                //    // This could potentially affect the opposite inset if it is a percentage
+                //    referenceComponent(newRef).referencePosition(pos);
+                //} else {
                     if (newRef != referenceComponent || pos != referencePosition) {
+                        // This may potentially affect both this inset 
+                        // and the opposite inset if it is either flexible or 
+                        // percent.
+                        
+                        byte restoreUnit = -1;
+                        if (unit == UNIT_PERCENT || isFlexible()) {
+                            restoreUnit = unit;
+                            changeUnitsTo(UNIT_DIPS, parent);
+                        }
+                        byte oppRestoreUnit = -1;
+                        if (getOppositeInset().unit == UNIT_PERCENT || isFlexible()) {
+                            oppRestoreUnit = getOppositeInset().unit;
+                            getOppositeInset().changeUnitsTo(UNIT_DIPS, parent);
+                        }
                         LayeredLayoutConstraint cpy = constraint().copy();
                         cpy.insets[side].referenceComponent(newRef).referencePosition(pos);
                         
@@ -2748,10 +2800,23 @@ public class LayeredLayout extends Layout {
                         int newBase = cpy.insets[side].calcBaseValue(top, left, bottom, right);
                         int oldBase = calcBaseValue(top, left, bottom, right);
                         
-                        translatePixels(oldBase - newBase, true, parent);
+                        
                         referenceComponent(newRef).referencePosition(pos);
+                        calculatedBaseValue += (newBase - oldBase);
+                        calculatedValue += (newBase - oldBase);
+                        if (getOppositeInset().isFlexible()) {
+                            getOppositeInset().delta -= (newBase - oldBase);
+                        }
+                        
+                        translatePixels(oldBase - newBase, true, parent);
+                        if (restoreUnit >=0) {
+                            changeUnitsTo(restoreUnit, parent);
+                        }
+                        if (oppRestoreUnit >= 0) {
+                            getOppositeInset().changeUnitsTo(oppRestoreUnit, parent);
+                        }
                     }
-                }
+                //}
                 
                 return this;
                 
@@ -2862,7 +2927,7 @@ public class LayeredLayout extends Layout {
                             if (Math.abs(relH) < 1f) {
                                 return this;
                             }
-                            float percentDelta = delta / relH * 100f;
+                            float percentDelta = delta / (float)relH * 100f;
                             value += percentDelta;
                             
                         } else {
