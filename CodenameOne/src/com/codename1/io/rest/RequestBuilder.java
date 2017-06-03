@@ -42,6 +42,7 @@ import java.util.Map;
  * This class is used to build, invoke the http request and to get the http 
  * response 
  *
+ * @author Chen Fishbein
  */
 public class RequestBuilder {
 

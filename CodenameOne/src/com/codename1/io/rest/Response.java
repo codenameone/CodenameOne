@@ -28,6 +28,7 @@ import java.io.InputStream;
 /**
  * The http Response class
  *
+ * @author Chen Fishbein
  */
 public class Response<T> {
     private int responseCode;
