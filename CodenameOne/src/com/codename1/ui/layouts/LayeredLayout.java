@@ -2722,7 +2722,7 @@ public class LayeredLayout extends Layout {
              * @deprecated Use {@link #changeUnitsTo(byte, com.codename1.ui.Container) }
              */
             public Inset changeUnits(byte unit, Component cmp) {
-                return changeUnitsTo(unit, cmp.getParent());
+                return changeUnitsTo(unit, cmp == null ? null : cmp.getParent());
             }
             
             /**
