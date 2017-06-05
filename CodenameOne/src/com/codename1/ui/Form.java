@@ -2318,6 +2318,7 @@ public class Form extends Container {
         stickyDrag = null;
         dragStopFlag = false;
         dragged = null;
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
@@ -2356,7 +2357,9 @@ public class Form extends Container {
                         leadParent = cmp.getParent().getLeadParent();
                     }
                     leadParent.repaint();
-                    setFocused(leadParent);
+                    if (!isScrollWheeling) {
+                        setFocused(leadParent);
+                    }
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
                     
@@ -2367,7 +2370,7 @@ public class Form extends Container {
                     }
                     
                     if (cmp.isEnabled()) {
-                        if (cmp.isFocusable()) {
+                        if (!isScrollWheeling && cmp.isFocusable()) {
                             setFocused(cmp);
                         }
                         cmp.pointerPressed(x, y);
@@ -2400,7 +2403,9 @@ public class Form extends Container {
                             } else {
                                 leadParent = cmp.getParent().getLeadParent();
                             }
-                            setFocused(leadParent);
+                            if (!isScrollWheeling) {
+                                setFocused(leadParent);
+                            }
                             cmp = cmp.getLeadComponent();
                         }
                         cmp.initDragAndDrop(x, y);
@@ -2462,6 +2467,7 @@ public class Form extends Container {
      */
     public void pointerDragged(int x, int y) {
         // disable the drag stop flag if we are dragging again
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if(dragStopFlag) {
             pointerPressed(x, y);
         }
@@ -2504,7 +2510,7 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
             cmp.pointerDragged(x, y);
@@ -2518,6 +2524,7 @@ public class Form extends Container {
     @Override
     public void pointerDragged(int[] x, int[] y) {
         // disable the drag stop flag if we are dragging again
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if(dragStopFlag) {
             pointerPressed(x, y);
         }
@@ -2561,7 +2568,7 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
             cmp.pointerDragged(x, y);
@@ -2599,13 +2606,14 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerHoverPressed(int[] x, int[] y) {
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         Container actual = getActualPane();
         Component cmp = actual.getComponentAt(x[0], y[0]);
         while (cmp != null && cmp.isIgnorePointerEvents()) {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
             cmp.pointerHoverPressed(x, y);
@@ -2616,7 +2624,7 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if (dragged != null) {
             dragged.pointerHover(x, y);
             return;
@@ -2629,7 +2637,7 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                if (cmp.isFocusable() && cmp.isEnabled()) {
+                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                     setFocused(cmp);
                 }
                 cmp.pointerHover(x, y);
@@ -2671,6 +2679,7 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
             Component atXY = getComponentAt(x, y);
@@ -2737,11 +2746,13 @@ public class Form extends Container {
                                 leadParent = cmp.getParent().getLeadParent();
                             }
                             leadParent.repaint();
-                            setFocused(leadParent);
+                            if (!isScrollWheeling) {
+                                setFocused(leadParent);
+                            }
                             cmp.getLeadComponent().pointerReleased(x, y);
                         } else {
                             if (cmp.isEnabled()) {
-                                if (cmp.isFocusable()) {
+                                if (!isScrollWheeling && cmp.isFocusable()) {
                                     setFocused(cmp);
                                 }
                                 cmp.pointerReleased(x, y);
@@ -2773,7 +2784,9 @@ public class Form extends Container {
                                         leadParent = cmp.getParent().getLeadParent();
                                     }
                                     leadParent.repaint();
-                                    setFocused(leadParent);
+                                    if (!isScrollWheeling) {
+                                        setFocused(leadParent);
+                                    }
                                     cmp = cmp.getLeadComponent();
                                     cmp.pointerReleased(x, y);
                                 } else {

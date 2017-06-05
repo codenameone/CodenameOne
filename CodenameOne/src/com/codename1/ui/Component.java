@@ -319,6 +319,10 @@ public class Component implements Animation, StyleListener {
     private Motion animationMotion;
     Motion draggedMotionX;
     Motion draggedMotionY;
+    
+    // Reference that is only filled when a drag motion is a decelration motion
+    // for tensile scrolling
+    private Motion decelerationMotion;
 
     /**
      * Allows us to flag a drag operation in action thus preventing the mouse pointer
@@ -1197,6 +1201,9 @@ public class Component implements Animation, StyleListener {
      * @param parent the parent container
      */
     void setParent(Container parent) {
+        if (parent == this) {
+            throw new IllegalArgumentException("Attempt to add self as parent");
+        }
         this.parent = parent;
     }
 
@@ -3558,6 +3565,25 @@ public class Component implements Animation, StyleListener {
         return tensileDragEnabled;
     }
 
+    boolean isScrollDecelerationMotionInProgress() {
+        if (draggedMotionY != null) {
+            if (draggedMotionY == decelerationMotion &&  !draggedMotionY.isFinished()) {
+                return true;
+            }
+        }
+        if (draggedMotionX != null) {
+            if (draggedMotionX == decelerationMotion && !draggedMotionX.isFinished()) {
+                return true;
+            }
+        }
+        Container parent = getParent();
+        if (parent != null) {
+            return parent.isScrollDecelerationMotionInProgress();
+        }
+        
+        return false;
+    }
+    
     void startTensile(int offset, int dest, boolean vertical) {
         Motion draggedMotion;
         if(tensileDragEnabled) {
@@ -3567,6 +3593,7 @@ public class Component implements Animation, StyleListener {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);
             draggedMotion.start();
         }
+        decelerationMotion = draggedMotion;
         
         if(vertical){
             draggedMotionY = draggedMotion;

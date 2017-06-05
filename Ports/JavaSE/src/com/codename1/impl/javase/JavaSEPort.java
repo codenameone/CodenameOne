@@ -1270,17 +1270,42 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         }
 
+        int lastUnits = 0;
+        boolean ignoreWheelMovements = false;
+        int lastX;
+        int lastY;
         public void mouseWheelMoved(MouseWheelEvent e) {
             e.consume();
             if (!isEnabled()) {
                 return;
             }
             lastInputEvent = e;
-            final int x = scaleCoordinateX(e.getX());
-            final int y = scaleCoordinateY(e.getY());
+            final int x = scrollWheeling ? lastX : scaleCoordinateX(e.getX());
+            final int y = scrollWheeling ? lastY : scaleCoordinateY(e.getY());
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
+                Form f = getCurrentForm();
+                if(f != null){
+                    Component cmp = f.getContentPane().getComponentAt(x, y);
+                    if(cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                        if (!ignoreWheelMovements) {
+                            ignoreWheelMovements = true;
+                        }
+                        return;
+                    }
+                }
+                
                 requestFocus();
                 final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
+
+                if (units * lastUnits < 0 || Math.abs(units) - Math.abs(lastUnits) > 100) {
+                    ignoreWheelMovements = false;
+                }
+                lastUnits = units;
+                lastX = x;
+                lastY = y;
+                if (ignoreWheelMovements) {
+                    return;
+                }
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         scrollWheeling = true;
@@ -1299,11 +1324,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                 });
+                
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
                             Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                                return;
+                            }
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerDragged(x, y + units / 4 * 2);
@@ -1319,6 +1348,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Form f = getCurrentForm();
                         if(f != null){
                             Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                                return;
+                            }
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerDragged(x, y + units / 4 * 3);
@@ -1334,6 +1366,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Form f = getCurrentForm();
                         if(f != null){
                             Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                                f.pointerReleased(x, y + units);
+                                return;
+                            }
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerDragged(x, y + units);
