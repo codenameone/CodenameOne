@@ -1043,7 +1043,8 @@ public class TextArea extends Component {
             //then minCharactersInRow
             to=from;//+minCharactersInRow;
         }
-        if(text[text.length -1 ] == '\n'){
+        // textLength can be 0
+        if(textLength>0 && text[ textLength-1 ] == '\n'){
             rowStrings.add("");
         }
     }
