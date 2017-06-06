@@ -46,7 +46,7 @@
     y = malloc(size);
     memcpy(y, yCoords, size);
     numPoints = num;
-    //NSLog(@"Num points: %d", numPoints);
+    //CN1Log(@"Num points: %d", numPoints);
     return self;
 }
 -(void)execute
@@ -58,7 +58,7 @@
     GLErrorLog;
     int j = 0;
     for ( int i=0; i<numPoints; i++){
-        //NSLog(@"Point: %f %f", x[i], y[i]);
+        //CN1Log(@"Point: %f %f", x[i], y[i]);
         vertexes[j++] = (GLfloat)x[i];
         vertexes[j++] = (GLfloat)y[i];
     }

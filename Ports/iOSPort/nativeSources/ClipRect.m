@@ -88,7 +88,7 @@ static CGRect drawingRect;
     [self executeWithClipping];
     NSDate *finish = [NSDate date];
     NSTimeInterval t = [finish timeIntervalSinceDate:start];
-    NSLog(@"%@ took %f", [self getName], t);
+    CN1Log(@"%@ took %f", [self getName], t);
 }
 
 -(void)execute {
@@ -221,7 +221,7 @@ static CGRect drawingRect;
     int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
     if(currentScaleX == 1 && currentScaleY == 1) {
         //_glEnable(GL_SCISSOR_TEST);
-        //NSLog(@"Updating clip to scale");
+        //CN1Log(@"Updating clip to scale");
         glScissor(clipX, displayHeight - clipY - clipH, clipW, clipH);
     }
 

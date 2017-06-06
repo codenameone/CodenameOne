@@ -1,4 +1,5 @@
 #import "CN1ES2compat.h"
+#import "CodenameOne_GLViewController.h"
 #ifdef USE_ES2
 #import <GLKit/GLKit.h>
 #import <OpenGLES/ES2/gl.h>
@@ -92,7 +93,7 @@ static int _getGLSize(GLenum type){
         case GL_FLOAT:
             elSize = sizeof(GLfloat);break;
         default:
-            NSLog(@"Don't know size for type %i", type);
+            CN1Log(@"Don't know size for type %i", type);
     }
     return elSize;
 }
@@ -100,19 +101,19 @@ static int _getGLSize(GLenum type){
 static int _printGLPointer(GLenum type, GLint len, GLint size, const GLvoid * pointer){
     return 0;
     if ( type == GL_FLOAT ){
-        NSLog(@"It's a float");
+        CN1Log(@"It's a float");
         for ( int i=0; i< size*len; i++){
-            NSLog(@"%f", ((GLfloat*)pointer)[i]);
+            CN1Log(@"%f", ((GLfloat*)pointer)[i]);
         }
     } else if ( type == GL_SHORT ){
-        NSLog(@"It's a short");
+        CN1Log(@"It's a short");
         for ( int i=0; i< size*len; i++){
-            NSLog(@"%d", ((GLshort*)pointer)[i]);
+            CN1Log(@"%d", ((GLshort*)pointer)[i]);
         }
     } else if ( type == GL_INT){
-        NSLog(@"It's an int");
+        CN1Log(@"It's an int");
         for ( int i=0; i< size*len; i++){
-            NSLog(@"%d", ((GLint*)pointer)[i]);
+            CN1Log(@"%d", ((GLint*)pointer)[i]);
         }
     }
     return 0;
@@ -129,7 +130,7 @@ GLuint CN1compileShaderProgram(NSString *vertexShaderSrc, NSString *fragmentShad
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
 
     int len = [fragmentShaderSrc length];
-    //NSLog(@"%d", len);
+    //CN1Log(@"%d", len);
     const char* fragmentShaderSrcUTF = fragmentShaderSrc.UTF8String;
     glShaderSource(fragmentShader,1, &fragmentShaderSrcUTF, &len);
     GLErrorLog;
@@ -141,7 +142,7 @@ GLuint CN1compileShaderProgram(NSString *vertexShaderSrc, NSString *fragmentShad
         GLchar message[256];
         glGetShaderInfoLog(fragmentShader, sizeof(message), 0, &message[0]);
         NSString *messageString = [NSString stringWithUTF8String:message];
-        NSLog(@"%@", messageString);
+        CN1Log(@"%@", messageString);
         
         exit(1);
     }
@@ -156,7 +157,7 @@ GLuint CN1compileShaderProgram(NSString *vertexShaderSrc, NSString *fragmentShad
         GLchar message[256];
         glGetShaderInfoLog(vertexShader, sizeof(message), 0, &message[0]);
         NSString *messageString = [NSString stringWithUTF8String:message];
-        NSLog(@"%@", messageString);
+        CN1Log(@"%@", messageString);
         
         exit(1);
     }
@@ -176,7 +177,7 @@ GLuint CN1compileShaderProgram(NSString *vertexShaderSrc, NSString *fragmentShad
         glGetProgramInfoLog(program, sizeof(message), 0, &message[0]);
         GLErrorLog;
         NSString * messageString = [NSString stringWithUTF8String:message];
-        NSLog(@"%@", messageString);
+        CN1Log(@"%@", messageString);
         exit(1);
     }
     
@@ -194,7 +195,7 @@ static void CN1compileBasicProgram(){
     }
     //CN1transformMatrix = GLKMatrix4MakeIdentity();
     
-    NSLog(@"Compiling basic program");
+    CN1Log(@"Compiling basic program");
     CN1ProgramLoaded = YES;
     CN1activeProgram = glCreateProgram();
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -230,10 +231,10 @@ static void CN1compileBasicProgram(){
     
     
      ;
-    //NSLog(fragmentShaderSrc);
+    //CN1Log(fragmentShaderSrc);
     
     int len = [fragmentShaderSrc length];
-    //NSLog(@"%d", len);
+    //CN1Log(@"%d", len);
     const char* fragmentShaderSrcUTF = fragmentShaderSrc.UTF8String;
     glShaderSource(fragmentShader,1, &fragmentShaderSrcUTF, &len);
     GLErrorLog;
@@ -245,7 +246,7 @@ static void CN1compileBasicProgram(){
         GLchar message[256];
         glGetShaderInfoLog(fragmentShader, sizeof(message), 0, &message[0]);
         NSString *messageString = [NSString stringWithUTF8String:message];
-        NSLog(@"%@", messageString);
+        CN1Log(@"%@", messageString);
         
         exit(1);
     }
@@ -281,7 +282,7 @@ static void CN1compileBasicProgram(){
     "   if ( uUseRGBATexture ){ vTextureRGBACoord = aTextureRGBACoord;}\n"
     "   if ( uUseVertexColors ){ vColor = aColor;}\n"
     "}";
-    //NSLog(vertexShaderSrc);
+    //CN1Log(vertexShaderSrc);
     len = [vertexShaderSrc length];
     const char* vertexShaderSrcUTF = vertexShaderSrc.UTF8String;
     glShaderSource(vertexShader, 1, &vertexShaderSrcUTF, &len);
@@ -292,7 +293,7 @@ static void CN1compileBasicProgram(){
         GLchar message[256];
         glGetShaderInfoLog(vertexShader, sizeof(message), 0, &message[0]);
         NSString *messageString = [NSString stringWithUTF8String:message];
-        NSLog(@"%@", messageString);
+        CN1Log(@"%@", messageString);
         
         exit(1);
     }
@@ -312,7 +313,7 @@ static void CN1compileBasicProgram(){
         glGetProgramInfoLog(CN1activeProgram, sizeof(message), 0, &message[0]);
         GLErrorLog;
         NSString * messageString = [NSString stringWithUTF8String:message];
-        NSLog(@"%@", messageString);
+        CN1Log(@"%@", messageString);
         exit(1);
     }
     
@@ -399,7 +400,7 @@ static void CN1updateProjectionMatrixES2(){
     glUniformMatrix4fv(CN1projectionMatrixUniform, 1, 0, CN1projectionMatrix.m);
     
     GLErrorLog;
-    //NSLog(@"Projection matrix now %@", NSStringFromGLKMatrix4(CN1projectionMatrix));
+    //CN1Log(@"Projection matrix now %@", NSStringFromGLKMatrix4(CN1projectionMatrix));
 }
 
 static void CN1updateTransformMatrixES2(){
@@ -413,11 +414,11 @@ static void CN1updateModelViewMatrixES2(){
     glUniformMatrix4fv(CN1modelViewMatrixUniform, 1, 0, CN1modelViewMatrix.m);
     
     GLErrorLog;
-    //NSLog(@"Model View matrix now %@", NSStringFromGLKMatrix4(CN1modelViewMatrix));
+    //CN1Log(@"Model View matrix now %@", NSStringFromGLKMatrix4(CN1modelViewMatrix));
 }
 
 static void CN1updateColorES2(){
-    //NSLog(@"Updating color to %f,%f,%f,%f", CN1currentColor.v[0], CN1currentColor.v[1], CN1currentColor.v[2], CN1currentColor.v[3]);
+    //CN1Log(@"Updating color to %f,%f,%f,%f", CN1currentColor.v[0], CN1currentColor.v[1], CN1currentColor.v[2], CN1currentColor.v[3]);
     glUniform4fv(CN1ColorUniform, 1, CN1currentColor.v);
 }
 extern void glLoadIdentityES2();
@@ -489,7 +490,7 @@ void glMatrixModeES2(GLenum mode){
 
 
 void glLoadIdentityES2(){
-    //NSLog(@"Loading identity");
+    //CN1Log(@"Loading identity");
     if ( CN1matrixMode == GL_PROJECTION ){
         if (!cn1CompareMatrices(CN1projectionMatrix, GLKMatrix4Identity)) {
             CN1projectionMatrix =GLKMatrix4Identity;
@@ -504,14 +505,14 @@ void glLoadIdentityES2(){
         }
         //CN1updateModelViewMatrixES2();
     } else {
-         NSLog(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
+         CN1Log(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
     }
     
     
 }
 
 void glOrthofES2(GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLfloat nearZ, GLfloat farZ){
-    //NSLog(@"Setting orthographic projection %f %f %f %f %f %f", left, right, bottom, top, nearZ, farZ);
+    //CN1Log(@"Setting orthographic projection %f %f %f %f %f %f", left, right, bottom, top, nearZ, farZ);
     GLKMatrix4 ortho = GLKMatrix4MakeOrtho(left, right, bottom, top, nearZ, farZ);
     if (CN1matrixMode == GL_PROJECTION ){
         if (!cn1CompareMatrices(ortho, GLKMatrix4Identity)) {
@@ -526,7 +527,7 @@ void glOrthofES2(GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLflo
         }
         //CN1updateModelViewMatrixES2();
     } else {
-        NSLog(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
+        CN1Log(@"Setting orthof on undefined matrix mode %d", CN1matrixMode);
     }
 }
 
@@ -568,7 +569,7 @@ void glEnableES2(GLenum feature){
 
 
 void glScalefES2(GLfloat xScale, GLfloat yScale, GLfloat zScale){
-    //NSLog(@"Scaling %f %f %f", xScale, yScale, zScale);
+    //CN1Log(@"Scaling %f %f %f", xScale, yScale, zScale);
     GLKMatrix4 scale = GLKMatrix4MakeScale(xScale, yScale, zScale);
     if ( CN1matrixMode == GL_PROJECTION ){
         if (!cn1CompareMatrices(GLKMatrix4Identity, scale)) {
@@ -587,9 +588,9 @@ void glScalefES2(GLfloat xScale, GLfloat yScale, GLfloat zScale){
     
 }
 void glTranslatefES2(GLfloat x, GLfloat y, GLfloat z){
-    //NSLog(@"Translating %f %f %f", x, y, z);
+    //CN1Log(@"Translating %f %f %f", x, y, z);
     GLKMatrix4 translate = GLKMatrix4MakeTranslation(x, y, z);
-    //NSLog(@"Translation matrix is %@", NSStringFromGLKMatrix4(translate));
+    //CN1Log(@"Translation matrix is %@", NSStringFromGLKMatrix4(translate));
     if ( CN1matrixMode == GL_PROJECTION ){
         if (!cn1CompareMatrices(GLKMatrix4Identity, translate)) {
             CN1projectionMatrix = GLKMatrix4Multiply(CN1projectionMatrix, translate);
@@ -606,7 +607,7 @@ void glTranslatefES2(GLfloat x, GLfloat y, GLfloat z){
 }
 
 void glRotatefES2(GLfloat angle, GLfloat x, GLfloat y, GLfloat z){
-    //NSLog(@"Rotating %f %f %f %f", angle, x, y, z);
+    //CN1Log(@"Rotating %f %f %f %f", angle, x, y, z);
     
     // Convert from degrees to radians
     angle = angle * M_PI / 180.0;
@@ -706,7 +707,7 @@ void glTexCoordPointerES2(	GLint size,
     glVertexAttribPointer(CN1TextureRGBACoordAtt, size, type, 0, stride, pointer);
     //glBufferData(GL_ARRAY_BUFFER, _getGLSize(type), pointer, GL_DYNAMIC_DRAW);
     //glBindBuffer(GL_ARRAY_BUFFER, 0);
-    //NSLog(@"Texture pointer:");
+    //CN1Log(@"Texture pointer:");
     //_printGLPointer(type, size, pointer);
     CN1textureRGBPointer = pointer;
     CN1textureRGBPointerType = type;
@@ -733,7 +734,7 @@ void glVertexPointerES2(	GLint size,
     CN1vertexPointer = pointer;
     CN1vertexPointerType = type;
     CN1vertexPointerSize = size;
-    //NSLog(@"Vertex pointer:");
+    //CN1Log(@"Vertex pointer:");
     //_printGLPointer(type, size, pointer);
     
     
@@ -749,7 +750,7 @@ void glAlphaMaskTexCoordPointerES2( GLint size, GLenum type, GLsizei stride, con
     glVertexAttribPointer(CN1TextureMaskCoordAtt, size, type, 0, stride, pointer);
     //glBufferData(GL_ARRAY_BUFFER, _getGLSize(type), pointer, GL_DYNAMIC_DRAW);
     //glBindBuffer(GL_ARRAY_BUFFER, 0);
-    //NSLog(@"Texture pointer:");
+    //CN1Log(@"Texture pointer:");
     //_printGLPointer(type, size, pointer);
     CN1textureMaskPointer = pointer;
     CN1textureMaskPointerType = type;

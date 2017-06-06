@@ -68,7 +68,7 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
             set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Failed to log in due to a configuration error."), googleLoginCallback);
             set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
             googleLoginCallback = NULL;
-            NSLog(@"Could not login to Google Plus because 'ios.gplus.clientId' property is not set.  Ensure that the ios.gplus.clientId build hint is set");
+            CN1Log(@"Could not login to Google Plus because 'ios.gplus.clientId' property is not set.  Ensure that the ios.gplus.clientId build hint is set");
             return;
         }
 
@@ -82,7 +82,7 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
                 set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Please install the Google Plus app on your device in order to log in with Google Plus."), googleLoginCallback);
                 set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
                 googleLoginCallback = NULL;
-                NSLog(@"Could not log into Google plus because the Google Plus app isn't installed and the ios.gplus.requireGplusAppForLogin property is set to true.  This limitation is to work around Apple app store rejections caused by logging in with Safari");
+                CN1Log(@"Could not log into Google plus because the Google Plus app isn't installed and the ios.gplus.requireGplusAppForLogin property is set to true.  This limitation is to work around Apple app store rejections caused by logging in with Safari");
                 return;
             }
         }
