@@ -199,7 +199,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             fontFaceSystem = "Arial";
         }
-        
     }
 
     /**
@@ -410,6 +409,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean subscriptionSupported;
     private boolean refundSupported;
     private int timeout = -1;
+    private JLabel widthLabel;
+    private JLabel heightLabel;
 
     private boolean includeHeaderInScreenshot = true;
 
@@ -933,9 +934,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public Graphics2D getGraphics2D() {
             updateBufferSize();
-            if (g2dInstance == null) {
+            while(g2dInstance == null) {
                 g2dInstance = buffer.createGraphics();
                 updateGraphicsScale(g2dInstance);
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
             return g2dInstance;
         }
@@ -1168,9 +1174,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }  
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
-        private Cursor defaultCursor = Cursor.getDefaultCursor();
-        
+        private Cursor defaultCursor = Cursor.getDefaultCursor();        
         private int currentCursor = 0;
+        private java.util.Timer reSize;
+        
         public void mouseMoved(MouseEvent e) {
             e.consume();
             if (!isEnabled()) {
@@ -1230,13 +1237,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void setBounds(int x, int y, int w, int h) {
             super.setBounds(x, y, w, h);
-            if (getSkin() == null) {
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+            if (getSkin() == null && !desktopSkin) {
                 JavaSEPort.this.sizeChanged(getWidth(), getHeight());
             }
         }
-
+        
         public void ancestorResized(HierarchyEvent e) {
-
+                
             if (getSkin() != null) {
                 if (!scrollableSkin) {
                     float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
@@ -1248,12 +1257,45 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 getParent().repaint();
-            } else {                
-                if(mediaContainer != null){
-                    JavaSEPort.this.sizeChanged(mediaContainer.getWidth(), mediaContainer.getHeight());
+            } else {  
+                if(reSize == null){
+                    reSize = new java.util.Timer();
                 }else{
-                    JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                    reSize.cancel();
+                    reSize = new java.util.Timer();
                 }
+                //some ugly hacks to workaround black screen issue
+                reSize.schedule(new TimerTask(){
+                    @Override
+                    public void run() {
+                        if(mediaContainer != null){
+                            JavaSEPort.this.sizeChanged(mediaContainer.getWidth(), mediaContainer.getHeight());
+                        }else{
+                            JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                        }
+                        try {
+                            Thread.sleep(1000);                                            
+                        } catch (Exception e) {
+                        }
+                        Form f = Display.getInstance().getCurrent();
+                        if (f != null) {
+                            f.forceRevalidate();
+                        }
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    Thread.sleep(1500);
+                                } catch (Exception e) {
+                                }
+                                window.repaint();
+                            }
+                        }).start();
+
+                        reSize = null;
+                    }
+                    
+                }, 2000);
             }
         }
 
@@ -1649,10 +1691,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-
+            installMenu(frm, false);
+            
+        } catch (IOException err) {
+            err.printStackTrace();
+        }
+    }
+    
+    private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
             JMenuBar bar = new JMenuBar();
             frm.setJMenuBar(bar);
-
+            
             JMenu simulatorMenu = new JMenu("Simulate");
             simulatorMenu.setDoubleBuffered(true);
             simulatorMenu.addMenuListener(new MenuListener(){
@@ -1674,6 +1723,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             
             JMenuItem rotate = new JMenuItem("Rotate");
+            rotate.setEnabled(!desktopSkin);
+
             simulatorMenu.add(rotate);
             JMenu zoomMenu = new JMenu("Zoom");
             simulatorMenu.add(zoomMenu);
@@ -1689,6 +1740,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             zoomMenu.add(zoom100);
             JMenuItem zoom200 = new JMenuItem("200%");
             zoomMenu.add(zoom200);
+            
+            zoomMenu.setEnabled(!desktopSkin);
 
             JRadioButtonMenuItem debugEdtNone = new JRadioButtonMenuItem("None");
             JRadioButtonMenuItem debugEdtLight = new JRadioButtonMenuItem("Light");
@@ -2239,6 +2292,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             final JCheckBoxMenuItem scrollFlag = new JCheckBoxMenuItem("Scrollable", scrollableSkin);
             simulatorMenu.add(scrollFlag);
+            scrollFlag.setEnabled(!desktopSkin);
 
             final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
             simulatorMenu.add(slowMotionFlag);
@@ -2567,9 +2621,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                     exitApplication();
                 }
             });
-        } catch (IOException err) {
-            err.printStackTrace();
-        }
     }
 
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
@@ -2622,9 +2673,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                             perfMonitor.dispose();
                             perfMonitor = null;
                         }
+                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                        pref.putBoolean("desktopSkin", false);
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
-                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                             pref.put("skin", current);
                             deinitializeSync();
                             frm.dispose();
@@ -2638,6 +2690,31 @@ public class JavaSEPort extends CodenameOneImplementation {
                 skinMenu.add(i);
             }
         }
+        JMenuItem dSkin = new JMenuItem("Desktop.skin");
+        dSkin.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent ae) {
+                if (netMonitor != null) {
+                    netMonitor.dispose();
+                    netMonitor = null;
+                }
+                if (perfMonitor != null) {
+                    perfMonitor.dispose();
+                    perfMonitor = null;
+                }
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("desktopSkin", true);
+                String mainClass = System.getProperty("MainClass");
+                if (mainClass != null) {
+                    deinitializeSync();
+                    frm.dispose();
+                    System.setProperty("reload.simulator", "true");
+                } 
+            }
+        });
+        skinMenu.addSeparator();
+        skinMenu.add(dSkin);
+        
         skinMenu.addSeparator();
         JMenuItem more = new JMenuItem("More...");
         skinMenu.add(more);
@@ -3089,6 +3166,28 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         inInit = true;
         
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+        if (desktopSkin) {
+            JPanel panel = new javax.swing.JPanel();  
+            panel.setLayout(new BorderLayout());
+            JPanel bottom = new javax.swing.JPanel(); 
+            bottom.setLayout(new FlowLayout(FlowLayout.RIGHT));
+            widthLabel = new JLabel("Width:   ");
+            heightLabel = new JLabel(" Height:   ");
+            bottom.add(widthLabel);
+            bottom.add(heightLabel);
+            panel.add(bottom, BorderLayout.SOUTH);
+            
+            JFrame frame = new JFrame();
+            frame.setLayout(new BorderLayout());
+            frame.add(panel, BorderLayout.CENTER);
+            frame.setSize(new Dimension(300, 400));
+            m = panel;
+            window = frame;            
+        }
+        setInvokePointerHover(desktopSkin);
+        
         // this is essential for push and other things to work in the simulator
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
         String user = p.get("user", null);
@@ -3116,7 +3215,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         URLConnection.setDefaultAllowUserInteraction(true);
         HttpURLConnection.setFollowRedirects(false);
-        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
             showNetworkMonitor();
         }
@@ -3138,6 +3236,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         } else {
             window = new JFrame();
+            window.setLayout(new java.awt.BorderLayout());
+            hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
+            vSelector = new JScrollBar(Scrollbar.VERTICAL);
+            hSelector.addAdjustmentListener(canvas);
+            vSelector.addAdjustmentListener(canvas);
+            scrollableSkin = pref.getBoolean("Scrollable", true);
+            if (scrollableSkin) {
+                window.add(java.awt.BorderLayout.SOUTH, hSelector);
+                window.add(java.awt.BorderLayout.EAST, vSelector);
+            }
+            window.add(java.awt.BorderLayout.CENTER, canvas);
+        }
+        if(window != null){
             java.awt.Image large = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application64.png"));
             java.awt.Image small = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application48.png"));
             try {
@@ -3171,23 +3282,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void windowDeactivated(WindowEvent e) {
                 }
             });
-
-
             window.setLocationByPlatform(true);
-            window.setLayout(new java.awt.BorderLayout());
-            hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
-            vSelector = new JScrollBar(Scrollbar.VERTICAL);
-            hSelector.addAdjustmentListener(canvas);
-            vSelector.addAdjustmentListener(canvas);
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
-            
-            scrollableSkin = pref.getBoolean("Scrollable", true);
-            if (scrollableSkin) {
-                window.add(java.awt.BorderLayout.SOUTH, hSelector);
-                window.add(java.awt.BorderLayout.EAST, vSelector);
-            }
-            window.add(java.awt.BorderLayout.CENTER, canvas);
             
             String reset = System.getProperty("resetSkins");
             if(reset != null && reset.equals("true")){
@@ -3197,13 +3294,21 @@ public class JavaSEPort extends CodenameOneImplementation {
            }
             
             if (hasSkins()) {
-                String f = System.getProperty("skin");
-                if (f != null) {
-                    loadSkinFile(f, window);
-                } else {
-                    String d = System.getProperty("dskin");
-                    f = pref.get("skin", d);
-                    loadSkinFile(f, window);
+                if(m == null){
+                    String f = System.getProperty("skin");
+                    if (f != null) {
+                        loadSkinFile(f, window);
+                    } else {
+                        String d = System.getProperty("dskin");
+                        f = pref.get("skin", d);
+                        loadSkinFile(f, window);
+                    }
+                }else{
+                    try{
+                        installMenu(window, true);
+                    }catch(Exception e){
+                        e.printStackTrace();
+                    }
                 }
             } else {
                 Resources.setRuntimeMultiImageEnabled(true);
@@ -3238,6 +3343,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         inInit = false;
+    }
+    
+    protected void sizeChanged(int w, int h) {
+        try{
+            super.sizeChanged(w, h);
+            if(widthLabel != null){
+                widthLabel.setText("Width: " + w);
+                heightLabel.setText("Height: " + h);
+                widthLabel.getParent().revalidate();
+            }
+            canvas.blit();
+        }catch(Exception e){
+            e.printStackTrace();
+        }
     }
 
     /**
