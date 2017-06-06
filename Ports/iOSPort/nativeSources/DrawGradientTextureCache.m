@@ -113,11 +113,11 @@ static int MAX_CACHE_SIZE = 5;
             [d->lastAccess retain];
             [tmp release];
 #endif
-            //NSLog(@"Gradient cache hit size %i!", [cachedGradients count]);
+            //CN1Log(@"Gradient cache hit size %i!", [cachedGradients count]);
             return d->textureName;
         }
     }
-    //NSLog(@"Gradient cache miss size %i for typeA:%i startColorA:%i endColorA:%i widthA:%i heightA:%i relativeXA:%f relativeYA:%f relativeSizeA:%f!", [cachedGradients count], typeA, startColorA, endColorA, widthA, heightA, relativeXA, relativeYA, relativeSizeA);
+    //CN1Log(@"Gradient cache miss size %i for typeA:%i startColorA:%i endColorA:%i widthA:%i heightA:%i relativeXA:%f relativeYA:%f relativeSizeA:%f!", [cachedGradients count], typeA, startColorA, endColorA, widthA, heightA, relativeXA, relativeYA, relativeSizeA);
 #ifndef CN1_USE_ARC
     [tmp release];
 #endif

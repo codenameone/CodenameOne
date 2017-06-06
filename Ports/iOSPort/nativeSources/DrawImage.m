@@ -153,7 +153,7 @@ static GLuint getOGLProgram(){
         wX, sY,
         eX, sY
     };
-    //NSLog(@"drawImage(%i, %i, %i, %i, %i, %i)", x, y, w, h, width, height);
+    //CN1Log(@"drawImage(%i, %i, %i, %i, %i, %i)", x, y, w, h, width, height);
     
     //static const GLshort textureCoordinates[] = {
     //    0, 1,
@@ -243,7 +243,7 @@ static GLuint getOGLProgram(){
         x, y + h,
         x + w, y + h
     };
-    //NSLog(@"drawImage(%i, %i, %i, %i, %i, %i)", x, y, w, h, width, height);
+    //CN1Log(@"drawImage(%i, %i, %i, %i, %i, %i)", x, y, w, h, width, height);
     
     static const GLshort textureCoordinates[] = {
         0, 1,
