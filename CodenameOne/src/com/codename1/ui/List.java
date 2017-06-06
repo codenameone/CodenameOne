@@ -1527,7 +1527,7 @@ public class List<T> extends Component {
     /**
      * This method allows extracting the action listeners from the current list
      * 
-     * @return Collection containing the action listeners on the list
+     * @return Collection (ArrayList) containing the action listeners on the list
      */
     public Collection getListeners() {
         return dispatcher.getListenerCollection();

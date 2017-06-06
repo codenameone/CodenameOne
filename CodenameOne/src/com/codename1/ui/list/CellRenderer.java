@@ -36,8 +36,8 @@ import com.codename1.ui.List;
  * essentially discarded.
  * <p>An instance of a renderer can be developed as such:
  * <pre>
-<strong>public</strong> <strong>class</strong> <font color="#2040a0">MyYesNoRenderer</font> <strong>extends</strong> <font color="#2040a0">Label</font> <strong>implements</strong> <font color="#2040a0">ListCellRenderer</font> <font color="4444FF"><strong>{</strong></font>
-    <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListCellRendererComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font>, <font color="#2040a0">Object</font> <font color="#2040a0">value</font>, <strong>int</strong> <font color="#2040a0">index</font>, <strong>boolean</strong> <font color="#2040a0">isSelected</font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
+<strong>public</strong> <strong>class</strong> <font color="#2040a0">MyYesNoRenderer</font> <strong>extends</strong> <font color="#2040a0">Label</font> <strong>implements</strong> <font color="#2040a0">CellRenderer<<font color="#2040a0">T</font>></font> <font color="4444FF"><strong>{</strong></font>
+    <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getCellRendererComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">Component</font> <font color="#2040a0">component</font>, <font color="#2040a0">Object</font> <font color="#2040a0">model</font>, <font color="#2040a0">T</font> <font color="#2040a0">value</font>, <strong>int</strong> <font color="#2040a0">index</font>, <strong>boolean</strong> <font color="#2040a0">isSelected</font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
         <strong>if</strong><font color="4444FF"><strong>(</strong></font> <font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">Boolean</font><font color="4444FF"><strong>)</strong></font><font color="#2040a0">value</font><font color="4444FF"><strong>)</strong></font>.<font color="#2040a0">booleanValue</font><font color="4444FF"><strong>(</strong></font><font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
             <font color="#2040a0">setText</font><font color="4444FF"><strong>(</strong></font><font color="#008000">&quot;Yes&quot;</font><font color="4444FF"><strong>)</strong></font><font color="4444FF">;</font>
         <font color="4444FF"><strong>}</strong></font> <strong>else</strong> <font color="4444FF"><strong>{</strong></font>
@@ -45,7 +45,7 @@ import com.codename1.ui.List;
         <font color="4444FF"><strong>}</strong></font>
         <strong>return</strong> <strong>this</strong><font color="4444FF">;</font>
     <font color="4444FF"><strong>}</strong></font>
-    <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getListFocusComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">List</font> <font color="#2040a0">list</font><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
+    <strong>public</strong> <font color="#2040a0">Component</font> <font color="#2040a0">getFocusComponent</font><font color="4444FF"><strong>(</strong></font><font color="#2040a0">Component</font> <font color="#2040a0">component</font><strong>)</strong></font> <font color="4444FF"><strong>{</strong></font>
         <font color="#2040a0">Label label = new label</font><strong>(&quot;&quot;);</strong>
         <font color="#2040a0">label.getStyle().setBgTransparency(</font><font color="#008000">100</font>);
      </strong>
