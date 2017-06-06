@@ -3535,7 +3535,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (nativeThemeAvailable) {
             try {
                 InputStream is;
-                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet() || Display.getInstance().getProperty("and.hololight", "false").equals("true")) {
+                if (android.os.Build.VERSION.SDK_INT < 14 && !isTablet() || !Display.getInstance().getProperty("and.hololight", "false").equals("true")) {
                     is = getResourceAsStream(getClass(), "/androidTheme.res");
                 } else {
                     is = getResourceAsStream(getClass(), "/android_holo_light.res");
