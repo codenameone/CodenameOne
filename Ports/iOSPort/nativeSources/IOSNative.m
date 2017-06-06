@@ -5895,6 +5895,7 @@ void com_codename1_impl_ios_Matrix_MatrixUtil_multiplyMM___float_1ARRAY_int_floa
 JAVA_VOID com_codename1_impl_ios_Matrix_MatrixUtil_transformPoints___float_1ARRAY_int_float_1ARRAY_int_float_1ARRAY_int_int(CN1_THREAD_STATE_MULTI_ARG
 JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT out, JAVA_INT destPos, JAVA_INT numPoints
 ) {
+#ifdef USE_ES2
 #ifndef NEW_CODENAME_ONE_VM
     JAVA_ARRAY_FLOAT* mData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)m)->fields.org_xmlvm_runtime_XMLVMArray.array_;
     JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((org_xmlvm_runtime_XMLVMArray*)in)->fields.org_xmlvm_runtime_XMLVMArray.array_;
@@ -5922,7 +5923,7 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
             outData[d0] = outputVector.v[2];
         }     
     }
-    
+#endif    
 }
 
 
