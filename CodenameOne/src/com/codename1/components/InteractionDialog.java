@@ -413,7 +413,7 @@ public class InteractionDialog extends Container {
 
         // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
         // preferred size logic of the dialog won't work with large title borders
-        if((dialogTitle != null || dialogTitle.length() == 0) && manager.isThemeConstant("hideEmptyTitleBool", false)) {
+        if((dialogTitle == null || dialogTitle.length() == 0) && manager.isThemeConstant("hideEmptyTitleBool", false)) {
             boolean b = getTitle().length() > 0;
             titleArea.setVisible(b);
             getTitleComponent().setVisible(b);

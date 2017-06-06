@@ -809,7 +809,9 @@ public class TextArea extends Component {
     }
 
     private void initRowString() {
-        if(!Display.getInstance().isEdt()) {
+        // this superficially fixes the problem with text
+    	// all displayed on one line.
+    	if(!Display.getInstance().isEdt()) {
             if(rowStrings == null) {
                 rowStrings = new ArrayList();
                 rowStrings.add(getText());
@@ -1043,7 +1045,7 @@ public class TextArea extends Component {
             //then minCharactersInRow
             to=from;//+minCharactersInRow;
         }
-        if(text[text.length -1 ] == '\n'){
+        if(textLength>0 && text[textLength -1 ] == '\n'){
             rowStrings.add("");
         }
     }
