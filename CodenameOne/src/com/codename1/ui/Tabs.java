@@ -1312,6 +1312,7 @@ public class Tabs extends Container {
                         lastX = -1;
                         initialX = -1;
                         initialY = -1;
+                        blockSwipe = true;
                     }
                     dragStarted = false;
                     break;
