@@ -1992,7 +1992,7 @@ public class LayeredLayout extends Layout {
                     }
                     if (!found && refParent != null) {
                         int index = refParent.getComponentIndex(referenceComponent);
-                        if (parent.getComponentCount() > index) {
+                        if (index != -1 && parent.getComponentCount() > index) {
                             referenceComponent = parent.getComponentAt(index);
                             found = true;
                         }
