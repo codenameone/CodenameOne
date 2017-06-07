@@ -1240,7 +1240,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             boolean desktopSkin = pref.getBoolean("desktopSkin", false);
             if (getSkin() == null && !desktopSkin) {
-                JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                    }
+                });
+                
             }
         }
         
@@ -1288,7 +1293,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                                     Thread.sleep(1500);
                                 } catch (Exception e) {
                                 }
-                                window.repaint();
+                                if (window != null) {
+                                    window.repaint();
+                                }
                             }
                         }).start();
 
