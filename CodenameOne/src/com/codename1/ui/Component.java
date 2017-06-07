@@ -2236,7 +2236,7 @@ public class Component implements Animation, StyleListener {
                 if (!contains) {
                     break;
                 }
-                parent = getParent();
+                parent = parent.getParent();
             }
         }
         return contains;
