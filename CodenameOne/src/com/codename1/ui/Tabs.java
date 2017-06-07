@@ -1278,7 +1278,7 @@ public class Tabs extends Container {
                 case PRESS: {
                     blockSwipe = false;
                     riskySwipe = false;
-                    if (contentPane.contains(x, y)) {
+                    if (contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
                         if(testCmp != null && testCmp != contentPane) {
                             while(testCmp != null && testCmp != contentPane) {

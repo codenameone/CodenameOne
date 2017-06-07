@@ -2192,15 +2192,54 @@ public class Component implements Animation, StyleListener {
     /**
      * Returns true if the given absolute coordinate is contained in the Component
      * 
+     * <p>NOTE: This will return true upon a "hit" even if the component is not
+     * visible, or if that part of the component is currently clipped by a parent
+     * component.  To check if a point is contained in the visible component bounds
+     * use {@link #visibleBoundsContains(int, int) }</p>
+     * 
      * @param x the given absolute x coordinate
      * @param y the given absolute y coordinate
      * @return true if the given absolute coordinate is contained in the 
      * Component; otherwise false
+     * 
+     * @see #visibleBoundsContains(int, int) 
      */
     public boolean contains(int x, int y) {
         int absX = getAbsoluteX() + getScrollX();
         int absY = getAbsoluteY() + getScrollY();
         return (x >= absX && x < absX + getWidth() && y >= absY && y < absY + getHeight());
+    }
+    
+    /**
+     * Returns true if the given absolute coordinate is contained inside the visible bounds
+     * of the component.  This differs from {@link #contains(int, int) } in that it will
+     * return {@literal false} if the component or any of its ancestors are not visible,
+     * or if (x, y) are contained inside the bounds of the component, but are clipped.
+     * 
+     * @param x the given absolute x coordinate
+     * @param y the given absolute y coordinate
+     * @return true if the given absolute coordinate is contained in the 
+     * Component's visible bounds; otherwise false
+     * @see #contains(int, int) 
+     */
+    public boolean visibleBoundsContains(int x, int y) {
+        boolean contains = true;
+        if (!isVisible() || !contains(x, y)) {
+            contains = false;
+        }
+        if (contains) {
+            Container parent = getParent();
+            while (parent != null) {
+                if (!parent.visibleBoundsContains(x, y)) {
+                    contains = false;
+                }
+                if (!contains) {
+                    break;
+                }
+                parent = getParent();
+            }
+        }
+        return contains;
     }
 
     /**
