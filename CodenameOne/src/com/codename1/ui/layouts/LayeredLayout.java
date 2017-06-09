@@ -217,6 +217,73 @@ public class LayeredLayout extends Layout {
      * have been laid out.
      */
     private HashSet<Component> tmpLaidOut = new HashSet<Component>();
+    
+    /**
+     * The preferred height in MM of this layout which serves as a sort of minimum
+     * height even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred height will be the max of this value and the 
+     * calculated preferred height based on the container's children.<p>
+     */
+    private float preferredHeightMM;
+    
+    /**
+     * The preferred width (in MM) of this layout which serves as a sort of minimum
+     * width even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred width will be the max of this value and the 
+     * calculated preferred width based on the container's children.<p>
+     */
+    private float preferredWidthMM;
+    
+    
+    /**
+     * Sets the preferred size of this layout in MM.  This serves as a minimum
+     * size that will be returned by calcPreferredSize().
+     * @param width The preferred width in MM.
+     * @param height The preferred height in MM.
+     */
+    public void setPreferredSizeMM(float width, float height) {
+        this.preferredHeightMM = height;
+        this.preferredWidthMM = width;
+    }
+    
+    /**
+     * The preferred height in MM of this layout which serves as a sort of minimum
+     * height even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred height will be the max of this value and the 
+     * calculated preferred height based on the container's children.<p>
+     */
+    public float getPreferredHeightMM() {
+        return preferredHeightMM;
+    }
+    
+    /**
+     * Sets the preferred height of this layout in MM.
+     * @param mm 
+     */
+    public void setPreferredHeightMM(float mm) {
+        preferredHeightMM = mm;
+    }
+    
+    /**
+     * Sets the preferred width of this layout in MM.
+     * @param mm 
+     */
+    public void setPreferredWidthMM(float mm) {
+        preferredWidthMM = mm;
+    }
+    /**
+     * The preferred width (in MM) of this layout which serves as a sort of minimum
+     * width even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred width will be the max of this value and the 
+     * calculated preferred width based on the container's children.<p>
+     */
+    public float getPreferredWidthMM() {
+        return preferredWidthMM;
+    }
 
     @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
@@ -829,6 +896,19 @@ public class LayeredLayout extends Layout {
         Style s = parent.getStyle();
         Dimension d = new Dimension(maxWidth + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(),
                 maxHeight + s.getPaddingTop() + s.getPaddingBottom());
+        if (preferredWidthMM > 0) {
+            int minW = Display.getInstance().convertToPixels(preferredWidthMM);
+            if (d.getWidth() < minW) {
+                d.setWidth(minW);
+            }
+        }
+        
+        if (preferredHeightMM > 0) {
+            int minH = Display.getInstance().convertToPixels(preferredHeightMM);
+            if (d.getHeight() < Display.getInstance().convertToPixels(preferredHeightMM)) {
+                d.setHeight(minH);
+            }
+        }
         return d;
     }
 
