@@ -2009,19 +2009,9 @@ namespace com.codename1.impl
             return sbyteArray;
         }
 
-        const int maxCacheSize = 50;
-        private static ConcurrentDictionary<int, CodenameOneImage> imageCache = new ConcurrentDictionary<int, CodenameOneImage>();
-
         public override object createImage(byte[] bytes, int offset, int len)
         {
-
-            if (imageCache.ContainsKey(bytes.GetHashCode()))
-            {
-                CodenameOneImage cached;
-                imageCache.TryGetValue(bytes.GetHashCode(), out cached);
-                cached.lastAccess = DateTime.Now.Ticks;
-                return cached;
-            }
+           
             if (bytes.Length == 0)
             {
                 // workaround for empty images
@@ -2057,16 +2047,7 @@ namespace com.codename1.impl
                 cim.graphics.destination.dispose();
                 ci = cim;
                 canvasbitmap.Dispose();
-                dispatcher.RunAsync(CoreDispatcherPriority.Low, () =>
-                {
-                    imageCache.TryAdd(bytes.GetHashCode(), ci);
-                    while (imageCache.Count > maxCacheSize)
-                    {
-                        int toRemove = imageCache.OrderBy(m => m.Value.lastAccess).First().Key;
-                        CodenameOneImage ignored;
-                        imageCache.TryRemove(toRemove, out ignored);
-                    }
-                }).AsTask();
+                
             }
             catch (Exception)
             {

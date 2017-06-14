@@ -1310,10 +1310,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void adjustmentValueChanged(AdjustmentEvent e) {
             JScrollBar s = (JScrollBar) e.getSource();
             int val = s.getValue();
-            if (s.getOrientation() == Scrollbar.HORIZONTAL) {
-                x = -(int) ((float) (val / 100f) * getWidth());
+            if(getSkin() != null) {
+                if (s.getOrientation() == Scrollbar.HORIZONTAL) {
+                    x = -(int) ((float) (val / 100f) * getSkin().getWidth());
+                } else {
+                    y = -(int) ((float) (val / 100f) * getSkin().getHeight());
+                }
             } else {
-                y = -(int) ((float) (val / 100f) * getHeight());
+                if (s.getOrientation() == Scrollbar.HORIZONTAL) {
+                    x = -(int) ((float) (val / 100f) * getWidth());
+                } else {
+                    y = -(int) ((float) (val / 100f) * getHeight());
+                }
             }
             repaint();
 
