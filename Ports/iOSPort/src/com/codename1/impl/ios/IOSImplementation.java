@@ -6921,6 +6921,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     super.setLocale(locale, language);
                     Locale l = new Locale(language, locale);
                     Locale.setDefault(l);
+                    nativeInstance.setLocale(language+"_"+locale);
                 }
             };
         }

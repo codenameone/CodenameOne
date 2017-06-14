@@ -392,6 +392,7 @@ public final class IOSNative {
     native void restorePurchases();
     native void zoozPurchase(double amount, String currency, String appKey, boolean sandbox, String invoiceNumber);
 
+    native void setLocale(String localeStr);
     native String formatInt(int i);
     native String formatDouble(double d);
     native String formatCurrency(double d);
