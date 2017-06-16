@@ -834,8 +834,8 @@ public class LayeredLayout extends Layout {
             int bottomInset = constraint.insets[Component.BOTTOM].calculate(cmp, innerTop, left, innerBottom, right);
             cmp.setX(leftInset + s.getMarginLeft(parent.isRTL()));
             cmp.setY(topInset + s.getMarginTop());
-            cmp.setWidth(right - left - s.getHorizontalMargins() - rightInset - leftInset);
-            cmp.setHeight(bottom - top - s.getVerticalMargins() - bottomInset - topInset);
+            cmp.setWidth(Math.max(0, right - left - s.getHorizontalMargins() - rightInset - leftInset));
+            cmp.setHeight(Math.max(0, bottom - top - s.getVerticalMargins() - bottomInset - topInset));
 
         } else {
 
@@ -846,8 +846,8 @@ public class LayeredLayout extends Layout {
 
             cmp.setX(x);
             cmp.setY(y);
-            cmp.setWidth(w);
-            cmp.setHeight(h);
+            cmp.setWidth(Math.max(0,w));
+            cmp.setHeight(Math.max(0,h));
             //System.out.println("Component laid out "+cmp);
         }
     }
@@ -2218,6 +2218,9 @@ public class LayeredLayout extends Layout {
              * @return Self for chaining.
              */
             public Inset setPercent(float percent) {
+                if (percent == Float.POSITIVE_INFINITY || percent == Float.NEGATIVE_INFINITY) {
+                    throw new IllegalArgumentException("Attempt to set illegal percent value");
+                }
                 this.value = percent;
                 return unit(UNIT_PERCENT);
             }
@@ -2832,6 +2835,22 @@ public class LayeredLayout extends Layout {
                 return this;
             }
             
+            
+            public Inset changeUnitsTo(byte unit, Rectangle refBox) {
+                if (unit != this.unit) {
+                    if (unit == UNIT_PIXELS) {
+                        setPixels(getCurrentValuePx());
+                    } else if (unit == UNIT_DIPS) {
+                        setDips(getCurrentValueMM());
+                    } else if (unit == UNIT_PERCENT) {
+                        setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
+                    } else {
+                        unit(unit);
+                    }
+                }
+                return this;
+            }
+            
             /**
              * Changes the reference component, while updating the value to remain in the same
              * absolute position.
@@ -3008,6 +3027,9 @@ public class LayeredLayout extends Layout {
                                 return this;
                             }
                             float percentDelta = delta / (float)relH * 100f;
+                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                                throw new IllegalArgumentException("Illegal percentage shift");
+                            }
                             value += percentDelta;
                             
                         } else {
@@ -3018,6 +3040,9 @@ public class LayeredLayout extends Layout {
                             }
                             float percentDelta = delta / relH * 100f;
                             //System.out.println("percentDelta="+percentDelta);
+                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                                throw new IllegalArgumentException("Illegal percent value");
+                            }
                             value += percentDelta;
                             //System.out.println("Value="+value);
                         }

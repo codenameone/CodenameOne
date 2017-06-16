@@ -3237,7 +3237,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             m = panel;
             window = frame;            
         }
-        setInvokePointerHover(desktopSkin);
+        setInvokePointerHover(desktopSkin || invokePointerHover);
         
         // this is essential for push and other things to work in the simulator
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
