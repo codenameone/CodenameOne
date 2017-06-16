@@ -3219,7 +3219,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
-        if (desktopSkin) {
+        if (desktopSkin && m == null) {
             JPanel panel = new javax.swing.JPanel();  
             panel.setLayout(new BorderLayout());
             JPanel bottom = new javax.swing.JPanel(); 
