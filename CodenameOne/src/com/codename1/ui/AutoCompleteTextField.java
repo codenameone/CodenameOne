@@ -318,7 +318,14 @@ public class AutoCompleteTextField extends TextField {
         popup.setVisible(false);
         popup.setEnabled(false);
         filter(getText());        
-        final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel());
+        final com.codename1.ui.List l = new com.codename1.ui.List(getSuggestionModel()) {
+            @Override
+            protected void fireActionEvent(ActionEvent a) {
+                if(popup.isVisible()) {
+                    super.fireActionEvent(a);
+                }
+            }
+        };
         if(getMinimumElementsShownInPopup() > 0) {
             l.setMinElementHeight(getMinimumElementsShownInPopup());
         }
