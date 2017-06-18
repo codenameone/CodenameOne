@@ -1282,6 +1282,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             Thread.sleep(1000);                                            
                         } catch (Exception e) {
                         }
+                        g2dInstance = null;
                         Form f = Display.getInstance().getCurrent();
                         if (f != null) {
                             f.forceRevalidate();
