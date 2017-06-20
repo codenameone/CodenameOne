@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.layouts;
 
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -2822,11 +2823,17 @@ public class LayeredLayout extends Layout {
                     } else if (unit == UNIT_DIPS) {
                         setDips(getCurrentValueMM());
                     } else if (unit == UNIT_PERCENT) {
-                        if (parent != null) {
-                            Rectangle refBox = constraint().getReferenceBox(parent);
-                            setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
-                        } else {
-                            throw new IllegalArgumentException("Cannot change unit to percent without specifying the target component.");
+                        try {
+                            if (parent != null) {
+                                Rectangle refBox = constraint().getReferenceBox(parent);
+
+                                setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
+                            } else {
+                                throw new IllegalArgumentException("Cannot change unit to percent without specifying the target component.");
+                            }
+                        } catch (IllegalArgumentException ex) {
+                            Log.p("Unable to calculate percentage because height or width is zero.  Setting to 100%");
+                            setPercent(100f);
                         }
                     } else {
                         unit(unit);
@@ -2843,7 +2850,13 @@ public class LayeredLayout extends Layout {
                     } else if (unit == UNIT_DIPS) {
                         setDips(getCurrentValueMM());
                     } else if (unit == UNIT_PERCENT) {
-                        setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
+                        try {
+                            setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
+                        } catch (IllegalArgumentException ex) {
+                            Log.p(ex.getMessage());
+                            setPercent(100f);
+                        }
+                        
                     } else {
                         unit(unit);
                     }
@@ -3028,7 +3041,7 @@ public class LayeredLayout extends Layout {
                             }
                             float percentDelta = delta / (float)relH * 100f;
                             if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
-                                throw new IllegalArgumentException("Illegal percentage shift");
+                                percentDelta = 0f;
                             }
                             value += percentDelta;
                             
@@ -3041,7 +3054,7 @@ public class LayeredLayout extends Layout {
                             float percentDelta = delta / relH * 100f;
                             //System.out.println("percentDelta="+percentDelta);
                             if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
-                                throw new IllegalArgumentException("Illegal percent value");
+                                percentDelta = 0f;
                             }
                             value += percentDelta;
                             //System.out.println("Value="+value);
