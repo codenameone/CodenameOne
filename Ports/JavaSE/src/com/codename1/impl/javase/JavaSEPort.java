@@ -3404,8 +3404,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 widthLabel.setText("Width: " + w);
                 heightLabel.setText("Height: " + h);
                 widthLabel.getParent().revalidate();
+                canvas.blit();
             }
-            canvas.blit();
         }catch(Exception e){
             e.printStackTrace();
         }
