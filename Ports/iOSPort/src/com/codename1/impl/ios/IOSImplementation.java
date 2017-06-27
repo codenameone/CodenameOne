@@ -423,6 +423,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             int pb = stl.getPaddingBottom();
             int pl = stl.getPaddingLeft(rtl);
             int pr = stl.getPaddingRight(rtl);
+            /*
             if(cmp.isSingleLineTextArea()) {
                 switch(cmp.getVerticalAlignment()) {
                     case TextArea.CENTER:
@@ -437,6 +438,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         break;
                 }
             }
+            */
             
             int maxH = Display.getInstance().getDisplayHeight() - nativeInstance.getVKBHeight();
             
@@ -732,6 +734,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     int pb = stl.getPaddingBottom();
                     int pl = stl.getPaddingLeft(rtl);
                     int pr = stl.getPaddingRight(rtl);
+                    /*
                     if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
                         switch(currentEditing.getVerticalAlignment()) {
                             case TextArea.CENTER:
@@ -746,6 +749,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 break;
                         }
                     }
+                    */
                     String hint = null;
                     if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
                         hint = currentEditing.getHint();
@@ -772,7 +776,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 pt,
                                 pb,
                                 pl,
-                                pr, hint, showToolbar, Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")));
+                                pr, 
+                                hint, 
+                                showToolbar, 
+                                Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")),
+                                currentEditing.getStyle().getAlignment(),
+                                currentEditing.getVerticalAlignment());
                     }
                 }
             });
