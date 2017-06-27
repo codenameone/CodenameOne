@@ -74,6 +74,7 @@ Codename One maintains a fork of iKVM which is a JVM for CLR. This modified port
 ## Getting Help & FAQ
 
 <img align="right" src="http://codenameone.com/img/blog/new_icon.png" height="250">
+
 We provide support over at [StackOverflow when you tag using codenameone](http://stackoverflow.com/tags/codenameone), you can ask anything there and we try to be pretty responsive. [The StackOverflow link](http://stackoverflow.com/tags/codenameone) also serves as an excellent community driven FAQ since it literally maps user questions to answers.
 
 Codename One has a [discussion group](https://www.codenameone.com/discussion-forum.html) where you can post questions. However, due to the nature of that group we try to limit discussions over the source. The discussion forum is intended for simpler usage and more complex source code hacks/native compilation might create noise there.
