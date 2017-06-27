@@ -4,7 +4,7 @@
 
 <img align="right" src="https://www.codenameone.com/img/iphone-and-android.png" height="250">
 
-[Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.). 
+[Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java (and soon [Kotlin](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html)) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.). 
 It is a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) thru a portable abstraction which enables 100% code reuse.
 
 Codename One is the only platform that...
