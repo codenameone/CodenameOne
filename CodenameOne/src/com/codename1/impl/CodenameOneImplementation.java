@@ -1478,7 +1478,13 @@ public abstract class CodenameOneImplementation {
         
     }
     
-    
+    /**
+     * Cleans up resources used by graphics object
+     * @param graphics 
+     */
+    public void disposeGraphics(Object graphics) {
+        
+    }
     
     
     /**

@@ -4558,6 +4558,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    
+    
     @Override
     public void pushClip(Object graphics) {
         checkEDT();
@@ -4575,6 +4577,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
             g.clipStack.push(currentClip);  
+        } else {
+            synchronized(clipStack) {
+                if (!clipStack.containsKey(graphics)) {
+                    clipStack.put(graphics, new LinkedList<Shape>());
+                }
+                clipStack.get(graphics).push(currentClip);
+            }
         }
         
     }
@@ -4589,12 +4598,30 @@ public class JavaSEPort extends CodenameOneImplementation {
             Shape oldClip = g.clipStack.pop();
             
             g2d.setClip(oldClip);
+        } else {
+            synchronized(clipStack) {
+                if (clipStack.containsKey(graphics)) {
+                    Shape oldClip = clipStack.get(graphics).pop();
+                    if (oldClip != null) {
+                        g2d.setClip(oldClip);
+                    }
+                }
+            }
         }
         
     }
-    
-    
 
+    private final Map<Object,LinkedList<Shape>> clipStack = new HashMap<Object,LinkedList<Shape>>();
+    
+    @Override
+    public void disposeGraphics(Object graphics) {
+        synchronized(clipStack) {
+            clipStack.remove(graphics);
+        }
+    }
+    
+    
+    
     
     
     

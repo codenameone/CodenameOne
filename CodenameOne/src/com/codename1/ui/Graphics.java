@@ -67,6 +67,12 @@ public final class Graphics {
         impl = Display.impl;
     }
     
+    protected void finalize() {
+        if (nativeGraphics != null) {
+            impl.disposeGraphics(nativeGraphics);
+        }
+    }
+    
     private Transform translation() {
         if (translation == null) {
             translation = Transform.makeTranslation(xTranslate, yTranslate);
