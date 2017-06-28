@@ -25,6 +25,7 @@ package com.codename1.ui.layouts;
 
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -2036,6 +2037,25 @@ public class LayeredLayout extends Layout {
                     case UNIT_DIPS: return value +"mm";
                     case UNIT_PIXELS: return ((int)value)+"px";
                     case UNIT_PERCENT: return value + "%";
+                    case UNIT_AUTO: return "auto";
+                }
+                return null;
+            }
+            
+            /**
+             * Gets the value of this inset as a string rounding to the specified number of decimal places. 
+             * Values will be in the format {@literal <value><unit>}, e.g.
+             * {@literal 2mm}, {@literal 15%}, {@literal 5px}, {@literal auto} (meaning it is flexible.
+             * @return The value of this inset as a string.
+             * @see #getValueAsString() 
+             */
+            public String getValueAsString(int decimalPlaces) {
+                L10NManager l10n = L10NManager.getInstance();
+                
+                switch (unit) {
+                    case UNIT_DIPS: return l10n.format(value, decimalPlaces) +"mm";
+                    case UNIT_PIXELS: return ((int)value)+"px";
+                    case UNIT_PERCENT: return l10n.format(value, decimalPlaces) + "%";
                     case UNIT_AUTO: return "auto";
                 }
                 return null;
