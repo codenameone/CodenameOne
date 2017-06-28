@@ -22,12 +22,14 @@
  */
 package com.codename1.social;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender.SendIntentException;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import static com.codename1.impl.android.AndroidImplementation.checkForPermission;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.impl.android.IntentResultListener;
@@ -82,7 +84,11 @@ public class GoogleImpl extends GoogleConnect implements
 
     @Override
     public void nativelogin() {
+        if(!checkForPermission(Manifest.permission.GET_ACCOUNTS, "This is required to login with Google+")) {
+            return;
+        }
         if (mGoogleApiClient != null) {
+            
             mGoogleApiClient.connect();
         }
     }
