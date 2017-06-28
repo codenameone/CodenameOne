@@ -229,7 +229,7 @@ BOOL isVKBAlwaysOpen() {
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment) {
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
@@ -267,6 +267,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utf.blockPaste = CN1_blockPaste || blockCopyPaste;
             utf.blockCopy = CN1_blockCopy || blockCopyPaste;
             utf.blockCut = CN1_blockCut || blockCopyPaste;
+            utf.contentVerticalAlignment = verticalAlignment == 4 ? UIControlContentVerticalAlignmentCenter :
+                verticalAlignment == 2 ? UIControlContentVerticalAlignmentBottom : UIControlContentVerticalAlignmentTop;
+            utf.textAlignment = alignment == 4 ? NSTextAlignmentCenter :
+                alignment == 3 ? NSTextAlignmentRight : NSTextAlignmentLeft;
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
             
