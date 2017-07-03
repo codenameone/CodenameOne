@@ -8868,7 +8868,23 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public String getIP() {
             try {
-                return java.net.InetAddress.getLocalHost().getHostAddress();
+                InetAddress i = java.net.InetAddress.getLocalHost();
+                if(i.isLoopbackAddress()) {
+                    Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+                    while(nie.hasMoreElements()) {
+                        NetworkInterface current = nie.nextElement();
+                        if(!current.isLoopback()) {
+                            Enumeration<InetAddress> iae = current.getInetAddresses();
+                            while(iae.hasMoreElements()) {
+                                InetAddress currentI = iae.nextElement();
+                                if(!currentI.isLoopbackAddress()) {
+                                    return currentI.getHostAddress();
+                                }
+                            }
+                        }
+                    }
+                }
+                return i.getHostAddress();
             } catch(Throwable t) {
                 t.printStackTrace();
                 errorMessage = t.toString();

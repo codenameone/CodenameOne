@@ -165,6 +165,8 @@ import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
 import java.io.*;
 import java.net.CookieHandler;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.security.MessageDigest;
 import java.text.ParseException;
@@ -7266,7 +7268,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public String getIP() {
             try {
-                return java.net.InetAddress.getLocalHost().getHostAddress();
+                InetAddress i = java.net.InetAddress.getLocalHost();
+                if(i.isLoopbackAddress()) {
+                    Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+                    while(nie.hasMoreElements()) {
+                        NetworkInterface current = nie.nextElement();
+                        if(!current.isLoopback()) {
+                            Enumeration<InetAddress> iae = current.getInetAddresses();
+                            while(iae.hasMoreElements()) {
+                                InetAddress currentI = iae.nextElement();
+                                if(!currentI.isLoopbackAddress()) {
+                                    return currentI.getHostAddress();
+                                }
+                            }
+                        }
+                    }
+                }
+                return i.getHostAddress();
             } catch(Throwable t) {
                 t.printStackTrace();
                 errorMessage = t.toString();
@@ -7344,7 +7362,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 ServerSocket serverSocketInstance = new ServerSocket(param);
                 socketInstance = serverSocketInstance.accept();
-                return socketInstance;
+                SocketImpl si = new SocketImpl();
+                si.socketInstance = socketInstance;
+                return si;
             } catch(Exception err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
