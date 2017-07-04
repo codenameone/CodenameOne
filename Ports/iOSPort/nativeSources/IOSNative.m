@@ -6805,13 +6805,16 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_j
     JAVA_INT i = startPos;
     for (; i < endOffset; i++) {
         if (src[i] == separator) {
-            JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-            java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+            if (i > startPos) {
+                JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+                java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+
+                java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
+            }
             startPos = i + 1;
-            java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
         }
     }
-    if (i >= startPos) {
+    if (i > startPos) {
         JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
         java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);

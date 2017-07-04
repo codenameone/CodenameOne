@@ -88,6 +88,13 @@ public class Ldc extends Instruction implements AssignableExpression {
         }
     }
 
+    @Override
+    public boolean isConstant() {
+        return true;
+    }
+
+    
+    
     public String getValueAsString() {
         StringBuilder b = new StringBuilder();
         if (cst instanceof Integer) {

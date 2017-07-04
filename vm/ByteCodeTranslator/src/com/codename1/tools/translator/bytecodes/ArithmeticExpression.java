@@ -26,6 +26,22 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
     }
 
     @Override
+    public boolean isConstant() {
+        if (lastInstruction != null && lastInstruction.isConstant()) {
+            return true;
+        }
+        if (subExpression2 == null && subExpression != null && subExpression.isConstant()) {
+            return true;
+        }
+        if (subExpression2 != null && subExpression != null && subExpression.isConstant() && subExpression2.isConstant()) {
+            return true;
+        }
+        return super.isConstant();
+    }
+
+    
+    
+    @Override
     public void addDependencies(List<String> dependencyList) {
         if (subExpression != null) {
             subExpression.addDependencies(dependencyList);

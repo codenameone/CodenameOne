@@ -1220,7 +1220,7 @@ public class BytecodeMethod {
                                 String exprString = sb.toString().trim();
                                 String retVal = exprString;
                                 sb.setLength(0);
-                                if(synchronizedMethod) {
+                                if (!prev.isConstant()) {
                                     sb.append("\n{\n    ");
                                     switch (currentOpcode) {
                                         case Opcodes.IRETURN:
@@ -1241,6 +1241,8 @@ public class BytecodeMethod {
                                     }
                                     sb.append(" ___returnValue=").append(exprString).append(";\n");
                                     retVal = "___returnValue";
+                                }
+                                if(synchronizedMethod) {
                                     if(staticMethod) {
                                         sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
                                         sb.append(getClsName());
@@ -1254,7 +1256,7 @@ public class BytecodeMethod {
                                 } else {
                                     sb.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return ").append(retVal).append(";\n");
                                 }
-                                if (synchronizedMethod) {
+                                if (!prev.isConstant()) {
                                     sb.append("}\n");
                                 }
                                 
@@ -1278,26 +1280,30 @@ public class BytecodeMethod {
                                     String exprString = sb.toString().trim();
                                     String retVal = exprString;
                                     sb.setLength(0);
-                                    sb.append("\n{\n    ");
-                                    switch (currentOpcode) {
-                                        case Opcodes.IRETURN:
-                                            sb.append("JAVA_INT");
-                                            break;
-                                        case Opcodes.FRETURN:
-                                            sb.append("JAVA_FLOAT");
-                                            break;
-                                        case Opcodes.ARETURN:
-                                            sb.append("JAVA_OBJECT");
-                                            break;
-                                        case Opcodes.LRETURN:
-                                            sb.append("JAVA_LONG");
-                                            break;
-                                        case Opcodes.DRETURN:
-                                            sb.append("JAVA_DOUBLE");
-                                            break;
+                                    if (!expr.isConstant()) {
+                                        
+                                        sb.append("\n{\n    ");
+                                        switch (currentOpcode) {
+                                            case Opcodes.IRETURN:
+                                                sb.append("JAVA_INT");
+                                                break;
+                                            case Opcodes.FRETURN:
+                                                sb.append("JAVA_FLOAT");
+                                                break;
+                                            case Opcodes.ARETURN:
+                                                sb.append("JAVA_OBJECT");
+                                                break;
+                                            case Opcodes.LRETURN:
+                                                sb.append("JAVA_LONG");
+                                                break;
+                                            case Opcodes.DRETURN:
+                                                sb.append("JAVA_DOUBLE");
+                                                break;
+                                        }
+                                    
+                                        sb.append(" ___returnValue=").append(exprString).append(";\n");
+                                        retVal = "___returnValue";
                                     }
-                                    sb.append(" ___returnValue=").append(exprString).append(";\n");
-                                    retVal = "___returnValue";
                                     if(synchronizedMethod) {
                                         if(staticMethod) {
                                             sb.append("    monitorExit(threadStateData, (JAVA_OBJECT)&class__");
@@ -1312,7 +1318,9 @@ public class BytecodeMethod {
                                     } else {
                                         sb.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return ").append(retVal).append(";\n");
                                     }
-                                    sb.append("}\n");
+                                    if (!expr.isConstant()) {
+                                        sb.append("}\n");
+                                    }
                                     
 
                                     instructions.add(iter-1, new CustomIntruction(sb.toString(), sb.toString(), dependentClasses));

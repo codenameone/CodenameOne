@@ -119,4 +119,10 @@ public abstract class Instruction {
         this.method = method;
         
     }
+    
+    public boolean isConstant() {
+        return false;
+    }
+    
+    
 }
