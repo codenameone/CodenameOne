@@ -707,7 +707,10 @@ public class CodenameOneActivity extends Activity {
     }
 
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-
+        if(grantResults != null || grantResults.length == 0) {
+            requestForPermission = false;
+            return;
+        }
         if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Log.i("Codename One", "PERMISSION_GRANTED");
         } else {

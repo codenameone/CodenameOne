@@ -476,18 +476,51 @@ public class ByteCodeTranslator {
         }
         return "file";
     }
-    
-    private static void replaceInFile(File sourceFile, String... values) throws IOException {
+    //
+    // Be kind to the GC; read as a StringBuilder, a data type designed
+    // to be mutated. Also, expire the temporary byte[] buffer so it can
+    // be collected.
+    //
+    private static StringBuilder readFileAsStringBuilder(File sourceFile) throws IOException
+    {
         DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile));
         byte[] data = new byte[(int)sourceFile.length()];
         dis.readFully(data);
         dis.close();
-        FileWriter fios = new FileWriter(sourceFile);
-        String str = new String(data);
-        for(int iter = 0 ; iter < values.length ; iter += 2) {
-            str = str.replace(values[iter], values[iter + 1]);
+        StringBuilder b = new StringBuilder(new String(data));
+        return b;
+    }
+    //
+    // rewrite 4/2017 by ddyer to use more appropriate data
+    // structures, minimizing gc thrashing.  This avoids a big
+    // spike in memory and gc usage (and corresponding build 
+    // failures due to OutOfMemoryError) at the very end of the build 
+    // process for large projects.  
+    //
+    private static void replaceInFile(File sourceFile, String... values) throws IOException {
+        StringBuilder str = readFileAsStringBuilder(sourceFile);
+        int totchanges = 0;
+    	// perform the mutations on stringbuilder, which ought to implement
+        // these operations efficiently.
+        for (int iter = 0; iter < values.length; iter += 2) {
+            String target = values[iter];
+            String replacement = values[iter + 1];
+            int found = 0;
+            int index = 0;
+            while ((index = str.indexOf(target, index)) >= 0) {
+                int targetSize = target.length();
+                str.replace(index, index + targetSize, replacement);
+                index += replacement.length();
+                found++;
+                totchanges++;
+            }
         }
-        fios.write(str);
+        //
+        // don't start the output file until all the processing is done
+        //
+        System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
+        FileWriter fios = new FileWriter(sourceFile);
+        fios.write(str.toString());
         fios.close();
     }
     

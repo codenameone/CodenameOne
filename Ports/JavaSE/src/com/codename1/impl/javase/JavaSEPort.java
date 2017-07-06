@@ -24,7 +24,6 @@
 package com.codename1.impl.javase;
 
 import com.codename1.background.BackgroundFetch;
-import com.codename1.cloud.CloudObjectConsole;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
@@ -35,7 +34,6 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
-import com.codename1.ui.VirtualKeyboard;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -115,6 +113,7 @@ import com.codename1.util.Callback;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.awt.event.TextEvent;
@@ -125,6 +124,7 @@ import java.awt.geom.PathIterator;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
+import java.security.MessageDigest;
 import java.sql.DriverManager;
 import java.text.DateFormat;
 import java.text.NumberFormat;
@@ -145,6 +145,7 @@ import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.scene.web.WebView;
 import javafx.util.Duration;
+import javax.net.ssl.HttpsURLConnection;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -172,8 +173,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     public static boolean blockNativeBrowser;
     private static final boolean isWindows;
     private static String fontFaceSystem;
-    private boolean takingScreenshot;
-    private float screenshotActualZoomLevel;
+    boolean takingScreenshot;
+    float screenshotActualZoomLevel;
+    private InputEvent lastInputEvent;
     
     /**
      * When set to true pointer hover events will be called for mouse move events
@@ -197,7 +199,6 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             fontFaceSystem = "Arial";
         }
-        
     }
 
     /**
@@ -408,6 +409,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean subscriptionSupported;
     private boolean refundSupported;
     private int timeout = -1;
+    private JLabel widthLabel;
+    private JLabel heightLabel;
 
     private boolean includeHeaderInScreenshot = true;
 
@@ -632,6 +635,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         nativeThemeRes = resFile;
     }
 
+    @Override
+    public boolean isSetCursorSupported() {
+        return true;
+    }
+
+    
+    
     public static Resources getNativeTheme() {
         return nativeThemeRes;
     }
@@ -677,6 +687,46 @@ public class JavaSEPort extends CodenameOneImplementation {
         softkeyCount = aSoftkeyCount;
     }
 
+    @Override
+    public boolean isShiftKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isShiftDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isAltKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isAltDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isAltGraphKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isAltGraphDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isControlKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isControlDown();
+        }
+        return false;
+    }
+
+    @Override
+    public boolean isMetaKeyDown() {
+        if (lastInputEvent != null) {
+            return lastInputEvent.isMetaDown();
+        }
+        return false;
+    }
+    
     class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
         private BufferedImage buffer;
         boolean painted;
@@ -884,9 +934,14 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public Graphics2D getGraphics2D() {
             updateBufferSize();
-            if (g2dInstance == null) {
+            while(g2dInstance == null) {
                 g2dInstance = buffer.createGraphics();
                 updateGraphicsScale(g2dInstance);
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(JavaSEPort.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
             return g2dInstance;
         }
@@ -940,6 +995,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
@@ -955,6 +1011,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
@@ -990,6 +1047,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
@@ -1043,6 +1101,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -1077,6 +1136,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
@@ -1114,26 +1174,60 @@ public class JavaSEPort extends CodenameOneImplementation {
             }  
         }
         private Cursor handCursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR);
-        private Cursor defaultCursor = Cursor.getDefaultCursor();
-
+        private Cursor defaultCursor = Cursor.getDefaultCursor();        
+        private int currentCursor = 0;
+        private java.util.Timer reSize;
+        
         public void mouseMoved(MouseEvent e) {
             e.consume();
             if (!isEnabled()) {
                 return;
             }
+            lastInputEvent = e;
             if(invokePointerHover) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
                     JavaSEPort.this.pointerHover(x, y);
-                }  
+                }
+                
+                
+            }
+            Form f = Display.getInstance().getCurrent();
+            if (f != null && f.isEnableCursors()) {
+                int x = scaleCoordinateX(e.getX());
+                int y = scaleCoordinateY(e.getY());
+                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                    Component cmp = f.getComponentAt(x, y);
+                    if (cmp != null) {
+                        int cursor = cmp.getCursor();
+                        if (cursor != currentCursor) {
+                            currentCursor = cursor;
+                            setCursor(Cursor.getPredefinedCursor(cursor));
+                        }
+                    } else {
+                        if (currentCursor != 0) {
+                            currentCursor = 0;
+                            setCursor(defaultCursor);
+                        }
+                    }
+                } else {
+                    if (currentCursor != 0) {
+                        setCursor(defaultCursor);
+                    }
+                            
+                }
+            } else {
+                if (currentCursor != 0) {
+                    setCursor(defaultCursor);
+                }
             }
             if (getSkinHotspots() != null) {
                 java.awt.Point p = new java.awt.Point((int) ((e.getX() - canvas.x) / zoomLevel), (int) ((e.getY() - canvas.y) / zoomLevel));
                 if (getSkinHotspots().containsKey(p)) {
                     setCursor(handCursor);
                 } else {
-                    setCursor(defaultCursor);
+                    setCursor(currentCursor == 0 ? defaultCursor : Cursor.getPredefinedCursor(currentCursor));
                 }
             } 
         }
@@ -1143,13 +1237,20 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void setBounds(int x, int y, int w, int h) {
             super.setBounds(x, y, w, h);
-            if (getSkin() == null) {
-                JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+            boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+            if (getSkin() == null && !desktopSkin) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                    }
+                });
+                
             }
         }
-
+        
         public void ancestorResized(HierarchyEvent e) {
-
+                
             if (getSkin() != null) {
                 if (!scrollableSkin) {
                     float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
@@ -1161,12 +1262,48 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
                 getParent().repaint();
-            } else {                
-                if(mediaContainer != null){
-                    JavaSEPort.this.sizeChanged(mediaContainer.getWidth(), mediaContainer.getHeight());
+            } else {  
+                if(reSize == null){
+                    reSize = new java.util.Timer();
                 }else{
-                    JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                    reSize.cancel();
+                    reSize = new java.util.Timer();
                 }
+                //some ugly hacks to workaround black screen issue
+                reSize.schedule(new TimerTask(){
+                    @Override
+                    public void run() {
+                        if(mediaContainer != null){
+                            JavaSEPort.this.sizeChanged(mediaContainer.getWidth(), mediaContainer.getHeight());
+                        }else{
+                            JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                        }
+                        try {
+                            Thread.sleep(1000);                                            
+                        } catch (Exception e) {
+                        }
+                        g2dInstance = null;
+                        Form f = Display.getInstance().getCurrent();
+                        if (f != null) {
+                            f.forceRevalidate();
+                        }
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    Thread.sleep(1500);
+                                } catch (Exception e) {
+                                }
+                                if (window != null) {
+                                    window.repaint();
+                                }
+                            }
+                        }).start();
+
+                        reSize = null;
+                    }
+                    
+                }, 2000);
             }
         }
 
@@ -1174,25 +1311,59 @@ public class JavaSEPort extends CodenameOneImplementation {
         public void adjustmentValueChanged(AdjustmentEvent e) {
             JScrollBar s = (JScrollBar) e.getSource();
             int val = s.getValue();
-            if (s.getOrientation() == Scrollbar.HORIZONTAL) {
-                x = -(int) ((float) (val / 100f) * getWidth());
+            if(getSkin() != null) {
+                if (s.getOrientation() == Scrollbar.HORIZONTAL) {
+                    x = -(int) ((float) (val / 100f) * getSkin().getWidth());
+                } else {
+                    y = -(int) ((float) (val / 100f) * getSkin().getHeight());
+                }
             } else {
-                y = -(int) ((float) (val / 100f) * getHeight());
+                if (s.getOrientation() == Scrollbar.HORIZONTAL) {
+                    x = -(int) ((float) (val / 100f) * getWidth());
+                } else {
+                    y = -(int) ((float) (val / 100f) * getHeight());
+                }
             }
             repaint();
 
         }
 
+        int lastUnits = 0;
+        boolean ignoreWheelMovements = false;
+        int lastX;
+        int lastY;
         public void mouseWheelMoved(MouseWheelEvent e) {
             e.consume();
             if (!isEnabled()) {
                 return;
             }
-            final int x = scaleCoordinateX(e.getX());
-            final int y = scaleCoordinateY(e.getY());
+            lastInputEvent = e;
+            final int x = scrollWheeling ? lastX : scaleCoordinateX(e.getX());
+            final int y = scrollWheeling ? lastY : scaleCoordinateY(e.getY());
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
+                Form f = getCurrentForm();
+                if(f != null){
+                    Component cmp = f.getContentPane().getComponentAt(x, y);
+                    if(cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                        if (!ignoreWheelMovements) {
+                            ignoreWheelMovements = true;
+                        }
+                        return;
+                    }
+                }
+                
                 requestFocus();
                 final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
+
+                if (units * lastUnits < 0 || Math.abs(units) - Math.abs(lastUnits) > 100) {
+                    ignoreWheelMovements = false;
+                }
+                lastUnits = units;
+                lastX = x;
+                lastY = y;
+                if (ignoreWheelMovements) {
+                    return;
+                }
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         scrollWheeling = true;
@@ -1211,11 +1382,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                 });
+                
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
                             Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                                return;
+                            }
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerDragged(x, y + units / 4 * 2);
@@ -1231,6 +1406,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Form f = getCurrentForm();
                         if(f != null){
                             Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                                return;
+                            }
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerDragged(x, y + units / 4 * 3);
@@ -1246,6 +1424,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         Form f = getCurrentForm();
                         if(f != null){
                             Component cmp = f.getContentPane().getComponentAt(x, y);
+                            if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
+                                f.pointerReleased(x, y + units);
+                                return;
+                            }
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerDragged(x, y + units);
@@ -1561,10 +1743,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             });
-
+            installMenu(frm, false);
+            
+        } catch (IOException err) {
+            err.printStackTrace();
+        }
+    }
+    
+    private void installMenu(final JFrame frm, boolean desktopSkin) throws IOException{
             JMenuBar bar = new JMenuBar();
             frm.setJMenuBar(bar);
-
+            
             JMenu simulatorMenu = new JMenu("Simulate");
             simulatorMenu.setDoubleBuffered(true);
             simulatorMenu.addMenuListener(new MenuListener(){
@@ -1586,6 +1775,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             
             JMenuItem rotate = new JMenuItem("Rotate");
+            rotate.setEnabled(!desktopSkin);
+
             simulatorMenu.add(rotate);
             JMenu zoomMenu = new JMenu("Zoom");
             simulatorMenu.add(zoomMenu);
@@ -1601,6 +1792,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             zoomMenu.add(zoom100);
             JMenuItem zoom200 = new JMenuItem("200%");
             zoomMenu.add(zoom200);
+            
+            zoomMenu.setEnabled(!desktopSkin);
 
             JRadioButtonMenuItem debugEdtNone = new JRadioButtonMenuItem("None");
             JRadioButtonMenuItem debugEdtLight = new JRadioButtonMenuItem("Light");
@@ -2018,20 +2211,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             
             simulatorMenu.add(componentTreeInspector);
             
-            JMenuItem cloudObjects = new JMenuItem("Cloud Objects Viewer");
-            cloudObjects.addActionListener(new ActionListener() {
-
-                @Override
-                public void actionPerformed(ActionEvent ae) {
-                    CloudObjectConsole cloud = new CloudObjectConsole();
-                    cloud.pack();
-                    cloud.setLocationByPlatform(true);
-                    cloud.setVisible(true);
-
-                }
-            });
-            simulatorMenu.add(cloudObjects);
-            
 
             JMenuItem testRecorderMenu = new JMenuItem("Test Recorder");
             testRecorderMenu.addActionListener(new ActionListener() {
@@ -2165,6 +2344,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             final JCheckBoxMenuItem scrollFlag = new JCheckBoxMenuItem("Scrollable", scrollableSkin);
             simulatorMenu.add(scrollFlag);
+            scrollFlag.setEnabled(!desktopSkin);
 
             final JCheckBoxMenuItem slowMotionFlag = new JCheckBoxMenuItem("Slow Motion", false);
             simulatorMenu.add(slowMotionFlag);
@@ -2447,11 +2627,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void itemStateChanged(ItemEvent ie) {
                     useNativeInput = !useNativeInput;
-                    if (useNativeInput) {
-                        Display.getInstance().setDefaultVirtualKeyboard(null);
-                    } else {
-                        Display.getInstance().setDefaultVirtualKeyboard(new VirtualKeyboard());
-                    }
                 }
             });
             
@@ -2498,9 +2673,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                     exitApplication();
                 }
             });
-        } catch (IOException err) {
-            err.printStackTrace();
-        }
     }
 
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
@@ -2553,9 +2725,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                             perfMonitor.dispose();
                             perfMonitor = null;
                         }
+                        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                        pref.putBoolean("desktopSkin", false);
                         String mainClass = System.getProperty("MainClass");
                         if (mainClass != null) {
-                            Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                             pref.put("skin", current);
                             deinitializeSync();
                             frm.dispose();
@@ -2569,6 +2742,31 @@ public class JavaSEPort extends CodenameOneImplementation {
                 skinMenu.add(i);
             }
         }
+        JMenuItem dSkin = new JMenuItem("Desktop.skin");
+        dSkin.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent ae) {
+                if (netMonitor != null) {
+                    netMonitor.dispose();
+                    netMonitor = null;
+                }
+                if (perfMonitor != null) {
+                    perfMonitor.dispose();
+                    perfMonitor = null;
+                }
+                Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                pref.putBoolean("desktopSkin", true);
+                String mainClass = System.getProperty("MainClass");
+                if (mainClass != null) {
+                    deinitializeSync();
+                    frm.dispose();
+                    System.setProperty("reload.simulator", "true");
+                } 
+            }
+        });
+        skinMenu.addSeparator();
+        skinMenu.add(dSkin);
+        
         skinMenu.addSeparator();
         JMenuItem more = new JMenuItem("More...");
         skinMenu.add(more);
@@ -3020,6 +3218,28 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         inInit = true;
         
+        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+        boolean desktopSkin = pref.getBoolean("desktopSkin", false);
+        if (desktopSkin && m == null) {
+            JPanel panel = new javax.swing.JPanel();  
+            panel.setLayout(new BorderLayout());
+            JPanel bottom = new javax.swing.JPanel(); 
+            bottom.setLayout(new FlowLayout(FlowLayout.RIGHT));
+            widthLabel = new JLabel("Width:   ");
+            heightLabel = new JLabel(" Height:   ");
+            bottom.add(widthLabel);
+            bottom.add(heightLabel);
+            panel.add(bottom, BorderLayout.SOUTH);
+            
+            JFrame frame = new JFrame();
+            frame.setLayout(new BorderLayout());
+            frame.add(panel, BorderLayout.CENTER);
+            frame.setSize(new Dimension(300, 400));
+            m = panel;
+            window = frame;            
+        }
+        setInvokePointerHover(desktopSkin || invokePointerHover);
+        
         // this is essential for push and other things to work in the simulator
         Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
         String user = p.get("user", null);
@@ -3047,7 +3267,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         URLConnection.setDefaultAllowUserInteraction(true);
         HttpURLConnection.setFollowRedirects(false);
-        Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
             showNetworkMonitor();
         }
@@ -3069,6 +3288,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         } else {
             window = new JFrame();
+            window.setLayout(new java.awt.BorderLayout());
+            hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
+            vSelector = new JScrollBar(Scrollbar.VERTICAL);
+            hSelector.addAdjustmentListener(canvas);
+            vSelector.addAdjustmentListener(canvas);
+            scrollableSkin = pref.getBoolean("Scrollable", true);
+            if (scrollableSkin) {
+                window.add(java.awt.BorderLayout.SOUTH, hSelector);
+                window.add(java.awt.BorderLayout.EAST, vSelector);
+            }
+            window.add(java.awt.BorderLayout.CENTER, canvas);
+        }
+        if(window != null){
             java.awt.Image large = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application64.png"));
             java.awt.Image small = Toolkit.getDefaultToolkit().createImage(getClass().getResource("/application48.png"));
             try {
@@ -3102,23 +3334,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void windowDeactivated(WindowEvent e) {
                 }
             });
-
-
             window.setLocationByPlatform(true);
-            window.setLayout(new java.awt.BorderLayout());
-            hSelector = new JScrollBar(Scrollbar.HORIZONTAL);
-            vSelector = new JScrollBar(Scrollbar.VERTICAL);
-            hSelector.addAdjustmentListener(canvas);
-            vSelector.addAdjustmentListener(canvas);
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
-            
-            scrollableSkin = pref.getBoolean("Scrollable", true);
-            if (scrollableSkin) {
-                window.add(java.awt.BorderLayout.SOUTH, hSelector);
-                window.add(java.awt.BorderLayout.EAST, vSelector);
-            }
-            window.add(java.awt.BorderLayout.CENTER, canvas);
             
             String reset = System.getProperty("resetSkins");
             if(reset != null && reset.equals("true")){
@@ -3128,13 +3346,21 @@ public class JavaSEPort extends CodenameOneImplementation {
            }
             
             if (hasSkins()) {
-                String f = System.getProperty("skin");
-                if (f != null) {
-                    loadSkinFile(f, window);
-                } else {
-                    String d = System.getProperty("dskin");
-                    f = pref.get("skin", d);
-                    loadSkinFile(f, window);
+                if(m == null){
+                    String f = System.getProperty("skin");
+                    if (f != null) {
+                        loadSkinFile(f, window);
+                    } else {
+                        String d = System.getProperty("dskin");
+                        f = pref.get("skin", d);
+                        loadSkinFile(f, window);
+                    }
+                }else{
+                    try{
+                        installMenu(window, true);
+                    }catch(Exception e){
+                        e.printStackTrace();
+                    }
                 }
             } else {
                 Resources.setRuntimeMultiImageEnabled(true);
@@ -3169,6 +3395,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         inInit = false;
+    }
+    
+    protected void sizeChanged(int w, int h) {
+        try{
+            super.sizeChanged(w, h);
+            if(widthLabel != null){
+                widthLabel.setText("Width: " + w);
+                heightLabel.setText("Height: " + h);
+                widthLabel.getParent().revalidate();
+                canvas.blit();
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
     }
 
     /**
@@ -3452,6 +3692,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         Display.getInstance().invokeAndBlock(l);
     }
 
+    @Override
+    public void stopTextEditing() {
+        if (textCmp != null && textCmp.getParent() != null) {
+            canvas.remove(textCmp);
+        }
+    }
+
+    @Override
+    public boolean usesInvokeAndBlockForEditString() {
+        return true;
+    }
+    
+    
+    
     
     /**
      * @inheritDoc
@@ -3497,6 +3751,26 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 };
+                
+                ((JTextField)t).addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        if (cmp instanceof com.codename1.ui.TextField) {
+                            final com.codename1.ui.TextField tf = (com.codename1.ui.TextField)cmp;
+                            if (tf.getDoneListener() != null) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        if (tf.getDoneListener() != null) {
+                                            tf.fireDoneEvent();
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    
+                });
             }
             swingT = t;
             textCmp = swingT;
@@ -3579,7 +3853,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         textCmp.setBorder(null);
         textCmp.setOpaque(false);
-        
+                
         canvas.add(textCmp);
         int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
         int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
@@ -3706,7 +3980,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             ((JTextField) tf).addActionListener(l);
         }
         ((JTextComponent) tf).getDocument().addDocumentListener(l);
-
+        
 
         tf.addKeyListener(l);
         tf.addFocusListener(l);
@@ -4284,6 +4558,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    
+    
     @Override
     public void pushClip(Object graphics) {
         checkEDT();
@@ -4301,6 +4577,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ( graphics instanceof NativeScreenGraphics ){
             NativeScreenGraphics g = (NativeScreenGraphics)graphics;
             g.clipStack.push(currentClip);  
+        } else {
+            synchronized(clipStack) {
+                if (!clipStack.containsKey(graphics)) {
+                    clipStack.put(graphics, new LinkedList<Shape>());
+                }
+                clipStack.get(graphics).push(currentClip);
+            }
         }
         
     }
@@ -4315,12 +4598,30 @@ public class JavaSEPort extends CodenameOneImplementation {
             Shape oldClip = g.clipStack.pop();
             
             g2d.setClip(oldClip);
+        } else {
+            synchronized(clipStack) {
+                if (clipStack.containsKey(graphics)) {
+                    Shape oldClip = clipStack.get(graphics).pop();
+                    if (oldClip != null) {
+                        g2d.setClip(oldClip);
+                    }
+                }
+            }
         }
         
     }
-    
-    
 
+    private final Map<Object,LinkedList<Shape>> clipStack = new HashMap<Object,LinkedList<Shape>>();
+    
+    @Override
+    public void disposeGraphics(Object graphics) {
+        synchronized(clipStack) {
+            clipStack.remove(graphics);
+        }
+    }
+    
+    
+    
     
     
     
@@ -5045,12 +5346,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return in;
     }
-    
+
     @Override
-    public boolean transformEqualsImpl(Transform t1, Transform t2) {
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
         if ( t1 != null ){
-            AffineTransform at1 = (AffineTransform)t1.getNativeTransform();
-            AffineTransform at2 = (AffineTransform)t2.getNativeTransform();
+            AffineTransform at1 = (AffineTransform)t1;
+            AffineTransform at2 = (AffineTransform)t2;
             return at1.equals(at2);
             
         } else {
@@ -5683,7 +5984,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
-    private Graphics2D getGraphics(Object nativeG) {
+    Graphics2D getGraphics(Object nativeG) {
         if (nativeG instanceof Graphics2D) {
             Graphics2D g2d = (Graphics2D) nativeG;
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -5697,7 +5998,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         return g2d;
     }
-    
+
     /**
      * @inheritDoc
      */
@@ -5738,7 +6039,39 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
-        private void sendToCn1(MouseEvent e) {
+
+        @Override
+        protected void processMouseEvent(MouseEvent e) {
+            //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
+            if (!sendToCn1(e)) {
+                super.processMouseEvent(e);
+            }
+            
+        }
+
+        @Override
+        protected void processMouseMotionEvent(MouseEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseMotionEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+            
+        }
+
+        @Override
+        protected void processMouseWheelEvent(MouseWheelEvent e) {
+            if (!sendToCn1(e)) {
+                super.processMouseWheelEvent(e); //To change body of generated methods, choose Tools | Templates.
+            }
+        }
+
+
+        
+        
+        
+        
+        
+        private boolean sendToCn1(MouseEvent e) {
+            
             int cn1X = getCN1X(e);
             int cn1Y = getCN1Y(e);
             if (Display.isInitialized()) {
@@ -5769,10 +6102,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 break;
                                 
                         }
+                        return true;
+                        
+                        
                         //canvas.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, canvas));
                     }
                 }
             }
+            return false;
         }
         
         private int getCN1X(MouseEvent e) {
@@ -5786,7 +6123,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         public CN1JFXPanel() {
             final CN1JFXPanel panel = this;
             
-            
+            /*
             panel.addMouseListener(new MouseListener() {
                 
                 
@@ -5839,6 +6176,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
             });
+            */
             
         }
 
@@ -5868,7 +6206,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         final String uri = uriAddress;
         if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
             System.out.println(msg);
             throw new IOException(msg);
         }
@@ -5942,7 +6280,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         if (!fxExists) {
-            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature";
+            String msg = "This fetaure is supported from Java version 1.7.0_06, update your Java to enable this feature. This might fail on OpenJDK as well in which case you will need to install the Oracle JDK. ";
             System.out.println(msg);
             throw new IOException(msg);
         }
@@ -6226,7 +6564,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return con;
     }
-
+   
     /**
      * @inheritDoc
      */
@@ -6234,6 +6572,52 @@ public class JavaSEPort extends CodenameOneImplementation {
         return connect(url, read, write, timeout);
     }
 
+    private static final char[] HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    
+    private static String dumpHex(byte[] data) {
+        final int n = data.length;
+        final StringBuilder sb = new StringBuilder(n * 3 - 1);
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append(' ');
+            }
+            sb.append(HEX_CHARS[(data[i] >> 4) & 0x0F]);
+            sb.append(HEX_CHARS[data[i] & 0x0F]);
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        if (connection instanceof HttpsURLConnection) {
+            HttpsURLConnection conn = (HttpsURLConnection)connection;
+            
+            try {    
+                conn.connect();
+                java.security.cert.Certificate[] certs = conn.getServerCertificates();
+                String[] out = new String[certs.length];
+                int i=0;
+                for (java.security.cert.Certificate cert : certs) {
+                    MessageDigest md = MessageDigest.getInstance("SHA1");
+                    md.update(cert.getEncoded());
+                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                }
+                return out;
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return new String[0];
+        
+    }
+
+    @Override
+    public boolean canGetSSLCertificates() {
+        return true;
+    }
+    
+    
+    
     /**
      * @inheritDoc
      */
@@ -7730,7 +8114,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
         try {
-            // Load the HSQL Database Engine JDBC driver
+            // Load the sqlite database Engine JDBC driver
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException ex) {
         }
@@ -8484,7 +8868,23 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public String getIP() {
             try {
-                return java.net.InetAddress.getLocalHost().getHostAddress();
+                InetAddress i = java.net.InetAddress.getLocalHost();
+                if(i.isLoopbackAddress()) {
+                    Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+                    while(nie.hasMoreElements()) {
+                        NetworkInterface current = nie.nextElement();
+                        if(!current.isLoopback()) {
+                            Enumeration<InetAddress> iae = current.getInetAddresses();
+                            while(iae.hasMoreElements()) {
+                                InetAddress currentI = iae.nextElement();
+                                if(!currentI.isLoopbackAddress()) {
+                                    return currentI.getHostAddress();
+                                }
+                            }
+                        }
+                    }
+                }
+                return i.getHostAddress();
             } catch(Throwable t) {
                 t.printStackTrace();
                 errorMessage = t.toString();

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.animations;
 
+import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -217,6 +218,7 @@ public final class CommonTransitions extends Transition {
      * horizontally movement to right.
      * @param duration represent the time the transition should take in millisecond
      * @return a transition object
+     * @deprecated this is not faster than slide on modern devices, you should use that {@link #createSlide(int, boolean, int) }
      */
     public static CommonTransitions createFastSlide(int type, boolean forward, int duration) {
         if(Display.getInstance().areMutableImagesFast()) {
@@ -322,6 +324,7 @@ public final class CommonTransitions extends Transition {
      * should be kept during a slide transition. This is only relevant for
      * dialog in/out transitions.
      * @return a transition object
+     * @deprecated this is not faster than slide on modern devices, you should use that {@link #createSlide(int, boolean, int, boolean) }
      */
     public static CommonTransitions createFastSlide(int type, boolean forward, int duration, boolean drawDialogMenu) {
         CommonTransitions t = new CommonTransitions(TYPE_FAST_SLIDE);
@@ -784,8 +787,8 @@ public final class CommonTransitions extends Transition {
                     return;
             }
         } catch(Throwable t) {
-            System.out.println("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
-            t.printStackTrace();
+            Log.p("An exception occurred during transition paint this might be valid in case of a resize in the middle of a transition");
+            Log.e(t);
         }
     }
 

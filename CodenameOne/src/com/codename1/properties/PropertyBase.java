@@ -24,6 +24,7 @@
 package com.codename1.properties;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Base class for property types
@@ -32,17 +33,39 @@ import java.util.ArrayList;
  */
 public class PropertyBase<T, K> {
     private final String name;
+    private Class genericType;
     private ArrayList<PropertyChangeListener<T, K>> listeners;
     PropertyIndex parent;
+    private static PropertyChangeListener lastChangeListener;
 
     /**
      * All properties must have a name
-     * @param name the name of the propert
+     * @param name the name of the property
      */
     protected PropertyBase(String name) {
         this.name = name;
     }
 
+    
+    /**
+     * Provides the internal list of listeners
+     * @return internal list of listeners
+     */
+    List<PropertyChangeListener<T, K>> getListeners() {
+        return listeners;
+    }
+
+    
+    
+    /**
+     * All properties must have a name, a generic type is helpful
+     * @param name the name of the property
+     * @param genericType the property type to workaround issues with erasure
+     */
+    protected PropertyBase(String name, Class genericType) {
+        this.name = name;
+        this.genericType = genericType;
+    }
         
     /**
      * The property name is immutable and can't be changed after creation it should match the parent field name by convention
@@ -58,11 +81,23 @@ public class PropertyBase<T, K> {
     protected void firePropertyChanged() {
         if(listeners != null) {
             for(PropertyChangeListener pl : listeners) {
+                lastChangeListener = pl;
                 pl.propertyChanged(this);
+                lastChangeListener = null;
             }
         }
     }
 
+    /**
+     * This method will work when invoked from a propertyChanged callback and should be similar to 
+     * {@code removePropertyChangeListener(this)}. It's useful for lambda's where {@code this} 
+     * means the base class and not the listener so {@code removePropertyChangeListener(this)} 
+     * won't do what we want unless we convert to an inner class
+     */
+    public void stopListening() {
+        removeChangeListener(lastChangeListener);
+    }
+    
     /**
      * Fires a notification that a property value changed to the given listener
      * @param pl the listener
@@ -138,5 +173,35 @@ public class PropertyBase<T, K> {
             return getName() + " = null";
         }
         return getName() + " = '" + o + "' : " +o.getClass().getName();
+    }
+    
+    /**
+     * Returns the generic type of this property if it is known or null
+     * @return the generic type
+     */
+    public Class getGenericType() {
+        return genericType;
+    }
+    
+    /**
+     * The label of the property defaults to its name but can be changed to anything, it can be used
+     * when binding a property to UI elements
+     * @param label the new label value
+     */
+    public void setLabel(String label) {
+        putClientProperty("cn1PropertyLabel", label);
+    }
+    
+    /**
+     * The label of the property defaults to its name but can be changed to anything
+     * 
+     * @return the label for the property
+     */
+    public String getLabel() {
+        String l = (String)getClientProperty("cn1PropertyLabel");
+        if(l == null) {
+            return getName();
+        }
+        return l;
     }
 }

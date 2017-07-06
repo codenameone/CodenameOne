@@ -368,6 +368,8 @@ public class Rectangle implements Shape {
         if (ty2 < Integer.MIN_VALUE) {
             ty2 = Integer.MIN_VALUE;
         }
+        tx2 = Math.max(0, tx2);
+        ty2 = Math.max(0, ty2);
         output.setBounds(tx1, ty1, tx2, ty2);
     }
 

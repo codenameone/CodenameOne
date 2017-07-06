@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.testing.JUnitXMLReporting;
 import com.codename1.testing.TestReporting;
 import java.io.DataInputStream;
 import java.io.File;
@@ -49,7 +50,7 @@ public class TestRunner {
     }
     
     private void printUsage() {
-        System.out.println("Usage: TestRunner mainClass [-testCases testCase1,testCase2...] [-skins skin1,skin2...] [-quiet] [-cleanMode]"
+        System.out.println("Usage: TestRunner mainClass [-testCases testCase1,testCase2...] [-skins skin1,skin2...] [-quiet] [-cleanMode] [-junitXML]"
                 + "[-stopOnFail]\n\n"
                 + "mainClass - the main application class which is being tested, this is the full name for the lifecycle class.\n"
                 + "testCases - optional set of test cases to run using the full package/class name syntax and comma delimited. If "
@@ -58,7 +59,8 @@ public class TestRunner {
                 + "quietMode - when set the skin running the tests will not appear and the tests will be executed in the background\n"
                 + "cleanMode - clean mode executes every test in complete isolation from the previous test restarting the Classloader"
                 + "completely. Clean mode can't be used on the device so its only useful for debugging\n"
-                + "stopOnFail - indicates that execution should stop the moment a failure occured");
+                + "stopOnFail - indicates that execution should stop the moment a failure occured\n"
+                + "junitXML - output is written in junit XML format");
     }
     
     private void init(String[] argv) {
@@ -92,6 +94,10 @@ public class TestRunner {
                         continue;
                     }
 
+                    if(s.equalsIgnoreCase("-junitXML")) {
+                        TestReporting.setInstance(new JUnitXMLReporting());
+                    }
+                    
                     if(s.equalsIgnoreCase("-cleanMode")) {
                         cleanMode = true;
                         pos++;

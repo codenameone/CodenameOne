@@ -42,6 +42,12 @@ public class Simulator {
      * Accepts the classname to launch
      */
     public static void main(final String[] argv) throws Exception {
+        try {
+            // Load the sqlite database Engine JDBC driver in the top level classloader so it's shared
+            // this works around the exception: java.lang.UnsatisfiedLinkError: Native Library sqlite already loaded in another classloader
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException ex) {
+        }
         System.setProperty("NSHighResolutionCapable", "true");
         String skin = System.getProperty("dskin");
         if (skin == null) {

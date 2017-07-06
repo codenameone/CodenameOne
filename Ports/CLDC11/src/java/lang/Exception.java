@@ -42,4 +42,21 @@ public class Exception extends java.lang.Throwable{
          //TODO codavaj!!
     }
 
+    /**
+     * Constructs a new exception with the provided cause.
+     * @param cause The cause of the exception.
+     */
+    public Exception(Throwable cause) {
+        //TODO codavaj!!
+    }
+    
+    /**
+     * Constructs a new exception with message and cause.
+     * @param s The detail message.
+     * @param cause The cause of the exception
+     */
+    public Exception(java.lang.String s, Throwable cause) {
+        //TODO codavaj!!
+    }
+    
 }

@@ -25,6 +25,7 @@
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
+#include "com_codename1_ui_Display.h"
 #ifdef NEW_CODENAME_ONE_VM
 #include "java_lang_System.h"
 int mallocWhileSuspended = 0;
@@ -82,7 +83,7 @@ extern UIView *editingComponent;
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
     if (launchOptions[UIApplicationLaunchOptionsLocalNotificationKey]) {
-        NSLog(@"Background notification received");
+        CN1Log(@"Background notification received");
         UILocalNotification *notification = launchOptions[UIApplicationLaunchOptionsLocalNotificationKey];
         com_codename1_impl_ios_IOSImplementation_localNotificationReceived___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [notification.userInfo valueForKey:@"__ios_id__"]));
         application.applicationIconBadgeNumber = 0;
@@ -114,7 +115,7 @@ extern UIView *editingComponent;
         //afterDidFinishLaunchingWithOptionsMarkerEntry
         return YES;
     }
-    NSLog(@"Received notification on start: %@", userInfo);
+    CN1Log(@"Received notification on start: %@", userInfo);
     BOOL pushIncludedBody = NO;
     if( [[userInfo valueForKey:@"aps"] valueForKey:@"alert"] != NULL)
     {
@@ -127,7 +128,7 @@ extern UIView *editingComponent;
                 alertValue = [NSString stringWithFormat:@"%@;%@", [alertValueD valueForKey:@"title"], [alertValueD valueForKey:@"body"]];
                 com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"));
             } else {
-                NSLog(@"Received push type 4 but missing either title or body");
+                CN1Log(@"Received push type 4 but missing either title or body");
             }
             
         } else {
@@ -320,13 +321,13 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
 }
  
 - (void)application:(UIApplication*)application didFailToRegisterForRemoteNotificationsWithError:(NSError*)error {
-	NSLog(@"Failed to get token, error: %@", error);
+	CN1Log(@"Failed to get token, error: %@", error);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]);
     com_codename1_impl_ios_IOSImplementation_pushRegistrationError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG str);
 }
 
 - (void)application:(UIApplication*)application didReceiveRemoteNotification:(NSDictionary*)userInfo {
-    NSLog(@"Received notification while running: %@", userInfo);
+    CN1Log(@"Received notification while running: %@", userInfo);
     
     NSDictionary *apsInfo = [userInfo objectForKey:@"aps"];
     if(apsInfo == nil) {
@@ -345,7 +346,7 @@ CN1BackgroundFetchBlockType cn1UIBackgroundFetchResultCompletionHandler = 0;
                 alertValue = [NSString stringWithFormat:@"%@;%@", [alertValueD valueForKey:@"title"], [alertValueD valueForKey:@"body"]];
                 com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG alertValue), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"4"));
             } else {
-                NSLog(@"Received push type 4 but missing either title or body");
+                CN1Log(@"Received push type 4 but missing either title or body");
             }
             
         } else {
@@ -393,7 +394,7 @@ extern void repaintUI();
 }
 
 - (void)application:(UIApplication*)application didReceiveLocalNotification:(UILocalNotification*)notification {
-    NSLog(@"Received local notification while running: %@", notification);
+    CN1Log(@"Received local notification while running: %@", notification);
     if( [notification.userInfo valueForKey:@"__ios_id__"] != NULL)
     {
         NSString* alertValue = [notification.userInfo valueForKey:@"__ios_id__"];

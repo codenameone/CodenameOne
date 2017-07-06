@@ -34,14 +34,14 @@ public class LongProperty<K> extends NumericProperty<Long, K>{
      * {@inheritDoc}
      */
     public LongProperty(String name) {
-        super(name);
+        super(name, Long.class);
     }
 
     /**
      * {@inheritDoc}
      */
     public LongProperty(String name, Long value) {
-        super(name, value);
+        super(name, Long.class, value);
     }    
 
     

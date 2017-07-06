@@ -294,7 +294,7 @@ static DrawTextureAlphaMaskOGLProgram* getOGLProgram() {
     //[PaintOp setCurrent:gp];
     
     if ( textureName == 0 ){
-        NSLog(@"Attempt to draw null texture.  Skipping");
+        CN1Log(@"Attempt to draw null texture.  Skipping");
     }
     DrawTextureAlphaMaskOGLProgram* p = getOGLProgram();
     

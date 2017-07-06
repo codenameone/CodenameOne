@@ -119,6 +119,8 @@ public class Parser extends ClassVisitor {
         return i;
     }
     
+    
+    
     private static void generateClassAndMethodIndexHeader(File outputDirectory) throws Exception {
         int classOffset = 0;
         int methodOffset = 0;
@@ -680,9 +682,6 @@ public class Parser extends ClassVisitor {
 
     @Override
     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-        if(name.indexOf("DynaCCSmsServiceConstants") > -1) {
-            System.out.println("Break");
-        }
         cls.setBaseClass(superName);
         cls.setBaseInterfaces(interfaces);
         if((access & Opcodes.ACC_ABSTRACT) == Opcodes.ACC_ABSTRACT) {
@@ -865,28 +864,34 @@ public class Parser extends ClassVisitor {
 
         @Override
         public AnnotationVisitor visitParameterAnnotation(int parameter, String desc, boolean visible) {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitParameterAnnotation(parameter, desc, visible));
         }
 
         @Override
         public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitTypeAnnotation(typeRef, typePath, desc, visible));
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)); 
         }
 
         @Override
         public AnnotationVisitor visitAnnotationDefault() {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitAnnotationDefault());
         }
 
         @Override
         public void visitParameter(String name, int access) {
             super.visitParameter(name, access); 
-        }        
+        }    
+        
+        
     }
     
     class FieldVisitorWrapper extends FieldVisitor {
@@ -930,11 +935,13 @@ public class Parser extends ClassVisitor {
 
         @Override
         public AnnotationVisitor visitArray(String name) {
+            if (av == null) return null;
             return super.visitArray(name); 
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(String name, String desc) {
+            if (av == null) return null;
             return super.visitAnnotation(name, desc); 
         }
 
@@ -947,6 +954,8 @@ public class Parser extends ClassVisitor {
         public void visit(String name, Object value) {
             super.visit(name, value); 
         }
+        
+        
     
     }
 }

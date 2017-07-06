@@ -89,6 +89,12 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         Context ctx = context;
         int smallIcon = ctx.getResources().getIdentifier("ic_stat_notify", "drawable", ctx.getApplicationInfo().packageName);
         int icon = ctx.getResources().getIdentifier("icon", "drawable", ctx.getApplicationInfo().packageName);
+        
+        if (smallIcon == 0) {
+            smallIcon = icon;
+        } else {
+            icon = smallIcon;
+        }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx);
         builder.setContentTitle(localNotif.getAlertTitle());
@@ -124,7 +130,9 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         }
         Notification n = builder.build();
         n.icon = icon;
-        n.defaults |= Notification.DEFAULT_SOUND;
+        if (sound == null || sound.length() == 0) {
+            n.defaults |= Notification.DEFAULT_SOUND;
+        }
         return n;
     }
 

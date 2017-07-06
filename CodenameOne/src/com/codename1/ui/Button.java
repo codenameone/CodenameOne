@@ -444,8 +444,10 @@ public class Button extends Label {
      * Invoked to change the state of the button to the pressed state
      */
     public void pressed(){
-        state=STATE_PRESSED;
-        repaint();
+        if (!Display.impl.isScrollWheeling()) {
+            state=STATE_PRESSED;
+            repaint();
+        }
     }
     
     /**
@@ -462,11 +464,12 @@ public class Button extends Label {
      * @param y the y position if a touch event triggered this, -1 if this isn't relevant
      */
     public void released(int x, int y) {
-        state=STATE_ROLLOVER;
         if (!Display.impl.isScrollWheeling()) {
+            state=STATE_ROLLOVER;
             fireActionEvent(x, y);
+        
+            repaint();
         }
-        repaint();
     }
     
     /**

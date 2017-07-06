@@ -42,10 +42,26 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
      * @param values default values for the property
      */
     public ListProperty(String name, T... values) {
-        super(name);
+        this(name, null, values);
+    }
+    
+    /**
+     * Constructs a property with the given name and values by specifying the
+     * type of the elements explicitly. The element type needs to be specified
+     * if the list should contain {@link PropertyBusinessObject}s and needs
+     * to get deserialized properly!
+     * @param name the name of the property
+     * @param elementType subclass of {@link PropertyBusinessObject}
+     * @param values default values for the property
+     */
+    public ListProperty(String name, Class<T> elementType, T... values) {
+        super(name, elementType);
         for(T t : values) {
             value.add(t);
         }
+        if(elementType == null || !PropertyBusinessObject.class.isAssignableFrom(elementType)) 
+            throw new IllegalArgumentException(
+                    "the element type class needs to be a subclass of PropertyBusinessObject");
     }
     
     /**
@@ -193,5 +209,24 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
             value.clear();
             firePropertyChanged();
         }
+    }
+
+    /**
+     * Returns true if the given element is contained in the list property  
+     * @param element the element
+     * @return true if the given element is contained in the list property  
+     */
+    public boolean contains(T element) {
+        return value.contains(element);
+    }
+
+
+    /**
+     * Returns the index of the given element in the list property  
+     * @param element the element
+     * @return the index of the given element in the list property  
+     */
+    public int indexOf(T element) {
+        return value.indexOf(element);
     }
 }

@@ -50,6 +50,11 @@ namespace UWPApp
             }
 #endif
 
+            if (args.StartsWith("cn1push:"))
+            {
+                Main.pushLaunchArg = args.Substring(8);
+            }
+
             Frame rootFrame = Window.Current.Content as Frame;
             // Do not repeat app initialization when the Window already has content,
             // just ensure that the window is active
@@ -261,7 +266,69 @@ namespace UWPApp
             // TODO: Save application state and stop any background activity
             deferral.Complete();
         }
-    }  
+    } 
+
+
+    // Uncomment this and modify the debug() method for pseudo-debugging in Visual studio.
+    // This only works if the project was built with the "windows.injectDebug" build hint.
+    // See https://github.com/shannah/CN1UWPPort/wiki/Using-the-injectDebug-flag for more information.
+    /* 
+    class IKVMDebugger : com.codename1.debug.Debugger
+    {
+        public static int len = 100;
+        public static int pos = 0;
+        public static string[] lastLocation = new string[len];
+        public static bool inDebugger;
+        public static bool activated;
+
+        public override void debug(string className, string methodName, int lineNum)
+        {
+            lock (this)
+            {
+                if (inDebugger) return;
+                try
+                {
+
+                    inDebugger = true;
+                    if (activated)
+                    {
+                        int stopHere = 1;
+                    }
+                    if ("monitorEnter".Equals(methodName))
+                    {
+                        int holdsLock = 1;
+                    }
+                    //Debug.WriteLine(java.lang.Thread.currentThread().getName());
+                    if ("EDT".Equals(java.lang.Thread.currentThread().getName()))
+                    {
+                        if (className.StartsWith("java/lang/Class") && lineNum > 3235 && lineNum < 3240)
+                        {
+                            activated = true;
+                        }
+                        //java.util.FoobarTest  testvar = new java.util.FoobarTest();
+                        //string testvar2 = testvar.getString();
+                        lastLocation[pos] = className + "." + methodName + ":" + lineNum;
+                        pos = (pos + 1) % len;
+                        lastLocation[pos] = null;
+                        //pos = (pos + 1) % len;
+                    }
+                    else if ("java/util/Properties".Equals(className) || "java/lang/Props".Equals(className) || "java/util/Hashtable".Equals(className))
+                    {
+                        int noop = 1;
+
+                    }
+                }
+                finally
+                {
+                    inDebugger = false;
+                }
+            }
+
+
+            //Debug.WriteLine("Hello "+className+" "+methodName+" "+lineNum);
+        }
+    }
+   */
     class IKVMReflectionHelper : RuntimeReflectionHelper
     {
 
@@ -271,6 +338,9 @@ namespace UWPApp
             Instance = new IKVMReflectionHelper();
             java.lang.System.setOut(new DebugPrintStream());
             java.lang.System.setErr(new DebugPrintStream());
+            // Uncomment only if using windows.injectDebug build hint and you are debugging
+            // the application in Visual Studio.
+            //com.codename1.debug.Debugger.setDebugger(new IKVMDebugger());
         }
 
         private IKVMReflectionHelper()

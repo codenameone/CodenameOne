@@ -41,6 +41,7 @@ public class ByteCodeClass {
     private List<ByteCodeField> fullFieldList;
     private List<ByteCodeField> staticFieldList;
     private Set<String> dependsClassesInterfaces = new TreeSet<String>();
+    private Set<String> exportsClassesInterfaces = new TreeSet<String>();
     private List<BytecodeMethod> methods = new ArrayList<BytecodeMethod>();
     private List<ByteCodeField> fields = new ArrayList<ByteCodeField>();
     private String clsName;
@@ -224,12 +225,15 @@ public class ByteCodeClass {
     
     public void updateAllDependencies() {
         dependsClassesInterfaces.clear();
+        exportsClassesInterfaces.clear();
+        dependsClassesInterfaces.add("java_lang_NullPointerException");
         setBaseClass(baseClass);
         for(String s : baseInterfaces) {
             s = s.replace('/', '_').replace('$', '_');
             if(!dependsClassesInterfaces.contains(s)) {
                 dependsClassesInterfaces.add(s);
             }
+            exportsClassesInterfaces.add(s);
         }
         if(virtualMethodList != null) {
             virtualMethodList.clear();
@@ -246,6 +250,9 @@ public class ByteCodeClass {
                     dependsClassesInterfaces.add(s);
                 }
             }
+            //for (String s : m.getExportedClasses()) {
+            //    exportsClassesInterfaces.add(s);
+            //}
         }
         for(ByteCodeField m : fields) {
             for(String s : m.getDependentClasses()) {
@@ -253,6 +260,9 @@ public class ByteCodeClass {
                     dependsClassesInterfaces.add(s);
                 }
             }
+            //for (String s : m.getExportedClasses()) {
+            //    exportsClassesInterfaces.add(s);
+            //}
         }
     }
     
@@ -309,6 +319,19 @@ public class ByteCodeClass {
         b.append("#include \"");
         b.append(clsName);
         b.append(".h\"\n");
+        
+        for(String s : dependsClassesInterfaces) {
+            if (exportsClassesInterfaces.contains(s)) {
+                continue;
+            }
+            if(s.startsWith("java_lang_annotation") || s.startsWith("java_lang_Deprecated") || 
+                    s.startsWith("java_lang_Override") || s.startsWith("java_lang_SuppressWarnings")) {
+                continue;
+            }
+            b.append("#include \"");
+            b.append(s);
+            b.append(".h\"\n");
+        }
         
         b.append("const struct clazz *base_interfaces_for_");
         b.append(clsName);
@@ -958,20 +981,16 @@ public class ByteCodeClass {
     } 
 
     private List<ByteCodeField> buildStaticFieldList(List<ByteCodeField> fieldList) {
-        for(ByteCodeField bf : fields) {
-            if(bf.isStaticField() && !fieldList.contains(bf)) {
-                fieldList.add(bf);
-            } 
+        if (fields != null) {
+            for(ByteCodeField bf : fields) {
+                if(bf.isStaticField() && !fieldList.contains(bf)) {
+                    fieldList.add(bf);
+                } 
+            }
         }
         if(baseInterfacesObject != null) {
             for(ByteCodeClass baseInterface : baseInterfacesObject) {
-                if(baseInterface.fields != null) {
-                    for(ByteCodeField bf : baseInterface.fields) {
-                        if(!fieldList.contains(bf)) {
-                            fieldList.add(bf);
-                        } 
-                    }
-                }
+                baseInterface.buildStaticFieldList(fieldList);
             }
         }
         if(baseClassObject != null) {
@@ -1008,7 +1027,7 @@ public class ByteCodeClass {
 
         b.append("#include \"cn1_globals.h\"\n");
         
-        for(String s : dependsClassesInterfaces) {
+        for(String s : exportsClassesInterfaces) {
             if(s.startsWith("java_lang_annotation") || s.startsWith("java_lang_Deprecated") || 
                     s.startsWith("java_lang_Override") || s.startsWith("java_lang_SuppressWarnings")) {
                 continue;
@@ -1265,6 +1284,7 @@ public class ByteCodeClass {
             if(!dependsClassesInterfaces.contains(b)) {
                 dependsClassesInterfaces.add(b);
             }
+            exportsClassesInterfaces.add(b);
         }
     }
     
@@ -1276,6 +1296,7 @@ public class ByteCodeClass {
                 if(!dependsClassesInterfaces.contains(s)) {
                     dependsClassesInterfaces.add(s);
                 }
+                exportsClassesInterfaces.add(s);
             }
         }
     }

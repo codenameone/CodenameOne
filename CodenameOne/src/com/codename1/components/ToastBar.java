@@ -25,8 +25,10 @@ package com.codename1.components;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Util;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -41,6 +43,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.util.FailureCallback;
@@ -481,11 +484,13 @@ public class ToastBar {
     private void updateStatus() {
         final ToastBarComponent c = getToastBarComponent();
         if (c != null) {
-            if (updatingStatus) {
-                pendingUpdateStatus = true;
-                return;
-            }
+            
             try {
+                if (updatingStatus) {
+                    pendingUpdateStatus = true;
+                    return;
+                }
+                
                 updatingStatus = true;
                 if (c.currentlyShowing != null && !statuses.contains(c.currentlyShowing)) {
                     c.currentlyShowing = null;
@@ -754,29 +759,37 @@ public class ToastBar {
      * @param visible 
      */
     public void setVisible(boolean visible) {
-        ToastBarComponent c = getToastBarComponent();
+        final ToastBarComponent c = getToastBarComponent();
         if (c == null || c.isVisible() == visible) {
             return;
         }
         if (visible) {
-            c.setVisible(true);
-            c.label.setPreferredH(UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true).getHeight());
-            Container layered = c.getParent();
             c.hidden = true;
-            layered.revalidate();
+            c.setVisible(false);
+            c.setHeight(0);
+            c.setShouldCalcPreferredSize(true);
+            c.getParent().revalidate();
             c.hidden = false;
-            layered.animateHierarchyAndWait(1000);
+
+            c.label.setPreferredH(UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true).getHeight());
+            c.setShouldCalcPreferredSize(true);
+            $(c).slideUpAndWait(2);
+            $(c).slideDownAndWait(800);
+            c.setVisible(true);
             updateStatus();
+
         } else {
             Form f = c.getComponentForm();
-            Container layered = c.getParent();
-            c.hidden = true;
             if(Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()){
-                layered.animateHierarchyAndWait(1000);
-            }else{
-                layered.revalidate();
+                if (this.position == Component.BOTTOM) {
+                    c.setY(c.getY() + c.getHeight());
+                }
+                $(c).slideUpAndWait(500);
+            } else {
+                c.getParent().revalidate();
             }
-            c.setVisible(false); 
+            c.hidden = true;
+            c.setVisible(false);
         }
     }
     
@@ -900,7 +913,8 @@ public class ToastBar {
                 NetworkManager.getInstance().removeErrorListener(errorListener);
                 NetworkManager.getInstance().removeProgressListener(progListener[0]);
                 s.clear();
-                if (onSuccess != null && (cr.getResponseCode() == 200 || cr.getResponseCode() == 202)) {
+                int rc = cr.getResponseCode();
+                if (onSuccess != null && (rc == 200 || rc == 201 || rc == 202)) {
                     onSuccess.onSucess(evt);
                 }
             }

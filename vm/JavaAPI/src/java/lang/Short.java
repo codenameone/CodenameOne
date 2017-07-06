@@ -26,7 +26,7 @@ package java.lang;
  * The Short class is the standard wrapper for short values.
  * Since: JDK1.1, CLDC 1.0
  */
-public final class Short{
+public final class Short extends Number {
     /**
      * The maximum value a Short can have.
      * See Also:Constant Field Values
@@ -98,5 +98,25 @@ public final class Short{
      */
     public static Short valueOf(short i) {
         return new Short(i);
+    }
+
+    @Override
+    public int intValue() {
+        return value;
+    }
+
+    @Override
+    public long longValue() {
+        return value;
+    }
+
+    @Override
+    public float floatValue() {
+        return value;
+    }
+
+    @Override
+    public double doubleValue() {
+        return value;
     }
 }

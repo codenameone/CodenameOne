@@ -239,30 +239,32 @@ public final class GeneralPath implements Shape {
      */
     private static final int BUFFER_CAPACITY = 10;
 
+    // These are package protected for ODD
+    
     /**
      * The point's types buffer
      */
-    private byte[] types;
+    byte[] types;
 
     /**
      * The points buffer
      */
-    private float[] points;
+    float[] points;
 
     /**
      * The point's type buffer size
      */
-    private int typeSize;
+    int typeSize;
 
     /**
      * The points buffer size
      */
-    private int pointSize;
+    int pointSize;
 
     /**
      * The path rule
      */
-    private int rule;
+    int rule;
     
     
 
@@ -954,12 +956,20 @@ public final class GeneralPath implements Shape {
                 p.moveTo(_tmp1.x, _tmp1.y);
             }
             _addToPath(p, startAngle, sweepAngle);
+            if (!join && Math.abs(Math.abs(sweepAngle)-Math.PI*2) < 0.001) {
+                p.closePath();
+            }
         }
         
         private void _addToPath(GeneralPath p, double startAngle, double sweepAngle) {
             //double _2pi = Math.PI*2;
-            
-            if (Math.abs(sweepAngle) > Math.PI/4) {
+            double absSweepAngle = Math.abs(sweepAngle);
+            if (absSweepAngle < 0.0001) {
+                // Basically zero sweep angle so we won't draw anytything here.
+                // IOS seemed to choke when we tried to draw too small an arc
+                return;
+            }
+            if (absSweepAngle > Math.PI/4) {
                 //double halfAngle = sweepAngle/2;
                 double diff = Math.PI/4;
                 if (sweepAngle < 0) {

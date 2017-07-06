@@ -22,6 +22,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.components.InteractionDialog;
+import com.codename1.io.Log;
 import com.codename1.ui.animations.BubbleTransition;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Motion;
@@ -94,6 +96,22 @@ public class Toolbar extends Container {
         centeredDefault = aCenteredDefault;
     }
 
+    /**
+     * Indicates if the side menu is in "on-top" mode
+     * @return the onTopSideMenu
+     */
+    public static boolean isOnTopSideMenu() {
+        return onTopSideMenu;
+    }
+
+    /**
+     * Sets the side menu to "on-top" mode
+     * @param aOnTopSideMenu the onTopSideMenu to set
+     */
+    public static void setOnTopSideMenu(boolean aOnTopSideMenu) {
+        onTopSideMenu = aOnTopSideMenu;
+    }
+
     private Component titleComponent;
 
     private ToolbarSideMenu sideMenu;
@@ -123,6 +141,13 @@ public class Toolbar extends Container {
     private boolean initialized = false;
     
     private static boolean permanentSideMenu;
+    
+    /**
+     * Sets the side menu to "on-top" mode
+     */
+    private static boolean onTopSideMenu;
+    
+    private InteractionDialog sidemenuDialog;
     
     private Container permanentSideMenuContainer;
 
@@ -247,7 +272,26 @@ public class Toolbar extends Container {
      * menu button in a "creative way" in which case we can bind the side menu to this
      */
     public void openSideMenu() {
-        ((SideMenuBar)getMenuBar()).openMenu(null);
+        if(onTopSideMenu) {
+            showOnTopSidemenu(-1, false);
+        } else {
+            ((SideMenuBar)getMenuBar()).openMenu(null);
+        }
+    }
+    
+    /**
+     * Closes the current side menu
+     */
+    public void closeSideMenu() {
+        if(onTopSideMenu) {
+            if(sidemenuDialog.isShowing()) {
+                sidemenuDialog.disposeToTheLeft();
+                Style s = getComponentForm().getLayeredPane(Toolbar.class, false).getUnselectedStyle();
+                s.setBgTransparency(0);
+            } 
+        } else {
+            SideMenuBar.closeCurrentMenu();
+        }
     }
     
     /**
@@ -447,7 +491,7 @@ public class Toolbar extends Container {
                     }
                 
                 };
-                Form f = (Form)Toolbar.this.getParent();
+                Form f = (Form)Toolbar.this.getComponentForm();
                 setHidden(true);
                 f.removeComponentFromForm(Toolbar.this);
                 f.setToolbar(s);
@@ -680,6 +724,18 @@ public class Toolbar extends Container {
         return cmd;
     }
     
+    boolean isComponentInOnTopSidemenu(Component cmp) {
+        if(cmp != null) {
+            while(cmp.getParent() != null) {
+                cmp = cmp.getParent();
+                if(cmp == permanentSideMenuContainer || cmp == this) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
     /**
      * Adds a Command to the side navigation menu
      *
@@ -703,11 +759,29 @@ public class Toolbar extends Container {
             } else {
                 b.setUIID("SideCommand");
             }
-            addComponentToSideMenu(permanentSideMenuContainer, b);
-            
+            addComponentToSideMenu(permanentSideMenuContainer, b); 
         } else {
-            sideMenu.addCommand(cmd);
-            sideMenu.installMenuBar();
+            if(onTopSideMenu) {
+                constructOnTopSideMenu();
+
+                Button b = new Button(sideMenu.wrapCommand(cmd));
+                b.setEndsWith3Points(false);
+                Integer gap = (Integer)cmd.getClientProperty("iconGap");
+                if(gap != null) {
+                    b.setGap(gap.intValue());
+                }
+                b.setTextPosition(Label.RIGHT);
+                String uiid = (String)cmd.getClientProperty("uiid");
+                if(uiid != null) {
+                    b.setUIID(uiid);
+                } else {
+                    b.setUIID("SideCommand");
+                }
+                addComponentToSideMenu(permanentSideMenuContainer, b); 
+            } else {
+                sideMenu.addCommand(cmd);
+                sideMenu.installMenuBar();
+            }
         }
     }
     
@@ -719,6 +793,181 @@ public class Toolbar extends Container {
         }
     }
 
+    private void constructOnTopSideMenu() {
+        if(sidemenuDialog == null) {
+            permanentSideMenuContainer = constructSideNavigationComponent();
+            
+            final Form parent = getComponentForm();
+            parent.addPointerPressedListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    if(sidemenuDialog.isShowing()) {
+                        if(evt.getX() > sidemenuDialog.getWidth()) {
+                            closeSideMenu();
+                            parent.putClientProperty("cn1$ignorRelease", Boolean.TRUE);
+                            evt.consume();
+                        } else {
+                            if(evt.getX() + Display.getInstance().convertToPixels(8) > sidemenuDialog.getWidth()) {
+                                parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                            } else {
+                                parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                            }
+                            if(!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                evt.consume();
+                            }
+                        }
+                    } else {
+                        int displayWidth = Display.getInstance().getDisplayWidth();
+                        final int sensitiveSection = displayWidth / getUIManager().getThemeConstant("sideSwipeSensitiveInt", 10);
+                        if(evt.getX() < sensitiveSection) {
+                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.TRUE);
+                            evt.consume();
+                        } else {
+                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
+                            permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());
+                        }
+                    }
+                }
+            });
+            parent.addPointerDraggedListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    Boolean b = (Boolean)parent.getClientProperty("cn1$sidemenuCharged");
+                    if(b != null && b.booleanValue()) {
+                        parent.putClientProperty("cn1$sidemenuActivated", Boolean.TRUE);
+                        showOnTopSidemenu(evt.getX(), false);
+                        evt.consume();
+                    } else {
+                        if(sidemenuDialog.isShowing()) {
+                            permanentSideMenuContainer.pointerDragged(evt.getX(), evt.getY());
+                            evt.consume();                        
+                        }                        
+                    }
+                }
+            });
+            parent.addPointerReleasedListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    Boolean ir = (Boolean)parent.getClientProperty("cn1$ignorRelease");
+                    if(ir != null && ir.booleanValue()) {
+                        parent.putClientProperty("cn1$ignorRelease", null);
+                        evt.consume();
+                        return;
+                    }
+                    Boolean b = (Boolean)parent.getClientProperty("cn1$sidemenuActivated");
+                    if(b != null && b.booleanValue()) {
+                        parent.putClientProperty("cn1$sidemenuActivated", null);
+                        if(evt.getX() < parent.getWidth() / 4) {
+                            closeSideMenu();
+                        } else {
+                            showOnTopSidemenu(-1, true);
+                        }
+                        evt.consume();
+                    } else {
+                        if(sidemenuDialog.isShowing()) {
+                            if(!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
+                                evt.consume();
+                            }
+                            permanentSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
+                        }
+                    }
+                }
+            });
+            
+            sidemenuDialog = new InteractionDialog(new BorderLayout());
+            
+            // change this to true when stable
+            sidemenuDialog.setFormMode(false);
+            sidemenuDialog.setUIID("Container");
+            sidemenuDialog.setDialogUIID("Container");
+            sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
+            float size = 4.5f;
+            try {
+                size = Float.parseFloat(getUIManager().getThemeConstant("menuImageSize", "4.5"));
+            } catch(Throwable t) {
+                Log.e(t);
+            }
+            addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    if(sidemenuDialog.isShowing()) {
+                        closeSideMenu();
+                        return;
+                    }
+                    showOnTopSidemenu(-1, false);
+                }
+            });
+        }
+    }
+    
+    void showOnTopSidemenu(int draggedX, boolean fromCurrent) {
+        int v = 0;
+        int dw = Display.getInstance().getDisplayWidth();
+        if (Display.getInstance().isPortrait()) {
+            if (Display.getInstance().isTablet()) {
+                v = getUIManager().getThemeConstant("sideMenuSizeTabPortraitInt", -1);
+                if(v < 0) {
+                    v = dw * 2 / 3;
+                } else {
+                    v = dw * (100 - v) / 100;
+                }
+            } else {
+                v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
+                if(v < 0) {
+                    v = dw - Display.getInstance().convertToPixels(10);
+                } else {
+                    v = dw * (100 - v) / 100;
+                }
+            }
+        } else {
+            if (Display.getInstance().isTablet()) {
+                v = getUIManager().getThemeConstant("sideMenuSizeTabLandscapeInt", -1);
+                if(v < 0) {
+                    v = dw * 3 / 4;
+                } else {
+                    v = dw * (100 - v) / 100;
+                }
+            } else {
+                v = getUIManager().getThemeConstant("sideMenuSizeLandscapeInt", -1);
+                if(v < 0) {
+                    v = dw * 4 / 10;
+                } else {
+                    v = dw * (100 - v) / 100;                        
+                }
+            }
+        }
+        if(draggedX > 0) {
+            v = Math.min(v, draggedX);
+            sidemenuDialog.setAnimateShow(false);
+            sidemenuDialog.dispose();
+        }  else {
+            sidemenuDialog.setAnimateShow(true);
+        }
+        
+        // workaround for layout issue on first show
+        if(sidemenuDialog.getClientProperty("cn1$firstShow") == null) {
+            sidemenuDialog.setAnimateShow(false);
+            sidemenuDialog.setVisible(false);
+            sidemenuDialog.show(0, 0, 0, dw - v);
+            sidemenuDialog.disposeToTheLeft();
+            sidemenuDialog.setVisible(true);
+            sidemenuDialog.putClientProperty("cn1$firstShow", Boolean.TRUE);
+            sidemenuDialog.setAnimateShow(draggedX < 1);
+    }
+        sidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
+        sidemenuDialog.setWidth(v);
+        if(!fromCurrent) {
+            sidemenuDialog.setX(-v);
+        }
+        sidemenuDialog.setRepositionAnimation(false);
+        sidemenuDialog.layoutContainer();
+        
+        float f = ((float)v) / ((float)dw) * 200.0f;
+        Style s = getComponentForm().getLayeredPane(Toolbar.class, false).getUnselectedStyle();
+        s.setBgTransparency((int)f);
+        s.setBgColor(0);
+        
+        // prevent events from propogating downwards 
+        //sidemenuDialog.getContentPane().setFocusable(true);
+        sidemenuDialog.show(0, 0, 0, dw - v);
+    }
+    
     /**
      * Adds a Component to the side navigation menu. The Component is added to
      * the navigation menu and the command gets the events once the Component is
@@ -738,10 +987,20 @@ public class Toolbar extends Container {
             cnt.setLeadComponent(btn);
             addComponentToSideMenu(permanentSideMenuContainer, cnt);
         } else {
-            cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
-            cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
-            sideMenu.addCommand(cmd);
-            sideMenu.installMenuBar();
+            if(onTopSideMenu) {
+                constructOnTopSideMenu();
+                Container cnt = new Container(new BorderLayout());
+                cnt.addComponent(BorderLayout.CENTER, cmp);
+                Button btn = new Button(cmd);
+                btn.setParent(cnt);
+                cnt.setLeadComponent(btn);
+                addComponentToSideMenu(permanentSideMenuContainer, cnt);
+            } else {
+                cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
+                cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
+                sideMenu.addCommand(cmd);
+                sideMenu.installMenuBar();
+            }
         }
     }
 
@@ -756,11 +1015,16 @@ public class Toolbar extends Container {
             constructPermanentSideMenu();
             addComponentToSideMenu(permanentSideMenuContainer, cmp);
         } else {
-            Command cmd = new Command("");
-            cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
-            cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.FALSE);
-            sideMenu.addCommand(cmd);
-            sideMenu.installMenuBar();
+            if(onTopSideMenu) {
+                constructOnTopSideMenu();
+                addComponentToSideMenu(permanentSideMenuContainer, cmp);
+            } else {
+                Command cmd = new Command("");
+                cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);
+                cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.FALSE);
+                sideMenu.addCommand(cmd);
+                sideMenu.installMenuBar();
+            }
         }
     }
 
@@ -770,7 +1034,7 @@ public class Toolbar extends Container {
      * @return the button instance
      */
     public Button findCommandComponent(Command c) {
-        if(permanentSideMenu) {
+        if(permanentSideMenu || onTopSideMenu) {
             Button b = findCommandComponent(c, permanentSideMenuContainer);
             if(b != null) {
                 return b;
@@ -1174,8 +1438,10 @@ public class Toolbar extends Container {
      */
     public Iterable<Command> getSideMenuCommands() {
         ArrayList<Command> cmds = new ArrayList<Command>();
-        if(permanentSideMenu) {
-            findAllCommands(permanentSideMenuContainer, cmds);
+        if(permanentSideMenu || onTopSideMenu) {
+            if(permanentSideMenuContainer != null) {
+                findAllCommands(permanentSideMenuContainer, cmds);
+            }
             return cmds;
         }
         Form f = getComponentForm();
@@ -1198,7 +1464,7 @@ public class Toolbar extends Container {
     
 
     class ToolbarSideMenu extends SideMenuBar {
-
+                
         @Override
         protected Container createSideNavigationComponent(Vector commands, String placement) {
             return Toolbar.this.createSideNavigationComponent(commands, placement);
@@ -1275,7 +1541,7 @@ public class Toolbar extends Container {
                     try {
                         size = Float.parseFloat(uim.getThemeConstant("overflowImageSize", "4.5"));
                     } catch(Throwable t) {
-                        t.printStackTrace();
+                        Log.e(t);
                     }
                     i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle("TitleCommand"), size);
                 }

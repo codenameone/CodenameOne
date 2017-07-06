@@ -67,6 +67,12 @@ public final class Graphics {
         impl = Display.impl;
     }
     
+    protected void finalize() {
+        if (nativeGraphics != null) {
+            impl.disposeGraphics(nativeGraphics);
+        }
+    }
+    
     private Transform translation() {
         if (translation == null) {
             translation = Transform.makeTranslation(xTranslate, yTranslate);
@@ -442,12 +448,15 @@ public final class Graphics {
      * 
      * @param x the x coordinate of the upper-left corner of the arc to be filled.
      * @param y the y coordinate of the upper-left corner of the arc to be filled.
-     * @param width the width of the arc to be filled.
-     * @param height the height of the arc to be filled.
+     * @param width the width of the arc to be filled, must be 1 or more.
+     * @param height the height of the arc to be filled, must be 1 or more.
      * @param startAngle the beginning angle.
      * @param arcAngle the angular extent of the arc, relative to the start angle.
      */
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
+        if(width < 1 || height < 1) {
+            throw new IllegalArgumentException("Width & Height of fillAsrc must be greater than 0");
+        }
         impl.fillArc(nativeGraphics, xTranslate + x, yTranslate + y, width, height, startAngle, arcAngle);
     }
     
@@ -1118,8 +1127,8 @@ public final class Graphics {
      * Rotates the coordinate system around a radian angle using the affine transform
      *
      * @param angle the rotation angle in radians
-     * @param pivotX the pivot point
-     * @param pivotY the pivot point
+     * @param pivotX the pivot point In absolute coordinates.
+     * @param pivotY the pivot point In absolute coordinates.
      */
     public void rotate(float angle, int pivotX, int pivotY) {
         impl.rotate(nativeGraphics, angle, pivotX, pivotY);

@@ -94,6 +94,8 @@ public class FloatingActionButton extends Button {
      */
     private static float fabDefaultSize = 3.8f;
 
+    private float sizeMm = fabDefaultSize;
+    
     /**
      * Constructor
      *
@@ -103,6 +105,7 @@ public class FloatingActionButton extends Button {
      */
     protected FloatingActionButton(char icon, String text, float size) {
         FontImage image = FontImage.createMaterial(icon, "FloatingActionButton", size);
+        sizeMm = size;
         setIcon(image);
         setText("");
         this.text = text;
@@ -111,7 +114,7 @@ public class FloatingActionButton extends Button {
         all.setAlignment(CENTER);
         updateBorder();
     }
-
+        
     /**
      * This constructor is used by text badges
      */
@@ -145,6 +148,11 @@ public class FloatingActionButton extends Button {
     public void styleChanged(String propertyName, Style source) {
         if(propertyName.equals(Style.BG_COLOR)) {
             updateBorder();
+        }
+        if(getIcon() instanceof FontImage && propertyName.equals(Style.FG_COLOR)) {
+            FontImage i = (FontImage)getIcon();
+            FontImage image = FontImage.createMaterial(i.getText().charAt(0), "FloatingActionButton", sizeMm);
+            setIcon(image);
         }
     }    
     
@@ -219,7 +227,7 @@ public class FloatingActionButton extends Button {
         flow.setValign(valign);
 
         Form f = cnt.getComponentForm();
-        if(f != null && f.getContentPane() == cnt) {
+        if(f != null && (f.getContentPane() == cnt || f == cnt)) {
             // special case for content pane installs the button directly on the content pane
             Container layers = f.getLayeredPane(getClass(), true);
             layers.setLayout(flow);

@@ -65,6 +65,13 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 #include "com_codename1_ui_plaf_Style.h"
 #import "RadialGradientPaint.h"
+#include "java_io_IOException.h"
+#include "com_codename1_io_Cookie.h"
+#include "com_codename1_ui_plaf_UIManager.h"
+#include "java_io_Writer.h"
+#include "java_util_ArrayList.h"
+#include "com_codename1_ui_Font.h"
+#include "java_util_Vector.h"
 //#import "QRCodeReaderOC.h"
 #define AUTO_PLAY_VIDEO
 
@@ -225,7 +232,7 @@ extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBIm
 extern void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* peer, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL dialogHeight, int color, JAVA_LONG imagePeer,
- int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste);
+ int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment);
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal();
 
@@ -328,16 +335,16 @@ NSString* toNSString(JAVA_OBJECT str) {
     // accessing internal state since toCharArray performs an allocation which can be REALLY expensive
     int offset = ((java_lang_String*) str)->fields.java_lang_String.offset_;
     org_xmlvm_runtime_XMLVMArray* cArr = ((java_lang_String*) str)->fields.java_lang_String.value_;
-    //NSLog(@"cArr pointer is: %i", cArr);
+    //CN1Log(@"cArr pointer is: %i", cArr);
     if(cArr == JAVA_NULL) {
         const char* chrs = stringToUTF8(str);
         NSString* st = [NSString stringWithUTF8String:chrs];
-        //NSLog(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
+        //CN1Log(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
         return st;
     }
     
     JAVA_ARRAY_CHAR* chrArr = (JAVA_ARRAY_CHAR*)cArr->fields.org_xmlvm_runtime_XMLVMArray.array_;
-    //NSLog(@"chrArr pointer is: %i", chrArr);
+    //CN1Log(@"chrArr pointer is: %i", chrArr);
     
     int length = ((java_lang_String*) str)->fields.java_lang_String.count_;
     
@@ -345,7 +352,7 @@ NSString* toNSString(JAVA_OBJECT str) {
         if(chrArr[iter] > 127) {
             const char* chrs = stringToUTF8(str);
             NSString* st = [NSString stringWithUTF8String:chrs];
-            //NSLog(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
+            //CN1Log(@"Unicode chars: %@ over %i at offset %i", st, chrArr[iter], iter);
             return st;
         }
     }
@@ -356,10 +363,11 @@ NSString* toNSString(JAVA_OBJECT str) {
 }
 #endif
 
-void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean_boolean(CN1_THREAD_STATE_MULTI_ARG
+void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolean_int_int_int_java_lang_String_boolean_int_long_int_int_int_int_java_lang_String_boolean_boolean_int_int(CN1_THREAD_STATE_MULTI_ARG
                                                                                                                                                                          JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_LONG n5, JAVA_BOOLEAN n6, JAVA_INT n7,
                                                                                                                                                                          JAVA_INT n8, JAVA_INT n9, JAVA_OBJECT n10, JAVA_BOOLEAN forceSlide,
-                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar, JAVA_BOOLEAN blockCopyPaste)
+                                                                                                                                                                         JAVA_INT color, JAVA_LONG imagePeer, JAVA_INT padTop, JAVA_INT padBottom, JAVA_INT padLeft, JAVA_INT padRight, JAVA_OBJECT hint, JAVA_BOOLEAN showToolbar, JAVA_BOOLEAN blockCopyPaste,
+                                                                                                                                                                         JAVA_INT alignment, JAVA_INT verticalAlignment)
 {
     POOL_BEGIN();
     const char* chr = stringToUTF8(CN1_THREAD_STATE_PASS_ARG n10);
@@ -367,7 +375,7 @@ void com_codename1_impl_ios_IOSNative_editStringAt___int_int_int_int_long_boolea
     char cc[l];
     memcpy(cc, chr, l);
     Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl(CN1_THREAD_STATE_PASS_ARG n1, n2, n3, n4, n5, n6, n7, n8, n9, cc, 0, forceSlide, color, imagePeer,
-                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar, blockCopyPaste);
+                                                                   padTop, padBottom, padLeft, padRight, toNSString(CN1_THREAD_STATE_PASS_ARG hint), showToolbar, blockCopyPaste, alignment, verticalAlignment);
     POOL_END();
 }
 extern float scaleValue;
@@ -394,11 +402,11 @@ void com_codename1_impl_ios_IOSNative_resizeNativeTextView___int_int_int_int_int
             editCompoentW = (w - padLeft - padRight) / scale;
             editCompoentH = (h - padTop - padBottom) / scale;
             CGRect rect = CGRectMake(editCompoentX, editCompoentY, editCompoentW, editCompoentH);
-            //NSLog(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+            //CN1Log(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
             if (fabs(existingBounds.size.width - rect.size.width) > 1 || fabs(existingBounds.size.height - rect.size.height) > 1 ||
                 fabs(existingBounds.origin.x - rect.origin.x) > 1 || fabs(existingBounds.origin.y - 1.5 - rect.origin.y) > 1
                 ) {
-                //NSLog(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+                //CN1Log(@"Changing bounds %f,%f,%f,%f to %f,%f,%f,%f", existingBounds.origin.x, existingBounds.origin.y, existingBounds.size.width, existingBounds.size.height, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
                 editingComponent.frame = rect;
             }
             
@@ -1240,7 +1248,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_writeToFile___byte_1ARRAY_java_lang_St
     NSError *error = nil;
     [d writeToFile:ns options:NSAtomicWrite error:&error];
     if(error != nil) {
-        NSLog(@"Error writeToFile: %@ for the file %@", [error localizedDescription], ns);
+        CN1Log(@"Error writeToFile: %@ for the file %@", [error localizedDescription], ns);
         POOL_END();
         return 1;
     }
@@ -1281,7 +1289,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getFileSize___java_lang_String(CN1_THR
     NSError *error = nil;
     NSDictionary *attrs = [man attributesOfItemAtPath:ns error:&error];
     if(error != nil) {
-        NSLog(@"Error getFileSize: %@ for the file %@", [error localizedDescription], ns);
+        CN1Log(@"Error getFileSize: %@ for the file %@", [error localizedDescription], ns);
     }
     UInt32 result = (UInt32)[attrs fileSize];
 #ifndef CN1_USE_ARC
@@ -1301,7 +1309,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getFileLastModified___java_lang_Strin
     NSError *error = nil;
     NSDictionary *attrs = [man attributesOfItemAtPath:ns error:&error];
     if(error != nil) {
-        NSLog(@"Error getFileLastModified: %@ for the file %@", [error localizedDescription], ns);
+        CN1Log(@"Error getFileLastModified: %@ for the file %@", [error localizedDescription], ns);
     }
     NSDate* modDate = [attrs fileModificationDate];
     //[modDate timeIntervalSince1970];
@@ -1365,7 +1373,7 @@ void com_codename1_impl_ios_IOSNative_deleteFile___java_lang_String(CN1_THREAD_S
     NSError *error = nil;
     [fm removeItemAtPath:ns error:&error];
     if(error != nil) {
-        NSLog(@"Error in deleteFile: %@ for the file %@", [error localizedDescription], ns);
+        CN1Log(@"Error in deleteFile: %@ for the file %@", [error localizedDescription], ns);
     }
 #ifndef CN1_USE_ARC
     [fm release];
@@ -1406,7 +1414,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_fileCountInDir___java_lang_String(CN1_
     NSError *error = nil;
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
     if(error != nil) {
-        NSLog(@"Error in fileCountInDir: %@", [error localizedDescription]);
+        CN1Log(@"Error in fileCountInDir: %@", [error localizedDescription]);
     }
     int i = nsArr.count;
 #ifndef CN1_USE_ARC
@@ -1423,7 +1431,7 @@ void com_codename1_impl_ios_IOSNative_listFilesInDir___java_lang_String_java_lan
     NSError *error = nil;
     NSArray* nsArr = [fm contentsOfDirectoryAtPath:ns error:&error];
     if(error != nil) {
-        NSLog(@"Error in listing files: %@", [error localizedDescription]);
+        CN1Log(@"Error in listing files: %@", [error localizedDescription]);
     }
     
 #ifndef NEW_CODENAME_ONE_VM
@@ -1450,7 +1458,7 @@ void com_codename1_impl_ios_IOSNative_createDirectory___java_lang_String(CN1_THR
     NSFileManager* fm = [[NSFileManager alloc] init];
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG dir);
     if (![fm createDirectoryAtPath:ns attributes:nil]) {
-        NSLog(@"Failed to create directory %@", ns);
+        CN1Log(@"Failed to create directory %@", ns);
     }
 #ifndef CN1_USE_ARC
     [fm release];
@@ -1472,7 +1480,7 @@ void com_codename1_impl_ios_IOSNative_moveFile___java_lang_String_java_lang_Stri
     NSError *error = nil;
     [fm moveItemAtPath:nsSrc toPath:nsDst error:&error];
     if(error != nil) {
-        NSLog(@"Error in moving file: %@", [error localizedDescription]);
+        CN1Log(@"Error in moving file: %@", [error localizedDescription]);
     }
 #ifndef CN1_USE_ARC
     [fm release];
@@ -1504,6 +1512,14 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
     [impl connect];
     POOL_END();
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSSLCertificates___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    JAVA_OBJECT result = [impl getSSLCertificates];
+    POOL_END();
+    return result;
 }
 
 void com_codename1_impl_ios_IOSNative_setChunkedStreamingMode___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT len) {
@@ -3145,7 +3161,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isContactsPermissionGranted__(CN1_
 
 void throwError(CFErrorRef error) {
     if (error != nil) {
-        NSLog(@"error %@", error);
+        CN1Log(@"error %@", error);
 #ifndef NEW_CODENAME_ONE_VM
         CFStringRef errorDesc = CFErrorCopyDescription(error);
         CFIndex length = CFStringGetLength(errorDesc);
@@ -3592,7 +3608,7 @@ void com_codename1_impl_ios_IOSNative_updatePersonWithRecordID___int_com_codenam
                 }
             }
         }
-        //NSLog(@"%@", toNSString(CN1_THREAD_STATE_PASS_ARG com_codename1_contacts_Contact_getDisplayName___R_java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt)));
+        //CN1Log(@"%@", toNSString(CN1_THREAD_STATE_PASS_ARG com_codename1_contacts_Contact_getDisplayName___R_java_lang_String(CN1_THREAD_STATE_PASS_ARG cnt)));
     }
 
     
@@ -3855,17 +3871,17 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
         NSError *err = nil;
         [audioSession setCategory :AVAudioSessionCategoryPlayAndRecord error:&err];
         if(err){
-            NSLog(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+            CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
             return;
         }
         err = nil;
         [audioSession setActive:YES error:&err];
         if(err){
-            NSLog(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
+            CN1Log(@"audioSession: %@ %d %@", [err domain], [err code], [[err userInfo] description]);
             return;
         }
         if (isIOS7()) {
-            NSLog(@"Asking for record permission");
+            CN1Log(@"Asking for record permission");
             [audioSession requestRecordPermission:^(BOOL granted) {
                 POOL_BEGIN();
                 if (granted) {
@@ -3878,7 +3894,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                         [fm removeItemAtPath:ns error:nil];
                     }
                     
-                    NSLog(@"Recording audio to: %@", filePath);
+                    CN1Log(@"Recording audio to: %@", filePath);
                     NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
                                                     [NSNumber numberWithFloat: 16000.0], AVSampleRateKey,
                                                     [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
@@ -3889,7 +3905,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                                                            settings: recordSettings
                                                               error: &error];
                     if(error != nil) {
-                        NSLog(@"Error in recording: %@", [error localizedDescription]);
+                        CN1Log(@"Error in recording: %@", [error localizedDescription]);
                     }
                     recorder.delegate = [CodenameOne_GLViewController instance];
                 } else {
@@ -3907,7 +3923,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                 [fm removeItemAtPath:ns error:nil];
             }
             
-            NSLog(@"Recording audio to: %@", filePath);
+            CN1Log(@"Recording audio to: %@", filePath);
             NSDictionary *recordSettings = [[NSDictionary alloc] initWithObjectsAndKeys:
                                             [NSNumber numberWithFloat: 16000.0], AVSampleRateKey,
                                             [NSNumber numberWithInt: kAudioFormatMPEG4AAC],AVFormatIDKey,
@@ -3918,7 +3934,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudioRecorder___java_lang_Strin
                                                    settings: recordSettings
                                                       error: &error];
             if(error != nil) {
-                NSLog(@"Error in recording: %@", [error localizedDescription]);
+                CN1Log(@"Error in recording: %@", [error localizedDescription]);
             }
             recorder.delegate = [CodenameOne_GLViewController instance];
         }
@@ -3933,10 +3949,10 @@ void com_codename1_impl_ios_IOSNative_startAudioRecord___long(CN1_THREAD_STATE_M
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         if(![recorder prepareToRecord]) {
-            NSLog(@"Error preparing to record");
+            CN1Log(@"Error preparing to record");
         }
         if(![recorder record]) {
-            NSLog(@"Error in recording record returned false for some reason?");
+            CN1Log(@"Error in recording record returned false for some reason?");
         }
 #ifndef CN1_USE_ARC
         [recorder retain];
@@ -4104,7 +4120,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
 #ifdef NEW_CODENAME_ONE_VM
         if (result != SQLITE_OK) {
             //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //NSLog(@"Error : %@", errStr);
+            //CN1Log(@"Error : %@", errStr);
             JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
             java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
             throwException(threadStateData, ex);
@@ -4129,7 +4145,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
 #ifdef NEW_CODENAME_ONE_VM
         if (result != SQLITE_ROW && result != SQLITE_DONE && result != SQLITE_OK) {
             //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //NSLog(@"Error : %@", errStr);
+            //CN1Log(@"Error : %@", errStr);
             JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
             java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %@", [NSString stringWithUTF8String:sqlite3_errmsg(db)]]));
             throwException(threadStateData, ex);
@@ -4140,7 +4156,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
 #ifdef NEW_CODENAME_ONE_VM
         if (result != SQLITE_OK) {
             //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //NSLog(@"Error : %@", errStr);
+            //CN1Log(@"Error : %@", errStr);
             JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
             java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %@", [NSString stringWithUTF8String:sqlite3_errmsg(db)]]));
             throwException(threadStateData, ex);
@@ -4154,7 +4170,7 @@ void com_codename1_impl_ios_IOSNative_sqlDbExec___long_java_lang_String_java_lan
 #ifdef NEW_CODENAME_ONE_VM
         if (result != SQLITE_OK) {
             //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-            //NSLog(@"Error : %@", errStr);
+            //CN1Log(@"Error : %@", errStr);
             JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
             java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG errInfo));
             throwException(threadStateData, ex);
@@ -4173,7 +4189,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
 #ifdef NEW_CODENAME_ONE_VM
     if (result != SQLITE_OK) {
         //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-        //NSLog(@"Error : %@", errStr);
+        //CN1Log(@"Error : %@", errStr);
         JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
         throwException(threadStateData, ex);
@@ -4198,7 +4214,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbExecQuery___long_java_lang_Strin
 #ifdef NEW_CODENAME_ONE_VM
             if (result != SQLITE_OK) {
                 //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-                //NSLog(@"Error : %@", errStr);
+                //CN1Log(@"Error : %@", errStr);
                 JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
                 java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG sqlite3_errmsg(db)));
                 throwException(threadStateData, ex);
@@ -4215,7 +4231,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorFirst___long(CN1_THREAD_S
 #ifdef NEW_CODENAME_ONE_VM
     if (result != SQLITE_OK && result != SQLITE_DONE && result != SQLITE_ROW) {
         //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-        //NSLog(@"Error : %@", errStr);
+        //CN1Log(@"Error : %@", errStr);
         JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %d", result]));
         throwException(threadStateData, ex);
@@ -4233,7 +4249,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlCursorNext___long(CN1_THREAD_ST
 #ifdef NEW_CODENAME_ONE_VM
     if (result != SQLITE_DONE && result != SQLITE_OK) {
         //NSString *errStr = [NSString stringWithUTF8String:errInfo];
-        //NSLog(@"Error : %@", errStr);
+        //CN1Log(@"Error : %@", errStr);
         JAVA_OBJECT ex = __NEW_java_io_IOException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
         java_io_IOException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString stringWithFormat:@"SQL error in step.  Code: %d", result]));
         throwException(threadStateData, ex);
@@ -4376,6 +4392,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canMakePayments__(CN1_THREAD_STATE
     return (JAVA_BOOLEAN)[SKPaymentQueue canMakePayments];
 }
 
+NSLocale *currentLocale = NULL;
+
+void com_codename1_impl_ios_IOSNative_setLocale___java_lang_String(CN1_THREAD_STATE_MULTI_ARG instanceObject, JAVA_OBJECT localeStr) {
+    POOL_BEGIN();
+#ifndef CN1_USE_ARC
+    if (currentLocale != NULL) {
+        [currentLocale release];
+    }
+#endif
+    currentLocale = [[NSLocale alloc] initWithLocaleIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG localeStr)];
+    POOL_END();
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT i) {
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
@@ -4383,6 +4412,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatInt___int(CN1_THREAD_STATE_MU
 #else
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromNumber:[NSNumber numberWithInt:i]]);
     POOL_END();
@@ -4396,6 +4428,10 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDouble___double(CN1_THREAD_ST
 #else
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
+    
     [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromNumber:[NSNumber numberWithDouble:d]]);
     POOL_END();
@@ -4409,6 +4445,9 @@ JAVA_DOUBLE com_codename1_impl_ios_IOSNative_parseDouble___java_lang_String(CN1_
 #else
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     [formatter setNumberStyle:NSNumberFormatterDecimalStyle];
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG d);
     JAVA_DOUBLE result = [[formatter numberFromString:ns] doubleValue];
@@ -4423,6 +4462,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatCurrency___double(CN1_THREAD_
 #else
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     [formatter setNumberStyle:NSNumberFormatterCurrencyStyle];
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromNumber:[NSNumber numberWithDouble:d]]);
     POOL_END();
@@ -4436,6 +4478,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDate___long(CN1_THREAD_STATE_
 #else
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterMediumStyle];
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
@@ -4450,6 +4495,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateShort___long(CN1_THREAD_S
 #else
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterShortStyle];
     JAVA_OBJECT o = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter stringFromDate:date]);
@@ -4464,6 +4512,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTime___long(CN1_THREAD_ST
 #else
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterLongStyle];
     [formatter setTimeStyle:NSDateFormatterLongStyle];
@@ -4479,6 +4530,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeMedium___long(CN1_THR
 #else
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterMediumStyle];
     [formatter setTimeStyle:NSDateFormatterMediumStyle];
@@ -4494,6 +4548,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_formatDateTimeShort___long(CN1_THRE
 #else
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(d / 1000)];
     [formatter setDateStyle:NSDateFormatterShortStyle];
     [formatter setTimeStyle:NSDateFormatterShortStyle];
@@ -4509,6 +4566,9 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getCurrencySymbol__(CN1_THREAD_STAT
 #else
     NSNumberFormatter *formatter = [[NSNumberFormatter alloc] init];
 #endif
+    if (currentLocale != NULL) {
+        formatter.locale = currentLocale;
+    }
     JAVA_OBJECT c = fromNSString(CN1_THREAD_STATE_PASS_ARG [formatter currencyCode]);
     POOL_END();
     return c;
@@ -4707,7 +4767,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_deriveTruetypeFont___long_boolean_boo
 
 void com_codename1_impl_ios_IOSNative_log___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name) {
     POOL_BEGIN();
-    NSLog(@"%@", toNSString(CN1_THREAD_STATE_PASS_ARG name));
+    CN1Log(@"%@", toNSString(CN1_THREAD_STATE_PASS_ARG name));
     POOL_END();
 }
 
@@ -4729,7 +4789,7 @@ void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_u
     nsStr = [nsStr stringByReplacingOccurrencesOfString:@"|" withString:@"%7C"];
     NSURL *url = [NSURL URLWithString:nsStr];
     if(url == nil) {
-        NSLog(@"Invalid URL! You need to escape the characters of the URL in order for it work properly! %@", nsStr);
+        CN1Log(@"Invalid URL! You need to escape the characters of the URL in order for it work properly! %@", nsStr);
         return;
     }
     NSArray *cookies = [cstore cookiesForURL:url];
@@ -4815,7 +4875,7 @@ JAVA_OBJECT java_util_TimeZone_getTimezoneId__(CN1_THREAD_STATE_SINGLE_ARG) {
     POOL_BEGIN();
     NSTimeZone *tzone = [NSTimeZone defaultTimeZone];
     NSString* n = [tzone name];
-    //NSLog(@"java_util_TimeZone_getTimezoneId__ %@", n);
+    //CN1Log(@"java_util_TimeZone_getTimezoneId__ %@", n);
     JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG n);
     POOL_END();
     return str;
@@ -4824,7 +4884,7 @@ JAVA_OBJECT java_util_TimeZone_getTimezoneId__(CN1_THREAD_STATE_SINGLE_ARG) {
 JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT name, JAVA_INT year, JAVA_INT month, JAVA_INT day, JAVA_INT timeOfDayMillis) {
     POOL_BEGIN();
     NSString* n = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    //NSLog(@"java_util_TimeZone_getTimezoneOffset___java_lang_String_long %@, %i", n, timeMillis / 1000);
+    //CN1Log(@"java_util_TimeZone_getTimezoneOffset___java_lang_String_long %@, %i", n, timeMillis / 1000);
     NSTimeZone *tzone = [NSTimeZone timeZoneWithName:n];
     NSDateComponents *comps = [[NSDateComponents alloc] init];
     [comps setDay:day];
@@ -4841,7 +4901,7 @@ JAVA_INT java_util_TimeZone_getTimezoneOffset___java_lang_String_int_int_int_int
 JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT name) {
     POOL_BEGIN();
     NSString* n = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    //NSLog(@"java_util_TimeZone_getTimezoneRawOffset___java_lang_String %@", n);
+    //CN1Log(@"java_util_TimeZone_getTimezoneRawOffset___java_lang_String %@", n);
     NSTimeZone *tzone = [NSTimeZone timeZoneWithName:n];
     JAVA_INT result = [tzone secondsFromGMT] * 1000;
     if([tzone isDaylightSavingTime]) {
@@ -4854,7 +4914,7 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String(CN1_THREAD_S
 JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT name, JAVA_LONG millis) {
     POOL_BEGIN();
     NSString* n = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    //NSLog(@"java_util_TimeZone_isTimezoneDST___java_lang_String_long %@, %i", n, millis / 1000);
+    //CN1Log(@"java_util_TimeZone_isTimezoneDST___java_lang_String_long %@, %i", n, millis / 1000);
     NSTimeZone *tzone = [NSTimeZone timeZoneWithName:n];
     NSDate* date = [NSDate dateWithTimeIntervalSince1970:(millis / 1000)];
     JAVA_BOOLEAN result = [tzone isDaylightSavingTimeForDate:date];
@@ -5598,21 +5658,21 @@ void com_codename1_impl_ios_IOSNative_nativePathRendererGetOutputBounds___long_i
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererGetConsumer___long(JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
-    //NSLog(@"In getConsumer()");
+    //CN1Log(@"In getConsumer()");
     return &(((Renderer*)ptr)->consumer);
 }
 
 //native void nativePathConsumerMoveTo(long ptr, double x, double y);
 void com_codename1_impl_ios_IOSNative_nativePathConsumerMoveTo___long_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT x, JAVA_FLOAT y)
 {
-    //NSLog(@"In moveTo %g,%g", x,y);
+    //CN1Log(@"In moveTo %g,%g", x,y);
     ((PathConsumer*)ptr)->moveTo((PathConsumer*)ptr,x,y);
-    //NSLog(@"Finished moveTo");
+    //CN1Log(@"Finished moveTo");
 }
 //native void nativePathConsumerLineTo(long ptr, double x, double y);
 void com_codename1_impl_ios_IOSNative_nativePathConsumerLineTo___long_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr, JAVA_FLOAT x, JAVA_FLOAT y)
 {
-    //NSLog(@"In lineto %g,%g", x, y);
+    //CN1Log(@"In lineto %g,%g", x, y);
     ((PathConsumer*)ptr)->lineTo((PathConsumer*)ptr, (jfloat)x,(jfloat)y);
 }
 //native void nativePathConsumerQuadTo(long ptr, double xc, double yc, double x1, double y1);
@@ -5629,7 +5689,7 @@ void com_codename1_impl_ios_IOSNative_nativePathConsumerCurveTo___long_float_flo
 //native void nativePathConsumerClose(long ptr);
 void com_codename1_impl_ios_IOSNative_nativePathConsumerClose___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG ptr)
 {
-    //NSLog(@"Closing path");
+    //CN1Log(@"Closing path");
     ((PathConsumer*)ptr)->closePath((PathConsumer*)ptr);
 }
 //native void nativePathConsumerDone(long ptr);
@@ -5700,7 +5760,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
 #ifndef NEW_CODENAME_ONE_VM
     org_xmlvm_runtime_XMLVMArray* data = XMLVMArray_createSingleDimension(__CLASS_byte, ac.width*ac.height);
     
-    //NSLog(@"Mask width %d height %d",
+    //CN1Log(@"Mask width %d height %d",
     //      ac.width,
     //      ac.height
     //      );
@@ -5723,7 +5783,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_nativePathRendererToARGB___long_int
     JAVA_INT len = ac.width*ac.height;
     for ( JAVA_INT i=0; i<len; i++){
         iArr[i] = color | (bArr[i] << 24);
-        //NSLog(@"%d", iArr[i]);
+        //CN1Log(@"%d", iArr[i]);
     }
     
     return (JAVA_OBJECT)idata;
@@ -5774,12 +5834,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         ac->height = height;
         
         
-        //NSLog(@"AC Width %d", ac.width);
+        //CN1Log(@"AC Width %d", ac.width);
         
         //jbyte maskArray[ac.width*ac.height];
         jbyte* maskArray = malloc(sizeof(jbyte)*ac->width*ac->height);
         
-        //NSLog(@"Mask width %d height %d",
+        //CN1Log(@"Mask width %d height %d",
         //      ac.width,
         //      ac.height
         //      );
@@ -7033,7 +7093,7 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
             notification.repeatInterval = NSWeekCalendarUnit;
             break;
         default:
-            NSLog(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
+            CN1Log(@"Unknown repeat interval type %d.  Ignoring repeat interval", repeatType);
             notification.repeatInterval = nil;
     }
     
@@ -7202,11 +7262,11 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_paintComponentBackground___ja
                 return;
             }
             case 20: { //Style.BACKGROUND_IMAGE_ALIGNED_TOP:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
                 return;
             }
             case 21: { //Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM:
-                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y);
+                DRAW_BGIMAGE_AT_GIVEN_POSITION_WITH_FILL_RECT(x + (width / 2 - iW / 2), y + (height - iH));
                 return;
             }
             case 22: {//Style.BACKGROUND_IMAGE_ALIGNED_LEFT:

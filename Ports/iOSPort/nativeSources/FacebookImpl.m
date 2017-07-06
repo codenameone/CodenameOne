@@ -53,7 +53,10 @@ void com_codename1_impl_ios_IOSNative_facebookLogin___java_lang_Object(CN1_THREA
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         FBSDKLoginManager *login = [[FBSDKLoginManager alloc] init];
-        [login logInWithReadPermissions:@[@"public_profile", @"email", @"user_friends"]  handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
+        
+        // Don't change the @["basic-info"] permission here.  It will be replaced by the build server
+        // to the contents of the ios.facebook_permissions build hint.]
+        [login logInWithReadPermissions:@[@"basic_info"]  handler:^(FBSDKLoginManagerLoginResult *result, NSError *error) {
             if (result.isCancelled) {
                 // Handle cancellations
 #ifdef NEW_CODENAME_ONE_VM

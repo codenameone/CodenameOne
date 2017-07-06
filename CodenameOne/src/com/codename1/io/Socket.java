@@ -112,7 +112,7 @@ public class Socket {
                     }
                 } catch(Exception err) {
                     // instansiating the class has caused a problem
-                    err.printStackTrace();
+                    Log.e(err);
                 }
             }
 
@@ -202,11 +202,14 @@ public class Socket {
         // until either data is available or it never will be.
         //
         // ddyer 12/2015.
-        // 
+        // Observed on IOS, isSocketConnected returned true even though 
+        // closing it has been tried.  Add closed to the set of conditions
+        // ddyer 4/2017
         private boolean getSomeData() 
         {  	// upon entry, there may be data leftover from the previous call to read
-        	while((buffer==null) 
-        			|| (bufferOffset>=buffer.length))
+        	while(!closed
+        			&& ((buffer==null) 
+        					|| (bufferOffset>=buffer.length)))
         	{	// we want new data, but if the socket is closed we won't get it.
           		if(!Util.getImplementation().isSocketConnected(impl))
           			{ return(false);	// we'll never get data
@@ -214,19 +217,17 @@ public class Socket {
           		buffer = Util.getImplementation().readFromSocketStream(impl);
           		bufferOffset = 0;
           		
-        		if((buffer==null) || (buffer.length==0))
-         		{	// wait a while
-        			if(!Util.getImplementation().isSocketConnected(impl))
-        				{ return(false);	// we'll never get data, return without waiting
-        				}
+        		if(((buffer==null) || (buffer.length==0))
+        			&& !closed
+        			&& Util.getImplementation().isSocketConnected(impl))
+         		{	// wait a while if there's still hope
         			try {
                         Thread.sleep(10);
                     } catch(InterruptedException err) {}	
         		}
         	}
-        	return(true);
-        }
-         
+        	return((buffer!=null) && (buffer.length>0));
+        }         
         // [ddyer 12/2015] 
         // rewritten to fix a bug that caused data loss if the the output 
         // and input buffer both ran out at the same time, then rewritten

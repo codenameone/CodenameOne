@@ -14,6 +14,7 @@
 #include "java_lang_Float.h"
 #include "java_lang_Runnable.h"
 #include "java_lang_System.h"
+#include "java_lang_ArrayIndexOutOfBoundsException.h"
 
 int currentGcMarkValue = 1;
 extern JAVA_BOOLEAN lowMemoryMode;

@@ -44,8 +44,24 @@ public abstract class NumericProperty<T, K> extends Property<T, K> {
     /**
      * {@inheritDoc}
      */
+    public NumericProperty(String name, Class genericType) {
+        super(name, genericType);
+        nullable = true;
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
     public NumericProperty(String name, T value) {
         super(name, value);
+        nullable = value == null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public NumericProperty(String name, Class genericType, T value) {
+        super(name, genericType, value);
         nullable = value == null;
     }
 

@@ -28,6 +28,7 @@
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "xmlvm.h"
 #include "CN1ES2compat.h"
+#include "com_codename1_impl_ios_TextEditUtil.h"
 
 static BOOL firstTime=YES;
 extern float scaleValue;
@@ -168,8 +169,8 @@ extern BOOL isRetinaBug();
         GLErrorLog;
         
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-            NSLog(@"Failed to make complete framebuffer object %x", glCheckFramebufferStatus(GL_FRAMEBUFFER));
-        //NSLog(@"Created framebuffer: %i %i", (int)framebufferWidth, (int)framebufferHeight);
+            CN1Log(@"Failed to make complete framebuffer object %x", glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        //CN1Log(@"Created framebuffer: %i %i", (int)framebufferWidth, (int)framebufferHeight);
         glClearColor(0, 0, 0, 1.0f);
 #if USE_ES2
         
@@ -240,7 +241,7 @@ extern BOOL isRetinaBug();
      framebufferHeight = h;
      //[self.layer setBounds:CGRectMake(0, 0, w, h)];
      //[self setBounds:CGRectMake(0, 0, w, h)];
-     NSLog(@"Deleted framebuffer: %i %i", w, h);*/
+     CN1Log(@"Deleted framebuffer: %i %i", w, h);*/
 }
 
 - (void)setFramebuffer
@@ -268,7 +269,7 @@ extern BOOL isRetinaBug();
         _glLoadIdentity();
         GLErrorLog;
         _glOrthof(0, framebufferWidth, 0, framebufferHeight, -1, 1);
-        //NSLog(@"glOrtho %i, %i  bounds.size.height: %i", framebufferWidth, framebufferHeight, (int)self.bounds.size.height);
+        //CN1Log(@"glOrtho %i, %i  bounds.size.height: %i", framebufferWidth, framebufferHeight, (int)self.bounds.size.height);
         GLErrorLog;
         _glMatrixMode(GL_MODELVIEW);
         GLErrorLog;
@@ -408,7 +409,7 @@ extern int currentlyEditingMaxLength;
         GLErrorLog;
         
         if(!success) {
-            NSLog(@"Present render buffer unsuccessful!");
+            CN1Log(@"Present render buffer unsuccessful!");
         }
     }
     

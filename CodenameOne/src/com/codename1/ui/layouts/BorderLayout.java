@@ -115,6 +115,7 @@ public class BorderLayout extends Layout {
     private Component portraitCenter;
     private Component portraitWest;
     private Component portraitEast;
+    private Component overlay;
 
     private HashMap<String, String> landscapeSwap;
 
@@ -144,6 +145,11 @@ public class BorderLayout extends Layout {
      */
     public static final String EAST = "East";
 
+    /**
+     * Overlay on top of the other layout components
+     */
+    public static final String OVERLAY = "Overlay";
+    
     /** 
      * Creates a new instance of BorderLayout 
      */
@@ -209,6 +215,9 @@ public class BorderLayout extends Layout {
         } else if (WEST.equals(name)) {
             previous = portraitWest;
             portraitWest = comp;
+        } else if (OVERLAY.equals(name)) {
+            previous = overlay;
+            overlay = comp;
         } else {
             throw new IllegalArgumentException("cannot add to layout: unknown constraint: " + name);
         }
@@ -231,6 +240,8 @@ public class BorderLayout extends Layout {
             portraitEast = null;
         } else if (comp == portraitWest) {
             portraitWest = null;
+        } else if (comp == overlay) {
+            overlay = null;
         }
     }
 
@@ -249,6 +260,8 @@ public class BorderLayout extends Layout {
             return SOUTH;
         } else if (comp == portraitEast) {
             return EAST;
+        } else if (comp == overlay) {
+            return OVERLAY;
         } else {
             if(comp == portraitWest) {
                 return WEST;
@@ -370,6 +383,13 @@ public class BorderLayout extends Layout {
             c.setHeight(h);
             c.setX(x);
             c.setY(y);
+        }
+        if (overlay != null) {
+            Component c = overlay;
+            c.setWidth(targetWidth);
+            c.setHeight(targetHeight);
+            c.setX(0);
+            c.setY(0);
         }
     }
 
@@ -637,7 +657,7 @@ public class BorderLayout extends Layout {
      * {@inheritDoc}
      */
     public boolean isOverlapSupported(){
-        return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW;
+        return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW || overlay != null;
     }
 
     /**
@@ -688,7 +708,12 @@ public class BorderLayout extends Layout {
      * @return the created component
      */
     public static Container centerEastWest(Component center, Component east, Component west) {
-        Container c = center(center);
+        Container c;
+        if(center != null) {
+            c = center(center);
+        } else {
+            c = new Container(new BorderLayout());
+        }
         if(east != null) {
             c.add(BorderLayout.EAST, east);
         }
@@ -707,7 +732,12 @@ public class BorderLayout extends Layout {
      * @return the created component
      */
     public static Container centerAbsoluteEastWest(Component center, Component east, Component west) {
-        Container c = centerAbsolute(center);
+        Container c;
+        if(center != null) {
+            c = centerAbsolute(center);
+        } else {
+            c = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE));
+        }
         if(east != null) {
             c.add(BorderLayout.EAST, east);
         }

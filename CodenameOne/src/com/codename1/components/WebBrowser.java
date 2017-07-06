@@ -24,6 +24,7 @@
 package com.codename1.components;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.events.ActionEvent;
@@ -52,6 +53,7 @@ import java.io.OutputStreamWriter;
  * using the {@Display.getInstance().setProperty("WebLoadingHidden", "true");} call.</p>
  *
  * @author Shai Almog
+ * @deprecated Use{@link com.codename1.ui.BrowserComponent} instead. The original purpose of this class was to work as an interim solution for platforms where {@link com.codename1.ui.BrowserComponent} isn't supported however all currently supported platforms work with {@code BrowserComponent} so there is no real reason to use this class
  */
 public class WebBrowser extends Container {
 
@@ -104,7 +106,7 @@ public class WebBrowser extends Container {
             } 
         } catch(Throwable t) {
             // workaround for issue in the designer related to JavaFX, fallback to lightweight mode...
-            t.printStackTrace();
+            Log.e(t);
         }
         
         isNative = false;
@@ -160,7 +162,7 @@ public class WebBrowser extends Container {
 
                     protected void handleException(Exception err) {
                         System.out.println("Error occured");
-                        err.printStackTrace();
+                        Log.e(err);
                         if(loading != null){
                             loading.unInstall();
                         }

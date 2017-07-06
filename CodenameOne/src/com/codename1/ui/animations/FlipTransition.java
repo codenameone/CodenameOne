@@ -219,7 +219,7 @@ public class FlipTransition extends Transition {
         
         if (getBgColor() >= 0) {
             int c = g.getColor();
-            g.setColor(0);
+            g.setColor(getBgColor());
             g.fillRect(x, y, w, h);
             g.setColor(c);
         } else {

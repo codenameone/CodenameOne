@@ -423,6 +423,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             int pb = stl.getPaddingBottom();
             int pl = stl.getPaddingLeft(rtl);
             int pr = stl.getPaddingRight(rtl);
+            /*
             if(cmp.isSingleLineTextArea()) {
                 switch(cmp.getVerticalAlignment()) {
                     case TextArea.CENTER:
@@ -437,6 +438,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         break;
                 }
             }
+            */
             
             int maxH = Display.getInstance().getDisplayHeight() - nativeInstance.getVKBHeight();
             
@@ -732,6 +734,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     int pb = stl.getPaddingBottom();
                     int pl = stl.getPaddingLeft(rtl);
                     int pr = stl.getPaddingRight(rtl);
+                    /*
                     if(currentEditing != null && currentEditing.isSingleLineTextArea()) {
                         switch(currentEditing.getVerticalAlignment()) {
                             case TextArea.CENTER:
@@ -746,6 +749,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 break;
                         }
                     }
+                    */
                     String hint = null;
                     if(currentEditing != null && currentEditing.getUIManager().isThemeConstant("nativeHintBool", true) && currentEditing.getHint() != null) {
                         hint = currentEditing.getHint();
@@ -772,7 +776,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 pt,
                                 pb,
                                 pl,
-                                pr, hint, showToolbar, Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")));
+                                pr, 
+                                hint, 
+                                showToolbar, 
+                                Boolean.TRUE.equals(cmp.getClientProperty("blockCopyPaste")),
+                                currentEditing.getStyle().getAlignment(),
+                                currentEditing.getVerticalAlignment());
                     }
                 }
             });
@@ -796,7 +805,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             });
             
             if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
-                cmp.getComponentForm().revalidate();
+                Form form = cmp.getComponentForm();
+                if (form != null) {
+                    form.revalidate();
+                }
             }
             if(editNext) {
                 editNext = false;
@@ -1984,13 +1996,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         );
     }
 
-    
-    
     @Override
-    public boolean transformEqualsImpl(Transform t1, Transform t2) {
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
         if ( t1 != null ){
-            Matrix m1 = (Matrix)t1.getNativeTransform();
-            Matrix m2 = (Matrix)t2.getNativeTransform();
+            Matrix m1 = (Matrix)t1;
+            Matrix m2 = (Matrix)t2;
             return m1.equals(m2);
         } else {
             return t2 == null;
@@ -5983,6 +5993,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
+        private String[] sslCertificates;
         private boolean connected;
         private boolean ensureConnectionLock;
         String error;
@@ -6189,9 +6200,37 @@ public class IOSImplementation extends CodenameOneImplementation {
                 return len;            
             }
         }
+
+        private String[] getSSLCertificates(String url) {
+            if (sslCertificates == null) {
+                try {
+                    com.codename1.io.URL uUrl = new com.codename1.io.URL(url);
+                    String key = uUrl.getHost()+":"+uUrl.getPort();
+                    String certs = nativeInstance.getSSLCertificates(peer);
+                    if (certs == null) {
+                        if (sslCertificatesCache.containsKey(key)) {
+                            sslCertificates = sslCertificatesCache.get(key);
+                        }
+                        if (sslCertificates == null) {
+                            return new String[0];
+                        }
+                        return sslCertificates;
+                    }
+                    sslCertificates = Util.split(certs, ",");
+                    sslCertificatesCache.put(key, sslCertificates);
+                    return sslCertificates;
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    return new String[0];
+                }
+            }
+            return sslCertificates;
+        }
         
     }
 
+    private static Map<String, String[]> sslCertificatesCache = new HashMap<String,String[]>();
+    
     public boolean isTimeoutSupported() {
         return true;
     }
@@ -6209,6 +6248,18 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     public Object connect(String url, boolean read, boolean write) throws IOException {
         return new NetworkConnection(nativeInstance.openConnection(url, timeout));
+    }
+
+    @Override
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        NetworkConnection conn =  (NetworkConnection)connection;
+        conn.ensureConnection();
+        return conn.getSSLCertificates(url);
+    }
+
+    @Override
+    public boolean canGetSSLCertificates() {
+        return true;
     }
 
     /**
@@ -6879,6 +6930,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     super.setLocale(locale, language);
                     Locale l = new Locale(language, locale);
                     Locale.setDefault(l);
+                    nativeInstance.setLocale(language+"_"+locale);
                 }
             };
         }
@@ -7581,8 +7633,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                 c.set(java.util.Calendar.HOUR_OF_DAY, ((Integer)currentValue).intValue() / 60);
                 c.set(java.util.Calendar.MINUTE, ((Integer)currentValue).intValue() % 60);
                 time = c.getTime().getTime();
-            } else {
+            } else if (currentValue != null) {
                 time = ((java.util.Date)currentValue).getTime();
+            } else {
+                time = new java.util.Date().getTime();
             }
             nativeInstance.openDatePicker(type, time, x, y, w, h, preferredWidth, preferredHeight);
         }

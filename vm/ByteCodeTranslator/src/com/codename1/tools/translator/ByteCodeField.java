@@ -37,16 +37,19 @@ public class ByteCodeField {
     private String fieldName;
 
     private List<String> dependentClasses = new ArrayList<String>();
+    //private List<String> exportedClasses = new ArrayList<String>();
     
     private int arrayDimensions;
     private String type;
     private Class primitiveType;
     private boolean finalField;
     private Object value;
+    private boolean privateField;
     
     public ByteCodeField(String clsName, int access, String name, String desc, String signature, Object value) {
         this.clsName = clsName;
         this.value = value;
+        privateField = (access & Opcodes.ACC_PRIVATE) == Opcodes.ACC_PRIVATE;
         if(value != null && value instanceof String) {
             Parser.addToConstantPool((String)value);
         }
@@ -69,6 +72,10 @@ public class ByteCodeField {
                 if(!dependentClasses.contains(objectType)) {
                     dependentClasses.add(objectType);
                 }
+                //if (!privateField && !exportedClasses.contains(objectType)) {
+                //    exportedClasses.add(objectType);
+                //}
+                
                 type = objectType;
                 break;
             case 'I':
@@ -112,7 +119,10 @@ public class ByteCodeField {
     public List<String> getDependentClasses() {
         return dependentClasses;
     }
-
+    
+    //public List<String> getExportedClasses() {
+    //    return exportedClasses;
+    //}
     /**
      * @return the staticField
      */

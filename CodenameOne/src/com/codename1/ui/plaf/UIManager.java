@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -281,8 +282,8 @@ public class UIManager {
             return new Style(style);
         } catch(Throwable err) {
             // fail gracefully for an illegal style, this is useful for the resource editor
-            System.out.println("Error creating style " + id + " selected: " + selected + " prefix: " + prefix);
-            err.printStackTrace();
+            Log.p("Error creating style " + id + " selected: " + selected + " prefix: " + prefix);
+            Log.e(err);
             return new Style(defaultStyle);
         }
     }
@@ -312,6 +313,9 @@ public class UIManager {
     private void resetThemeProps(Hashtable installedTheme) {
         themeProps = new HashMap<String, Object>();
         wasThemeInstalled = false;
+        if(current == null) {
+            current = new DefaultLookAndFeel(this);    
+        }
         String disabledColor = Integer.toHexString(getLookAndFeel().getDisableColor());
         Integer centerAlign = new Integer(Component.CENTER);
         Integer rightAlign = new Integer(Component.RIGHT);
@@ -398,6 +402,11 @@ public class UIManager {
             themeProps.put("ToastBarMessage.dis#derive", "ToastBarMessage");
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("ChartComponent.derive")) {
+            themeProps.put("ChartComponent.transparency", "0");
+            themeProps.put("ChartComponent.sel#derive", "ChartComponent");
+            themeProps.put("ChartComponent.press#derive", "ChartComponent");
+        }
         
         if(installedTheme == null || !installedTheme.containsKey("Button.derive")) {
             themeProps.put("Button.border", Border.getDefaultBorder());
@@ -921,7 +930,7 @@ public class UIManager {
             try {
                 return Integer.parseInt(v);
             } catch(NumberFormatException err) {
-                err.printStackTrace();
+                Log.e(err);
             }
         }
         return def;
@@ -1061,7 +1070,7 @@ public class UIManager {
                     accessible = a;
                 } catch (Exception ex) {
                     System.err.println("Failed to load overlay theme file specified by @overlayThemes theme constant: "+th);
-                    ex.printStackTrace();
+                    Log.e(ex);
                 }
             }
         }
@@ -1339,7 +1348,7 @@ public class UIManager {
                     return com.codename1.ui.Font.getBitmapFont(nameStr);
                 } catch (Exception ex) {
                     // illegal argument exception?
-                    ex.printStackTrace();
+                    Log.e(ex);
                 }
             }
         }
@@ -1427,33 +1436,6 @@ public class UIManager {
                     
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
-                }
-                String vkbInputMode = (String)resourceBundle.get("@vkb");
-                if(vkbInputMode != null && vkbInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
-                    VirtualKeyboard.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String[][] res = getInputMode("@vkb-", tokenized[iter], resourceBundle);
-                        if(res != null) {
-                            VirtualKeyboard.addDefaultInputMode(val, res);
-                        }
-                    }
-                }
-                String textFieldInputMode = (String)resourceBundle.get("@im");
-                if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
-                    TextField.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String actual = (String)resourceBundle.get("@im-" + val);
-                        // val can be null for builtin input mode types...
-                        if(actual != null) {
-                            TextField.addInputMode(val, parseTextFieldInputMode(actual), Character.isUpperCase(val.charAt(0)));
-                        }
-                    }
                 }
                 bundle = new HashMap<String, String>((Hashtable<String, String>)resourceBundle);
             } else {
@@ -1571,7 +1553,7 @@ public class UIManager {
             Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
-            e.printStackTrace();
+            Log.e(e);
         }
         return null;
     }
@@ -1590,7 +1572,7 @@ public class UIManager {
             Resources.setGlobalResources(theme);
             return theme;
         } catch(IOException e){
-            e.printStackTrace();
+            Log.e(e);
         }
         return null;
     }

@@ -76,6 +76,38 @@ public class JSONParser implements JSONParseCallback {
         useLongsDefault = aUseLongsDefault;
     }
 
+    /**
+     * Indicates that the parser will include null values in the parsed output
+     * @return the includeNullsDefault
+     */
+    public static boolean isIncludeNulls() {
+        return includeNullsDefault;
+    }
+
+    /**
+     * Indicates that the parser will include null values in the parsed output
+     * @param aIncludeNullsDefault the includeNullsDefault to set
+     */
+    public static void setIncludeNulls(boolean aIncludeNullsDefault) {
+        includeNullsDefault = aIncludeNullsDefault;
+    }
+
+    /**
+     * Indicates that the parser will generate Boolean objects and not just Strings for boolean values
+     * @return the useBooleanDefault
+     */
+    public static boolean isUseBoolean() {
+        return useBooleanDefault;
+    }
+
+    /**
+     * Indicates that the parser will generate Boolean objects and not just Strings for boolean values
+     * @param aUseBooleanDefault the useBooleanDefault to set
+     */
+    public static void setUseBoolean(boolean aUseBooleanDefault) {
+        useBooleanDefault = aUseBooleanDefault;
+    }
+
     static class ReaderClass {
         char[] buffer;
         int buffOffset;
@@ -102,6 +134,12 @@ public class JSONParser implements JSONParseCallback {
     }
 
     private static boolean useLongsDefault;
+    
+    /**
+     * Indicates that the parser will generate Boolean objects and not just Strings for boolean values
+     */
+    private static boolean useBooleanDefault;
+    private static boolean includeNullsDefault;
     private boolean modern;
     private Map<String, Object> state;
     private java.util.List<Object> parseStack;
@@ -179,7 +217,7 @@ public class JSONParser implements JSONParseCallback {
                                     c = (char) Integer.parseInt(unicode, 16);
                                 } catch (NumberFormatException err) {
                                     // problem in parsing the u notation!
-                                    err.printStackTrace();
+                                    Log.e(err);
                                     System.out.println("Error in parsing \\u" + unicode);
                                 }
                             } else {
@@ -225,7 +263,11 @@ public class JSONParser implements JSONParseCallback {
                             char a2 = (char) rc.read(i);
                             char a3 = (char) rc.read(i);
                             if (a1 == 'r' && a2 == 'u' && a3 == 'e') {
-                                callback.stringToken("true");
+                                if(useBooleanDefault) {
+                                    callback.booleanToken(true);
+                                } else {
+                                    callback.stringToken("true");
+                                }
                                 if (lastKey != null) {
                                     callback.keyValue(lastKey, "true");
                                     lastKey = null;
@@ -249,7 +291,11 @@ public class JSONParser implements JSONParseCallback {
                             char b3 = (char) rc.read(i);
                             char b4 = (char) rc.read(i);
                             if (b1 == 'a' && b2 == 'l' && b3 == 's' && b4 == 'e') {
-                                callback.stringToken("false");
+                                if(useBooleanDefault) {
+                                    callback.booleanToken(false);
+                                } else {
+                                    callback.stringToken("false");
+                                }
                                 if (lastKey != null) {
                                     callback.keyValue(lastKey, "false");
                                     lastKey = null;
@@ -292,7 +338,7 @@ public class JSONParser implements JSONParseCallback {
                                     }
                                     
                                 } catch (NumberFormatException err) {
-                                    err.printStackTrace();
+                                    Log.e(err);
                                     // this isn't a number!
                                 }
                             }
@@ -528,7 +574,7 @@ public class JSONParser implements JSONParseCallback {
             if (currentKey == null) {
                 currentKey = tok;
             } else {
-                if (tok != null) {
+                if (tok != null || isIncludeNulls()) {
                     getStackHash().put(currentKey, tok);
                 }
                 currentKey = null;
@@ -562,6 +608,18 @@ public class JSONParser implements JSONParseCallback {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public void booleanToken(boolean tok) {
+        if (isStackHash()) {
+            getStackHash().put(currentKey, tok);
+            currentKey = null;
+        } else {
+            getStackVec().add(tok);
+        }
+    }
+    
     /**
      * {@inheritDoc}
      */

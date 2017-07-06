@@ -1151,7 +1151,7 @@ public class Container extends Component implements Iterable<Component>{
         setShouldCalcPreferredSize(true);
         Form root = getComponentForm();
         
-        if (root != null) {
+        if (root != null && root != this) {
             root.layoutContainer();
             root.repaint();
             
@@ -1856,6 +1856,11 @@ public class Container extends Component implements Iterable<Component>{
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y)) {
+                // this is a workaround for the issue mentioned here: https://stackoverflow.com/questions/44112337/action-listening-for-container-itself-and-sub-buttons/44125364
+                // the block lead has some weird behaviors with overlap hierarchies, not sure if this is the best solution
+                if(component != null && component.isBlockLead()) {
+                    return component;
+                }
                 component = cmp;
                 if (!overlaps && component.isFocusable()) {
                     // special case for lead blocking
@@ -1944,7 +1949,7 @@ public class Container extends Component implements Iterable<Component>{
     protected Dimension calcPreferredSize() {
         Dimension d = layout.getPreferredSize(this);
         Style style = getStyle();
-        if(isVisible() && style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
+        if(style.getBorder() != null && d.getWidth() != 0 && d.getHeight() != 0) {
             d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));
             d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));
         }
@@ -2669,7 +2674,7 @@ public class Container extends Component implements Iterable<Component>{
      * @param callback if not null will be invoked when unlayouting is complete
      */
     public void animateUnlayout(final int duration, int opacity, Runnable callback) {
-        animateUnlayout(duration, false, opacity, callback);
+        animateUnlayout(duration, false, opacity, callback, true);
     }
     
     /**
@@ -2682,15 +2687,28 @@ public class Container extends Component implements Iterable<Component>{
      * @param opacity the opacity to which the layout will reach, allows fading out the components
      */
     public void animateUnlayoutAndWait(final int duration, int opacity) {
-        animateUnlayout(duration, true, opacity, null);
+        animateUnlayout(duration, true, opacity, null, true);
     }
 
+    /**
+     * <p>This method is the exact reverse of createAnimateLayout, when animation is completed it leaves the container in 
+     * an invalid state. It is useful to invoke this in order to remove a component, transition to a
+     * different form or provide some other interaction. E.g.:</p>
+     * 
+     * @param duration the duration of the animation
+     * @param opacity the opacity to which the layout will reach, allows fading out the components
+     * @return the animation object that should be added to the animation manager
+     */
+    public ComponentAnimation createAnimateUnlayout(int duration, int opacity, Runnable callback) {
+        return animateUnlayout(duration, false, opacity, callback, false);
+    }
+    
     /**
      * Animates a pending layout into place, this effectively replaces revalidate with a more visual form of animation
      *
      * @param duration the duration in milliseconds for the animation
      */
-    private void animateUnlayout(final int duration, boolean wait, int opacity, Runnable callback) {
+    private ComponentAnimation animateUnlayout(final int duration, boolean wait, int opacity, Runnable callback, boolean add) {
         setShouldCalcPreferredSize(true);
         enableLayoutOnPaint = false;
         final int componentCount = getComponentCount();
@@ -2726,15 +2744,18 @@ public class Container extends Component implements Iterable<Component>{
         });
         setAnimOpacity(255, opacity, a, componentCount, duration);
         a.dontRevalidate = true;
-        if(wait) {
-            getAnimationManager().addAnimationAndBlock(a);
-        } else {
-            if(callback != null) {
-                getAnimationManager().addAnimation(a, callback);
+        if (add) {
+            if(wait) {
+                getAnimationManager().addAnimationAndBlock(a);
             } else {
-                getAnimationManager().addAnimation(a);
+                if(callback != null) {
+                    getAnimationManager().addAnimation(a, callback);
+                } else {
+                    getAnimationManager().addAnimation(a);
+                }
             }
         }
+        return a;
     }
     
     /**
@@ -3001,4 +3022,3 @@ public class Container extends Component implements Iterable<Component>{
         
     }
 }
-

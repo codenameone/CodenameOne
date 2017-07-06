@@ -343,7 +343,7 @@ public class RoundBorder extends Border {
                 tg.translate(-iter, -iter);
             }
             if(Display.getInstance().isGaussianBlurSupported()) {
-                Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur);
+                Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur/2);
                 target = Image.createImage(w, h, 0);
                 tg = target.getGraphics();
                 tg.drawImage(blured, 0, 0);
@@ -417,8 +417,9 @@ public class RoundBorder extends Border {
                 }
             }
             if(stroke && this.stroke != null) {
+                int sw = (int)Math.ceil((stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0);
                 GeneralPath arc = new GeneralPath();
-                arc.arc(x, y, size, size, 0, 2*Math.PI);
+                arc.arc(x+sw/2, y+sw/2, size-2*sw, size-2*sw, 0, 2*Math.PI);
                 g.fillShape(arc);
                 g.setColor(strokeColor);
                 g.setAlpha(strokeOpacity);

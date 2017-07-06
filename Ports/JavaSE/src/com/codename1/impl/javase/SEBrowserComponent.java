@@ -22,16 +22,21 @@
  */
 package com.codename1.impl.javase;
 
+import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.logging.Level;
@@ -43,6 +48,7 @@ import javafx.concurrent.Worker.State;
 import javafx.event.EventHandler;
 
 import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JComponent;
@@ -66,7 +72,7 @@ public class SEBrowserComponent extends PeerComponent {
     private JPanel cnt;
     private boolean lightweightMode;
     private boolean lightweightModeSet;
-    private final JScrollBar hSelector, vSelector;
+    private  JScrollBar hSelector, vSelector;
     private AdjustmentListener adjustmentListener;
     private BrowserComponent browserComp;
     
@@ -74,7 +80,12 @@ public class SEBrowserComponent extends PeerComponent {
     /**
      * A bridge to inject java methods into the webview.
      */
-    public class Bridge {
+    public static class Bridge {
+        final WeakReference<BrowserComponent> weakBrowserComp;
+        
+        Bridge(BrowserComponent cmp) {
+            weakBrowserComp = new WeakReference(cmp);
+        }
         
         /**
          * A method injected into the webview to provide direct access to the getBrowserNavigationCallback
@@ -86,75 +97,96 @@ public class SEBrowserComponent extends PeerComponent {
          * @return 
          */
         public boolean shouldNavigate(String url) {
-            if (browserComp.getBrowserNavigationCallback() != null) {
-                return browserComp.getBrowserNavigationCallback().shouldNavigate(url);
+            BrowserComponent browserComp = weakBrowserComp.get();
+            if (browserComp != null) {
+                if (browserComp.getBrowserNavigationCallback() != null) {
+                    return browserComp.getBrowserNavigationCallback().shouldNavigate(url);
+                }
             }
             return true;
         }        
     }
     
-    public SEBrowserComponent(JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p, final JScrollBar hSelector, JScrollBar vSelector) {
-        super(null);
-        this.web = web;
-        this.instance = instance;
-        this.frm = f;
-        this.panel = fx;
-        final JavaSEPort inst = instance;
-        browserComp = p;
-        WebEngine we = web.getEngine();
-        try {
-            Method mtd = we.getClass().getMethod("setUserDataDirectory",java.io.File.class); 
-            mtd.invoke(we, new File(JavaSEPort.getAppHomeDir()));
-        } catch(Throwable t) {
-            System.out.println("It looks like you are running on a version of Java older than Java 8. We recommend upgrading");
-            t.printStackTrace();
-        }
+    private static class InternalJPanel extends JPanel {
+        private final JavaSEPort instance;
         
+        InternalJPanel(JavaSEPort instance) {
+            this.instance = instance;
+            
+        }
+        public void paint(java.awt.Graphics g) {
+            // We want the native component to be hidden unless
+            // it is being drawn by Codename One via drawNativePeer()
+            // This allows the component to be present (respond to events)
+            // but gives us the flexibility to draw the component
+            // at the correct depth with the rest of the Codename One
+            // components.
+            if (instance.drawingNativePeer) {
+                super.paint(g);
+            } else {
+
+            }
+        }
+    }
+    
+    private static EventHandler<WebErrorEvent> createOnErrorHandler() {
+        return new EventHandler<WebErrorEvent>() {
+            @Override
+            public void handle(WebErrorEvent event) {
+                Log.p("WebError: " + event.toString());
+            }
+        };
+    }
+    
+    
+    private static void init(SEBrowserComponent self, BrowserComponent p) {
+        final WeakReference<SEBrowserComponent> weakSelf = new WeakReference<>(self);
+        final WeakReference<BrowserComponent> weakP = new WeakReference<>(p);
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                cnt = new JPanel() {
-                    public void paint(java.awt.Graphics g) {
-                        // We want the native component to be hidden unless
-                        // it is being drawn by Codename One via drawNativePeer()
-                        // This allows the component to be present (respond to events)
-                        // but gives us the flexibility to draw the component
-                        // at the correct depth with the rest of the Codename One
-                        // components.
-                        if (SEBrowserComponent.this.instance.drawingNativePeer) {
-                            super.paint(g);
-                        } else {
-                            
-                        }
-                    }
-                };
+                SEBrowserComponent self = weakSelf.get();
+                if (self == null) {
+                    return;
+                }
+                self.cnt = new InternalJPanel(self.instance);
                 
-                cnt.setOpaque(false); // <--- Important if container is opaque it will cause
+                self.cnt.setOpaque(false); // <--- Important if container is opaque it will cause
                                         // all kinds of flicker due to painting conflicts with CN1 pipeline.
-                cnt.setLayout(new BorderLayout());
-                cnt.add(BorderLayout.CENTER, panel);
+                self.cnt.setLayout(new BorderLayout());
+                self.cnt.add(BorderLayout.CENTER, self.panel);
                 //cnt.setVisible(false);
             }
         });
-
-        web.getEngine().getLoadWorker().messageProperty().addListener(new ChangeListener<String>() {
+        
+        
+        self.web.getEngine().getLoadWorker().messageProperty().addListener(new ChangeListener<String>() {
             @Override
             public void changed(ObservableValue<? extends String> ov, String t, String t1) {
+                SEBrowserComponent self = weakSelf.get();
+                BrowserComponent p = weakP.get();
+                if (self == null || p == null) {
+                    return;
+                }
                 if (t1.startsWith("Loading http:") || t1.startsWith("Loading file:") || t1.startsWith("Loading https:")) {
                     String url = t1.substring("Loading ".length());
-                    if (!url.equals(currentURL)) {
+                    if (!url.equals(self.currentURL)) {
                         p.fireWebEvent("onStart", new ActionEvent(url));
                     }
-                    currentURL = url;
+                    self.currentURL = url;
                 } else if ("Loading complete".equals(t1)) {
                     
                 }
             }
         });
         
-        web.getEngine().setOnAlert(new EventHandler<WebEvent<String>>() {
+        self.web.getEngine().setOnAlert(new EventHandler<WebEvent<String>>() {
 
             @Override
             public void handle(WebEvent<String> t) {
+                BrowserComponent p = weakP.get();
+                if (p == null) {
+                    return;
+                }
                 String msg = t.getData();
                 if (msg.startsWith("!cn1_message:")) {
                     System.out.println("Receiving message "+msg);
@@ -164,7 +196,7 @@ public class SEBrowserComponent extends PeerComponent {
             
         });
         
-        web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
+        self.web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
             @Override
             public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
                 System.out.println("Received exception: "+t1.getMessage());
@@ -181,10 +213,15 @@ public class SEBrowserComponent extends PeerComponent {
             }
         });
 
-        web.getEngine().getLoadWorker().stateProperty().addListener(new ChangeListener<State>() {
+        self.web.getEngine().getLoadWorker().stateProperty().addListener(new ChangeListener<State>() {
             @Override
             public void changed(ObservableValue ov, State oldState, State newState) {
-                String url = web.getEngine().getLocation();
+                SEBrowserComponent self = weakSelf.get();
+                BrowserComponent p = weakP.get();
+                if (self == null || p == null) {
+                    return;
+                }
+                String url = self.web.getEngine().getLocation();
                 if (newState == State.SCHEDULED) {
                     p.fireWebEvent("onStart", new ActionEvent(url));
                 } else if (newState == State.RUNNING) {
@@ -192,27 +229,31 @@ public class SEBrowserComponent extends PeerComponent {
                     
                 } else if (newState == State.SUCCEEDED) {
                     if (!p.isNativeScrollingEnabled()) {
-                        web.getEngine().executeScript("document.body.style.overflow='hidden'");
+                        self.web.getEngine().executeScript("document.body.style.overflow='hidden'");
                     }
                     
                     // Since I end of injecting firebug nearly every time I have to do some javascript code
                     // let's just add a client property to the BrowserComponent to enable firebug
                     if (Boolean.TRUE.equals(p.getClientProperty("BrowserComponent.firebug"))) {
-                        web.getEngine().executeScript("if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}");
+                        self.web.getEngine().executeScript("if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}");
                     }
-                    netscape.javascript.JSObject window = (netscape.javascript.JSObject)web.getEngine().executeScript("window");
-                    window.setMember("cn1application", new Bridge());
-                    //web.getEngine().executeScript("window.addEventListener('unload', function(e){console.log('unloading...');return 'foobar';});");
+                    netscape.javascript.JSObject window = (netscape.javascript.JSObject)self.web.getEngine().executeScript("window");
+                    window.setMember("cn1application", new Bridge(p));
+                    self.web.getEngine().executeScript("window.addEventListener('unload', function(e){console.log('unloading...');return 'foobar';});");
                     p.fireWebEvent("onLoad", new ActionEvent(url));
                     
                 }
-                currentURL = url;
-                repaint();
+                self.currentURL = url;
+                self.repaint();
             }
         });
-        web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
+        self.web.getEngine().getLoadWorker().exceptionProperty().addListener(new ChangeListener<Throwable>() {
             @Override
             public void changed(ObservableValue<? extends Throwable> ov, Throwable t, Throwable t1) {
+                BrowserComponent p = weakP.get();
+                if (p == null) {
+                    return;
+                }
                 t1.printStackTrace();
                 if(t1 == null) {
                     if(t == null) {
@@ -228,22 +269,31 @@ public class SEBrowserComponent extends PeerComponent {
 
         // Monitor the location property so that we can send the shouldLoadURL event.
         // This allows us to cancel the loading of a URL if we want to handle it ourself.
-        web.getEngine().locationProperty().addListener(new ChangeListener<String>(){
+        self.web.getEngine().locationProperty().addListener(new ChangeListener<String>(){
             @Override
             public void changed(ObservableValue<? extends String> prop, String before, String after) {
-                if ( !p.getBrowserNavigationCallback().shouldNavigate(web.getEngine().getLocation()) ){
-                    web.getEngine().getLoadWorker().cancel();
+                SEBrowserComponent self = weakSelf.get();
+                BrowserComponent p = weakP.get();
+                if (self == null || p == null) {
+                    return;
+                }
+                if ( !p.getBrowserNavigationCallback().shouldNavigate(self.web.getEngine().getLocation()) ){
+                    self.web.getEngine().getLoadWorker().cancel();
                 }
             }
         });
         
-        adjustmentListener = new AdjustmentListener() {
+        self.adjustmentListener = new AdjustmentListener() {
 
             @Override
             public void adjustmentValueChanged(AdjustmentEvent e) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        onPositionSizeChange(); 
+                        SEBrowserComponent self = weakSelf.get();
+                        if (self == null) {
+                            return;
+                        }
+                        self.onPositionSizeChange(); 
                     }
                 });
                 
@@ -251,8 +301,32 @@ public class SEBrowserComponent extends PeerComponent {
             
         };
         
+    }
+    
+    public SEBrowserComponent(final JavaSEPort instance, JPanel f, javafx.embed.swing.JFXPanel fx, final WebView web, final BrowserComponent p, final JScrollBar hSelector, JScrollBar vSelector) {
+        super(null);
+        this.web = web;
+        this.instance = instance;
+        this.frm = f;
+        this.panel = fx;
+        WebEngine we = web.getEngine();
+        try {
+            Method mtd = we.getClass().getMethod("setUserDataDirectory",java.io.File.class); 
+            mtd.invoke(we, new File(JavaSEPort.getAppHomeDir()));
+        } catch(Throwable t) {
+            System.out.println("It looks like you are running on a version of Java older than Java 8. We recommend upgrading");
+            t.printStackTrace();
+        }
+        
+        we.setOnError(createOnErrorHandler());
+        
+        init(this, p);
+        
+       
+        
         this.hSelector = hSelector;
         this.vSelector = vSelector;
+        
 
         
     }
@@ -283,7 +357,7 @@ public class SEBrowserComponent extends PeerComponent {
                 while ( !complete[0] ){
                     synchronized(complete){
                         try {
-                            complete.wait(200);
+                            complete.wait(20);
                         } catch (InterruptedException ex) {
                         }
                     }
@@ -308,10 +382,27 @@ public class SEBrowserComponent extends PeerComponent {
     protected void deinitialize() {
         //lightweightMode = true;
         final boolean[] complete = new boolean[1];
+        
+        synchronized(imageLock) {
+            peerImage = new BufferedImage(cnt.getWidth(), cnt.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            System.out.println("PI width: "+peerImage.getWidth()+ "PI height "+peerImage.getHeight());
+            System.out.println("Creating peer image");
+            Graphics2D imageG = (Graphics2D)peerImage.createGraphics();
+            try {
+                instance.drawingNativePeer = true;
+                cnt.paint(imageG);
+            } catch (Exception ex){
+            } finally {
+                instance.drawingNativePeer = false;
+                imageG.dispose();
+            }
+        }
+        
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
                 if (init) {
+                    
                     hSelector.removeAdjustmentListener(adjustmentListener);
                     vSelector.removeAdjustmentListener(adjustmentListener);
                     lastX=0;
@@ -354,13 +445,18 @@ public class SEBrowserComponent extends PeerComponent {
     
     
     private static final Object INIT_LOCK = new Object();
+    private final Object imageLock = new Object();
+    private BufferedImage peerImage;
     private void init() {
         final boolean[] completed = new boolean[1];
+        synchronized(imageLock) {
+            peerImage = null;
+        }
         SwingUtilities.invokeLater(new Runnable() {
 
             public void run() {
                 if (!init) {
-
+                    
                     init = true;
                     frm.add(cnt, 0);
                     completed[0] = true;
@@ -541,6 +637,26 @@ public class SEBrowserComponent extends PeerComponent {
 
     @Override
     public void paint(Graphics g) {
+        if (!init) {
+            synchronized(imageLock) {
+                if (peerImage != null) {
+                    Object nativeGraphics = Accessor.getNativeGraphics(g);
+                    Graphics2D g2 = (Graphics2D)instance.getGraphics(nativeGraphics).create();
+                    try {
+                        g2.translate(getAbsoluteX(), getAbsoluteY());
+                        if (instance.zoomLevel != 1) {
+                            g2.scale(1/instance.zoomLevel, 1/instance.zoomLevel);
+                        } else if (instance.takingScreenshot && instance.screenshotActualZoomLevel != 1) {
+                            g2.scale(1/instance.screenshotActualZoomLevel, 1/instance.screenshotActualZoomLevel);
+                        }
+                        g2.drawImage(peerImage, 0,0, null);
+                    } finally {
+                        g2.dispose();
+                    }
+                    return;
+                }
+            }
+        }
         instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
         onPositionSizeChange();
         

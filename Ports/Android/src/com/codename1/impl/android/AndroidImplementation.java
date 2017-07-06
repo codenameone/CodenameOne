@@ -23,6 +23,7 @@
 package com.codename1.impl.android;
 
 import android.Manifest;
+import android.annotation.TargetApi;
 import com.codename1.location.AndroidLocationManager;
 import android.app.*;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -93,6 +94,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.provider.Settings.Secure;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -163,9 +165,13 @@ import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
 import java.io.*;
 import java.net.CookieHandler;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
+import java.security.MessageDigest;
 import java.text.ParseException;
 import java.util.*;
+import javax.net.ssl.HttpsURLConnection;
 //import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
@@ -750,29 +756,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } else {
             metrics = getContext().getResources().getDisplayMetrics();
         }
-        switch (metrics.densityDpi) {
-            case DisplayMetrics.DENSITY_LOW:
-                return Display.DENSITY_LOW;
-            case DisplayMetrics.DENSITY_HIGH:
-            case 213: // DENSITY_TV 
-                return Display.DENSITY_HIGH;
-            case DisplayMetrics.DENSITY_XHIGH:
-                return Display.DENSITY_VERY_HIGH;
-            case 400: // DisplayMetrics.DENSITY_400
-            case 420: // DisplayMetrics.DENSITY_420
-            case 480: // DisplayMetrics.DENSITY_XXHIGH
-                return Display.DENSITY_HD;
-            case 560: // DisplayMetrics.DENSITY_560
-                return Display.DENSITY_560;
-            case 640: // DisplayMetrics.DENSITY_XXXHIGH 
-                return Display.DENSITY_2HD;
-                 
-            default:
-                if(metrics.densityDpi > 640) {
-                    return Display.DENSITY_4K;
-                }
-                return Display.DENSITY_MEDIUM;
+        
+        if(metrics.densityDpi < DisplayMetrics.DENSITY_MEDIUM) {
+            return Display.DENSITY_LOW;
         }
+        
+        if(metrics.densityDpi < 213) {
+            return Display.DENSITY_MEDIUM;
+        }
+
+        // 213 == TV
+        if(metrics.densityDpi >= 213 &&  metrics.densityDpi <= DisplayMetrics.DENSITY_HIGH) {
+            return Display.DENSITY_HIGH;
+        }
+
+        if(metrics.densityDpi > DisplayMetrics.DENSITY_HIGH && metrics.densityDpi < 400) {
+            return Display.DENSITY_VERY_HIGH;
+        }
+
+        if(metrics.densityDpi >= 400 && metrics.densityDpi < 560) {
+            return Display.DENSITY_HD;
+        }
+        
+        if(metrics.densityDpi >= 560 && metrics.densityDpi <= 640) {
+            return Display.DENSITY_2HD;
+        }
+        if(metrics.densityDpi > 640) {
+            return Display.DENSITY_4K;
+        }
+
+        return Display.DENSITY_MEDIUM;
     }
 
     /**
@@ -798,11 +811,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     public void deinitialize() {
         //activity.getWindowManager().removeView(relativeLayout);
-
+        super.deinitialize();
         if (getActivity() != null) {
 
             Runnable r = new Runnable() {
                 public void run() {
+                    synchronized (AndroidImplementation.this) {
+                        if (!deinitializing) {
+                            return;
+                        }
+                        deinitializing = false;
+                    }
                     if (nativePeers.size() > 0) {
                         for (int i = 0; i < nativePeers.size(); i++) {
                             ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
@@ -813,13 +832,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     relativeLayout = null;
                     myView = null;
-                    deinitializing = false;
                 }
             };
 
             if (Looper.getMainLooper().getThread() == Thread.currentThread()) {
+                deinitializing = true;
                 r.run();
             } else {
+                deinitializing = true;
                 getActivity().runOnUiThread(r);
             }
         } else {
@@ -2222,8 +2242,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
-                                while (attachment.read(buffer) > 0) {
-                                    tmp.write(buffer);
+                                int read = -1;
+                                while ((read = attachment.read(buffer)) > -1) {
+                                    tmp.write(buffer, 0, read);
                                 }
                                 tmp.close();
                                 attachment.close();
@@ -2355,7 +2376,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     return "";
                 }
                 TelephonyManager tm = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
-                return tm.getDeviceId();
+                String imei = null;
+                if (tm!=null && tm.getDeviceId() != null) {
+                    // for phones or 3g tablets
+                    imei = tm.getDeviceId(); 
+                } else {
+                    try {
+                        imei = Secure.getString(getContext().getContentResolver(), Secure.ANDROID_ID); 
+                    } catch(Throwable t) {
+                        com.codename1.io.Log.e(t);
+                    }
+                }
+                return imei;
             }
             if ("MSISDN".equals(key)) {
                 if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get the device ID")){
@@ -2467,7 +2499,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         String extension = MimeTypeMap.getFileExtensionFromUrl(url);
         if (extension != null) {
             MimeTypeMap mime = MimeTypeMap.getSingleton();
+            
             type = mime.getMimeTypeFromExtension(extension);
+        }
+        if (type == null) {
+            try {
+                Uri uri = Uri.parse(url);
+                ContentResolver cr = getContext().getContentResolver();
+                type = cr.getType(uri);
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
         }
         return type;
     }
@@ -2479,8 +2521,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (url.startsWith("intent")) {
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
-                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
-                    return null;
+                if(url.startsWith("/") || url.startsWith("file:")) {
+                    if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
+                        return null;
+                    }
                 }
                 url = fixAttachmentPath(url);
                 intent = new Intent();
@@ -2730,8 +2774,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             player.prepare();
             return new Audio(getActivity(), player, stream, onCompletion);
         }
-
-        final File temp = File.createTempFile("mtmp", "dat");
+        String extension = MimeTypeMap.getFileExtensionFromUrl(mimeType);
+        final File temp = File.createTempFile("mtmp", extension == null ? "dat" : extension);
         temp.deleteOnExit();
         OutputStream out = createFileOuputStream(temp);
        
@@ -3844,9 +3888,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                r.run();
-                completed[0] = true;
+                try {
+                    r.run();
+                } catch(Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
                 synchronized(completed) {
+                    completed[0] = true;
                     completed.notify();
                 }
             }
@@ -4069,6 +4117,37 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // Always grant permission since the app itself requires location
                     // permission and the user has therefore already granted it
                     callback.invoke(origin, true, false);
+                }
+                
+                @Override
+                public void onPermissionRequest(final PermissionRequest request) {
+                    
+                    Log.d("Codename One", "onPermissionRequest");
+                    getActivity().runOnUiThread(new Runnable() {
+                        @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+                        @Override
+                        public void run() {
+                            String allowedOrigins = Display.getInstance().getProperty("android.WebView.grantPermissionsFrom", null);
+                            if (allowedOrigins != null) {
+                                String[] origins = Util.split(allowedOrigins, " ");
+                                boolean allowed = false;
+                                for (String origin : origins) {
+                                    if (request.getOrigin().toString().equals(origin)) {
+                                        allowed = true;
+                                        break;
+                                    }
+                                }
+                                if (allowed) {
+                                    Log.d("Codename One", "Allowing permission for "+Arrays.toString(request.getResources())+" in web view for origin "+request.getOrigin());
+                                    request.grant(request.getResources());
+                                } else {
+                                    Log.d("Codename One", "Denying permission for "+Arrays.toString(request.getResources())+" in web view for origin "+request.getOrigin());
+                                    request.deny();
+                                }
+                            }
+                            
+                        }
+                    });
                 }
             });
         }
@@ -4401,6 +4480,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return connect(url, read, write, timeout);
     }
 
+    
+    private static final char[] HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    
+    private static String dumpHex(byte[] data) {
+        final int n = data.length;
+        final StringBuilder sb = new StringBuilder(n * 3 - 1);
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                sb.append(' ');
+            }
+            sb.append(HEX_CHARS[(data[i] >> 4) & 0x0F]);
+            sb.append(HEX_CHARS[data[i] & 0x0F]);
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        if (connection instanceof HttpsURLConnection) {
+            HttpsURLConnection conn = (HttpsURLConnection)connection;
+            
+            try {    
+                conn.connect();
+                java.security.cert.Certificate[] certs = conn.getServerCertificates();
+                String[] out = new String[certs.length];
+                int i=0;
+                for (java.security.cert.Certificate cert : certs) {
+                    MessageDigest md = MessageDigest.getInstance("SHA1");
+                    md.update(cert.getEncoded());
+                    out[i++] = "SHA1:" + dumpHex(md.digest());
+                }
+                return out;
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }
+        return new String[0];
+        
+    }
+
+    @Override
+    public boolean canGetSSLCertificates() {
+        return true;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -5686,8 +5810,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                                 File f = new File(filePath);
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
-                                while (inputStream.read(buffer) > 0) {
-                                    tmp.write(buffer);
+                                int read = -1;
+                                while ((read = inputStream.read(buffer)) > -1) {
+                                    tmp.write(buffer, 0, read);
                                 }
                                 tmp.close();
                                 inputStream.close();                                                           
@@ -5776,7 +5901,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             final Form current = Display.getInstance().getCurrent();
 
-            final File temp = File.createTempFile("mtmp", "dat");
+            final File temp = File.createTempFile("mtmp", ".3gpp");
             temp.deleteOnExit();
 
             if (recorder != null) {
@@ -6030,6 +6155,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         String id = (String)metaData.get(com.codename1.push.Push.GOOGLE_PUSH_KEY);
+        if (id == null) {
+            id = Display.getInstance().getProperty("gcm.sender_id", null);
+        }
         if(has) {
             Log.d("Codename One", "Sending async push request for id: " + id);
             ((CodenameOneActivity) getActivity()).registerForPush(id);
@@ -7024,6 +7152,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     break;
                 }
             }
+            if (pickInstance.result == -1 && values.length > 0) {
+                // The picker will default to showing the first element anyways
+                // If we don't set the result to 0, then the user has to first
+                // scroll to a different number, then back to the first option
+                // to pick the first option.
+                pickInstance.result = 0;
+            }
 
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
@@ -7133,7 +7268,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public String getIP() {
             try {
-                return java.net.InetAddress.getLocalHost().getHostAddress();
+                InetAddress i = java.net.InetAddress.getLocalHost();
+                if(i.isLoopbackAddress()) {
+                    Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+                    while(nie.hasMoreElements()) {
+                        NetworkInterface current = nie.nextElement();
+                        if(!current.isLoopback()) {
+                            Enumeration<InetAddress> iae = current.getInetAddresses();
+                            while(iae.hasMoreElements()) {
+                                InetAddress currentI = iae.nextElement();
+                                if(!currentI.isLoopbackAddress()) {
+                                    return currentI.getHostAddress();
+                                }
+                            }
+                        }
+                    }
+                }
+                return i.getHostAddress();
             } catch(Throwable t) {
                 t.printStackTrace();
                 errorMessage = t.toString();
@@ -7211,7 +7362,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 ServerSocket serverSocketInstance = new ServerSocket(param);
                 socketInstance = serverSocketInstance.accept();
-                return socketInstance;
+                SocketImpl si = new SocketImpl();
+                si.socketInstance = socketInstance;
+                return si;
             } catch(Exception err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
@@ -7336,16 +7489,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean transformEqualsImpl(Transform t1, Transform t2) {
-        
+        Object o1 = null;
+        if(t1 != null) {
+            o1 = t1.getNativeTransform();
+        }
+        Object o2 = null;
+        if(t2 != null) {
+            o2 = t2.getNativeTransform();
+        }
+        return transformNativeEqualsImpl(o1, o2);
+    }
+
+    @Override
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
         if ( t1 != null ){
-            CN1Matrix4f m1 = (CN1Matrix4f)t1.getNativeTransform();
-            CN1Matrix4f m2 = (CN1Matrix4f)t2.getNativeTransform();
+            CN1Matrix4f m1 = (CN1Matrix4f)t1;
+            CN1Matrix4f m2 = (CN1Matrix4f)t2;
             return m1.equals(m2);
         } else {
             return t2 == null;
         }
     }
 
+    
     @Override
     public boolean isTransformSupported() {
         return true;
@@ -7728,6 +7894,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             contentIntent.setComponent(getActivity().getComponentName());
         }
         contentIntent.putExtra("LocalNotificationID", notif.getId());
+        
         if (BACKGROUND_FETCH_NOTIFICATION_ID.equals(notif.getId()) && getBackgroundFetchListener() != null) {
             Context context = AndroidNativeUtil.getContext();
 
@@ -7741,6 +7908,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     PendingIntent.FLAG_UPDATE_CURRENT);
             notificationIntent.putExtra(LocalNotificationPublisher.BACKGROUND_FETCH_INTENT, pendingIntent);
 
+        } else {
+            contentIntent.setData(Uri.parse("http://codenameone.com/a?LocalNotificationID="+Uri.encode(notif.getId())));
         }
         PendingIntent pendingContentIntent = PendingIntent.getActivity(getContext(), 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 

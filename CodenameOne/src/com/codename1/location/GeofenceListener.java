@@ -28,6 +28,10 @@ package com.codename1.location;
  * <script src="https://gist.github.com/codenameone/b0fa5280bde905a8f0cd.js"></script>
  *
  * @author Chen
+ * 
+ * @see LocationManager#isGeofenceSupported() 
+ * @see LocationManager#addGeoFencing(java.lang.Class, com.codename1.location.Geofence) 
+ * @see Geofence
  */
 public interface GeofenceListener {
     

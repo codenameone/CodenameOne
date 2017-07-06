@@ -247,7 +247,7 @@ public class JSObject {
      */
     public JSObject(JavascriptContext context, String expr) {
         this.context = context;
-        synchronized (context){
+        synchronized (context.browser){
             String escaped = StringUtil.replaceAll(expr, "\\", "\\\\");
             escaped = StringUtil.replaceAll(escaped, "'", "\\'");
             exec(R1+"=eval('"+escaped+"')");
@@ -955,7 +955,7 @@ public class JSObject {
      * @return The result of the javascript function call converted to the appropriate
      * Java type.
      */
-    public Object call(Object[] params){
+    public Object call(Object... params){
         JSObject window = (JSObject)context.get("window");
         return context.call(this, window, params);
     }
@@ -1018,5 +1018,15 @@ public class JSObject {
              
         });
     }
+
+    /**
+     * Returns the toString from the JavaScript object effectively the equivalent of {@code callString("toString")}
+     * @return the String representation of the JavaScript object
+     */
+    @Override
+    public String toString() {
+        return callString("toString");
+    }
+
     
 }

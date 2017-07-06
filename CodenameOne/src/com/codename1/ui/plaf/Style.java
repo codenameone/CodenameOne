@@ -348,7 +348,7 @@ public class Style {
 
     /**
      * Indicates the unit type for padding/margin in device independent pixels. Device independent pixels try to aim
-     * at roghly 1 milimeter of the screen per DIP but make no guarantee for accuracy.
+     * at roughly 1 millimeter of the screen per DIP but make no guarantee for accuracy.
      */
     public static final byte UNIT_TYPE_DIPS = 2;
 
@@ -357,20 +357,20 @@ public class Style {
     private int bgColor = 0xFFFFFF;
     private Font font = Font.getDefaultFont();
     private Image bgImage;
-    private int[] padding = new int[4];
-    private int[] margin = new int[4];
+    int[] padding = new int[4];
+    int[] margin = new int[4];
 
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
      */
-    private byte[] paddingUnit;
+    byte[] paddingUnit;
 
     /**
      * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
      */
-    private byte[] marginUnit;
+    byte[] marginUnit;
     private byte transparency = (byte) 0xFF; //no transparency
     private byte opacity = (byte) 0xFF; //full opacity
     private Painter bgPainter;
@@ -2140,6 +2140,12 @@ public class Style {
      * @param l a style listener
      */
     public void addStyleListener(StyleListener l) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.addStyleListener(l);
+            }
+            return;
+        }
         if (listeners == null) {
             listeners = new EventDispatcher();
         }
@@ -2152,6 +2158,12 @@ public class Style {
      * @param l a style listener
      */
     public void removeStyleListener(StyleListener l) {
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.removeStyleListener(l);
+            }
+            return;
+        }
         if (listeners != null) {
             listeners.removeListener(l);
         }
@@ -2161,6 +2173,12 @@ public class Style {
      * This method removes all Listeners from the Style
      */
     public void removeListeners(){
+        if(proxyTo != null) {
+            for(Style s : proxyTo) {
+                s.removeListeners();
+            }
+            return;
+        }
         if (listeners != null) {
             listeners = null;
         }

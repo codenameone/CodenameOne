@@ -28,8 +28,16 @@ package com.codename1.location;
  * The sample below tracks location and posts a notification or shows a dialog based on the state of the app:</p>
  * 
  * <script src="https://gist.github.com/codenameone/3de90e0ff4886ec145e8.js"></script>
+ * 
+ * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
+ * 
+ * <p>Geofencing is not supported on all platforms, use {@link LocationManager#isGeofenceSupported() } to find out if the current
+ * platform supports it at runtime.</p>
  *
  * @author Chen
+ * @see LocationManager#isGeofenceSupported() 
+ * @see LocationManager#addGeoFencing(java.lang.Class, com.codename1.location.Geofence) 
+ * @see GeofenceListener
  */
 public class Geofence {
     
