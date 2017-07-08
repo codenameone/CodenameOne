@@ -413,7 +413,8 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * Sets a custom cursor for this component.  This will only be used if the platform supports custom cursors.  
+     * Sets a custom mouse cursor for this component if the platform supports mouse cursors, notice that this isn't applicable for touch devices.  
+     * This will only be used if the platform supports custom cursors.  
      * You can call {@link #isSetCursorSupported() } to find out.
      * 
      * <p><strong>Note:</strong> Since cursors incur some overhead, they are turned off at the form level by default.
