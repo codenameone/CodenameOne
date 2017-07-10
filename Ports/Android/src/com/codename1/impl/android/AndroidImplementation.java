@@ -7390,7 +7390,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             return i.getHostAddress();
         } catch(Throwable t) {
-            Log.e(t);
+            com.codename1.io.Log.e(t);
             return null;
         }
     }
