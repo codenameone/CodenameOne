@@ -149,14 +149,16 @@ import java.util.Set;
  * <p>The following is an example form that demonstrates the use of ComponentSelector to
  * easily create effects on components in a form.</p>
  * 
- * <p><script src="https://gist.github.com/shannah/536f852c3b7242a4d3106fc9e5b5d147.js"></script></p>
+ * <p><script src="https://gist.github.com/shannah/536f852c3b7242a4d3106fc9e5b5d147.js"></script>
+ * </p>
  * 
  * <h3>Advanced Use of Tags</h3>
  * 
  * <p>The following shows the use of tags to help with striping a table, and selecting rows
  * when clicked on.</p>
  * 
- * <p><script src="https://gist.github.com/shannah/6da5728888e01abb54486a02b8c1a7c9.js"></script></p>
+ * <p><script src="https://gist.github.com/shannah/6da5728888e01abb54486a02b8c1a7c9.js"></script>
+ * </p>
  * 
  * <p>See full Demo App in this  <a href="https://github.com/shannah/cn1-component-selector-demo">Github Repo</a></p>
  * 
@@ -1314,7 +1316,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * Creates a selector that will query the current form.  If there is no 
      * current form, then this selector will have no roots.
      * <p>Generally it is better to provide a root explicitly using {@link ComponentSelector#ComponentSelector(java.lang.String, com.codename1.ui.Component...) 
-     * to ensure that the selector has a tree to walk down.
+     * to ensure that the selector has a tree to walk down.</p>
      * @param selector The selector string.
      */
     public ComponentSelector(String selector) {
@@ -2191,7 +2193,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     /**
-     * Wrapper for {@link Component#putClientProperty(java.lang.String, java.lang.Object) 
+     * Wrapper for {@link Component#putClientProperty(java.lang.String, java.lang.Object) }
      * @param key Property key
      * @param value Property value
      * @return Self for chaining.
@@ -3526,7 +3528,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     /**
-     * Wraps {@link Container#animateUnlayout(int, int, java.lang.Runnable) 
+     * Wraps {@link Container#animateUnlayout(int, int, java.lang.Runnable) }
      * @param duration
      * @param opacity
      * @return 
