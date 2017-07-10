@@ -80,7 +80,7 @@
             <fileset dir="${src.dir}" excludes="*.java,${excludes}" includes="${includes}">
                 <filename name="**/*.java"/>
             </fileset>
-            <fileset dir="${codenameone.dir}/CLDC11/src" excludes="*.java,${excludes}" includes="${includes}">
+            <fileset dir="../Ports/CLDC11/src" excludes="*.java,${excludes}" includes="${includes}">
                 <filename name="**/*.java"/>
             </fileset>
             <fileset dir="${build.generated.sources.dir}" erroronmissingdir="false">
@@ -157,7 +157,7 @@
         <copy file="dist/CodenameOne.jar" todir="build/tmp" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
         <zip basedir="build/tmp" compress="true" file="updatedLibs.zip" />
         <deltree dir="build/tmp"/>        
     </target>
@@ -249,8 +249,8 @@
         
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/JavaSE/build.xml" target="jar" />
-        <ant inheritall="false" antfile="${codenameone.dir}/CLDC11/build.xml" target="clean" />
-        <ant inheritall="false" antfile="${codenameone.dir}/CLDC11/build.xml" target="jar" />
+        <ant inheritall="false" antfile="../Ports/CLDC11/build.xml" target="clean" />
+        <ant inheritall="false" antfile="../Ports/CLDC11/build.xml" target="jar" />
         <ant inheritall="false" antfile="../Ports/JavaSEWithSVGSupport/build.xml" target="clean" />
         <ant inheritall="false" antfile="../Ports/JavaSEWithSVGSupport/build.xml" target="jar" />
 
@@ -284,7 +284,7 @@
         <copydir src="../../SwiftnotesCN1" dest="build/CodenameOneDist/CodenameOne/demos/Swiftnotes" />        
                 
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
         
         <delete dir="build/tempsource" />
         <!-- this will get overriden the main value is keeping the package.html files -->
@@ -300,16 +300,16 @@
         
         <copy file="dist/CodenameOne.jar" todir="build/CodenameOneDist/CodenameOne/demos" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="../demos" />
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="../demos" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="../demos" />
         <copy file="dist/CodenameOne.jar" todir="../demos" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../demos" />
 
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
         <copy file="dist/CodenameOne.jar" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
         <copy file="${codenameone.dir}/BuildClient/dist/CodenameOneBuildClient.jar" tofile="${codenameone.dir}/IdeaPlugin/depedencies/CodeNameOneBuildClient.jar" />
 
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
         <copy file="dist/CodenameOne.jar" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
         <copy file="${codenameone.dir}/BuildClient/dist/CodenameOneBuildClient.jar" tofile="${codenameone.dir}/IdeaPlugin/resources/dependencies/CodeNameOneBuildClient.jar" />
@@ -323,7 +323,7 @@
         <copy file="dist/CodenameOne.jar" todir="build/tmp" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="build/tmp" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="build/tmp" />
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="build/tmp" />        
         <zip basedir="build/tmp" compress="true" file="repo/updatedLibs.zip" />
         <deltree dir="build/tmp"/>
 
@@ -390,11 +390,11 @@
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="${nbplugin}/CodenameOnePlugin/release/modules/ext" />
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="${nbplugin}/CodenameOne_Template/" />
         
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="${nbplugin}/CodenameOne_Template/lib" />
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="${nbplugin}/LibraryProject/lib" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="${nbplugin}/CodenameOne_Template/lib" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="${nbplugin}/LibraryProject/lib" />
 
         <!-- Libs for Demos -->
-        <copy file="${codenameone.dir}/CLDC11/dist/CLDC11.jar" todir="../CodenameOnePlugin/src" />
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="../CodenameOnePlugin/src" />
         <copy file="dist/CodenameOne.jar" todir="${codenameone.dir}/NBPlugin/CodenameOnePlugin/src"/>
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${codenameone.dir}/NBPlugin/CodenameOnePlugin/src"/>
         <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="${codenameone.dir}/NBPlugin/CodenameOnePlugin/src" />
