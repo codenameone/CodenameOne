@@ -3720,6 +3720,15 @@ public class Component implements Animation, StyleListener {
     void dragFinishedImpl(int x, int y) {
         if(dragAndDropInitialized && dragActivated) {
             Form p = getComponentForm();
+            if (p == null) {
+                //The component was removed from the form during the drag
+                dragActivated = false;
+                dragAndDropInitialized = false;
+                setVisible(true);
+                dragImage = null;
+                dropTargetComponent = null;
+                return;
+            }
             p.setDraggedComponent(null);
             Component dropTo = findDropTarget(this, x, y);
             if(dropTargetComponent != dropTo) {
