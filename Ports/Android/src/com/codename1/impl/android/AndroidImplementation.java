@@ -7266,32 +7266,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return errorMessage;
         }
 
-        public String getIP() {
-            try {
-                InetAddress i = java.net.InetAddress.getLocalHost();
-                if(i.isLoopbackAddress()) {
-                    Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
-                    while(nie.hasMoreElements()) {
-                        NetworkInterface current = nie.nextElement();
-                        if(!current.isLoopback()) {
-                            Enumeration<InetAddress> iae = current.getInetAddresses();
-                            while(iae.hasMoreElements()) {
-                                InetAddress currentI = iae.nextElement();
-                                if(!currentI.isLoopbackAddress()) {
-                                    return currentI.getHostAddress();
-                                }
-                            }
-                        }
-                    }
-                }
-                return i.getHostAddress();
-            } catch(Throwable t) {
-                t.printStackTrace();
-                errorMessage = t.toString();
-                return t.getMessage();
-            }
-        }
-
         public byte[] readFromStream() {
             try {
                 int av = getAvailableInput();
@@ -7398,10 +7372,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String getHostOrIP() {
         try {
-            return java.net.InetAddress.getLocalHost().getHostName();
+            InetAddress i = java.net.InetAddress.getLocalHost();
+            if(i.isLoopbackAddress()) {
+                Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+                while(nie.hasMoreElements()) {
+                    NetworkInterface current = nie.nextElement();
+                    if(!current.isLoopback()) {
+                        Enumeration<InetAddress> iae = current.getInetAddresses();
+                        while(iae.hasMoreElements()) {
+                            InetAddress currentI = iae.nextElement();
+                            if(!currentI.isLoopbackAddress()) {
+                                return currentI.getHostAddress();
+                            }
+                        }
+                    }
+                }
+            }
+            return i.getHostAddress();
         } catch(Throwable t) {
-            t.printStackTrace();
-            return t.getMessage();
+            Log.e(t);
+            return null;
         }
     }
 
