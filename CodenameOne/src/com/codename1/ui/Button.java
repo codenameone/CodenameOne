@@ -58,6 +58,34 @@ import java.util.Vector;
  */
 public class Button extends Label {
     /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     */
+    private static boolean capsTextDefault;
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design.
+     * This value can be set by the {@code capsButtonTextBool} theme constant
+     * @return the capsTextDefault
+     */
+    public static boolean isCapsTextDefault() {
+        return capsTextDefault;
+    }
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * This value can be set by the {@code capsButtonTextBool} theme constant
+     * @param aCapsTextDefault the capsTextDefault to set
+     */
+    public static void setCapsTextDefault(boolean aCapsTextDefault) {
+        capsTextDefault = aCapsTextDefault;
+    }
+    
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     */
+    private Boolean capsText;
+    
+    /**
      * Indicates the rollover state of a button which is equivalent to focused for
      * most uses
      */
@@ -105,6 +133,9 @@ public class Button extends Label {
      */
     public Button(String text) {
         this(text, null, "Button");
+        if(isCapsText() && text != null) {
+            super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
+        } 
     }
     
     /**
@@ -792,4 +823,35 @@ public class Button extends Label {
         super.paintImpl(g);
     }
 
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * @return the capsText
+     */
+    public final boolean isCapsText() {
+        if(capsText == null) {
+            return capsTextDefault && getUIID().equals("Button");
+        }
+        return capsText;
+    }
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * @param capsText the capsText to set
+     */
+    public void setCapsText(boolean capsText) {
+        this.capsText = capsText;
+    }
+
+    /**
+     * Overriden to implement the caps mode {@link #setCapsText(boolean)}
+     * {@inheritDoc}
+     */
+    @Override
+    public void setText(String t) {
+        if(isCapsText() && t != null) {
+            super.setText(getUIManager().localize(t, t).toUpperCase());
+            return;
+        } 
+        super.setText(t);
+    }
 }
