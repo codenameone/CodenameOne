@@ -1,16 +1,16 @@
 # Codename One
 
-## Write Once Run Anywhere Native Mobile Apps for Java Developers
+## Write Once Run Anywhere Native Mobile Apps for Java & Kotlin Developers
 
 <img align="right" src="https://www.codenameone.com/img/iphone-and-android.png" height="250">
 
-[Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java (and soon [Kotlin](https://www.codenameone.com/blog/kotlin-wora-ios-iphone-windows-android.html)) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.). 
+[Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.). 
 It is a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) thru a portable abstraction which enables 100% code reuse.
 
 Codename One is the only platform that...
 
 - Has Write Once Run Anywhere support with no special hardware requirements and 100% code reuse
-- Compiles Java into native code for iOS, UWP (Universal Windows Platform), Android & even JavaScript
+- Compiles Java (or Kotlin) into native code for iOS, UWP (Universal Windows Platform), Android & even JavaScript
 - Is Open Source & Free with an enterprise grade commercial offering
 - Is Easy to use with 100% portable Drag & Drop GUI builder
 - Has Full access to underlying native OS capabilities using the native OS programming language (e.g. Objective-C) without compromising portability
@@ -40,6 +40,7 @@ You can get started with the binary and the birds eye view in the [download sect
 - [Codename One Academy](http://codenameone.teachable.com/)
 - [Blog](https://www.codenameone.com/blog/)
 - [Community Discussion Forum](https://www.codenameone.com/discussion-forum.html)
+- [Using the Kotlin Support](https://www.codenameone.com/blog/kotlin-support-public-beta.html)
 
 
 ## Setup & Getting Started With The Code
