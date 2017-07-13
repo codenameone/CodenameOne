@@ -14,6 +14,7 @@ Codename One is the only platform that...
 - Is Open Source & Free with an enterprise grade commercial offering
 - Is Easy to use with 100% portable Drag & Drop GUI builder
 - Has Full access to underlying native OS capabilities using the native OS programming language (e.g. Objective-C) without compromising portability
+- Has full control over every pixel on the screen! Just override paint and draw or use a glass pane to draw anywhere...
 - Lets you use native widgets (views) and mix them with Codename One components within the same hierarchy (heavyweight/lightweight mixing)
 
 [Codename One](https://www.codenameone.com/) is a mature open source project with roots dating back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. You can learn about its history and how it works in [this video](https://www.youtube.com/watch?v=EMRmo6ZRnGw).
