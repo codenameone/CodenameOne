@@ -34,9 +34,15 @@ JAVA_BOOLEAN publishPermission = 0;
 #include "com_codename1_social_FacebookConnect.h"
 #include "com_codename1_social_LoginCallback.h"
 #include "com_codename1_social_FacebookImpl.h"
+#ifdef USE_FACEBOOK_CONNECT_PODS
+#import <FBSDKLoginKit/FBSDKLoginKit.h>
+#import <FBSDKShareKit/FBSDKAppInviteContent.h>
+#import <FBSDKShareKit/FBSDKAppInviteDialog.h>
+#else
 #import "FBSDKLoginKit.h"
 #import "FBSDKAppInviteContent.h"
 #import "FBSDKAppInviteDialog.h"
+#endif
 
 
 #ifdef NEW_CODENAME_ONE_VM

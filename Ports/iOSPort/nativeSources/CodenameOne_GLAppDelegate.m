@@ -56,7 +56,11 @@ extern UIView *editingComponent;
 #endif
 
 #ifdef INCLUDE_FACEBOOK_CONNECT
+#ifdef USE_FACEBOOK_CONNECT_PODS
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#else
 #import "FBSDKCoreKit.h"
+#endif
 #endif
 
 

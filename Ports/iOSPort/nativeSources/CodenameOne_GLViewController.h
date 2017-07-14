@@ -56,9 +56,15 @@
 
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
+//#define USE_FACEBOOK_CONNECT_PODS
 #ifdef INCLUDE_FACEBOOK_CONNECT
+#ifdef USE_FACEBOOK_CONNECT_PODS
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <FBSDKShareKit/FBSDKAppInviteDialog.h>
+#else
 #import "FBSDKCoreKit.h"
 #import "FBSDKAppInviteDialog.h"
+#endif
 #endif
 
 #define NOT_INCLUDE_ZOOZ
