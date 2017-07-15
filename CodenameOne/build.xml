@@ -304,15 +304,6 @@
         <copy file="dist/CodenameOne.jar" todir="../demos" />
         <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="../demos" />
 
-        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
-        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
-        <copy file="dist/CodenameOne.jar" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
-        <copy file="${codenameone.dir}/BuildClient/dist/CodenameOneBuildClient.jar" tofile="${codenameone.dir}/IdeaPlugin/depedencies/CodeNameOneBuildClient.jar" />
-
-        <copy file="../Ports/CLDC11/dist/CLDC11.jar" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
-        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
-        <copy file="dist/CodenameOne.jar" todir="${codenameone.dir}/IdeaPlugin/resources/dependencies" />
-        <copy file="${codenameone.dir}/BuildClient/dist/CodenameOneBuildClient.jar" tofile="${codenameone.dir}/IdeaPlugin/resources/dependencies/CodeNameOneBuildClient.jar" />
 
         <delete>
             <fileset dir="build/CodenameOneDist/CodenameOne/demos" includes="**/*.jar" />
@@ -369,7 +360,6 @@
         <ant inheritall="false" antfile="${codenameone.dir}/GUIBuilder/GUIBuilderSE/build.xml" target="pack" />
         <ant inheritall="false" antfile="../CodenameOneDesigner/build.xml" target="release" />
         <!-- zip basedir="../CodenameOneDesigner/dist" includes="designer.jar" file="../nightly_builds/CodenameOneDesigner_${tstamp}.zip" / -->
-        <copy file="../CodenameOneDesigner/dist/designer.jar" todir="${codenameone.dir}/IdeaPlugin/depedencies" />
         
         <!-- prepare the NB Plugin -->
         <property name="nbplugin" location="${codenameone.dir}/NBPlugin"/>
