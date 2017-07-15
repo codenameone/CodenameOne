@@ -1162,11 +1162,11 @@ public class UIManager {
                 }
             }
             if (margin != null) {
-                int[] marginArr = toIntArray(margin.trim());
+                float[] marginArr = toFloatArray(margin.trim());
                 style.setMargin(marginArr[0], marginArr[1], marginArr[2], marginArr[3]);
             }
             if (padding != null) {
-                int[] paddingArr = toIntArray(padding.trim());
+                float[] paddingArr = toFloatArray(padding.trim());
                 style.setPadding(paddingArr[0], paddingArr[1], paddingArr[2], paddingArr[3]);
             }
             if(paddingUnit != null) {
@@ -1259,12 +1259,12 @@ public class UIManager {
      * @param str
      * @return
      */
-    private int[] toIntArray(String str) {
-        int[] retVal = new int[4];
+    private float[] toFloatArray(String str) {
+        float[] retVal = new float[4];
         str = str + ",";
         int rlen = retVal.length;
         for (int i = 0; i < rlen; i++) {
-            retVal[i] = Integer.parseInt(str.substring(0, str.indexOf(",")));
+            retVal[i] = Float.parseFloat(str.substring(0, str.indexOf(",")));
             str = str.substring(str.indexOf(",") + 1, str.length());
         }
         return retVal;

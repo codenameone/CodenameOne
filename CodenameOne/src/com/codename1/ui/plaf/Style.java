@@ -357,8 +357,8 @@ public class Style {
     private int bgColor = 0xFFFFFF;
     private Font font = Font.getDefaultFont();
     private Image bgImage;
-    int[] padding = new int[4];
-    int[] margin = new int[4];
+    float[] padding = new float[4];
+    float[] margin = new float[4];
 
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
@@ -1224,12 +1224,24 @@ public class Style {
     /**
      * Sets the Style Padding
      *  
-     * @param top number of pixels to padd
-     * @param bottom number of pixels to padd
-     * @param left number of pixels to padd
-     * @param right number of pixels to padd
+     * @param top number of pixels to pad
+     * @param bottom number of pixels to pad
+     * @param left number of pixels to pad
+     * @param right number of pixels to pad
      */
     public void setPadding(int top, int bottom, int left, int right) {
+        this.setPadding((float)top, (float)bottom, (float)left, (float)right);
+    }
+    
+    /**
+     * Sets the Style Padding
+     *  
+     * @param top number of pixels to pad
+     * @param bottom number of pixels to pad
+     * @param left number of pixels to pad
+     * @param right number of pixels to pad
+     */
+    public void setPadding(float top, float bottom, float left, float right) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPadding(top, bottom, left, right);
@@ -1257,12 +1269,22 @@ public class Style {
      * Sets the Style Padding
      * 
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap number of pixels to padd
+     * @param gap number of pixels to pad
      */
     public void setPadding(int orientation, int gap) {
         setPadding(orientation, gap, false);
     }
 
+    /**
+     * Sets the Style Padding
+     * 
+     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+     * @param gap number of pixels to pad
+     */
+    public void setPadding(int orientation, float gap) {
+        setPadding(orientation, gap, false);
+    }
+    
     /**
      * Sets the Style Margin
      *  
@@ -1272,6 +1294,18 @@ public class Style {
      * @param right number of margin using the current unit
      */
     public void setMargin(int top, int bottom, int left, int right) {
+        setMargin((float)top, (float)bottom, (float)left, (float)right);
+    }
+    
+    /**
+     * Sets the Style Margin
+     *  
+     * @param top number of margin using the current unit
+     * @param bottom number of margin using the current unit
+     * @param left number of margin using the current unit
+     * @param right number of margin using the current unit
+     */
+    public void setMargin(float top, float bottom, float left, float right) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMargin(top, bottom, left, right);
@@ -1327,7 +1361,7 @@ public class Style {
             }
         }
 
-        return padding[orientation];
+        return (int)padding[orientation];
     }
     
     /**
@@ -1668,26 +1702,26 @@ public class Style {
         return convertUnit(paddingUnit, v, orientation);
     }
 
-    private int convertUnit(byte[] unitType, int v, int orientation) {
+    private int convertUnit(byte[] unitType, float v, int orientation) {
         if(unitType != null) {
             switch(unitType[orientation]) {
                 case UNIT_TYPE_DIPS:
-                    return Display.getInstance().convertToPixels(v, orientation == Component.LEFT || orientation == Component.RIGHT);
+                    return Display.getInstance().convertToPixels(v);
                 case UNIT_TYPE_SCREEN_PERCENTAGE:
                     if(orientation == Component.TOP || orientation == Component.BOTTOM) {
                         float h = Display.getInstance().getDisplayHeight();
-                        h = h / 100.0f * ((float)v);
+                        h = h / 100.0f * v;
                         return (int)h;
                     } else {
                         float w = Display.getInstance().getDisplayWidth();
-                        w = w / 100.0f * ((float)v);
+                        w = w / 100.0f * v;
                         return (int)w;
                     }
                 default:
-                    return v;
+                    return (int)v;
             }
         }
-        return v;
+        return (int)v;
     }
 
     /**
@@ -1743,7 +1777,7 @@ public class Style {
                     break;
             }
         }
-        return margin[orientation];
+        return (int)margin[orientation];
     }
 
     /**
@@ -2071,6 +2105,18 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setPadding(int orientation, int gap,boolean override) {
+        setPadding(orientation, (float)gap, override);
+    }
+    
+    /**
+     * Sets the Style Padding
+     * 
+     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+     * @param gap number of pixels to pad
+     * @param override If set to true allows the look and feel/theme to override 
+     * the value in this attribute when changing a theme/look and feel
+     */
+    public void setPadding(int orientation, float gap,boolean override) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPadding(orientation, gap, override);
@@ -2093,7 +2139,6 @@ public class Style {
         }
     }
 
-
     /**
      * Sets the Style Margin
      * 
@@ -2103,6 +2148,18 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setMargin(int orientation, int gap, boolean override) {
+        setMargin(orientation, (float)gap, override);
+    }
+    
+    /**
+     * Sets the Style Margin
+     * 
+     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+     * @param gap number of margin using the current unit
+     * @param override If set to true allows the look and feel/theme to override 
+     * the value in this attribute when changing a theme/look and feel
+     */
+    public void setMargin(int orientation, float gap, boolean override) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMargin(orientation, gap, override);

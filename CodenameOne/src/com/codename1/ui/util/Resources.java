@@ -1297,11 +1297,19 @@ public class Resources {
 
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("adding") || key.endsWith("argin")) {
-                int p1 = input.readByte() & 0xff;
-                int p2 = input.readByte() & 0xff;
-                int p3 = input.readByte() & 0xff;
-                int p4 = input.readByte() & 0xff;
-                theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                if(minorVersion > 7) {
+                    float p1 = input.readFloat();
+                    float p2 = input.readFloat();
+                    float p3 = input.readFloat();
+                    float p4 = input.readFloat();
+                    theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                } else {
+                    int p1 = input.readByte() & 0xff;
+                    int p2 = input.readByte() & 0xff;
+                    int p3 = input.readByte() & 0xff;
+                    int p4 = input.readByte() & 0xff;
+                    theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                }
                 continue;
             }
 

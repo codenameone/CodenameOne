@@ -109,7 +109,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 7;
+    private static final short MINOR_VERSION = 8;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -1897,10 +1897,10 @@ public class EditableResources extends Resources implements TreeModel {
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("padding") || key.endsWith("margin")) {
                 String[] arr = ((String)theme.get(key)).split(",");
-                output.writeByte(Integer.parseInt(arr[0]));
-                output.writeByte(Integer.parseInt(arr[1]));
-                output.writeByte(Integer.parseInt(arr[2]));
-                output.writeByte(Integer.parseInt(arr[3]));
+                output.writeFloat(Float.parseFloat(arr[0]));
+                output.writeFloat(Float.parseFloat(arr[1]));
+                output.writeFloat(Float.parseFloat(arr[2]));
+                output.writeFloat(Float.parseFloat(arr[3]));
                 continue;
             }
 
