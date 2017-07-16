@@ -94,7 +94,7 @@ public class RoundRectBorder extends Border {
     private float cornerRadius = 2;
     
     /**
-     * True if the corners are bezier curves
+     * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
      */
     private boolean bezierCorners;
     
@@ -247,6 +247,18 @@ public class RoundRectBorder extends Border {
     }
     
     /**
+     * True if the corners are Bezier curves, otherwise the corners are drawn as a regular arc
+     * 
+     * @param bezierCorners true if the corners use a bezier curve for drawing
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bezierCorners(boolean bezierCorners) {
+        this.bezierCorners = bezierCorners;
+        return this;
+    }
+    
+    
+    /**
      * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
      * 
      * @param topOnlyMode new value for top only mode
@@ -302,12 +314,18 @@ public class RoundRectBorder extends Border {
             shapeX += Math.round(((float)shadowSpreadL) * shadowX);
             shapeY += Math.round(((float)shadowSpreadL) * shadowY);
             
+            int initialOffsetX = Math.round(((float)shadowSpreadL) * (1 - shadowX));
+            int initialOffsetY = Math.round(((float)shadowSpreadL) * (1 - shadowY));
+            tg.translate(initialOffsetX, initialOffsetY);
+            
             // draw a gradient of sort for the shadow
             for(int iter = shadowSpreadL - 1 ; iter >= 0 ; iter--) {            
                 tg.translate(iter, iter);
                 fillShape(tg, 0, shadowOpacity / shadowSpreadL, w - (iter * 2), h - (iter * 2), false);
                 tg.translate(-iter, -iter);
             }
+            tg.translate(-initialOffsetX, -initialOffsetY);
+            
             if(Display.getInstance().isGaussianBlurSupported()) {
                 Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur/2);
                 target = Image.createImage(w, h, 0);
@@ -322,6 +340,12 @@ public class RoundRectBorder extends Border {
         GeneralPath gp = createShape(shapeW, shapeH);
         tg.setClip(gp);
         c.getStyle().getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
+        if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+            tg.setClip(0, 0, w, h);
+            tg.setAlpha(strokeOpacity);
+            tg.setColor(strokeColor);
+            tg.drawShape(gp, this.stroke);
+        }            
         c.getStyle().setBorder(this);
         g.drawImage(target, x, y);
         c.putClientProperty(CACHE_KEY + instanceVal, target);
@@ -330,10 +354,27 @@ public class RoundRectBorder extends Border {
     private GeneralPath createShape(int shapeW, int shapeH) {
         GeneralPath gp = new GeneralPath();
         float radius = Display.getInstance().convertToPixels(cornerRadius);
-        float x = radius;
-        float y = radius;
-        float widthF = shapeW - (2 * radius);
-        float heightF = shapeH- (2 * radius);
+        float x = 0;
+        float y = 0;
+        float widthF = shapeW;
+        float heightF = shapeH;
+        
+        if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+            int strokePx = (int)strokeThickness;
+            if(strokeMM) {
+                strokePx = Display.getInstance().convertToPixels(strokeThickness);
+            }
+            widthF -= strokePx;
+            heightF -= strokePx;
+            x += strokePx / 2;
+            y += strokePx / 2;
+            
+            if(strokePx % 2 == 1) {
+                x += 0.5f;
+                y += 0.5f;
+            }
+        }            
+        
         gp.moveTo(x + radius, y);
         gp.lineTo(x + widthF - radius, y);
         gp.quadTo(x + widthF, y, x + widthF, y + radius);
@@ -407,6 +448,15 @@ public class RoundRectBorder extends Border {
         return strokeMM;
     }
 
+    /**
+     * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
+     * 
+     * @return true if the corners are a curve
+     */
+    public boolean isBezierCorners() {
+        return bezierCorners;
+    }
+    
     /**
      * The spread of the shadow in pixels of millimeters
      * @return the shadowSpread

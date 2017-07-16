@@ -34,17 +34,18 @@
         <Component class="javax.swing.JComboBox" name="borderType">
           <Properties>
             <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-              <StringArray count="10">
+              <StringArray count="11">
                 <StringItem index="0" value="[Null]"/>
                 <StringItem index="1" value="[Empty]"/>
                 <StringItem index="2" value="Bevel"/>
                 <StringItem index="3" value="Etched"/>
                 <StringItem index="4" value="Line"/>
-                <StringItem index="5" value="Rounded (square with rounded corners)"/>
+                <StringItem index="5" value="Rounded (Deprecated)"/>
                 <StringItem index="6" value="Image"/>
                 <StringItem index="7" value="Horizontal Image"/>
                 <StringItem index="8" value="Vertical Image"/>
                 <StringItem index="9" value="Round (circle or square whose corners are completely round)"/>
+                <StringItem index="10" value="Rounded Rectangle"/>
               </StringArray>
             </Property>
             <Property name="name" type="java.lang.String" value="borderType" noResource="true"/>
@@ -476,8 +477,8 @@
           </Properties>
           <Constraints>
             <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
-              <JTabbedPaneConstraints tabName="Image Border">
-                <Property name="tabTitle" type="java.lang.String" value="Image Border"/>
+              <JTabbedPaneConstraints tabName="Image">
+                <Property name="tabTitle" type="java.lang.String" value="Image"/>
               </JTabbedPaneConstraints>
             </Constraint>
           </Constraints>
@@ -617,8 +618,8 @@
           </Properties>
           <Constraints>
             <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
-              <JTabbedPaneConstraints tabName="Round Border">
-                <Property name="tabTitle" type="java.lang.String" value="Round Border"/>
+              <JTabbedPaneConstraints tabName="Round">
+                <Property name="tabTitle" type="java.lang.String" value="Round"/>
               </JTabbedPaneConstraints>
             </Constraint>
           </Constraints>
@@ -925,6 +926,319 @@
                 <Property name="text" type="java.lang.String" value="..."/>
                 <Property name="name" type="java.lang.String" value="backgroundColorPicker" noResource="true"/>
               </Properties>
+            </Component>
+          </SubComponents>
+        </Container>
+        <Container class="javax.swing.JPanel" name="jPanel2">
+          <Properties>
+            <Property name="name" type="java.lang.String" value="jPanel2" noResource="true"/>
+          </Properties>
+          <Constraints>
+            <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
+              <JTabbedPaneConstraints tabName="Round Rect">
+                <Property name="tabTitle" type="java.lang.String" value="Round Rect"/>
+              </JTabbedPaneConstraints>
+            </Constraint>
+          </Constraints>
+
+          <Layout>
+            <DimensionLayout dim="0">
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Group type="102" attributes="0">
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Component id="jLabel24" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel22" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel23" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel25" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel26" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel27" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel28" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel29" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel30" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel31" alignment="0" min="-2" max="-2" attributes="0"/>
+                          <Component id="jLabel32" alignment="0" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="0" attributes="0">
+                          <Group type="102" alignment="0" attributes="0">
+                              <Component id="rrStrokeThickness" max="32767" attributes="0"/>
+                              <EmptySpace max="-2" attributes="0"/>
+                              <Component id="rrStrokeMillimeter" min="-2" max="-2" attributes="0"/>
+                          </Group>
+                          <Group type="102" attributes="0">
+                              <Component id="rrBezier" min="-2" max="-2" attributes="0"/>
+                              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
+                          </Group>
+                          <Group type="102" alignment="1" attributes="0">
+                              <Group type="103" groupAlignment="1" attributes="0">
+                                  <Component id="rrMode" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="rrStrokeOpacity" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="rrShadowOpacity" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="rrShadowSpread" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="rrShadowX" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="rrShadowY" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="rrShadowBlur" alignment="0" max="32767" attributes="0"/>
+                                  <Component id="rrRadius" alignment="0" max="32767" attributes="0"/>
+                                  <Group type="102" alignment="0" attributes="0">
+                                      <Component id="rrStrokeColor" pref="173" max="32767" attributes="0"/>
+                                      <EmptySpace max="-2" attributes="0"/>
+                                      <Component id="rrStrokeColorPicker" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                              </Group>
+                              <EmptySpace min="124" pref="124" max="-2" attributes="0"/>
+                          </Group>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                  </Group>
+              </Group>
+            </DimensionLayout>
+            <DimensionLayout dim="1">
+              <Group type="103" groupAlignment="0" attributes="0">
+                  <Group type="102" alignment="0" attributes="0">
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel30" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrRadius" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel22" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrStrokeColor" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrStrokeColorPicker" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel23" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrStrokeOpacity" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel24" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrStrokeMillimeter" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrStrokeThickness" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel25" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrShadowOpacity" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel26" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrShadowSpread" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel27" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrShadowX" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel28" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrShadowY" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel29" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrShadowBlur" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel31" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrBezier" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace max="-2" attributes="0"/>
+                      <Group type="103" groupAlignment="3" attributes="0">
+                          <Component id="jLabel32" alignment="3" min="-2" max="-2" attributes="0"/>
+                          <Component id="rrMode" alignment="3" min="-2" max="-2" attributes="0"/>
+                      </Group>
+                      <EmptySpace pref="44" max="32767" attributes="0"/>
+                  </Group>
+              </Group>
+            </DimensionLayout>
+          </Layout>
+          <SubComponents>
+            <Component class="javax.swing.JLabel" name="jLabel22">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Stroke Color"/>
+                <Property name="name" type="java.lang.String" value="jLabel22" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JTextField" name="rrStrokeColor">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="0"/>
+                <Property name="name" type="java.lang.String" value="rrStrokeColor" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="rrStrokeColorActionPerformed"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JButton" name="rrStrokeColorPicker">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="..."/>
+                <Property name="name" type="java.lang.String" value="rrStrokeColorPicker" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="rrStrokeColorPickerActionPerformed"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel23">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Stroke Opacity"/>
+                <Property name="name" type="java.lang.String" value="jLabel23" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrStrokeOpacity">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrStrokeOpacity" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrStrokeOpacityStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel24">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Stroke Thickness"/>
+                <Property name="name" type="java.lang.String" value="jLabel24" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrStrokeThickness">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrStrokeThickness" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrStrokeThicknessStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JCheckBox" name="rrStrokeMillimeter">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="In Millimeters"/>
+                <Property name="toolTipText" type="java.lang.String" value="Is the thickness in millimeters or pixels"/>
+                <Property name="name" type="java.lang.String" value="rrStrokeMillimeter" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="rrStrokeMillimeterActionPerformed"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel25">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Shadow Opacity"/>
+                <Property name="name" type="java.lang.String" value="jLabel25" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrShadowOpacity">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrShadowOpacity" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrShadowOpacityStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel26">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Shadow Spread"/>
+                <Property name="name" type="java.lang.String" value="jLabel26" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrShadowSpread">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrShadowSpread" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrShadowSpreadStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel27">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Shadow X"/>
+                <Property name="name" type="java.lang.String" value="jLabel27" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrShadowX">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrShadowX" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrShadowXStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel28">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Shadow Y"/>
+                <Property name="name" type="java.lang.String" value="jLabel28" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrShadowY">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrShadowY" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrShadowYStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel29">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Shadow Blur"/>
+                <Property name="name" type="java.lang.String" value="jLabel29" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrShadowBlur">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrShadowBlur" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrShadowBlurStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel30">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Radius Millimeters"/>
+                <Property name="name" type="java.lang.String" value="jLabel30" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JSpinner" name="rrRadius">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrRadius" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="rrRadiusStateChanged"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel31">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Bezier Corners"/>
+                <Property name="name" type="java.lang.String" value="jLabel31" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JCheckBox" name="rrBezier">
+              <Properties>
+                <Property name="name" type="java.lang.String" value="rrBezier" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="rrBezierActionPerformed"/>
+              </Events>
+            </Component>
+            <Component class="javax.swing.JLabel" name="jLabel32">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Mode"/>
+                <Property name="name" type="java.lang.String" value="jLabel32" noResource="true"/>
+              </Properties>
+            </Component>
+            <Component class="javax.swing.JComboBox" name="rrMode">
+              <Properties>
+                <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
+                  <StringArray count="3">
+                    <StringItem index="0" value="Standard"/>
+                    <StringItem index="1" value="Top Only"/>
+                    <StringItem index="2" value="Bottom Only"/>
+                  </StringArray>
+                </Property>
+                <Property name="name" type="java.lang.String" value="rrMode" noResource="true"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="rrModeActionPerformed"/>
+              </Events>
             </Component>
           </SubComponents>
         </Container>

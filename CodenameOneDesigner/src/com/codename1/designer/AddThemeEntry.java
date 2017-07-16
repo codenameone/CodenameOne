@@ -239,14 +239,14 @@ public class AddThemeEntry extends javax.swing.JPanel {
         initImagesCombo();
         bitmapFontValue.setModel(new DefaultComboBoxModel(resources.getFontResourceNames()));
         
-        paddingBottom.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
-        paddingLeft.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
-        paddingRight.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
-        paddingTop.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
-        marginBottom.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
-        marginLeft.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
-        marginRight.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
-        marginTop.setModel(new SpinnerNumberModel(0, 0, 100, 0.05));
+        paddingBottom.setModel(new SpinnerNumberModelThatWorks(0, 0, 100.0, 0.5));
+        paddingLeft.setModel(new SpinnerNumberModelThatWorks(0, 0, 100.0, 0.5));
+        paddingRight.setModel(new SpinnerNumberModelThatWorks(0, 0, 100.0, 0.5));
+        paddingTop.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginBottom.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginLeft.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginRight.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginTop.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
         transparencyValue.setModel(new SpinnerNumberModel(0, 0, 255, 1));
         gradientX.setModel(new SpinnerNumberModel(0.5, 0, 1, 0.01));
         gradientY.setModel(new SpinnerNumberModel(0.5, 0, 1, 0.01));

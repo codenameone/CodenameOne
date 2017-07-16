@@ -52,6 +52,7 @@ import com.codename1.designer.ResourceEditorApp;
 import com.codename1.impl.javase.JavaSEPortWithSVGSupport;
 import com.codename1.ui.Form;
 import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.util.xml.Data;
 import com.codename1.ui.util.xml.Entry;
 import com.codename1.ui.util.xml.L10n;
@@ -589,12 +590,30 @@ public class EditableResources extends Resources implements TreeModel {
                                             rb = rb.rectangle(b.isRectangle());
                                             rb = rb.shadowBlur(b.getShadowBlur());
                                             rb = rb.shadowOpacity(b.getShadowOpacity());
-                                            rb = rb.shadowSpread(b.getShadowSpread(), b.isShadowMM());
+                                            rb = rb.shadowSpread((int)b.getShadowSpread(), b.isShadowMM());
                                             rb = rb.shadowX(b.getShadowX());
                                             rb = rb.shadowY(b.getShadowY());
                                             rb = rb.stroke(b.getStrokeThickness(), b.isStrokeMM());
                                             rb = rb.strokeColor(b.getStrokeColor());
                                             rb = rb.strokeOpacity(b.getStrokeOpacity());
+                                            theme.put(b.getKey(), rb);
+                                            continue;
+                                        }
+
+                                        if("roundRect".equals(b.getType())) {
+                                            RoundRectBorder rb = RoundRectBorder.create();
+                                            rb = rb.shadowBlur(b.getShadowBlur());
+                                            rb = rb.shadowOpacity(b.getShadowOpacity());
+                                            rb = rb.shadowSpread(b.getShadowSpread());
+                                            rb = rb.shadowX(b.getShadowX());
+                                            rb = rb.shadowY(b.getShadowY());
+                                            rb = rb.stroke(b.getStrokeThickness(), b.isStrokeMM());
+                                            rb = rb.strokeColor(b.getStrokeColor());
+                                            rb = rb.strokeOpacity(b.getStrokeOpacity());
+                                            rb = rb.bezierCorners(b.isBezierCorners());
+                                            rb = rb.bottomOnlyMode(b.isBottomOnlyMode());
+                                            rb = rb.topOnlyMode(b.isTopOnlyMode());
+                                            rb = rb.cornerRadius(b.getCornerRadius());
                                             theme.put(b.getKey(), rb);
                                             continue;
                                         }
@@ -1065,6 +1084,25 @@ public class EditableResources extends Resources implements TreeModel {
                                             + "shadowBlur=\"" + rb.getShadowBlur()+ "\" " 
                                             + "shadowMM=\"" + rb.isShadowMM()+ "\" " 
                                             + "rectangle=\"" + rb.isRectangle()+ "\" />\n");
+                            
+                                    continue;
+                                }
+                                if(border instanceof RoundRectBorder) {
+                                    RoundRectBorder rb = (RoundRectBorder)border;
+                                    bw.write("        <border key=\"" + key + "\" type=\"roundRect\" "
+                                            + "strokeColor=\"" + rb.getStrokeColor()+ "\" " 
+                                            + "strokeOpacity=\"" + rb.getStrokeOpacity()+ "\" " 
+                                            + "strokeThickness=\"" + rb.getStrokeThickness()+ "\" " 
+                                            + "strokeMM=\"" + rb.isStrokeMM()+ "\" " 
+                                            + "shadowSpread=\"" + rb.getShadowSpread()+ "\" " 
+                                            + "shadowOpacity=\"" + rb.getShadowOpacity()+ "\" " 
+                                            + "shadowX=\"" + rb.getShadowX()+ "\" " 
+                                            + "shadowY=\"" + rb.getShadowY()+ "\" " 
+                                            + "shadowBlur=\"" + rb.getShadowBlur()+ "\" " 
+                                            + "topOnlyMode=\"" + rb.isTopOnlyMode()+ "\" " 
+                                            + "bottomOnlyMode=\"" + rb.isBottomOnlyMode()+ "\" " 
+                                            + "CornerRadius=\"" + rb.getCornerRadius()+ "\" " 
+                                            + "bezierCorners=\"" + rb.isBezierCorners()+ "\" />\n");
                             
                                     continue;
                                 }
@@ -2009,6 +2047,24 @@ public class EditableResources extends Resources implements TreeModel {
             output.writeBoolean(rb.isShadowMM());
             output.writeFloat(rb.getShadowX());
             output.writeFloat(rb.getShadowY());
+            return;
+        }
+        if(border instanceof RoundRectBorder) {
+            output.writeShort(0xff13);
+            RoundRectBorder rb = (RoundRectBorder)border;
+            output.writeFloat(rb.getStrokeThickness());
+            output.writeBoolean(rb.isStrokeMM());
+            output.writeInt(rb.getStrokeColor());
+            output.writeInt(rb.getStrokeOpacity());
+            output.writeFloat(rb.getShadowBlur());
+            output.writeInt(rb.getShadowOpacity());
+            output.writeFloat(rb.getShadowSpread());
+            output.writeFloat(rb.getShadowX());
+            output.writeFloat(rb.getShadowY());
+            output.writeFloat(rb.getCornerRadius());
+            output.writeBoolean(rb.isBezierCorners());
+            output.writeBoolean(rb.isTopOnlyMode());
+            output.writeBoolean(rb.isBottomOnlyMode());
             return;
         }
         int type = Accessor.getType(border);

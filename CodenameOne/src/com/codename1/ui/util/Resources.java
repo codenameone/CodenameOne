@@ -33,6 +33,7 @@ import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -1577,6 +1578,21 @@ public class Resources {
                             shadowX(input.readFloat()).
                             shadowY(input.readFloat());
                             
+            // round rect border
+            case 0xff13:                    
+                    return RoundRectBorder.create().
+                            stroke(input.readFloat(), input.readBoolean()).
+                            strokeColor(input.readInt()).
+                            strokeOpacity(input.readInt()).
+                            shadowBlur(input.readFloat()).
+                            shadowOpacity(input.readInt()).
+                            shadowSpread(input.readFloat()).
+                            shadowX(input.readFloat()).
+                            shadowY(input.readFloat()).
+                            cornerRadius(input.readFloat()).
+                            bezierCorners(input.readBoolean()).
+                            topOnlyMode(input.readBoolean()).
+                            bottomOnlyMode(input.readBoolean());
         }
         return null;
     }
