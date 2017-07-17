@@ -201,6 +201,7 @@ public class Button extends Label {
         this.pressedIcon = icon;
         this.rolloverIcon = icon;
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
+        setRippleEffect(UIManager.getInstance().isThemeConstant("buttonRippleBool", false));        
     }
     
     /**
@@ -649,22 +650,7 @@ public class Button extends Label {
             disabledIcon.unlock();
         }
     }
-
-    
-    /**
-     * {@inheritDoc}
-     */
-    public void pointerDragged(int x, int y) {
-        // this releases buttons on drag instead of keeping them pressed making them harder to click
-        /*if(Display.getInstance().shouldRenderSelection(this)) {
-            if(state != STATE_ROLLOVER) {
-                state=STATE_ROLLOVER;
-                repaint();
-            }
-        }*/
-        super.pointerDragged(x, y);
-    }
-    
+   
     /**
      * {@inheritDoc}
      */
@@ -750,17 +736,14 @@ public class Button extends Label {
     public boolean animate() {
         boolean a = super.animate();
         if(!isEnabled() && disabledIcon != null) {
-            a = disabledIcon.isAnimation() && disabledIcon.animate() ||
-                    a;
+            a |= disabledIcon.isAnimation() && disabledIcon.animate();
         } else {
             switch(state) {
                 case STATE_ROLLOVER:
-                    a = rolloverIcon != null && rolloverIcon.isAnimation() && rolloverIcon.animate() ||
-                            a;
+                    a |= rolloverIcon != null && rolloverIcon.isAnimation() && rolloverIcon.animate();
                     break;
                 case STATE_PRESSED:
-                    a = pressedIcon != null && pressedIcon.isAnimation() && pressedIcon.animate() ||
-                            a;
+                    a |= pressedIcon != null && pressedIcon.isAnimation() && pressedIcon.animate();
                     break;
             }
         }
@@ -853,5 +836,5 @@ public class Button extends Label {
             return;
         } 
         super.setText(t);
-    }
+    }    
 }
