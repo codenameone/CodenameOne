@@ -6113,11 +6113,25 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         private int getCN1X(MouseEvent e) {
-            return (int)((e.getXOnScreen() - canvas.getLocationOnScreen().x - (canvas.x + getScreenCoordinates().x) * zoomLevel) / zoomLevel);
+            if (canvas == null) {
+                return e.getXOnScreen();
+            }
+            java.awt.Rectangle screenCoords = getScreenCoordinates();
+            if (screenCoords == null) {
+                screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
+            }
+            return (int)((e.getXOnScreen() - canvas.getLocationOnScreen().x - (canvas.x + screenCoords.x) * zoomLevel) / zoomLevel);
         }
 
         private int getCN1Y(MouseEvent e) {
-            return (int)((e.getYOnScreen() - canvas.getLocationOnScreen().y - (canvas.y + getScreenCoordinates().y) * zoomLevel) / zoomLevel);
+            if (canvas == null) {
+                return e.getYOnScreen();
+            }
+            java.awt.Rectangle screenCoords = getScreenCoordinates();
+            if (screenCoords == null) {
+                screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
+            }
+            return (int)((e.getYOnScreen() - canvas.getLocationOnScreen().y - (canvas.y + screenCoords.y) * zoomLevel) / zoomLevel);
         }
         
         public CN1JFXPanel() {
