@@ -165,6 +165,8 @@ import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
 import java.io.*;
 import java.net.CookieHandler;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.security.MessageDigest;
 import java.text.ParseException;
@@ -3891,8 +3893,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 } catch(Throwable t) {
                     com.codename1.io.Log.e(t);
                 }
-                completed[0] = true;
                 synchronized(completed) {
+                    completed[0] = true;
                     completed.notify();
                 }
             }
@@ -7264,16 +7266,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return errorMessage;
         }
 
-        public String getIP() {
-            try {
-                return java.net.InetAddress.getLocalHost().getHostAddress();
-            } catch(Throwable t) {
-                t.printStackTrace();
-                errorMessage = t.toString();
-                return t.getMessage();
-            }
-        }
-
         public byte[] readFromStream() {
             try {
                 int av = getAvailableInput();
@@ -7344,7 +7336,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 ServerSocket serverSocketInstance = new ServerSocket(param);
                 socketInstance = serverSocketInstance.accept();
-                return socketInstance;
+                SocketImpl si = new SocketImpl();
+                si.socketInstance = socketInstance;
+                return si;
             } catch(Exception err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
@@ -7378,10 +7372,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String getHostOrIP() {
         try {
-            return java.net.InetAddress.getLocalHost().getHostName();
+            InetAddress i = java.net.InetAddress.getLocalHost();
+            if(i.isLoopbackAddress()) {
+                Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+                while(nie.hasMoreElements()) {
+                    NetworkInterface current = nie.nextElement();
+                    if(!current.isLoopback()) {
+                        Enumeration<InetAddress> iae = current.getInetAddresses();
+                        while(iae.hasMoreElements()) {
+                            InetAddress currentI = iae.nextElement();
+                            if(!currentI.isLoopbackAddress()) {
+                                return currentI.getHostAddress();
+                            }
+                        }
+                    }
+                }
+            }
+            return i.getHostAddress();
         } catch(Throwable t) {
-            t.printStackTrace();
-            return t.getMessage();
+            com.codename1.io.Log.e(t);
+            return null;
         }
     }
 

@@ -58,6 +58,55 @@ import java.util.Vector;
  */
 public class Button extends Label {
     /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     */
+    private static boolean buttonRippleEffectDefault;
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     */
+    private static boolean capsTextDefault;
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design.
+     * This value can be set by the {@code capsButtonTextBool} theme constant
+     * @return the capsTextDefault
+     */
+    public static boolean isCapsTextDefault() {
+        return capsTextDefault;
+    }
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * This value can be set by the {@code capsButtonTextBool} theme constant
+     * @param aCapsTextDefault the capsTextDefault to set
+     */
+    public static void setCapsTextDefault(boolean aCapsTextDefault) {
+        capsTextDefault = aCapsTextDefault;
+    }
+
+    /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     * @return the buttonRippleEffectDefault
+     */
+    public static boolean isButtonRippleEffectDefault() {
+        return buttonRippleEffectDefault;
+    }
+
+    /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     * @param aButtonRippleEffectDefault the buttonRippleEffectDefault to set
+     */
+    public static void setButtonRippleEffectDefault(boolean aButtonRippleEffectDefault) {
+        buttonRippleEffectDefault = aButtonRippleEffectDefault;
+    }
+    
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     */
+    private Boolean capsText;
+    
+    /**
      * Indicates the rollover state of a button which is equivalent to focused for
      * most uses
      */
@@ -105,6 +154,9 @@ public class Button extends Label {
      */
     public Button(String text) {
         this(text, null, "Button");
+        if(isCapsText() && text != null) {
+            super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
+        } 
     }
     
     /**
@@ -170,6 +222,7 @@ public class Button extends Label {
         this.pressedIcon = icon;
         this.rolloverIcon = icon;
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
+        setRippleEffect(buttonRippleEffectDefault);        
     }
     
     /**
@@ -444,8 +497,10 @@ public class Button extends Label {
      * Invoked to change the state of the button to the pressed state
      */
     public void pressed(){
-        state=STATE_PRESSED;
-        repaint();
+        if (!Display.impl.isScrollWheeling()) {
+            state=STATE_PRESSED;
+            repaint();
+        }
     }
     
     /**
@@ -462,11 +517,12 @@ public class Button extends Label {
      * @param y the y position if a touch event triggered this, -1 if this isn't relevant
      */
     public void released(int x, int y) {
-        state=STATE_ROLLOVER;
         if (!Display.impl.isScrollWheeling()) {
+            state=STATE_ROLLOVER;
             fireActionEvent(x, y);
+        
+            repaint();
         }
-        repaint();
     }
     
     /**
@@ -615,22 +671,7 @@ public class Button extends Label {
             disabledIcon.unlock();
         }
     }
-
-    
-    /**
-     * {@inheritDoc}
-     */
-    public void pointerDragged(int x, int y) {
-        // this releases buttons on drag instead of keeping them pressed making them harder to click
-        /*if(Display.getInstance().shouldRenderSelection(this)) {
-            if(state != STATE_ROLLOVER) {
-                state=STATE_ROLLOVER;
-                repaint();
-            }
-        }*/
-        super.pointerDragged(x, y);
-    }
-    
+   
     /**
      * {@inheritDoc}
      */
@@ -716,17 +757,14 @@ public class Button extends Label {
     public boolean animate() {
         boolean a = super.animate();
         if(!isEnabled() && disabledIcon != null) {
-            a = disabledIcon.isAnimation() && disabledIcon.animate() ||
-                    a;
+            a |= disabledIcon.isAnimation() && disabledIcon.animate();
         } else {
             switch(state) {
                 case STATE_ROLLOVER:
-                    a = rolloverIcon != null && rolloverIcon.isAnimation() && rolloverIcon.animate() ||
-                            a;
+                    a |= rolloverIcon != null && rolloverIcon.isAnimation() && rolloverIcon.animate();
                     break;
                 case STATE_PRESSED:
-                    a = pressedIcon != null && pressedIcon.isAnimation() && pressedIcon.animate() ||
-                            a;
+                    a |= pressedIcon != null && pressedIcon.isAnimation() && pressedIcon.animate();
                     break;
             }
         }
@@ -789,4 +827,35 @@ public class Button extends Label {
         super.paintImpl(g);
     }
 
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * @return the capsText
+     */
+    public final boolean isCapsText() {
+        if(capsText == null) {
+            return capsTextDefault && getUIID().equals("Button");
+        }
+        return capsText;
+    }
+
+    /**
+     * Indicates whether text on the button should be drawn capitalized by default to match the Android design
+     * @param capsText the capsText to set
+     */
+    public void setCapsText(boolean capsText) {
+        this.capsText = capsText;
+    }
+
+    /**
+     * Overriden to implement the caps mode {@link #setCapsText(boolean)}
+     * {@inheritDoc}
+     */
+    @Override
+    public void setText(String t) {
+        if(isCapsText() && t != null) {
+            super.setText(getUIManager().localize(t, t).toUpperCase());
+            return;
+        } 
+        super.setText(t);
+    }    
 }

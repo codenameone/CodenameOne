@@ -37,7 +37,7 @@ import java.io.IOException;
  */
 public class ThreadSafeDatabase extends Database {
     private Database underlying;
-    private EasyThread et;
+    private final EasyThread et;
     
     /**
      * Wraps the given database with a threadsafe version
@@ -45,6 +45,7 @@ public class ThreadSafeDatabase extends Database {
      */
     public ThreadSafeDatabase(Database db) {
         underlying = db;
+        et = EasyThread.start("Database");
     }
 
     /**

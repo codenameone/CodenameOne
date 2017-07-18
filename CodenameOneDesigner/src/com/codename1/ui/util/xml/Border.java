@@ -109,7 +109,7 @@ public class Border {
     private boolean strokeMM;
 
     @XmlAttribute
-    private int shadowSpread;
+    private float shadowSpread;
 
     @XmlAttribute
     private int shadowOpacity = 0;
@@ -128,7 +128,19 @@ public class Border {
 
     @XmlAttribute
     private boolean rectangle;
-        
+
+    @XmlAttribute
+    private float cornerRadius;
+    
+    @XmlAttribute
+    private boolean bezierCorners;
+    
+    @XmlAttribute
+    private boolean topOnlyMode;
+    
+    @XmlAttribute
+    private boolean bottomOnlyMode;
+    
     /**
      * @return the key
      */
@@ -293,7 +305,7 @@ public class Border {
     /**
      * @return the shadowSpread
      */
-    public int getShadowSpread() {
+    public float getShadowSpread() {
         return shadowSpread;
     }
 
@@ -351,5 +363,33 @@ public class Border {
      */
     public void setRoundBorderColor(int roundBorderColor) {
         this.roundBorderColor = roundBorderColor;
+    }
+
+    /**
+     * @return the cornerRadius
+     */
+    public float getCornerRadius() {
+        return cornerRadius;
+    }
+
+    /**
+     * @return the bezierCorners
+     */
+    public boolean isBezierCorners() {
+        return bezierCorners;
+    }
+
+    /**
+     * @return the topOnlyMode
+     */
+    public boolean isTopOnlyMode() {
+        return topOnlyMode;
+    }
+
+    /**
+     * @return the bottomOnlyMode
+     */
+    public boolean isBottomOnlyMode() {
+        return bottomOnlyMode;
     }
 }

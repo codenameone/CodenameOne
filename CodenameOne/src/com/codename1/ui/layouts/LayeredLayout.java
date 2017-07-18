@@ -23,7 +23,9 @@
  */
 package com.codename1.ui.layouts;
 
+import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -217,6 +219,73 @@ public class LayeredLayout extends Layout {
      * have been laid out.
      */
     private HashSet<Component> tmpLaidOut = new HashSet<Component>();
+    
+    /**
+     * The preferred height in MM of this layout which serves as a sort of minimum
+     * height even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred height will be the max of this value and the 
+     * calculated preferred height based on the container's children.<p>
+     */
+    private float preferredHeightMM;
+    
+    /**
+     * The preferred width (in MM) of this layout which serves as a sort of minimum
+     * width even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred width will be the max of this value and the 
+     * calculated preferred width based on the container's children.<p>
+     */
+    private float preferredWidthMM;
+    
+    
+    /**
+     * Sets the preferred size of this layout in MM.  This serves as a minimum
+     * size that will be returned by calcPreferredSize().
+     * @param width The preferred width in MM.
+     * @param height The preferred height in MM.
+     */
+    public void setPreferredSizeMM(float width, float height) {
+        this.preferredHeightMM = height;
+        this.preferredWidthMM = width;
+    }
+    
+    /**
+     * The preferred height in MM of this layout which serves as a sort of minimum
+     * height even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred height will be the max of this value and the 
+     * calculated preferred height based on the container's children.<p>
+     */
+    public float getPreferredHeightMM() {
+        return preferredHeightMM;
+    }
+    
+    /**
+     * Sets the preferred height of this layout in MM.
+     * @param mm 
+     */
+    public void setPreferredHeightMM(float mm) {
+        preferredHeightMM = mm;
+    }
+    
+    /**
+     * Sets the preferred width of this layout in MM.
+     * @param mm 
+     */
+    public void setPreferredWidthMM(float mm) {
+        preferredWidthMM = mm;
+    }
+    /**
+     * The preferred width (in MM) of this layout which serves as a sort of minimum
+     * width even when the components in the layout don't demand space.
+     * 
+     * <p>The actual preferred width will be the max of this value and the 
+     * calculated preferred width based on the container's children.<p>
+     */
+    public float getPreferredWidthMM() {
+        return preferredWidthMM;
+    }
 
     @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
@@ -767,8 +836,8 @@ public class LayeredLayout extends Layout {
             int bottomInset = constraint.insets[Component.BOTTOM].calculate(cmp, innerTop, left, innerBottom, right);
             cmp.setX(leftInset + s.getMarginLeft(parent.isRTL()));
             cmp.setY(topInset + s.getMarginTop());
-            cmp.setWidth(right - left - s.getHorizontalMargins() - rightInset - leftInset);
-            cmp.setHeight(bottom - top - s.getVerticalMargins() - bottomInset - topInset);
+            cmp.setWidth(Math.max(0, right - left - s.getHorizontalMargins() - rightInset - leftInset));
+            cmp.setHeight(Math.max(0, bottom - top - s.getVerticalMargins() - bottomInset - topInset));
 
         } else {
 
@@ -779,8 +848,8 @@ public class LayeredLayout extends Layout {
 
             cmp.setX(x);
             cmp.setY(y);
-            cmp.setWidth(w);
-            cmp.setHeight(h);
+            cmp.setWidth(Math.max(0,w));
+            cmp.setHeight(Math.max(0,h));
             //System.out.println("Component laid out "+cmp);
         }
     }
@@ -829,6 +898,19 @@ public class LayeredLayout extends Layout {
         Style s = parent.getStyle();
         Dimension d = new Dimension(maxWidth + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(),
                 maxHeight + s.getPaddingTop() + s.getPaddingBottom());
+        if (preferredWidthMM > 0) {
+            int minW = Display.getInstance().convertToPixels(preferredWidthMM);
+            if (d.getWidth() < minW) {
+                d.setWidth(minW);
+            }
+        }
+        
+        if (preferredHeightMM > 0) {
+            int minH = Display.getInstance().convertToPixels(preferredHeightMM);
+            if (d.getHeight() < Display.getInstance().convertToPixels(preferredHeightMM)) {
+                d.setHeight(minH);
+            }
+        }
         return d;
     }
 
@@ -1008,11 +1090,25 @@ public class LayeredLayout extends Layout {
          * {@link cmp} has no reference components in any of its insets, then the resulting box will
          * just bee the inner box of the parent (e.g. the parent's inner bounds.
          * @param parent The parent container.
-         * @param cmp The component whose reference box we are obtaining.
+         * @param parent
          * @param box An out parameter.  This will store the bounds of the box.
          * @return The reference box.  (This will be the same object that is passed in the {@literal box} parameter.
          */
-        public Rectangle getReferenceBox(Container parent, Component cmp, Rectangle box) {
+        public Rectangle getReferenceBox(Container parent, Rectangle box) {
+            return getReferenceBox(parent, null, box);
+            
+        }
+        /**
+         * Returns a reference box within which insets of the given component are calculated.  If 
+         * {@link cmp} has no reference components in any of its insets, then the resulting box will
+         * just bee the inner box of the parent (e.g. the parent's inner bounds.
+         * @param parent The parent container.
+         * @param cmp The component whose reference box we are obtaining.  Not used.  May be null.
+         * @param box An out parameter.  This will store the bounds of the box.
+         * @return The reference box.  (This will be the same object that is passed in the {@literal box} parameter.
+         * @deprecated Use {@link #getReferenceBox(com.codename1.ui.Container, com.codename1.ui.geom.Rectangle) } instead.
+         */
+        public Rectangle getReferenceBox(Container parent, Component cmp2, Rectangle box) {
             Style parentStyle = parent.getStyle();
             //Style cmpStyle = cmp.getStyle();
             
@@ -1054,10 +1150,22 @@ public class LayeredLayout extends Layout {
          * just bee the inner box of the parent (e.g. the parent's inner bounds.
          * @param parent The parent container.
          * @param cmp The component whose reference box we are obtaining.
-         * @return The reference box.  
+         * @return The reference box. 
+         * @deprecated Use {@link #getReferenceBox(com.codename1.ui.Container) 
          */
         public Rectangle getReferenceBox(Container parent, Component cmp) {
             return getReferenceBox(parent, cmp, new Rectangle());
+        }
+        
+        /**
+         * Returns a reference box within which insets of the given component are calculated.  If 
+         * {@link cmp} has no reference components in any of its insets, then the resulting box will
+         * just bee the inner box of the parent (e.g. the parent's inner bounds.
+         * @param parent The parent container.
+         * @return The reference box.  
+         */
+        public Rectangle getReferenceBox(Container parent) {
+            return getReferenceBox(parent, (Component)null);
         }
         
         /**
@@ -1935,6 +2043,25 @@ public class LayeredLayout extends Layout {
             }
             
             /**
+             * Gets the value of this inset as a string rounding to the specified number of decimal places. 
+             * Values will be in the format {@literal <value><unit>}, e.g.
+             * {@literal 2mm}, {@literal 15%}, {@literal 5px}, {@literal auto} (meaning it is flexible.
+             * @return The value of this inset as a string.
+             * @see #getValueAsString() 
+             */
+            public String getValueAsString(int decimalPlaces) {
+                L10NManager l10n = L10NManager.getInstance();
+                
+                switch (unit) {
+                    case UNIT_DIPS: return l10n.format(value, decimalPlaces) +"mm";
+                    case UNIT_PIXELS: return ((int)value)+"px";
+                    case UNIT_PERCENT: return l10n.format(value, decimalPlaces) + "%";
+                    case UNIT_AUTO: return "auto";
+                }
+                return null;
+            }
+            
+            /**
              * Fixes dependencies in this inset recursively so that all reference
              * components are children of the given parent container.  If a reference
              * component is not in the parent, then it will first check to find a
@@ -1966,7 +2093,7 @@ public class LayeredLayout extends Layout {
                     }
                     if (!found && refParent != null) {
                         int index = refParent.getComponentIndex(referenceComponent);
-                        if (parent.getComponentCount() > index) {
+                        if (index != -1 && parent.getComponentCount() > index) {
                             referenceComponent = parent.getComponentAt(index);
                             found = true;
                         }
@@ -2112,6 +2239,9 @@ public class LayeredLayout extends Layout {
              * @return Self for chaining.
              */
             public Inset setPercent(float percent) {
+                if (percent == Float.POSITIVE_INFINITY || percent == Float.NEGATIVE_INFINITY) {
+                    throw new IllegalArgumentException("Attempt to set illegal percent value");
+                }
                 this.value = percent;
                 return unit(UNIT_PERCENT);
             }
@@ -2680,6 +2810,7 @@ public class LayeredLayout extends Layout {
              * the same as the current value. 
              * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
              * @return Self for chaining.
+             * @deprecated Use {@link #changeUnitsTo(byte, com.codename1.ui.Container) }
              */
             public Inset changeUnits(byte unit) {
                 return changeUnits(unit, cmp);
@@ -2692,20 +2823,60 @@ public class LayeredLayout extends Layout {
              * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
              * @param cmp The component for which the inset is applying.
              * @return Self for chaining.
+             * @deprecated Use {@link #changeUnitsTo(byte, com.codename1.ui.Container) }
              */
             public Inset changeUnits(byte unit, Component cmp) {
+                return changeUnitsTo(unit, cmp == null ? null : cmp.getParent());
+            }
+            
+            /**
+             * Changes the units of this inset, and updates the value to remain 
+             * the same as the current value. 
+             * @param unit The unit.  One of {@link #UNIT_AUTO}, {@link #UNIT_DIPS}, {@link #UNIT_PIXELS}, or {@link #UNIT_PERCENT}.
+             * @param parent The container in which the layout applies.
+             * @return Self for chaining.
+             */
+            public Inset changeUnitsTo(byte unit, Container parent) {
                 if (unit != this.unit) {
                     if (unit == UNIT_PIXELS) {
                         setPixels(getCurrentValuePx());
                     } else if (unit == UNIT_DIPS) {
                         setDips(getCurrentValueMM());
                     } else if (unit == UNIT_PERCENT) {
-                        if (cmp != null && cmp.getParent() != null) {
-                            Rectangle refBox = constraint().getReferenceBox(cmp.getParent(), cmp);
-                            setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
-                        } else {
-                            throw new IllegalArgumentException("Cannot change unit to percent without specifying the target component.");
+                        try {
+                            if (parent != null) {
+                                Rectangle refBox = constraint().getReferenceBox(parent);
+
+                                setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
+                            } else {
+                                throw new IllegalArgumentException("Cannot change unit to percent without specifying the target component.");
+                            }
+                        } catch (IllegalArgumentException ex) {
+                            Log.p("Unable to calculate percentage because height or width is zero.  Setting to 100%");
+                            setPercent(100f);
                         }
+                    } else {
+                        unit(unit);
+                    }
+                }
+                return this;
+            }
+            
+            
+            public Inset changeUnitsTo(byte unit, Rectangle refBox) {
+                if (unit != this.unit) {
+                    if (unit == UNIT_PIXELS) {
+                        setPixels(getCurrentValuePx());
+                    } else if (unit == UNIT_DIPS) {
+                        setDips(getCurrentValueMM());
+                    } else if (unit == UNIT_PERCENT) {
+                        try {
+                            setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
+                        } catch (IllegalArgumentException ex) {
+                            Log.p(ex.getMessage());
+                            setPercent(100f);
+                        }
+                        
                     } else {
                         unit(unit);
                     }
@@ -2728,12 +2899,25 @@ public class LayeredLayout extends Layout {
                         throw new IllegalArgumentException("Attempted to set a reference that would produce a circular dependency in LayeredLayout");
                     }
                 }
-                if (isFlexible()) {
-                    // we are flexible, so we'll just set the new reference
-                    // and be done
-                    referenceComponent(newRef).referencePosition(pos);
-                } else {
+                //if (isFlexible()) {
+                //    // This could potentially affect the opposite inset if it is a percentage
+                //    referenceComponent(newRef).referencePosition(pos);
+                //} else {
                     if (newRef != referenceComponent || pos != referencePosition) {
+                        // This may potentially affect both this inset 
+                        // and the opposite inset if it is either flexible or 
+                        // percent.
+                        
+                        byte restoreUnit = -1;
+                        if (unit == UNIT_PERCENT || isFlexible()) {
+                            restoreUnit = unit;
+                            changeUnitsTo(UNIT_DIPS, parent);
+                        }
+                        byte oppRestoreUnit = -1;
+                        if (getOppositeInset().unit == UNIT_PERCENT || isFlexible()) {
+                            oppRestoreUnit = getOppositeInset().unit;
+                            getOppositeInset().changeUnitsTo(UNIT_DIPS, parent);
+                        }
                         LayeredLayoutConstraint cpy = constraint().copy();
                         cpy.insets[side].referenceComponent(newRef).referencePosition(pos);
                         
@@ -2748,10 +2932,23 @@ public class LayeredLayout extends Layout {
                         int newBase = cpy.insets[side].calcBaseValue(top, left, bottom, right);
                         int oldBase = calcBaseValue(top, left, bottom, right);
                         
-                        translatePixels(oldBase - newBase, true, parent);
+                        
                         referenceComponent(newRef).referencePosition(pos);
+                        calculatedBaseValue += (newBase - oldBase);
+                        calculatedValue += (newBase - oldBase);
+                        if (getOppositeInset().isFlexible()) {
+                            getOppositeInset().delta -= (newBase - oldBase);
+                        }
+                        
+                        translatePixels(oldBase - newBase, true, parent);
+                        if (restoreUnit >=0) {
+                            changeUnitsTo(restoreUnit, parent);
+                        }
+                        if (oppRestoreUnit >= 0) {
+                            getOppositeInset().changeUnitsTo(oppRestoreUnit, parent);
+                        }
                     }
-                }
+                //}
                 
                 return this;
                 
@@ -2862,7 +3059,10 @@ public class LayeredLayout extends Layout {
                             if (Math.abs(relH) < 1f) {
                                 return this;
                             }
-                            float percentDelta = delta / relH * 100f;
+                            float percentDelta = delta / (float)relH * 100f;
+                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                                percentDelta = 0f;
+                            }
                             value += percentDelta;
                             
                         } else {
@@ -2873,6 +3073,9 @@ public class LayeredLayout extends Layout {
                             }
                             float percentDelta = delta / relH * 100f;
                             //System.out.println("percentDelta="+percentDelta);
+                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                                percentDelta = 0f;
+                            }
                             value += percentDelta;
                             //System.out.println("Value="+value);
                         }

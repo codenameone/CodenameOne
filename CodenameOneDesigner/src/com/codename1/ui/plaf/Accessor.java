@@ -70,6 +70,9 @@ public class Accessor {
         if(b == null) {
             return "[null]";
         }
+        if(b instanceof RoundBorder) {
+            return "Round";
+        }
         switch(b.type) {
             case TYPE_EMPTY:
                 return "Empty";

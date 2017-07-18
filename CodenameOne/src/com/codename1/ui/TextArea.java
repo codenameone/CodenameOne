@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -32,6 +33,7 @@ import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.util.UITimer;
 import java.util.ArrayList;
 
 /**
@@ -1665,9 +1667,10 @@ public class TextArea extends Component {
     }
     
     /**
-     * If the TextArea text is too long to fit the text to the widget add "..."
-     * points at the last displayable row.
-     * By default this is set to false
+     * If the TextArea text is too long to fit the text to the widget this will add "..."
+     * at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+     * E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated 
+     * and end with 3 points. By default this is set to false
      * 
      * @param endsWith3Points true if text should add "..." at the end
      */
@@ -1676,7 +1679,10 @@ public class TextArea extends Component {
     }
 
     /**
-     * Simple getter
+     * If the TextArea text is too long to fit the text to the widget this will add "..."
+     * at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+     * E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated 
+     * and end with 3 points. By default this is set to false
      * 
      * @return true if this TextArea adds "..." when the text is too long
      */
@@ -1699,6 +1705,27 @@ public class TextArea extends Component {
      */
     public void startEditingAsync() {
         if(!Display.getInstance().isTextEditing(this)) {
+            if (Display.impl.usesInvokeAndBlockForEditString()) {
+                // Implementations that use invokeAndBlock for edit string
+                // need to have the existing text area's editing stopped 
+                // before starting a new edit session or the previous text
+                // field won't be updated until the next one is finished editing.
+                Component c = Display.impl.getEditingText();
+                if (c != this && c != null) {
+                    if (c instanceof TextArea) {
+                        //System.out.println("Stopping editing");
+                        ((TextArea)c).stopEditing();
+                        final TextArea ta = (TextArea)c;
+                        UITimer.timer(30, false, new Runnable() {
+                            public void run() {
+                                ta.repaint();
+                                Display.getInstance().editString(TextArea.this, maxSize, constraint, text);
+                            }
+                        });
+                        return;
+                    }
+                }
+            }
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     Display.getInstance().editString(TextArea.this, maxSize, constraint, text);

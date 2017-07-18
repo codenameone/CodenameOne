@@ -878,6 +878,12 @@ public class Dialog extends Form {
                 if(uiid != null) {
                     b.setUIID(uiid);
                 }
+                
+                // special case for dialog butons uppercase on Android
+                if(Button.isCapsTextDefault()) {
+                    b.setCapsText(true);
+                }
+                
                 largest = Math.max(b.getPreferredW(), largest);
                 if(lineColor != null && lineColor.length() > 0) {
                     int color = Integer.parseInt(lineColor, 16);

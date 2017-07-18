@@ -29,13 +29,13 @@
 #import <UIKit/UIKit.h>
 
 
-
-
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
 #ifdef GOOGLE_CONNECT_PODS
 #import <GooglePlus/GooglePlus.h>
 #else
 #import "GooglePlus.h"
+#endif
 #endif
 #include "com_codename1_social_GoogleConnect.h"
 #include "com_codename1_social_LoginCallback.h"
@@ -61,14 +61,19 @@ static NSString *accessToken;
 void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
     if (googleLoginCallback == NULL) {
         googleLoginCallback = instance;
+#ifdef GOOGLE_SIGNIN
+        GIDSignIn* signIn = [GIDSignIn sharedInstance];
+#else
         GPPSignIn *signIn = [GPPSignIn sharedInstance];
+#endif
+        
         JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         JAVA_OBJECT jClientID = virtual_com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, fromNSString(CN1_THREAD_STATE_PASS_ARG @"ios.gplus.clientId"), JAVA_NULL);
         if (jClientID == JAVA_NULL) {
             set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Failed to log in due to a configuration error."), googleLoginCallback);
             set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
             googleLoginCallback = NULL;
-            NSLog(@"Could not login to Google Plus because 'ios.gplus.clientId' property is not set.  Ensure that the ios.gplus.clientId build hint is set");
+            CN1Log(@"Could not login to Google Plus because 'ios.gplus.clientId' property is not set.  Ensure that the ios.gplus.clientId build hint is set");
             return;
         }
 
@@ -82,7 +87,7 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
                 set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG @"Please install the Google Plus app on your device in order to log in with Google Plus."), googleLoginCallback);
                 set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
                 googleLoginCallback = NULL;
-                NSLog(@"Could not log into Google plus because the Google Plus app isn't installed and the ios.gplus.requireGplusAppForLogin property is set to true.  This limitation is to work around Apple app store rejections caused by logging in with Safari");
+                CN1Log(@"Could not log into Google plus because the Google Plus app isn't installed and the ios.gplus.requireGplusAppForLogin property is set to true.  This limitation is to work around Apple app store rejections caused by logging in with Safari");
                 return;
             }
         }
@@ -94,12 +99,16 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
             signIn.scopes = @[scope];
         }
         dispatch_async(dispatch_get_main_queue(), ^{
+#ifdef GOOGLE_SIGNIN
+            [[GIDSignIn sharedInstance] signIn];
+#else
             [signIn authenticate];
+#endif
         });
     } 
 }
 
-
+#ifndef GOOGLE_SIGNIN
 void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authentication *auth, NSError *error) {
 
     if (accessToken != nil) {
@@ -124,9 +133,39 @@ void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authenti
     
     
 }
+#else
+void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *user, NSError *error) {
+    
+    if (user.authentication.accessToken != nil) {
+        [accessToken release];
+    }
+    accessToken = user.authentication.accessToken;
+    if (accessToken != nil) {
+        [accessToken retain];
+    }
+    
+    
+    if (googleLoginCallback != NULL) {
+        if (error != nil) {
+            set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]), googleLoginCallback);
+        } else {
+            set_field_com_codename1_social_GoogleImpl_loginMessage(CN1_THREAD_GET_STATE_PASS_ARG JAVA_NULL, googleLoginCallback);
+        }
+        set_field_com_codename1_social_GoogleImpl_loginCompleted(CN1_THREAD_GET_STATE_PASS_ARG JAVA_TRUE, googleLoginCallback);
+        googleLoginCallback = NULL;
+    }
+    
+    
+    
+}
+#endif
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoogleLoggedIn___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifndef GOOGLE_SIGNIN
     return [[GPPSignIn sharedInstance] authentication];
+#else
+    return [[GIDSignIn sharedInstance] currentUser] != nil;
+#endif
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getGoogleToken___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
@@ -139,7 +178,13 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getGoogleToken___R_java_lang_String
 }
 
 void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifndef GOOGLE_SIGNIN
     [[GPPSignIn sharedInstance] disconnect];
+#else
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[GIDSignIn sharedInstance] disconnect];
+    });
+#endif
     if (accessToken != nil) {
         [accessToken release];
         accessToken = nil;

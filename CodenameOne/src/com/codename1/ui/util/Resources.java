@@ -33,6 +33,7 @@ import com.codename1.ui.animations.Timeline;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -1297,11 +1298,19 @@ public class Resources {
 
             // if this is a padding or margin then we will have the 4 values as bytes
             if(key.endsWith("adding") || key.endsWith("argin")) {
-                int p1 = input.readByte() & 0xff;
-                int p2 = input.readByte() & 0xff;
-                int p3 = input.readByte() & 0xff;
-                int p4 = input.readByte() & 0xff;
-                theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                if(minorVersion > 7) {
+                    float p1 = input.readFloat();
+                    float p2 = input.readFloat();
+                    float p3 = input.readFloat();
+                    float p4 = input.readFloat();
+                    theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                } else {
+                    int p1 = input.readByte() & 0xff;
+                    int p2 = input.readByte() & 0xff;
+                    int p3 = input.readByte() & 0xff;
+                    int p4 = input.readByte() & 0xff;
+                    theme.put(key, "" + p1 + "," + p2 + "," + p3 + "," + p4);
+                }
                 continue;
             }
 
@@ -1569,6 +1578,21 @@ public class Resources {
                             shadowX(input.readFloat()).
                             shadowY(input.readFloat());
                             
+            // round rect border
+            case 0xff13:                    
+                    return RoundRectBorder.create().
+                            stroke(input.readFloat(), input.readBoolean()).
+                            strokeColor(input.readInt()).
+                            strokeOpacity(input.readInt()).
+                            shadowBlur(input.readFloat()).
+                            shadowOpacity(input.readInt()).
+                            shadowSpread(input.readFloat()).
+                            shadowX(input.readFloat()).
+                            shadowY(input.readFloat()).
+                            cornerRadius(input.readFloat()).
+                            bezierCorners(input.readBoolean()).
+                            topOnlyMode(input.readBoolean()).
+                            bottomOnlyMode(input.readBoolean());
         }
         return null;
     }

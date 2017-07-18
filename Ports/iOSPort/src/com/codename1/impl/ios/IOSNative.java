@@ -49,7 +49,7 @@ public final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
-    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar, boolean blockCopyPaste);
+    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
@@ -392,6 +392,7 @@ public final class IOSNative {
     native void restorePurchases();
     native void zoozPurchase(double amount, String currency, String appKey, boolean sandbox, String invoiceNumber);
 
+    native void setLocale(String localeStr);
     native String formatInt(int i);
     native String formatDouble(double d);
     native String formatCurrency(double d);

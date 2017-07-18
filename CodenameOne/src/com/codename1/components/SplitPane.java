@@ -171,6 +171,24 @@ public class SplitPane extends Container {
     }
     
     /**
+     * Changes the minimum, preferred, and maximum insets of the split pane.  This will also
+     * update the current divider position to the supplied preferred inset.
+     * @param minInset The minimum inset.  Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. "25%"
+     * @param preferredInset The preferred inset. Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. "25%"
+     * @param maxInset Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. "25%"
+     */
+    public void changeInsets(String minInset, String preferredInset, String maxInset) {
+        LayeredLayout l = (LayeredLayout)getLayout();
+        initDividerInset(l.createConstraint(), preferredInset).copyTo(this.preferredInset);
+        initDividerInset(l.createConstraint(), minInset).copyTo(this.minInset);
+        initDividerInset(l.createConstraint(), maxInset).copyTo(this.maxInset);
+        
+        l.setInsets(this.topOrLeft, "0 0 0 0")
+                .setInsets(this.topOrLeft, "0 0 0 0");
+        this.preferredInset.copyTo(l.getOrCreateConstraint(divider));
+    }
+    
+    /**
      * The active inset of the divider.
      * @return 
      */
@@ -253,7 +271,8 @@ public class SplitPane extends Container {
     private void clampInset() {
         
         int px = getDividerInset().getAbsolutePixels(divider);
-        
+        isCollapsed = false;
+        isExpanded = false;
         Inset minInset = getMinDividerInset();
         if (minInset.getAbsolutePixels(divider) >= px) {
             minInset.copyTo(getDividerInset());
@@ -434,11 +453,29 @@ public class SplitPane extends Container {
     }
     
     /**
+     * Gets the string value of the preferred inset.  E.g. "25mm", or "50%".  Note:  The preferred
+     * inset is changed automatically when the user drags it to a new location so the value returned here
+     * may be different than the inset supplied in the constructor.
+     * @return The current preferred inset of the divider.
+     */
+    public String getPreferredInset() {
+        return getFixedInset(preferredInset).getValueAsString();
+    }
+    
+    /**
      * Sets the minimum inset allowed for the divider.
      * @param inset The inset.  E.g. "2mm", "10%", "200px"
      */
     public void setMinInset(String inset) {
         getFixedInset(minInset).setValueAsString(inset);
+    }
+    
+    /**
+     * Gets the string value of the minimum inset of the divider.  E.g. "25mm", or "50%".
+     * @return 
+     */
+    public String getMinInset() {
+        return getFixedInset(minInset).getValueAsString();
     }
     
     /**
@@ -450,6 +487,14 @@ public class SplitPane extends Container {
     }
     
     /**
+     * Gets the string value of the maximum inset of the divider.  E.g. "25mm", or "50%"
+     * @return 
+     */
+    public String getMaxInset() {
+        return getFixedInset(maxInset).getValueAsString();
+    }
+    
+    /**
      * Internal component used as the divider.  This responds to drag events and 
      * updates its own insets.  The parent layout is layerd layout, and the left and
      * right containers are anchored to the divider so they are automatically resized
@@ -458,6 +503,7 @@ public class SplitPane extends Container {
      */
     private class Divider extends Container {
         int pressedX, pressedY, draggedX, draggedY;
+        LayeredLayoutConstraint pressedPreferredConstraint;
         LayeredLayoutConstraint pressedConstraint;
         private final Button btnCollapse;
         private final Button btnExpand;
@@ -617,6 +663,7 @@ public class SplitPane extends Container {
             pressedX = x;
             pressedY = y;
             pressedConstraint = ((LayeredLayout)getLayout()).getOrCreateConstraint(this).copy();
+            pressedPreferredConstraint = preferredInset.copy();
             inDrag = true;
             pointerDragged(x, y);
         }
@@ -643,7 +690,10 @@ public class SplitPane extends Container {
 
         @Override
         protected void dragFinished(int x, int y) {
-            super.dragFinished(x, y); 
+            super.dragFinished(x, y);
+            if (!isExpanded && !isCollapsed) {
+                getDividerInset().constraint().copyTo(preferredInset);
+            }
             inDrag = false;
         }
         
@@ -652,14 +702,19 @@ public class SplitPane extends Container {
         private void updateInsets() {
             LayeredLayout ll = (LayeredLayout)SplitPane.this.getLayout();
             LayeredLayoutConstraint cnst = pressedConstraint.copy();
+            int diff = 0;
             if (orientation == HORIZONTAL_SPLIT) {
-                cnst.left().translatePixels(draggedX - pressedX, false, getParent());
+                diff = draggedX - pressedX;
+                cnst.left().translatePixels(diff, false, getParent());
+                
             } else {
-                cnst.top().translatePixels(draggedY - pressedY, false, getParent());
+                diff = draggedY - pressedY;
+                cnst.top().translatePixels(diff, false, getParent());
             }
             cnst.copyTo(ll.getOrCreateConstraint(this));
-            cnst.copyTo(preferredInset);
             clampInset();
+            
+            
             
         }
 

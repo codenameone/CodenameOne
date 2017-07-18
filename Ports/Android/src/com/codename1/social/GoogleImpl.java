@@ -22,12 +22,14 @@
  */
 package com.codename1.social;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender.SendIntentException;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import static com.codename1.impl.android.AndroidImplementation.checkForPermission;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.impl.android.IntentResultListener;
@@ -82,7 +84,11 @@ public class GoogleImpl extends GoogleConnect implements
 
     @Override
     public void nativelogin() {
+        if(!checkForPermission(Manifest.permission.GET_ACCOUNTS, "This is required to login with Google+")) {
+            return;
+        }
         if (mGoogleApiClient != null) {
+            
             mGoogleApiClient.connect();
         }
     }
@@ -178,17 +184,28 @@ public class GoogleImpl extends GoogleConnect implements
 
     private class RequestTokenTask extends AsyncTask<String, Void, String> {
 
+        boolean inRecoverableRequest;
+        Bundle extra;
+        
+        
         @Override
         protected String doInBackground(String... params) {
             String token = null;
 
             try {
-                Context ctx = AndroidNativeUtil.getContext();
-                token = GoogleAuthUtil.getToken(
-                        ctx,
-                        Plus.AccountApi.getAccountName(mGoogleApiClient),
-                        "oauth2:"
-                        + scope);
+                if (extra != null && inRecoverableRequest) {
+                    
+                    token = extra.getString("authtoken");
+                } 
+                if (token == null) {
+                    Context ctx = AndroidNativeUtil.getContext();
+                    token = GoogleAuthUtil.getToken(
+                            ctx,
+                            Plus.AccountApi.getAccountName(mGoogleApiClient),
+                            "oauth2:"
+                            + scope);
+                    
+                }
                 setAccessToken(new AccessToken(token, null));
 
             } catch (IOException transientEx) {
@@ -197,13 +214,16 @@ public class GoogleImpl extends GoogleConnect implements
                 //Log.e(TAG, transientEx.toString());
             } catch (UserRecoverableAuthException e) {
                 // Recover (with e.getIntent())
-                Intent recover = e.getIntent();
+                final Intent recover = e.getIntent();
                 AndroidNativeUtil.startActivityForResult(recover, new IntentResultListener() {
 
                     public void onActivityResult(int requestCode, int resultCode, Intent data) {
                         if (resultCode == Activity.RESULT_OK) {
                             // We had to sign in - now we can finish off the token request.
-                            new RequestTokenTask().execute();
+                            RequestTokenTask task = new RequestTokenTask();
+                            task.inRecoverableRequest = true;
+                            task.extra = recover.getExtras();
+                            task.execute();
                         }
                     }
                 });

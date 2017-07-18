@@ -1439,7 +1439,9 @@ public class Toolbar extends Container {
     public Iterable<Command> getSideMenuCommands() {
         ArrayList<Command> cmds = new ArrayList<Command>();
         if(permanentSideMenu || onTopSideMenu) {
-            findAllCommands(permanentSideMenuContainer, cmds);
+            if(permanentSideMenuContainer != null) {
+                findAllCommands(permanentSideMenuContainer, cmds);
+            }
             return cmds;
         }
         Form f = getComponentForm();

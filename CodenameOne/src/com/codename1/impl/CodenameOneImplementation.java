@@ -337,6 +337,17 @@ public abstract class CodenameOneImplementation {
      */
     public void stopTextEditing() {    
     }
+    
+    /**
+     * Using invokeAndBlock inside EditString creates peculiar behaviour that needs
+     * to be worked around.  Ideally no port should use invokeAndBlock for this
+     * but currently JavaSE and UWP both do.  Need to be able to detect this
+     * for workarounds.
+     * @return 
+     */
+    public boolean usesInvokeAndBlockForEditString() {
+        return false;
+    }
 
     /**
      * Encapsulates the editing code which is specific to the platform, some platforms
@@ -1467,7 +1478,13 @@ public abstract class CodenameOneImplementation {
         
     }
     
-    
+    /**
+     * Cleans up resources used by graphics object
+     * @param graphics 
+     */
+    public void disposeGraphics(Object graphics) {
+        
+    }
     
     
     /**
@@ -2049,6 +2066,50 @@ public abstract class CodenameOneImplementation {
     protected void keyReleased(final int keyCode) {
         Display.getInstance().keyReleased(keyCode);
     }
+    
+    /**
+     * Checks whether the alt key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the shift key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isShiftKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the altgraph key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltGraphKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the control key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isControlKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the meta key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isMetaKeyDown() {
+        return false;
+    }
+    
+    
+    
+   
 
     /**
      * Subclasses should invoke this method, it delegates the event to the display and into
@@ -5885,7 +5946,7 @@ public abstract class CodenameOneImplementation {
      */
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
-        Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
+        //Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
         Preferences.set("push_key", id);
         /*if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);

@@ -32,4 +32,8 @@ public class Accessor {
     public static Object getNativeGraphics(Graphics g) {
         return g.getGraphics();
     }
+    
+    public static boolean isScrollDecelerationMotionInProgress(Component cmp) {
+        return cmp != null && cmp.isScrollDecelerationMotionInProgress();
+    }
 }
