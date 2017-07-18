@@ -60,6 +60,11 @@ import java.util.HashMap;
 public class Component implements Animation, StyleListener {
     
     /**
+     * Indicates whether the component displays the material design ripple effect
+     */
+    private boolean rippleEffect;    
+    
+    /**
      * The default cursor
      */
     public static final int DEFAULT_CURSOR = 0;
@@ -1881,6 +1886,12 @@ public class Component implements Animation, StyleListener {
         g.translate(-transX, -transY);
     }
 
+    private void paintRippleEffect(Graphics g) {
+        if(isRippleEffect() && hasFocus() && Form.rippleMotion != null) {
+            paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.rippleMotion.getValue());
+        } 
+    }
+    
     /**
      * Normally returns getStyle().getBorder() but some subclasses might use this 
      * to programmatically replace the border in runtime e.g. for a pressed border effect
@@ -1938,6 +1949,7 @@ public class Component implements Animation, StyleListener {
             Border b = getBorder();
             if (b != null && b.isBackgroundPainter()) {
                 b.paintBorderBackground(g, this);
+                paintRippleEffect(g);
                 return;
             }
         }
@@ -1945,6 +1957,7 @@ public class Component implements Animation, StyleListener {
             getStyle().getBgPainter().paint(g, bounds);
         }
         paintBackground(g);
+        paintRippleEffect(g);
     }
     
     /**
@@ -2630,6 +2643,22 @@ public class Component implements Animation, StyleListener {
      */
     public void setIgnorePointerEvents(boolean ignorePointerEvents) {
         this.ignorePointerEvents = ignorePointerEvents;
+    }
+
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     * @return the rippleEffect
+     */
+    public boolean isRippleEffect() {
+        return rippleEffect;
+    }
+
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     * @param rippleEffect the rippleEffect to set
+     */
+    public void setRippleEffect(boolean rippleEffect) {
+        this.rippleEffect = rippleEffect;
     }
 
     class AnimationTransitionPainter implements Painter{
@@ -3787,6 +3816,33 @@ public class Component implements Animation, StyleListener {
         pointerPressedListeners.addListener(l);
     }
 
+    /**
+     * Invoked to draw the ripple effect overlay in Android where the finger of the user causes a growing 
+     * circular overlay over time. This method is invoked after paintBackground and is invoked repeatedly until
+     * the users finger is removed, it will only be invoked if isRippleEffect returns true
+     * @param g the graphics object for the component clipped to the background
+     * @param x the x position of the touch
+     * @param y the y position of the touch
+     * @param position a value between 0 and 1000 with 0 indicating the beginning of the ripple effect and 1000 
+     * indicating the completion of it
+     */
+    public void paintRippleOverlay(Graphics g, int x, int y, int position) {
+        int a = g.getAlpha();
+        int c = g.getColor();
+        g.setAlpha(20);
+        g.setColor(0);
+        if(position == 1000) {
+            g.fillRect(getX(), getY(), getWidth(), getHeight());
+        } else {
+            float ratio = ((float)position) / 1000.0f;
+            int w = (int)(((float)getWidth()) * ratio);
+            w = Math.max(w, Display.INSTANCE.convertToPixels(4));
+            g.fillArc(x - getParent().getAbsoluteX() - w / 2, y - getParent().getAbsoluteY() - w / 2, w, w, 0, 360);
+        }
+        g.setAlpha(a);
+        g.setColor(c);
+    }
+    
     /**
      * Removes the listener from the pointer event
      *

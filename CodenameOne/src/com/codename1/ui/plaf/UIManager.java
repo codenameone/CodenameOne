@@ -417,6 +417,12 @@ public class UIManager {
             themeProps.put("Button.sel#bgColor", "a0a0a0");
             themeProps.put("Button.sel#padding", "4,4,4,4");
         }
+        if(installedTheme == null || !installedTheme.containsKey("RaisedButton.derive")) {
+            themeProps.put("RaisedButton.derive", "Button");
+            themeProps.put("RaisedButton.sel#derive", "Button.sel");
+            themeProps.put("RaisedButton.press#derive", "Button.press");
+            themeProps.put("RaisedButton.dis#derive", "Button.dis");
+        }
         
         if(installedTheme == null || !installedTheme.containsKey("Button.press#derive")) {
             themeProps.put("Button.press#border", Border.getDefaultBorder().createPressedVersion());

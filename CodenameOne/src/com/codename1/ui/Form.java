@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -68,6 +69,10 @@ public class Form extends Container {
     private MenuBar menuBar;
     private Component dragged;
     private boolean enableCursors;
+    static Motion rippleMotion;
+    private Component rippleComponent;
+    static int rippleX;
+    static int rippleY;
     
     ArrayList<Component> buttonsAwatingRelease;
     
@@ -1425,6 +1430,12 @@ public class Form extends Container {
      * frame
      */
     void repaintAnimations() {
+        if(rippleComponent != null) {
+            rippleComponent.repaint();
+            if(rippleMotion == null) {
+                rippleComponent = null;
+            } 
+        }
         if (animatableComponents != null) {
             loopAnimations(animatableComponents, null);
         }
@@ -2304,6 +2315,16 @@ public class Form extends Container {
             keyReleased(keyCode);
         }
     }
+    
+    private void initRippleEffect(int x, int y, Component cmp) {
+        if(cmp.isRippleEffect()) {
+            rippleMotion = Motion.createEaseInMotion(0, 1000, 800);
+            rippleMotion.start();
+            rippleComponent = cmp;
+            rippleX = x;
+            rippleY = y;
+        }
+    }
 
     private void tactileTouchVibe(int x, int y, Component cmp) {
         if (tactileTouchDuration > 0 && cmp.isTactileTouch(x, y)) {
@@ -2331,6 +2352,7 @@ public class Form extends Container {
             if (cmp != null && cmp.isEnabled()) {
                 cmp.pointerPressed(x, y);
                 tactileTouchVibe(x, y, cmp);
+                initRippleEffect(x, y, cmp);
             }
             return;
         }
@@ -2375,6 +2397,7 @@ public class Form extends Container {
                         }
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
+                        initRippleEffect(x, y, cmp);
                     }
                 }
             }
@@ -2387,6 +2410,7 @@ public class Form extends Container {
                 if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
                     cmp.pointerPressed(x, y);
                     tactileTouchVibe(x, y, cmp);
+                    initRippleEffect(x, y, cmp);
                 }   
             } else {
                 Component cmp = ((BorderLayout)super.getLayout()).getWest();
@@ -2411,6 +2435,7 @@ public class Form extends Container {
                         cmp.initDragAndDrop(x, y);
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
+                        initRippleEffect(x, y, cmp);
                     }   
                 }
             }
@@ -2476,6 +2501,8 @@ public class Form extends Container {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
         }
 
+        rippleMotion = null;
+        
         if (dragged != null) {
             dragged.pointerDragged(x, y);
             return;
@@ -2532,6 +2559,8 @@ public class Form extends Container {
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
             pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]));
         }
+
+        rippleMotion = null;
 
         if (dragged != null) {
             dragged.pointerDragged(x, y);
@@ -2679,6 +2708,8 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        rippleMotion = null;
+
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
