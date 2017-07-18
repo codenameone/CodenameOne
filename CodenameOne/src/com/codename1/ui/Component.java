@@ -1887,9 +1887,9 @@ public class Component implements Animation, StyleListener {
     }
 
     private void paintRippleEffect(Graphics g) {
-        if(isRippleEffect() && Form.rippleMotion != null) {
+        if(isRippleEffect() && hasFocus() && Form.rippleMotion != null) {
             paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.rippleMotion.getValue());
-        }
+        } 
     }
     
     /**
@@ -1949,6 +1949,7 @@ public class Component implements Animation, StyleListener {
             Border b = getBorder();
             if (b != null && b.isBackgroundPainter()) {
                 b.paintBorderBackground(g, this);
+                paintRippleEffect(g);
                 return;
             }
         }
@@ -3836,7 +3837,7 @@ public class Component implements Animation, StyleListener {
             float ratio = ((float)position) / 1000.0f;
             int w = (int)(((float)getWidth()) * ratio);
             w = Math.max(w, Display.INSTANCE.convertToPixels(4));
-            g.fillArc(x - getAbsoluteX() - w / 2, y - getAbsoluteY() - w / 2, w, w, 0, 360);
+            g.fillArc(x - getParent().getAbsoluteX() - w / 2, y - getParent().getAbsoluteY() - w / 2, w, w, 0, 360);
         }
         g.setAlpha(a);
         g.setColor(c);

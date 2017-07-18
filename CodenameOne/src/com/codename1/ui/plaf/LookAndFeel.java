@@ -927,6 +927,7 @@ public abstract class LookAndFeel {
         }
         
         Button.setCapsTextDefault(manager.isThemeConstant("capsButtonTextBool", false));
+        Button.setButtonRippleEffectDefault(manager.isThemeConstant("buttonRippleBool", false));
         
         defaultFormTintColor = (int)Long.parseLong(manager.getThemeConstant("tintColor", Integer.toHexString(defaultFormTintColor)), 16);
         disableColor = Integer.parseInt(manager.getThemeConstant("disabledColor", Integer.toHexString(disableColor)), 16);

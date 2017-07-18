@@ -58,6 +58,11 @@ import java.util.Vector;
  */
 public class Button extends Label {
     /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     */
+    private static boolean buttonRippleEffectDefault;
+
+    /**
      * Indicates whether text on the button should be drawn capitalized by default to match the Android design
      */
     private static boolean capsTextDefault;
@@ -78,6 +83,22 @@ public class Button extends Label {
      */
     public static void setCapsTextDefault(boolean aCapsTextDefault) {
         capsTextDefault = aCapsTextDefault;
+    }
+
+    /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     * @return the buttonRippleEffectDefault
+     */
+    public static boolean isButtonRippleEffectDefault() {
+        return buttonRippleEffectDefault;
+    }
+
+    /**
+     * Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+     * @param aButtonRippleEffectDefault the buttonRippleEffectDefault to set
+     */
+    public static void setButtonRippleEffectDefault(boolean aButtonRippleEffectDefault) {
+        buttonRippleEffectDefault = aButtonRippleEffectDefault;
     }
     
     /**
@@ -201,7 +222,7 @@ public class Button extends Label {
         this.pressedIcon = icon;
         this.rolloverIcon = icon;
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
-        setRippleEffect(UIManager.getInstance().isThemeConstant("buttonRippleBool", false));        
+        setRippleEffect(buttonRippleEffectDefault);        
     }
     
     /**
