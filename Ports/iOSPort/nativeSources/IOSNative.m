@@ -2613,16 +2613,37 @@ void com_codename1_impl_ios_IOSNative_sendEmailMessage___java_lang_String_1ARRAY
 void com_codename1_impl_ios_IOSNative_startVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
         [m play];
         POOL_END();
     });
 }
 
 void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
         [m stop];
         POOL_END();
     });
@@ -2631,7 +2652,17 @@ void com_codename1_impl_ios_IOSNative_stopVideoComponent___long(CN1_THREAD_STATE
 void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
         [m pause];
         POOL_END();
     });
@@ -2639,11 +2670,17 @@ void com_codename1_impl_ios_IOSNative_pauseVideoComponent___long(CN1_THREAD_STAT
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getMediaTimeMS___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+    MPMoviePlayerController* m = nil;;
     if([obj isKindOfClass:[MPMoviePlayerController class]]) {
-        MPMoviePlayerController* m = (MPMoviePlayerController*) obj;
-        return (int)m.currentPlaybackTime * 1000;
+        m = (MPMoviePlayerController*)obj;
+    } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+        MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+        m = mv.moviePlayer;
+    } else {
+        return 0;
     }
-    return 0;
+    return (int)m.currentPlaybackTime * 1000;
+
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_setMediaTimeMS___long_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_INT time) {
@@ -2770,9 +2807,24 @@ void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STA
 
 JAVA_BOOLEAN responseIsVideoPlaying = 0;
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    if (peer == 0) {
+        return JAVA_FALSE;
+    }
+    responseIsVideoPlaying = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
         responseIsVideoPlaying = m.playbackState == MPMoviePlaybackStatePlaying;
         POOL_END();
     });
@@ -2782,7 +2834,18 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoPlaying___long(CN1_THREAD_S
 void com_codename1_impl_ios_IOSNative_setVideoFullScreen___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN fullscreen) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
         [m setFullscreen:fullscreen];
         POOL_END();
     });
@@ -2793,7 +2856,18 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isVideoFullScreen___long(CN1_THREA
     responseIsVideoFullScreen = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerController* m = (BRIDGE_CAST MPMoviePlayerController*) ((void *)peer);
+        
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            return;
+        }
+
         responseIsVideoFullScreen = [m isFullscreen];
         POOL_END();
     });
@@ -2814,7 +2888,6 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         POOL_END();
     });
 }
-
 
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 JAVA_LONG com_codename1_impl_ios_IOSNative_createCLLocation__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
