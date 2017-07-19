@@ -154,9 +154,6 @@ public class Button extends Label {
      */
     public Button(String text) {
         this(text, null, "Button");
-        if(isCapsText() && text != null) {
-            super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
-        } 
     }
     
     /**
@@ -223,6 +220,9 @@ public class Button extends Label {
         this.rolloverIcon = icon;
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
         setRippleEffect(buttonRippleEffectDefault);        
+        if(isCapsText() && text != null) {
+            super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
+        } 
     }
     
     /**
@@ -833,7 +833,7 @@ public class Button extends Label {
      */
     public final boolean isCapsText() {
         if(capsText == null) {
-            return capsTextDefault && getUIID().equals("Button");
+            return capsTextDefault && (getUIID().equals("Button") || getUIID().equals("RaisedButton"));
         }
         return capsText;
     }
