@@ -140,7 +140,7 @@ public class AndroidNativeUtil {
     /**
      * Start an intent for result
      */ 
-    public static void startActivityForResult(Intent intent, final IntentResultListener listener){
+    public static void startActivityForResult(Intent intent, int requestCode, final IntentResultListener listener){
         if (getActivity() == null) {
             throw new RuntimeException("Cannot start activity for result when running in background.");
         }
@@ -153,7 +153,11 @@ public class AndroidNativeUtil {
                 act.restoreIntentResultListener();
             }
         });
-        act.startActivityForResult(intent, 2000);
+        act.startActivityForResult(intent, requestCode);
+    }
+    
+    public static void startActivityForResult(Intent intent, final IntentResultListener listener){
+        startActivityForResult(intent, 2000, listener);
     }
     
     private static HashMap<Class, BitmapViewRenderer> viewRendererMap;

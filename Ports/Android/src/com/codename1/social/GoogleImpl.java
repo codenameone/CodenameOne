@@ -22,30 +22,41 @@
  */
 package com.codename1.social;
 
-import android.Manifest;
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender.SendIntentException;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import static com.codename1.impl.android.AndroidImplementation.checkForPermission;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.CodenameOneActivity;
 import com.codename1.impl.android.IntentResultListener;
 import com.codename1.impl.android.LifecycleListener;
 import com.codename1.io.AccessToken;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
 import com.codename1.ui.Display;
-import com.google.android.gms.auth.GoogleAuthException;
-import com.google.android.gms.auth.GoogleAuthUtil;
-import com.google.android.gms.auth.UserRecoverableAuthException;
+import com.codename1.util.SuccessCallback;
+import com.google.android.gms.auth.api.Auth;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.auth.api.signin.GoogleSignInResult;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.common.Scopes;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.plus.Plus;
-import com.google.android.gms.plus.model.people.Person;
+//import com.google.android.gms.plus.Plus;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Scope;
+import com.google.android.gms.common.api.Status;
+//import com.google.android.gms.plus.Plus;
+//import com.google.android.gms.plus.model.people.Person;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * This is an implementation to the google sign in.
@@ -58,6 +69,7 @@ public class GoogleImpl extends GoogleConnect implements
         GoogleApiClient.OnConnectionFailedListener,
         LifecycleListener {
 
+    private static final int RC_SIGN_IN = 9001;
     private GoogleApiClient mGoogleApiClient;
 
     private boolean mIntentInProgress;
@@ -82,28 +94,214 @@ public class GoogleImpl extends GoogleConnect implements
         return false;
     }
 
+    
+    private void nativeLoginImpl(final GoogleApiClient client) {
+        Intent signInIntent = Auth.GoogleSignInApi.getSignInIntent(client);
+        AndroidNativeUtil.startActivityForResult(signInIntent, RC_SIGN_IN, new IntentResultListener() {
+            @Override
+            public void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+                // Result returned from launching the Intent from GoogleSignInApi.getSignInIntent(...);
+                if (requestCode == RC_SIGN_IN) {
+                    final GoogleSignInResult result = Auth.GoogleSignInApi.getSignInResultFromIntent(data);
+
+                    if (result.isSuccess()) {
+                        // Signed in successfully, show authenticated UI.
+                        GoogleSignInAccount acct = result.getSignInAccount();
+                        String displayName = acct.getDisplayName();
+                        String acctId = acct.getId();
+                        String email = acct.getEmail();
+                        String requestIdToken = acct.getIdToken();
+                        Set<Scope> grantedScopes = acct.getGrantedScopes();
+                        String code = acct.getServerAuthCode();
+                        String scopeStr = scope;
+                        System.out.println("Token is "+acct.getIdToken());
+                        if (acct.getIdToken() == null && clientId != null && clientSecret != null) {
+                            Log.p("Received null ID token even though clientId and clientSecret are set.");
+                        }
+                        // In order to use Google's REST APIs, we'll need to request a token
+                        // that can be used for OAuth2 requests.  The requestId token we received
+                        // doesn't do this, but we can use it to request a token that does.
+                        // We'll only request this token if the clientId and clientSecret were
+                        // supplied (these should be the client ID and client secret for web clients)
+                        // otherwise we'll set the token to null.
+                        if (clientId != null && clientSecret != null && requestIdToken != null && code != null) {
+                            ConnectionRequest req = new ConnectionRequest() {
+                                @Override
+                                protected void readResponse(InputStream input) throws IOException {
+                                    Map<String, Object> json = new JSONParser().parseJSON(new InputStreamReader(input, "UTF-8"));
+                                    if (json.containsKey("access_token")) {
+                                        setAccessToken(new AccessToken((String) json.get("access_token"), null));
+                                        Display.getInstance().callSerially(new Runnable() {
+
+                                            @Override
+                                            public void run() {
+                                                callback.loginSuccessful();
+                                            }
+                                        });
+                                    } else {
+                                        setAccessToken(new AccessToken(null, null));
+                                        Log.p("Failed to retrieve the access token from the google auth server.  Login succeeded, but access token is null, so you won't be able to use it to retrieve additional information.");
+                                        Log.p("Response was " + json);
+                                        Display.getInstance().callSerially(new Runnable() {
+
+                                            @Override
+                                            public void run() {
+                                                callback.loginSuccessful();
+                                            }
+                                        });
+                                    }
+                                }
+                            };
+                            req.setUrl("https://www.googleapis.com/oauth2/v4/token");
+                            req.addArgument("grant_type", "authorization_code");
+                            //req.addArgument("client_id", "555462747934-iujpd5saj4pjpibo7c6r9tbjfef22rh1.apps.googleusercontent.com");
+                            req.addArgument("client_id", clientId);
+                            //req.addArgument("client_secret", "650YqplrnAI0KXb9LMUnVNnx");
+                            req.addArgument("client_secret", clientSecret);
+                            req.addArgument("redirect_uri", "");
+                            req.addArgument("code", code);
+                            req.addArgument("id_token", requestIdToken);
+                            req.setPost(true);
+                            req.setReadResponseForErrors(true);
+                            NetworkManager.getInstance().addToQueue(req);
+                        } else {
+                            setAccessToken(new AccessToken(null, null));
+                            Log.p("The access token was set to null because one of clientId, clientSecret, requestIdToken, or auth were null");
+                            Log.p("The login succeeded, but you won't be able to make any requests to Google's REST apis using the login token.");
+                            Log.p("In order to obtain a token that can be used with Google's REST APIs, you need to set the clientId, and clientSecret of" +
+                                    "the GoogleConnect instance to valid OAuth2.0 Client IDs for Web Clients.");
+                            Log.p("See https://console.developers.google.com/apis/credentials");
+                            Log.p("You can get the OAuth2.0 client ID for this project in your google-services.json file in the oauth_client section");
+
+                            Display.getInstance().callSerially(new Runnable() {
+
+                                @Override
+                                public void run() {
+                                    callback.loginSuccessful();
+                                }
+                            });
+                        }
+
+                    } else {
+                        if (callback != null) {
+                            if (callback != null) {
+                                Display.getInstance().callSerially(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        callback.loginFailed(GooglePlayServicesUtil.getErrorString(result.getStatus().getStatusCode()));
+                                    }
+                                });
+                            }
+                        }
+                    }
+
+                }
+            }
+        });
+        
+    }
+    
     @Override
     public void nativelogin() {
-        if(!checkForPermission(Manifest.permission.GET_ACCOUNTS, "This is required to login with Google+")) {
-            return;
-        }
-        if (mGoogleApiClient != null) {
-            
-            mGoogleApiClient.connect();
-        }
-    }
+        //if(!checkForPermission(Manifest.permission.GET_ACCOUNTS, "This is required to login with Google+")) {
+        //    return;
+        //}
+        getClient(new SuccessCallback<GoogleApiClient>() {
 
+            @Override
+            public void onSucess(GoogleApiClient client) {
+                nativeLoginImpl(client);
+            }
+            
+        });
+        
+    }
+    
+    private List<SuccessCallback<GoogleApiClient>> onConnectedCallbacks = new ArrayList<SuccessCallback<GoogleApiClient>>();
+    
+    private GoogleApiClient getClient(SuccessCallback<GoogleApiClient> onConnected) {
+        if (mGoogleApiClient == null) {
+            Context ctx = AndroidNativeUtil.getContext();
+            if (mGoogleApiClient == null) {
+                GoogleSignInOptions gso;
+
+                if (clientId != null && clientSecret != null) {
+                    System.out.println("Generating GoogleSignIn for clientID="+clientId);
+                    gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            //.requestIdToken("555462747934-iujpd5saj4pjpibo7c6r9tbjfef22rh1.apps.googleusercontent.com")
+                            .requestIdToken(clientId)
+                            //.requestScopes(Plus.SCOPE_PLUS_PROFILE)
+                            //.requestServerAuthCode("555462747934-iujpd5saj4pjpibo7c6r9tbjfef22rh1.apps.googleusercontent.com")
+                            .requestServerAuthCode(clientId)
+                            .build();
+                } else {
+                    System.out.println("Generating GoogleSignIn without ID token");
+                    gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build();
+                }
+                mGoogleApiClient = new GoogleApiClient.Builder(ctx)
+                        .addConnectionCallbacks(this)
+                        .addOnConnectionFailedListener(this)
+                        .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
+                        .build();
+            }
+        }
+        if (mGoogleApiClient.isConnected()) {
+            if (onConnected != null) {
+                onConnected.onSucess(mGoogleApiClient);
+            }
+        } else {
+            synchronized(onConnectedCallbacks) {
+                if (onConnected != null) {
+                    onConnectedCallbacks.add(onConnected);
+                }
+                if (!mGoogleApiClient.isConnecting()) {
+                    mGoogleApiClient.connect(GoogleApiClient.SIGN_IN_MODE_OPTIONAL);
+                }
+            }
+        }
+        return mGoogleApiClient;
+    }
+    
+    
     @Override
     public void nativeLogout() {
-        if (mGoogleApiClient != null) {
-            Plus.AccountApi.clearDefaultAccount(mGoogleApiClient);
-            mGoogleApiClient.disconnect();
-            mGoogleApiClient = null;
-        }
+        
+        getClient(new SuccessCallback<GoogleApiClient>() {
+
+            @Override
+            public void onSucess(final GoogleApiClient client) {
+                Auth.GoogleSignInApi.signOut(client).setResultCallback(
+                    new ResultCallback<Status>() {
+                        @Override
+                        public void onResult(Status status) {
+                            Log.p("Finished signing out "+status);
+                            setAccessToken(null);
+                            mGoogleApiClient = null;
+                            client.disconnect();
+                        }
+                    });
+            }
+            
+        });
     }
 
     public void onConnected(Bundle bundle) {
-        new RequestTokenTask().execute();
+        List<SuccessCallback<GoogleApiClient>> callbacks;
+    
+        synchronized(onConnectedCallbacks) {
+            if (!onConnectedCallbacks.isEmpty()) {
+                callbacks = new ArrayList<SuccessCallback<GoogleApiClient>>(onConnectedCallbacks);
+                onConnectedCallbacks.clear();
+            } else {
+                callbacks = new ArrayList<SuccessCallback<GoogleApiClient>>();
+            }
+        }
+        GoogleApiClient client = mGoogleApiClient;
+        for (SuccessCallback<GoogleApiClient> cb : callbacks) {
+            cb.onSucess(client);
+        }
 
     }
 
@@ -151,19 +349,17 @@ public class GoogleImpl extends GoogleConnect implements
         }
     }
 
+    private boolean wasConnected;
     public void onCreate(Bundle savedInstanceState) {
+        clientId = savedInstanceState.getString("clientId");
+        clientSecret = savedInstanceState.getString("clientSecret");
+        wasConnected = savedInstanceState.getBoolean("isConnected", false);
     }
 
     public void onResume() {
-        Context ctx = AndroidNativeUtil.getContext();
-        if (mGoogleApiClient == null) {
-            mGoogleApiClient = new GoogleApiClient.Builder(ctx)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .addApi(Plus.API, Plus.PlusOptions.builder().build())
-                    .addScope(Plus.SCOPE_PLUS_LOGIN)
-                    .addScope(Plus.SCOPE_PLUS_PROFILE)
-                    .build();
+        if (wasConnected) {
+            wasConnected = false;
+            getClient(null);
         }
     }
 
@@ -173,81 +369,18 @@ public class GoogleImpl extends GoogleConnect implements
     public void onDestroy() {
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
             mGoogleApiClient.disconnect();
+            mGoogleApiClient = null;
         }
     }
 
     public void onSaveInstanceState(Bundle b) {
+        b.putString("clientId", clientId);
+        b.putString("clientSecret", clientSecret);
+        b.putBoolean("isConnected", mGoogleApiClient != null && mGoogleApiClient.isConnected());
     }
 
     public void onLowMemory() {
     }
 
-    private class RequestTokenTask extends AsyncTask<String, Void, String> {
 
-        boolean inRecoverableRequest;
-        Bundle extra;
-        
-        
-        @Override
-        protected String doInBackground(String... params) {
-            String token = null;
-
-            try {
-                if (extra != null && inRecoverableRequest) {
-                    
-                    token = extra.getString("authtoken");
-                } 
-                if (token == null) {
-                    Context ctx = AndroidNativeUtil.getContext();
-                    token = GoogleAuthUtil.getToken(
-                            ctx,
-                            Plus.AccountApi.getAccountName(mGoogleApiClient),
-                            "oauth2:"
-                            + scope);
-                    
-                }
-                setAccessToken(new AccessToken(token, null));
-
-            } catch (IOException transientEx) {
-                transientEx.printStackTrace();
-                // Network or server error, try later
-                //Log.e(TAG, transientEx.toString());
-            } catch (UserRecoverableAuthException e) {
-                // Recover (with e.getIntent())
-                final Intent recover = e.getIntent();
-                AndroidNativeUtil.startActivityForResult(recover, new IntentResultListener() {
-
-                    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-                        if (resultCode == Activity.RESULT_OK) {
-                            // We had to sign in - now we can finish off the token request.
-                            RequestTokenTask task = new RequestTokenTask();
-                            task.inRecoverableRequest = true;
-                            task.extra = recover.getExtras();
-                            task.execute();
-                        }
-                    }
-                });
-            } catch (GoogleAuthException authEx) {
-                authEx.printStackTrace();
-                // The call is not ever expected to succeed
-                // assuming you have already verified that 
-                // Google Play services is installed.
-            }
-            return token;
-        }
-
-        @Override
-        protected void onPostExecute(String token) {
-            if (callback != null && token != null) {
-                Display.getInstance().callSerially(new Runnable() {
-
-                    @Override
-                    public void run() {
-                        callback.loginSuccessful();
-                    }
-                });
-            }
-        }
-
-    }
 }
