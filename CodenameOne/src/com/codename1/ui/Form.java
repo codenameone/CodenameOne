@@ -70,7 +70,7 @@ public class Form extends Container {
     private Component dragged;
     private boolean enableCursors;
     static Motion rippleMotion;
-    private Component rippleComponent;
+    static Component rippleComponent;
     static int rippleX;
     static int rippleY;
     
