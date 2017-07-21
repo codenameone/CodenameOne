@@ -1157,6 +1157,7 @@ public class Container extends Component implements Iterable<Component>{
             
             // for complex hierarchies 
             if(getParent() != null) {
+                getParent().shouldLayout = true;
                 getParent().layoutContainer();
             } else {
                 layoutContainer();
