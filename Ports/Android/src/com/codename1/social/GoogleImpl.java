@@ -35,6 +35,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 import com.google.android.gms.auth.api.Auth;
@@ -43,6 +44,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.auth.api.signin.GoogleSignInResult;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.common.Scopes;
 import com.google.android.gms.common.api.GoogleApiClient;
 //import com.google.android.gms.plus.Plus;
 import com.google.android.gms.common.api.ResultCallback;
@@ -229,9 +231,28 @@ public class GoogleImpl extends GoogleConnect implements
 
                 if (clientId != null && clientSecret != null) {
                     System.out.println("Generating GoogleSignIn for clientID="+clientId);
+                    List<Scope> includeScopes = new ArrayList<Scope>();
+                    Scope firstScope = new Scope(Scopes.PROFILE);
+                    if (scope != null) {
+                        for (String str : Util.split(scope, " ")) {
+                            if ("profile".equals(str)) {
+                                //str = Scopes.PROFILE;
+                                continue;
+                            } else if ("email".equals(str)) {
+                                str = Scopes.EMAIL;
+                            } else if (Scopes.PROFILE.equals(str)) {
+                                continue;
+                            }
+                            if (str.trim().isEmpty()) {
+                                continue;
+                            }
+                            includeScopes.add(new Scope(str.trim()));
+                        }
+                    }
                     gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                             //.requestIdToken("555462747934-iujpd5saj4pjpibo7c6r9tbjfef22rh1.apps.googleusercontent.com")
                             .requestIdToken(clientId)
+                            .requestScopes(firstScope, includeScopes.toArray(new Scope[includeScopes.size()]))
                             //.requestScopes(Plus.SCOPE_PLUS_PROFILE)
                             //.requestServerAuthCode("555462747934-iujpd5saj4pjpibo7c6r9tbjfef22rh1.apps.googleusercontent.com")
                             .requestServerAuthCode(clientId)
