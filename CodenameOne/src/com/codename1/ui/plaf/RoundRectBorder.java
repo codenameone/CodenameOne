@@ -32,9 +32,12 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 
 /**
- * <p>Customizable rounded rectangle border that breaks down the border into customizable pieces</p>
+ * <p>Customizable rounded rectangle border that breaks down the border into customizable pieces.
+ * The background is inherited from the parent UIID but stroke and shadow can be customized via user settings.
+ * </p>
+ * <script src="https://gist.github.com/codenameone/27bd5a15c7000118089d8037e2dd9367.js"></script>
+ * <img src="https://www.codenameone.com/img/blog/round-rect-sample.png" alt="Round Rect Border" />
  * 
- *
  * @author Shai Almog
  */
 public class RoundRectBorder extends Border {

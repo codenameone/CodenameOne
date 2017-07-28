@@ -88,7 +88,7 @@ public class TestExecuter {
                     timeoutKiller.schedule(timeoutTask, timeout);
                     TestReporting.getInstance().startingTestCase(test);
                     test.prepare();
-                    TestReporting.getInstance().logMessage("Test prepared for execution on EDT");
+                    TestReporting.getInstance().logMessage("Test prepared for execution off the EDT");
                     failed = !test.runTest();
                     test.cleanup();
                     TestReporting.getInstance().finishedTestCase(test, !failed);
