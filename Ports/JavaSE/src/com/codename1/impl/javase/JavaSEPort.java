@@ -176,6 +176,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     boolean takingScreenshot;
     float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
+    static double retinaScale = 1.0;
     
     /**
      * When set to true pointer hover events will be called for mouse move events
@@ -282,11 +283,19 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
-            if(defaultPixelMilliRatio.doubleValue() == 10) {
+            /*
+            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
                 return Display.DENSITY_MEDIUM;
             }
-            if(defaultPixelMilliRatio.doubleValue() == 20) {
+            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
                 return Display.DENSITY_VERY_HIGH;
+            }
+            System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
+            */
+            if (retinaScale > 1.5) {
+                return Display.DENSITY_VERY_HIGH;
+            } else {
+                return Display.DENSITY_MEDIUM;
             }
         }
         return super.getDeviceDensity();
@@ -356,6 +365,14 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static int medianFontSize = 15;
     private static int smallFontSize = 11;
     private static int largeFontSize = 19;
+    static {
+        if (retinaScale > 1.5) {
+            medianFontSize = (int)(medianFontSize * retinaScale);
+            smallFontSize = (int)(smallFontSize * retinaScale);
+            largeFontSize = (int)(largeFontSize * retinaScale);
+            
+        }
+    }
     private static String fontFaceProportional = "SansSerif";
     private static String fontFaceMonospace = "Monospaced";
     private static boolean useNativeInput = true;
@@ -743,6 +760,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             addMouseMotionListener(this);
             addHierarchyBoundsListener(this);
             setFocusable(true);
+            setOpaque(false);
             requestFocus();
         }
         
@@ -765,7 +783,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void updateBufferSize() {
             if (getScreenCoordinates() == null) {
                 java.awt.Dimension d = getSize();
-                if (buffer == null || buffer.getWidth() != d.width || buffer.getHeight() != d.height) {
+                if (buffer == null || buffer.getWidth() != (int)(d.width * retinaScale) || buffer.getHeight() != (int)(d.height*retinaScale)) {
                     buffer = createBufferedImage();
                 }
             } else {
@@ -834,6 +852,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
             AffineTransform t = ((Graphics2D)g).getTransform();
+            AffineTransform t2 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
+            t2.concatenate(t);
+            ((Graphics2D)g).setTransform(t2);
             boolean painted = false;
             Rectangle screenCoord = getScreenCoordinates();
             if (screenCoord != null) {
@@ -870,8 +891,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 }
                 updateGraphicsScale(g);
+                if (zoomLevel != 1) {
+                    AffineTransform t3 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
+                    t3.concatenate(((Graphics2D)g).getTransform());
+                    ((Graphics2D)g).setTransform(t3);
+                }
+                //((Graphics2D)g).setTransform(t2);
                 g.drawImage(getSkin(), x, y, this);
-                ((Graphics2D)g).setTransform(t);
+                
             } else {
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
@@ -888,6 +915,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 g.drawImage(buffer, x, y, this);
             }
+            ((Graphics2D)g).setTransform(t);
             return painted;
         }
 
@@ -919,11 +947,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return forcedSize;
             }
             if (getSkin() != null) {
-                return new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight());
+                return new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale));
             }
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
-                return new java.awt.Dimension(f.getPreferredW(), f.getPreferredH());
+                return new java.awt.Dimension((int)(f.getPreferredW() / retinaScale), (int)(f.getPreferredH() / retinaScale));
             }
             return new java.awt.Dimension(800, 480);
         }
@@ -951,7 +979,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getScreenCoordinates() != null) {
                 return new BufferedImage(Math.max(20, (int) (getScreenCoordinates().width * zoomLevel)), Math.max(20, (int) (getScreenCoordinates().height * zoomLevel)), BufferedImage.TYPE_INT_RGB);
             }
-            return new BufferedImage(Math.max(20, getWidth()), Math.max(20, getHeight()), BufferedImage.TYPE_INT_RGB);
+            return new BufferedImage(Math.max(20, (int)(getWidth() * retinaScale)), Math.max(20, (int)(getHeight() * retinaScale)), BufferedImage.TYPE_INT_RGB);
         }
 
         public void validate() {
@@ -1029,16 +1057,16 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private int scaleCoordinateX(int coordinate) {
             if (getScreenCoordinates() != null) {
-                return (int) (coordinate / zoomLevel - (getScreenCoordinates().x + x));
+                return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().x + x));
             }
-            return coordinate;
+            return (int)(coordinate * retinaScale);
         }
 
         private int scaleCoordinateY(int coordinate) {
             if (getScreenCoordinates() != null) {
-                return (int) (coordinate / zoomLevel - (getScreenCoordinates().y + y));
+                return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().y + y));
             }
-            return coordinate;
+            return (int)(coordinate * retinaScale);
         }
         Integer triggeredKeyCode;
 
@@ -1242,7 +1270,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getSkin() == null && !desktopSkin) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                        JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
                     }
                 });
                 
@@ -1253,8 +1281,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             if (getSkin() != null) {
                 if (!scrollableSkin) {
-                    float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
-                    float h1 = ((float) getParent().getHeight()) / ((float) getSkin().getHeight());
+                    float w1 = ((float) getParent().getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+                    float h1 = ((float) getParent().getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
                     zoomLevel = Math.min(h1, w1);
                     Form f = Display.getInstance().getCurrent();
                     if (f != null) {
@@ -1263,44 +1291,74 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 getParent().repaint();
             } else {  
+                //some ugly hacks to workaround black screen issue
+                if (canvas != null) {
+                    canvas.setForcedSize(new Dimension(getWidth(), getHeight()));
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
+                            Form f = Display.getInstance().getCurrent();
+                            if (f != null) {
+                                f.forceRevalidate();
+                                f.revalidate();
+                                f.repaint();
+                            }
+                            EventQueue.invokeLater(new Runnable() {
+                                public void run() {
+                                    getParent().repaint();
+                                }
+                            });
+                        }
+                    });
+                    getParent().repaint();
+                    return;
+                } 
+                
                 if(reSize == null){
                     reSize = new java.util.Timer();
                 }else{
                     reSize.cancel();
                     reSize = new java.util.Timer();
                 }
-                //some ugly hacks to workaround black screen issue
+                
                 reSize.schedule(new TimerTask(){
                     @Override
                     public void run() {
-                        if(mediaContainer != null){
-                            JavaSEPort.this.sizeChanged(mediaContainer.getWidth(), mediaContainer.getHeight());
-                        }else{
-                            JavaSEPort.this.sizeChanged(getWidth(), getHeight());
-                        }
-                        try {
-                            Thread.sleep(1000);                                            
-                        } catch (Exception e) {
-                        }
-                        g2dInstance = null;
-                        Form f = Display.getInstance().getCurrent();
-                        if (f != null) {
-                            f.forceRevalidate();
-                        }
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    Thread.sleep(1500);
-                                } catch (Exception e) {
-                                }
-                                if (window != null) {
-                                    window.repaint();
-                                }
-                            }
-                        }).start();
+                        //if(mediaContainer != null){
+                        //    System.out.println("Resize with media container");
+                        //    JavaSEPort.this.sizeChanged((int)(mediaContainer.getWidth() * retinaScale), (int)(mediaContainer.getHeight() * retinaScale));
+                        //}else{
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
+                                    try {
+                                        Thread.sleep(1000);                                            
+                                    } catch (Exception e) {
+                                    }
+                                    g2dInstance = null;
+                                    Form f = Display.getInstance().getCurrent();
+                                    if (f != null) {
+                                        f.forceRevalidate();
+                                    }
+                                    new Thread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            try {
+                                                Thread.sleep(1500);
+                                            } catch (Exception e) {
+                                            }
+                                            if (window != null) {
+                                                window.repaint();
+                                            }
+                                        }
+                                    }).start();
 
-                        reSize = null;
+                                    reSize = null;
+                                }
+                            });
+                            
+                        //}
+                        
                     }
                     
                 }, 2000);
@@ -1523,10 +1581,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         }
-        screenPosition.x = screenX1;
-        screenPosition.y = screenY1;
-        screenPosition.width = screenX2 - screenX1 + 1;
-        screenPosition.height = screenY2 - screenY1 + 1;
+        double scale = 1.0; // retinaScale
+        screenPosition.x = (int)(screenX1 / scale);
+        screenPosition.y = (int)(screenY1 / scale); 
+        screenPosition.width = (int)((screenX2 - screenX1 + 1)/scale);
+        screenPosition.height = (int)((screenY2 - screenY1 + 1)/scale);
     }
 
     private static void readFully(InputStream i, byte b[]) throws IOException {
@@ -2547,11 +2606,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     pref.putBoolean("Portrait", portrait);
 
-                    float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
-                    float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
+                    float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth()/(float)retinaScale);
+                    float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight()/(float)retinaScale);
                     zoomLevel = Math.min(h1, w1);
                     frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
 
@@ -2563,7 +2622,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void actionPerformed(ActionEvent ae) {
                     frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 1;
@@ -2577,7 +2636,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void actionPerformed(ActionEvent ae) {
                     frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() / 2, getSkin().getHeight() / 2));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 0.25f;
@@ -2591,7 +2650,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void actionPerformed(ActionEvent ae) {
                     frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() / 2, getSkin().getHeight() / 2));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 0.5f;
@@ -2605,7 +2664,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 public void actionPerformed(ActionEvent ae) {
                     frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() * 2, getSkin().getHeight() * 2));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() * 2 / retinaScale), (int)(getSkin().getHeight() * 2 / retinaScale)));
                     frm.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 2;
@@ -2652,7 +2711,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         frm.remove(vSelector);
                     }
                     frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                     frm.add(BorderLayout.CENTER, canvas);
 
                     canvas.x = 0;
@@ -3137,8 +3196,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
 
             public void run() {
-                float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
+                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
                 zoomLevel = Math.min(h1, w1);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
                 deepRevaliate(Display.getInstance().getCurrent());
@@ -3150,7 +3209,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 deepRevaliate(Display.getInstance().getCurrent());
                 JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 Display.getInstance().getCurrent().revalidate();
-                canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() /retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                 zoomLevel = 1;
                 frm.pack();
             }
@@ -3224,6 +3283,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             JPanel panel = new javax.swing.JPanel();  
             panel.setLayout(new BorderLayout());
             JPanel bottom = new javax.swing.JPanel(); 
+            panel.setOpaque(false);
             bottom.setLayout(new FlowLayout(FlowLayout.RIGHT));
             widthLabel = new JLabel("Width:   ");
             heightLabel = new JLabel(" Height:   ");
@@ -3232,6 +3292,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             panel.add(bottom, BorderLayout.SOUTH);
             
             JFrame frame = new JFrame();
+            //frame.addWindowListener(new WindowListener() {
+            //    
+            //});
             frame.setLayout(new BorderLayout());
             frame.add(panel, BorderLayout.CENTER);
             frame.setSize(new Dimension(300, 400));
@@ -3369,15 +3432,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             window.pack();
             if (getSkin() != null && !scrollableSkin) {
-                float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
+                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
                 zoomLevel = Math.min(h1, w1);
             }
 
             portrait = pref.getBoolean("Portrait", true);
             if (!portrait && getSkin() != null) {
-                canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                window.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
             }
             window.setVisible(true);
         }
@@ -3434,11 +3497,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private int getDisplayWidthImpl() {
         if (getScreenCoordinates() != null) {
-            return getScreenCoordinates().width;
+            return getScreenCoordinates().width ;
         }
-        int w = canvas.getWidth();
+        int w = (int)(canvas.getWidth() * retinaScale);
         if (w < 10 && canvas.getParent() != null) {
-            return canvas.getParent().getWidth();
+            return (int)(canvas.getParent().getWidth() * retinaScale);
         }
         return Math.max(w, 100);
     }
@@ -3454,9 +3517,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (getScreenCoordinates() != null) {
             return getScreenCoordinates().height;
         }
-        int h = canvas.getHeight();
+        int h = (int)(canvas.getHeight() * retinaScale);
         if (h < 10 && canvas.getParent() != null) {
-            return canvas.getParent().getHeight();
+            return (int)(canvas.getParent().getHeight() * retinaScale);
         }
         return Math.max(h, 100);
     }
@@ -3751,7 +3814,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 };
-                
+                /*
                 ((JTextField)t).addActionListener(new ActionListener() {
 
                     @Override
@@ -3771,6 +3834,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     
                 });
+                */
             }
             swingT = t;
             textCmp = swingT;
@@ -3891,6 +3955,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     testRecorder.editTextFieldCompleted(cmp, txt);
                 }
                 Display.getInstance().onEditingComplete(cmp, txt);
+                if (e != null && cmp instanceof com.codename1.ui.TextField) {
+                    final com.codename1.ui.TextField cn1Tf = (com.codename1.ui.TextField)cmp;
+                    if (cmp != null && cn1Tf.getDoneListener() != null) {
+                        cn1Tf.fireDoneEvent();
+                    }
+                }
                 if (tf instanceof JTextField) {
                     ((JTextField) tf).removeActionListener(this);
                 }
@@ -4639,31 +4709,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     boolean drawingNativePeer;
     public void drawNativePeer(final Object graphics, final PeerComponent cmp, final JComponent jcmp) {
-        checkEDT();
-        Graphics2D nativeGraphics = getGraphics(graphics);
-        nativeGraphics = (Graphics2D)nativeGraphics.create();
-        nativeGraphics.translate(cmp.getAbsoluteX(), cmp.getAbsoluteY());
+        drawingNativePeer = true;
+    
         try {
-            drawingNativePeer = true;
-            if (zoomLevel != 1) {
-                nativeGraphics.scale(1/zoomLevel, 1/zoomLevel);
-            } else if (takingScreenshot && screenshotActualZoomLevel != 1) {
-                nativeGraphics.scale(1/screenshotActualZoomLevel, 1/screenshotActualZoomLevel);
+            synchronized(cmp) {
+                if (cmp.getClientProperty("__buffer") != null) {
+                    BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
+                    Graphics2D nativeGraphics = getGraphics(graphics);
+                    nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
+                }
             }
-            jcmp.paint(nativeGraphics);
-            //if (zoomLevel != 1 && graphics != nativeGraphics) {
-            //    nativeGraphics.scale(zoomLevel, zoomLevel);
-            //    if (nativeGraphics == graphics) {
-            //        nativeGraphics.scale(zoomLevel, zoomLevel);
-            //    }
-            //}
-        } catch (Exception ex){}
-        finally {
+        } finally {
             drawingNativePeer = false;
-            //nativeGraphics.translate(-cmp.getAbsoluteX(), -cmp.getAbsoluteY());
-            nativeGraphics.dispose();
         }
-        
         
     }
 
@@ -4881,11 +4939,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    NativeScreenGraphics ng;
+    
     /**
      * @inheritDoc
      */
     public Object getNativeGraphics() {
-        return new NativeScreenGraphics();
+        if (ng == null) {
+            ng = new NativeScreenGraphics();
+        }
+        return ng;
+        //return new NativeScreenGraphics();
     }
 
     /**
@@ -4984,7 +5048,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getHeight(Object nativeFont) {
         checkEDT();
-        return canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getHeight();
+        return (int)(canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getHeight());
     }
 
     /**
@@ -5707,7 +5771,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         t.transform(in, 0, out, 0, 1);
         clamp(out);
     }
-
+    
+    
     
     @Override
     public void setTransform(Object graphics, Transform transform) {
@@ -7770,17 +7835,34 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    
                     cnt = new JPanel() {
+                        private int index;
+                        private boolean showingDialog;
+                        BufferedImage buf;
+                        @Override
                         public void paint(java.awt.Graphics g) {
-                            if (drawingNativePeer) {
-                                super.paint(g);
-                            } else {
+                            synchronized(VideoComponent.this) {
                                 
+                                final BufferedImage buf = getBuffer();
+                                Graphics2D g2d = buf.createGraphics();
+                                vid.paint(g2d);
+                                g2d.dispose();
+                                VideoComponent.this.putClientProperty("__buffer", buf);
                             }
+                        }
+                        
+                        private BufferedImage getBuffer() {
+                            if (buf == null || buf.getWidth() != getWidth() || buf.getHeight() != getHeight()) {
+                                
+                                buf = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+                            }
+                            return buf;
                         }
                     };
 
                     cnt.setOpaque(false);
+                    vid.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, vid);
                     cnt.setVisible(false);
@@ -7788,7 +7870,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             Group root = new Group();
+            
             v = new MediaView(player);
+            
+            
             root.getChildren().add(v);
             vid.setScene(new Scene(root));
 
@@ -7799,6 +7884,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected void initComponent() {
+            bounds.setBounds(0,0,0,0);
             super.initComponent();
         }
 
@@ -7833,6 +7919,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             init = true;
                             cnt.setVisible(true);
                             frm.add(cnt, 0);
+                            
                             frm.repaint();
                         } else {
                             cnt.setVisible(false);
@@ -7853,10 +7940,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         @Override
-        public void paint(Graphics g) {
+        public void paint(final Graphics g) {
             if (init) {
                 onPositionSizeChange();
                 drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        cnt.repaint();
+                    }
+                });
+                
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
@@ -7884,7 +7978,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                     (int) (h * zoomLevel));
             
             if(!bounds.equals(cnt.getBounds())){
-            
                 Platform.runLater(new Runnable() {
 
                     @Override
@@ -7892,20 +7985,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                         v.setFitWidth(w * zoomLevel);
                         v.setFitHeight(h * zoomLevel);
-
+                        
                         SwingUtilities.invokeLater(new Runnable() {
 
                             @Override
                             public void run() {
                                 cnt.setBounds(bounds);
-                                cnt.validate();
-                                Display.getInstance().callSerially(new Runnable() {
-
-                                    @Override
-                                    public void run() {
-                                        getComponentForm().repaint();
-                                    }
-                                });
+                                cnt.doLayout();
+                                cnt.repaint();
+                                
                             }
                         });
                     }
@@ -9190,6 +9278,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    /*
                     cnt = new JPanel() {
                         public void paint(java.awt.Graphics g) {
                             if (drawingNativePeer) {
@@ -9199,6 +9288,31 @@ public class JavaSEPort extends CodenameOneImplementation {
                             }
                         }
                     };
+                    */
+                    cnt = new JPanel() {
+                        BufferedImage buf;
+                        @Override
+                        public void paint(java.awt.Graphics g) {
+                            synchronized(Peer.this) {
+                                
+                                final BufferedImage buf = getBuffer();
+                                Graphics2D g2d = buf.createGraphics();
+                                cmp.paint(g2d);
+                                g2d.dispose();
+                                Peer.this.putClientProperty("__buffer", buf);
+                            }
+                        }
+                        
+                        private BufferedImage getBuffer() {
+                            if (buf == null || buf.getWidth() != getWidth() || buf.getHeight() != getHeight()) {
+                                
+                                buf = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+                            }
+                            return buf;
+                        }
+                    };
+
+                    
 
                     cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
@@ -9210,6 +9324,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected void initComponent() {
+            bounds.setBounds(0,0,0,0);
             super.initComponent();
         }
 
@@ -9263,11 +9378,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         
-        @Override
-        public void paint(Graphics g) {
+        //@Override
+        public void paint_(Graphics g) {
             if (init) {
                 onPositionSizeChange();
                 drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                cnt.repaint();
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
@@ -9275,8 +9391,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
-        @Override
-        protected void onPositionSizeChange() {
+        //@Override
+        protected void onPositionSizeChange_() {
             final int x = getAbsoluteX();
             final int y = getAbsoluteY();
             final int w = getWidth();
@@ -9299,6 +9415,60 @@ public class JavaSEPort extends CodenameOneImplementation {
                     cnt.validate();
                 }
             });
+
+        }
+        
+        @Override
+        public void paint(final Graphics g) {
+            if (init) {
+                onPositionSizeChange();
+                drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        cnt.repaint();
+                    }
+                });
+                
+            }else{
+                if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
+                    setLightweightMode(false);
+                }
+            }
+        }
+        
+        java.awt.Rectangle bounds = new java.awt.Rectangle();
+        
+        @Override
+        protected void onPositionSizeChange() {
+            final int x = getAbsoluteX();
+            final int y = getAbsoluteY();
+            final int w = getWidth();
+            final int h = getHeight();
+
+            int screenX = 0;
+            int screenY = 0;
+            if(getScreenCoordinates() != null) {
+                screenX = getScreenCoordinates().x;
+                screenY = getScreenCoordinates().y;
+            }
+            bounds.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
+                    (int) ((y + screenY + canvas.y) * zoomLevel),
+                    (int) (w * zoomLevel),
+                    (int) (h * zoomLevel));
+            
+            if(!bounds.equals(cnt.getBounds())){
+                SwingUtilities.invokeLater(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        cnt.setBounds(bounds);
+                        cnt.doLayout();
+                        cnt.repaint();
+
+                    }
+                });
+            }
 
         }
 

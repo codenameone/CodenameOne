@@ -109,12 +109,34 @@ public class SEBrowserComponent extends PeerComponent {
     
     private static class InternalJPanel extends JPanel {
         private final JavaSEPort instance;
+        private final SEBrowserComponent cmp;
         
-        InternalJPanel(JavaSEPort instance) {
+        InternalJPanel(JavaSEPort instance, SEBrowserComponent cmp) {
             this.instance = instance;
+            this.cmp = cmp;
             
         }
-        public void paint(java.awt.Graphics g) {
+        BufferedImage buf;
+            @Override
+            public void paint(java.awt.Graphics g) {
+                synchronized(cmp) {
+
+                    final BufferedImage buf = getBuffer();
+                    Graphics2D g2d = buf.createGraphics();
+                    super.paint(g2d);
+                    g2d.dispose();
+                    cmp.putClientProperty("__buffer", buf);
+                }
+            }
+
+            private BufferedImage getBuffer() {
+                if (buf == null || buf.getWidth() != getWidth() || buf.getHeight() != getHeight()) {
+
+                    buf = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+                }
+                return buf;
+            }
+        public void paint_(java.awt.Graphics g) {
             // We want the native component to be hidden unless
             // it is being drawn by Codename One via drawNativePeer()
             // This allows the component to be present (respond to events)
@@ -148,7 +170,7 @@ public class SEBrowserComponent extends PeerComponent {
                 if (self == null) {
                     return;
                 }
-                self.cnt = new InternalJPanel(self.instance);
+                self.cnt = new InternalJPanel(self.instance, self);
                 
                 self.cnt.setOpaque(false); // <--- Important if container is opaque it will cause
                                         // all kinds of flicker due to painting conflicts with CN1 pipeline.
@@ -657,8 +679,9 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
         }
-        instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
         onPositionSizeChange();
+        instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+        
         
     }
    
