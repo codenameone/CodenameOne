@@ -2882,9 +2882,12 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_getVideoViewPeer___long(CN1_THREAD_ST
 void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
-        MPMoviePlayerViewController* m = (BRIDGE_CAST MPMoviePlayerViewController*) ((void *)peer);
-        m.moviePlayer.shouldAutoplay = NO;
-        [[CodenameOne_GLViewController instance] presentMoviePlayerViewControllerAnimated:m];
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            mv.moviePlayer.shouldAutoplay = NO;
+            [[CodenameOne_GLViewController instance] presentMoviePlayerViewControllerAnimated:mv];
+        }
         POOL_END();
     });
 }
