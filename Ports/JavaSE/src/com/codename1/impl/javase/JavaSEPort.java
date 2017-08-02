@@ -1030,28 +1030,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                     g1.drawString("Paused", buffer.getWidth() / 2 - sw / 2, buffer.getHeight() / 2 - f.getSize() / 2);
                     g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 }
-                updateGraphicsScale(g);
+                //updateGraphicsScale(g);
                 if (zoomLevel != 1) {
-                    AffineTransform curr = ((Graphics2D)g).getTransform();
-                    double tx = curr.getTranslateX();
-                    double ty = curr.getTranslateY();
-                    boolean showingBrowser = false;
-                    //
-                    if (showingBrowser) {
-                        // This code works for showing browser
-                        AffineTransform t3 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
-                        //t3.translate(-tx / zoomLevel, -ty / zoomLevel);
-                        t3.concatenate(curr);
-                        t3.translate(tx / zoomLevel, ty / zoomLevel);
-                        ((Graphics2D)g).setTransform(t3);
-                    } else {
-                        // This code works for showing browser
-                        AffineTransform t3 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
-                        //t3.translate(tx * retinaScale, ty * retinaScale);
-                        t3.concatenate(curr);
-                        t3.translate(tx / zoomLevel, ty / zoomLevel);
-                        ((Graphics2D)g).setTransform(t3);
-                    }
+                    AffineTransform t3 = ((Graphics2D)g).getTransform();
+                    t3.scale(zoomLevel/t3.getScaleX()/retinaScale, zoomLevel/t3.getScaleX()/retinaScale);
+                    
+                    //AffineTransform t3 = AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
+                    ((Graphics2D)g).setTransform(t3);
+                    
                 }
                 //((Graphics2D)g).setTransform(t2);
                 g.drawImage(getSkin(), x, y, this);
@@ -1089,7 +1075,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                 Graphics2D g2 = (Graphics2D)g.create();
                 //System.out.println("blitx="+blitTx+", blitY="+blitTy+", tx="+g2.getTransform().getTranslateX()+", ty="+g2.getTransform().getTranslateY());
                 //if (zoomLevel == 1) {
-                    g2.translate(-blitTx + g2.getTransform().getTranslateX(), -blitTy + g2.getTransform().getTranslateY());
+                AffineTransform t = g2.getTransform();
+                double tx = t.getTranslateX();
+                double ty = t.getTranslateY();
+                AffineTransform t2 = AffineTransform.getScaleInstance(1, 1);
+                if (zoomLevel == 1) {
+                    t2.translate(tx * retinaScale, ty * retinaScale);
+                } else {
+                    t2.translate(tx * retinaScale, ty * retinaScale);
+                }
+                //g2.translate( - tx / zoomLevel + tx * retinaScale / zoomLevel,  - ty / zoomLevel + ty * retinaScale / zoomLevel);
+                g2.setTransform(t2);
                 //} else {
                 //    g2.translate(-blitTx - g2.getTransform().getTranslateX(), -blitTy - g2.getTransform().getTranslateY());
                 //}
