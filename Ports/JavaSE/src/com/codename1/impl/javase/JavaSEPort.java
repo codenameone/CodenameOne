@@ -3764,7 +3764,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean isSimulator() {
         // differentiate simulator from JavaSE port and detect designer
-        return designMode || portraitSkin != null;
+        return designMode || getSkin() != null || widthLabel != null;
     }
     
     /**
