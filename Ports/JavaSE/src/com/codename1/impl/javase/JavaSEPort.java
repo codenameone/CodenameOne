@@ -1080,8 +1080,24 @@ public class JavaSEPort extends CodenameOneImplementation {
         private boolean bufferSafeMode;
         public void paintComponent(java.awt.Graphics g) {
             //if (true) return;
+            
+            // This will turn on buffer safe mode
+            // next time blit() is run
             blitCounter=0;
-            if (!bufferSafeMode) {
+            
+            if (buffer != null) {
+                Graphics2D g2 = (Graphics2D)g.create();
+                //System.out.println("blitx="+blitTx+", blitY="+blitTy+", tx="+g2.getTransform().getTranslateX()+", ty="+g2.getTransform().getTranslateY());
+                //if (zoomLevel == 1) {
+                    g2.translate(-blitTx + g2.getTransform().getTranslateX(), -blitTy + g2.getTransform().getTranslateY());
+                //} else {
+                //    g2.translate(-blitTx - g2.getTransform().getTranslateX(), -blitTy - g2.getTransform().getTranslateY());
+                //}
+                synchronized(bufferLock) {
+                    drawScreenBuffer(g2);
+                }
+                g2.dispose();
+                //updateBufferSize();
                 if (Display.isInitialized()) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
@@ -1091,36 +1107,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                             }
                         }
                     });
-                    
-                }  
-                repaint();
-            } else {
-                if (buffer != null) {
-                    Graphics2D g2 = (Graphics2D)g.create();
-                    //System.out.println("blitx="+blitTx+", blitY="+blitTy+", tx="+g2.getTransform().getTranslateX()+", ty="+g2.getTransform().getTranslateY());
-                    //if (zoomLevel == 1) {
-                        g2.translate(-blitTx + g2.getTransform().getTranslateX(), -blitTy + g2.getTransform().getTranslateY());
-                    //} else {
-                    //    g2.translate(-blitTx - g2.getTransform().getTranslateX(), -blitTy - g2.getTransform().getTranslateY());
-                    //}
-                    synchronized(bufferLock) {
-                        drawScreenBuffer(g2);
-                    }
-                    g2.dispose();
-                    //updateBufferSize();
-                    if (Display.isInitialized()) {
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                Form f = getCurrentForm();
-                                if (f != null) {
-                                    f.repaint();
-                                }
-                            }
-                        });
 
-                    }    
-                }
+                }    
             }
+            
         }
 
         private void updateGraphicsScale(java.awt.Graphics g) {
@@ -1616,6 +1606,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
                 Form f = getCurrentForm();
                 if(f != null){
+                    // NOTE:  This is off edt... I've noticed an NPE
+                    // inset getComponentAt() because of this
+                    // we should move to EDT
                     Component cmp = f.getContentPane().getComponentAt(x, y);
                     if(cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                         if (!ignoreWheelMovements) {
