@@ -3328,6 +3328,22 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
+    public boolean isScrollableX() {
+        return getContentPane().isScrollableX();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isScrollableY() {
+        return getContentPane().isScrollableY();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public void setVisible(boolean visible) {
         super.setVisible(visible);
         if (mediaComponents != null) {
