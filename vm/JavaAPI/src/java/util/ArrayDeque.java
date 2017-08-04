@@ -199,7 +199,7 @@ public class ArrayDeque<E> extends AbstractCollection<E> implements Deque<E> {
      * count out the size for a new deque, and ensure that size >= minSize
      */
     private int countInitSize(final int minSize) {
-        return -1;
+        return Math.max(minSize, DEFAULT_SIZE);
     }
 
     /**

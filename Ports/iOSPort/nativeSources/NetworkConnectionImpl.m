@@ -57,6 +57,7 @@ int connections = 0;
     request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]
                                               cachePolicy:NSURLRequestReloadIgnoringLocalCacheData
                                               timeoutInterval:time];
+    request.HTTPShouldHandleCookies = NO;
 #ifndef CN1_USE_ARC
     [request retain];
 #endif
@@ -80,7 +81,7 @@ int connections = 0;
 -(void)setChunkedStreamingLen:(int)len {
     chunkedStreamingLen = len;
     if (!isIOS8() && len > -1) {
-        NSLog(@"Attempt to set chunked streaming mode detected.  Chunked streaming mode is only supported in iOS 8 and higher");
+        CN1Log(@"Attempt to set chunked streaming mode detected.  Chunked streaming mode is only supported in iOS 8 and higher");
     }
 }
 

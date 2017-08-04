@@ -417,6 +417,12 @@ public class UIManager {
             themeProps.put("Button.sel#bgColor", "a0a0a0");
             themeProps.put("Button.sel#padding", "4,4,4,4");
         }
+        if(installedTheme == null || !installedTheme.containsKey("RaisedButton.derive")) {
+            themeProps.put("RaisedButton.derive", "Button");
+            themeProps.put("RaisedButton.sel#derive", "Button.sel");
+            themeProps.put("RaisedButton.press#derive", "Button.press");
+            themeProps.put("RaisedButton.dis#derive", "Button.dis");
+        }
         
         if(installedTheme == null || !installedTheme.containsKey("Button.press#derive")) {
             themeProps.put("Button.press#border", Border.getDefaultBorder().createPressedVersion());
@@ -1162,11 +1168,11 @@ public class UIManager {
                 }
             }
             if (margin != null) {
-                int[] marginArr = toIntArray(margin.trim());
+                float[] marginArr = toFloatArray(margin.trim());
                 style.setMargin(marginArr[0], marginArr[1], marginArr[2], marginArr[3]);
             }
             if (padding != null) {
-                int[] paddingArr = toIntArray(padding.trim());
+                float[] paddingArr = toFloatArray(padding.trim());
                 style.setPadding(paddingArr[0], paddingArr[1], paddingArr[2], paddingArr[3]);
             }
             if(paddingUnit != null) {
@@ -1259,12 +1265,12 @@ public class UIManager {
      * @param str
      * @return
      */
-    private int[] toIntArray(String str) {
-        int[] retVal = new int[4];
+    private float[] toFloatArray(String str) {
+        float[] retVal = new float[4];
         str = str + ",";
         int rlen = retVal.length;
         for (int i = 0; i < rlen; i++) {
-            retVal[i] = Integer.parseInt(str.substring(0, str.indexOf(",")));
+            retVal[i] = Float.parseFloat(str.substring(0, str.indexOf(",")));
             str = str.substring(str.indexOf(",") + 1, str.length());
         }
         return retVal;
@@ -1436,33 +1442,6 @@ public class UIManager {
                     
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
-                }
-                String vkbInputMode = (String)resourceBundle.get("@vkb");
-                if(vkbInputMode != null && vkbInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
-                    VirtualKeyboard.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String[][] res = getInputMode("@vkb-", tokenized[iter], resourceBundle);
-                        if(res != null) {
-                            VirtualKeyboard.addDefaultInputMode(val, res);
-                        }
-                    }
-                }
-                String textFieldInputMode = (String)resourceBundle.get("@im");
-                if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
-                    TextField.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String actual = (String)resourceBundle.get("@im-" + val);
-                        // val can be null for builtin input mode types...
-                        if(actual != null) {
-                            TextField.addInputMode(val, parseTextFieldInputMode(actual), Character.isUpperCase(val.charAt(0)));
-                        }
-                    }
                 }
                 bundle = new HashMap<String, String>((Hashtable<String, String>)resourceBundle);
             } else {

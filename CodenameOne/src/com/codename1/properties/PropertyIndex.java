@@ -391,6 +391,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         try {
             InputStream is = Storage.getInstance().createInputStream(name);
             JSONParser jp = new JSONParser();
+            JSONParser.setUseBoolean(true);
+            JSONParser.setUseLongs(true);
             populateFromMap(jp.parseJSON(new InputStreamReader(is, "UTF-8")), parent.getClass());
         } catch(IOException err) {
             Log.e(err);

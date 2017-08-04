@@ -58,6 +58,85 @@ import java.util.HashMap;
  * @author Chen Fishbein
  */
 public class Component implements Animation, StyleListener {
+    
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     */
+    private boolean rippleEffect;    
+    
+    /**
+     * The default cursor
+     */
+    public static final int DEFAULT_CURSOR = 0;
+
+    /**
+     * The crosshair cursor type.
+     */
+    public static final int CROSSHAIR_CURSOR = 1;
+
+    /**
+     * The text cursor type.
+     */
+    public static final int TEXT_CURSOR = 2;
+
+    /**
+     * The wait cursor type.
+     */
+    public static final int WAIT_CURSOR = 3;
+
+    /**
+     * The south-west-resize cursor type.
+     */
+    public static final int SW_RESIZE_CURSOR = 4;
+
+    /**
+     * The south-east-resize cursor type.
+     */
+    public static final int SE_RESIZE_CURSOR = 5;
+
+    /**
+     * The north-west-resize cursor type.
+     */
+    public static final int NW_RESIZE_CURSOR = 6;
+
+    /**
+     * The north-east-resize cursor type.
+     */
+    public static final int NE_RESIZE_CURSOR = 7;
+
+    /**
+     * The north-resize cursor type.
+     */
+    public static final int N_RESIZE_CURSOR = 8;
+
+    /**
+     * The south-resize cursor type.
+     */
+    public static final int S_RESIZE_CURSOR = 9;
+
+    /**
+     * The west-resize cursor type.
+     */
+    public static final int W_RESIZE_CURSOR = 10;
+
+    /**
+     * The east-resize cursor type.
+     */
+    public static final int E_RESIZE_CURSOR = 11;
+
+    /**
+     * The hand cursor type.
+     */
+    public static final int HAND_CURSOR = 12;
+
+    /**
+     * The move cursor type.
+     */
+    public static final int MOVE_CURSOR = 13;
+    
+    private int cursor;
+
+
     /**
      * Used by getDragRegionStatus to indicate no dragability
      */
@@ -92,6 +171,21 @@ public class Component implements Animation, StyleListener {
      * Used by getDragRegionStatus to indicate likely dragability
      */
     public static final int DRAG_REGION_LIKELY_DRAG_XY = 23;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_X = 31;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_Y = 32;
+    
+    /**
+     * Used by getDragRegionStatus to indicate immediate dragability
+     */
+    public static final int DRAG_REGION_IMMEDIATELY_DRAG_XY = 33;
     
     private String selectText;
     private boolean alwaysTensile;
@@ -208,6 +302,7 @@ public class Component implements Animation, StyleListener {
 
     private boolean hideInPortrait;
     private int scrollOpacity = 0xff;
+    private boolean ignorePointerEvents;
             
     /**
      * Indicates the decrement units for the scroll opacity
@@ -229,6 +324,10 @@ public class Component implements Animation, StyleListener {
     private Motion animationMotion;
     Motion draggedMotionX;
     Motion draggedMotionY;
+    
+    // Reference that is only filled when a drag motion is a decelration motion
+    // for tensile scrolling
+    private Motion decelerationMotion;
 
     /**
      * Allows us to flag a drag operation in action thus preventing the mouse pointer
@@ -319,6 +418,38 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Sets a custom mouse cursor for this component if the platform supports mouse cursors, notice that this isn't applicable for touch devices.  
+     * This will only be used if the platform supports custom cursors.  
+     * You can call {@link #isSetCursorSupported() } to find out.
+     * 
+     * <p><strong>Note:</strong> Since cursors incur some overhead, they are turned off at the form level by default.
+     * If you want your custom cursors to be used, then you'll need to enable cursors in the form using {@link Form#setEnableCursors(boolean) }.</p>
+     * @param cursor The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
+     * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
+     * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
+     * 
+     * @see Form#setEnableCursors(boolean) 
+     * @see Form#isEnableCursors() 
+     * 
+     */
+    public void setCursor(int cursor) {
+        this.cursor = cursor;
+    }
+    
+    /**
+     * Gets the custom cursor for this component.  This will only be used if the platform supports custom cursors.  
+     * You can call {@link #isSetCursorSupported() } to find out.
+     * @return The cursor to set on this component.  One of {@link #DEFAULT_CURSOR}, {@link #CROSSHAIR_CURSOR}, {@link #TEXT_CURSOR},
+     * {@link #WAIT_CURSOR}, {@link #SW_RESIZE_CURSOR}, {@link #SE_RESIZE_CURSOR}, {@link #S_RESIZE_CURSOR}, {@link #NE_RESIZE_CURSOR},
+     * {@link #NW_RESIZE_CURSOR}, {@link #W_RESIZE_CURSOR}, {@link #HAND_CURSOR}, or {@link #MOVE_CURSOR}.
+     * 
+     * 
+     */
+    public int getCursor() {
+        return this.cursor;
+    }
+    
+    /**
      * This is identical to invoking {@link #sameWidth} followed by {@link #sameHeight}
      * 
      * @param c the components to group together, this will override all previous width/height grouping
@@ -356,6 +487,15 @@ public class Component implements Animation, StyleListener {
                 cc.sameWidth = c;
             }
         }
+    }
+    
+    /**
+     * Checks to see if this platform supports cursors.  If the platform doesn't support cursors then any cursors
+     * set with {@link #setCursor(int) } will simply be ignored.
+     * @return True if the platform supports custom cursors.
+     */
+    public static boolean isSetCursorSupported() {
+        return Display.getInstance().getImplementation().isSetCursorSupported();
     }
     
     /**
@@ -498,6 +638,24 @@ public class Component implements Animation, StyleListener {
     public int getX() {
         return bounds.getX();
     }
+    
+    /**
+     * Gets the x-coordinate of the outer bounds of this component.  The outer bounds are formed
+     * by the bounds outside the margin of the component.  (i.e. {@code x - leftMargin}).
+     * @return The outer X bound.
+     */
+    public int getOuterX() {
+        return getX() - getStyle().getMarginLeftNoRTL();
+    }
+    
+    /**
+     * Gets x-coordinate of the inner bounds of this component.  The inner bounds are formed by 
+     * the bounds of the padding of the component.  i.e. {@code x + leftPadding}.
+     * @return The inner x bound.
+     */
+    public int getInnerX() {
+        return getX() + getStyle().getMarginLeftNoRTL();
+    }
 
     /**
      * Returns the component y location relatively to its parent container
@@ -506,6 +664,24 @@ public class Component implements Animation, StyleListener {
      */
     public int getY() {
         return bounds.getY();
+    }
+    
+    /**
+     * Gets the Y-coordinate of the outer bounds of this component.  The outer bounds are formed
+     * by the bound of the margin of the component.  i.e. {@code y - leftMargin}.
+     * @return The outer y bound.
+     */
+    public int getOuterY() {
+        return getY() - getStyle().getMarginTop();
+    }
+    
+    /**
+     * Gets the inner y-coordinate of the inner bounds of this component. The inner bounds are formed
+     * by the bound of the padding of the component.  i.e. {@code y + leftPadding}.
+     * @return The inner y bound.
+     */
+    public int getInnerY() {
+        return getY() + getStyle().getPaddingTop();
     }
 
     /**
@@ -619,6 +795,22 @@ public class Component implements Animation, StyleListener {
     public int getWidth() {
         return bounds.getSize().getWidth();
     }
+    
+    /**
+     * Gets the outer width of this component. This is the width of the component including horizontal margins.
+     * @return The outer width.
+     */
+    public int getOuterWidth() {
+        return getWidth() + getStyle().getHorizontalMargins();
+    }
+    
+    /**
+     * Gets the inner width of this component.  This is the width of the component removing horizontal padding.
+     * @return The inner width.
+     */
+    public int getInnerWidth() {
+        return getWidth() - getStyle().getHorizontalPadding();
+    }
 
     /**
      * Returns the component height
@@ -628,6 +820,23 @@ public class Component implements Animation, StyleListener {
     public int getHeight() {
         return bounds.getSize().getHeight();
     }
+    
+    /**
+     * Gets the outer height of this component.  This is the height of the component including vertical margins.
+     * @return The outer height.
+     */
+    public int getOuterHeight() {
+        return getHeight() + getStyle().getVerticalMargins();
+    }
+    
+    /**
+     * Gets the inner height of this component.  This is the height of the component removing vertical padding.
+     * @return The inner height.
+     */
+    public int getInnerHeight() {
+        return getHeight() - getStyle().getVerticalPadding();
+    }
+    
 
     /**
      * Sets the Component x location relative to the parent container, this method
@@ -871,6 +1080,38 @@ public class Component implements Animation, StyleListener {
     public int getPreferredH() {
         return getPreferredSize().getHeight();
     }
+    
+    /**
+     * Gets the preferred height including the vertical margins.
+     * @return The preferred outer height.
+     */
+    public int getOuterPreferredH() {
+        return getPreferredH() + getStyle().getVerticalMargins();
+    }
+    
+    /**
+     * Gets the preferred height removing vertical padding.
+     * @return The preferred inner height.
+     */
+    public int getInnerPreferredH() {
+        return getPreferredH() - getStyle().getVerticalPadding();
+    }
+    
+    /**
+     * Gets the preferred width including horizontal margins.
+     * @return The preferred outer width.
+     */
+    public int getOuterPreferredW() {
+        return getPreferredW() + getStyle().getHorizontalMargins();
+    }
+    
+    /**
+     * Gets the preferred width removing horizontal padding.
+     * @return 
+     */
+    public int getInnerPreferredW() {
+        return getPreferredW() - getStyle().getHorizontalPadding();
+    }
 
     /**
      * Sets the Component width, this method is exposed for the purpose of 
@@ -966,6 +1207,9 @@ public class Component implements Animation, StyleListener {
      * @param parent the parent container
      */
     void setParent(Container parent) {
+        if (parent == this) {
+            throw new IllegalArgumentException("Attempt to add self as parent");
+        }
         this.parent = parent;
     }
 
@@ -1642,6 +1886,12 @@ public class Component implements Animation, StyleListener {
         g.translate(-transX, -transY);
     }
 
+    private void paintRippleEffect(Graphics g) {
+        if(isRippleEffect() && Form.rippleComponent == this && Form.rippleMotion != null) {
+            paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.rippleMotion.getValue());
+        } 
+    }
+    
     /**
      * Normally returns getStyle().getBorder() but some subclasses might use this 
      * to programmatically replace the border in runtime e.g. for a pressed border effect
@@ -1699,6 +1949,7 @@ public class Component implements Animation, StyleListener {
             Border b = getBorder();
             if (b != null && b.isBackgroundPainter()) {
                 b.paintBorderBackground(g, this);
+                paintRippleEffect(g);
                 return;
             }
         }
@@ -1706,6 +1957,7 @@ public class Component implements Animation, StyleListener {
             getStyle().getBgPainter().paint(g, bounds);
         }
         paintBackground(g);
+        paintRippleEffect(g);
     }
     
     /**
@@ -1954,15 +2206,54 @@ public class Component implements Animation, StyleListener {
     /**
      * Returns true if the given absolute coordinate is contained in the Component
      * 
+     * <p>NOTE: This will return true upon a "hit" even if the component is not
+     * visible, or if that part of the component is currently clipped by a parent
+     * component.  To check if a point is contained in the visible component bounds
+     * use {@link #visibleBoundsContains(int, int) }</p>
+     * 
      * @param x the given absolute x coordinate
      * @param y the given absolute y coordinate
      * @return true if the given absolute coordinate is contained in the 
      * Component; otherwise false
+     * 
+     * @see #visibleBoundsContains(int, int) 
      */
     public boolean contains(int x, int y) {
         int absX = getAbsoluteX() + getScrollX();
         int absY = getAbsoluteY() + getScrollY();
         return (x >= absX && x < absX + getWidth() && y >= absY && y < absY + getHeight());
+    }
+    
+    /**
+     * Returns true if the given absolute coordinate is contained inside the visible bounds
+     * of the component.  This differs from {@link #contains(int, int) } in that it will
+     * return {@literal false} if the component or any of its ancestors are not visible,
+     * or if (x, y) are contained inside the bounds of the component, but are clipped.
+     * 
+     * @param x the given absolute x coordinate
+     * @param y the given absolute y coordinate
+     * @return true if the given absolute coordinate is contained in the 
+     * Component's visible bounds; otherwise false
+     * @see #contains(int, int) 
+     */
+    public boolean visibleBoundsContains(int x, int y) {
+        boolean contains = true;
+        if (!isVisible() || !contains(x, y)) {
+            contains = false;
+        }
+        if (contains) {
+            Container parent = getParent();
+            while (parent != null) {
+                if (!parent.visibleBoundsContains(x, y)) {
+                    contains = false;
+                }
+                if (!contains) {
+                    break;
+                }
+                parent = parent.getParent();
+            }
+        }
+        return contains;
     }
 
     /**
@@ -2338,6 +2629,36 @@ public class Component implements Animation, StyleListener {
         if(blockLead) {
             hasLead = false;
         }
+    }
+
+    /**
+     * @return the ignorePointerEvents
+     */
+    public boolean isIgnorePointerEvents() {
+        return ignorePointerEvents;
+    }
+
+    /**
+     * @param ignorePointerEvents the ignorePointerEvents to set
+     */
+    public void setIgnorePointerEvents(boolean ignorePointerEvents) {
+        this.ignorePointerEvents = ignorePointerEvents;
+    }
+
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     * @return the rippleEffect
+     */
+    public boolean isRippleEffect() {
+        return rippleEffect;
+    }
+
+    /**
+     * Indicates whether the component displays the material design ripple effect
+     * @param rippleEffect the rippleEffect to set
+     */
+    public void setRippleEffect(boolean rippleEffect) {
+        this.rippleEffect = rippleEffect;
     }
 
     class AnimationTransitionPainter implements Painter{
@@ -3313,6 +3634,25 @@ public class Component implements Animation, StyleListener {
         return tensileDragEnabled;
     }
 
+    boolean isScrollDecelerationMotionInProgress() {
+        if (draggedMotionY != null) {
+            if (draggedMotionY == decelerationMotion &&  !draggedMotionY.isFinished()) {
+                return true;
+            }
+        }
+        if (draggedMotionX != null) {
+            if (draggedMotionX == decelerationMotion && !draggedMotionX.isFinished()) {
+                return true;
+            }
+        }
+        Container parent = getParent();
+        if (parent != null) {
+            return parent.isScrollDecelerationMotionInProgress();
+        }
+        
+        return false;
+    }
+    
     void startTensile(int offset, int dest, boolean vertical) {
         Motion draggedMotion;
         if(tensileDragEnabled) {
@@ -3322,6 +3662,7 @@ public class Component implements Animation, StyleListener {
             draggedMotion = Motion.createLinearMotion(offset, dest, 0);
             draggedMotion.start();
         }
+        decelerationMotion = draggedMotion;
         
         if(vertical){
             draggedMotionY = draggedMotion;
@@ -3409,6 +3750,15 @@ public class Component implements Animation, StyleListener {
     void dragFinishedImpl(int x, int y) {
         if(dragAndDropInitialized && dragActivated) {
             Form p = getComponentForm();
+            if (p == null) {
+                //The component was removed from the form during the drag
+                dragActivated = false;
+                dragAndDropInitialized = false;
+                setVisible(true);
+                dragImage = null;
+                dropTargetComponent = null;
+                return;
+            }
             p.setDraggedComponent(null);
             Component dropTo = findDropTarget(this, x, y);
             if(dropTargetComponent != dropTo) {
@@ -3466,6 +3816,33 @@ public class Component implements Animation, StyleListener {
         pointerPressedListeners.addListener(l);
     }
 
+    /**
+     * Invoked to draw the ripple effect overlay in Android where the finger of the user causes a growing 
+     * circular overlay over time. This method is invoked after paintBackground and is invoked repeatedly until
+     * the users finger is removed, it will only be invoked if isRippleEffect returns true
+     * @param g the graphics object for the component clipped to the background
+     * @param x the x position of the touch
+     * @param y the y position of the touch
+     * @param position a value between 0 and 1000 with 0 indicating the beginning of the ripple effect and 1000 
+     * indicating the completion of it
+     */
+    public void paintRippleOverlay(Graphics g, int x, int y, int position) {
+        int a = g.getAlpha();
+        int c = g.getColor();
+        g.setAlpha(20);
+        g.setColor(0);
+        if(position == 1000) {
+            g.fillRect(getX(), getY(), getWidth(), getHeight());
+        } else {
+            float ratio = ((float)position) / 1000.0f;
+            int w = (int)(((float)getWidth()) * ratio);
+            w = Math.max(w, Display.INSTANCE.convertToPixels(4));
+            g.fillArc(x - getParent().getAbsoluteX() - w / 2, y - getParent().getAbsoluteY() - w / 2, w, w, 0, 360);
+        }
+        g.setAlpha(a);
+        g.setColor(c);
+    }
+    
     /**
      * Removes the listener from the pointer event
      *

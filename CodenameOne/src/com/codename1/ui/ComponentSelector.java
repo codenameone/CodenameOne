@@ -149,14 +149,16 @@ import java.util.Set;
  * <p>The following is an example form that demonstrates the use of ComponentSelector to
  * easily create effects on components in a form.</p>
  * 
- * <p><script src="https://gist.github.com/shannah/536f852c3b7242a4d3106fc9e5b5d147.js"></script></p>
+ * <p><script src="https://gist.github.com/shannah/536f852c3b7242a4d3106fc9e5b5d147.js"></script>
+ * </p>
  * 
  * <h3>Advanced Use of Tags</h3>
  * 
  * <p>The following shows the use of tags to help with striping a table, and selecting rows
  * when clicked on.</p>
  * 
- * <p><script src="https://gist.github.com/shannah/6da5728888e01abb54486a02b8c1a7c9.js"></script></p>
+ * <p><script src="https://gist.github.com/shannah/6da5728888e01abb54486a02b8c1a7c9.js"></script>
+ * </p>
  * 
  * <p>See full Demo App in this  <a href="https://github.com/shannah/cn1-component-selector-demo">Github Repo</a></p>
  * 
@@ -1314,7 +1316,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * Creates a selector that will query the current form.  If there is no 
      * current form, then this selector will have no roots.
      * <p>Generally it is better to provide a root explicitly using {@link ComponentSelector#ComponentSelector(java.lang.String, com.codename1.ui.Component...) 
-     * to ensure that the selector has a tree to walk down.
+     * to ensure that the selector has a tree to walk down.</p>
      * @param selector The selector string.
      */
     public ComponentSelector(String selector) {
@@ -2191,7 +2193,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     /**
-     * Wrapper for {@link Component#putClientProperty(java.lang.String, java.lang.Object) 
+     * Wrapper for {@link Component#putClientProperty(java.lang.String, java.lang.Object) }
      * @param key Property key
      * @param value Property value
      * @return Self for chaining.
@@ -2199,8 +2201,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     public ComponentSelector putClientProperty(String key, Object value) {
         for (Component c : this) {
             c.putClientProperty(key, value);
+            
         }
         return this;
+    }
+    
+    /**
+     * Gets a client property from the first component in the set.  Wraps {@link Component#getClientProperty(java.lang.String) }
+     * @param key The key of the client property to retrieve.
+     * @return The value of the client property.
+     */
+    public Object getClientProperty(String key) {
+        for (Component c : this) {
+            return c.getClientProperty(key);
+        }
+        return null;
     }
     
     /**
@@ -2871,6 +2886,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         return this;
     }
     
+    
+    public ComponentSelector setIgnorePointerEvents(boolean ignore) {
+        for (Component c : this) {
+            c.setIgnorePointerEvents(ignore);
+        }
+        return this;
+    }
+    
+    public boolean isIgnorePointerEvents() {
+        for (Component c : this) {
+            return c.isIgnorePointerEvents();
+        }
+        return false;
+    }
+    
     /**
      * Wraps {@link Component#setFlatten(boolean)}
      * @param f
@@ -3498,7 +3528,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
     
     /**
-     * Wraps {@link Container#animateUnlayout(int, int, java.lang.Runnable) 
+     * Wraps {@link Container#animateUnlayout(int, int, java.lang.Runnable) }
      * @param duration
      * @param opacity
      * @return 
@@ -4682,6 +4712,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                 style.setFont(curr);
             }
                 
+        }
+        return this;
+    }
+    
+    public ComponentSelector setCursor(int cursor) {
+        for (Component c : this) {
+            c.setCursor(cursor);
         }
         return this;
     }

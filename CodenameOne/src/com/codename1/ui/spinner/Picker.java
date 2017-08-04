@@ -29,11 +29,13 @@ import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.list.DefaultListModel;
 import java.util.Calendar;
 import java.util.Date;
@@ -100,8 +102,9 @@ public class Picker extends Button {
                                     }
                                 }
                             }
-                            showDialog(pickerDlg, gs);
-                            value = gs.getValue();
+                            if (showDialog(pickerDlg, gs)) {
+                                value = gs.getValue();
+                            }
                             break;
                         case Display.PICKER_TYPE_DATE:
                             DateSpinner ds = new DateSpinner();
@@ -114,11 +117,13 @@ public class Picker extends Button {
                             ds.setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));
                             ds.setCurrentMonth(cld.get(Calendar.MONTH) + 1);
                             ds.setCurrentYear(cld.get(Calendar.YEAR));
-                            showDialog(pickerDlg, ds);
-                            cld.set(Calendar.DAY_OF_MONTH, ds.getCurrentDay());
-                            cld.set(Calendar.MONTH, ds.getCurrentMonth() - 1);
-                            cld.set(Calendar.YEAR, ds.getCurrentYear());
-                            value = cld.getTime();
+                            if (showDialog(pickerDlg, ds)) {
+                            
+                                cld.set(Calendar.DAY_OF_MONTH, ds.getCurrentDay());
+                                cld.set(Calendar.MONTH, ds.getCurrentMonth() - 1);
+                                cld.set(Calendar.YEAR, ds.getCurrentYear());
+                                value = cld.getTime();
+                            }
                             break;
                         case Display.PICKER_TYPE_TIME:
                             int v = ((Integer)value).intValue();
@@ -133,23 +138,25 @@ public class Picker extends Button {
                                 ts.setCurrentHour(hour);
                             }
                             ts.setCurrentMinute(minute);
-                            showDialog(pickerDlg, ts);
-                            if(isShowMeridiem()) {
-                                int offset = 0;
-                                if(ts.getCurrentHour() == 12) {
-                                    if(!ts.isCurrentMeridiem()) {
-                                        offset = 12;
+                            if (showDialog(pickerDlg, ts)) {
+
+                                if(isShowMeridiem()) {
+                                    int offset = 0;
+                                    if(ts.getCurrentHour() == 12) {
+                                        if(!ts.isCurrentMeridiem()) {
+                                            offset = 12;
+                                        }
+                                    } else {
+                                        if(ts.isCurrentMeridiem()) {
+                                            offset = 12;
+                                        }
                                     }
+                                    hour = ts.getCurrentHour() + offset;
                                 } else {
-                                    if(ts.isCurrentMeridiem()) {
-                                        offset = 12;
-                                    }
+                                    hour = ts.getCurrentHour();
                                 }
-                                hour = ts.getCurrentHour() + offset;
-                            } else {
-                                hour = ts.getCurrentHour();
+                                value = new Integer(hour * 60 + ts.getCurrentMinute());
                             }
-                            value = new Integer(hour * 60 + ts.getCurrentMinute());
                             break;
                         case Display.PICKER_TYPE_DATE_AND_TIME:
                             DateTimeSpinner dts = new DateTimeSpinner();
@@ -162,31 +169,42 @@ public class Picker extends Button {
                                 dts.setCurrentHour(cld.get(Calendar.HOUR_OF_DAY));
                             }
                             dts.setCurrentMinute(cld.get(Calendar.MINUTE));
-                            showDialog(pickerDlg, dts);
-                            cld.setTime(dts.getCurrentDate());
-                            if(isShowMeridiem() && dts.isCurrentMeridiem()) {
-                                cld.set(Calendar.AM_PM, Calendar.PM);
-                                cld.set(Calendar.HOUR, dts.getCurrentHour());
-                            } else {
-                                cld.set(Calendar.HOUR_OF_DAY, dts.getCurrentHour());
+                            if (showDialog(pickerDlg, dts)) {
+                                cld.setTime(dts.getCurrentDate());
+                                if(isShowMeridiem() && dts.isCurrentMeridiem()) {
+                                    cld.set(Calendar.AM_PM, Calendar.PM);
+                                    cld.set(Calendar.HOUR, dts.getCurrentHour());
+                                } else {
+                                    cld.set(Calendar.HOUR_OF_DAY, dts.getCurrentHour());
+                                }
+                                cld.set(Calendar.MINUTE, dts.getCurrentMinute());
+                                value = cld.getTime();
                             }
-                            cld.set(Calendar.MINUTE, dts.getCurrentMinute());
-                            value = cld.getTime();
                             break;
                     }
                     updateValue();
                 }
             }
             
-            private void showDialog(Dialog pickerDlg, Component c) {
+            private boolean showDialog(Dialog pickerDlg, Component c) {
                 pickerDlg.addComponent(BorderLayout.CENTER, c);
+                Button ok = new Button(new Command("OK"));
+                final boolean[] userCanceled = new boolean[1];
+                Button cancel = new Button(new Command("Cancel") {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        userCanceled[0] = true;
+                        super.actionPerformed(evt);
+                    }
+                });
+                Container buttons = GridLayout.encloseIn(2, cancel, ok);
+                pickerDlg.addComponent(BorderLayout.SOUTH, buttons);
                 if(Display.getInstance().isTablet()) {
                     pickerDlg.showPopupDialog(Picker.this);
                 } else {
-                    Button ok = new Button(new Command("OK"));
-                    pickerDlg.addComponent(BorderLayout.SOUTH, ok);
                     pickerDlg.show();
                 }
+                return !userCanceled[0];
             }
         });
         updateValue();
@@ -537,5 +555,12 @@ public class Picker extends Button {
         }
         return super.setPropertyValue(name, value);
     }
-    
+
+    /**
+     * Returns the value which works for all picker types
+     * @return the value object
+     */
+    public Object getValue() {
+        return value;
+    }
 }

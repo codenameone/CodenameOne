@@ -165,6 +165,8 @@ import java.util.logging.Logger;
 import com.codename1.util.StringUtil;
 import java.io.*;
 import java.net.CookieHandler;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.security.MessageDigest;
 import java.text.ParseException;
@@ -2519,8 +2521,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (url.startsWith("intent")) {
                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
             } else {
-                if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
-                    return null;
+                if(url.startsWith("/") || url.startsWith("file:")) {
+                    if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to open the file")){
+                        return null;
+                    }
                 }
                 url = fixAttachmentPath(url);
                 intent = new Intent();
@@ -3884,9 +3888,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                r.run();
-                completed[0] = true;
+                try {
+                    r.run();
+                } catch(Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
                 synchronized(completed) {
+                    completed[0] = true;
                     completed.notify();
                 }
             }
@@ -7258,16 +7266,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return errorMessage;
         }
 
-        public String getIP() {
-            try {
-                return java.net.InetAddress.getLocalHost().getHostAddress();
-            } catch(Throwable t) {
-                t.printStackTrace();
-                errorMessage = t.toString();
-                return t.getMessage();
-            }
-        }
-
         public byte[] readFromStream() {
             try {
                 int av = getAvailableInput();
@@ -7338,7 +7336,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             try {
                 ServerSocket serverSocketInstance = new ServerSocket(param);
                 socketInstance = serverSocketInstance.accept();
-                return socketInstance;
+                SocketImpl si = new SocketImpl();
+                si.socketInstance = socketInstance;
+                return si;
             } catch(Exception err) {
                 errorMessage = err.toString();
                 err.printStackTrace();
@@ -7372,10 +7372,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String getHostOrIP() {
         try {
-            return java.net.InetAddress.getLocalHost().getHostName();
+            InetAddress i = java.net.InetAddress.getLocalHost();
+            if(i.isLoopbackAddress()) {
+                Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+                while(nie.hasMoreElements()) {
+                    NetworkInterface current = nie.nextElement();
+                    if(!current.isLoopback()) {
+                        Enumeration<InetAddress> iae = current.getInetAddresses();
+                        while(iae.hasMoreElements()) {
+                            InetAddress currentI = iae.nextElement();
+                            if(!currentI.isLoopbackAddress()) {
+                                return currentI.getHostAddress();
+                            }
+                        }
+                    }
+                }
+            }
+            return i.getHostAddress();
         } catch(Throwable t) {
-            t.printStackTrace();
-            return t.getMessage();
+            com.codename1.io.Log.e(t);
+            return null;
         }
     }
 
@@ -7463,16 +7479,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     
     @Override
     public boolean transformEqualsImpl(Transform t1, Transform t2) {
-        
+        Object o1 = null;
+        if(t1 != null) {
+            o1 = t1.getNativeTransform();
+        }
+        Object o2 = null;
+        if(t2 != null) {
+            o2 = t2.getNativeTransform();
+        }
+        return transformNativeEqualsImpl(o1, o2);
+    }
+
+    @Override
+    public boolean transformNativeEqualsImpl(Object t1, Object t2) {
         if ( t1 != null ){
-            CN1Matrix4f m1 = (CN1Matrix4f)t1.getNativeTransform();
-            CN1Matrix4f m2 = (CN1Matrix4f)t2.getNativeTransform();
+            CN1Matrix4f m1 = (CN1Matrix4f)t1;
+            CN1Matrix4f m2 = (CN1Matrix4f)t2;
             return m1.equals(m2);
         } else {
             return t2 == null;
         }
     }
 
+    
     @Override
     public boolean isTransformSupported() {
         return true;

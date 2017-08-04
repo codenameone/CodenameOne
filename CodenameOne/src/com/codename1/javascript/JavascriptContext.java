@@ -712,7 +712,7 @@ public class JavascriptContext  {
         //String lookup = LOOKUP_TABLE;
         String self = source.toJSPointer();
         String js = self+"."+method+"=function(){"+
-                "var len=arguments.length;var url='/!cn1command/"+self+"."+method+"?'; "+
+                "var len=arguments.length;var url='https://www.codenameone.com/!cn1command/"+self+"."+method+"?'; "+
                 "for (var i=0; i<len; i++){"+
                     "var val = arguments[i]; var strval=val;"+
                     "if ( (typeof(val) == 'object') || (typeof(val) == 'function')){ "+

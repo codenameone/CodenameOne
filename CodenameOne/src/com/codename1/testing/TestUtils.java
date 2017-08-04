@@ -33,13 +33,16 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.List;
+import com.codename1.ui.SideMenuBar;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.spinner.BaseSpinner;
 import com.codename1.ui.spinner.GenericSpinner;
 import com.codename1.ui.util.ImageIO;
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * Various utility classes to automate UI testing
@@ -299,6 +302,63 @@ public class TestUtils {
     }
 
     /**
+     * Returns all the command objects from the toolbar in the order of left, right, overflow &amp; sidemenu
+     * @return the set of commands
+     */
+    public static Command[] getToolbarCommands() {
+        Form f = Display.getInstance().getCurrent();
+        Toolbar tb = f.getToolbar();
+        ArrayList<Command> result = new ArrayList<Command>();
+        addAllCommands(tb.getLeftBarCommands(), result);
+        addAllCommands(tb.getRightBarCommands(), result);
+        addAllCommands(tb.getOverflowCommands(), result);
+        addAllCommands(tb.getSideMenuCommands(), result);
+        Command[] carr = new Command[result.size()];
+        result.toArray(carr);
+        return carr;
+    }
+    
+    private static void addAllCommands(Iterable<Command> cs, ArrayList<Command> result) {
+        if(cs != null) {
+            for(Command c : cs) {
+                result.add(c);
+            }
+        }
+    }
+    
+    /**
+     * Shows the sidemenu UI
+     */
+    public static void showSidemenu() {
+        Form f = Display.getInstance().getCurrent();
+        Toolbar tb = f.getToolbar();
+        if(tb != null) {
+            tb.openSideMenu();
+        } else {
+            ((SideMenuBar)f.getMenuBar()).openMenu(null);
+        }
+    }
+    
+    /**
+     * Executes a command from the offset returned by {@link #getToolbarCommands()}
+     * 
+     * @param offset the offset of the command we want to execute
+     */
+    public static void executeToolbarCommandAtOffset(final int offset) {
+        Form f = Display.getInstance().getCurrent();
+        if(!Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    executeToolbarCommandAtOffset(offset);
+                }
+            });
+            return;
+        }
+        Command cmd = getToolbarCommands()[offset];
+        f.dispatchCommand(cmd, new ActionEvent(cmd));
+    }
+    
+    /**
      * Scrolls to show the component in case it is invisible currently
      * @param c the component
      */
@@ -331,7 +391,7 @@ public class TestUtils {
         }
         ensureVisible(getComponentByPath(path));
     }
-
+        
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
      * @param title the title of the form to wait for
@@ -352,8 +412,20 @@ public class TestUtils {
         waitFor(50);
     }
 
+    private static String getFormTitle(Form f) {
+        if(f.getToolbar() != null) {
+            Component c = f.getToolbar().getTitleComponent();
+            if(c instanceof Label) {
+                return ((Label)c).getText();
+            }
+            return null;
+        } else {
+            return f.getTitle();
+        }
+    }
+    
     private static void waitForFormTitleImpl(String title) {
-        while(!title.equals(Display.getInstance().getCurrent().getTitle())) {
+        while(!title.equals(getFormTitle(Display.getInstance().getCurrent()))) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException ex) {
@@ -380,7 +452,7 @@ public class TestUtils {
         }
         waitFor(50);
     }
-
+    
     private static void waitForFormNameImpl(String title) {
         long t = System.currentTimeMillis() + 90000;
         while(!title.equals(Display.getInstance().getCurrent().getName())) {
@@ -390,6 +462,38 @@ public class TestUtils {
             }
             if(System.currentTimeMillis() > t) {
                 assertBool(false, "Waiting for form " + title + " timed out! Current form name is: " + Display.getInstance().getCurrent().getName());
+            }
+        }
+    }
+    
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     */
+    public static void waitForUnnamedForm() {
+        if(verbose) {
+            log("waitForUnnamedForm()");
+        }
+        if(Display.getInstance().isEdt()) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    waitForUnnamedFormImpl();
+                }
+            });
+        } else {
+            waitForUnnamedFormImpl();
+        }
+        waitFor(50);
+    }
+
+    private static void waitForUnnamedFormImpl() {
+        long t = System.currentTimeMillis() + 90000;
+        while(Display.getInstance().getCurrent().getName() != null) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException ex) {
+            }
+            if(System.currentTimeMillis() > t) {
+                assertBool(false, "Waiting for form unnamed form timed out! Current form name is: " + Display.getInstance().getCurrent().getName());
             }
         }
     }

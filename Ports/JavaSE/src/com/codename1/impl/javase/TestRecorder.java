@@ -23,9 +23,12 @@
 package com.codename1.impl.javase;
 
 import com.codename1.testing.TestUtils;
+import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.Toolbar;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.list.ListModel;
@@ -59,7 +62,6 @@ public class TestRecorder extends javax.swing.JFrame {
             "}\n";
     private String generatedCode = "";
     
-    
     /** Creates new form TestRecorder */
     public TestRecorder() {
         initComponents();
@@ -74,20 +76,50 @@ public class TestRecorder extends javax.swing.JFrame {
                     bindForm(f);
                 }
                 JavaSEPort.addFormChangeListener(new com.codename1.ui.events.ActionListener() {
+                    Form oldForm;
+                    int counter = 1;
+                    
+                    private String getFormTitle(Form f) {
+                        String s = null;
+                        if(f.getToolbar() != null) {
+                            Component cmp = f.getToolbar().getTitleComponent();
+                            if(cmp instanceof Label) {
+                                s = ((Label)cmp).getText();
+                            }
+                        } else {
+                            s =f.getTitle();
+                        }
+                        if(s == null) {
+                            return "";
+                        }
+                        return s;
+                    }
+                    
                     public void actionPerformed(ActionEvent evt) {
                         Form newForm = Display.getInstance().getCurrent();
                         if(isRecording()) {
                             if(newForm.getName() != null && newForm.getName().length() > 0) {
                                 generatedCode += "        waitForFormName(\"" + newForm.getName() + "\");\n";
                             } else {
-                                if(newForm.getTitle() != null) {
-                                    generatedCode += "        waitForFormTitle(\"" + newForm.getTitle() + "\");\n";
+                                String ft = getFormTitle(newForm);
+                                String oldT = "";
+                                if(oldForm != null) {
+                                    oldT = getFormTitle(oldForm);
                                 }
+                                if(ft.equals(oldT) || ft.length() == 0) {
+                                    generatedCode += "        waitForUnnamedForm();\n";
+                                } else {
+                                    generatedCode += "        waitForFormTitle(\"" + ft + "\");\n";
+                                }
+                                generatedCode += "        Display.getInstance().getCurrent().setName(\"Form_"  + counter + "\");\n";
+                                Display.getInstance().getCurrent().setName("Form_"  + counter);
+                                counter++;
                             }
                             updateTestCode();
                             resetWaitTimer();
                         }
                         bindForm(newForm);
+                        oldForm = newForm;
                     }
                 });
             }
@@ -321,6 +353,16 @@ public class TestRecorder extends javax.swing.JFrame {
         return false;
     }
     
+    public boolean isToolbarComponent(Component cmp) {
+        while(cmp.getParent() != null) {
+            cmp = cmp.getParent();
+            if(cmp instanceof Toolbar) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     void eventPointerReleased(int x, int y) {
         if(isRecording()) {
             com.codename1.ui.Component cmp = Display.getInstance().getCurrent().getComponentAt(x, y);
@@ -354,6 +396,32 @@ public class TestRecorder extends javax.swing.JFrame {
                     updateTestCode();
                 }
             } else {
+                if(isToolbarComponent(cmp)) {
+                    if(cmp instanceof com.codename1.ui.Button) {
+                        Command cmd = ((com.codename1.ui.Button)cmp).getCommand();
+                        if(cmd != null) {
+                            int offset = 0;
+                            Command[] commands = TestUtils.getToolbarCommands();
+                            for(Command c : commands) {
+                                if(c == cmd) {
+                                    generatedCode += "        assertEqual(getToolbarCommands().length, " + commands.length + ");\n";
+                                    generatedCode += "        executeToolbarCommandAtOffset(" + offset + ");\n";
+                                    updateTestCode();
+                                    return;
+                                }
+                                offset++;
+                            }
+                        } else {
+                            if(cmp.getUIID().equals("MenuButton")) {
+                                // side menu button
+                                generatedCode += "        showSidemenu();\n";
+                                updateTestCode();
+                                return;
+                            }
+                        }
+                    }
+                }
+                
                 if(cmp instanceof com.codename1.ui.Button) {
                     com.codename1.ui.Button btn = (com.codename1.ui.Button)cmp;
                     

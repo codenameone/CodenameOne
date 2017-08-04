@@ -45,6 +45,7 @@ import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.Picker;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -380,6 +381,9 @@ public class Validator {
     protected Object getComponentValue(Component cmp) {
         if(cmp instanceof TextArea) {
             return ((TextArea)cmp).getText();
+        }
+        if(cmp instanceof Picker) {
+            ((Picker)cmp).getValue();
         }
         if(cmp instanceof RadioButton || cmp instanceof CheckBox) {
             if(((Button)cmp).isSelected()) {

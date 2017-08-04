@@ -751,18 +751,19 @@ namespace com.codename1.impl
             return true;
         }
 
-        public override void installNativeTheme()
+         public override void installNativeTheme()
         {
            ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
             ui.plaf.UIManager uim = ui.plaf.UIManager.getInstance();
             string[] themeNames = r.getThemeResourceNames();
             java.util.Hashtable props = r.getTheme((string)themeNames[0]);
-            if (isDesktop() || isTablet())
+            bool isHardwareButtonsAPIPresent = Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons");
+            if (!isHardwareButtonsAPIPresent)
             {
-                props.put("hideBackCommandBool", false);
+                props.put("@hideBackCommandBool", "false");
             } else 
             {
-                props.put("hideBackCommandBool", true);
+                props.put("@hideBackCommandBool", "true");
             } 
             uim.setThemeProps(props);
             ui.plaf.DefaultLookAndFeel dl = (ui.plaf.DefaultLookAndFeel)uim.getLookAndFeel();
@@ -2008,19 +2009,9 @@ namespace com.codename1.impl
             return sbyteArray;
         }
 
-        const int maxCacheSize = 50;
-        private static ConcurrentDictionary<int, CodenameOneImage> imageCache = new ConcurrentDictionary<int, CodenameOneImage>();
-
         public override object createImage(byte[] bytes, int offset, int len)
         {
-
-            if (imageCache.ContainsKey(bytes.GetHashCode()))
-            {
-                CodenameOneImage cached;
-                imageCache.TryGetValue(bytes.GetHashCode(), out cached);
-                cached.lastAccess = DateTime.Now.Ticks;
-                return cached;
-            }
+           
             if (bytes.Length == 0)
             {
                 // workaround for empty images
@@ -2056,16 +2047,7 @@ namespace com.codename1.impl
                 cim.graphics.destination.dispose();
                 ci = cim;
                 canvasbitmap.Dispose();
-                dispatcher.RunAsync(CoreDispatcherPriority.Low, () =>
-                {
-                    imageCache.TryAdd(bytes.GetHashCode(), ci);
-                    while (imageCache.Count > maxCacheSize)
-                    {
-                        int toRemove = imageCache.OrderBy(m => m.Value.lastAccess).First().Key;
-                        CodenameOneImage ignored;
-                        imageCache.TryRemove(toRemove, out ignored);
-                    }
-                }).AsTask();
+                
             }
             catch (Exception)
             {

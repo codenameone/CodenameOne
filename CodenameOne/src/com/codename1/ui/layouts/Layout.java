@@ -83,6 +83,10 @@ public abstract class Layout {
         return null;
     }
     
+    public Object cloneConstraint(Object constraint) {
+        return constraint;
+    }
+    
     /**
      * This method returns true if the Layout allows Components to
      * Overlap.

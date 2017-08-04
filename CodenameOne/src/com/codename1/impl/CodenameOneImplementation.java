@@ -232,9 +232,6 @@ public abstract class CodenameOneImplementation {
      * Some implementations might need to perform initializations of the EDT thread
      */
     public void initEDT() {
-        if(Preferences.get("PollingPush", false) && callback != null) {
-            registerPollingFallback();
-        }
     }
 
     /**
@@ -339,6 +336,17 @@ public abstract class CodenameOneImplementation {
      * Invoked for special cases to stop text editing and clear native editing state
      */
     public void stopTextEditing() {    
+    }
+    
+    /**
+     * Using invokeAndBlock inside EditString creates peculiar behaviour that needs
+     * to be worked around.  Ideally no port should use invokeAndBlock for this
+     * but currently JavaSE and UWP both do.  Need to be able to detect this
+     * for workarounds.
+     * @return 
+     */
+    public boolean usesInvokeAndBlockForEditString() {
+        return false;
     }
 
     /**
@@ -1470,7 +1478,13 @@ public abstract class CodenameOneImplementation {
         
     }
     
-    
+    /**
+     * Cleans up resources used by graphics object
+     * @param graphics 
+     */
+    public void disposeGraphics(Object graphics) {
+        
+    }
     
     
     /**
@@ -2052,6 +2066,50 @@ public abstract class CodenameOneImplementation {
     protected void keyReleased(final int keyCode) {
         Display.getInstance().keyReleased(keyCode);
     }
+    
+    /**
+     * Checks whether the alt key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the shift key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isShiftKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the altgraph key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltGraphKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the control key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isControlKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the meta key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isMetaKeyDown() {
+        return false;
+    }
+    
+    
+    
+   
 
     /**
      * Subclasses should invoke this method, it delegates the event to the display and into
@@ -2243,6 +2301,20 @@ public abstract class CodenameOneImplementation {
             case Component.DRAG_REGION_LIKELY_DRAG_XY:
                 startX = 0.9f;
                 startY = 0.9f;
+                break;
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_X:
+                startX = 0f;
+                startY = Math.max(5, startY);
+                break;
+                
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_Y:
+                startY = 0f;
+                startX = Math.max(5, startX);
+                break;
+                
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_XY:
+                startX = 0f;
+                startY = 0f;
                 break;
             case Component.DRAG_REGION_POSSIBLE_DRAG_X:
                 startY = Math.max(5, startY);
@@ -4339,6 +4411,17 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Checks if this platform supports custom cursors.  
+     * @return True if the platform supports custom cursors.
+     * @see Form#setEnableCursors(boolean) 
+     * @see Component#setCursor(int) 
+     * @see ComponentSelector#setCursor(int) 
+     */
+    public boolean isSetCursorSupported() {
+        return false;
+    }
+    
+    /**
      * Returns the content length for this connection
      * 
      * @param connection the connection 
@@ -5406,9 +5489,21 @@ public abstract class CodenameOneImplementation {
     }
     
     public boolean transformEqualsImpl(Transform t1, Transform t2){
-        throw new RuntimeException("Transforms not supported");
+        Object o1 = null;
+        if(t1 != null) {
+            o1 = t1.getNativeTransform();
+        }
+        Object o2 = null;
+        if(t2 != null) {
+            o2 = t2.getNativeTransform();
+        }
+        return transformNativeEqualsImpl(o1, o2);
     }
     
+    public boolean transformNativeEqualsImpl(Object t1, Object t2){
+        throw new RuntimeException("Transforms not supported");
+    }
+
     /**
      * Makes a new native translation transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5851,7 +5946,7 @@ public abstract class CodenameOneImplementation {
      */
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
-        Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
+        //Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
         Preferences.set("push_key", id);
         /*if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);

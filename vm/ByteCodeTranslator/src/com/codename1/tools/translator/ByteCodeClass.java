@@ -478,7 +478,7 @@ public class ByteCodeClass {
                         b.append("STRING_FROM_CONSTANT_POOL_OFFSET(");
                         b.append(Parser.addToConstantPool((String)bf.getValue()));
                         b.append(") /* ");
-                        b.append(bf.getValue());
+                        b.append(String.valueOf(bf.getValue()).replace("*/", "* /"));
                         b.append(" */");
                     } else {
                         if(bf.getValue() instanceof Number) {
