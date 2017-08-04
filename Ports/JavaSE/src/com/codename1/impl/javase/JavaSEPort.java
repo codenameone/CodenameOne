@@ -193,8 +193,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     isRetina = true;
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (Throwable e) {
+            //e.printStackTrace();
         }
         return isRetina;
     }
