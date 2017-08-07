@@ -6316,6 +6316,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
 
         @Override
+        public void revalidate() {
+            // We need to override this with an empty implementation to workaround
+            // Deadlock bug  http://bugs.java.com/view_bug.do?bug_id=8058870
+            // If we allow the default implementation, then it will periodically deadlock
+            // when displaying a browser component
+        }
+
+        
+        
+        @Override
         protected void processMouseEvent(MouseEvent e) {
             //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
             if (!sendToCn1(e)) {
