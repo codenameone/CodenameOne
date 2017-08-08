@@ -59,6 +59,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
 import javax.swing.event.MenuDragMouseEvent;
+import netscape.javascript.JSException;
 
 /**
  *
@@ -428,9 +429,15 @@ public class SEBrowserComponent extends PeerComponent {
     public String executeAndReturnString(final String js){
         final String[] result = new String[1];
         final boolean[] complete = new boolean[]{false};
+        final Throwable[] error = new Throwable[1];
         Platform.runLater(new Runnable() {
             public void run() {
-                result[0] = ""+web.getEngine().executeScript(js);
+                try {
+                    result[0] = ""+web.getEngine().executeScript(js);
+                } catch (Throwable jse) {
+                    System.out.println("Error trying to execute js "+js);
+                    error[0] = jse;
+                }
                 synchronized(complete){
                     complete[0] = true;
                     complete.notify();
@@ -440,19 +447,24 @@ public class SEBrowserComponent extends PeerComponent {
 
         // We need to wait for the result of the javascript operation
         // but we don't want to block the entire EDT, so we use invokeAndBlock
-        Display.getInstance().invokeAndBlock(new Runnable(){
-            public void run() {
-                while ( !complete[0] ){
-                    synchronized(complete){
-                        try {
-                            complete.wait(20);
-                        } catch (InterruptedException ex) {
+        while (!complete[0]) {
+            Display.getInstance().invokeAndBlock(new Runnable(){
+                public void run() {
+                    if ( !complete[0] ){
+                        synchronized(complete){
+                            try {
+                                complete.wait(20);
+                            } catch (InterruptedException ex) {
+                            }
                         }
                     }
                 }
-            }
 
-        });
+            });
+        }
+        if (error[0] != null) {
+            throw new RuntimeException(error[0]);
+        }
         return result[0];
     }
      
