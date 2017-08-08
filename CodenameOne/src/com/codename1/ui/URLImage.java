@@ -367,16 +367,6 @@ public class URLImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
-    @Override
-    public boolean requiresDrawImage() {
-        return getInternal().requiresDrawImage();
-    }
-    
-    
-
-    /**
-     * {@inheritDoc}
-     */
     public byte[] getImageData() {
         if(imageData != null) {
             return imageData;
