@@ -138,6 +138,7 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
@@ -8137,6 +8138,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 @Override
                 public void run() {
                     
+                    
+                    
                     cnt = new JPanel() {
                         
                         @Override
@@ -8181,7 +8184,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             Group root = new Group();
             
             v = new MediaView(player);
-            
+            final Runnable oldOnReady = player.getOnPlaying();
+            player.setOnPlaying(new Runnable() {
+                public void run() {
+                    if (oldOnReady != null) oldOnReady.run();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (VideoComponent.this.getParent() != null) {
+                                VideoComponent.this.getParent().revalidate();
+                            }
+                        }
+                    });
+                }
+            });
             
             root.getChildren().add(v);
             vid.setScene(new Scene(root));
