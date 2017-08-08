@@ -4922,17 +4922,31 @@ public class JavaSEPort extends CodenameOneImplementation {
         drawingNativePeer = true;
     
         try {
-            synchronized(cmp) {
-                if (cmp.getClientProperty("__buffer") != null) {
-                    BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
-                    Graphics2D nativeGraphics = getGraphics(graphics);
-                    nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
+            
+            // This should only be run on EDT to avoid deadlocks
+            if (Display.getInstance().isEdt()) {
+                synchronized(cmp) {
+                    drawNativePeerImpl(graphics, cmp, jcmp);
                 }
+            } else if (!EventQueue.isDispatchThread()){ // I can just imagine bad things if we're already inside an EventQueue.invokeAndWait()
+                Display.getInstance().callSeriallyAndWait(new Runnable() {
+                    public void run() {
+                        drawNativePeer(graphics, cmp, jcmp);
+                    }
+                });
             }
         } finally {
             drawingNativePeer = false;
         }
         
+    }
+    
+    private void drawNativePeerImpl(Object graphics, PeerComponent cmp, JComponent jcmp) {
+        if (cmp.getClientProperty("__buffer") != null) {
+            BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
+            Graphics2D nativeGraphics = getGraphics(graphics);
+            nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
+        }
     }
 
     /**
@@ -8085,17 +8099,35 @@ public class JavaSEPort extends CodenameOneImplementation {
             // drawNativePeer will also synchronize on this
             // This prevents simulataneous reads and writes to/from the
             // buffered image.
-            synchronized(VideoComponent.this) {
-                                
-                final BufferedImage buf = getBuffer();
-                Graphics2D g2d = buf.createGraphics();
-                AffineTransform t = g2d.getTransform();
-                double tx = t.getTranslateX();
-                double ty = t.getTranslateY();
-                vid.paint(g2d);
-                g2d.dispose();
-                VideoComponent.this.putClientProperty("__buffer", buf);
+            if (EventQueue.isDispatchThread()) {
+                // Only run this on the AWT event dispatch thread
+                // to avoid deadlocks
+                synchronized(VideoComponent.this) {
+                    paintOnBufferImpl();
+                }
+            } else if (!Display.getInstance().isEdt()){
+                // I can only imagine bad things 
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
             }
+        }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            AffineTransform t = g2d.getTransform();
+            double tx = t.getTranslateX();
+            double ty = t.getTranslateY();
+            vid.paint(g2d);
+            g2d.dispose();
+            VideoComponent.this.putClientProperty("__buffer", buf);
         }
         
         public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
@@ -9599,17 +9631,34 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (cnt.getWidth() == 0 || cnt.getHeight() == 0) {
                 return;
             }
-            synchronized(Peer.this) {
-                final BufferedImage buf = getBuffer();
-                Graphics2D g2d = buf.createGraphics();
-                g2d.scale(retinaScale / zoomLevel, retinaScale / zoomLevel);
+            if (EventQueue.isDispatchThread()) {
+                synchronized(Peer.this) {
+                    paintOnBufferImpl();
 
-                cmp.paintAll(g2d);
-                g2d.dispose();
-                Peer.this.putClientProperty("__buffer", buf);
-
+                }
+            } else if (!Display.getInstance().isEdt()){
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t ) {
+                    t.printStackTrace();
+                }
+                
             }
             
+        }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            g2d.scale(retinaScale / zoomLevel, retinaScale / zoomLevel);
+
+            cmp.paintAll(g2d);
+            g2d.dispose();
+            Peer.this.putClientProperty("__buffer", buf);
         }
         
         // HOLY LORD!! Because we're adding the peer directly to the JFrame

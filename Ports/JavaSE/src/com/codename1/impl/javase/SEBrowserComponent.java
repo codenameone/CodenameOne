@@ -137,23 +137,40 @@ public class SEBrowserComponent extends PeerComponent {
             if (getWidth() == 0 || getHeight() == 0) {
                 return;
             }
-            synchronized(cmp) {
-                final BufferedImage buf = getBuffer();
-                Graphics2D g2d = buf.createGraphics();
-                g2d.scale(JavaSEPort.retinaScale / instance.zoomLevel, JavaSEPort.retinaScale / instance.zoomLevel);
-                cmp.panel.paint(g2d);
-                g2d.dispose();
-                cmp.putClientProperty("__buffer", buf);
+            if (EventQueue.isDispatchThread()) {
+                synchronized(cmp) {
+                    paintOnBufferImpl();
+
+                    // IMPORTANT:  Don't call any cn1 repaint() or paint() from here
+                    // even using callSerially().  If you do you risk starting a cycle
+                    // of cn1 paint -> awt paint -> cn1 paint -> awt paint -> etc...
+                    // See paint(Graphics) below which calls paintOnBuffer() and then
+                    // dispatches to cn1 to update itself.
+
+                    // COROLARY: Don't call AWT repaint, etc from inside CN1 paint()
+                    // Call this instead to prevent cycles.
+                }
+            } else if (!Display.getInstance().isEdt()) {
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
                 
-                // IMPORTANT:  Don't call any cn1 repaint() or paint() from here
-                // even using callSerially().  If you do you risk starting a cycle
-                // of cn1 paint -> awt paint -> cn1 paint -> awt paint -> etc...
-                // See paint(Graphics) below which calls paintOnBuffer() and then
-                // dispatches to cn1 to update itself.
-                
-                // COROLARY: Don't call AWT repaint, etc from inside CN1 paint()
-                // Call this instead to prevent cycles.
             }
+        }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            g2d.scale(JavaSEPort.retinaScale / instance.zoomLevel, JavaSEPort.retinaScale / instance.zoomLevel);
+            cmp.panel.paint(g2d);
+            g2d.dispose();
+            cmp.putClientProperty("__buffer", buf);
         }
         
         // The buffered image that AWT paints to and CN1 paints from
