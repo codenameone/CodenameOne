@@ -456,10 +456,15 @@ public class SEBrowserComponent extends PeerComponent {
         
         synchronized(imageLock) {
             peerImage = new BufferedImage(cnt.getWidth(), cnt.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            Graphics2D imageG = (Graphics2D)peerImage.createGraphics();
+            final Graphics2D imageG = (Graphics2D)peerImage.createGraphics();
             try {
                 instance.drawingNativePeer = true;
-                cnt.paint(imageG);
+                EventQueue.invokeAndWait(new Runnable() {
+                    public void run() {
+                        cnt.paint(imageG);
+                    }
+                });
+                
             } catch (Exception ex){
             } finally {
                 instance.drawingNativePeer = false;
