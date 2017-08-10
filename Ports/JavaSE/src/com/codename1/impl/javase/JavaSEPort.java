@@ -180,7 +180,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private InputEvent lastInputEvent;
     static double retinaScale = 1.0;
     
-    private static boolean isRetina() {
+    public static boolean isRetina() {
         //if (true) return false;
         boolean isRetina = false;
         GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
@@ -198,6 +198,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             //e.printStackTrace();
         }
         return isRetina;
+    }
+    
+    public static double getRetinaScale() {
+        return retinaScale;
     }
     
     /**
