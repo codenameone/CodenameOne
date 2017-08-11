@@ -221,6 +221,7 @@ public class Button extends Label {
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
         setRippleEffect(buttonRippleEffectDefault);        
         if(isCapsText() && text != null) {
+            putClientProperty("cn1$origText", text);
             super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
         } 
     }
@@ -750,6 +751,25 @@ public class Button extends Label {
             setUIID("ToggleButton");
         }
     }
+
+    /**
+     * Overriden to workaround issue with caps text and different UIID's
+     * {@inheritDoc}
+     */
+    @Override
+    public void setUIID(String id) {
+        super.setUIID(id);
+        String t = (String)getClientProperty("cn1$origText");
+        if(t != null) {
+            if(isCapsText()) {
+                super.setText(UIManager.getInstance().localize(t, t).toUpperCase());
+            } else {
+                super.setText(UIManager.getInstance().localize(t, t));
+            }
+        } 
+    }
+    
+    
 
     /**
      * {@inheritDoc}
