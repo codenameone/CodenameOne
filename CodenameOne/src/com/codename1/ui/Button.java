@@ -872,10 +872,13 @@ public class Button extends Label {
      */
     @Override
     public void setText(String t) {
-        if(isCapsText() && t != null) {
-            super.setText(getUIManager().localize(t, t).toUpperCase());
-            return;
-        } 
+        if(isCapsText()) {
+            putClientProperty("cn1$origText", t);
+            if(t != null) {
+                super.setText(getUIManager().localize(t, t).toUpperCase());
+                return;
+            } 
+        }
         super.setText(t);
     }    
 }
