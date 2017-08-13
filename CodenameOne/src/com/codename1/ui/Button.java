@@ -765,6 +765,7 @@ public class Button extends Label {
                 super.setText(UIManager.getInstance().localize(t, t).toUpperCase());
             } else {
                 super.setText(UIManager.getInstance().localize(t, t));
+                putClientProperty("cn1$origText", null);
             }
         } 
     }
