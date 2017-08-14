@@ -327,6 +327,8 @@ public class SEBrowserComponent extends PeerComponent {
                     }
                     netscape.javascript.JSObject window = (netscape.javascript.JSObject)self.web.getEngine().executeScript("window");
                     window.setMember("cn1application", new Bridge(p));
+                    self.web.getEngine().executeScript("while (window._cn1ready && window._cn1ready.length > 0) {var f = window._cn1ready.shift(); f();}");
+                    //System.out.println("cn1application is "+self.web.getEngine().executeScript("window.cn1application && window.cn1application.shouldNavigate"));
                     self.web.getEngine().executeScript("window.addEventListener('unload', function(e){console.log('unloading...');return 'foobar';});");
                     p.fireWebEvent("onLoad", new ActionEvent(url));
                     
