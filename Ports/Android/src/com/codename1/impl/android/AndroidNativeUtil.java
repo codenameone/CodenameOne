@@ -29,9 +29,6 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.os.Bundle;
 import android.view.View;
-import com.codename1.impl.android.AndroidImplementation;
-import static com.codename1.impl.android.AndroidImplementation.checkForPermission;
-import com.codename1.ui.Display;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -207,4 +204,17 @@ public class AndroidNativeUtil {
     public static boolean checkForPermission(String permission, String description){
         return AndroidImplementation.checkForPermission(permission, description, false);
     }
+    
+    /** 
+     * @param requestCode to identify the permission requested
+     * @param permissionStatus true: if the user accept permission, false: if user denied the permission
+     */
+    static void onRequestPermissionsResult(int requestCode,boolean permissionStatus) {
+        if(listeners != null) {
+            for(LifecycleListener l : listeners) {
+                l.onRequestPermissionsResult(requestCode,permissionStatus);
+            }
+        }
+    }
+    
 }

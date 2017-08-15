@@ -38,4 +38,5 @@ public interface LifecycleListener {
     public void onDestroy();
     public void onSaveInstanceState(Bundle b);
     public void onLowMemory();
+    public void onRequestPermissionsResult(int requestCode,boolean permissionStatus);
 }

@@ -35,7 +35,6 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.Window;
-import android.widget.Toast;
 import com.codename1.payment.Product;
 import com.codename1.payment.PurchaseCallback;
 import com.codename1.payment.Receipt;
@@ -705,7 +704,8 @@ public class CodenameOneActivity extends Activity {
     public boolean isRequestForPermission() {
         return requestForPermission;
     }
-
+    
+    @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if(grantResults != null || grantResults.length == 0) {
             requestForPermission = false;
@@ -713,9 +713,10 @@ public class CodenameOneActivity extends Activity {
         }
         if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Log.i("Codename One", "PERMISSION_GRANTED");
+            AndroidNativeUtil.onRequestPermissionsResult(requestCode, true);
         } else {
-            // Permission Denied
-            Toast.makeText(this, "Permission is denied", Toast.LENGTH_SHORT).show();
+            AndroidNativeUtil.onRequestPermissionsResult(requestCode, false);
+            //Toast.makeText(this, "Permission is denied", Toast.LENGTH_SHORT).show();
         }
         requestForPermission = false;
     }
