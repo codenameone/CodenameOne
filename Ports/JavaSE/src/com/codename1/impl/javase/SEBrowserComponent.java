@@ -27,6 +27,7 @@ import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.EventQueue;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -52,20 +53,30 @@ import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
 import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
 import javax.swing.event.MenuDragMouseEvent;
+import netscape.javascript.JSException;
 
 /**
  *
+ * Retina support note:  The browser component currently doesn't take advantage
+ * of hidpi displays like the Video Component does.  This is because the *actual*
+ * WebView needs to be the same visible dimensions the Swing Canvas for events to
+ * work properly.  (Even if you intercept the events of the WebView and convert 
+ * their coordinates, there are other aspects, such as tooltips, that will work
+ * weirdly if the component doesn't take the acutal space on which it is rendered.
+ * 
  * @author Chen
  */
 public class SEBrowserComponent extends PeerComponent {
     private static boolean firstTime = true;
     private WebView web;
     private javafx.embed.swing.JFXPanel panel;
-    private JPanel frm;
+    private JFrame frm;
     private JavaSEPort instance;
     private String currentURL;
     private boolean init = false;
@@ -75,7 +86,6 @@ public class SEBrowserComponent extends PeerComponent {
     private  JScrollBar hSelector, vSelector;
     private AdjustmentListener adjustmentListener;
     private BrowserComponent browserComp;
-    
     
     /**
      * A bridge to inject java methods into the webview.
@@ -107,26 +117,104 @@ public class SEBrowserComponent extends PeerComponent {
         }        
     }
     
+    
+    
     private static class InternalJPanel extends JPanel {
         private final JavaSEPort instance;
+        private final SEBrowserComponent cmp;
         
-        InternalJPanel(JavaSEPort instance) {
+        InternalJPanel(JavaSEPort instance, SEBrowserComponent cmp) {
             this.instance = instance;
+            this.cmp = cmp;
             
         }
-        public void paint(java.awt.Graphics g) {
-            // We want the native component to be hidden unless
-            // it is being drawn by Codename One via drawNativePeer()
-            // This allows the component to be present (respond to events)
-            // but gives us the flexibility to draw the component
-            // at the correct depth with the rest of the Codename One
-            // components.
-            if (instance.drawingNativePeer) {
-                super.paint(g);
-            } else {
+        
+        /**
+         * Paints native peer onto a buffered image
+         * This buffered image will later be drawn to cn1 pipeline
+         * in drawNativePeer()
+         */
+        public void paintOnBuffer() {
+            if (getWidth() == 0 || getHeight() == 0) {
+                return;
+            }
+            if (EventQueue.isDispatchThread()) {
+                synchronized(cmp) {
+                    paintOnBufferImpl();
 
+                    // IMPORTANT:  Don't call any cn1 repaint() or paint() from here
+                    // even using callSerially().  If you do you risk starting a cycle
+                    // of cn1 paint -> awt paint -> cn1 paint -> awt paint -> etc...
+                    // See paint(Graphics) below which calls paintOnBuffer() and then
+                    // dispatches to cn1 to update itself.
+
+                    // COROLARY: Don't call AWT repaint, etc from inside CN1 paint()
+                    // Call this instead to prevent cycles.
+                }
+            } else if (!Display.getInstance().isEdt()) {
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+                
             }
         }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            g2d.scale(JavaSEPort.retinaScale / instance.zoomLevel, JavaSEPort.retinaScale / instance.zoomLevel);
+            cmp.panel.paint(g2d);
+            g2d.dispose();
+            cmp.putClientProperty("__buffer", buf);
+        }
+        
+        // The buffered image that AWT paints to and CN1 paints from
+        BufferedImage buf;
+        
+        @Override
+        public void paint(java.awt.Graphics g) {
+            paintOnBuffer();
+            
+            // After painting buffer, we notify CN1 that it should 
+            // draw the buffer as there are changes
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    cmp.repaint();
+                }
+            });
+        }
+
+        @Override
+        protected void paintChildren(java.awt.Graphics g) {
+            
+        }
+
+        @Override
+        protected void paintBorder(java.awt.Graphics g) {
+            
+        }
+
+        @Override
+        protected void paintComponent(java.awt.Graphics g) {
+            
+        }
+
+           
+        // Gets the buffer that AWT draws to and CN1 reads from.   
+        private BufferedImage getBuffer() {
+            if (buf == null || buf.getWidth() != getWidth() * JavaSEPort.retinaScale / instance.zoomLevel || buf.getHeight() != getHeight() * JavaSEPort.retinaScale / instance.zoomLevel) {
+
+                buf = new BufferedImage((int)(getWidth() * JavaSEPort.retinaScale / instance.zoomLevel), (int)(getHeight() * JavaSEPort.retinaScale / instance.zoomLevel), BufferedImage.TYPE_INT_ARGB);
+            }
+            return buf;
+        }
+        
     }
     
     private static EventHandler<WebErrorEvent> createOnErrorHandler() {
@@ -148,7 +236,7 @@ public class SEBrowserComponent extends PeerComponent {
                 if (self == null) {
                     return;
                 }
-                self.cnt = new InternalJPanel(self.instance);
+                self.cnt = new InternalJPanel(self.instance, self);
                 
                 self.cnt.setOpaque(false); // <--- Important if container is opaque it will cause
                                         // all kinds of flicker due to painting conflicts with CN1 pipeline.
@@ -239,6 +327,8 @@ public class SEBrowserComponent extends PeerComponent {
                     }
                     netscape.javascript.JSObject window = (netscape.javascript.JSObject)self.web.getEngine().executeScript("window");
                     window.setMember("cn1application", new Bridge(p));
+                    self.web.getEngine().executeScript("while (window._cn1ready && window._cn1ready.length > 0) {var f = window._cn1ready.shift(); f();}");
+                    //System.out.println("cn1application is "+self.web.getEngine().executeScript("window.cn1application && window.cn1application.shouldNavigate"));
                     self.web.getEngine().executeScript("window.addEventListener('unload', function(e){console.log('unloading...');return 'foobar';});");
                     p.fireWebEvent("onLoad", new ActionEvent(url));
                     
@@ -307,7 +397,8 @@ public class SEBrowserComponent extends PeerComponent {
         super(null);
         this.web = web;
         this.instance = instance;
-        this.frm = f;
+        this.frm = (JFrame)f.getTopLevelAncestor();
+        
         this.panel = fx;
         WebEngine we = web.getEngine();
         try {
@@ -340,9 +431,15 @@ public class SEBrowserComponent extends PeerComponent {
     public String executeAndReturnString(final String js){
         final String[] result = new String[1];
         final boolean[] complete = new boolean[]{false};
+        final Throwable[] error = new Throwable[1];
         Platform.runLater(new Runnable() {
             public void run() {
-                result[0] = ""+web.getEngine().executeScript(js);
+                try {
+                    result[0] = ""+web.getEngine().executeScript(js);
+                } catch (Throwable jse) {
+                    System.out.println("Error trying to execute js "+js);
+                    error[0] = jse;
+                }
                 synchronized(complete){
                     complete[0] = true;
                     complete.notify();
@@ -352,19 +449,24 @@ public class SEBrowserComponent extends PeerComponent {
 
         // We need to wait for the result of the javascript operation
         // but we don't want to block the entire EDT, so we use invokeAndBlock
-        Display.getInstance().invokeAndBlock(new Runnable(){
-            public void run() {
-                while ( !complete[0] ){
-                    synchronized(complete){
-                        try {
-                            complete.wait(20);
-                        } catch (InterruptedException ex) {
+        while (!complete[0]) {
+            Display.getInstance().invokeAndBlock(new Runnable(){
+                public void run() {
+                    if ( !complete[0] ){
+                        synchronized(complete){
+                            try {
+                                complete.wait(20);
+                            } catch (InterruptedException ex) {
+                            }
                         }
                     }
                 }
-            }
 
-        });
+            });
+        }
+        if (error[0] != null) {
+            throw new RuntimeException(error[0]);
+        }
         return result[0];
     }
      
@@ -385,12 +487,15 @@ public class SEBrowserComponent extends PeerComponent {
         
         synchronized(imageLock) {
             peerImage = new BufferedImage(cnt.getWidth(), cnt.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            System.out.println("PI width: "+peerImage.getWidth()+ "PI height "+peerImage.getHeight());
-            System.out.println("Creating peer image");
-            Graphics2D imageG = (Graphics2D)peerImage.createGraphics();
+            final Graphics2D imageG = (Graphics2D)peerImage.createGraphics();
             try {
                 instance.drawingNativePeer = true;
-                cnt.paint(imageG);
+                EventQueue.invokeAndWait(new Runnable() {
+                    public void run() {
+                        cnt.paint(imageG);
+                    }
+                });
+                
             } catch (Exception ex){
             } finally {
                 instance.drawingNativePeer = false;
@@ -499,7 +604,7 @@ public class SEBrowserComponent extends PeerComponent {
     
     @Override
     protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-        return new com.codename1.ui.geom.Dimension((int) web.getWidth(), (int) web.getHeight());
+        return new com.codename1.ui.geom.Dimension((int) (web.getWidth() * JavaSEPort.retinaScale / instance.zoomLevel), (int) (web.getHeight() * JavaSEPort.retinaScale / instance.zoomLevel));
     }
    
     int lastX, lastY, lastW, lastH;
@@ -527,11 +632,22 @@ public class SEBrowserComponent extends PeerComponent {
         if (lastZoom == instance.zoomLevel && x==lastX && y==lastY && w==lastW && h==lastH) {
             return;
         }
+        final int screenX;
+        final int screenY;
+        if(instance.getScreenCoordinates() != null) {
+            screenX = instance.getScreenCoordinates().x;
+            screenY = instance.getScreenCoordinates().y;
+        } else {
+            screenX = 0;
+            screenY = 0;
+        }
+        
         lastX = x;
         lastY=y;
         lastW=w;
         lastH=h;
         lastZoom = instance.zoomLevel;
+        final double zoom = lastZoom;
         
         Runnable r = new Runnable() {
             @Override
@@ -554,12 +670,20 @@ public class SEBrowserComponent extends PeerComponent {
                         }
                     }
                 });
+
                 
-                cnt.setBounds((int) ((x + getScreenCoordinateX() + instance.canvas.x) * instance.zoomLevel),
-                        (int) ((y + getScreenCoordinateY() + instance.canvas.y) * instance.zoomLevel),
-                        (int) (w * instance.zoomLevel),
-                        (int) (h * instance.zoomLevel));
-                cnt.validate();
+                frm.doLayout();
+                cnt.setBounds(
+                    (int) ((x + screenX + instance.canvas.x) * zoom / JavaSEPort.retinaScale),
+                    (int) ((y + screenY + instance.canvas.y) * zoom / JavaSEPort.retinaScale),
+                    (int) (w * zoom / JavaSEPort.retinaScale),
+                    (int) (h * zoom / JavaSEPort.retinaScale)
+                );
+                cnt.doLayout();
+                ((InternalJPanel)cnt).paintOnBuffer();
+                    
+                
+                
             }
         };
         
@@ -657,8 +781,21 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
         }
-        instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+        
         onPositionSizeChange();
+        instance.drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+        // If this paint is a result of an explicit repaint() call within
+        // the AWT paint() method, then we don't reciprocate the call back
+        // to AWT.  If, however, this paint came naturally from the CN1
+        // paint pipeline, then we will propagate it back to AWT.
+        // Trying to prevent infinite cycle here.
+        
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                ((InternalJPanel)cnt).paintOnBuffer();
+            }
+        });
+        
         
     }
    

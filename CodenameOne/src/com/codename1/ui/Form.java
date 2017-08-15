@@ -70,7 +70,7 @@ public class Form extends Container {
     private Component dragged;
     private boolean enableCursors;
     static Motion rippleMotion;
-    private Component rippleComponent;
+    static Component rippleComponent;
     static int rippleX;
     static int rippleY;
     
@@ -3323,6 +3323,22 @@ public class Form extends Container {
      */
     public boolean isScrollable() {
         return getContentPane().isScrollable();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isScrollableX() {
+        return getContentPane().isScrollableX();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isScrollableY() {
+        return getContentPane().isScrollableY();
     }
 
     /**

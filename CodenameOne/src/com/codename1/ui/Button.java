@@ -154,9 +154,6 @@ public class Button extends Label {
      */
     public Button(String text) {
         this(text, null, "Button");
-        if(isCapsText() && text != null) {
-            super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
-        } 
     }
     
     /**
@@ -223,6 +220,10 @@ public class Button extends Label {
         this.rolloverIcon = icon;
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
         setRippleEffect(buttonRippleEffectDefault);        
+        if(isCapsText() && text != null) {
+            putClientProperty("cn1$origText", text);
+            super.setText(UIManager.getInstance().localize(text, text).toUpperCase());
+        } 
     }
     
     /**
@@ -752,6 +753,26 @@ public class Button extends Label {
     }
 
     /**
+     * Overriden to workaround issue with caps text and different UIID's
+     * {@inheritDoc}
+     */
+    @Override
+    public void setUIID(String id) {
+        super.setUIID(id);
+        String t = (String)getClientProperty("cn1$origText");
+        if(t != null) {
+            if(isCapsText()) {
+                super.setText(UIManager.getInstance().localize(t, t).toUpperCase());
+            } else {
+                super.setText(UIManager.getInstance().localize(t, t));
+                putClientProperty("cn1$origText", null);
+            }
+        } 
+    }
+    
+    
+
+    /**
      * {@inheritDoc}
      */
     public boolean animate() {
@@ -833,7 +854,7 @@ public class Button extends Label {
      */
     public final boolean isCapsText() {
         if(capsText == null) {
-            return capsTextDefault && getUIID().equals("Button");
+            return capsTextDefault && (getUIID().equals("Button") || getUIID().equals("RaisedButton"));
         }
         return capsText;
     }
@@ -852,10 +873,13 @@ public class Button extends Label {
      */
     @Override
     public void setText(String t) {
-        if(isCapsText() && t != null) {
-            super.setText(getUIManager().localize(t, t).toUpperCase());
-            return;
-        } 
+        if(isCapsText()) {
+            putClientProperty("cn1$origText", t);
+            if(t != null) {
+                super.setText(getUIManager().localize(t, t).toUpperCase());
+                return;
+            } 
+        }
         super.setText(t);
     }    
 }

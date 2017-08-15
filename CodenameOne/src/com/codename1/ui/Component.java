@@ -1887,7 +1887,7 @@ public class Component implements Animation, StyleListener {
     }
 
     private void paintRippleEffect(Graphics g) {
-        if(isRippleEffect() && hasFocus() && Form.rippleMotion != null) {
+        if(isRippleEffect() && Form.rippleComponent == this && Form.rippleMotion != null) {
             paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.rippleMotion.getValue());
         } 
     }

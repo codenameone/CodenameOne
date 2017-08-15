@@ -22,7 +22,13 @@
  */
 package com.codename1.impl.android;
 
-//import android.webkit.JavascriptInterface;
+import android.webkit.JavascriptInterface;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 
 /**
  * A class that is used by executeAndReturnString to be exposed in Javascript so
@@ -31,26 +37,54 @@ package com.codename1.impl.android;
 public class AndroidBrowserComponentCallback {
 
     static final String JS_VAR_NAME = "com_codename1_impl_AndroidImplementation_AndroidBrowserComponent";
-    static final String JS_RETURNVAL_VARNAME = "com_codename1_impl_AndroidImplementation_AndroidBrowserComponent_returnValue";
-    private String returnValue;
-    private boolean valueSet = false;
+    static final String JS_RETURNVAL_VARNAME = "window.com_codename1_impl_AndroidImplementation_AndroidBrowserComponent_returnValue";
 
-    //@JavascriptInterface
-    public synchronized void setReturnValue(String value) {
-        valueSet = true;
-        this.returnValue = value;
-        notify();
+    
+    public String jsCleanup() {
+        if (toClean.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        List<Integer> cleanNow = new ArrayList<Integer>(toClean);
+        for (Integer i : cleanNow) {
+            sb.append("delete ").append(JS_RETURNVAL_VARNAME).append("[").append(i).append("];");
+        }
+        toClean.clear();
+        return sb.toString();
+    }
+    
+    public String jsInit() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(JS_RETURNVAL_VARNAME).append("=").append(JS_RETURNVAL_VARNAME).append("||{};");
+        return sb.toString();
+    }
+    
+    
+    private Map<Integer, String> returnValues = new HashMap<Integer, String>();
+    private List<Integer> toClean = new ArrayList<Integer>();
+    
+
+    @JavascriptInterface
+    public synchronized void addReturnValue(int index, String value) {
+        returnValues.put(index, value);
+        notifyAll();
     }
 
-    public String getReturnValue() {
-        return returnValue;
+    public String getReturnValue(int index) {
+        return returnValues.get(index);
+    }
+    
+    
+    public boolean isValueSet(int index) {
+        return returnValues.containsKey(index);
+    }
+    
+    public boolean isIndexAvailable(int index) {
+        return !isValueSet(index) && !toClean.contains(index);
     }
 
-    public boolean isValueSet() {
-        return valueSet;
-    }
-
-    public void reset() {
-        valueSet = false;
+    public void remove(int index) {
+        returnValues.remove(index);
+        toClean.add(index);
     }
 }

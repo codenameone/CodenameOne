@@ -138,6 +138,7 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
@@ -147,6 +148,7 @@ import javafx.scene.web.WebView;
 import javafx.util.Duration;
 import javax.net.ssl.HttpsURLConnection;
 import javax.swing.*;
+import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.MenuEvent;
@@ -176,6 +178,31 @@ public class JavaSEPort extends CodenameOneImplementation {
     boolean takingScreenshot;
     float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
+    static double retinaScale = 1.0;
+    
+    public static boolean isRetina() {
+        //if (true) return false;
+        boolean isRetina = false;
+        GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+
+        try {
+            Field field = graphicsDevice.getClass().getDeclaredField("scale");
+            if (field != null) {
+                field.setAccessible(true);
+                Object scale = field.get(graphicsDevice);
+                if (scale instanceof Integer && ((Integer) scale).intValue() == 2) {
+                    isRetina = true;
+                }
+            }
+        } catch (Throwable e) {
+            //e.printStackTrace();
+        }
+        return isRetina;
+    }
+    
+    public static double getRetinaScale() {
+        return retinaScale;
+    }
     
     /**
      * When set to true pointer hover events will be called for mouse move events
@@ -218,7 +245,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     private boolean minimized;
-    private javafx.embed.swing.JFXPanel mediaContainer;
+    //private javafx.embed.swing.JFXPanel mediaContainer;
 
     private static File baseResourceDir;
     private static final String DEFAULT_SKINS
@@ -282,11 +309,19 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
-            if(defaultPixelMilliRatio.doubleValue() == 10) {
+            /*
+            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
                 return Display.DENSITY_MEDIUM;
             }
-            if(defaultPixelMilliRatio.doubleValue() == 20) {
+            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
                 return Display.DENSITY_VERY_HIGH;
+            }
+            System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
+            */
+            if (retinaScale > 1.5) {
+                return Display.DENSITY_VERY_HIGH;
+            } else {
+                return Display.DENSITY_MEDIUM;
             }
         }
         return super.getDeviceDensity();
@@ -356,6 +391,15 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static int medianFontSize = 15;
     private static int smallFontSize = 11;
     private static int largeFontSize = 19;
+    static {
+        retinaScale = isRetina() ? 2.0 : 1.0;
+        if (retinaScale > 1.5) {
+            medianFontSize = (int)(medianFontSize * retinaScale);
+            smallFontSize = (int)(smallFontSize * retinaScale);
+            largeFontSize = (int)(largeFontSize * retinaScale);
+            
+        }
+    }
     private static String fontFaceProportional = "SansSerif";
     private static String fontFaceMonospace = "Monospaced";
     private static boolean useNativeInput = true;
@@ -727,6 +771,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         return false;
     }
     
+    private static void dumpSwingHierarchy(java.awt.Component root, String indent) {
+        System.out.println(indent + root.getName()+" "+root.getClass() + " "+root.getBounds());
+        if (root instanceof Container) {
+            Container rootc = (Container)root;
+            for (int i=0; i<rootc.getComponentCount(); i++) {
+                dumpSwingHierarchy(rootc.getComponent(i), indent + "    ");
+            }
+        }
+        
+    }
+    
     class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
         private BufferedImage buffer;
         boolean painted;
@@ -743,6 +798,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             addMouseMotionListener(this);
             addHierarchyBoundsListener(this);
             setFocusable(true);
+            setOpaque(false);
             requestFocus();
         }
         
@@ -758,14 +814,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             return true;
         }
         
-        /*
-         * public void update(java.awt.Graphics g) { paint(g);           
-        }
-         */
-        private void updateBufferSize() {
+        private BufferedImage updateBufferSize(BufferedImage buffer) {
             if (getScreenCoordinates() == null) {
                 java.awt.Dimension d = getSize();
-                if (buffer == null || buffer.getWidth() != d.width || buffer.getHeight() != d.height) {
+                if (buffer == null || buffer.getWidth() != (int)(d.width * retinaScale) || buffer.getHeight() != (int)(d.height*retinaScale)) {
                     buffer = createBufferedImage();
                 }
             } else {
@@ -774,22 +826,129 @@ public class JavaSEPort extends CodenameOneImplementation {
                     buffer = createBufferedImage();
                 }
             }
+            return buffer;
         }
-
+        
+        private void updateEdtBufferSize() {
+            edtBuffer = updateBufferSize(edtBuffer);
+        }
+        
+        // Only call on AWT Event thread
+        private void updateBuffer(BufferedImage inputBuf) {
+            if (buffer == null || buffer.getWidth() != inputBuf.getWidth() || buffer.getHeight() != inputBuf.getHeight()) {
+                buffer = new BufferedImage(inputBuf.getWidth(), inputBuf.getHeight(), BufferedImage.TYPE_INT_RGB);
+            }
+            Graphics2D g = (Graphics2D)buffer.createGraphics();
+            g.drawImage(inputBuf, 0, 0, this);
+            g.dispose();
+        }
+        
+        /**
+         * We synchronize on this lock when copying buffer to/from edtBuffer
+         */
+        private final Object bufferLock = new Object();
+        
+        // Only use on EDT
+        private BufferedImage edtBuffer;
+        
+        double blitTx;
+        double blitTy;
+        
+        /**
+         * We keep a counter to keep track of successive blits between 
+         * AWT paints.  Generally AWT doesn't paint at all.  Only when 
+         * there is a native peer, the window resizes, or text editing is 
+         * going on.  If none of these are happening we can achieve efficiencies
+         * by sharing the same image buffer on both the CN1 thread and the AWT
+         * thread, since AWT will only use the buffer inside blit() , and
+         * in that case, it is called inside SwingUtilities.invokeAndWait()
+         * so it won't conflict with the EDT.
+         * 
+         * If AWT starts to do some painting, then this counter gets reset to 
+         * 0 and we use two image buffers instead.
+         */
+        int blitCounter;
+        
         public void blit() {
             if(menuDisplayed){
                 return;
             }
+            
+            // We keep a blitCounter that gets reset in paintComponent()
+            // If blit is called a number of times with no call to paintComponet
+            // in between then it is probably safe to just use a shared 
+            // image buffer between the CN1 EDT and the AWT EDT because 
+            // AWT only uses this buffer inside SwingUtilities.invokeAndWait()
+            // in this method.
+            // If paintComponent() is being called, then it is likely that there
+            // is a peer component being displayed or a text field, so 
+            // we need to work in a thread-safe way - since we can't control
+            // when paintComponent() is called.
+            blitCounter++;
+            
+            if (blitCounter > 5) {
+                // blit() has been called more than 5 times since last
+                // paintComponent() - we'll disable buffer thread safety
+                // to maximize performance.
+                blitCounter = 5;
+                if (bufferSafeMode) {
+                    bufferSafeMode = false;
+                    buffer = null;
+                }
+                
+            } else if (blitCounter < 5) {
+                // blit() has not been called more than 5 times since 
+                // last paintComponent() call - so we'll enable buffer
+                // thread safety.
+                if (!bufferSafeMode) {
+                    bufferSafeMode = true;
+                    buffer = null;
+                    //System.out.println("On");
+                }
+            }
+            if (bufferSafeMode) {
+                
+                // When using buffer safe mode, we copy the edtBuffer
+                // to the buffer in a synchronized block so that 
+                // there is no possible conflict when paintComponent()
+                // is called.
+                synchronized (bufferLock) {
+                    updateBuffer(edtBuffer);
+                    updateEdtBufferSize();
+                }
+            } else {
+                
+                // When not using buffer safe mode, we just use the same
+                // edt buffer from AWT
+                buffer = edtBuffer;
+                
+            }
+            
             try {
                 Runnable r = new Runnable() {
                     public void run() {
                         if (buffer != null) {
+                            
                             java.awt.Graphics g = getGraphics();
                             if (g == null) {
                                 return;
                             }
-                            drawScreenBuffer(g);
-                            updateBufferSize();
+                            blitTx = ((Graphics2D)g).getTransform().getTranslateX();
+                            blitTy = ((Graphics2D)g).getTransform().getTranslateY();
+                            if (bufferSafeMode) {
+                                // If AWT is painting and CN1 is painting
+                                // then we need to be more careful.  Safe mode
+                                // is enabled whenever AWT starts painting - this
+                                // generally only occurs when there is a native
+                                // peer on the screen
+                                synchronized(bufferLock) {
+                                    drawScreenBuffer(g);
+                                }
+                            } else {
+                                drawScreenBuffer(g);
+                                updateEdtBufferSize();
+                            }
+                            
                             if (window != null) {
 
                                 if (zoomLevel != 1) {
@@ -834,9 +993,15 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private boolean drawScreenBuffer(java.awt.Graphics g) {
             AffineTransform t = ((Graphics2D)g).getTransform();
+            AffineTransform t2 = AffineTransform.getScaleInstance(1/retinaScale, 1/retinaScale);
+            
+            t2.concatenate(t);
+            
+            ((Graphics2D)g).setTransform(t2);
             boolean painted = false;
             Rectangle screenCoord = getScreenCoordinates();
             if (screenCoord != null) {
+                
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
                     if(zoomLevel != 1) {
@@ -852,6 +1017,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     bg.dispose();
                     painted = true;
                 }
+                
                 if (isEnabled()) {
                     g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 } else {
@@ -869,9 +1035,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                     g1.drawString("Paused", buffer.getWidth() / 2 - sw / 2, buffer.getHeight() / 2 - f.getSize() / 2);
                     g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 }
-                updateGraphicsScale(g);
+                //updateGraphicsScale(g);
+                if (zoomLevel != 1) {
+                    AffineTransform t3 = ((Graphics2D)g).getTransform();
+                    t3.scale(zoomLevel/t3.getScaleX()/retinaScale, zoomLevel/t3.getScaleX()/retinaScale);
+                    
+                    //AffineTransform t3 = AffineTransform.getScaleInstance(zoomLevel, zoomLevel);
+                    ((Graphics2D)g).setTransform(t3);
+                    
+                }
+                //((Graphics2D)g).setTransform(t2);
                 g.drawImage(getSkin(), x, y, this);
-                ((Graphics2D)g).setTransform(t);
+                
             } else {
                 if(getComponentCount() > 0) {
                     Graphics2D bg = buffer.createGraphics();
@@ -888,26 +1063,62 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 g.drawImage(buffer, x, y, this);
             }
+            ((Graphics2D)g).setTransform(t);
             return painted;
         }
 
+        
+        private boolean bufferSafeMode;
         public void paintComponent(java.awt.Graphics g) {
+            //if (true) return;
+            
+            // This will turn on buffer safe mode
+            // next time blit() is run
+            blitCounter=0;
+            
             if (buffer != null) {
-                drawScreenBuffer(g);
-                updateBufferSize();
+                Graphics2D g2 = (Graphics2D)g.create();
+                //System.out.println("blitx="+blitTx+", blitY="+blitTy+", tx="+g2.getTransform().getTranslateX()+", ty="+g2.getTransform().getTranslateY());
+                //if (zoomLevel == 1) {
+                AffineTransform t = g2.getTransform();
+                double tx = t.getTranslateX();
+                double ty = t.getTranslateY();
+                AffineTransform t2 = AffineTransform.getScaleInstance(1, 1);
+                if (zoomLevel == 1) {
+                    t2.translate(tx * retinaScale, ty * retinaScale);
+                } else {
+                    t2.translate(tx * retinaScale, ty * retinaScale);
+                }
+                //g2.translate( - tx / zoomLevel + tx * retinaScale / zoomLevel,  - ty / zoomLevel + ty * retinaScale / zoomLevel);
+                g2.setTransform(t2);
+                //} else {
+                //    g2.translate(-blitTx - g2.getTransform().getTranslateX(), -blitTy - g2.getTransform().getTranslateY());
+                //}
+                synchronized(bufferLock) {
+                    drawScreenBuffer(g2);
+                }
+                g2.dispose();
+                //updateBufferSize();
                 if (Display.isInitialized()) {
-                    Form f = getCurrentForm();
-                    if (f != null) {
-                        f.repaint();
-                    }
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            Form f = getCurrentForm();
+                            if (f != null) {
+                                f.repaint();
+                            }
+                        }
+                    });
+
                 }    
             }
+            
         }
 
         private void updateGraphicsScale(java.awt.Graphics g) {
             if (zoomLevel != 1) {
                 Graphics2D g2d = (Graphics2D) g;
                 AffineTransform t= g2d.getTransform();
+                //t.translate(-t.getTranslateX(), -t.getTranslateY());
                 t.scale(1/t.getScaleX(), 1/t.getScaleY());
                 t.scale(zoomLevel, zoomLevel);
                 g2d.setTransform(t);
@@ -919,11 +1130,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return forcedSize;
             }
             if (getSkin() != null) {
-                return new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight());
+                return new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale));
             }
             Form f = Display.getInstance().getCurrent();
             if (f != null) {
-                return new java.awt.Dimension(f.getPreferredW(), f.getPreferredH());
+                return new java.awt.Dimension((int)(f.getPreferredW() / retinaScale), (int)(f.getPreferredH() / retinaScale));
             }
             return new java.awt.Dimension(800, 480);
         }
@@ -933,9 +1144,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public Graphics2D getGraphics2D() {
-            updateBufferSize();
+            updateEdtBufferSize();
             while(g2dInstance == null) {
-                g2dInstance = buffer.createGraphics();
+                
+                g2dInstance = edtBuffer.createGraphics();
                 updateGraphicsScale(g2dInstance);
                 try {
                     Thread.sleep(10);
@@ -951,12 +1163,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getScreenCoordinates() != null) {
                 return new BufferedImage(Math.max(20, (int) (getScreenCoordinates().width * zoomLevel)), Math.max(20, (int) (getScreenCoordinates().height * zoomLevel)), BufferedImage.TYPE_INT_RGB);
             }
-            return new BufferedImage(Math.max(20, getWidth()), Math.max(20, getHeight()), BufferedImage.TYPE_INT_RGB);
+            return new BufferedImage(Math.max(20, (int)(getWidth() * retinaScale)), Math.max(20, (int)(getHeight() * retinaScale)), BufferedImage.TYPE_INT_RGB);
         }
 
         public void validate() {
             super.validate();
-            buffer = createBufferedImage();
+            //buffer = createBufferedImage();
             Form current = getCurrentForm();
             if (current == null) {
                 return;
@@ -1029,16 +1241,16 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         private int scaleCoordinateX(int coordinate) {
             if (getScreenCoordinates() != null) {
-                return (int) (coordinate / zoomLevel - (getScreenCoordinates().x + x));
+                return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().x + x));
             }
-            return coordinate;
+            return (int)(coordinate * retinaScale);
         }
 
         private int scaleCoordinateY(int coordinate) {
             if (getScreenCoordinates() != null) {
-                return (int) (coordinate / zoomLevel - (getScreenCoordinates().y + y));
+                return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().y + y));
             }
-            return coordinate;
+            return (int)(coordinate * retinaScale);
         }
         Integer triggeredKeyCode;
 
@@ -1242,19 +1454,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getSkin() == null && !desktopSkin) {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        JavaSEPort.this.sizeChanged(getWidth(), getHeight());
+                        JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
                     }
                 });
                 
             }
         }
         
+        
         public void ancestorResized(HierarchyEvent e) {
-                
+            
+            /*
+            if (e.getChanged() != getParent()) {
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        System.out.println("Parent size: "+getParent().getSize()+"; Window size "+((JFrame)getTopLevelAncestor()).getContentPane().getSize());
+                        
+                        getParent().setSize(((JFrame)getTopLevelAncestor()).getContentPane().getSize());
+                    }
+                });
+                return;
+            } */
             if (getSkin() != null) {
                 if (!scrollableSkin) {
-                    float w1 = ((float) getParent().getWidth()) / ((float) getSkin().getWidth());
-                    float h1 = ((float) getParent().getHeight()) / ((float) getSkin().getHeight());
+                    float w1 = ((float) getParent().getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+                    float h1 = ((float) getParent().getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
                     zoomLevel = Math.min(h1, w1);
                     Form f = Display.getInstance().getCurrent();
                     if (f != null) {
@@ -1263,44 +1487,84 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 getParent().repaint();
             } else {  
+                //some ugly hacks to workaround black screen issue
+                if (canvas != null) {
+                    
+                    //dumpSwingHierarchy(getTopLevelAncestor(), "");
+                    Dimension topSize = ((JFrame)getTopLevelAncestor()).getContentPane().getSize();
+                    Dimension parentSize = getParent().getSize();
+                    if (e.getChanged() != getParent() && !topSize.equals(parentSize)) {
+                        getParent().setSize(topSize);
+                        getParent().doLayout();
+                    }
+                    
+                    canvas.setForcedSize(new Dimension(getWidth(), getHeight()));
+                    
+                    final int newW = getWidth();
+                    final int newH = getHeight();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            JavaSEPort.this.sizeChanged((int)(newW * retinaScale), (int)(newH * retinaScale));
+                            Form f = Display.getInstance().getCurrent();
+                            if (f != null) {
+                                f.revalidate();
+                            }
+                            EventQueue.invokeLater(new Runnable() {
+                                public void run() {
+                                    getParent().repaint();
+                                }
+                            });
+                        }
+                    });
+                    getParent().repaint();
+                    return;
+                } 
+                
                 if(reSize == null){
                     reSize = new java.util.Timer();
                 }else{
                     reSize.cancel();
                     reSize = new java.util.Timer();
                 }
-                //some ugly hacks to workaround black screen issue
+                
                 reSize.schedule(new TimerTask(){
                     @Override
                     public void run() {
-                        if(mediaContainer != null){
-                            JavaSEPort.this.sizeChanged(mediaContainer.getWidth(), mediaContainer.getHeight());
-                        }else{
-                            JavaSEPort.this.sizeChanged(getWidth(), getHeight());
-                        }
-                        try {
-                            Thread.sleep(1000);                                            
-                        } catch (Exception e) {
-                        }
-                        g2dInstance = null;
-                        Form f = Display.getInstance().getCurrent();
-                        if (f != null) {
-                            f.forceRevalidate();
-                        }
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    Thread.sleep(1500);
-                                } catch (Exception e) {
-                                }
-                                if (window != null) {
-                                    window.repaint();
-                                }
-                            }
-                        }).start();
+                        //if(mediaContainer != null){
+                        //    System.out.println("Resize with media container");
+                        //    JavaSEPort.this.sizeChanged((int)(mediaContainer.getWidth() * retinaScale), (int)(mediaContainer.getHeight() * retinaScale));
+                        //}else{
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    JavaSEPort.this.sizeChanged((int)(getWidth() * retinaScale), (int)(getHeight() * retinaScale));
+                                    try {
+                                        Thread.sleep(1000);                                            
+                                    } catch (Exception e) {
+                                    }
+                                    g2dInstance = null;
+                                    Form f = Display.getInstance().getCurrent();
+                                    if (f != null) {
+                                        f.forceRevalidate();
+                                    }
+                                    new Thread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            try {
+                                                Thread.sleep(1500);
+                                            } catch (Exception e) {
+                                            }
+                                            if (window != null) {
+                                                window.repaint();
+                                            }
+                                        }
+                                    }).start();
 
-                        reSize = null;
+                                    reSize = null;
+                                }
+                            });
+                            
+                        //}
+                        
                     }
                     
                 }, 2000);
@@ -1343,6 +1607,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
                 Form f = getCurrentForm();
                 if(f != null){
+                    // NOTE:  This is off edt... I've noticed an NPE
+                    // inset getComponentAt() because of this
+                    // we should move to EDT
                     Component cmp = f.getContentPane().getComponentAt(x, y);
                     if(cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                         if (!ignoreWheelMovements) {
@@ -1523,10 +1790,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
         }
-        screenPosition.x = screenX1;
-        screenPosition.y = screenY1;
-        screenPosition.width = screenX2 - screenX1 + 1;
-        screenPosition.height = screenY2 - screenY1 + 1;
+        double scale = 1.0; // retinaScale
+        screenPosition.x = (int)(screenX1 / scale);
+        screenPosition.y = (int)(screenY1 / scale); 
+        screenPosition.width = (int)((screenX2 - screenX1 + 1)/scale);
+        screenPosition.height = (int)((screenY2 - screenY1 + 1)/scale);
     }
 
     private static void readFully(InputStream i, byte b[]) throws IOException {
@@ -2547,12 +2815,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
                     pref.putBoolean("Portrait", portrait);
 
-                    float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
-                    float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
+                    float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth()/(float)retinaScale);
+                    float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight()/(float)retinaScale);
                     zoomLevel = Math.min(h1, w1);
-                    frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                    frm.add(BorderLayout.CENTER, canvas);
+                    Container parent = canvas.getParent();
+                    parent.remove(canvas);
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
+                    parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
 
                     zoomLevel = 1;
@@ -2562,9 +2831,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             zoom100.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
-                    frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                    frm.add(BorderLayout.CENTER, canvas);
+                    Container parent = canvas.getParent();
+                    parent.remove(canvas);
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
+                    parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 1;
                     if(Display.getInstance().getCurrent() != null) {
@@ -2576,9 +2846,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             zoom25.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
-                    frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() / 2, getSkin().getHeight() / 2));
-                    frm.add(BorderLayout.CENTER, canvas);
+                    Container parent = canvas.getParent();
+                    parent.remove(canvas);
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
+                    parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 0.25f;
                     if(Display.getInstance().getCurrent() != null) {
@@ -2590,9 +2861,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             zoom50.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
-                    frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() / 2, getSkin().getHeight() / 2));
-                    frm.add(BorderLayout.CENTER, canvas);
+                    Container parent = canvas.getParent();
+                    parent.remove(canvas);
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
+                    parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 0.5f;
                     if(Display.getInstance().getCurrent() != null) {
@@ -2604,9 +2876,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             zoom200.addActionListener(new ActionListener() {
 
                 public void actionPerformed(ActionEvent ae) {
-                    frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth() * 2, getSkin().getHeight() * 2));
-                    frm.add(BorderLayout.CENTER, canvas);
+                    Container parent = canvas.getParent();
+                    parent.remove(canvas);
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() * 2 / retinaScale), (int)(getSkin().getHeight() * 2 / retinaScale)));
+                    parent.add(BorderLayout.CENTER, canvas);
                     frm.pack();
                     zoomLevel = 2;
                     if(Display.getInstance().getCurrent() != null) {
@@ -2651,9 +2924,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                         frm.remove(hSelector);
                         frm.remove(vSelector);
                     }
-                    frm.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                    frm.add(BorderLayout.CENTER, canvas);
+                    Container parent = canvas.getParent();
+                    parent.remove(canvas);
+                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                    parent.add(BorderLayout.CENTER, canvas);
 
                     canvas.x = 0;
                     canvas.y = 0;
@@ -3137,8 +3411,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         Display.getInstance().callSerially(new Runnable() {
 
             public void run() {
-                float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
+                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
                 zoomLevel = Math.min(h1, w1);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_DEFAULT);
                 deepRevaliate(Display.getInstance().getCurrent());
@@ -3150,7 +3424,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 deepRevaliate(Display.getInstance().getCurrent());
                 JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 Display.getInstance().getCurrent().revalidate();
-                canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() /retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                 zoomLevel = 1;
                 frm.pack();
             }
@@ -3224,6 +3498,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             JPanel panel = new javax.swing.JPanel();  
             panel.setLayout(new BorderLayout());
             JPanel bottom = new javax.swing.JPanel(); 
+            panel.setOpaque(false);
             bottom.setLayout(new FlowLayout(FlowLayout.RIGHT));
             widthLabel = new JLabel("Width:   ");
             heightLabel = new JLabel(" Height:   ");
@@ -3232,6 +3507,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             panel.add(bottom, BorderLayout.SOUTH);
             
             JFrame frame = new JFrame();
+            //frame.addWindowListener(new WindowListener() {
+            //    
+            //});
             frame.setLayout(new BorderLayout());
             frame.add(panel, BorderLayout.CENTER);
             frame.setSize(new Dimension(300, 400));
@@ -3369,15 +3647,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             window.pack();
             if (getSkin() != null && !scrollableSkin) {
-                float w1 = ((float) canvas.getWidth()) / ((float) getSkin().getWidth());
-                float h1 = ((float) canvas.getHeight()) / ((float) getSkin().getHeight());
+                float w1 = ((float) canvas.getWidth() * (float)retinaScale) / ((float) getSkin().getWidth());
+                float h1 = ((float) canvas.getHeight() * (float)retinaScale) / ((float) getSkin().getHeight());
                 zoomLevel = Math.min(h1, w1);
             }
 
             portrait = pref.getBoolean("Portrait", true);
             if (!portrait && getSkin() != null) {
-                canvas.setForcedSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
-                window.setSize(new java.awt.Dimension(getSkin().getWidth(), getSkin().getHeight()));
+                canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
+                window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
             }
             window.setVisible(true);
         }
@@ -3434,11 +3712,11 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private int getDisplayWidthImpl() {
         if (getScreenCoordinates() != null) {
-            return getScreenCoordinates().width;
+            return getScreenCoordinates().width ;
         }
-        int w = canvas.getWidth();
+        int w = (int)(canvas.getWidth() * retinaScale);
         if (w < 10 && canvas.getParent() != null) {
-            return canvas.getParent().getWidth();
+            return (int)(canvas.getParent().getWidth() * retinaScale);
         }
         return Math.max(w, 100);
     }
@@ -3454,9 +3732,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (getScreenCoordinates() != null) {
             return getScreenCoordinates().height;
         }
-        int h = canvas.getHeight();
+        int h = (int)(canvas.getHeight() * retinaScale);
         if (h < 10 && canvas.getParent() != null) {
-            return canvas.getParent().getHeight();
+            return (int)(canvas.getParent().getHeight() * retinaScale);
         }
         return Math.max(h, 100);
     }
@@ -3491,7 +3769,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean isSimulator() {
         // differentiate simulator from JavaSE port and detect designer
-        return designMode || portraitSkin != null;
+        return designMode || getSkin() != null || widthLabel != null;
     }
     
     /**
@@ -3751,7 +4029,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 };
-                
+                /*
                 ((JTextField)t).addActionListener(new ActionListener() {
 
                     @Override
@@ -3771,6 +4049,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                     
                 });
+                */
             }
             swingT = t;
             textCmp = swingT;
@@ -3891,6 +4170,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                     testRecorder.editTextFieldCompleted(cmp, txt);
                 }
                 Display.getInstance().onEditingComplete(cmp, txt);
+                if (e != null && cmp instanceof com.codename1.ui.TextField) {
+                    final com.codename1.ui.TextField cn1Tf = (com.codename1.ui.TextField)cmp;
+                    if (cmp != null && cn1Tf.getDoneListener() != null) {
+                        cn1Tf.fireDoneEvent();
+                    }
+                }
                 if (tf instanceof JTextField) {
                     ((JTextField) tf).removeActionListener(this);
                 }
@@ -4639,32 +4924,34 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     boolean drawingNativePeer;
     public void drawNativePeer(final Object graphics, final PeerComponent cmp, final JComponent jcmp) {
-        checkEDT();
-        Graphics2D nativeGraphics = getGraphics(graphics);
-        nativeGraphics = (Graphics2D)nativeGraphics.create();
-        nativeGraphics.translate(cmp.getAbsoluteX(), cmp.getAbsoluteY());
+        drawingNativePeer = true;
+    
         try {
-            drawingNativePeer = true;
-            if (zoomLevel != 1) {
-                nativeGraphics.scale(1/zoomLevel, 1/zoomLevel);
-            } else if (takingScreenshot && screenshotActualZoomLevel != 1) {
-                nativeGraphics.scale(1/screenshotActualZoomLevel, 1/screenshotActualZoomLevel);
+            
+            // This should only be run on EDT to avoid deadlocks
+            if (Display.getInstance().isEdt()) {
+                synchronized(cmp) {
+                    drawNativePeerImpl(graphics, cmp, jcmp);
+                }
+            } else if (!EventQueue.isDispatchThread()){ // I can just imagine bad things if we're already inside an EventQueue.invokeAndWait()
+                Display.getInstance().callSeriallyAndWait(new Runnable() {
+                    public void run() {
+                        drawNativePeer(graphics, cmp, jcmp);
+                    }
+                });
             }
-            jcmp.paint(nativeGraphics);
-            //if (zoomLevel != 1 && graphics != nativeGraphics) {
-            //    nativeGraphics.scale(zoomLevel, zoomLevel);
-            //    if (nativeGraphics == graphics) {
-            //        nativeGraphics.scale(zoomLevel, zoomLevel);
-            //    }
-            //}
-        } catch (Exception ex){}
-        finally {
+        } finally {
             drawingNativePeer = false;
-            //nativeGraphics.translate(-cmp.getAbsoluteX(), -cmp.getAbsoluteY());
-            nativeGraphics.dispose();
         }
         
-        
+    }
+    
+    private void drawNativePeerImpl(Object graphics, PeerComponent cmp, JComponent jcmp) {
+        if (cmp.getClientProperty("__buffer") != null) {
+            BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
+            Graphics2D nativeGraphics = getGraphics(graphics);
+            nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
+        }
     }
 
     /**
@@ -4881,11 +5168,17 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    NativeScreenGraphics ng;
+    
     /**
      * @inheritDoc
      */
     public Object getNativeGraphics() {
-        return new NativeScreenGraphics();
+        //if (ng == null) {
+            ng = new NativeScreenGraphics();
+        //}
+        return ng;
+        //return new NativeScreenGraphics();
     }
 
     /**
@@ -4984,7 +5277,7 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public int getHeight(Object nativeFont) {
         checkEDT();
-        return canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getHeight();
+        return (int)(canvas.getGraphics2D().getFontMetrics(font(nativeFont)).getHeight());
     }
 
     /**
@@ -5707,7 +6000,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         t.transform(in, 0, out, 0, 1);
         clamp(out);
     }
-
+    
+    
     
     @Override
     public void setTransform(Object graphics, Transform transform) {
@@ -6041,6 +6335,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
 
         @Override
+        public void revalidate() {
+            // We need to override this with an empty implementation to workaround
+            // Deadlock bug  http://bugs.java.com/view_bug.do?bug_id=8058870
+            // If we allow the default implementation, then it will periodically deadlock
+            // when displaying a browser component
+        }
+
+        
+        
+        @Override
         protected void processMouseEvent(MouseEvent e) {
             //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
             if (!sendToCn1(e)) {
@@ -6120,7 +6424,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (screenCoords == null) {
                 screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
             }
-            return (int)((e.getXOnScreen() - canvas.getLocationOnScreen().x - (canvas.x + screenCoords.x) * zoomLevel) / zoomLevel);
+            return (int)((e.getXOnScreen() - canvas.getLocationOnScreen().x - (canvas.x + screenCoords.x) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
         }
 
         private int getCN1Y(MouseEvent e) {
@@ -6131,7 +6435,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (screenCoords == null) {
                 screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
             }
-            return (int)((e.getYOnScreen() - canvas.getLocationOnScreen().y - (canvas.y + screenCoords.y) * zoomLevel) / zoomLevel);
+            return (int)((e.getYOnScreen() - canvas.getLocationOnScreen().y - (canvas.y + screenCoords.y) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
         }
         
         public CN1JFXPanel() {
@@ -6237,7 +6541,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
         final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
-        mediaContainer = m;
+        //mediaContainer = m;
         Platform.runLater(new Runnable() {
 
             @Override
@@ -6245,10 +6549,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 try {
                     if (uri.indexOf(':') < 0 && uri.lastIndexOf('/') == 0) {
                         String mimeType = "video/mp4";
-                        media[0] = new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, mediaContainer, onCompletion);
+                        media[0] = new CodenameOneMediaPlayer(getResourceAsStream(getClass(), uri), mimeType, (JFrame) c, m, onCompletion);
+                        return;
                     }
 
-                    media[0] = new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, mediaContainer, onCompletion);
+                    media[0] = new CodenameOneMediaPlayer(uri, isVideo, (JFrame) c, m, onCompletion);
                 } catch (Exception ex) {
                     err[0] = ex;
                 }
@@ -6310,14 +6615,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         final Media[] media = new Media[1];
         final Exception[] err = new Exception[1];
         final javafx.embed.swing.JFXPanel m = new CN1JFXPanel();
-        mediaContainer = m;
+        //mediaContainer = m;
 
         Platform.runLater(new Runnable() {
 
             @Override
             public void run() {
                 try {
-                    media[0] = new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, mediaContainer, onCompletion);
+                    media[0] = new CodenameOneMediaPlayer(stream, mimeType, (JFrame) c, m, onCompletion);
                 } catch (Exception ex) {
                     err[0] = ex;
                 }
@@ -7755,32 +8060,125 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * Video peer component.
+     * 
+     * In contrast to the BrowserComponent and Peer (other peer components),
+     * the native peer supports hi-resolution retina displays.  This was possible
+     * on this component, but no browser component, or other components in general
+     * because videos don't need to respond to pointer events.  Thus the rendered
+     * dimensions and location (on the CN1 pipeline) may be different the size and 
+     * position of the actual component on the screen (even though in all cases
+     * we hide the actual component).
+     */
     class VideoComponent extends PeerComponent {
 
         private javafx.embed.swing.JFXPanel vid;
         private JFrame frm;
+        
+        // Container that holds the video
         private JPanel cnt = new JPanel();
         private MediaView v;
         private boolean init = false;
         private Rectangle bounds = new Rectangle();
+        
+        // AWT paints to this buffered image
+        // CN1 reads from the buffered image to paint in its own pipeline.
+        BufferedImage buf;
 
+        // Gets the buffered image that AWT paints to and CN1 reads from
+        private BufferedImage getBuffer() {
+            if (buf == null || buf.getWidth() != cnt.getWidth() || buf.getHeight() != cnt.getHeight()) {
+
+                buf = new BufferedImage((int)(cnt.getWidth()), (int)(cnt.getHeight()), BufferedImage.TYPE_INT_ARGB);
+            }
+            return buf;
+        }
+        
+        /**
+         * Paints the native component to the buffer
+         */
+        private void paintOnBuffer() {
+            
+            // We need to synchronize on the peer component
+            // drawNativePeer will also synchronize on this
+            // This prevents simulataneous reads and writes to/from the
+            // buffered image.
+            if (EventQueue.isDispatchThread()) {
+                // Only run this on the AWT event dispatch thread
+                // to avoid deadlocks
+                synchronized(VideoComponent.this) {
+                    paintOnBufferImpl();
+                }
+            } else if (!Display.getInstance().isEdt()){
+                // I can only imagine bad things 
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
+        }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            AffineTransform t = g2d.getTransform();
+            double tx = t.getTranslateX();
+            double ty = t.getTranslateY();
+            vid.paint(g2d);
+            g2d.dispose();
+            VideoComponent.this.putClientProperty("__buffer", buf);
+        }
+        
         public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
             super(null);
             SwingUtilities.invokeLater(new Runnable() {
 
                 @Override
                 public void run() {
+                    
+                    
+                    
                     cnt = new JPanel() {
+                        
+                        @Override
                         public void paint(java.awt.Graphics g) {
-                            if (drawingNativePeer) {
-                                super.paint(g);
-                            } else {
-                                
-                            }
+                            paintOnBuffer();
+                            
+                            // After we paint to the buffer we need to 
+                            // tell CN1 to paint the buffer to its pipeline.
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    VideoComponent.this.repaint();
+                                }
+                            });
+                            
                         }
+
+                        @Override
+                        protected void paintChildren(java.awt.Graphics g) {
+                            // Not sure if this is necessary
+                            // but we don't want any painting to occur
+                            // on regular pipeline
+                        }
+
+                        @Override
+                        protected void paintBorder(java.awt.Graphics g) {
+                            // Not sure if this is necessary but we don't
+                            // want any painting to occur on regular pipeline
+                        }
+                        
+                        
+                        
                     };
 
                     cnt.setOpaque(false);
+                    vid.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, vid);
                     cnt.setVisible(false);
@@ -7788,7 +8186,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
 
             Group root = new Group();
+            
             v = new MediaView(player);
+            final Runnable oldOnReady = player.getOnPlaying();
+            player.setOnPlaying(new Runnable() {
+                public void run() {
+                    if (oldOnReady != null) oldOnReady.run();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (VideoComponent.this.getParent() != null) {
+                                VideoComponent.this.getParent().revalidate();
+                            }
+                        }
+                    });
+                }
+            });
+            
             root.getChildren().add(v);
             vid.setScene(new Scene(root));
 
@@ -7799,6 +8212,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected void initComponent() {
+            bounds.setBounds(0,0,0,0);
             super.initComponent();
         }
 
@@ -7813,13 +8227,16 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    vid.setScene(null);
                     vid.removeAll();
                     cnt.remove(vid);
                     frm.remove(cnt);
                     frm.repaint();
-                    mediaContainer = null;
+                    
+                    //mediaContainer = null;
                 }
             });
+            
         }
 
         protected void setLightweightMode(final boolean l) {
@@ -7833,6 +8250,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             init = true;
                             cnt.setVisible(true);
                             frm.add(cnt, 0);
+                            
                             frm.repaint();
                         } else {
                             cnt.setVisible(false);
@@ -7849,14 +8267,23 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension(vid.getWidth(), vid.getHeight());
+            return new com.codename1.ui.geom.Dimension((int)(vid.getWidth()), (int)(vid.getHeight()));
         }
 
         @Override
-        public void paint(Graphics g) {
+        public void paint(final Graphics g) {
             if (init) {
+                
                 onPositionSizeChange();
                 drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        paintOnBuffer();
+                    }
+                });
+                
+                
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
@@ -7878,34 +8305,37 @@ public class JavaSEPort extends CodenameOneImplementation {
                 screenX = getScreenCoordinates().x;
                 screenY = getScreenCoordinates().y;
             }
-            bounds.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
-                    (int) ((y + screenY + canvas.y) * zoomLevel),
-                    (int) (w * zoomLevel),
-                    (int) (h * zoomLevel));
+            
+            // NOTE:  For the VideoComponent we make the size the actual
+            // pixel size of the light-weight peer even though, on retina,
+            // this means that the native component is twice the height and
+            // width of the native peer.  We can do this here because
+            // the video component doesn't have any interactivity 
+            // that constrains us to keep the same real position on the screen
+            // as our render position is.  THis is not the case for WebBrowser
+            // 
+            bounds.setBounds((int) ((x + screenX + canvas.x)),
+                    (int) ((y + screenY + canvas.y)),
+                    (int) (w),
+                    (int) (h));
             
             if(!bounds.equals(cnt.getBounds())){
-            
                 Platform.runLater(new Runnable() {
 
                     @Override
                     public void run() {
 
-                        v.setFitWidth(w * zoomLevel);
-                        v.setFitHeight(h * zoomLevel);
-
+                        v.setFitWidth(w );
+                        v.setFitHeight(h);
+                        
                         SwingUtilities.invokeLater(new Runnable() {
 
                             @Override
                             public void run() {
                                 cnt.setBounds(bounds);
-                                cnt.validate();
-                                Display.getInstance().callSerially(new Runnable() {
-
-                                    @Override
-                                    public void run() {
-                                        getComponentForm().repaint();
-                                    }
-                                });
+                                cnt.doLayout();
+                                paintOnBuffer();
+                                
                             }
                         });
                     }
@@ -8216,7 +8646,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 webContainer.setScene(new Scene(root));
                 
                 // now wait for the Swing side to finish initializing f'ing JavaFX is so broken its unbeliveable
-                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, canvas, webContainer, webView, (BrowserComponent) parent, hSelector, vSelector);
+                final SEBrowserComponent bcc = new SEBrowserComponent(JavaSEPort.this, ((JPanel)canvas.getParent()), webContainer, webView, (BrowserComponent) parent, hSelector, vSelector);
                 SwingUtilities.invokeLater(new Runnable() {
                     public void run() {
                         bc[0] = bcc;
@@ -9177,39 +9607,149 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     class Peer extends PeerComponent {
         
+        // Container that will hold the native peer component.
+        // Wrapping the component in a container allows us to
+        // override key methods like paint() and setBounds()
+        // so that we can bend them to our needs
         private JPanel cnt = new JPanel();
         private boolean init = false;
+        
+        // Reference to the JFrame into which cnt will be added.
         private JFrame frm;
+        
+        // The native peer component.
         private java.awt.Component cmp;
+        
+        // Buffered image that will be drawn to by AWT and read from
+        // by CN1
+        BufferedImage buf;
+        
+        /**
+         * Gets a buffered image on which we paint the native peer.
+         * We draw to this image from the AWT thread, and we draw from
+         * this image on the CN1 EDT.
+         * @return 
+         * @see #paintOnBuffer() 
+         * @see #drawNativePeer(java.lang.Object, com.codename1.ui.PeerComponent, javax.swing.JComponent) 
+         */
+        private BufferedImage getBuffer() {
+            if (buf == null || buf.getWidth() != cnt.getWidth() * retinaScale / zoomLevel || buf.getHeight() != cnt.getHeight() * retinaScale / zoomLevel) {
+
+                buf = new BufferedImage((int)(cnt.getWidth() * retinaScale / zoomLevel), (int)(cnt.getHeight() * retinaScale / zoomLevel), BufferedImage.TYPE_INT_ARGB);
+            }
+            return buf;
+        }
+        
+        /**
+         * Paints the native peer onto a buffered image and stores the image
+         * in the peer to be later drawn by drawNativePeer (in the CN1 pipeline).
+         * 
+         * THis method should be called only on the AWT dispatch thread.
+         */
+        public void paintOnBuffer() {
+            if (cnt.getWidth() == 0 || cnt.getHeight() == 0) {
+                return;
+            }
+            if (EventQueue.isDispatchThread()) {
+                synchronized(Peer.this) {
+                    paintOnBufferImpl();
+
+                }
+            } else if (!Display.getInstance().isEdt()){
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t ) {
+                    t.printStackTrace();
+                }
+                
+            }
+            
+        }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            g2d.scale(retinaScale / zoomLevel, retinaScale / zoomLevel);
+
+            cmp.paintAll(g2d);
+            g2d.dispose();
+            Peer.this.putClientProperty("__buffer", buf);
+        }
+        
+        // HOLY LORD!! Because we're adding the peer directly to the JFrame
+        // and the JFrame has BorderLayout, it will try sometimes to treat
+        // this component like it is in the center and lay it out as such.
+        // So we keep this lock that only allows the bounds of the container
+        // to be changed when we decide it is OK.
+        private boolean allowSetCntBounds;
+        
+        /**
+         * Sets the container bounds.  Use this rather than cnt.setBounds()
+         * as that has been modified to do nothing in order to prevent other layout
+         * managers from messing with our layout. 
+         * @param x
+         * @param y
+         * @param w
+         * @param h 
+         */
+        private void setCntBounds(int x, int y, int w, int h) {
+            allowSetCntBounds = true;
+            if (cnt != null) {
+                cnt.setBounds(x, y, w, h);
+            }
+            allowSetCntBounds = false;
+        }
         
         Peer(JFrame f, java.awt.Component c) {
             super(null);
             this.frm = f;
             this.cmp = c;
             SwingUtilities.invokeLater(new Runnable() {
-
                 @Override
                 public void run() {
                     cnt = new JPanel() {
+                        @Override
                         public void paint(java.awt.Graphics g) {
-                            if (drawingNativePeer) {
-                                super.paint(g);
-                            } else {
-                                
-                            }
+                            paintOnBuffer();
+                            
+                            // We need to tell CN1 to repaint now
+                            // since the native peer has been updated
+                            // There should be a new buffer to paint now.
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    Peer.this.repaint();
+                                }
+                            });
                         }
-                    };
 
+                        @Override
+                        public void setBounds(int x, int y, int w, int h) {
+                            if (allowSetCntBounds) {
+                                super.setBounds(x, y, w, h);
+                            } 
+                        }   
+                    };
                     cnt.setOpaque(false);
                     cnt.setLayout(new BorderLayout());
                     cnt.add(BorderLayout.CENTER, cmp);
                     cnt.setVisible(false);
+                    cnt.setBorder(new EmptyBorder(0,0,0,0));
                 }
             });
         }
 
         @Override
         protected void initComponent() {
+            bounds.setBounds(0,0,0,0);
+            lastX=0;
+            lastY=0;
+            lastH=0;
+            lastW=0;
+            lastZoom=1;
             super.initComponent();
         }
 
@@ -9257,51 +9797,101 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            //return new com.codename1.ui.geom.Dimension(50, 50);
-            return new com.codename1.ui.geom.Dimension((int)cmp.getPreferredSize().getWidth(), 
-                    (int)cmp.getPreferredSize().getHeight());
+            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* retinaScale / zoomLevel), 
+                    (int)(cmp.getPreferredSize().getHeight() * retinaScale / zoomLevel));
         }
 
-        
         @Override
-        public void paint(Graphics g) {
+        public void paint(final Graphics g) {
             if (init) {
                 onPositionSizeChange();
                 drawNativePeer(Accessor.getNativeGraphics(g), this, cnt);
+                
+                // Tell AWT to do a repaint so that we know we have the latest.
+                EventQueue.invokeLater(new Runnable() {
+                    public void run() {
+                        // NOTICE We use paintOnBuffer() here and not
+                        // cnt.repaint()
+                        // This prevents an infinite loop since cnt.repaint()
+                        // will tell CN1 to repaint - and the cycle would continue
+                        
+                        paintOnBuffer();
+                    }
+                });
+                
             }else{
                 if(getComponentForm() != null && getComponentForm() == getCurrentForm()){
                     setLightweightMode(false);
                 }
             }
         }
+        
+        java.awt.Rectangle bounds = new java.awt.Rectangle();
+        
+        int lastX, lastY, lastW, lastH;
+        double lastZoom;
 
         @Override
         protected void onPositionSizeChange() {
+
+            if (cnt == null) {
+                return;
+            }
+            Form f = getComponentForm();
+            if (cnt.getParent() == null
+                    && f != null
+                    && Display.getInstance().getCurrent() == f) {
+                //();
+                return;
+            }
+
             final int x = getAbsoluteX();
             final int y = getAbsoluteY();
             final int w = getWidth();
             final int h = getHeight();
 
-            SwingUtilities.invokeLater(new Runnable() {
+            if (lastZoom == zoomLevel && x == lastX && y == lastY && w == lastW && h == lastH) {
+                return;
+            }
+            final int screenX;
+            final int screenY;
+            if (getScreenCoordinates() != null) {
+                screenX = getScreenCoordinates().x;
+                screenY = getScreenCoordinates().y;
+            } else {
+                screenX = 0;
+                screenY = 0;
+            }
 
+            lastX = x;
+            lastY = y;
+            lastW = w;
+            lastH = h;
+            lastZoom = zoomLevel;
+            final double zoom = lastZoom;
+
+            Runnable r = new Runnable() {
                 @Override
                 public void run() {
-                    int screenX = 0;
-                    int screenY = 0;
-                    if(getScreenCoordinates() != null) {
-                        screenX = getScreenCoordinates().x;
-                        screenY = getScreenCoordinates().y;
+                    setCntBounds(
+                            (int) ((x + screenX + canvas.x) * zoom / retinaScale),
+                            (int) ((y + screenY + canvas.y) * zoom / retinaScale),
+                            (int) (w * zoom / retinaScale),
+                            (int) (h * zoom / retinaScale)
+                    );
+                    cnt.doLayout();
+                    if (cmp instanceof Container) {
+                        ((Container)cmp).doLayout();
                     }
-                    cnt.setBounds((int) ((x + screenX + canvas.x) * zoomLevel),
-                            (int) ((y + screenY + canvas.y) * zoomLevel),
-                            (int) (w * zoomLevel),
-                            (int) (h * zoomLevel));
-                    cnt.validate();
+                    paintOnBuffer();
                 }
-            });
-
+            };
+            if (SwingUtilities.isEventDispatchThread()) {
+                r.run();
+                return;
+            }
+            SwingUtilities.invokeLater(r);
         }
-
     }
     
     public static boolean checkForPermission(String permission, String description){
