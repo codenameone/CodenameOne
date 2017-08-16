@@ -29,6 +29,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.LayeredLayout.LayeredLayoutConstraint.Inset;
@@ -213,6 +214,14 @@ public class LayeredLayout extends Layout {
      * @see Inset#changeUnits(byte) 
      */
     public static final byte UNIT_AUTO = 100;
+    
+    /**
+     * Unit used for insets.  Baseline.  Baseline unit type for an inset indicates
+     * the inset will be aligned with the baseline of the reference component.  This only
+     * makes sense for the top inset.  The height will automatically become the preferred
+     * height and the bottom inset will become "auto" if the top inset uses the baseline unit.
+     */
+    public static final byte UNIT_BASELINE = 101;
 
     /**
      * Temp collection to keep track of which components in the container
@@ -989,23 +998,14 @@ public class LayeredLayout extends Layout {
         return cmp.getX() - cmp.getStyle().getMarginLeftNoRTL();
     }
     
-    private static int getInnerX(Component cmp) {
-        return cmp.getX() + cmp.getStyle().getPaddingLeftNoRTL();
-    }
-    
     private static int getOuterY(Component cmp) {
         return cmp.getY() - cmp.getStyle().getMarginTop();
-    }
-    
-    private static int getInnerY(Component cmp) {
-        return cmp.getY() + cmp.getStyle().getPaddingTop();
     }
     
     /**
      * A class that encapsulates the insets for a component in layered layout.
      */
     public class LayeredLayoutConstraint {
-       
         
         /**
          * The component that this constraint belongs to.  If you try to add
@@ -1181,7 +1181,9 @@ public class LayeredLayout extends Layout {
          */
         public LayeredLayoutConstraint translatePixels(int x, int y, boolean preferMM, Container parent) {
             if (y != 0) {
-                if (top().isFlexible() && top().autoIsClipped) {
+                if (top().getUnit() == UNIT_BASELINE) {
+                    top().changeUnits(preferMM ? UNIT_DIPS : UNIT_PIXELS);
+                } else if (top().isFlexible() && top().autoIsClipped) {
                     top().changeUnits(preferMM ? UNIT_DIPS : UNIT_PIXELS);
                 }
                 if (bottom().isFlexible() && bottom().autoIsClipped) {
@@ -1249,49 +1251,7 @@ public class LayeredLayout extends Layout {
          */
         public LayeredLayoutConstraint translateMM(float x, float y, boolean preferMM, Container parent) {
             return translatePixels(Display.getInstance().convertToPixels(x), Display.getInstance().convertToPixels(y), preferMM, parent);
-            /*
-            if (y != 0) {
-                if (top().isFlexible() && bottom().isFlexible()) {
-                    // Both top and bottom are flexible... we need to make one of these 
-                    // fixed
-                    if (y > 0) {
-                        // we're moving it to toward the bottom, so we'll choose the bottom 
-                        // as an anchor point.
-                        bottom().translateMM(-y, preferMM, parent);
-                    } else {
-                        top().translateMM(y, preferMM, parent);
-                    }
-                } else {
-                    if (top().isFixed()) {
-                        top().translateMM(y, preferMM, parent);
-                    }
-                    if (bottom().isFixed()) {
-                        bottom().translateMM(-y, preferMM, parent);
-                    }
-                }
-            }
-            if (x != 0) {
-                if (left().isFlexible() && right().isFlexible()) {
-                    // Both top and bottom are flexible... we need to make one of these 
-                    // fixed
-                    if (x > 0) {
-                        // we're moving it to toward the bottom, so we'll choose the bottom 
-                        // as an anchor point.
-                        right().translateMM(-x, preferMM, parent);
-                    } else {
-                        left().translateMM(x, preferMM, parent);
-                    }
-                } else {
-                    if (left().isFixed()) {
-                        left().translateMM(x, preferMM, parent);
-                    }
-                    if (right().isFixed()) {
-                        right().translateMM(-x, preferMM, parent);
-                    }
-                }
-            }
-            return this;
-            */
+            
         }
         
         /**
@@ -2027,6 +1987,8 @@ public class LayeredLayout extends Layout {
                 }
             }
             
+           
+            
             /**
              * Gets the value of this inset as a string. Values will be in the format {@literal <value><unit>}, e.g.
              * {@literal 2mm}, {@literal 15%}, {@literal 5px}, {@literal auto} (meaning it is flexible.
@@ -2038,6 +2000,7 @@ public class LayeredLayout extends Layout {
                     case UNIT_PIXELS: return ((int)value)+"px";
                     case UNIT_PERCENT: return value + "%";
                     case UNIT_AUTO: return "auto";
+                    case UNIT_BASELINE: return "baseline";
                 }
                 return null;
             }
@@ -2057,6 +2020,7 @@ public class LayeredLayout extends Layout {
                     case UNIT_PIXELS: return ((int)value)+"px";
                     case UNIT_PERCENT: return l10n.format(value, decimalPlaces) + "%";
                     case UNIT_AUTO: return "auto";
+                    case UNIT_BASELINE: return "baseline";
                 }
                 return null;
             }
@@ -2109,7 +2073,7 @@ public class LayeredLayout extends Layout {
             }
             
             /**
-             * Sets the value of this inset as a string.  E.g. "2mm", or "2px", or "3%", or "auto".
+             * Sets the value of this inset as a string.  E.g. "2mm", or "2px", or "3%", "auto", or "baseline".
              * @param value The value of this inset.
              * @return Self for chaining.
              */
@@ -2170,7 +2134,14 @@ public class LayeredLayout extends Layout {
              * @see #changeUnits(byte) To change units while recalculating the value to be effectively equivalent.
              */
             public Inset unit(byte unit) {
+                if (unit == UNIT_BASELINE && side != Component.TOP) {
+                    throw new IllegalArgumentException("baseline unit can only be used on the top inset.");
+                }
                 this.unit = unit;
+                if (unit == UNIT_BASELINE) {
+                    referencePosition = 0f;
+                    getOppositeInset().setAuto().referenceComponent(null).referencePosition(0f);
+                }
                 return this;
             }
             
@@ -2390,6 +2361,8 @@ public class LayeredLayout extends Layout {
                         case UNIT_AUTO:
                             preferredValue = 0;
                             break;
+                        case UNIT_BASELINE:
+                            preferredValue = 0;
                         default:
                             throw new RuntimeException("Invalid unit " + unit);
                     }
@@ -2436,6 +2409,14 @@ public class LayeredLayout extends Layout {
                         case UNIT_AUTO:
                             preferredValue = baseValue;
                             break;
+                        case UNIT_BASELINE: {
+                            Style rs = referenceComponent.getStyle();
+                            Style s = cmp.getStyle();
+                            preferredValue = baseValue + (referenceComponent.getPreferredH() - cmp.getPreferredH())/2
+                                    + (rs.getFont().getAscent() - s.getFont().getAscent())
+                                    + (rs.getPaddingTop() - s.getPaddingTop());
+                            break;
+                        }
                         default:
                             throw new RuntimeException("Invalid unit " + unit);
                     }
@@ -2526,6 +2507,9 @@ public class LayeredLayout extends Layout {
              * @return The actual value of this inset.
              */
             private int calculate(Component cmp, int top, int left, int bottom, int right) {
+                if (side == Component.BOTTOM && getOppositeInset().unit == UNIT_BASELINE) {
+                    unit = UNIT_AUTO;
+                }
                 int w = right - left;
                 int h = bottom - top;
                 int baseValue = calcBaseValue(top, left, bottom ,right);
@@ -2546,6 +2530,25 @@ public class LayeredLayout extends Layout {
                         } else {
                             calculatedValue = (int)(baseValue + (w - oppositeBaseValue - baseValue) * value / 100f);
                         }
+                        break;
+                    }
+                    case UNIT_BASELINE: {
+                        if (getReferenceComponent() == null) {
+                            calculatedValue = baseValue;
+                        } else {
+                            Component ref = getReferenceComponent();
+                            Style rs = ref.getStyle();
+                            Style s = cmp.getStyle();
+                            Font rf = rs.getFont();
+                            Font sf = s.getFont();
+                            int ra = rf == null || sf == null ? 0 : rf.getAscent();
+                            int sa = rf == null || sf == null ? 0 : sf.getAscent();
+                            calculatedValue = baseValue + (ref.getHeight() - cmp.getPreferredH())/2
+                                    + (rs.getPaddingTop() - s.getPaddingTop())
+                                    + (rs.getMarginTop() - s.getMarginTop())
+                                    + (ra - sa);
+                        }
+                        
                         break;
                     }
                     case UNIT_AUTO: {
@@ -2670,6 +2673,8 @@ public class LayeredLayout extends Layout {
                     this.setPercent(Float.parseFloat(val.substring(0, pos)));
                 } else if ("auto".equals(val)) {
                     this.setAuto();
+                } else if ("baseline".equals(val)) {
+                    this.unit(UNIT_BASELINE);
                 } else {
                     this.setPixels(Integer.parseInt(val));
                     
@@ -2855,6 +2860,12 @@ public class LayeredLayout extends Layout {
                             Log.p("Unable to calculate percentage because height or width is zero.  Setting to 100%");
                             setPercent(100f);
                         }
+                    } else if (unit == UNIT_BASELINE) {
+                        if (side != Component.TOP) {
+                            throw new IllegalArgumentException("Baseline unit only allowed on top inset");
+                        }
+                        getOppositeInset().changeUnitsTo(UNIT_AUTO, parent);
+                        unit(unit);
                     } else {
                         unit(unit);
                     }
@@ -2876,7 +2887,12 @@ public class LayeredLayout extends Layout {
                             Log.p(ex.getMessage());
                             setPercent(100f);
                         }
-                        
+                    } else if (unit == UNIT_BASELINE) {
+                        if (side != Component.TOP) {
+                            throw new IllegalArgumentException("Baseline unit only allowed on top inset");
+                        }
+                        getOppositeInset().changeUnitsTo(UNIT_AUTO, refBox);
+                        unit(unit);
                     } else {
                         unit(unit);
                     }
@@ -2907,6 +2923,10 @@ public class LayeredLayout extends Layout {
                         // This may potentially affect both this inset 
                         // and the opposite inset if it is either flexible or 
                         // percent.
+                        
+                        if (unit == UNIT_BASELINE) {
+                            changeUnitsTo(UNIT_DIPS, parent);
+                        }
                         
                         byte restoreUnit = -1;
                         if (unit == UNIT_PERCENT || isFlexible()) {
@@ -2993,6 +3013,23 @@ public class LayeredLayout extends Layout {
                         int out = (int)(baseValue + (isHorizontalInset() ? baseRect.getWidth() : baseRect.getHeight()) * value / 100f);
                         //System.out.println("Result is "+out);
                         return out;
+                    }
+                    case UNIT_BASELINE : {
+                        Component ref = getReferenceComponent();
+                        if (ref == null) {
+                            return baseValue;
+                        } else {
+                            Style rs = ref.getStyle();
+                            Style cs = cmp.getStyle();
+                            Font rf = rs.getFont();
+                            Font cf = cs.getFont();
+                            int ra = rf == null || cf == null ? 0 : rf.getAscent();
+                            int ca = rf == null || cf == null ? 0 : cf.getAscent();
+                            return baseValue + (ref.getHeight()-cmp.getPreferredH())/2
+                                    + (rs.getPaddingTop() - cs.getPaddingTop())
+                                    + (rs.getMarginTop() - cs.getMarginTop())
+                                    + (ra - ca);
+                        }
                     }
                     case UNIT_AUTO : {
                         Inset oppositeInset = getOppositeInset();
@@ -3081,6 +3118,10 @@ public class LayeredLayout extends Layout {
                         }
                         break;
                         
+                    }
+                    case UNIT_BASELINE : {
+                        changeUnitsTo(UNIT_DIPS, parent);
+                        return translatePixels(delta, preferMM, parent);
                     }
                     case UNIT_AUTO : {
                         // If this is auto then we'll need to make it fixed... but we'll start
