@@ -594,13 +594,18 @@ public class ByteCodeClass {
         
         fullFieldList = new ArrayList<ByteCodeField>();
         buildInstanceFieldList(fullFieldList);
+        
+        String nullCheck = "";
+        if (System.getProperty("fieldNullChecks", "false").equals("true")) {
+            nullCheck = "if(__cn1T == JAVA_NULL){throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));} ";
+        }
         for(ByteCodeField fld : fullFieldList) {
             b.append(fld.getCDefinition());
             b.append(" get_field_");
             b.append(clsName);
             b.append("_");
             b.append(fld.getFieldName());
-            b.append("(JAVA_OBJECT __cn1T) {\n    return (*(struct obj__");
+            b.append("(JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append(" return (*(struct obj__");
             b.append(clsName);
             b.append("*)__cn1T).");            
             b.append(fld.getClsName());
@@ -615,9 +620,9 @@ public class ByteCodeClass {
             b.append("(CODENAME_ONE_THREAD_STATE, ");
             b.append(fld.getCDefinition());
             if(fld.isObjectType()) {
-                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n    (*(struct obj__");
+                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   (*(struct obj__");
             } else {
-                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n    (*(struct obj__");
+                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  (*(struct obj__");
             }
             b.append(clsName);
             b.append("*)__cn1T).");            
