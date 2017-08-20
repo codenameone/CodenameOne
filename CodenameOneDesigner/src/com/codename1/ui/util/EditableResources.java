@@ -110,7 +110,7 @@ import javax.xml.bind.JAXBException;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 8;
+    private static final short MINOR_VERSION = 9;
     private static final short MAJOR_VERSION = 1;
 
     private boolean modified;
@@ -620,9 +620,26 @@ public class EditableResources extends Resources implements TreeModel {
 
                                         if("line".equals(b.getType())) {
                                             if(b.getColor() == null) {
-                                                theme.put(b.getKey(), Border.createLineBorder(b.getThickness().intValue()));
+                                                if(b.isMillimeters()) {
+                                                    theme.put(b.getKey(), Border.createLineBorder(b.getThickness().floatValue()));
+                                                } else {
+                                                    theme.put(b.getKey(), Border.createLineBorder(b.getThickness().intValue()));
+                                                }
                                             } else {
-                                                theme.put(b.getKey(), Border.createLineBorder(b.getThickness().intValue(), b.getColor().intValue()));
+                                                if(b.isMillimeters()) {
+                                                    theme.put(b.getKey(), Border.createLineBorder(b.getThickness().floatValue(), b.getColor().intValue()));
+                                                } else {
+                                                    theme.put(b.getKey(), Border.createLineBorder(b.getThickness().intValue(), b.getColor().intValue()));
+                                                }
+                                            }
+                                            continue;
+                                        }
+
+                                        if("underline".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createUndelineBorder(b.getThickness().intValue()));
+                                            } else {
+                                                theme.put(b.getKey(), Border.createUnderlineBorder(b.getThickness().intValue(), b.getColor().intValue()));
                                             }
                                             continue;
                                         }
@@ -1114,11 +1131,26 @@ public class EditableResources extends Resources implements TreeModel {
                                     case BORDER_TYPE_LINE:
                                         // use theme colors?
                                         if(Accessor.isThemeColors(border)) {
-                                            bw.write("        <border key=\"" + key + "\" type=\"line\" "
-                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                            bw.write("        <border key=\"" + key + "\" type=\"line\" millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +
+                                                    "\" thickness=\"" + Accessor.getThickness(border) + "\" />\n");
                                         } else {
-                                            bw.write("        <border key=\"" + key + "\" type=\"line\" "
-                                                    + "thickness=\"" + Accessor.getThickness(border) + "\" color=\""
+                                            bw.write("        <border key=\"" + key + "\" type=\"line\" millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +
+                                                    "\" thickness=\"" + Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_UNDERLINE:
+                                        // use theme colors?
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"underline\" millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +
+                                                    "\" thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"underline\"  millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +"\" thickness=\"" + 
+                                                    Accessor.getThickness(border) + "\" color=\""
                                                     + Accessor.getColorA(border) + "\" />\n");
                                         }
                                         continue;
@@ -2078,10 +2110,27 @@ public class EditableResources extends Resources implements TreeModel {
                 // use theme colors?
                 if(Accessor.isThemeColors(border)) {
                     output.writeBoolean(true);
-                    output.writeByte(Accessor.getThickness(border));
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
                 } else {
                     output.writeBoolean(false);
-                    output.writeByte(Accessor.getThickness(border));
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
+                    output.writeInt(Accessor.getColorA(border));
+                }
+                return;
+            case BORDER_TYPE_UNDERLINE:
+                output.writeShort(0xff14);
+
+                // use theme colors?
+                if(Accessor.isThemeColors(border)) {
+                    output.writeBoolean(true);
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
+                } else {
+                    output.writeBoolean(false);
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
                     output.writeInt(Accessor.getColorA(border));
                 }
                 return;
