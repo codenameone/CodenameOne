@@ -110,7 +110,7 @@ public class ThreadSafeDatabase extends Database {
     public void commitTransaction() throws IOException {
         invokeWithException(new RunnableWithIOException() {
             public void run() throws IOException {
-                underlying.beginTransaction();
+                underlying.commitTransaction();
             }
         });
     }
