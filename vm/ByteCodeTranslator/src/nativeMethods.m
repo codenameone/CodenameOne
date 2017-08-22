@@ -231,7 +231,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     
     // first try to optimize encoding in case of US-ASCII characters
     if(enc == NSUTF8StringEncoding) {
-##ifdef USE_DFA_UTF8_DECODER
+#ifdef USE_DFA_UTF8_DECODER
         size_t count;
         uint32_t codepoint;
         uint32_t state = 0;
