@@ -26,7 +26,7 @@ The main class name (referred to as stub class) is expected to have a `public st
 
 The following java properties can be set via the command-line using the `-D` flag to modify the output:
 
-* `USE_RPMALLOC` - "true" or "false".  Default value is "false". Use [rpmalloc](https://github.com/rampantpixels/rpmalloc) instead of malloc/free for memory allocation.  This requires that you change the target deployment version in the resulting project to 7.0 or higher.
+* `USE_RPMALLOC` - "true" or "false".  Default value is "false". Use [rpmalloc](https://github.com/rampantpixels/rpmalloc) instead of malloc/free for memory allocation.  This requires that you change the target deployment version in the resulting project to 8.0 or higher.
 * `bundleVersionNumber` - The app bundle version to set in the info.plist.
 
 ## Why Another VM for iOS?
