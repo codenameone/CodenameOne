@@ -43,15 +43,24 @@ extern UIView *editingComponent;
 #define INCLUDE_CN1_PUSH
 
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
 #ifdef GOOGLE_CONNECT_PODS
 #import <GooglePlus/GooglePlus.h>
 #else
 #import "GooglePlus.h"
 #endif
+#else
+#import <GoogleSignIn/GoogleSignIn.h>
+#endif
+
 #endif
 
 #ifdef INCLUDE_FACEBOOK_CONNECT
+#ifdef USE_FACEBOOK_CONNECT_PODS
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#else
 #import "FBSDKCoreKit.h"
+#endif
 #endif
 
 
@@ -208,7 +217,7 @@ extern UIView *editingComponent;
     JAVA_OBJECT str2 = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG sourceApplication);
     
 #ifdef INCLUDE_GOOGLE_CONNECT
-    
+#ifndef GOOGLE_SIGNIN
     // Handle Google Plus Login
     BOOL res = [GPPURLHandler handleURL:url
            sourceApplication:sourceApplication
@@ -216,7 +225,13 @@ extern UIView *editingComponent;
     if (res) {
         return res;
     }
-    
+#else
+    BOOL res = [[GIDSignIn sharedInstance] handleURL:url sourceApplication:sourceApplication
+                                           annotation:annotation];
+    if (res) {
+        return res;
+    }
+#endif
 #endif
 #ifdef INCLUDE_FACEBOOK_CONNECT
     BOOL fbRes = [[FBSDKApplicationDelegate sharedInstance] application:application

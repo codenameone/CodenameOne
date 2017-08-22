@@ -1667,9 +1667,10 @@ public class TextArea extends Component {
     }
     
     /**
-     * If the TextArea text is too long to fit the text to the widget add "..."
-     * points at the last displayable row.
-     * By default this is set to false
+     * If the TextArea text is too long to fit the text to the widget this will add "..."
+     * at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+     * E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated 
+     * and end with 3 points. By default this is set to false
      * 
      * @param endsWith3Points true if text should add "..." at the end
      */
@@ -1678,7 +1679,10 @@ public class TextArea extends Component {
     }
 
     /**
-     * Simple getter
+     * If the TextArea text is too long to fit the text to the widget this will add "..."
+     * at the last displayable row. This flag is only applicable when there is a grow limit on the TextArea.
+     * E.g. a TextArea with potentially 10 rows can be displayed in 4 rows where the last row can be truncated 
+     * and end with 3 points. By default this is set to false
      * 
      * @return true if this TextArea adds "..." when the text is too long
      */

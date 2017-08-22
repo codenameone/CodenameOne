@@ -101,6 +101,12 @@ public abstract class InfiniteContainer extends Container {
      * This refreshes the UI in a similar way to the "pull to refresh" functionality
      */
     public void refresh() {
+        // prevent exception when refresh() is invoked too soon
+        if(!isInitialized()) {
+            if(getClientProperty("cn1$infinite") == null) {
+                return;
+            }
+        }
         if(isAsync()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {

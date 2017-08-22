@@ -171,6 +171,24 @@ public class SplitPane extends Container {
     }
     
     /**
+     * Changes the minimum, preferred, and maximum insets of the split pane.  This will also
+     * update the current divider position to the supplied preferred inset.
+     * @param minInset The minimum inset.  Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. "25%"
+     * @param preferredInset The preferred inset. Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. "25%"
+     * @param maxInset Can be expressed in pixels (px), millimetres (mm), or percent (%).  E.g. "25%"
+     */
+    public void changeInsets(String minInset, String preferredInset, String maxInset) {
+        LayeredLayout l = (LayeredLayout)getLayout();
+        initDividerInset(l.createConstraint(), preferredInset).copyTo(this.preferredInset);
+        initDividerInset(l.createConstraint(), minInset).copyTo(this.minInset);
+        initDividerInset(l.createConstraint(), maxInset).copyTo(this.maxInset);
+        
+        l.setInsets(this.topOrLeft, "0 0 0 0")
+                .setInsets(this.topOrLeft, "0 0 0 0");
+        this.preferredInset.copyTo(l.getOrCreateConstraint(divider));
+    }
+    
+    /**
      * The active inset of the divider.
      * @return 
      */
@@ -435,6 +453,16 @@ public class SplitPane extends Container {
     }
     
     /**
+     * Gets the string value of the preferred inset.  E.g. "25mm", or "50%".  Note:  The preferred
+     * inset is changed automatically when the user drags it to a new location so the value returned here
+     * may be different than the inset supplied in the constructor.
+     * @return The current preferred inset of the divider.
+     */
+    public String getPreferredInset() {
+        return getFixedInset(preferredInset).getValueAsString();
+    }
+    
+    /**
      * Sets the minimum inset allowed for the divider.
      * @param inset The inset.  E.g. "2mm", "10%", "200px"
      */
@@ -443,11 +471,27 @@ public class SplitPane extends Container {
     }
     
     /**
+     * Gets the string value of the minimum inset of the divider.  E.g. "25mm", or "50%".
+     * @return 
+     */
+    public String getMinInset() {
+        return getFixedInset(minInset).getValueAsString();
+    }
+    
+    /**
      * Sets the maximum inset allowed for the divider.
      * @param inset The inset.  E.g. "2mm", "10%", "200px"
      */
     public void setMaxInset(String inset) {
         getFixedInset(maxInset).setValueAsString(inset);
+    }
+    
+    /**
+     * Gets the string value of the maximum inset of the divider.  E.g. "25mm", or "50%"
+     * @return 
+     */
+    public String getMaxInset() {
+        return getFixedInset(maxInset).getValueAsString();
     }
     
     /**

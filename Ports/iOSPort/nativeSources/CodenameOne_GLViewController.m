@@ -65,7 +65,11 @@
 #include "java_lang_System.h"
 
 #ifdef INCLUDE_GOOGLE_CONNECT
-#import "GoogleOpenSource.h"
+#ifndef GOOGLE_SIGNIN
+#import <GoogleOpenSource/GoogleOpenSource.h>
+#else
+#import <GoogleSignIn/GoogleSignIn.h>
+#endif
 #endif
 #import "com_codename1_payment_Purchase.h"
 
@@ -1626,29 +1630,58 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 - (void)initGoogleConnect {
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
   GPPSignIn *signIn = [GPPSignIn sharedInstance];
   signIn.shouldFetchGooglePlusUser = YES;
+#else
+  GIDSignIn* signIn = [GIDSignIn sharedInstance];
+  signIn.shouldFetchBasicProfile = YES;
+#endif
+  
   //signIn.shouldFetchGoogleUserEmail = YES;  // Uncomment to get the user's email
 
   // You previously set kClientId in the "Initialize the Google+ client" step
   // signIn.clientID = googleClientId;
 
   // Uncomment one of these two statements for the scope you chose in the previous step
+#ifndef GOOGLE_SIGNIN
   signIn.scopes = @[ kGTLAuthScopePlusLogin ];  // "https://www.googleapis.com/auth/plus.login" scope
   //signIn.scopes = @[ @"profile" ];            // "profile" scope
+#else
+  signIn.scopes = @[ @"profile", @"email" ];
+#endif
 
   // Optional: declare signIn.actions, see "app activities"
   signIn.delegate = self;
+#ifdef GOOGLE_SIGNIN
+    signIn.uiDelegate = self;
 #endif
+#endif
+    
 }
 
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
 extern void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authentication *auth, NSError * error);
-
+#else
+extern void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *user, NSError * error);
+extern void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me);
+#endif
+#ifndef GOOGLE_SIGNIN
 - (void)finishedWithAuth: (GTMOAuth2Authentication *)auth
                    error: (NSError *) error {
     com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(auth, error);
 }
+#else
+- (void)signIn:(GIDSignIn *)signIn didSignInForUser:(GIDGoogleUser *)user withError:(NSError *)error {
+    // Perform any operations on signed in user here.
+    com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(user, error);
+}
+- (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error {
+    // Perform any operations when the user disconnects from app here.
+    com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG user.userID));
+}
+#endif
 #endif
 
 bool lockDrawing;
@@ -3330,6 +3363,9 @@ extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_
 {
     return self;
 }
+
+
+
 @end
 
 

@@ -38,8 +38,10 @@
 #import "StoreKit/StoreKit.h"
 #import <AudioToolbox/AudioServices.h>
 #import <AVFoundation/AVFoundation.h>
+//#define GOOGLE_SIGNIN
 //#define GOOGLE_CONNECT_PODS
 //#define INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
 #ifdef INCLUDE_GOOGLE_CONNECT
 #ifdef GOOGLE_CONNECT_PODS
 #import <GooglePlus/GooglePlus.h>
@@ -47,12 +49,22 @@
 #import "GooglePlus.h"
 #endif
 #endif
+#else
+#import <GoogleSignIn/GoogleSignIn.h>
+#endif
+
 
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
+//#define USE_FACEBOOK_CONNECT_PODS
 #ifdef INCLUDE_FACEBOOK_CONNECT
+#ifdef USE_FACEBOOK_CONNECT_PODS
+#import <FBSDKCoreKit/FBSDKCoreKit.h>
+#import <FBSDKShareKit/FBSDKAppInviteDialog.h>
+#else
 #import "FBSDKCoreKit.h"
 #import "FBSDKAppInviteDialog.h"
+#endif
 #endif
 
 #define NOT_INCLUDE_ZOOZ
@@ -123,7 +135,11 @@
         ,MPAdViewDelegate
 #endif
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
         ,GPPSignInDelegate
+#else
+        ,GIDSignInDelegate,GIDSignInUIDelegate
+#endif
 #endif
 #ifdef INCLUDE_FACEBOOK_CONNECT
         ,FBSDKAppInviteDialogDelegate
@@ -161,7 +177,10 @@
 @property (readonly, nonatomic, getter=isAnimating) BOOL animating;
 @property (nonatomic) NSInteger animationFrameInterval;
 @property (readwrite, assign) GLUIImage* currentMutableImage;
-
+#ifdef GOOGLE_SIGNIN
+- (void)signIn:(GIDSignIn *)signIn didSignInForUser:(GIDGoogleUser *)user withError:(NSError *)error;
+- (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error;
+#endif
 -(void)startAnimation;
 -(void)stopAnimation;
 +(BOOL)isDrawTextureSupported;
