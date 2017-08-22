@@ -206,7 +206,7 @@ public class ByteCodeTranslator {
             File nativeMethods = new File(srcRoot, "nativeMethods.m");
             copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
 
-            if (System.getProperty("USE_RPMALLOC", "false").equals(true)) {
+            if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
                 File malloc = new File(srcRoot, "malloc.c");
                 copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
                 File rpmalloc = new File(srcRoot, "rpmalloc.c");
