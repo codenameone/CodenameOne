@@ -206,6 +206,15 @@ public class ByteCodeTranslator {
             File nativeMethods = new File(srcRoot, "nativeMethods.m");
             copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
 
+            if (System.getProperty("USE_RPMALLOC", "false").equals(true)) {
+                File malloc = new File(srcRoot, "malloc.c");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
+                File rpmalloc = new File(srcRoot, "rpmalloc.c");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
+                File rpmalloch = new File(srcRoot, "rpmalloc.h");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+            }
+            
             Parser.writeOutput(srcRoot);
             
             File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
