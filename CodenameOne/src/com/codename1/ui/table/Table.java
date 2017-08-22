@@ -442,6 +442,18 @@ public class Table extends Container {
     }
     
     /**
+     * Sorts the given column programmatically
+     * @param column the column to sort
+     * @param ascending true to sort in ascending order
+     */
+    public void sort(int column, boolean ascending) {
+        sortedColumn = column;
+        ascending = false;
+        Comparator cmp = createColumnSortComparator(column);
+        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));          
+    }
+    
+    /**
      * Creates a cell based on the given value
      *
      * @param value the new value object
