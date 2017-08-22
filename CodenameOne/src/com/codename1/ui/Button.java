@@ -239,6 +239,16 @@ public class Button extends Label {
     /**
      * Constructor a button with text and image
      * 
+     * @param icon image appearing on the button
+     * @param id UIID unique identifier for button
+     */
+    public Button(Image icon, String id) {
+        this("", icon, id);
+    }
+    
+    /**
+     * Constructor a button with text and image
+     * 
      * @param text label appearing on the button
      * @param id UIID unique identifier for button
      */
