@@ -3047,6 +3047,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         protected void setLightweightMode(boolean l) {
             if(superPeerMode) {
+                if (l != lightweightMode) {
+                    lightweightMode = l;
+                    if (lightweightMode) {
+                        Image img = generatePeerImage();
+                        if (img != null) {
+                            peerImage = img;
+                        }
+                    }
+
+                }
                 return;
             }
             doSetVisibility(!l);
@@ -3105,12 +3115,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 deinit();
             }else{
-                if (peerImage == null) {
-                    peerImage = generatePeerImage();
+                Image img = generatePeerImage();
+                if (img != null) {
+                    peerImage = img;
                 }
+
                 if(myView instanceof AndroidAsyncView){
                     ((AndroidAsyncView)myView).removePeerView(v);
                 }
+                super.deinitialize();
             }
         }
 
@@ -3295,9 +3308,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     g.drawImage(peerImage, getX(), getY());
                     return;
                 }
-                peerImage = null;
-
-                ((AndroidGraphics)nativeGraphics).drawView(v, lp);
+                ((AndroidGraphics) nativeGraphics).drawView(v, lp);
+                if (lightweightMode && peerImage != null) {
+                    g.drawImage(peerImage, getX(), getY(), getWidth(), getHeight());
+                }
             } else {
                 super.paint(g);
             }
