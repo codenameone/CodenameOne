@@ -63,6 +63,39 @@ extern UIView *editingComponent;
 #endif
 #endif
 
+#import "java_lang_NullPointerException.h"
+#import "java_lang_RuntimeException.h"
+
+// A signal handler to handle bad accesses.  This will throw NPEs that we can catch
+// rather than crashing the app.
+// See http://www.cocoawithlove.com/2010/05/handling-unhandled-exceptions-and.html
+//
+// NOTE: This handler WILL NOT WORK while using the debugger
+static void SignalHandler(int sig)
+{
+    if (sig == 11) {
+        // We received an EXEC_BAD_ACCESS.  This generally happens if we try to use an object
+        // that is null, so let's convert it into a null pointer exception.
+        throwException(getThreadLocalData(),  __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));
+    } else {
+        // We received one of the other kinds of signals.  So let's raise it as a RuntimeException
+        throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_RuntimeException(getThreadLocalData()));
+    }
+    // Log something just in case the exception handling is foobar'd
+    NSLog(@"We had a signal %d", sig);
+    //signal(sig, SIG_DFL);
+}
+
+static void installSignalHandlers() {
+    signal(SIGABRT, SignalHandler);
+    signal(SIGILL, SignalHandler);
+    signal(SIGSEGV, SignalHandler);
+    signal(SIGFPE, SignalHandler);
+    signal(SIGBUS, SignalHandler);
+    signal(SIGPIPE, SignalHandler);
+
+}
+
 
 @implementation CodenameOne_GLAppDelegate
 
@@ -76,6 +109,10 @@ extern UIView *editingComponent;
     //beforeDidFinishLaunchingWithOptionsMarkerEntry
     
     // Override point for customization after application launch.
+    
+    // Install signal handlers so that rather than the app crashing upon a BAD_ACCESS, the 
+    // app will throw an NPE.
+    installSignalHandlers();
     self.window.rootViewController = self.viewController;
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
     if(url != nil) {
