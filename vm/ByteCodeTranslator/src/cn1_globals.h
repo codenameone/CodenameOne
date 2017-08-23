@@ -13,7 +13,7 @@
 #define NUMBER_OF_SUPPORTED_THREADS 1024
 #define CN1_FINALIZER_QUEUE_SIZE 65536
 
-#define CN1_INCLUDE_NPE_CHECKS
+//#define CN1_INCLUDE_NPE_CHECKS
 #define CN1_INCLUDE_ARRAY_BOUND_CHECKS
 
 #ifdef DEBUG_GC_ALLOCATIONS
@@ -23,7 +23,6 @@
 #define DEBUG_GC_VARIABLES
 #define DEBUG_GC_INIT 
 #endif
-
 
 /**
  * header file containing global CN1 constants and structs
@@ -364,6 +363,7 @@ typedef struct clazz*       JAVA_CLASS;
 
 #define BC_D2F() SP[-1].data.f = (JAVA_FLOAT)SP[-1].data.d
 
+#ifdef CN1_INCLUDE_NPE_CHECKS
 #define BC_ARRAYLENGTH() { \
     if(SP[-1].data.o == JAVA_NULL) { \
         throwException(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)); \
@@ -371,6 +371,12 @@ typedef struct clazz*       JAVA_CLASS;
     SP[-1].type = CN1_TYPE_INT; \
     SP[-1].data.i = (*((JAVA_ARRAY)SP[-1].data.o)).length; \
 }
+#else
+#define BC_ARRAYLENGTH() { \
+    SP[-1].type = CN1_TYPE_INT; \
+    SP[-1].data.i = (*((JAVA_ARRAY)SP[-1].data.o)).length; \
+}
+#endif
 
 #define BC_IF_ICMPEQ() SP-=2; if((*SP).data.i == SP[1].data.i)
 
@@ -867,8 +873,11 @@ extern JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_T
     #define CHECK_ARRAY_BOUNDS_AT_STACK(pos, bounds)
 #endif
 
+#ifdef CN1_INCLUDE_NPE_CHECKS
 #define CN1_ARRAY_LENGTH(array) ((array == JAVA_NULL) ? throwException_R_int(threadStateData, __NEW_INSTANCE_java_lang_NullPointerException(threadStateData)) : (*((JAVA_ARRAY)array)).length)
-
+#else
+#define CN1_ARRAY_LENGTH(array) ((*((JAVA_ARRAY)array)).length)
+#endif
 #define CN1_ARRAY_ELEMENT_INT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_INT*) (*(JAVA_ARRAY)array).data)[index] : 0)
 #define CN1_ARRAY_ELEMENT_BYTE(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_BYTE*) (*(JAVA_ARRAY)array).data)[index] : 0)
 #define CN1_ARRAY_ELEMENT_FLOAT(array, index) (CHECK_ARRAY_ACCESS_EXPR(array,index) ? ((JAVA_ARRAY_FLOAT*) (*(JAVA_ARRAY)array).data)[index] : 0)

@@ -99,9 +99,11 @@ JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_T
     if(__cn1ThisObject == __cn1Arg1) {
         return JAVA_TRUE;
     }
+#ifdef CN1_INCLUDE_NPE_CHECKS
     if(__cn1ThisObject == JAVA_NULL) {
         THROW_NULL_POINTER_EXCEPTION();
     }
+#endif
     if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
         return JAVA_FALSE;
     }
@@ -142,9 +144,11 @@ JAVA_BOOLEAN java_lang_String_equalsIgnoreCase___java_lang_String_R_boolean(CODE
     if(__cn1ThisObject == __cn1Arg1) {
         return JAVA_TRUE;
     }
+#ifdef CN1_INCLUDE_NPE_CHECKS
     if(__cn1ThisObject == JAVA_NULL) {
         THROW_NULL_POINTER_EXCEPTION();
     }
+#endif
     if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
         return JAVA_FALSE;
     }
