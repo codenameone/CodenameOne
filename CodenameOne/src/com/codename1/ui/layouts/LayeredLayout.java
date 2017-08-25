@@ -835,18 +835,20 @@ public class LayeredLayout extends Layout {
 
         Style s = cmp.getStyle();
         if (constraint != null) {
-            int innerTop = top;
-            int innerBottom = bottom;
+            //int innerTop = top;
+            //int innerBottom = bottom;
             //left = 0;
             //right = parent.getLayoutWidth();
-            int leftInset = constraint.insets[Component.LEFT].calculate(cmp, innerTop, left, innerBottom, right);
-            int rightInset = constraint.insets[Component.RIGHT].calculate(cmp, innerTop, left, innerBottom, right);
-            int topInset = constraint.insets[Component.TOP].calculate(cmp, innerTop, left, innerBottom, right);
-            int bottomInset = constraint.insets[Component.BOTTOM].calculate(cmp, innerTop, left, innerBottom, right);
-            cmp.setX(leftInset + s.getMarginLeft(parent.isRTL()));
-            cmp.setY(topInset + s.getMarginTop());
-            cmp.setWidth(Math.max(0, right - left - s.getHorizontalMargins() - rightInset - leftInset));
-            cmp.setHeight(Math.max(0, bottom - top - s.getVerticalMargins() - bottomInset - topInset));
+            int leftInset = constraint.insets[Component.LEFT].calculate(cmp, top, left, bottom, right);
+            int rightInset = constraint.insets[Component.RIGHT].calculate(cmp, top, left, bottom, right);
+            int topInset = constraint.insets[Component.TOP].calculate(cmp, top, left, bottom, right);
+            int bottomInset = constraint.insets[Component.BOTTOM].calculate(cmp, top, left, bottom, right);
+            cmp.setX(left + leftInset + s.getMarginLeft(parent.isRTL()));
+            cmp.setY(top + topInset + s.getMarginTop());
+            cmp.setWidth(Math.max(0, right - cmp.getX() - s.getMarginRight(parent.isRTL()) - rightInset));
+            //cmp.setWidth(Math.max(0, right - left - s.getHorizontalMargins() - rightInset - leftInset));
+            //cmp.setHeight(Math.max(0, bottom - top - s.getVerticalMargins() - bottomInset - topInset));
+            cmp.setHeight(Math.max(0, bottom - cmp.getY() - s.getMarginBottom() - bottomInset));
 
         } else {
 
