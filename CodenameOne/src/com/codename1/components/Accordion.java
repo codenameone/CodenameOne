@@ -67,6 +67,11 @@ public class Accordion extends Container {
     private Image openIcon;
 
     private boolean autoClose = true;
+    private OnItemAccordionListener onItemListener = null;
+    public interface OnItemAccordionListener{
+        
+        public void onItemClikListener(ActionEvent evt);
+    }
     
     /**
      * Empty Constructor
@@ -240,6 +245,8 @@ public class Accordion extends Container {
                         }
                     }
                     Accordion.this.animateLayout(250);
+                    if (onItemListener!=null)
+                        onItemListener.onItemClikListener(evt);
                 }
             });
             top.add(BorderLayout.EAST, arrow);
@@ -264,6 +271,10 @@ public class Accordion extends Container {
         }
 
 
+    }
+    
+    public void setOnItemAccordionListener(OnItemAccordionListener on){
+        this.onItemListener = on;
     }
 
 }
