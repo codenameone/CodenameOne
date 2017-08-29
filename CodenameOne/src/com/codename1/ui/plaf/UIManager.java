@@ -435,6 +435,12 @@ public class UIManager {
             themeProps.put("CalendarTitle.align", centerAlign);
         }
 
+        if(installedTheme == null || !installedTheme.containsKey("CalendarMultipleDay.derive")) {
+            themeProps.put("CalendarMultipleDay.border", Border.getDefaultBorder());
+            themeProps.put("CalendarMultipleDay.align", centerAlign);
+        }
+        themeProps.put("CalendarMultipleDay.sel#derive", "CalendarMultipleDay");
+
         if(installedTheme == null || !installedTheme.containsKey("CalendarSelectedDay.derive")) {
             themeProps.put("CalendarSelectedDay.border", Border.getDefaultBorder());
             themeProps.put("CalendarSelectedDay.align", centerAlign);
