@@ -43,7 +43,10 @@ public class Border {
     private String type;
 
     @XmlAttribute
-    private Integer thickness;
+    private Float thickness;
+
+    @XmlAttribute
+    private boolean millimeters;
 
     @XmlAttribute
     private Integer color;
@@ -158,7 +161,7 @@ public class Border {
     /**
      * @return the thickness
      */
-    public Integer getThickness() {
+    public Float getThickness() {
         return thickness;
     }
 
@@ -391,5 +394,12 @@ public class Border {
      */
     public boolean isBottomOnlyMode() {
         return bottomOnlyMode;
+    }
+
+    /**
+     * @return the millimeters
+     */
+    public boolean isMillimeters() {
+        return millimeters;
     }
 }

@@ -3047,6 +3047,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         protected void setLightweightMode(boolean l) {
             if(superPeerMode) {
+                if (l != lightweightMode) {
+                    lightweightMode = l;
+                    if (lightweightMode) {
+                        Image img = generatePeerImage();
+                        if (img != null) {
+                            peerImage = img;
+                        }
+                    }
+
+                }
                 return;
             }
             doSetVisibility(!l);
@@ -3105,12 +3115,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 deinit();
             }else{
-                if (peerImage == null) {
-                    peerImage = generatePeerImage();
+                Image img = generatePeerImage();
+                if (img != null) {
+                    peerImage = img;
                 }
+
                 if(myView instanceof AndroidAsyncView){
                     ((AndroidAsyncView)myView).removePeerView(v);
                 }
+                super.deinitialize();
             }
         }
 
@@ -3295,9 +3308,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     g.drawImage(peerImage, getX(), getY());
                     return;
                 }
-                peerImage = null;
-
-                ((AndroidGraphics)nativeGraphics).drawView(v, lp);
+                ((AndroidGraphics) nativeGraphics).drawView(v, lp);
+                if (lightweightMode && peerImage != null) {
+                    g.drawImage(peerImage, getX(), getY(), getWidth(), getHeight());
+                }
             } else {
                 super.paint(g);
             }
@@ -5740,13 +5754,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         @Override
-        public void setWidth(int width) {
+        public void setWidth(final int width) {
             super.setWidth(width);
+            final int currH = getHeight();
             if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
-                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+                        float nh = nativeVideo.getHeight();
+                        float nw = nativeVideo.getWidth();
+                        float w = width;
+                        float h = currH;
+                        if (nh != 0 && nw != 0) {
+                            h = width * nh / nw;
+                            if (h > getHeight()) {
+                                h = getHeight();
+                                w = h * nw / nh;
+                            }
+                            if (w > getWidth()) {
+                                w = getWidth();
+                                h = w * nh / nw;
+                            }
+                        }
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int)w, (int)h);
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
@@ -5758,13 +5788,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         @Override
-        public void setHeight(int height) {
+        public void setHeight(final int height) {
             super.setHeight(height);
+            final int currW = getWidth();
             if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
-                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+                        float nh = nativeVideo.getHeight();
+                        float nw = nativeVideo.getWidth();
+                        float h = height;
+                        float w = currW;
+                        if (nh != 0 && nw != 0) {
+                            w = h * nw / nh;
+                            if (h > getHeight()) {
+                                h = getHeight();
+                                w = h * nw / nh;
+                            }
+                            if (w > getWidth()) {
+                                w = getWidth();
+                                h = w * nh / nw;
+                            }
+                        }
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int)w, (int)h);
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);

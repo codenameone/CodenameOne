@@ -1202,7 +1202,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void keyTyped(KeyEvent e) {
         }
-
+        // We only know if meta/ctrl/alt etc is down when the key is pressed, but we 
+        // are taking action when the key is released... so we need to track whether the
+        // control key was down while a key was pressed.
+        private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
         public void keyPressed(KeyEvent e) {
             if (!isEnabled()) {
                 return;
@@ -1210,6 +1213,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastInputEvent = e;
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+                ignorePressedKeys.add(e.getKeyCode());
                 return;
             }
             int code = getCode(e);
@@ -1220,12 +1224,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyReleased(KeyEvent e) {
+            boolean ignore = ignorePressedKeys.contains(e.getKeyCode());
+            if (ignore) ignorePressedKeys.remove(e.getKeyCode());
             if (!isEnabled()) {
                 return;
             }
             lastInputEvent = e;
             // block key combos that might generate unreadable events
-            if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+            if (ignore || e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
             }
             int code = getCode(e);
@@ -6774,8 +6780,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D g2d = getGraphics(graphics);
         if (a) {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                   RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         } else {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                   RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         }
     }
 

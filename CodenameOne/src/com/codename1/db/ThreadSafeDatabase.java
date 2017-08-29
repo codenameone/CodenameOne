@@ -25,9 +25,7 @@ package com.codename1.db;
 
 import com.codename1.io.Log;
 import com.codename1.util.EasyThread;
-import com.codename1.util.RunnableWithResult;
 import com.codename1.util.RunnableWithResultSync;
-import com.codename1.util.SuccessCallback;
 import java.io.IOException;
 
 /**
@@ -36,7 +34,7 @@ import java.io.IOException;
  * @author Shai Almog
  */
 public class ThreadSafeDatabase extends Database {
-    private Database underlying;
+    private final Database underlying;
     private final EasyThread et;
     
     /**
@@ -110,7 +108,7 @@ public class ThreadSafeDatabase extends Database {
     public void commitTransaction() throws IOException {
         invokeWithException(new RunnableWithIOException() {
             public void run() throws IOException {
-                underlying.beginTransaction();
+                underlying.commitTransaction();
             }
         });
     }
@@ -134,6 +132,7 @@ public class ThreadSafeDatabase extends Database {
                 } catch(IOException err) {
                     Log.e(err);
                 }
+                et.kill();
             }
         });
     }
@@ -221,7 +220,7 @@ public class ThreadSafeDatabase extends Database {
     }
     
     private class CursorWrapper implements Cursor {
-        private Cursor underlyingCursor;
+        private final Cursor underlyingCursor;
         public CursorWrapper(Cursor underlyingCursor) {
             this.underlyingCursor = underlyingCursor;
         }

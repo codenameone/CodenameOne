@@ -200,15 +200,55 @@ public class InPlaceEditView extends FrameLayout{
         mInputTypeMap.append(TextArea.PASSWORD, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         mInputTypeMap.append(TextArea.PHONENUMBER, InputType.TYPE_CLASS_PHONE);
         mInputTypeMap.append(TextArea.URL, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        
     }
 
+    private boolean hasConstraint(int inputType, int constraint) {
+        return ((inputType & constraint) == constraint);
+    }
+    private boolean isNonPredictive(int inputType) {
+        return hasConstraint(inputType, TextArea.NON_PREDICTIVE);
+    }
+    
+    private int makeNonPredictive(int codenameOneInputType, int inputType) {
+        if (isNonPredictive(codenameOneInputType)) {
+            return inputType | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+        }
+        return inputType;
+    }
+    
     /**
      * Get the Android equivalent input type for a given Codename One input-type
      * @param codenameOneInputType One of the com.codename1.ui.TextArea input type constants
      * @return The Android equivalent of the given input type
      */
     private int getAndroidInputType(int codenameOneInputType) {
-        int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
+        int type = mInputTypeMap.get(codenameOneInputType, -1);
+        if (type == -1) {
+            
+            if (hasConstraint(codenameOneInputType, TextArea.NUMERIC)) {
+                type = InputType.TYPE_CLASS_NUMBER;
+            } else if (hasConstraint(codenameOneInputType, TextArea.DECIMAL)) {
+                type = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
+            } else if (hasConstraint(codenameOneInputType, TextArea.EMAILADDR)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                
+            } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_SENTENCE)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+                
+            } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_WORD)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+
+            } else if (hasConstraint(codenameOneInputType, TextArea.PASSWORD)) {
+                type = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
+            } else if (hasConstraint(codenameOneInputType, TextArea.PHONENUMBER)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_PHONE);
+            } else if (hasConstraint(codenameOneInputType, TextArea.URL)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+            } else {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
+            }
+        }
 
         // If we're editing standard text, disable auto complete.
         // The name of the flag is a little misleading. From the docs:

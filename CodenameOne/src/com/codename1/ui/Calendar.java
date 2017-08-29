@@ -37,6 +37,7 @@ import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
 import java.util.TimeZone;
@@ -81,6 +82,9 @@ public class Calendar extends Container {
     private long[] dates = new long[42];
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
+    private long SELECTED_DAY = -1;
+    private ArrayList<Date> selectedDays = new ArrayList<Date>();
+    private boolean multipleSelectionEnabled = false;
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
@@ -267,7 +271,7 @@ public class Calendar extends Container {
      */
     public void setDate(Date d) {
         mv.setSelectedDay(d.getTime());
-        mv.setCurrentDay(mv.selectedDay, true);
+        mv.setCurrentDay(SELECTED_DAY, true);
         componentChanged();
     }
 
@@ -507,7 +511,11 @@ public class Calendar extends Container {
                 dayButton.setText("" + day);
             }
         } else {
-            dayButton.setText("" + day);
+            if(day < 10) {
+                dayButton.setText(" " + day + " "); //To match the space occupied by 2 digits buttons
+            } else {
+                dayButton.setText("" + day);
+            }
         }
     }
 
@@ -527,12 +535,49 @@ public class Calendar extends Container {
         this.twoDigitMode = twoDigitMode;
     }
 
+    /**
+     * Gets the dates selected on the calendar or null if no date is selected
+     *
+     * @return the selected days
+     */
+    public ArrayList<Date> getSelectedDays() {
+        return selectedDays;
+    }
+
+    /**
+     * Sets the dates to be selected on the calendar
+     *
+     * @param selectedDays the multipleDateSelection to set
+     */
+    public void setSelectedDays(ArrayList<Date> selectedDays) {
+        this.selectedDays = selectedDays;
+    }
+
+    /**
+     * If true multiple days can be selected on a calendar and
+     * "{@code getSelectedDays()}" will return the dates selected
+     *
+     * @return the multipleSelectionEnabled
+     */
+    public boolean isMultipleSelectionEnabled() {
+        return multipleSelectionEnabled;
+    }
+
+    /**
+     * When set to true multiple days can be selected on a calendar and
+     * "{@code getSelectedDays()}" will return the dates selected
+     *
+     * @param multipleSelectionEnabled the multipleSelectionEnabled to set
+     */
+    public void setMultipleSelectionEnabled(boolean multipleSelectionEnabled) {
+        this.multipleSelectionEnabled = multipleSelectionEnabled;
+    }
+
     class MonthView extends Container implements ActionListener{
 
         long currentDay;
         private Button[] buttons = new Button[42];
         private Button selected;
-        private long selectedDay = -1;
         private Container titles;
         private Container days;
 
@@ -604,8 +649,8 @@ public class Calendar extends Container {
 
             if (yearNew != yearOld || monthNew != monthOld || dayNew != dayOld || force) {
                 currentDay = cal.getTime().getTime();
-                if(selectedDay == -1){
-                    selectedDay = currentDay;
+                if(SELECTED_DAY == -1){
+                    SELECTED_DAY = currentDay;
                 }
                 int month = cal.get(java.util.Calendar.MONTH);
                 cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
@@ -644,11 +689,17 @@ public class Calendar extends Container {
                 for (; j < buttons.length && (j - i + 1) <= lastDay; j++) {
                     buttons[j].setEnabled(true);
                     dates[j] = startDate;
-                    if(dates[j] == selectedDay){
+                    if (dates[j] == SELECTED_DAY) {
                         buttons[j].setUIID("CalendarSelectedDay");
                         selected = buttons[j];
-                    }else{
+                    } else {
                         buttons[j].setUIID("CalendarDay");
+                    }
+                    
+                    if (multipleSelectionEnabled) {
+                        if (selectedDays.contains(new Date(dates[j]))) {
+                            buttons[j].setUIID("CalendarMultipleDay");
+                        }
                     }
                     updateButtonDayDate(buttons[j], yearNew, month, j - i + 1);
                     startDate += DAY;
@@ -686,7 +737,7 @@ public class Calendar extends Container {
         }
 
         private long getSelectedDay() {
-            return selectedDay;
+            return SELECTED_DAY;
         }
 
         public void setSelectedDay(long selectedDay){
@@ -697,7 +748,7 @@ public class Calendar extends Container {
             cal.set(java.util.Calendar.MINUTE, 0);
             cal.set(java.util.Calendar.SECOND, 0);
             cal.set(java.util.Calendar.MILLISECOND, 0);
-            this.selectedDay = cal.getTime().getTime();
+            SELECTED_DAY = cal.getTime().getTime();
         }
 
         private void setMonth(int year, int month) {
@@ -779,13 +830,24 @@ public class Calendar extends Container {
             if(changesSelectedDateEnabled){
                 for (int iter = 0; iter < buttons.length; iter++) {
                     if (src == buttons[iter]) {
-
-                        if(selected != null){
+                        
+                        if (selected != null) {
                             selected.setUIID("CalendarDay");
                         }
-                        buttons[iter].setUIID("CalendarSelectedDay");
-                        selectedDay = dates[iter];
-                        selected = buttons[iter];
+                        
+                        if (multipleSelectionEnabled) {
+                            if (selectedDays.contains(new Date(dates[iter]))) {
+                                buttons[iter].setUIID("CalendarDay");
+                                selectedDays.remove(new Date(dates[iter]));
+                            } else {
+                                buttons[iter].setUIID("CalendarMultipleDay");
+                                selectedDays.add(new Date(dates[iter]));
+                            }
+                        } else {
+                            buttons[iter].setUIID("CalendarSelectedDay");
+                            SELECTED_DAY = dates[iter];
+                            selected = buttons[iter];
+                        }
                         fireActionEvent();
                         if (!getComponentForm().isSingleFocusMode()) {
                             setHandlesInput(false);

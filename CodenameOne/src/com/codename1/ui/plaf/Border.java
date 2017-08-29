@@ -67,6 +67,7 @@ public class Border {
     private static final int TYPE_INSET = 17;
     private static final int TYPE_OUTSET = 18;
     private static final int TYPE_IMAGE_SCALED = 19;
+    private static final int TYPE_UNDERLINE = 21;
 
     // variables are package protected for the benefit of the resource editor!
     int type;
@@ -85,7 +86,8 @@ public class Border {
     int colorB;
     int colorC;
     int colorD;
-    int thickness = 0;
+    float thickness = 0;
+    boolean millimeters;
     int arcWidth;
     int arcHeight;
     boolean outline = true;
@@ -164,7 +166,7 @@ public class Border {
     }
 
     /**
-     * Adss a border that wraps this border
+     * Ads a border that wraps this border
      * 
      * @param outer The outer border
      */
@@ -370,9 +372,87 @@ public class Border {
         b.type = TYPE_LINE;
         b.themeColors = true;
         b.thickness = thickness;
+        b.millimeters = false;
         return b;
     }
 
+    /**
+     * Creates a line border that uses the color of the component foreground for drawing
+     * 
+     * @param thickness thickness of the border in millimeters
+     * @return new border instance
+     */
+    public static Border createLineBorder(float thickness) {
+        Border b = new Border();
+        b.type = TYPE_LINE;
+        b.themeColors = true;
+        b.thickness = thickness;
+        b.millimeters = true;
+        return b;
+    }
+    
+    /**
+     * Creates an underline border that uses the color of the component foreground for drawing
+     * 
+     * @param thickness thickness of the border in pixels
+     * @return new border instance
+     */
+    public static Border createUndelineBorder(int thickness) {
+        Border b = new Border();
+        b.type = TYPE_UNDERLINE;
+        b.themeColors = true;
+        b.thickness = thickness;
+        return b;
+    }
+
+    /**
+     * Creates an underline border that uses the color of the component foreground for drawing
+     * 
+     * @param thickness thickness of the border in millimeters
+     * @return new border instance
+     */
+    public static Border createUndelineBorder(float thickness) {
+        Border b = new Border();
+        b.type = TYPE_UNDERLINE;
+        b.themeColors = true;
+        b.thickness = thickness;
+        b.millimeters = true;
+        return b;
+    }
+    
+    /**
+     * Creates an underline border that uses the given color
+     * 
+     * @param thickness thickness of the border in pixels
+     * @param color the color
+     * @return new border instance
+     */
+    public static Border createUnderlineBorder(int thickness, int color) {
+        Border b = new Border();
+        b.type = TYPE_UNDERLINE;
+        b.themeColors = false;
+        b.thickness = thickness;
+        b.colorA = color;
+        return b;
+    }
+
+    /**
+     * Creates an underline border that uses the given color
+     * 
+     * @param thickness thickness of the border in millimeters
+     * @param color the color
+     * @return new border instance
+     */
+    public static Border createUnderlineBorder(float thickness, int color) {
+        Border b = new Border();
+        b.type = TYPE_UNDERLINE;
+        b.themeColors = false;
+        b.thickness = thickness;
+        b.millimeters = true;
+        b.colorA = color;
+        return b;
+    }
+    
     /**
      * Creates a dotted border with the specified thickness and color
      *
@@ -545,7 +625,7 @@ public class Border {
      * Creates a line border with the specified title
      *
      * @param thickness thickness of the border in pixels
-     * @param title The border's title
+     * @param title The borders title
      * @return new border instance
      */
     public static Border createLineBorder(int thickness, String title) {
@@ -562,7 +642,7 @@ public class Border {
      * 
      * @param thickness thickness of the border in pixels
      * @param color the color for the border
-     * @param title The border's title
+     * @param title The borders title
      * @return new border instance
      */
     public static Border createLineBorder(int thickness, int color, String title) {
@@ -587,6 +667,23 @@ public class Border {
         b.type = TYPE_LINE;
         b.themeColors = false;
         b.thickness = thickness;
+        b.colorA = color;
+        return b;
+    }
+
+    /**
+     * Creates a line border that uses the given color for the component
+     * 
+     * @param thickness thickness of the border in millimeters
+     * @param color the color for the border
+     * @return new border instance
+     */
+    public static Border createLineBorder(float thickness, int color) {
+        Border b = new Border();
+        b.type = TYPE_LINE;
+        b.themeColors = false;
+        b.thickness = thickness;
+        b.millimeters = true;
         b.colorA = color;
         return b;
     }
@@ -827,7 +924,7 @@ public class Border {
         b.thickness=0;
         for(int i=Component.TOP;i<=Component.RIGHT;i++) {
             if (b.compoundBorders[i]!=null) {
-                int sideThickness=b.compoundBorders[i].thickness;
+                int sideThickness = (int)b.compoundBorders[i].thickness;
                 if (sideThickness>b.thickness) {
                     b.thickness=sideThickness;
                 }
@@ -988,7 +1085,10 @@ public class Border {
         }
         switch(type) {
             case TYPE_LINE:
-                return createLineBorder(thickness + 1, colorA);
+                if(millimeters) {
+                    return createLineBorder(thickness + 0.1f, colorA);
+                }
+                return createLineBorder((int)thickness + 1, colorA);
             case TYPE_ETCHED_LOWERED: {
                 Border b = createEtchedRaised(colorA, colorB);
                 b.themeColors = themeColors;
@@ -1038,11 +1138,17 @@ public class Border {
         int width = c.getWidth();
         int height = c.getHeight();
         if (outerBorder != null) {
+            int ac;
+            if(millimeters) {
+                ac = Display.getInstance().convertToPixels(thickness);
+            } else {
+                ac = (int)thickness;
+            }
             if (paintOuterBorderFirst) {
                 outerBorder.paintBorderBackground(g, c);
-                paintBorderBackground(g, x + thickness, y + thickness, width - thickness * 2, height - thickness * 2, c);
+                paintBorderBackground(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);
             } else {
-                paintBorderBackground(g, x + thickness, y + thickness, width - thickness * 2, height - thickness * 2, c);
+                paintBorderBackground(g, x + ac, y + ac, width - ac * 2, height - ac * 2, c);
                 outerBorder.paintBorderBackground(g, c);
            }
         } else {
@@ -1330,11 +1436,17 @@ public class Border {
         int width = c.getWidth();
         int height = c.getHeight();
          if (outerBorder!=null) {
+            int ac;
+            if(millimeters) {
+                ac = Display.getInstance().convertToPixels(thickness);
+            } else {
+                ac = (int)thickness;
+            }
             if(paintOuterBorderFirst) {
                 outerBorder.paint(g, x, y, width, height, c);
-                paint(g, x+thickness, y+thickness, width-thickness*2, height-thickness*2, c);
+                paint(g, x+ac, y+ac, width-ac*2, height-ac*2, c);
             } else {
-                paint(g, x+thickness, y+thickness, width-thickness*2, height-thickness*2, c);
+                paint(g, x+ac, y+ac, width-ac*2, height-ac*2, c);
                 outerBorder.paint(g, x, y, width, height, c);
             }
         } else {
@@ -1347,55 +1459,67 @@ public class Border {
         if(!themeColors) {
             g.setColor(colorA);
         } 
+        int ac = 1;
+        if(thickness > 0) {
+            if(millimeters) {
+                ac = Display.getInstance().convertToPixels(thickness);
+            } else {
+                ac = (int)thickness;
+            }
+        }
         switch(type) {
-            case TYPE_LINE:
+            case TYPE_LINE:                
                 if (borderTitle==null) {
-                    g.drawRect(x, y, width, height, thickness);
+                    if(millimeters) {
+                        g.drawRect(x, y, width, height, ac);
+                    } else {
+                        g.drawRect(x, y, width, height, ac);
+                    }
                 } else {
                     Font f=c.getStyle().getFont();
                     int titleW=f.stringWidth(borderTitle);
                     int topPad=c.getStyle().getPaddingTop();
-                    int topY=y+(topPad-thickness)/2;
+                    int topY=y+(topPad-ac)/2;
                     if (c.isRTL()) {
-                        g.fillRect(x+width-TITLE_MARGIN, topY, TITLE_MARGIN , thickness); //top (segment before the title)
-                        g.fillRect(x, topY, width-(TITLE_MARGIN +titleW+TITLE_SPACE*2), thickness); //top (segment after the title)
+                        g.fillRect(x+width-TITLE_MARGIN, topY, TITLE_MARGIN , ac); //top (segment before the title)
+                        g.fillRect(x, topY, width-(TITLE_MARGIN +titleW+TITLE_SPACE*2), ac); //top (segment after the title)
                         g.drawString(borderTitle, x+width-(TITLE_MARGIN +titleW+TITLE_SPACE), y+(topPad-f.getHeight())/2);
                     } else {
-                        g.fillRect(x, topY, TITLE_MARGIN , thickness); //top (segment before the title)
-                        g.fillRect(x+TITLE_MARGIN +titleW+TITLE_SPACE*2, topY, width-(TITLE_MARGIN +titleW+TITLE_SPACE*2), thickness); //top (segment after the title)
+                        g.fillRect(x, topY, TITLE_MARGIN , ac); //top (segment before the title)
+                        g.fillRect(x+TITLE_MARGIN +titleW+TITLE_SPACE*2, topY, width-(TITLE_MARGIN +titleW+TITLE_SPACE*2), ac); //top (segment after the title)
                         g.drawString(borderTitle, x+TITLE_MARGIN+TITLE_SPACE, y+(topPad-f.getHeight())/2);
                     }
 
-                    g.fillRect(x, y+height-thickness, width, thickness); //bottom
-                    g.fillRect(x, topY, thickness, height); //left
-                    g.fillRect(x+width-thickness, topY, thickness, height); //right
+                    g.fillRect(x, y+height-ac, width, ac); //bottom
+                    g.fillRect(x, topY, ac, height); //left
+                    g.fillRect(x+width-ac, topY, ac, height); //right
                     
                 }
                 break;
             case TYPE_DASHED:
             case TYPE_DOTTED:
-                int segWidth=thickness;
+                int segWidth=ac;
                 if (type==TYPE_DASHED) {
-                    segWidth=thickness*3;
+                    segWidth=ac*3;
                 }
                 int ix=x;
                 for (;ix<x+width;ix+=segWidth*2) {
-                    g.fillRect(ix, y, segWidth, thickness);
-                    g.fillRect(ix, y+height-thickness, segWidth, thickness);
+                    g.fillRect(ix, y, segWidth, ac);
+                    g.fillRect(ix, y+height-ac, segWidth, ac);
                 }
                 if (ix-segWidth<x+width) { //fill in the gap if any
-                    g.fillRect(ix-segWidth, y, x+width-ix+segWidth, thickness);
-                    g.fillRect(ix-segWidth, y+height-thickness, x+width-ix+segWidth, thickness);
+                    g.fillRect(ix-segWidth, y, x+width-ix+segWidth, ac);
+                    g.fillRect(ix-segWidth, y+height-ac, x+width-ix+segWidth, ac);
                 }
 
                 int iy=y;
                 for (;iy<y+height;iy+=segWidth*2) {
-                    g.fillRect(x, iy, thickness, segWidth);
-                    g.fillRect(x+width-thickness, iy, thickness, segWidth);
+                    g.fillRect(x, iy, ac, segWidth);
+                    g.fillRect(x+width-ac, iy, ac, segWidth);
                 }
                 if (iy-segWidth<y+height) { //fill in the gap if any
-                    g.fillRect(x, iy-segWidth, thickness, y+height-iy+segWidth);
-                    g.fillRect(x+width-thickness, iy-segWidth, thickness, y+height-iy+segWidth);
+                    g.fillRect(x, iy-segWidth, ac, y+height-iy+segWidth);
+                    g.fillRect(x+width-ac, iy-segWidth, ac, y+height-iy+segWidth);
                 }
 
 
@@ -1403,8 +1527,8 @@ public class Border {
             case TYPE_DOUBLE:
                     width--;
                     height--;
-                    for(int iter = 0 ; iter < thickness ; iter++) {
-                        if ((iter*100/thickness<=33) || (iter*100/thickness>=66)) {
+                    for(int iter = 0 ; iter < ac ; iter++) {
+                        if ((iter*100/ac<=33) || (iter*100/ac>=66)) {
                             g.drawRect(x + iter, y + iter, width, height);
                         }
                         width -= 2; height -= 2;
@@ -1412,7 +1536,7 @@ public class Border {
                     break;
             case TYPE_INSET:
             case TYPE_OUTSET:
-                for(int i=0;i<thickness;i++) {
+                for(int i=0;i<ac;i++) {
                     g.drawLine(x+i, y+i, x+i, y+height-i);
                     g.drawLine(x+i, y+i, x+width-i, y+i);
                 }
@@ -1422,18 +1546,18 @@ public class Border {
                 } else {
                     g.darkerColor(50);
                 }
-                for(int i=0;i<thickness;i++) {
+                for(int i=0;i<ac;i++) {
                     g.drawLine(x+i, y+height-i, x+width-i, y+height-i);
                     g.drawLine(x+width-i, y+i, x+width-i, y+height-i);
                 }
                 break;
             case TYPE_GROOVE:
             case TYPE_RIDGE:
-                for(int i=0;i<thickness/2;i++) {
+                for(int i=0;i<ac/2;i++) {
                     g.drawLine(x+i, y+i, x+i, y+height-i);
                     g.drawLine(x+i, y+i, x+width-i, y+i);
                 }
-                for(int i=thickness/2;i<thickness;i++) {
+                for(int i=ac/2;i<ac;i++) {
                     g.drawLine(x+i, y+height-i, x+width-i, y+height-i);
                     g.drawLine(x+width-i, y+i, x+width-i, y+height-i);
                 }
@@ -1443,11 +1567,11 @@ public class Border {
                 } else {
                     g.darkerColor(50);
                 }
-                for(int i=0;i<thickness/2;i++) {
+                for(int i=0;i<ac/2;i++) {
                     g.drawLine(x+i, y+height-i, x+width-i, y+height-i);
                     g.drawLine(x+width-i, y+i, x+width-i, y+height-i);
                 }
-                for(int i=thickness/2;i<thickness;i++) {
+                for(int i=ac/2;i<ac;i++) {
                     g.drawLine(x+i, y+i, x+i, y+height-i);
                     g.drawLine(x+i, y+i, x+width-i, y+i);
                 }
@@ -1518,6 +1642,9 @@ public class Border {
                 g.drawLine(x + 1, y + height - 2, x + width - 2, y + height - 2);
                 g.drawLine(x + width - 2, y + 1, x + width - 2, y + height - 3);
                 break;
+            case TYPE_UNDERLINE:
+                g.fillRect(x, y + height - ac - 1, width, ac);
+                break;
             case TYPE_BEVEL_LOWERED: 
                 if(themeColors) {
                     g.setColor(getBackgroundColor(c));
@@ -1572,7 +1699,7 @@ public class Border {
                 if (top != null) {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
-                    topThickness = top.thickness;
+                    topThickness = (int)top.thickness;
                     g.clipRect(x, y, width, topThickness);
                     top.paint(g, x, y, width, height, c); //top.paint(g, c);
                     restoreClip(g, clip);
@@ -1582,7 +1709,7 @@ public class Border {
                 if (bottom != null) {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
-                    bottomThickness = bottom.thickness;
+                    bottomThickness = (int)bottom.thickness;
                     g.clipRect(x, y + height - bottomThickness, width, bottomThickness);
                     bottom.paint(g, x, y, width, height, c); //bottom.paint(g, c);
                     restoreClip(g, clip);
@@ -1593,7 +1720,7 @@ public class Border {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
                     g.clipRect(x, y + topThickness,
-                            left.thickness,
+                            (int)left.thickness,
                             height - topThickness - bottomThickness);
                     left.paint(g, x, y, width, height, c); //left.paint(g, c);
                     restoreClip(g, clip);
@@ -1602,9 +1729,9 @@ public class Border {
                 if ((drawRight) && (right != null)) {
                     Rectangle clip = saveClip(g);
                     //g.pushClip();
-                    g.clipRect(x + width - right.thickness,
+                    g.clipRect(x + width - (int)right.thickness,
                             y + topThickness,
-                            right.thickness,
+                            (int)right.thickness,
                             height - topThickness - bottomThickness);
                     right.paint(g, x, y, width, height, c); //right.paint(g, c);
                     restoreClip(g, clip);
@@ -1713,7 +1840,10 @@ public class Border {
      * @return the Border thickness
      */
     public int getThickness() {
-        return thickness;
+        if(millimeters) {
+            return Display.getInstance().convertToPixels(thickness);
+        }
+        return (int)thickness;
     }
 
     /**

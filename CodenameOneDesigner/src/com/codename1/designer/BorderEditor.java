@@ -93,7 +93,7 @@ public class BorderEditor extends javax.swing.JPanel {
                     arcHeight, arcWidth, bottom, bottomLeft, bottomRight, center,
                     changeHighlightColor, changeLineColor, changeSecondaryHighlightColor,
                     changeSecondaryShadowColor, changeShadowColor, highlightColor, imageMode,
-                    left, lineColor, thickness, raisedBorder, right, secondaryHighlightColor,
+                    left, lineColor, thickness, thicknessMillimeters, raisedBorder, right, secondaryHighlightColor,
                     secondaryShadowColor, shadowColor, top, topLeft, topRight,
                     themeColors, imageBorderPreview, roundBorderSettings
                 };
@@ -130,7 +130,11 @@ public class BorderEditor extends javax.swing.JPanel {
                 },
                 // Line
                 {
-                    lineColor, changeLineColor, themeColors, thickness
+                    lineColor, changeLineColor, themeColors, thickness, thicknessMillimeters
+                },
+                // Underline
+                {
+                    lineColor, changeLineColor, themeColors, thickness, thicknessMillimeters
                 },
                 // Round
                 {
@@ -162,7 +166,7 @@ public class BorderEditor extends javax.swing.JPanel {
 
         arcWidth.setModel(new SpinnerNumberModel(1, 1, 100, 1));
         arcHeight.setModel(new SpinnerNumberModel(1, 1, 100, 1));
-        thickness.setModel(new SpinnerNumberModel(1, 1, 100, 1));
+        thickness.setModel(new SpinnerNumberModelThatWorks(1, 0.1, 100, 0.1));
         opacity.setModel(new SpinnerNumberModel(255, 0, 255, 1));
         shadowBlur.setModel(new SpinnerNumberModelThatWorks(10.0, 1, 100, 1));
         shadowOpacity.setModel(new SpinnerNumberModel(0, 0, 255, 1));
@@ -217,9 +221,12 @@ public class BorderEditor extends javax.swing.JPanel {
                         case Accessor.TYPE_LINE:
                             borderType.setSelectedIndex(4);
                             break;
+                        case Accessor.TYPE_UNDERLINE:
+                            borderType.setSelectedIndex(5);
+                            break;
                         case Accessor.TYPE_ROUNDED:
                         case Accessor.TYPE_ROUNDED_PRESSED:
-                            borderType.setSelectedIndex(5);
+                            borderType.setSelectedIndex(6);
                             break;
                         case Accessor.TYPE_ETCHED_RAISED:
                             raisedBorder.setSelected(true);
@@ -233,13 +240,13 @@ public class BorderEditor extends javax.swing.JPanel {
                             fourColorBorder = true;
                             break;
                         case Accessor.TYPE_IMAGE:
-                            borderType.setSelectedIndex(6);
-                            break;
-                        case Accessor.TYPE_IMAGE_HORIZONTAL:
                             borderType.setSelectedIndex(7);
                             break;
-                        case Accessor.TYPE_IMAGE_VERTICAL:
+                        case Accessor.TYPE_IMAGE_HORIZONTAL:
                             borderType.setSelectedIndex(8);
+                            break;
+                        case Accessor.TYPE_IMAGE_VERTICAL:
+                            borderType.setSelectedIndex(9);
                             break;
                     }
                 }
@@ -286,7 +293,8 @@ public class BorderEditor extends javax.swing.JPanel {
                     arcWidth.setValue(new Integer(Math.max(1, Accessor.getArcWidth(border))));
                     highlightColor.setText(Integer.toHexString(Accessor.getColorA(border)));
                     lineColor.setText(Integer.toHexString(Accessor.getColorA(border)));
-                    thickness.setValue(new Integer(Math.max(1, Accessor.getThickness(border))));
+                    thickness.setValue(new Double(Accessor.getThickness(border)));
+                    thicknessMillimeters.setSelected(Accessor.isMillimeters(border));
                     secondaryShadowColor.setText(Integer.toHexString(Accessor.getColorD(border)));
                     if(fourColorBorder) {
                         secondaryHighlightColor.setText(Integer.toHexString(Accessor.getColorB(border)));
@@ -405,6 +413,7 @@ public class BorderEditor extends javax.swing.JPanel {
         themeColors = new javax.swing.JCheckBox();
         jLabel7 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
+        thicknessMillimeters = new javax.swing.JCheckBox();
         imageBorderSettings = new javax.swing.JPanel();
         imageMode = new javax.swing.JCheckBox();
         jPanel4 = new javax.swing.JPanel();
@@ -477,7 +486,7 @@ public class BorderEditor extends javax.swing.JPanel {
         jPanel6.setName("jPanel6"); // NOI18N
         jPanel6.setLayout(new java.awt.BorderLayout());
 
-        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Rounded (Deprecated)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)", "Rounded Rectangle" }));
+        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Underline", "Rounded (Deprecated)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)", "Rounded Rectangle" }));
         borderType.setName("borderType"); // NOI18N
         borderType.addActionListener(formListener);
         jPanel6.add(borderType, java.awt.BorderLayout.CENTER);
@@ -612,6 +621,10 @@ public class BorderEditor extends javax.swing.JPanel {
         jLabel5.setText("Secondary");
         jLabel5.setName("jLabel5"); // NOI18N
 
+        thicknessMillimeters.setText("Millimeters");
+        thicknessMillimeters.setName("thicknessMillimeters"); // NOI18N
+        thicknessMillimeters.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout generalSettingsLayout = new org.jdesktop.layout.GroupLayout(generalSettings);
         generalSettings.setLayout(generalSettingsLayout);
         generalSettingsLayout.setHorizontalGroup(
@@ -628,45 +641,43 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(6, 6, 6)
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(generalSettingsLayout.createSequentialGroup()
-                        .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(thickness, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(highlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeHighlightColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jLabel5)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(secondaryHighlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeSecondaryHighlightColor))
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(shadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeShadowColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jLabel6)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(secondaryShadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeSecondaryShadowColor)))
-                        .add(14, 14, 14))
+                        .add(highlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeHighlightColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jLabel5)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(secondaryHighlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeSecondaryHighlightColor))
                     .add(generalSettingsLayout.createSequentialGroup()
-                        .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(raisedBorder)
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(arcWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE)
-                                .add(56, 56, 56)
-                                .add(jLabel9)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(arcHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE))
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(lineColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeLineColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(themeColors)))
-                        .add(6, 6, 6))))
+                        .add(shadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeShadowColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jLabel6)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(secondaryShadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeSecondaryShadowColor))
+                    .add(generalSettingsLayout.createSequentialGroup()
+                        .add(thickness, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 143, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(18, 18, 18)
+                        .add(thicknessMillimeters))
+                    .add(raisedBorder)
+                    .add(generalSettingsLayout.createSequentialGroup()
+                        .add(arcWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE)
+                        .add(56, 56, 56)
+                        .add(jLabel9)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(arcHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE))
+                    .add(generalSettingsLayout.createSequentialGroup()
+                        .add(lineColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeLineColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(themeColors)))
+                .addContainerGap(41, Short.MAX_VALUE))
         );
 
         generalSettingsLayout.linkSize(new java.awt.Component[] {arcHeight, arcWidth, highlightColor, lineColor, secondaryHighlightColor, secondaryShadowColor, shadowColor}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
@@ -684,7 +695,8 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(3, 3, 3)
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel12)
-                    .add(thickness, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(thickness, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(thicknessMillimeters))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(arcWidth, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -711,7 +723,7 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(raisedBorder)
                     .add(jLabel7))
-                .add(0, 187, Short.MAX_VALUE))
+                .add(0, 209, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("General", generalSettings);
@@ -1218,17 +1230,20 @@ public class BorderEditor extends javax.swing.JPanel {
             else if (evt.getSource() == rrStrokeColor) {
                 BorderEditor.this.rrStrokeColorActionPerformed(evt);
             }
-            else if (evt.getSource() == rrStrokeMillimeter) {
-                BorderEditor.this.rrStrokeMillimeterActionPerformed(evt);
-            }
             else if (evt.getSource() == rrStrokeColorPicker) {
                 BorderEditor.this.rrStrokeColorPickerActionPerformed(evt);
+            }
+            else if (evt.getSource() == rrStrokeMillimeter) {
+                BorderEditor.this.rrStrokeMillimeterActionPerformed(evt);
             }
             else if (evt.getSource() == rrBezier) {
                 BorderEditor.this.rrBezierActionPerformed(evt);
             }
             else if (evt.getSource() == rrMode) {
                 BorderEditor.this.rrModeActionPerformed(evt);
+            }
+            else if (evt.getSource() == thicknessMillimeters) {
+                BorderEditor.this.thicknessMillimetersActionPerformed(evt);
             }
         }
 
@@ -1429,7 +1444,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                             }
                         }
                         break;
-                    case 6: {
+                    case 7: {
                         // this is a theme with no images
                         if(borderType.getItemCount() < 8) {
                             break;
@@ -1454,7 +1469,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                         }
                         break;
                     }
-                    case 7: {
+                    case 8: {
                         Image c = getButtonImageBorderIcon(this.center);
 
                         currentBorder = Border.createHorizonalImageBorder(
@@ -1463,7 +1478,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                             c);
                         break;
                     }
-                    case 8: {
+                    case 9: {
                         Image c = getButtonImageBorderIcon(this.center);
 
                         currentBorder = Border.createVerticalImageBorder(
@@ -1474,13 +1489,37 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                     }
                     case 4:
                         // line border
-                        if(themeColors.isSelected()) {
-                            currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue());
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue());
+                            } else {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
+                            }
                         } else {
-                            currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue());
+                            } else {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                            }
                         }
                         break;
                     case 5:
+                        // underline border
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).floatValue());
+                            } else {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
+                            }
+                        } else {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).intValue());
+                            } else {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                            }
+                        }
+                        break;
+                    case 6:
                         // rounded border
                         if(themeColors.isSelected()) {
                             currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
@@ -1688,6 +1727,10 @@ private void bottomRightActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         updateBorder();
     }//GEN-LAST:event_rrModeActionPerformed
 
+    private void thicknessMillimetersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_thicknessMillimetersActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_thicknessMillimetersActionPerformed
+
 public Border getResult() {
     return currentBorder;
 }
@@ -1788,6 +1831,7 @@ public Border getResult() {
     private javax.swing.JSpinner strokeThickness;
     private javax.swing.JCheckBox themeColors;
     private javax.swing.JSpinner thickness;
+    private javax.swing.JCheckBox thicknessMillimeters;
     private javax.swing.JComboBox top;
     private javax.swing.JComboBox topLeft;
     private javax.swing.JComboBox topRight;
