@@ -2638,7 +2638,7 @@ public class LayeredLayout extends Layout {
              * left inset, it will get the associated right inset.
              * @return The opposite inset.
              */
-            private Inset getOppositeInset() {
+            public Inset getOppositeInset() {
                 LayeredLayoutConstraint cnst = LayeredLayoutConstraint.this;
                 if (cnst != null) {
                     int oppSide = 0;
