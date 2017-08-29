@@ -94,9 +94,11 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
+import com.codename1.location.Geofence;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
@@ -110,6 +112,7 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.Callback;
+import com.codename1.util.MathUtil;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
@@ -563,6 +566,71 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+
+    private static long getRepeatPeriod(int repeat) {
+        switch (repeat) {
+            case LocalNotification.REPEAT_DAY:
+                return 24 * 60 * 60 * 1000L;
+            case LocalNotification.REPEAT_HOUR:
+                return 60 * 60 * 1000L;
+            case LocalNotification.REPEAT_MINUTE:
+                return 60 * 1000L;
+            case LocalNotification.REPEAT_WEEK:
+                return 7 * 24 * 60 * 60 * 1000L;
+            default:
+                return 0L;
+        }
+    }
+    
+    private Map<String,TimerTask> localNotifications = new HashMap<String,TimerTask>();
+    private java.util.Timer localNotificationsTimer;
+    
+    @Override
+    public void scheduleLocalNotification(final LocalNotification notif, long firstTime, int repeat) {
+        if (isSimulator()) {
+            if (localNotificationsTimer == null) {
+                localNotificationsTimer = new java.util.Timer();
+            }
+            TimerTask task = new TimerTask() {
+                public void run() {
+                    if (isMinimized()) {
+                        SystemTray sysTray = SystemTray.getSystemTray();
+                        TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
+                        tray.setImageAutoSize(true);
+                        try {
+                            sysTray.add(tray);
+                            tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            };
+            if (localNotifications.containsKey(notif.getId())) {
+                TimerTask old = localNotifications.get(notif.getId());
+                old.cancel();
+            }
+            localNotifications.put(notif.getId(), task);
+            if (repeat == LocalNotification.REPEAT_NONE) {
+                localNotificationsTimer.schedule(task, new Date(firstTime));
+            } else {
+                localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
+            }
+        }
+    }
+
+    @Override
+    public void cancelLocalNotification(String notificationId) {
+        if (isSimulator()) {
+            if (localNotifications.containsKey(notificationId)) {
+                TimerTask n = localNotifications.get(notificationId);
+                n.cancel();
+                localNotifications.remove(notificationId);
+            }
+        }
+    }
+    
+    
     
     
     public static void blockMonitors() {
@@ -1202,7 +1270,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void keyTyped(KeyEvent e) {
         }
-
+        // We only know if meta/ctrl/alt etc is down when the key is pressed, but we 
+        // are taking action when the key is released... so we need to track whether the
+        // control key was down while a key was pressed.
+        private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
         public void keyPressed(KeyEvent e) {
             if (!isEnabled()) {
                 return;
@@ -1210,6 +1281,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastInputEvent = e;
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+                ignorePressedKeys.add(e.getKeyCode());
                 return;
             }
             int code = getCode(e);
@@ -1220,12 +1292,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyReleased(KeyEvent e) {
+            boolean ignore = ignorePressedKeys.contains(e.getKeyCode());
+            if (ignore) ignorePressedKeys.remove(e.getKeyCode());
             if (!isEnabled()) {
                 return;
             }
             lastInputEvent = e;
             // block key combos that might generate unreadable events
-            if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+            if (ignore || e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
             }
             int code = getCode(e);
@@ -6774,8 +6848,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D g2d = getGraphics(graphics);
         if (a) {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                   RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         } else {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                   RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         }
     }
 
@@ -7500,6 +7578,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             return StubLocationManager.getLocationManager();
         }
         return new LocationManager() {
+            
+            
+            
             @Override
             public Location getCurrentLocation() throws IOException {
                 return new Location();
@@ -7517,6 +7598,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             protected void clearListener() {
             }
+
+            
+            
         };
     }
 

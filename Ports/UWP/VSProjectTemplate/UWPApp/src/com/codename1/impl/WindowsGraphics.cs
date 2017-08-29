@@ -34,6 +34,7 @@ namespace com.codename1.impl
             this.graphics.Units = CanvasUnits.Pixels;
         }
 
+
         internal void setGraphics(CanvasDrawingSession graphics)
         {
             this.graphics = graphics;
