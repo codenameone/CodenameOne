@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
 
 /**
  * <p>The {@code Accordion} ui pattern is a vertically stacked list of items. 
@@ -63,15 +64,9 @@ import com.codename1.ui.plaf.UIManager;
 public class Accordion extends Container {
 
     private Image closeIcon;
-
     private Image openIcon;
-
     private boolean autoClose = true;
-    private OnItemAccordionListener onItemListener = null;
-    public interface OnItemAccordionListener{
-        
-        public void onItemClikListener(ActionEvent evt);
-    }
+    private final EventDispatcher listeners = new EventDispatcher();
     
     /**
      * Empty Constructor
@@ -134,7 +129,6 @@ public class Accordion extends Container {
         add(new AccordionContent(header, body));
     }
 
-
     /**
      * Returns the body component of the currently expanded accordion element or null if none is expanded
      * @return a component
@@ -148,7 +142,6 @@ public class Accordion extends Container {
         }
         return null;
     }
-
 
     /**
      * Expands the accordion with the given "body" 
@@ -245,8 +238,7 @@ public class Accordion extends Container {
                         }
                     }
                     Accordion.this.animateLayout(250);
-                    if (onItemListener!=null)
-                        onItemListener.onItemClikListener(evt);
+                    fireEvent(evt);
                 }
             });
             top.add(BorderLayout.EAST, arrow);
@@ -273,8 +265,23 @@ public class Accordion extends Container {
 
     }
     
-    public void setOnItemAccordionListener(OnItemAccordionListener on){
-        this.onItemListener = on;
+    /**
+     * To listen item click in accordion component
+     * @param ActionListener to implement the method
+     */ 
+    public void setOnClickItemAccordionListener(ActionListener a) {
+        listeners.addListener(a);
+    }
+    /**
+     * To remove item click in accordion component
+     * @param ActionListener to implement the method
+     */ 
+    public void removeOnClickItemAccordionListener(ActionListener a) {
+        listeners.removeListener(a);
+    }
+    
+    private void fireEvent(ActionEvent ev) {
+        listeners.fireActionEvent(ev);
     }
 
 }
