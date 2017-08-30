@@ -103,7 +103,7 @@ public class SEDatabase extends Database{
             s =  conn.prepareStatement(sql);  
             s.execute();
         } catch (SQLException ex) {
-            ex.printStackTrace();
+            //ex.printStackTrace();
             throw new IOException(ex.getMessage());
         } finally {
             cleanup(s);
