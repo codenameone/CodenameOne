@@ -79,7 +79,7 @@ public abstract class LocationManager {
     }
 
     /**
-     * Allows the implentation to set the status of the location
+     * Allows the implementation to set the status of the location
      * @param status the new status
      */
     protected void setStatus(int status) {

@@ -269,14 +269,14 @@ public class Accordion extends Container {
      * To listen item click in accordion component
      * @param ActionListener to implement the method
      */ 
-    public void setOnClickItemAccordionListener(ActionListener a) {
+    public void addOnClickItemListener(ActionListener a) {
         listeners.addListener(a);
     }
     /**
      * To remove item click in accordion component
      * @param ActionListener to implement the method
      */ 
-    public void removeOnClickItemAccordionListener(ActionListener a) {
+    public void removeOnClickItemListener(ActionListener a) {
         listeners.removeListener(a);
     }
     
