@@ -94,7 +94,6 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
-import com.codename1.location.Geofence;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -112,7 +111,6 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.Callback;
-import com.codename1.util.MathUtil;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
@@ -141,7 +139,6 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
@@ -182,6 +179,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
     static double retinaScale = 1.0;
+    
+    static JMenuItem pause;
     
     public static boolean isRetina() {
         //if (true) return false;
@@ -593,10 +592,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             TimerTask task = new TimerTask() {
                 public void run() {
+                    if (!SystemTray.isSupported()) {
+                        System.out.println("Local notification not supported on this OS!!!");
+                        return;
+                    }
                     if (isMinimized()) {
                         SystemTray sysTray = SystemTray.getSystemTray();
                         TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
                         tray.setImageAutoSize(true);
+                        tray.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        Executor.startApp();
+                                        minimized = false;
+                                    }
+                                });
+                                canvas.setEnabled(true);
+                                pause.setText("Pause App");
+                            }
+                        });
                         try {
                             sysTray.add(tray);
                             tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
@@ -2708,7 +2724,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
-            final JMenuItem pause = new JMenuItem("Pause App");
+            pause = new JMenuItem("Pause App");
             simulatorMenu.add(pause);
             pause.addActionListener(new ActionListener() {
 
