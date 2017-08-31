@@ -32,6 +32,7 @@ import java.io.IOException;
  * Wraps all database calls in a single thread so they are all proxied thru that thread
  *
  * @author Shai Almog
+ * @deprecated platform specific nuances prevented this approach from working out, we improved the native iOS support for thread safety instead
  */
 public class ThreadSafeDatabase extends Database {
     private final Database underlying;
@@ -223,6 +224,9 @@ public class ThreadSafeDatabase extends Database {
         private final Cursor underlyingCursor;
         public CursorWrapper(Cursor underlyingCursor) {
             this.underlyingCursor = underlyingCursor;
+        }
+
+        protected void finalize()  {
         }
         
         public boolean first() throws IOException {
