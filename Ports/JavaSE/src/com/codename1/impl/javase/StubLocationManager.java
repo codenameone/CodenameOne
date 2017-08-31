@@ -23,11 +23,18 @@
 package com.codename1.impl.javase;
 
 import static com.codename1.impl.javase.JavaSEPort.locSimulation;
+import com.codename1.io.Log;
+import com.codename1.location.Geofence;
+import com.codename1.location.GeofenceListener;
 import com.codename1.location.Location;
 import com.codename1.location.LocationListener;
 import com.codename1.location.LocationManager;
 import com.codename1.ui.Display;
+import com.codename1.util.MathUtil;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -41,11 +48,17 @@ import java.util.prefs.Preferences;
  */
 class StubLocationManager extends LocationManager {
 
+    private Timer geofenceTimer;
+    private TimerTask geofenceTask;
+    
     private Timer timer;
     private TimerTask task;
     private Location loc = new Location();
     private boolean checked;
     private static StubLocationManager instance = new StubLocationManager();
+    List<Geofence> geoFences = new ArrayList<Geofence>();
+    List<String> insideFences = new ArrayList<String>();
+
 
     private StubLocationManager() {
         //new york
@@ -81,6 +94,133 @@ class StubLocationManager extends LocationManager {
     public static LocationManager getLocationManager() {
         return instance;
     }
+    
+    // Checks if location is inside geofence radius
+    private boolean isInRegion(Location l, Geofence f) {
+        return l.getDistanceTo(f.getLoc()) < f.getRadius();
+    }
+
+    @Override
+    public void addGeoFencing(final Class GeofenceListenerClass, Geofence gf) {
+        if (gf.getId() != null) {
+            String id = gf.getId();
+            int index = -1;
+            for (Geofence f : geoFences) {
+                if (id.equals(f.getId())) {
+                    index = geoFences.indexOf(f);
+                    break;
+                }
+            }
+            if (index >= 0) {
+                geoFences.remove(index);
+            }
+            if (gf.getRadius() < 0) {
+                throw new IllegalArgumentException("Attempt to add geofence with negative radius");
+            }
+            
+            if (gf.getRadius() < 100) {
+                Log.p("Adding Geofence with a radius of "+gf.getRadius()+" metres.  On an actual device, the effective radius will vary.  Typical Android and iOS devices have a minimum geofence radius of approximately 100m");
+            }
+            
+            long expires = gf.getExpiration();
+            geoFences.add(gf);
+            
+            if (geofenceTimer == null) {
+                geofenceTimer = new java.util.Timer();
+                geofenceTask = new TimerTask() {
+                    public void run() {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                Location loc;
+                                try {
+                                    loc = getCurrentLocation();
+                                    if (JavaSEPort.locSimulation == null) {
+                                        loc.setLongitude(loc.getLongitude() + 0.001);
+                                        loc.setLatitude(loc.getLatitude() + +0.001);                                        
+                                    } else {
+                                        loc.setLongitude(JavaSEPort.locSimulation.getLongitude());
+                                        loc.setLatitude(JavaSEPort.locSimulation.getLatitude());                                        
+                                    } 
+                                    
+                                    for (final Geofence f : geoFences) {
+                                        if (isInRegion(loc, f) && !insideFences.contains(f.getId())) {
+                                            insideFences.add(f.getId());
+                                            try {
+                                                final GeofenceListener l = (GeofenceListener) GeofenceListenerClass.newInstance();
+                                                new Thread() {
+                                                    public void run() {
+                                                        // In a separate thread to simulate that
+                                                        // this might not happen on EDT
+                                                        l.onEntered(f.getId());
+                                                    }
+                                                }.start();
+                                                
+                                            } catch (Throwable t) {
+                                                Log.e(t);
+                                            }
+                                        } else if (!isInRegion(loc, f) && insideFences.contains(f.getId())) {
+                                            insideFences.remove(f.getId());
+                                            try {
+                                                final GeofenceListener l = (GeofenceListener) GeofenceListenerClass.newInstance();
+                                                new Thread() {
+                                                    public void run() {
+                                                        // In a separate thread to simulate that
+                                                        // this might not happen on EDT
+                                                        l.onExit(f.getId());
+                                                    }
+                                                }.start();
+                                                
+                                            } catch (Throwable t) {
+                                                Log.e(t);
+                                            }
+                                        }
+                                    }
+                                    
+                                } catch (IOException ex) {
+                                    Logger.getLogger(StubLocationManager.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+                                
+                            }
+                        });
+                    }
+                };
+                geofenceTimer.schedule(geofenceTask, new Date(System.currentTimeMillis()+10000L), 10000L);
+            }
+            
+        } else {
+            Log.p("Attempt to add Geofence with null ID", Log.WARNING);
+        }
+        
+    }
+
+    @Override
+    public void removeGeoFencing(String id) {
+        int index = -1;
+        for (Geofence gf : geoFences) {
+            if (gf.getId() != null && gf.getId().equals(id)) {
+                index = geoFences.indexOf(gf);
+                break;
+            }
+        }
+        if (index >= 0) {
+            geoFences.remove(index);
+        }
+        if (geoFences.isEmpty()) {
+            if (geofenceTimer != null) {
+                geofenceTimer.cancel();
+                geofenceTimer = null;
+                geofenceTask = null;
+            }
+        }
+        
+    }
+
+    @Override
+    public boolean isGeofenceSupported() {
+        return true;
+    }
+            
+            
 
     @Override
     public Location getCurrentLocation() throws IOException {

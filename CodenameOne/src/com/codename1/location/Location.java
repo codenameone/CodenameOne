@@ -22,6 +22,9 @@
  */
 package com.codename1.location;
 
+import com.codename1.util.MathUtil;
+import java.util.Comparator;
+
 /**
  * <p>
  * Represents a position and possible velocity returned from positioning API's. This class is used both by
@@ -199,7 +202,27 @@ public class Location {
     public void setVelocity(float velocity) {
         this.velocity = velocity;
     }
+    
+    /**
+     * Gets the distance in metres from the current location to another location.
+     * @param l2 The location to measure distance to.
+     * @return The number of metres between the current location and {@literal l2}.
+     */
+    public double getDistanceTo(Location l2) {
+        return haversine(getLatitude(), getLongitude(), l2.getLatitude(), l2.getLongitude()) * 1000;
+    }
+    
+    private static double haversine(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6372.8;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        lat1 = Math.toRadians(lat1);
+        lat2 = Math.toRadians(lat2);
 
+        double a = MathUtil.pow(Math.sin(dLat / 2),2) + MathUtil.pow(Math.sin(dLon / 2),2) * Math.cos(lat1) * Math.cos(lat2);
+        double c = 2 * MathUtil.asin(Math.sqrt(a));
+        return R * c ;
+    }
     /**
      * {@inheritDoc}
      */
@@ -211,6 +234,23 @@ public class Location {
                 + "\ntimeStamp" + timeStamp
                 + "\nvelocity" + velocity;
                 
+    }
+    
+    /**
+     * Creates a comparator for sorting locations in order of increasing distance from the current
+     * location.
+     * @return 
+     */
+    public Comparator<Location> createDistanceCompartor() {
+        return new Comparator<Location>() {
+
+            public int compare(Location o1, Location o2) {
+                double d1 = Location.this.getDistanceTo(o1);
+                double d2 = Location.this.getDistanceTo(o2);
+                return d1 < d2 ? -1 : d2 < d1 ? 1 : 0;
+            }
+            
+        };
     }
     
     
