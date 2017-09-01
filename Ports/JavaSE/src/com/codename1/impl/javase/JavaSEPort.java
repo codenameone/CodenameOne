@@ -94,7 +94,6 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
-import com.codename1.location.Geofence;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -112,7 +111,6 @@ import com.codename1.ui.Transform;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.Callback;
-import com.codename1.util.MathUtil;
 import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.event.AdjustmentListener;
@@ -141,7 +139,6 @@ import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.layout.StackPane;
@@ -182,6 +179,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     float screenshotActualZoomLevel;
     private InputEvent lastInputEvent;
     static double retinaScale = 1.0;
+    
+    static JMenuItem pause;
     
     public static boolean isRetina() {
         //if (true) return false;
@@ -405,6 +404,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     private static String fontFaceProportional = "SansSerif";
     private static String fontFaceMonospace = "Monospaced";
+    private static boolean alwaysOnTop = false;
     private static boolean useNativeInput = true;
     private static boolean simulateAndroidKeyboard = false;
     private static boolean scrollableSkin = true;
@@ -593,10 +593,27 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             TimerTask task = new TimerTask() {
                 public void run() {
+                    if (!SystemTray.isSupported()) {
+                        System.out.println("Local notification not supported on this OS!!!");
+                        return;
+                    }
                     if (isMinimized()) {
                         SystemTray sysTray = SystemTray.getSystemTray();
                         TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
                         tray.setImageAutoSize(true);
+                        tray.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        Executor.startApp();
+                                        minimized = false;
+                                    }
+                                });
+                                canvas.setEnabled(true);
+                                pause.setText("Pause App");
+                            }
+                        });
                         try {
                             sysTray.add(tray);
                             tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
@@ -2696,7 +2713,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Motion.setSlowMotion(slowMotionFlag.isSelected());
                 }
             });
-            final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 permissions", android6PermissionsFlag);
+            final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 Permissions", android6PermissionsFlag);
             simulatorMenu.add(permFlag);
             permFlag.addActionListener(new ActionListener() {
 
@@ -2708,7 +2725,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
-            final JMenuItem pause = new JMenuItem("Pause App");
+            pause = new JMenuItem("Pause App");
             simulatorMenu.add(pause);
             pause.addActionListener(new ActionListener() {
 
@@ -2736,6 +2753,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
+            final JCheckBoxMenuItem alwaysOnTopFlag = new JCheckBoxMenuItem("Always on Top", alwaysOnTop);
+            simulatorMenu.add(alwaysOnTopFlag);
+            
             simulatorMenu.addSeparator();
 
 
@@ -2977,6 +2997,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             
+            alwaysOnTopFlag.addItemListener(new ItemListener() {
+
+                public void itemStateChanged(ItemEvent ie) {
+                    alwaysOnTop = !alwaysOnTop;
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("AlwaysOnTop", alwaysOnTop);
+                    window.setAlwaysOnTop(alwaysOnTop);
+                }
+            });
+            
             simulateAndroidVKBFlag.addItemListener(new ItemListener() {
 
                 public void itemStateChanged(ItemEvent ie) {
@@ -3039,6 +3069,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (skinNames.length() < DEFAULT_SKINS.length()) {
                 skinNames = DEFAULT_SKINS;
             }
+            ButtonGroup skinGroup = new ButtonGroup();
             StringTokenizer tkn = new StringTokenizer(skinNames, ";");
             while (tkn.hasMoreTokens()) {
                 final String current = tkn.nextToken();
@@ -3061,7 +3092,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                         continue;
                     }
                 }
-                JMenuItem i = new JMenuItem(name);
+                String d = System.getProperty("dskin");
+                JRadioButtonMenuItem i = new JRadioButtonMenuItem(name, name.equals(pref.get("skin", d)));
                 i.addActionListener(new ActionListener() {
 
                     public void actionPerformed(ActionEvent ae) {
@@ -3087,6 +3119,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                 });
+                skinGroup.add(i);
                 skinMenu.add(i);
             }
         }
@@ -3187,6 +3220,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
 
                         if (data.size() == 0) {
+                            pleaseWait.setVisible(false);
                             JOptionPane.showMessageDialog(frm, "No New Skins to Install");
                             return;
                         }
@@ -3731,6 +3765,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                 window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
             }
+            
+            alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
+            window.setAlwaysOnTop(alwaysOnTop);
+            
             window.setVisible(true);
         }
         if (useNativeInput) {
