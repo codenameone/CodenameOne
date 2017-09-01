@@ -24,11 +24,7 @@ package com.codename1.location;
 
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
-import com.codename1.location.Geofence;
-import com.codename1.location.GeofenceListener;
-import com.codename1.location.Location;
-import com.codename1.location.LocationListener;
-import com.codename1.location.LocationManager;
+import com.codename1.ui.Display;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -90,9 +86,13 @@ import java.util.Map;
 public class GeofenceManager implements Iterable<Geofence> {
     //private GeoStreamerAsyncDataSource dataSource;
     private static final String STORAGE_KEY = "$AsyncGeoStreamer.geofences$";
+    private static final String ACTIVE_FENCES_KEY = "$AsyncGeoStreamer.activegeofences$";
     private static final String CURRENT_ACTIVE_KEY = "$AsyncGeoStreamer.currentActive";
+    private static final String EXPIRATIONS_KEY = "$AsyncGeoStreamer.expirations";
     private static final String LISTENER_CLASS_KEY = "$AsyncGeoStreamer.listenerClass";
     private static final String BUBBLE_GEOFENCE_ID = "$AsyncGeoStreamer.bubble";
+    private static int MAX_ACTIVE_GEOFENCES=19;
+    
     
     /**
      * The radius of the bubble region (in metres)
@@ -102,7 +102,7 @@ public class GeofenceManager implements Iterable<Geofence> {
     /**
      * The bubble region expiraton time (duration).  Default -1 means no expiration.
      */
-    private long bubbleExpiration = -1;
+    private long bubbleExpiration = -1L;
     
     /**
      * The Class that should be instantiated to handle Geofence events.
@@ -115,6 +115,8 @@ public class GeofenceManager implements Iterable<Geofence> {
      */
     private List<String> activeKeys;
     
+    private Map<String,Long> expiryTimes;
+    
     /**
      * Default timeout for getting location.
      */
@@ -124,8 +126,77 @@ public class GeofenceManager implements Iterable<Geofence> {
      * Map of all currently registered fences.
      */
     private Map<String,Geofence> fences;
+    private Map<String,Geofence> activeFences;
     
     private static GeofenceManager instance;
+    
+    private synchronized Map<String,Long> getExpiryTimes(boolean reload) {
+        if (reload || expiryTimes == null) {
+            try {
+                expiryTimes = (Map) Storage.getInstance().readObject(EXPIRATIONS_KEY);
+            } catch (Throwable t) {}
+            if (expiryTimes == null) {
+                expiryTimes = new HashMap<String,Long>();
+            }
+            
+        }
+        return expiryTimes;
+    }
+    
+    private synchronized void updateExpiryTimes(Geofence... geofences) {
+        Map<String, Long> times = getExpiryTimes(false);
+        long now = System.currentTimeMillis();
+        for (Geofence g : geofences) {
+            if (g.getExpiration() <= 0) {
+                times.put(g.getId(), -1L);
+            } else {
+                times.put(g.getId(), now + g.getExpiration());
+            }
+        }
+        Storage.getInstance().writeObject(EXPIRATIONS_KEY, times);
+        
+    }
+    
+    private synchronized void purgeExpired() {
+        long now = System.currentTimeMillis();
+        Map<String, Long> times = getExpiryTimes(false);
+        List<String> expired = new ArrayList<String>();
+        Map<String,Geofence> fences = getFences(false);
+        List<String> activeKeys = getActiveKeys(false);
+        Map<String,Geofence> activeFences = getActiveFences(false);
+        boolean saveFences = false;
+        boolean saveActive = false;
+        boolean saveActiveFences = false;
+        for (Map.Entry<String,Long> time : times.entrySet()) {
+            if (time.getValue() > 0L && time.getValue() < now) {
+                times.remove(time.getKey());
+                if (!saveFences && fences.containsKey(time.getKey())) {
+                    saveFences = true;
+                }
+                fences.remove(time.getKey());
+                while (activeKeys.remove(time.getKey())) {
+                    saveActive = true;
+                }
+                if (activeFences.containsKey(time.getKey())) {
+                    activeFences.remove(time.getKey());
+                    saveActiveFences = true;
+                }
+
+                
+            }
+        }
+        
+        Storage.getInstance().writeObject(EXPIRATIONS_KEY, times);
+        if (saveFences) {
+            saveFences();
+        }
+        if (saveActive) {
+            saveActiveKeys();
+        }
+        if (saveActiveFences) {
+            saveActiveFences();
+        }
+    }
     
     /**
      * Obtains reference to the singleton GeofenceManager
@@ -202,7 +273,12 @@ public class GeofenceManager implements Iterable<Geofence> {
     }
     
     private GeofenceManager() {
-        update(defaultTimeout);
+        if ("and".equals(Display.getInstance().getPlatformName())) {
+            MAX_ACTIVE_GEOFENCES = 99;
+        }
+        // On simulator we need to force refresh because the 
+        // actual geofence timers aren't persisted
+        update(defaultTimeout, true);
     }
     
     /**
@@ -241,7 +317,7 @@ public class GeofenceManager implements Iterable<Geofence> {
         if (c == null) {
             Storage.getInstance().deleteStorageFile(LISTENER_CLASS_KEY);
         } else {
-            Storage.getInstance().writeObject(LISTENER_CLASS_KEY, c.getCanonicalName());
+            Storage.getInstance().writeObject(LISTENER_CLASS_KEY, c.getName());
         }
     }
     
@@ -271,7 +347,10 @@ public class GeofenceManager implements Iterable<Geofence> {
             fences.put(f.getId(), f);
         }
         saveFences();
+        updateExpiryTimes(geofence);
     }
+
+
     
     /**
      * Adds a set of regions to be monitored by GeofenceManager.
@@ -291,10 +370,16 @@ public class GeofenceManager implements Iterable<Geofence> {
         return activeKeys;
     }
     
+    public synchronized boolean isCurrentlyActive(String id) {
+        return getActiveKeys(false).contains(id);
+    }
+    
     private synchronized void saveActiveKeys() {
         Storage.getInstance().writeObject(CURRENT_ACTIVE_KEY, getActiveKeys(false));
     }
-    
+
+
+
     /**
      * Removes a set of regions (by ID) so that they will no longer be monitored.
      * @param ids 
@@ -305,6 +390,10 @@ public class GeofenceManager implements Iterable<Geofence> {
             fences.remove(i);
         }
         saveFences();
+    }
+    
+    public synchronized void remove(Collection<String> ids) {
+        remove(ids.toArray(new String[ids.size()]));
     }
     
     /**
@@ -365,10 +454,14 @@ public class GeofenceManager implements Iterable<Geofence> {
         double lat = (Double)m.get("lat");
         String id = (String)m.get("id");
         int radius = (Integer)m.get("radius");
+        Long expiration = (Long)m.get("expiration");
+        if (expiration == null) {
+            expiration = -1L;
+        }
         Location l = new Location();
         l.setLatitude(lat);
         l.setLongitude(lng);
-        return new Geofence(id, l, radius, 0);
+        return new Geofence(id, l, radius, expiration);
     }
     
     private Map<String,Object> toMap(Geofence g) {
@@ -381,9 +474,32 @@ public class GeofenceManager implements Iterable<Geofence> {
         out.put("lat", lat);
         out.put("radius", radius);
         out.put("id", id);
+        out.put("expiration", g.getExpiration());
         return out;
     }
-    
+
+    private synchronized Map<String, Geofence> getActiveFences(boolean reload) {
+        if (reload || activeFences == null) {
+            activeFences = new HashMap<String,Geofence>();
+            Map<String,Map> tmp = (Map)Storage.getInstance().readObject(ACTIVE_FENCES_KEY);
+            if (tmp != null) {
+                for (Map.Entry<String,Map> e : tmp.entrySet()) {
+                    activeFences.put(e.getKey(), fromMap(e.getValue()));
+                }
+            }
+        }
+        return activeFences;
+    }
+
+    private synchronized void saveActiveFences() {
+        if (activeFences != null) {
+            Map<String,Map> out = new HashMap<String,Map>();
+            for (Map.Entry<String,Geofence> f : activeFences.entrySet()) {
+                out.put(f.getValue().getId(), toMap(f.getValue()));
+            }
+            Storage.getInstance().writeObject(ACTIVE_FENCES_KEY, out);
+        }
+    }
     
     
     private synchronized Map<String, Geofence> getFences(boolean reload) {
@@ -413,13 +529,25 @@ public class GeofenceManager implements Iterable<Geofence> {
         return l1.getDistanceTo(l2) <= radius;
     }
 
+    // Reference to the last bubble set.
+    Geofence lastBubble;
+
     /**
      * Updates the active Geofences that are being monitored on the OS.  This should be called
      * after making changes to the set of Geofences you wish to monitor.
      * @param timeout Timeout (in milliseconds)
-     */
+     * */
     public synchronized void update(int timeout) {
-        
+        update(timeout, false);
+    }
+    
+    /**
+     * Updates the active Geofences that are being monitored on the OS.  This should be called
+     * after making changes to the set of Geofences you wish to monitor.
+     * @param timeout Timeout (in milliseconds)
+     * @param forceRefresh If true, then this will force removal and re-addition of all geofences.
+     */
+    public synchronized void update(int timeout, boolean forceRefresh) {
         Location here = LocationManager.getLocationManager().getCurrentLocationSync(timeout);
         if (here == null) {
             LocationManager.getLocationManager().setBackgroundLocationListener(Listener.class);
@@ -429,27 +557,53 @@ public class GeofenceManager implements Iterable<Geofence> {
         List<String> activeIds = new ArrayList<String>(getActiveKeys(false));
         List<String> activeKeys = getActiveKeys(false);
         for (String id : activeIds) {
-            LocationManager.getLocationManager().removeGeoFencing(id);
-            activeKeys.remove(id);
-            saveActiveKeys();
+            Geofence g = getFences(false).get(id);
+            Geofence cg = getActiveFences(false).get(id);
+            if (!forceRefresh && g != null) {
+                if (!isWithinRadius(g.getLoc(), here, getBubbleRadius() + g.getRadius())) {
+                    LocationManager.getLocationManager().removeGeoFencing(id);
+                    removeAll(activeKeys, id);
+                    activeFences.remove(id);
+                }
+            } else {
+                LocationManager.getLocationManager().removeGeoFencing(id);
+                removeAll(activeKeys, id);
+                activeFences.remove(id);
+                
+            }
+            
         }
         
-        for (Geofence g : this) {
+        for (Geofence g : asSortedList()) {
             if (isWithinRadius(g.getLoc(), here, getBubbleRadius() + g.getRadius())) {
-                if (activeKeys.size() >= 19) {
-                    // only allowed 20 at a time.
+                if (activeKeys.size() >= MAX_ACTIVE_GEOFENCES) {
+                    // only allowed 20 at a time
                     break;
                 }
-                activeKeys.add(g.getId());
-                LocationManager.getLocationManager().addGeoFencing(Listener.class, g);
-                saveActiveKeys();
+                Geofence ag = getActiveFences(false).get(g.getId());
+                if (forceRefresh || !activeKeys.contains(g.getId()) || !g.equals(ag)) {
+                    if (!activeKeys.contains(g.getId())) {
+                        activeKeys.add(g.getId());
+
+                    }
+                    activeFences.put(g.getId(), g);
+                    LocationManager.getLocationManager().addGeoFencing(Listener.class, g);
+
+
+                }
             }
         }
+        saveActiveKeys();
+        saveActiveFences();
         Location hereCopy = new Location();
         hereCopy.setLatitude(here.getLatitude());
         hereCopy.setLongitude(here.getLongitude());
         Geofence bubble = new Geofence(BUBBLE_GEOFENCE_ID, hereCopy, getBubbleRadius(), getBubbleExpiration());
-        LocationManager.getLocationManager().addGeoFencing(Listener.class, bubble);
+        if (lastBubble == null || lastBubble.getLoc().getDistanceTo(bubble.getLoc()) > Math.min(100, bubbleRadius+1)) {
+            lastBubble = bubble;
+            LocationManager.getLocationManager().addGeoFencing(Listener.class, bubble);
+        }
+        purgeExpired();
     }
 
     private void onExit(String id) {
@@ -462,6 +616,10 @@ public class GeofenceManager implements Iterable<Geofence> {
             update(defaultTimeout);
             
         }
+    }
+
+    private void removeAll(List l, Object o) {
+        while (l.remove(o));
     }
 
     private void onEntered(String id) {

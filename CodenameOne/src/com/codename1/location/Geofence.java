@@ -50,11 +50,14 @@ import java.util.Comparator;
 public class Geofence {
     
     private String id;
-    
+
+    // Location of the geofence
     private Location loc;
-    
+
+    // radius in metres.
     private int radius;
-    
+
+    // Expiration in milliseconds .  Duration, not timestamp.  -1L to never expire.
     private long expiration;
 
     /**
@@ -151,5 +154,40 @@ public class Geofence {
             }
             
         };
+    }
+
+    /**
+     * Geofences are equal if their id, radius, and expiration are the same, and the location latitude
+     * and longitude are the same.
+     * @param o
+     * @return
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof Geofence) {
+            Geofence g = (Geofence)o;
+            return eq(id, g.id) && g.radius == radius && eq(loc, g.loc) && g.expiration == expiration;
+        }
+        return false;
+    }
+
+    private boolean eq(Object o1, Object o2) {
+        if (o1 != null) {
+            return o1.equals(o2);
+        } else if (o2 != null) {
+            return o2.equals(o1);
+        } else {
+            return true; // both null
+        }
+    }
+
+    private boolean eq(Location l1, Location l2) {
+        if (l1 != null) {
+            return l1.equalsLatLng(l2);
+        } else if (l2 != null) {
+            return l2.equalsLatLng(l1);
+        } else {
+            return true; // both null
+        }
     }
 }
