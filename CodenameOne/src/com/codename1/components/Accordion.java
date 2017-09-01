@@ -209,6 +209,24 @@ public class Accordion extends Container {
     }
     
     /**
+     * Sets the closed icon customized
+     * @param closeIcon the close icon
+     * @param uiid to custom icon from res file
+     */ 
+    public void setCloseIcon(char closeIcon, String uiid) {
+        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiid));
+    }
+
+    /**
+     * Sets the open icon customized
+     * @param openIcon the open icon
+     * @param uiid to custom icon from res file
+     */ 
+    public void setOpenIcon(char openIcon, String uiid) {
+        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiid));
+    }
+    
+    /**
      * Sets the auto close flag, if this flag is true clicking on an item to open 
      * an item will automatically close the previous opened item.
      * 
