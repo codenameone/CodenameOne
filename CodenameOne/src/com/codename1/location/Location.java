@@ -252,6 +252,17 @@ public class Location {
             
         };
     }
-    
-    
+
+    /**
+     * Checks if the latitude and longitude of this location is the same as the provided location.
+     * Null values for {@literal l} are safe.
+     *
+     * @param l
+     * @return True if l has same latitude and longitude as this location.
+     */
+    boolean equalsLatLng(Location l) {
+
+        return l != null && l.latitude == latitude && l.longitude == longitude;
+
+    }
 }

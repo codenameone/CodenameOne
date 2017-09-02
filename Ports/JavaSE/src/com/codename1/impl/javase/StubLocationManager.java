@@ -142,6 +142,27 @@ class StubLocationManager extends LocationManager {
                                         loc.setLatitude(JavaSEPort.locSimulation.getLatitude());                                        
                                     } 
                                     
+                                    // Do exits first
+                                    for (final Geofence f : geoFences) {
+                                        if (!isInRegion(loc, f) && insideFences.contains(f.getId())) {
+                                            insideFences.remove(f.getId());
+                                            try {
+                                                final GeofenceListener l = (GeofenceListener) GeofenceListenerClass.newInstance();
+                                                new Thread() {
+                                                    public void run() {
+                                                        // In a separate thread to simulate that
+                                                        // this might not happen on EDT
+                                                        l.onExit(f.getId());
+                                                    }
+                                                }.start();
+                                                
+                                            } catch (Throwable t) {
+                                                Log.e(t);
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Do entrances next
                                     for (final Geofence f : geoFences) {
                                         if (isInRegion(loc, f) && !insideFences.contains(f.getId())) {
                                             insideFences.add(f.getId());
@@ -152,21 +173,6 @@ class StubLocationManager extends LocationManager {
                                                         // In a separate thread to simulate that
                                                         // this might not happen on EDT
                                                         l.onEntered(f.getId());
-                                                    }
-                                                }.start();
-                                                
-                                            } catch (Throwable t) {
-                                                Log.e(t);
-                                            }
-                                        } else if (!isInRegion(loc, f) && insideFences.contains(f.getId())) {
-                                            insideFences.remove(f.getId());
-                                            try {
-                                                final GeofenceListener l = (GeofenceListener) GeofenceListenerClass.newInstance();
-                                                new Thread() {
-                                                    public void run() {
-                                                        // In a separate thread to simulate that
-                                                        // this might not happen on EDT
-                                                        l.onExit(f.getId());
                                                     }
                                                 }.start();
                                                 

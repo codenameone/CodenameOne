@@ -366,18 +366,21 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
 
     @Override
     public void addGeoFencing(final Class GeofenceListenerClass, final com.codename1.location.Geofence gf) {
+        //Display.getInstance().scheduleBackgroundTask(new Runnable() {
         Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
+                //com.codename1.io.Log.p("PLACES add "+gf.getId()+" 1");
                 while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
                     }
                 }
+                //com.codename1.io.Log.p("PLACES add "+gf.getId()+" 2");
                 Handler mHandler = new Handler(Looper.getMainLooper());
                 mHandler.post(new Runnable() {
 
@@ -396,8 +399,9 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
                                 .setCircularRegion(gf.getLoc().getLatitude(), gf.getLoc().getLongitude(), gf.getRadius())
                                 .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER
                                         | Geofence.GEOFENCE_TRANSITION_EXIT)
-                                .setExpirationDuration(gf.getExpiration())
+                                .setExpirationDuration(gf.getExpiration() > 0 ? gf.getExpiration() : Geofence.NEVER_EXPIRE)
                                 .build());
+                        
                         LocationServices.GeofencingApi.addGeofences(getmGoogleApiClient(), geofences, pendingIntent);
                     }
                 });
@@ -414,18 +418,21 @@ public class AndroidLocationPlayServiceManager extends com.codename1.location.Lo
      * @param id a Geofence id to stop tracking
      */
     public void removeGeoFencing(final String id) {
+        //Display.getInstance().scheduleBackgroundTask(new Runnable() {
         Thread t = new Thread(new Runnable() {
 
             @Override
             public void run() {
                 //wait until the client is connected, otherwise the call to
                 //requestLocationUpdates will fail
+                //com.codename1.io.Log.p("PLACES remove "+id);
                 while (!getmGoogleApiClient().isConnected()) {
                     try {
                         Thread.sleep(300);
                     } catch (Exception ex) {
                     }
                 }
+                //com.codename1.io.Log.p("PLACES remove "+id+" 2");
                 Handler mHandler = new Handler(Looper.getMainLooper());
                 mHandler.post(new Runnable() {
 
