@@ -610,6 +610,23 @@ public class Calendar extends Container {
     }
 
     /**
+     *
+     * @return selectedDays uiid
+     */
+    public String getSelectedDaysUIID() {
+        return selectedDaysUIID;
+    }
+
+    /**
+     * Sets the selectedDays UIID to the given uiid. being considered.
+     *
+     * @param uiid the uiid to change to
+     */
+    public void setSelectedDaysUIID(String uiid) {
+        this.selectedDaysUIID = uiid;
+    }
+
+    /**
      * Highlights dates on the calendar using the supplied uiid. (Selected dates
      * uiid takes precedence over highlighted dates uiid)
      *
@@ -647,8 +664,8 @@ public class Calendar extends Container {
 
     /**
      * Un-highlights dates on the calendar by removing the highlighting uiid.
-     * (If dates were part of selectedDays, {@code selectedDaysUIID} uiid will be
-     * applied)
+     * (If dates were part of selectedDays, {@code selectedDaysUIID} uiid will
+     * be applied)
      *
      * @param dates the dates to be un-highlighted
      */
