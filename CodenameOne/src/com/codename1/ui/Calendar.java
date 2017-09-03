@@ -846,14 +846,12 @@ public class Calendar extends Container {
                     for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
                         if (entry.getValue().contains(new Date(dates[j]))) {
                             buttons[j].setUIID(entry.getKey());
-                            break;
                         }
                     }
 
                     if (multipleSelectionEnabled) {
                         if (selectedDays.contains(new Date(dates[j]))) {
                             buttons[j].setUIID(selectedDaysUIID);
-                            break;
                         }
                     }
                     updateButtonDayDate(buttons[j], yearNew, month, j - i + 1);
