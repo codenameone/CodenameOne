@@ -40,6 +40,7 @@ import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.Vector;
@@ -642,16 +643,19 @@ public class Calendar extends Container {
             cal.set(java.util.Calendar.MINUTE, 0);
             cal.set(java.util.Calendar.SECOND, 0);
             cal.set(java.util.Calendar.MILLISECOND, 0);
+
             if (!highlightGroup.isEmpty()) {
+                Map<String, ArrayList<Date>> newHighlightsGroup = new HashMap<String, ArrayList<Date>>();
                 for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
                     if (entry.getKey().equals(uiid)) {
                         entry.getValue().add(cal.getTime());
                     } else {
                         ArrayList<Date> datesArray = new ArrayList<Date>();
                         datesArray.add(cal.getTime());
-                        highlightGroup.put(uiid, datesArray);
+                        newHighlightsGroup.put(uiid, datesArray);
                     }
                 }
+                highlightGroup.putAll(newHighlightsGroup);
             } else {
                 ArrayList<Date> datesArray = new ArrayList<Date>();
                 datesArray.add(cal.getTime());
@@ -670,19 +674,24 @@ public class Calendar extends Container {
      * @param dates the dates to be un-highlighted
      */
     public void unHighlightDates(ArrayList<Date> dates) {
-        for (Date selectedDay : dates) {
-            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
-            cal.setTime(selectedDay);
-            cal.set(java.util.Calendar.HOUR, 1);
-            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
-            cal.set(java.util.Calendar.MINUTE, 0);
-            cal.set(java.util.Calendar.SECOND, 0);
-            cal.set(java.util.Calendar.MILLISECOND, 0);
-            if (!highlightGroup.isEmpty()) {
-                for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
+        if (!highlightGroup.isEmpty()) {
+            for (Date selectedDay : dates) {
+                java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+                cal.setTime(selectedDay);
+                cal.set(java.util.Calendar.HOUR, 1);
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+                cal.set(java.util.Calendar.MINUTE, 0);
+                cal.set(java.util.Calendar.SECOND, 0);
+                cal.set(java.util.Calendar.MILLISECOND, 0);
+
+                Iterator it = highlightGroup.entrySet().iterator();
+                while (it.hasNext()) {
+                    Map.Entry<String, ArrayList<Date>> entry = (Map.Entry) it.next();
                     if (entry.getValue().contains(cal.getTime())) {
                         entry.getValue().remove(cal.getTime());
-                        highlightGroup.put(entry.getKey(), entry.getValue());
+                        if (entry.getValue().isEmpty()) {
+                            it.remove();
+                        }
                     }
                 }
             }
@@ -837,12 +846,14 @@ public class Calendar extends Container {
                     for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
                         if (entry.getValue().contains(new Date(dates[j]))) {
                             buttons[j].setUIID(entry.getKey());
+                            break;
                         }
                     }
 
                     if (multipleSelectionEnabled) {
                         if (selectedDays.contains(new Date(dates[j]))) {
                             buttons[j].setUIID(selectedDaysUIID);
+                            break;
                         }
                     }
                     updateButtonDayDate(buttons[j], yearNew, month, j - i + 1);
@@ -976,16 +987,12 @@ public class Calendar extends Container {
                     if (src == buttons[iter]) {
                         if (multipleSelectionEnabled) {
                             if (selectedDays.contains(new Date(dates[iter]))) {
-                                if (!highlightGroup.isEmpty()) {
-                                    for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
-                                        if (entry.getValue().contains(new Date(dates[iter]))) {
-                                            buttons[iter].setUIID(entry.getKey());
-                                        } else {
-                                            buttons[iter].setUIID("CalendarDay");
-                                        }
+                                buttons[iter].setUIID("CalendarDay");
+                                for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
+                                    if (entry.getValue().contains(new Date(dates[iter]))) {
+                                        buttons[iter].setUIID(entry.getKey());
+                                        break;
                                     }
-                                } else {
-                                    buttons[iter].setUIID("CalendarDay");
                                 }
 
                                 selectedDays.remove(new Date(dates[iter]));
@@ -998,16 +1005,12 @@ public class Calendar extends Container {
                                 selected.setUIID("CalendarDay");
                             }
 
-                            if (!highlightGroup.isEmpty()) {
-                                for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
-                                    if (entry.getValue().contains(new Date(dates[iter]))) {
-                                        buttons[iter].setUIID(entry.getKey());
-                                    } else {
-                                        buttons[iter].setUIID("CalendarSelectedDay");
-                                    }
+                            buttons[iter].setUIID("CalendarSelectedDay");
+                            for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
+                                if (entry.getValue().contains(new Date(dates[iter]))) {
+                                    buttons[iter].setUIID(entry.getKey());
+                                    break;
                                 }
-                            } else {
-                                buttons[iter].setUIID("CalendarSelectedDay");
                             }
 
                             SELECTED_DAY = dates[iter];
