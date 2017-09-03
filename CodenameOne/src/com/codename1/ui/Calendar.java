@@ -38,6 +38,7 @@ import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -88,10 +89,10 @@ public class Calendar extends Container {
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
     private long SELECTED_DAY = -1;
-    private ArrayList<Date> selectedDays = new ArrayList<Date>();
+    private Collection<Date> selectedDays = new ArrayList<Date>();
     private boolean multipleSelectionEnabled = false;
     private String selectedDaysUIID = "CalendarMultipleDay";
-    private Map<String, ArrayList<Date>> highlightGroup = new HashMap<String, ArrayList<Date>>();
+    private Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
@@ -561,7 +562,7 @@ public class Calendar extends Container {
      *
      * @return the selected days
      */
-    public ArrayList<Date> getSelectedDays() {
+    public Collection<Date> getSelectedDays() {
         return selectedDays;
     }
 
@@ -570,7 +571,7 @@ public class Calendar extends Container {
      *
      * @param selectedDays the multipleDateSelection to set
      */
-    public void setSelectedDays(ArrayList<Date> selectedDays) {
+    public void setSelectedDays(Collection<Date> selectedDays) {
         for (Date selectedDay : selectedDays) {
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
             cal.setTime(selectedDay);
@@ -594,7 +595,7 @@ public class Calendar extends Container {
      * @param selectedDays the multipleDateSelection to set
      * @param uiid a custom uiid to be used in the dates selected
      */
-    public void setSelectedDays(ArrayList<Date> selectedDays, String uiid) {
+    public void setSelectedDays(Collection<Date> selectedDays, String uiid) {
         for (Date selectedDay : selectedDays) {
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
             cal.setTime(selectedDay);
@@ -634,7 +635,7 @@ public class Calendar extends Container {
      * @param dates the dates to be highlighted
      * @param uiid a custom uiid to be used in highlighting the dates
      */
-    public void highlightDates(ArrayList<Date> dates, String uiid) {
+    public void highlightDates(Collection<Date> dates, String uiid) {
         for (Date selectedDay : dates) {
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
             cal.setTime(selectedDay);
@@ -645,19 +646,19 @@ public class Calendar extends Container {
             cal.set(java.util.Calendar.MILLISECOND, 0);
 
             if (!highlightGroup.isEmpty()) {
-                Map<String, ArrayList<Date>> newHighlightsGroup = new HashMap<String, ArrayList<Date>>();
-                for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
+                Map<String, Collection<Date>> newHighlightsGroup = new HashMap<String, Collection<Date>>();
+                for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                     if (entry.getKey().equals(uiid)) {
                         entry.getValue().add(cal.getTime());
                     } else {
-                        ArrayList<Date> datesArray = new ArrayList<Date>();
+                        Collection<Date> datesArray = new ArrayList<Date>();
                         datesArray.add(cal.getTime());
                         newHighlightsGroup.put(uiid, datesArray);
                     }
                 }
                 highlightGroup.putAll(newHighlightsGroup);
             } else {
-                ArrayList<Date> datesArray = new ArrayList<Date>();
+                Collection<Date> datesArray = new ArrayList<Date>();
                 datesArray.add(cal.getTime());
                 highlightGroup.put(uiid, datesArray);
             }
@@ -673,7 +674,7 @@ public class Calendar extends Container {
      *
      * @param dates the dates to be un-highlighted
      */
-    public void unHighlightDates(ArrayList<Date> dates) {
+    public void unHighlightDates(Collection<Date> dates) {
         if (!highlightGroup.isEmpty()) {
             for (Date selectedDay : dates) {
                 java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
@@ -686,7 +687,7 @@ public class Calendar extends Container {
 
                 Iterator it = highlightGroup.entrySet().iterator();
                 while (it.hasNext()) {
-                    Map.Entry<String, ArrayList<Date>> entry = (Map.Entry) it.next();
+                    Map.Entry<String, Collection<Date>> entry = (Map.Entry) it.next();
                     if (entry.getValue().contains(cal.getTime())) {
                         entry.getValue().remove(cal.getTime());
                         if (entry.getValue().isEmpty()) {
@@ -843,7 +844,7 @@ public class Calendar extends Container {
                         buttons[j].setUIID("CalendarDay");
                     }
 
-                    for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
+                    for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                         if (entry.getValue().contains(new Date(dates[j]))) {
                             buttons[j].setUIID(entry.getKey());
                         }
@@ -986,7 +987,7 @@ public class Calendar extends Container {
                         if (multipleSelectionEnabled) {
                             if (selectedDays.contains(new Date(dates[iter]))) {
                                 buttons[iter].setUIID("CalendarDay");
-                                for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
+                                for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                                     if (entry.getValue().contains(new Date(dates[iter]))) {
                                         buttons[iter].setUIID(entry.getKey());
                                         break;
@@ -1004,7 +1005,7 @@ public class Calendar extends Container {
                             }
 
                             buttons[iter].setUIID("CalendarSelectedDay");
-                            for (Map.Entry<String, ArrayList<Date>> entry : highlightGroup.entrySet()) {
+                            for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                                 if (entry.getValue().contains(new Date(dates[iter]))) {
                                     buttons[iter].setUIID(entry.getKey());
                                     break;
