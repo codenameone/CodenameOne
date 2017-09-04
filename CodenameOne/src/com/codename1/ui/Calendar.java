@@ -1000,17 +1000,27 @@ public class Calendar extends Container {
                                 selectedDays.add(new Date(dates[iter]));
                             }
                         } else {
+                            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+                            cal.setTime(new Date(currentDay));
+                            cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(selected.getText().trim()));
+                            cal.set(java.util.Calendar.HOUR, 1);
+                            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+                            cal.set(java.util.Calendar.MINUTE, 0);
+                            cal.set(java.util.Calendar.SECOND, 0);
+                            cal.set(java.util.Calendar.MILLISECOND, 0);
+                            System.out.println(cal);
                             if (selected != null) {
                                 selected.setUIID("CalendarDay");
-                            }
-
-                            buttons[iter].setUIID("CalendarSelectedDay");
-                            for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
-                                if (entry.getValue().contains(new Date(dates[iter]))) {
-                                    buttons[iter].setUIID(entry.getKey());
-                                    break;
+                                if (!highlightGroup.isEmpty()) {
+                                    for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
+                                        if (entry.getValue().contains(cal.getTime())) {
+                                            selected.setUIID(entry.getKey());
+                                            break;
+                                        }
+                                    }
                                 }
                             }
+                            buttons[iter].setUIID("CalendarSelectedDay");
 
                             SELECTED_DAY = dates[iter];
                             selected = buttons[iter];
