@@ -806,7 +806,7 @@ public class Calendar extends Container {
             }
             for (int iter = 0; iter < buttons.length; iter++) {
                 buttons[iter] = createDay();
-                days.addComponent(buttons[iter]);
+                days.addComponent(FlowLayout.encloseCenterMiddle(buttons[iter]));
                 if (iter <= 7) {
                     buttons[iter].setNextFocusUp(year);
                 }
@@ -1033,8 +1033,7 @@ public class Calendar extends Container {
         public void actionPerformed(ActionEvent evt) {
             Object src = evt.getSource();
             if (src instanceof ComboBox) {
-                setMonth(Integer.parseInt((String) year.getSelectedItem()),
-                        month.getSelectedIndex());
+                setMonth(Integer.parseInt((String) year.getSelectedItem()), month.getSelectedIndex());
                 componentChanged();
                 return;
             }
@@ -1061,16 +1060,16 @@ public class Calendar extends Container {
                                 selectedDays.add(new Date(dates[iter]));
                             }
                         } else {
-                            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
-                            cal.setTime(new Date(currentDay));
-                            cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(selected.getText().trim()));
-                            cal.set(java.util.Calendar.HOUR, 1);
-                            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
-                            cal.set(java.util.Calendar.MINUTE, 0);
-                            cal.set(java.util.Calendar.SECOND, 0);
-                            cal.set(java.util.Calendar.MILLISECOND, 0);
                             if (selected != null) {
                                 selected.setUIID("CalendarDay");
+                                java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+                                cal.setTime(new Date(currentDay));
+                                cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(selected.getText().trim()));
+                                cal.set(java.util.Calendar.HOUR, 1);
+                                cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+                                cal.set(java.util.Calendar.MINUTE, 0);
+                                cal.set(java.util.Calendar.SECOND, 0);
+                                cal.set(java.util.Calendar.MILLISECOND, 0);
                                 if (!highlightGroup.isEmpty()) {
                                     for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                                         if (entry.getValue().contains(cal.getTime())) {
