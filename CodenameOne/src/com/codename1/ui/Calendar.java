@@ -84,7 +84,7 @@ public class Calendar extends Container {
     static final long DAY = HOUR * 24;
     static final long WEEK = DAY * 7;
     private EventDispatcher dispatcher = new EventDispatcher();
-    private EventDispatcher dataChangeListeners = new EventDispatcher();
+    private EventDispatcher dataChangedListeners = new EventDispatcher();
     private long[] dates = new long[42];
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
@@ -93,6 +93,7 @@ public class Calendar extends Container {
     private boolean multipleSelectionEnabled = false;
     private String selectedDaysUIID = "CalendarMultipleDay";
     private Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
+    private ArrayList<ActionListener> daysListeners = new ArrayList<ActionListener>();
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
@@ -414,12 +415,32 @@ public class Calendar extends Container {
     }
 
     /**
+     * Adds an ActionListener to the day buttons. This is different from
+     * {@code Calendar.addActionListener} and will only fire when an active day
+     * is selected.
+     *
+     * @param l listener to add
+     */
+    public void addDaysActionListener(ActionListener l) {
+        mv.addDaysActionListener(l);
+    }
+
+    /**
+     * Removes ActionListener from day buttons
+     *
+     * @param l listener to remove
+     */
+    public void removeDayActionListener(ActionListener l) {
+        mv.removeDayActionListener(l);
+    }
+
+    /**
      * Allows tracking selection changes in the calendar in real time
      *
      * @param l listener to add
      */
     public void addDataChangedListener(DataChangedListener l) {
-        mv.addDataChangeListener(l);
+        mv.addDataChangedListener(l);
     }
 
     /**
@@ -428,7 +449,7 @@ public class Calendar extends Container {
      * @param l listener to remove
      */
     public void removeDataChangedListener(DataChangedListener l) {
-        mv.removeDataChangeListener(l);
+        mv.removeDataChangedListener(l);
     }
 
     /**
@@ -438,7 +459,7 @@ public class Calendar extends Container {
      * @deprecated use #addDataChangedListener(DataChangedListener) instead
      */
     public void addDataChangeListener(DataChangedListener l) {
-        mv.addDataChangeListener(l);
+        mv.addDataChangedListener(l);
     }
 
     /**
@@ -448,7 +469,7 @@ public class Calendar extends Container {
      * @deprecated use #removeDataChangedListener(DataChangedListener) instead
      */
     public void removeDataChangeListener(DataChangedListener l) {
-        mv.removeDataChangeListener(l);
+        mv.removeDataChangedListener(l);
     }
 
     /**
@@ -811,6 +832,9 @@ public class Calendar extends Container {
                     buttons[iter].setNextFocusUp(year);
                 }
                 buttons[iter].addActionListener(this);
+                for (ActionListener dayListener : daysListeners) {
+                    buttons[iter].addActionListener(dayListener);
+                }
             }
             setCurrentDay(time);
 
@@ -1006,13 +1030,27 @@ public class Calendar extends Container {
             dispatcher.removeListener(l);
         }
 
+        public void addDaysActionListener(ActionListener l) {
+            daysListeners.add(l);
+            for (Button button : buttons) {
+                button.addActionListener(l);
+            }
+        }
+
+        public void removeDayActionListener(ActionListener l) {
+            daysListeners.remove(l);
+            for (Button button : buttons) {
+                button.removeActionListener(l);
+            }
+        }
+
         /**
          * Allows tracking selection changes in the calendar in real time
          *
          * @param l listener to add
          */
-        public void addDataChangeListener(DataChangedListener l) {
-            dataChangeListeners.addListener(l);
+        public void addDataChangedListener(DataChangedListener l) {
+            dataChangedListeners.addListener(l);
         }
 
         /**
@@ -1020,8 +1058,8 @@ public class Calendar extends Container {
          *
          * @param l listener to remove
          */
-        public void removeDataChangeListener(DataChangedListener l) {
-            dataChangeListeners.removeListener(l);
+        public void removeDataChangedListener(DataChangedListener l) {
+            dataChangedListeners.removeListener(l);
         }
 
         protected void fireActionEvent() {
