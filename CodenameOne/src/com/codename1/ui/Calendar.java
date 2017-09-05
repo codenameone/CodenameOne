@@ -127,8 +127,8 @@ public class Calendar extends Container {
         Image leftArrow = UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
         if (leftArrow != null) {
             Image rightArrow = UIManager.getInstance().getThemeImageConstant("calendarRightImage");
-            final Button left = new Button(leftArrow);
-            final Button right = new Button(rightArrow);
+            final Button left = new Button(leftArrow, "CalendarLeft");
+            final Button right = new Button(rightArrow, "CalendarRight");
             ActionListener progress = new ActionListener() {
                 private boolean lock = false;
 
@@ -175,8 +175,6 @@ public class Calendar extends Container {
             };
             left.addActionListener(progress);
             right.addActionListener(progress);
-            left.setUIID("CalendarLeft");
-            right.setUIID("CalendarRight");
 
             Container dateCnt = new Container(new BorderLayout());
             dateCnt.setUIID("CalendarDate");
@@ -292,7 +290,7 @@ public class Calendar extends Container {
      */
     public void setYearRange(int minYear, int maxYear) {
         if (minYear > maxYear) {
-            throw new IllegalArgumentException("Max year should be bigger or equal than min year!");
+            throw new IllegalArgumentException("Max year should be bigger than or equal to min year!");
         }
         //The year combobox may not exist in the current context
         if (year != null) {
@@ -629,6 +627,38 @@ public class Calendar extends Container {
     }
 
     /**
+     * Highlights a date on the calendar using the supplied uiid. (Selected
+     * dates uiid takes precedence over highlighted dates uiid)
+     *
+     * @param date the date to be highlighted
+     * @param uiid a custom uiid to be used in highlighting the date
+     */
+    public void highlightDate(Date date, String uiid) {
+        java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+        cal.setTime(date);
+        cal.set(java.util.Calendar.HOUR, 1);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+
+        if (!highlightGroup.isEmpty()) {
+            Collection<Date> datesArray = new ArrayList<Date>();
+            if (highlightGroup.containsKey(uiid)) {
+                datesArray = highlightGroup.get(uiid);
+            }
+            datesArray.add(cal.getTime());
+            highlightGroup.put(uiid, datesArray);
+        } else {
+            Collection<Date> datesArray = new ArrayList<Date>();
+            datesArray.add(cal.getTime());
+            highlightGroup.put(uiid, datesArray);
+        }
+        mv.setCurrentDay(SELECTED_DAY, true);
+        componentChanged();
+    }
+
+    /**
      * Highlights dates on the calendar using the supplied uiid. (Selected dates
      * uiid takes precedence over highlighted dates uiid)
      *
@@ -646,17 +676,12 @@ public class Calendar extends Container {
             cal.set(java.util.Calendar.MILLISECOND, 0);
 
             if (!highlightGroup.isEmpty()) {
-                Map<String, Collection<Date>> newHighlightsGroup = new HashMap<String, Collection<Date>>();
-                for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
-                    if (entry.getKey().equals(uiid)) {
-                        entry.getValue().add(cal.getTime());
-                    } else {
-                        Collection<Date> datesArray = new ArrayList<Date>();
-                        datesArray.add(cal.getTime());
-                        newHighlightsGroup.put(uiid, datesArray);
-                    }
+                Collection<Date> datesArray = new ArrayList<Date>();
+                if (highlightGroup.containsKey(uiid)) {
+                    datesArray = highlightGroup.get(uiid);
                 }
-                highlightGroup.putAll(newHighlightsGroup);
+                datesArray.add(cal.getTime());
+                highlightGroup.put(uiid, datesArray);
             } else {
                 Collection<Date> datesArray = new ArrayList<Date>();
                 datesArray.add(cal.getTime());
@@ -669,8 +694,8 @@ public class Calendar extends Container {
 
     /**
      * Un-highlights dates on the calendar by removing the highlighting uiid.
-     * (If dates were part of selectedDays, {@code selectedDaysUIID} uiid will
-     * be applied)
+     * ({@code selectedDaysUIID} uiid will be applied to any of the dates that
+     * are part of {@code selectedDays})
      *
      * @param dates the dates to be un-highlighted
      */
@@ -696,9 +721,41 @@ public class Calendar extends Container {
                     }
                 }
             }
+            mv.setCurrentDay(SELECTED_DAY, true);
+            componentChanged();
         }
-        mv.setCurrentDay(SELECTED_DAY, true);
-        componentChanged();
+    }
+
+    /**
+     * Un-highlights dates on the calendar by removing the highlighting uiid.
+     * ({@code selectedDaysUIID} uiid will be applied to the date if it is part
+     * of {@code selectedDays})
+     *
+     * @param date the date to be un-highlighted
+     */
+    public void unHighlightDate(Date date) {
+        if (!highlightGroup.isEmpty()) {
+            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+            cal.setTime(date);
+            cal.set(java.util.Calendar.HOUR, 1);
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+            cal.set(java.util.Calendar.MINUTE, 0);
+            cal.set(java.util.Calendar.SECOND, 0);
+            cal.set(java.util.Calendar.MILLISECOND, 0);
+
+            Iterator it = highlightGroup.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, Collection<Date>> entry = (Map.Entry) it.next();
+                if (entry.getValue().contains(cal.getTime())) {
+                    entry.getValue().remove(cal.getTime());
+                    if (entry.getValue().isEmpty()) {
+                        it.remove();
+                    }
+                }
+            }
+            mv.setCurrentDay(SELECTED_DAY, true);
+            componentChanged();
+        }
     }
 
     /**
@@ -986,7 +1043,11 @@ public class Calendar extends Container {
                     if (src == buttons[iter]) {
                         if (multipleSelectionEnabled) {
                             if (selectedDays.contains(new Date(dates[iter]))) {
-                                buttons[iter].setUIID("CalendarDay");
+                                if (SELECTED_DAY == dates[iter]) {
+                                    buttons[iter].setUIID("CalendarSelectedDay");
+                                } else {
+                                    buttons[iter].setUIID("CalendarDay");
+                                }
                                 for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                                     if (entry.getValue().contains(new Date(dates[iter]))) {
                                         buttons[iter].setUIID(entry.getKey());
@@ -1008,7 +1069,6 @@ public class Calendar extends Container {
                             cal.set(java.util.Calendar.MINUTE, 0);
                             cal.set(java.util.Calendar.SECOND, 0);
                             cal.set(java.util.Calendar.MILLISECOND, 0);
-                            System.out.println(cal);
                             if (selected != null) {
                                 selected.setUIID("CalendarDay");
                                 if (!highlightGroup.isEmpty()) {
