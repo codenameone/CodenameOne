@@ -41,6 +41,7 @@ import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -378,6 +379,13 @@ public class Component implements Animation, StyleListener {
     private final Object dirtyRegionLock = new Object();
     private Label componentLabel;
     private String id;
+    
+    private Resources inlineStylesTheme;
+    private String inlineAllStyles;
+    private String inlinePressedStyles;
+    private String inlineDisabledStyles;
+    private String inlineSelectedStyles;
+    private String inlineUnselectedStyles;
 
     /**
      * Is the component a bidi RTL component
@@ -594,8 +602,159 @@ public class Component implements Animation, StyleListener {
         }        
     }
 
+    /**
+     * Gets the UIID that would be used for this component if inline styles are used.
+     * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
+     * the component, and "name" is the name of the component. 
+     * @return 
+     */
+    private String getInlineStylesUIID() {
+        return getUIID()+"["+getName()+"]";
+    }
+    
+    /**
+     * Gets the UIID that would be used for this component if inline styles are used.
+     * Generally this UIID follows the format: {@literal id[name]} where "id" is the UIID of
+     * the component, and "name" is the name of the component. 
+     * @param id UIID to use as the base.
+     * @return 
+     * @see #getInlineStylesUIID() 
+     */
+    private String getInlineStylesUIID(String id) {
+        return id +"["+getName()+"]";
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its unselected state.
+     * @return True if the component has inline styles registered for the unselected state.  
+     */
+    private boolean hasInlineUnselectedStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineUnselectedStyles != null);
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its pressed state.
+     * @return True if the component has inline styles registered for the pressed state.  
+     */
+    private boolean hasInlinePressedStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlinePressedStyles != null);
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its disabled state.
+     * @return True if the component has inline styles registered for the disabled state.  
+     */
+    private boolean hasInlineDisabledStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineDisabledStyles != null);
+    }
+    
+    /**
+     * Checks to see if the component has any inline styles registered for its selected state.
+     * @return True if the component has inline styles registered for the selected state.  
+     */
+    private boolean hasInlineSelectedStyle() {
+        return getInlineStylesTheme() != null && (inlineAllStyles != null || inlineSelectedStyles != null);
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline unselected style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlineUnselectedStyles} string.
+     * @return Array of inline style strings to be applied to pressed state.  Or null if
+     * none specified.
+     */
+    private String[] getInlineUnselectedStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlineUnselectedStyles != null) {
+                return new String[] {inlineAllStyles, inlineUnselectedStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlineUnselectedStyles != null) {
+                return new String[]{inlineUnselectedStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline selected style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlineSelectedStyles} string.
+     * @return Array of inline style strings to be applied to pressed state.  Or null if
+     * none specified.
+     */
+    private String[] getInlineSelectedStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlineSelectedStyles != null) {
+                return new String[] {inlineAllStyles, inlineSelectedStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlineSelectedStyles != null) {
+                return new String[]{inlineSelectedStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline pressed style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlinePressedStyles} string.
+     * @return Array of inline style strings to be applied to pressed state.  Or null if
+     * none specified.
+     */
+    private String[] getInlinePressedStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlinePressedStyles != null) {
+                return new String[] {inlineAllStyles, inlinePressedStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlinePressedStyles != null) {
+                return new String[]{inlinePressedStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    /**
+     * Gets array of style strings to be used for inline disabled style. This may include
+     * the {@link #inlineAllStyles} string and/or the {@link #inlineDisabledStyles} string.
+     * @return Array of inline style strings to be applied to disabled state.  Or null if
+     * none specified.
+     */
+    private String[] getInlineDisabledStyleStrings() {
+        if (inlineAllStyles != null) {
+            if (inlineDisabledStyles != null) {
+                return new String[] {inlineAllStyles, inlineDisabledStyles};
+            } else {
+                return new String[] {inlineAllStyles};
+            }
+        } else {
+            if (inlineDisabledStyles != null) {
+                return new String[]{inlineDisabledStyles};
+            } else {
+                return null;
+            }
+                    
+        }
+    }
+    
+    
     private void initStyle() {
-        unSelectedStyle = getUIManager().getComponentStyle(getUIID());
+        if (hasInlineUnselectedStyle()) {
+            unSelectedStyle = getUIManager().parseComponentStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), getInlineUnselectedStyleStrings());
+        } else {
+            unSelectedStyle = getUIManager().getComponentStyle(getUIID());
+        }
         lockStyleImages(unSelectedStyle);
         if (unSelectedStyle != null) {
             unSelectedStyle.addStyleListener(this);
@@ -1182,6 +1341,160 @@ public class Component implements Animation, StyleListener {
         }
     }
     
+    /**
+     * Gets inline styles that are to be applied to all states of this component.
+     * @return Inline styles applied to all states.
+     */
+    public String getInlineAllStyles() {
+        return inlineAllStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the selected state of this component.
+     * @return Inline styles applied to selected state
+     */
+    public String getInlineSelectedStyles() {
+        return this.inlineSelectedStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the unselected state of this component.
+     * @return Inline styles applied to unselected state
+     */
+    public String getInlineUnselectedStyles() {
+        return this.inlineUnselectedStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the disabled state of this component.
+     * @return Inline styles applied to disabled state
+     */
+    public String getInlineDisabledStyles() {
+        return this.inlineDisabledStyles;
+    }
+    
+    /**
+     * Gets inline styles that are to be applied to the pressed state of this component.
+     * @return Inline styles applied to pressed state
+     */
+    public String getInlinePressedStyles() {
+        return this.inlinePressedStyles;
+        
+    }
+    
+    /**
+     * Registers inline styles that should be applied to all states of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineAllStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles != inlineAllStyles) {
+            this.inlineAllStyles = styles;
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the unselected state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineUnselectedStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles != inlineUnselectedStyles) {
+            this.inlineUnselectedStyles = styles;
+
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+        
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the selected state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineSelectedStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles != inlineSelectedStyles) {
+            this.inlineSelectedStyles = styles;
+
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+        
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the disabled state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlineDisabledStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles != inlineDisabledStyles) {
+            this.inlineDisabledStyles = styles;
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+    }
+    
+    /**
+     * Registers inline styles that should be applied to the pressed state of the component.  
+     * @param styles 
+     * @see UIManager#parseStyle(com.codename1.ui.util.Resources, java.lang.String, java.lang.String, java.lang.String, boolean, java.lang.String...) For a description of the syntax.
+     */
+    public void setInlinePressedStyles(String styles) {
+        if (styles != null && styles.trim().length() == 0) {
+            styles = null;
+        }
+        if (styles != inlinePressedStyles) {
+            this.inlinePressedStyles = styles;
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+        }
+    }
     /**
      * This method will remove the Component from its parent.
      */
@@ -2661,6 +2974,35 @@ public class Component implements Animation, StyleListener {
         this.rippleEffect = rippleEffect;
     }
 
+    /**
+     * Gets the theme that is used by inline styles to reference images.
+     * @return the inlineStylesTheme
+     * @see #setInlineStylesTheme(com.codename1.ui.util.Resources) 
+     * @see #getInlineAllStyles() 
+     * @see #getInlineSelectedStyles() 
+     * @see #getInlinePressedStyles()
+     * @see #getInlineUnselectedStyles() 
+     * @see #getInlineDisabledStyles() 
+     */
+    public Resources getInlineStylesTheme() {
+        return inlineStylesTheme;
+    }
+
+    /**
+     * Sets the theme that is used by inline styles to reference images.  Inline styles will be
+     * disabled unless an inlineStylesTheme is registered with the component.
+     * @param inlineStylesTheme the theme that inline styles use to reference images.
+     * @see #getInlineStylesTheme() 
+     * @see #setInlineAllStyles(java.lang.String) 
+     * @see #setInlinePressedStyles(java.lang.String) 
+     * @see #setInlineSelectedStyles(java.lang.String) 
+     * @see #setInlineDisabledStyles(java.lang.String) 
+     * @see #setInlineUnselectedStyles(java.lang.String) 
+     */
+    public void setInlineStylesTheme(Resources inlineStylesTheme) {
+        this.inlineStylesTheme = inlineStylesTheme;
+    }
+
     class AnimationTransitionPainter implements Painter{
         int alpha;
         Style originalStyle;
@@ -2710,7 +3052,9 @@ public class Component implements Animation, StyleListener {
      */
     public ComponentAnimation createStyleAnimation(final String destUIID, final int duration) {
         final Style sourceStyle = getUnselectedStyle();
-        final Style destStyle = getUIManager().getComponentStyle(destUIID);
+        final Style destStyle = hasInlineUnselectedStyle() ?
+                getUIManager().parseComponentStyle(getInlineStylesTheme(), destUIID, getInlineStylesUIID(destUIID), getInlineUnselectedStyleStrings())
+                :getUIManager().getComponentStyle(destUIID);
         return createStyleAnimation(sourceStyle, destStyle, duration, destUIID);
         
     }
@@ -4066,7 +4410,11 @@ public class Component implements Animation, StyleListener {
      */
     public Style getPressedStyle() {
         if (pressedStyle == null) {
-            pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
+            if (hasInlineUnselectedStyle()) {
+                pressedStyle = getUIManager().parseComponentCustomStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), "press", getInlinePressedStyleStrings());
+            } else {
+                pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
+            }
             pressedStyle.addStyleListener(this);
             if(pressedStyle.getBgPainter() == null){
                 pressedStyle.setBgPainter(new BGPainter());
@@ -4115,7 +4463,11 @@ public class Component implements Animation, StyleListener {
      */
     public Style getSelectedStyle() {
         if (selectedStyle == null) {
-            selectedStyle = getUIManager().getComponentSelectedStyle(getUIID());
+            if (hasInlineSelectedStyle()) {
+                selectedStyle = getUIManager().parseComponentSelectedStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), getInlineSelectedStyleStrings());
+            } else {
+                selectedStyle = getUIManager().getComponentSelectedStyle(getUIID());
+            }
             selectedStyle.addStyleListener(this);
             if (selectedStyle.getBgPainter() == null) {
                 selectedStyle.setBgPainter(new BGPainter());
@@ -4135,7 +4487,11 @@ public class Component implements Animation, StyleListener {
      */
     public Style getDisabledStyle() {
         if (disabledStyle == null) {
-            disabledStyle = getUIManager().getComponentCustomStyle(getUIID(), "dis");
+            if (hasInlineDisabledStyle()) {
+                disabledStyle = getUIManager().parseComponentCustomStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), "dis", getInlineDisabledStyleStrings());
+            } else {
+                disabledStyle = getUIManager().getComponentCustomStyle(getUIID(), "dis");
+            }
             disabledStyle.addStyleListener(this);
             if (disabledStyle.getBgPainter() == null) {
                 disabledStyle.setBgPainter(new BGPainter());
@@ -4274,15 +4630,31 @@ public class Component implements Animation, StyleListener {
    
         if(merge){
             Style unSelected = getUnselectedStyle();
-            setUnselectedStyle(mergeStyle(unSelected, manager.getComponentStyle(id)));            
+            if (hasInlineUnselectedStyle()) {
+                setUnselectedStyle(mergeStyle(unSelected, manager.parseComponentStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), getInlineUnselectedStyleStrings())));
+            } else {
+                setUnselectedStyle(mergeStyle(unSelected, manager.getComponentStyle(id)));            
+            }
             if (selectedStyle != null) {
-                setSelectedStyle(mergeStyle(selectedStyle, manager.getComponentSelectedStyle(id)));
+                if (hasInlineSelectedStyle()) {
+                    setSelectedStyle(mergeStyle(selectedStyle, manager.parseComponentSelectedStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), getInlineSelectedStyleStrings())));
+                } else {
+                    setSelectedStyle(mergeStyle(selectedStyle, manager.getComponentSelectedStyle(id)));
+                }
             }
             if (disabledStyle != null) {
-                setDisabledStyle(mergeStyle(disabledStyle, manager.getComponentCustomStyle(id, "dis")));
+                if (hasInlineDisabledStyle()) {
+                    setDisabledStyle(mergeStyle(disabledStyle, manager.parseComponentCustomStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), "dis", getInlineDisabledStyleStrings())));
+                } else {
+                    setDisabledStyle(mergeStyle(disabledStyle, manager.getComponentCustomStyle(id, "dis")));
+                }
             }
             if(pressedStyle != null) {
-                setPressedStyle(mergeStyle(pressedStyle, manager.getComponentCustomStyle(id, "press")));
+                if (hasInlinePressedStyle()) {
+                    setPressedStyle(mergeStyle(pressedStyle, manager.parseComponentCustomStyle(getInlineStylesTheme(), id, getInlineStylesUIID(id), "press", getInlinePressedStyleStrings())));
+                } else {
+                    setPressedStyle(mergeStyle(pressedStyle, manager.getComponentCustomStyle(id, "press")));
+                }
             }
         }else{
             unSelectedStyle = null;
