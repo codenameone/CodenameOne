@@ -49,6 +49,7 @@ import java.util.Vector;
  * the hint components in their proper places.
  * 
  * @author Shai Almog
+ * @deprecated interaction dialog is a superior way for displaying these types of tutorials
  */
 public class GlassTutorial implements Painter {
     private static final String DEST = "$$GLSDESTHINT$$";

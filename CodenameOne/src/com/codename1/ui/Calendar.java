@@ -38,7 +38,10 @@ import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.Vector;
@@ -86,8 +89,10 @@ public class Calendar extends Container {
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
     private long SELECTED_DAY = -1;
-    private ArrayList<Date> selectedDays = new ArrayList<Date>();
+    private Collection<Date> selectedDays = new ArrayList<Date>();
     private boolean multipleSelectionEnabled = false;
+    private String selectedDaysUIID = "CalendarMultipleDay";
+    private Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
@@ -122,8 +127,8 @@ public class Calendar extends Container {
         Image leftArrow = UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
         if (leftArrow != null) {
             Image rightArrow = UIManager.getInstance().getThemeImageConstant("calendarRightImage");
-            final Button left = new Button(leftArrow);
-            final Button right = new Button(rightArrow);
+            final Button left = new Button(leftArrow, "CalendarLeft");
+            final Button right = new Button(rightArrow, "CalendarRight");
             ActionListener progress = new ActionListener() {
                 private boolean lock = false;
 
@@ -170,8 +175,6 @@ public class Calendar extends Container {
             };
             left.addActionListener(progress);
             right.addActionListener(progress);
-            left.setUIID("CalendarLeft");
-            right.setUIID("CalendarRight");
 
             Container dateCnt = new Container(new BorderLayout());
             dateCnt.setUIID("CalendarDate");
@@ -287,7 +290,7 @@ public class Calendar extends Container {
      */
     public void setYearRange(int minYear, int maxYear) {
         if (minYear > maxYear) {
-            throw new IllegalArgumentException("Max year should be bigger or equal than min year!");
+            throw new IllegalArgumentException("Max year should be bigger than or equal to min year!");
         }
         //The year combobox may not exist in the current context
         if (year != null) {
@@ -557,7 +560,7 @@ public class Calendar extends Container {
      *
      * @return the selected days
      */
-    public ArrayList<Date> getSelectedDays() {
+    public Collection<Date> getSelectedDays() {
         return selectedDays;
     }
 
@@ -566,7 +569,7 @@ public class Calendar extends Container {
      *
      * @param selectedDays the multipleDateSelection to set
      */
-    public void setSelectedDays(ArrayList<Date> selectedDays) {
+    public void setSelectedDays(Collection<Date> selectedDays) {
         for (Date selectedDay : selectedDays) {
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
             cal.setTime(selectedDay);
@@ -577,8 +580,182 @@ public class Calendar extends Container {
             cal.set(java.util.Calendar.MILLISECOND, 0);
             this.selectedDays.add(cal.getTime());
         }
+        selectedDaysUIID = "CalendarMultipleDay";
         mv.setCurrentDay(SELECTED_DAY, true);
         componentChanged();
+    }
+
+    /**
+     * Sets the dates to be selected on the calendar with a custom uiid. To use
+     * default uiid "{@code CalendarMultipleDay}", call this method without the
+     * "{@code uiid} parameter"
+     *
+     * @param selectedDays the multipleDateSelection to set
+     * @param uiid a custom uiid to be used in the dates selected
+     */
+    public void setSelectedDays(Collection<Date> selectedDays, String uiid) {
+        for (Date selectedDay : selectedDays) {
+            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+            cal.setTime(selectedDay);
+            cal.set(java.util.Calendar.HOUR, 1);
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+            cal.set(java.util.Calendar.MINUTE, 0);
+            cal.set(java.util.Calendar.SECOND, 0);
+            cal.set(java.util.Calendar.MILLISECOND, 0);
+            this.selectedDays.add(cal.getTime());
+        }
+        selectedDaysUIID = uiid;
+        mv.setCurrentDay(SELECTED_DAY, true);
+        componentChanged();
+    }
+
+    /**
+     *
+     * @return selectedDays uiid
+     */
+    public String getSelectedDaysUIID() {
+        return selectedDaysUIID;
+    }
+
+    /**
+     * Sets the selectedDays UIID to the given uiid. being considered.
+     *
+     * @param uiid the uiid to change to
+     */
+    public void setSelectedDaysUIID(String uiid) {
+        this.selectedDaysUIID = uiid;
+    }
+
+    /**
+     * Highlights a date on the calendar using the supplied uiid. (Selected
+     * dates uiid takes precedence over highlighted dates uiid)
+     *
+     * @param date the date to be highlighted
+     * @param uiid a custom uiid to be used in highlighting the date
+     */
+    public void highlightDate(Date date, String uiid) {
+        java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+        cal.setTime(date);
+        cal.set(java.util.Calendar.HOUR, 1);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+
+        if (!highlightGroup.isEmpty()) {
+            Collection<Date> datesArray = new ArrayList<Date>();
+            if (highlightGroup.containsKey(uiid)) {
+                datesArray = highlightGroup.get(uiid);
+            }
+            datesArray.add(cal.getTime());
+            highlightGroup.put(uiid, datesArray);
+        } else {
+            Collection<Date> datesArray = new ArrayList<Date>();
+            datesArray.add(cal.getTime());
+            highlightGroup.put(uiid, datesArray);
+        }
+        mv.setCurrentDay(SELECTED_DAY, true);
+        componentChanged();
+    }
+
+    /**
+     * Highlights dates on the calendar using the supplied uiid. (Selected dates
+     * uiid takes precedence over highlighted dates uiid)
+     *
+     * @param dates the dates to be highlighted
+     * @param uiid a custom uiid to be used in highlighting the dates
+     */
+    public void highlightDates(Collection<Date> dates, String uiid) {
+        for (Date selectedDay : dates) {
+            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+            cal.setTime(selectedDay);
+            cal.set(java.util.Calendar.HOUR, 1);
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+            cal.set(java.util.Calendar.MINUTE, 0);
+            cal.set(java.util.Calendar.SECOND, 0);
+            cal.set(java.util.Calendar.MILLISECOND, 0);
+
+            if (!highlightGroup.isEmpty()) {
+                Collection<Date> datesArray = new ArrayList<Date>();
+                if (highlightGroup.containsKey(uiid)) {
+                    datesArray = highlightGroup.get(uiid);
+                }
+                datesArray.add(cal.getTime());
+                highlightGroup.put(uiid, datesArray);
+            } else {
+                Collection<Date> datesArray = new ArrayList<Date>();
+                datesArray.add(cal.getTime());
+                highlightGroup.put(uiid, datesArray);
+            }
+        }
+        mv.setCurrentDay(SELECTED_DAY, true);
+        componentChanged();
+    }
+
+    /**
+     * Un-highlights dates on the calendar by removing the highlighting uiid.
+     * ({@code selectedDaysUIID} uiid will be applied to any of the dates that
+     * are part of {@code selectedDays})
+     *
+     * @param dates the dates to be un-highlighted
+     */
+    public void unHighlightDates(Collection<Date> dates) {
+        if (!highlightGroup.isEmpty()) {
+            for (Date selectedDay : dates) {
+                java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+                cal.setTime(selectedDay);
+                cal.set(java.util.Calendar.HOUR, 1);
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+                cal.set(java.util.Calendar.MINUTE, 0);
+                cal.set(java.util.Calendar.SECOND, 0);
+                cal.set(java.util.Calendar.MILLISECOND, 0);
+
+                Iterator it = highlightGroup.entrySet().iterator();
+                while (it.hasNext()) {
+                    Map.Entry<String, Collection<Date>> entry = (Map.Entry) it.next();
+                    if (entry.getValue().contains(cal.getTime())) {
+                        entry.getValue().remove(cal.getTime());
+                        if (entry.getValue().isEmpty()) {
+                            it.remove();
+                        }
+                    }
+                }
+            }
+            mv.setCurrentDay(SELECTED_DAY, true);
+            componentChanged();
+        }
+    }
+
+    /**
+     * Un-highlights dates on the calendar by removing the highlighting uiid.
+     * ({@code selectedDaysUIID} uiid will be applied to the date if it is part
+     * of {@code selectedDays})
+     *
+     * @param date the date to be un-highlighted
+     */
+    public void unHighlightDate(Date date) {
+        if (!highlightGroup.isEmpty()) {
+            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+            cal.setTime(date);
+            cal.set(java.util.Calendar.HOUR, 1);
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+            cal.set(java.util.Calendar.MINUTE, 0);
+            cal.set(java.util.Calendar.SECOND, 0);
+            cal.set(java.util.Calendar.MILLISECOND, 0);
+
+            Iterator it = highlightGroup.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, Collection<Date>> entry = (Map.Entry) it.next();
+                if (entry.getValue().contains(cal.getTime())) {
+                    entry.getValue().remove(cal.getTime());
+                    if (entry.getValue().isEmpty()) {
+                        it.remove();
+                    }
+                }
+            }
+            mv.setCurrentDay(SELECTED_DAY, true);
+            componentChanged();
+        }
     }
 
     /**
@@ -724,9 +901,15 @@ public class Calendar extends Container {
                         buttons[j].setUIID("CalendarDay");
                     }
 
+                    for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
+                        if (entry.getValue().contains(new Date(dates[j]))) {
+                            buttons[j].setUIID(entry.getKey());
+                        }
+                    }
+
                     if (multipleSelectionEnabled) {
                         if (selectedDays.contains(new Date(dates[j]))) {
-                            buttons[j].setUIID("CalendarMultipleDay");
+                            buttons[j].setUIID(selectedDaysUIID);
                         }
                     }
                     updateButtonDayDate(buttons[j], yearNew, month, j - i + 1);
@@ -860,18 +1043,45 @@ public class Calendar extends Container {
                     if (src == buttons[iter]) {
                         if (multipleSelectionEnabled) {
                             if (selectedDays.contains(new Date(dates[iter]))) {
-                                buttons[iter].setUIID("CalendarDay");
+                                if (SELECTED_DAY == dates[iter]) {
+                                    buttons[iter].setUIID("CalendarSelectedDay");
+                                } else {
+                                    buttons[iter].setUIID("CalendarDay");
+                                }
+                                for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
+                                    if (entry.getValue().contains(new Date(dates[iter]))) {
+                                        buttons[iter].setUIID(entry.getKey());
+                                        break;
+                                    }
+                                }
+
                                 selectedDays.remove(new Date(dates[iter]));
                             } else {
-                                buttons[iter].setUIID("CalendarMultipleDay");
+                                buttons[iter].setUIID(selectedDaysUIID);
                                 selectedDays.add(new Date(dates[iter]));
                             }
                         } else {
+                            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+                            cal.setTime(new Date(currentDay));
+                            cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(selected.getText().trim()));
+                            cal.set(java.util.Calendar.HOUR, 1);
+                            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+                            cal.set(java.util.Calendar.MINUTE, 0);
+                            cal.set(java.util.Calendar.SECOND, 0);
+                            cal.set(java.util.Calendar.MILLISECOND, 0);
                             if (selected != null) {
                                 selected.setUIID("CalendarDay");
+                                if (!highlightGroup.isEmpty()) {
+                                    for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
+                                        if (entry.getValue().contains(cal.getTime())) {
+                                            selected.setUIID(entry.getKey());
+                                            break;
+                                        }
+                                    }
+                                }
                             }
-
                             buttons[iter].setUIID("CalendarSelectedDay");
+
                             SELECTED_DAY = dates[iter];
                             selected = buttons[iter];
                         }

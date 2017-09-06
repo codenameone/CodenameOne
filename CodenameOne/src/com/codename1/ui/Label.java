@@ -117,6 +117,20 @@ public class Label extends Component {
         setUIID(uiid);
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
+
+    /**
+     * {@inheritDoc}
+     * This is overriden for auto size mode
+     */
+    @Override
+    protected void laidOut() {
+        super.laidOut();
+        if(autoSizeMode) {
+            initAutoResize();
+        }
+    }
+    
+    
     
     /**
      * Construct an empty label
@@ -500,7 +514,7 @@ public class Label extends Component {
                     }
                 }
                 
-                Font currentFont = originalFont;
+                Font currentFont = getUnselectedStyle().getFont();
                 float fontSize = currentFont.getPixelSize();
                 if(fontSize < 1) {
                     Log.p("Autosize disabled probably because component wasn't using native fonts for UIID: " + getUIID());
@@ -509,24 +523,21 @@ public class Label extends Component {
                 }
                 widthAtLastCheck = w;
                 autoSizeMode = false;
-                while(calcPreferredSize().getWidth() < w) {
+                int currentWidth = calcPreferredSize().getWidth();
+                while(currentWidth < w) {
                     fontSize++;
                     currentFont = currentFont.derive(fontSize, currentFont.getStyle());
                     getAllStyles().setFont(currentFont);
+                    currentWidth = calcPreferredSize().getWidth();
                 }
-                while(calcPreferredSize().getWidth() > w) {
+                while(currentWidth > w) {
                     fontSize--;
                     currentFont = currentFont.derive(fontSize, currentFont.getStyle());
                     getAllStyles().setFont(currentFont);
+                    currentWidth = calcPreferredSize().getWidth();
                 }
                 autoSizeMode = true;
             }
-        }
-    }
-
-    void calcSizeAutoSize() {
-        if(autoSizeMode && originalFont != null) {
-            getAllStyles().setFont(originalFont);
         }
     }
     
@@ -534,7 +545,6 @@ public class Label extends Component {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
-        calcSizeAutoSize();
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
     }
     

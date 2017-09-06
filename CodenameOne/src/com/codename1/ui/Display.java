@@ -279,6 +279,12 @@ public final class Display extends CN1Constants {
     private ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
 
     /**
+     * Contains the call serially idle elements
+     */
+    private ArrayList<Runnable> pendingIdleSerialCalls = new ArrayList<Runnable>();
+
+
+    /**
      * This is the instance of the EDT used internally to indicate whether
      * we are executing on the EDT or some arbitrary thread
      */
@@ -678,6 +684,26 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Causes the runnable to be invoked on the event dispatch thread when the event 
+     * dispatch thread is idle. This method returns immediately and will not wait for the serial call 
+     * to occur. Notice this method is identical to call serially but will perform the runnable only when
+     * the EDT is idle
+     *
+     * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+     * the paint and key handling events
+     */
+    public void callSeriallyOnIdle(Runnable r){
+        if(codenameOneRunning) {
+            synchronized(lock) {
+                pendingIdleSerialCalls.add(r);
+                lock.notifyAll();
+            }
+        } else {
+            r.run();
+        }
+    }
+
+    /**
      * Allows executing a background task in a separate low priority thread. Tasks are serialized
      * so they don't overload the CPU.
      * 
@@ -859,7 +885,17 @@ public final class Display extends CN1Constants {
             // for features such as call serially
             while(impl.getCurrentForm() == null) {
                 synchronized(lock){
+                    breakOut2:
+                    
                     if(shouldEDTSleep()) {
+                        while(pendingIdleSerialCalls.size() > 0) {
+                            Runnable r = pendingIdleSerialCalls.get(0);
+                            pendingIdleSerialCalls.remove(0);
+                            callSerially(r);
+
+                            break breakOut2;
+                        }
+                        
                         lock.wait();
                     }
 
@@ -891,12 +927,21 @@ public final class Display extends CN1Constants {
                 // wait indefinetly Lock surrounds the should method to prevent serial calls from
                 // getting "lost"
                  synchronized(lock){
-                     if(shouldEDTSleep()) {
+                    breakOut1:
+
+                    if(shouldEDTSleep()) {
+                         while(pendingIdleSerialCalls.size() > 0) {
+                            Runnable r = pendingIdleSerialCalls.get(0);
+                            pendingIdleSerialCalls.remove(0);
+                            callSerially(r);
+                            break breakOut1;
+                         }
                          impl.edtIdle(true);
                          lock.wait();
                          impl.edtIdle(false);
                      }
                  }
+                 
 
                 edtLoopImpl();
             } catch(Throwable err) {
