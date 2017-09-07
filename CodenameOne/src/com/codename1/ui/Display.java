@@ -447,6 +447,8 @@ public final class Display extends CN1Constants {
     
     private ActionListener virtualKeyboardListener;
     
+    private int lastSizeChangeEventWH = -1;
+    
     /**
      * Private constructor to prevent instanciation
      */
@@ -1844,9 +1846,12 @@ public final class Display extends CN1Constants {
             return;
         }
         if(w == current.getWidth() && h == current.getHeight()) {
-            return;
+            // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
+            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == current.getWidth() + current.getHeight()) {
+                return;            
+            }
         }
-
+        lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
 
