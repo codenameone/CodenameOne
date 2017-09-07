@@ -434,9 +434,9 @@ public final class Display extends CN1Constants {
      */
     public static final int COMMAND_BEHAVIOR_NATIVE = 10;
 
-    private static String selectedVirtualKeyboard = VirtualKeyboard.NAME;
+    private static String selectedVirtualKeyboard = null;
 
-    private static Hashtable virtualKeyboards = new Hashtable();
+    private static Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
 
     private boolean dropEvents;
     
@@ -878,8 +878,6 @@ public final class Display extends CN1Constants {
     void mainEDTLoop() {
         impl.initEDT();
         UIManager.getInstance();
-        com.codename1.ui.VirtualKeyboard vkb = new com.codename1.ui.VirtualKeyboard();
-        INSTANCE.registerVirtualKeyboard(vkb);
         try {
             // when there is no current form the EDT is useful only
             // for features such as call serially
@@ -2388,9 +2386,8 @@ public final class Display extends CN1Constants {
     public String [] getSupportedVirtualKeyboard(){
         String [] retVal = new String[virtualKeyboards.size()];
         int index = 0;
-        Enumeration keys = virtualKeyboards.keys();
-        while (keys.hasMoreElements()) {
-            retVal[index++] = (String) keys.nextElement();
+        for(String k : virtualKeyboards.keySet()) {
+            retVal[index++] = k;
         }
         return retVal;
     }

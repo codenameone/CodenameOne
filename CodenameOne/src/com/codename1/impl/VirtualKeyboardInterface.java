@@ -35,7 +35,7 @@ public interface VirtualKeyboardInterface {
      * This can be used to indicate to the VirtualKeyboard what type of input
      * to display.
      * 
-     * @param constraint one of TextArea.ANY, TextArea.EMAILADDR, 
+     * @param inputType one of TextArea.ANY, TextArea.EMAILADDR, 
      * TextArea.NUMERIC, TextArea.PHONENUMBER, TextArea.URL, TextArea.DECIMAL
      * it can be bitwised or'd with one of TextArea.PASSWORD, 
      * TextArea.UNEDITABLE, TextArea.SENSITIVE, TextArea.NON_PREDICTIVE,
