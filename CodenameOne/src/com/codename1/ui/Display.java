@@ -448,7 +448,7 @@ public final class Display extends CN1Constants {
     private ActionListener virtualKeyboardListener;
     
     private int lastSizeChangeEventWH = -1;
-    
+
     /**
      * Private constructor to prevent instanciation
      */
@@ -1005,19 +1005,32 @@ public final class Display extends CN1Constants {
             lastDragOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
-            inputEventStack = qt;
-        }
-        
-        int offset = 0;
-        while(offset < inputEventStackPointerTmp) {            
-            if(offset == inputEventStackPointer) {
-                inputEventStackPointer = 0;
-                lastDragOffset = -1;
+
+            // We have a special flag here for a case where the input event stack might still be processing this can 
+            // happen if an event callback calls something like invokeAndBlock while processing and might reach
+            // this code again
+            if(qt[qt.length - 1] == Integer.MAX_VALUE) {
+                inputEventStack = new int[qt.length];
+            } else {
+                inputEventStack = qt;
+                qt[qt.length - 1] = 0;
             }
-            offset = handleEvent(offset);
+        }
+
+        // we copy the variables to the stack since the array might be replaced while we are working if the EDT
+        // is nested into an "invokeAndBlock"
+        int actualTmpPointer = inputEventStackPointerTmp;
+        inputEventStackPointerTmp = 0;
+        int[] actualStack = inputEventStackTmp;
+        int offset = 0;
+        actualStack[actualStack.length - 1] = Integer.MAX_VALUE;
+        while(offset < actualTmpPointer) {            
+            offset = handleEvent(offset, actualStack);
         }
         
-        if(!impl.isInitialized()){
+        actualStack[actualStack.length - 1] = 0;
+
+    if(!impl.isInitialized()){
             return;
         }
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
@@ -1141,6 +1154,10 @@ public final class Display extends CN1Constants {
                 RunnableWrapper.pushToThreadPool(w);
 
                 synchronized(lock) {
+                    // prevent an invoke and block loop from breaking the ongoing event processing
+                    if(inputEventStackPointerTmp > 0) {
+                        inputEventStackPointerTmp = inputEventStackPointer;
+                    }
                     try {
                         // yeald the CPU for a very short time to let the invoke thread
                         // get started
@@ -1934,7 +1951,7 @@ public final class Display extends CN1Constants {
     /**
      * Invoked on the EDT to propagate the event
      */
-    private int handleEvent(int offset) {
+    private int handleEvent(int offset, int[] inputEventStackTmp) {
         Form f = getCurrentUpcomingForm(true);
 
         // might happen when returning from a deinitialized version of Codename One
