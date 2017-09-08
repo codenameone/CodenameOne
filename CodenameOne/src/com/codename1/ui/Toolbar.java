@@ -803,7 +803,6 @@ public class Toolbar extends Container {
                     if(sidemenuDialog.isShowing()) {
                         if(evt.getX() > sidemenuDialog.getWidth()) {
                             closeSideMenu();
-                            parent.putClientProperty("cn1$ignorRelease", Boolean.TRUE);
                             evt.consume();
                         } else {
                             if(evt.getX() + Display.getInstance().convertToPixels(8) > sidemenuDialog.getWidth()) {
@@ -845,12 +844,6 @@ public class Toolbar extends Container {
             });
             parent.addPointerReleasedListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
-                    Boolean ir = (Boolean)parent.getClientProperty("cn1$ignorRelease");
-                    if(ir != null && ir.booleanValue()) {
-                        parent.putClientProperty("cn1$ignorRelease", null);
-                        evt.consume();
-                        return;
-                    }
                     Boolean b = (Boolean)parent.getClientProperty("cn1$sidemenuActivated");
                     if(b != null && b.booleanValue()) {
                         parent.putClientProperty("cn1$sidemenuActivated", null);
@@ -874,7 +867,7 @@ public class Toolbar extends Container {
             sidemenuDialog = new InteractionDialog(new BorderLayout());
             
             // change this to true when stable
-            sidemenuDialog.setFormMode(false);
+            sidemenuDialog.setFormMode(true);
             sidemenuDialog.setUIID("Container");
             sidemenuDialog.setDialogUIID("Container");
             sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
@@ -958,7 +951,7 @@ public class Toolbar extends Container {
         sidemenuDialog.setRepositionAnimation(false);
         sidemenuDialog.layoutContainer();
         
-        float f = ((float)v) / ((float)dw) * 200.0f;
+        float f = ((float)v) / ((float)dw) * 80.0f;
         Style s = getComponentForm().getLayeredPane(Toolbar.class, false).getUnselectedStyle();
         s.setBgTransparency((int)f);
         s.setBgColor(0);
