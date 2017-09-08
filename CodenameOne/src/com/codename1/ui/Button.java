@@ -687,7 +687,6 @@ public class Button extends Label {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
-        calcSizeAutoSize();
         return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
     }
     

@@ -154,6 +154,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("rightSideMenuImage","Same as sideMenuImage only for the right side, optional and defaults to sideMenuImage");
         helpMap.put("rightSideMenuPressImage","Same as sideMenuPressImage only for the right side, optional and defaults to sideMenuPressImage");
         helpMap.put("showBackCommandOnTitleBool","Used by the Toolbar API to indicate whether the back button should appear on the title");
+        helpMap.put("scrollVisibleBool", "true/false default is platform dependent. Toggles whether the scroll bar is visible");
         helpMap.put("shrinkPopupTitleBool","Indicates the title of the popup should be set to 0 if its missing");
         helpMap.put("sideMenuAnimSpeedInt","The speed at which a sidemenu moves defaults to 300 milliseconds");
         helpMap.put("sideMenuFoldedSwipeBool","Indicates the side menu could be opened via swiping");

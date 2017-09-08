@@ -193,19 +193,37 @@ public class Accordion extends Container {
     }
 
     /**
-     * Sets the closed icon
-     * @param closeIcon the close icon
+     * Sets the closed icon using material image
+     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
      */ 
     public void setCloseIcon(char closeIcon) {
         this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
     }
 
     /**
-     * Sets the open icon
-     * @param openIcon the open icon
+     * Sets the open icon using material image
+     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
      */ 
     public void setOpenIcon(char openIcon) {
         this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+    }
+    
+    /**
+     * Sets the closed icon using material image with a custom uiid
+     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
+     * @param uiid to custom icon from res file
+     */ 
+    public void setCloseIcon(char closeIcon, String uiid) {
+        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiid));
+    }
+
+    /**
+     * Sets the open icon using material image with a custom uiid
+     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
+     * @param uiid to custom icon from res file
+     */ 
+    public void setOpenIcon(char openIcon, String uiid) {
+        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiid));
     }
     
     /**

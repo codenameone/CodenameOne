@@ -24,6 +24,7 @@
 #include "java_util_Date.h"
 #include "java_text_DateFormat.h"
 #include "CodenameOne_GLViewController.h"
+#import <mach/mach.h>
 
 extern JAVA_BOOLEAN lowMemoryMode;
 
@@ -1284,11 +1285,17 @@ void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginIn
 }
 
 JAVA_LONG java_lang_Runtime_totalMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
-    return 0;
+    return [NSProcessInfo processInfo].physicalMemory;
 }
 
 JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
-    return 0;
+    struct task_basic_info info;
+    mach_msg_type_number_t size = sizeof(info);
+    kern_return_t kerr = task_info(mach_task_self(),
+                                   TASK_BASIC_INFO,
+                                   (task_info_t)&info,
+                                   &size);
+    return [NSProcessInfo processInfo].physicalMemory - info.resident_size;
 }
 
 
