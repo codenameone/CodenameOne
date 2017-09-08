@@ -27,6 +27,12 @@ import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.plaf.StyleParser.BorderInfo;
+import com.codename1.ui.plaf.StyleParser.FontInfo;
+import com.codename1.ui.plaf.StyleParser.ImageInfo;
+import com.codename1.ui.plaf.StyleParser.MarginInfo;
+import com.codename1.ui.plaf.StyleParser.PaddingInfo;
+import com.codename1.ui.plaf.StyleParser.StyleInfo;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.Resources;
 import com.codename1.util.StringUtil;
@@ -1164,6 +1170,30 @@ public class UIManager {
         return parseCache;
     }
     
+    private String fromFloatArray(float[] arr) {
+        StringBuilder sb = new StringBuilder();
+        int len = arr.length;
+        boolean first=true;
+        for (int i=0; i<len; i++) {
+            if (first) first = false;
+            else sb.append(",");
+            sb.append(arr[i]);
+        }
+        return sb.toString();
+    }
+    
+    private String fromByteArray(byte[] arr) {
+        StringBuilder sb = new StringBuilder();
+        int len = arr.length;
+        boolean first=true;
+        for (int i=0; i<len; i++) {
+            if (first) first = false;
+            else sb.append(",");
+            sb.append(arr[i]);
+        }
+        return sb.toString();
+    }
+    
     /**
      * Creates a style by providing style strings in a specific format. This method allows for the use of inline styles
      * to override the styles in {@link com.codename1.ui.Component}
@@ -1208,7 +1238,7 @@ public class UIManager {
         for (String str : styleString) {
             StyleParser.parseString(styles, str);
         }
-        
+        StyleInfo styleInfo = new StyleInfo(styles);
         
         
         if (prefix != null && prefix.length() > 0) {
@@ -1219,85 +1249,92 @@ public class UIManager {
         }
         if (baseStyle != null) {
             themeProps.put(id+"derive", baseStyle);
+        } else {
+            themeProps.remove(id+"derive");
         }
         String val = null;
-        if ((val = styles.get("bgColor")) != null) {
-            themeProps.put(id + Style.BG_COLOR, val);
+        Integer bgColor = styleInfo.getBgColor();
+        if (bgColor != null) {
+            themeProps.put(id + Style.BG_COLOR, Integer.toHexString(bgColor));
+        } else {
+            themeProps.remove(id + Style.BG_COLOR);
         }
-        if ((val = styles.get("fgColor")) != null) {
-            themeProps.put(id + Style.FG_COLOR, val);
+        Integer fgColor = styleInfo.getFgColor();
+        if (fgColor != null) {
+            themeProps.put(id + Style.FG_COLOR, Integer.toHexString(fgColor));
+        } else {
+            themeProps.remove(id + Style.FG_COLOR);
         }
-        if ((val = styles.get("border")) != null) {
-            Border border;
-            if ((border = StyleParser.parseBorder(theme, val)) != null) {
-                themeProps.put(id + Style.BORDER, border);
-            }
+        BorderInfo border = styleInfo.getBorder();
+        if (border != null) {
+            themeProps.put(id + Style.BORDER, border.createBorder(theme));
+        } else {
+            themeProps.remove(id + Style.BORDER);
         }
-        if ((val = styles.get("bgType")) != null) {
-            Integer bgType;
-            if ((bgType = StyleParser.parseBgType(val)) != null) {
-                themeProps.put(id + Style.BACKGROUND_TYPE, bgType.byteValue());
-            }
+        Integer bgType = styleInfo.getBgType();
+        if (bgType != null) {
+            themeProps.put(id + Style.BACKGROUND_TYPE, bgType.byteValue());
+        } else {
+            themeProps.remove(id + Style.BACKGROUND_TYPE);
         }
-        if ((val = styles.get("bgImage")) != null) {
-            Image im;
-            if ((im = StyleParser.parseBgImage(theme, val)) != null) {
-                themeProps.put(id + Style.BG_IMAGE, im);
-            }
-            
-        }
-        if ((val = styles.get("margin")) != null) {
-            String margin;
-            if ((margin = StyleParser.parseMargin(base, val)) != null) {
-                themeProps.put(id + Style.MARGIN, margin);
-            }
-            byte[] unit;
-            if ((unit = StyleParser.parseMarginUnit(base, val)) != null) {
-                themeProps.put(id + Style.MARGIN_UNIT, unit);
-            }
-        }
-        if ((val = styles.get("padding")) != null) {
-            String padding;
-            if ((padding = StyleParser.parsePadding(base, val)) != null) { 
-                themeProps.put(id + Style.PADDING, padding);
-            }
-            byte[] unit;
-            if ((unit = StyleParser.parsePaddingUnit(base, val)) != null) {
-                themeProps.put(id + Style.PADDING_UNIT, unit);
-            }
-            
-        }
-        if ((val = styles.get("transparency")) != null) {
-            themeProps.put(id + Style.TRANSPARENCY, val);
-        }
-        if ((val = styles.get("opacity")) != null) {
-            themeProps.put(id + Style.OPACITY, val);
-        }
-        if ((val = styles.get("alignment")) != null) {
-            Integer alignment;
-            if ((alignment = StyleParser.parseAlignment(val)) != null) {
-                themeProps.put(id + Style.ALIGNMENT, alignment);
-            }
+        ImageInfo bgImage = styleInfo.getBgImage();
+        if (bgImage != null) {
+            themeProps.put(id + Style.BG_IMAGE, bgImage.getImage(theme));
+        } else {
+            themeProps.remove(id + Style.BG_IMAGE);
         }
         
-        if ((val = styles.get("textDecoration")) != null) {
-            Integer textDecoration;
-            if ((textDecoration = StyleParser.parseTextDecoration(val)) != null) {
-                themeProps.put(id + Style.TEXT_DECORATION, textDecoration);
-            }
+        MarginInfo margin = styleInfo.getMargin();
+        if (margin != null) {
+            themeProps.put(id + Style.MARGIN, fromFloatArray(margin.createMargin(base)));
+            themeProps.put(id + Style.MARGIN_UNIT, margin.createMarginUnit(base));
+        } else {
+            themeProps.remove(id + Style.MARGIN);
+            themeProps.remove(id + Style.MARGIN_UNIT);
+        }
+        PaddingInfo padding = styleInfo.getPadding();
+        if (padding != null) {
+            themeProps.put(id + Style.PADDING, fromFloatArray(padding.createPadding(base)));
+            themeProps.put(id + Style.PADDING_UNIT, padding.createPaddingUnit(base));
+        } else {
+            themeProps.remove(id + Style.PADDING);
+            themeProps.remove(id + Style.PADDING_UNIT);
+        }
+                
+        Integer transparency = styleInfo.getTransparency();
+        if (transparency != null) {
+            themeProps.put(id + Style.TRANSPARENCY, String.valueOf(transparency.intValue()));
+        } else {
+            themeProps.remove(id + Style.TRANSPARENCY);
+        }
+        Integer opacity = styleInfo.getOpacity();
+        if (opacity != null) {
+            themeProps.put(id + Style.OPACITY, String.valueOf(opacity.intValue()));
+        } else {
+            themeProps.remove(id + Style.OPACITY);
+        }
+        Integer alignment = styleInfo.getAlignment();
+        if (alignment != null) {
+            themeProps.put(id + Style.ALIGNMENT, alignment);
+        } else {
+            themeProps.remove(id + Style.ALIGNMENT);
+        }
+        Integer textDecoration = styleInfo.getTextDecoration();
+        if (textDecoration != null) {
+            themeProps.put(id + Style.TEXT_DECORATION, textDecoration);
+        } else {
+            themeProps.remove(id + Style.TEXT_DECORATION);
         }
         
-        if ((val = styles.get("font")) != null) {
-            Font font;
-            
-            if ((font = StyleParser.parseFont(base, val)) != null) {
-                themeProps.put(id + Style.FONT, font);
-            }
+        FontInfo font = styleInfo.getFont();
+        if (font != null) {
+            themeProps.put(id + Style.FONT, font.createFont(base));
+        } else {
+            themeProps.remove(id + Style.FONT);
         }
+        
         if (selected) selectedStyles.remove(id);
-        else {
-            this.styles.remove(id);
-        }
+        else this.styles.remove(id);
         
         return getComponentStyleImpl(originalId, selected, prefix);
         

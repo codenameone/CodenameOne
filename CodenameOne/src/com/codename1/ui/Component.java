@@ -2985,7 +2985,12 @@ public class Component implements Animation, StyleListener {
      * @see #getInlineDisabledStyles() 
      */
     public Resources getInlineStylesTheme() {
-        return inlineStylesTheme;
+        if (inlineStylesTheme == null) {
+            Container parent = getParent();
+            return parent == null ? null : parent.getInlineStylesTheme();
+        } else {
+            return inlineStylesTheme;
+        }
     }
 
     /**
