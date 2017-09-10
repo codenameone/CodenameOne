@@ -255,6 +255,7 @@ public class Toolbar extends Container {
      */
     public static void setPermanentSideMenu(boolean p) {
         permanentSideMenu = p;
+        onTopSideMenu = false;
     }
 
     /**
@@ -802,6 +803,7 @@ public class Toolbar extends Container {
                 public void actionPerformed(ActionEvent evt) {
                     if(sidemenuDialog.isShowing()) {
                         if(evt.getX() > sidemenuDialog.getWidth()) {
+                            parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                             closeSideMenu();
                             evt.consume();
                         } else {
@@ -925,6 +927,7 @@ public class Toolbar extends Container {
                 }
             }
         }
+        int actualV = v;
         if(draggedX > 0) {
             v = Math.min(v, draggedX);
             sidemenuDialog.setAnimateShow(false);
@@ -942,7 +945,7 @@ public class Toolbar extends Container {
             sidemenuDialog.setVisible(true);
             sidemenuDialog.putClientProperty("cn1$firstShow", Boolean.TRUE);
             sidemenuDialog.setAnimateShow(draggedX < 1);
-    }
+        }
         sidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());
         sidemenuDialog.setWidth(v);
         if(!fromCurrent) {
@@ -956,9 +959,10 @@ public class Toolbar extends Container {
         s.setBgTransparency((int)f);
         s.setBgColor(0);
         
-        // prevent events from propogating downwards 
-        //sidemenuDialog.getContentPane().setFocusable(true);
-        sidemenuDialog.show(0, 0, 0, dw - v);
+        sidemenuDialog.show(0, 0, 0, dw - actualV);
+        if(draggedX > 0) {
+            sidemenuDialog.setX(Math.min(0, draggedX - actualV));
+        }
     }
     
     /**
