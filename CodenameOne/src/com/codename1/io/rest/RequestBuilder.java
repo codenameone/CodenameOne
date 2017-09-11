@@ -155,7 +155,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */ 
     public RequestBuilder basicAuth(String username, String password) {
-        header("Authorization", "Basic " + Base64.encode((username + ":" + password).getBytes()));
+        header("Authorization", "Basic " + Base64.encodeNoNewline((username + ":" + password).getBytes()));
         return this;
     }
     

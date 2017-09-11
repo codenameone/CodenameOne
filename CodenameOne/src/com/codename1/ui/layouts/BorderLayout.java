@@ -675,6 +675,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isOverlapSupported(){
         return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW || overlay != null;
     }
@@ -699,7 +700,7 @@ public class BorderLayout extends Layout {
      * {@inheritDoc}
      */
     public boolean isConstraintTracking() {
-        return false;
+        return true;
     }    
     
     /**
