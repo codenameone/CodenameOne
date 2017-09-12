@@ -274,10 +274,6 @@ public class Toolbar extends Container {
      */
     public void openSideMenu() {
         if(onTopSideMenu) {
-            if(sidemenuDialog.isShowing()) {
-                closeSideMenu();
-                return;
-            }
             showOnTopSidemenu(-1, false);
         } else {
             ((SideMenuBar)getMenuBar()).openMenu(null);
