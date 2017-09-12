@@ -364,7 +364,7 @@ public class Resources {
 
     void checkKey(String id) {
         if(key == null) {
-            throw new IllegalStateException("This is an password protected resource");
+            throw new IllegalStateException("This is a password protected resource");
         }
         char l = (char)decode(id.charAt(0));
         char w = (char)decode(id.charAt(1));
