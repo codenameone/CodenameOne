@@ -283,6 +283,42 @@ public class Border {
     }
     
     /**
+     * The given image is spliced into 9 pieces based on the provided top, right, bottom, and left insets, and the resulting
+     * sub-images are used to form a 9-piece image border via {@link #createImageBorder(com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image) }
+     * 
+     * <p>Insets are all given in a (u,v) coordinate space where (0,0) is the top-left corner of the image, and (1.0, 1.0) is the bottom-right corner of the image.</p>
+     * @param img The image to be used as a background image and spliced.
+     * @param topInset
+     * @param rightInset
+     * @param bottomInset
+     * @param leftInset
+     * @return A 9-piece image border.
+     */
+    public static Border createImageSplicedBorder(Image img, double topInset, double rightInset, double bottomInset, double leftInset) {
+        
+        Border b = new Border();
+        b.type = TYPE_IMAGE;
+        int w = img.getWidth();
+        int h = img.getHeight();
+        int topInsetPx = (int)Math.round(h * topInset);
+        int leftInsetPx = (int)Math.round(w * leftInset);
+        int rightInsetPx = (int)Math.round(w * rightInset);
+        int bottomInsetPx = (int)Math.round(h * bottomInset);
+        Image top = img.subImage(leftInsetPx, 0, w - leftInsetPx - rightInsetPx, topInsetPx, true);
+        Image bottom = img.subImage(leftInsetPx, h - bottomInsetPx, w - leftInsetPx - rightInsetPx, bottomInsetPx, true);
+        Image left = img.subImage(0, topInsetPx, leftInsetPx, h - topInsetPx - bottomInsetPx, true);
+        Image right = img.subImage(w - rightInsetPx, topInsetPx, rightInsetPx, h - topInsetPx - bottomInsetPx, true);
+        Image topLeft = img.subImage(0, 0, leftInsetPx, topInsetPx, true);
+        Image topRight = img.subImage(w - rightInsetPx, 0, rightInsetPx, topInsetPx, true);
+        Image bottomLeft = img.subImage(0, h - bottomInsetPx, leftInsetPx, bottomInsetPx, true);
+        Image bottomRight = img.subImage(w - rightInsetPx, h - bottomInsetPx, rightInsetPx, bottomInsetPx, true);
+        Image background = img.subImage(leftInsetPx, topInsetPx, w - leftInsetPx - rightInsetPx, h - topInsetPx - bottomInsetPx, true);
+        b.images = new Image[] {top, bottom, left, right, topLeft, topRight, bottomLeft,
+                        bottomRight, background};
+        return b;
+    }
+    
+    /**
      * The given top/bottom/left/right images are scaled appropriately across the matching sides of the border and the corners are placed
      * as expected in the four corners. The background image is optional and it will be tiled in  the background if necessary.
      *
@@ -1953,4 +1989,7 @@ public class Border {
         }
         return null;
     }
+    
+    
+    
 }

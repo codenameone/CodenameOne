@@ -711,6 +711,9 @@ public class SEBrowserComponent extends PeerComponent {
     }
     
     void setProperty(String key, Object value) {
+        if(key.equalsIgnoreCase("User-Agent")) {
+            web.getEngine().setUserAgent((String)value);
+        }
     }
 
     String getTitle() {

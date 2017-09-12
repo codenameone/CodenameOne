@@ -296,23 +296,8 @@ public class RoundBorder extends Border {
         this.rectangle = rectangle;
         return this;
     }
-        
-    @Override
-    public void paintBorderBackground(Graphics g, Component c) {
-        int w = c.getWidth();
-        int h = c.getHeight();
-        int x = c.getX();
-        int y = c.getY();
-        if(w > 0 && h > 0) {
-            Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
-            if(background != null && background.getWidth() == w && background.getHeight() == h) {
-                g.drawImage(background, x, y);
-                return;
-            }
-        } else {
-            return;
-        }
-                
+
+    private Image createTargetImage(Component c, int w, int h, boolean fast) {
         Image target = Image.createImage(w, h, 0);
         
         int shapeX = 0;
@@ -342,7 +327,7 @@ public class RoundBorder extends Border {
                 fillShape(tg, 0, shadowOpacity / shadowSpreadL, w - (iter * 2), h - (iter * 2), false);
                 tg.translate(-iter, -iter);
             }
-            if(Display.getInstance().isGaussianBlurSupported()) {
+            if(Display.getInstance().isGaussianBlurSupported() && !fast) {
                 Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur/2);
                 target = Image.createImage(w, h, 0);
                 tg = target.getGraphics();
@@ -385,8 +370,39 @@ public class RoundBorder extends Border {
         } else {
             fillShape(tg, color, opacity, shapeW, shapeH, true);
         }
+        return target;
+    }
+    
+    @Override
+    public void paintBorderBackground(Graphics g, final Component c) {
+        final int w = c.getWidth();
+        final int h = c.getHeight();
+        int x = c.getX();
+        int y = c.getY();
+        if(w > 0 && h > 0) {
+            Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
+            if(background != null && background.getWidth() == w && background.getHeight() == h) {
+                g.drawImage(background, x, y);
+                return;
+            }
+        } else {
+            return;
+        }
+                
+        Image target = createTargetImage(c, w, h, true);
         g.drawImage(target, x, y);
         c.putClientProperty(CACHE_KEY + instanceVal, target);
+        
+        // update the cache with a more refined version and repaint
+        Display.getInstance().callSeriallyOnIdle(new Runnable() {
+            public void run() {
+                if(w == c.getWidth() && h == c.getHeight()) {
+                    Image target = createTargetImage(c, w, h, false);
+                    c.putClientProperty(CACHE_KEY + instanceVal, target);
+                    c.repaint();
+                }
+            }
+        });
     }
 
     @Override
