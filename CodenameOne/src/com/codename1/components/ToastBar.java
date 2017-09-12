@@ -331,7 +331,7 @@ public class ToastBar {
         /**
          * Schedules this status message to be shown after a specified number of milliseconds,
          * if it hasn't been cleared or shown first.  
-         * <p>This is handy if you want to show an status for an operation that usually completes very quickly, but could 
+         * <p>This is handy if you want to show a status for an operation that usually completes very quickly, but could 
          * potentially hang.  In such a case you might decide not to display a status message at all unless the operation
          * takes more than 500ms to complete.</p>
          * 
