@@ -577,7 +577,7 @@ public final class CC
 	/** The id used to reference this component in some constraints.
 	 * <p>
 	 * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
-	 * @param s The id or <code>null</code>. May consist of a groupID and an componentID which are separated by a dot: ".". E.g. "grp1.id1".
+	 * @param s The id or <code>null</code>. May consist of a groupID and a componentID which are separated by a dot: ".". E.g. "grp1.id1".
 	 * The dot should never be first or last if present.
 	 * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
 	 */
@@ -1507,7 +1507,7 @@ public final class CC
 	/** Returns the id used to reference this component in some constraints.
 	 * <p>
 	 * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
-	 * @return The id or <code>null</code>. May consist of a groupID and an componentID which are separated by a dot: ".". E.g. "grp1.id1".
+	 * @return The id or <code>null</code>. May consist of a groupID and a componentID which are separated by a dot: ".". E.g. "grp1.id1".
 	 * The dot should never be first or last if present.
 	 */
 	public String getId()
@@ -1518,7 +1518,7 @@ public final class CC
 	/** Sets the id used to reference this component in some constraints.
 	 * <p>
 	 * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
-	 * @param id The id or <code>null</code>. May consist of a groupID and an componentID which are separated by a dot: ".". E.g. "grp1.id1".
+	 * @param id The id or <code>null</code>. May consist of a groupID and a componentID which are separated by a dot: ".". E.g. "grp1.id1".
 	 * The dot should never be first or last if present.
 	 */
 	public void setId(String id)

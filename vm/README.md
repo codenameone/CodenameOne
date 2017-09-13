@@ -3,11 +3,11 @@
 
 <img align="right" src="http://codenameone.com/img/parpar.png" height="250">
 
-ParparVM is the VM developed by Codename One to replace the defunct [XMLVM](http://xmlvm.org) with which it was 
+ParparVM is the VM developed by Codename One to replace the defunct [XMLVM](http://xmlvm.org) with which it was
 originally built. We took our extensive experience both in JITs and native OS development and built something
-that is both simple, conservative and performant. 
+that is both simple, conservative and performant.
 
-ParparVM was designed as a client side VM. It features a **concurrent GC** that doesn't block the current execution thread. 
+ParparVM was designed as a client side VM. It features a **concurrent GC** that doesn't block the current execution thread.
 
 ## Usage
 The ByteCodeTranslator and JavaAPI projects are designed as a NetBeans project although it should be possible to work with any Java IDE or ant directly. It requires asm 5.0.3 which you can find in the [cn1-binaries](http://github.com/codenameone/cn1-binaries) project.
@@ -22,6 +22,13 @@ Once the translation process succeeds you should have a valid xcode project that
 
 The main class name (referred to as stub class) is expected to have a `public static void main(String[])` method and it is assumed to reside in the `com.package.name` directory  (figuratively, you need to replace `com.package.name` with your actual package passed to the translator).
 
+### Command-line Flags
+
+The following java properties can be set via the command-line using the `-D` flag to modify the output:
+
+* `USE_RPMALLOC` - "true" or "false".  Default value is "false". Use [rpmalloc](https://github.com/rampantpixels/rpmalloc) instead of malloc/free for memory allocation.  This requires that you change the target deployment version in the resulting project to 8.0 or higher.
+* `bundleVersionNumber` - The app bundle version to set in the info.plist.
+
 ## Why Another VM for iOS?
 
 There are many VM's on the market and a few open source ones but none of the ones that translate to C are actively maintained. None of the other VM's have a non-blocking concurrent GC at this time. This is an important feature when dealing with UI's as we don't want GC stalls during animations.
@@ -29,34 +36,34 @@ There are many VM's on the market and a few open source ones but none of the one
 [J2ObjC](https://github.com/google/j2objc) is an excellent tool for porting libraries to Objective-C but it isn't designed
 to be a full scale VM (no GC etc.).
 
-The other VM's (Avian & RoboVM) are pretty impressive technically since they compile directly to ARM/LLVM. 
+The other VM's (Avian & RoboVM) are pretty impressive technically since they compile directly to ARM/LLVM.
 That is a very problematic approach:
 
- - While this is an impressive feat Apple doesn't officially support this route. That means that with every transition 
- Apple makes (64bit, bitcode etc.) hurdles occur. This isn't some theoretical issue but something that has created 
+ - While this is an impressive feat Apple doesn't officially support this route. That means that with every transition
+ Apple makes (64bit, bitcode etc.) hurdles occur. This isn't some theoretical issue but something that has created
  serious stumbling blocks to such projects.
- 
+
  ParparVM had a seamless migration to iOS 9 (no code changes!) and had a relatively easy 64 bit transition!
  By comparison RoboVM's CEO [wrote this](https://groups.google.com/d/msg/robovm/OnE3moz3d-8/nba0ury5CwAJ) at the time:
 
-> "Our work to add full support for iOS 9 in time for its public release was one of the most daunting challenges we’ve faced in our existence" 
+> "Our work to add full support for iOS 9 in time for its public release was one of the most daunting challenges we’ve faced in our existence"
 
 To reiterate the point, ParparVM required no changes for this to work...
 
- - These VM's usually use the entire Android class libraries resulting in relatively large apps. They also take longer 
- to compile as a result. This can result in order of magnitude difference in size! 
- The problem is that in iOS we need to package at least 2 platforms (e.g. 32bit and 64bit or bitcode) and once an app is submitted to Apple the size increases significantly. A Codename One app can be 5mb during development and 10-13mb after submission. These tools often feature 100mb+ app sizes. 
- The problem with that is that Apple places some restrictions (such as OTA update policies) on larger apps. 
- 
+ - These VM's usually use the entire Android class libraries resulting in relatively large apps. They also take longer
+ to compile as a result. This can result in order of magnitude difference in size!
+ The problem is that in iOS we need to package at least 2 platforms (e.g. 32bit and 64bit or bitcode) and once an app is submitted to Apple the size increases significantly. A Codename One app can be 5mb during development and 10-13mb after submission. These tools often feature 100mb+ app sizes.
+ The problem with that is that Apple places some restrictions (such as OTA update policies) on larger apps.
+
  - Xcode's tools can't be used to their full extent with such tools, with ParparVM you can just use Xcodes amazing
  profiler and related tools out of the box since all the code is C code
- 
- - Hacking these tools requires some deep VM/ASM/LLVM knowledge. ParparVM is trivial by comparison and requires a bit 
- of Java bytecode knowledege and some C. 
+
+ - Hacking these tools requires some deep VM/ASM/LLVM knowledge. ParparVM is trivial by comparison and requires a bit
+ of Java bytecode knowledege and some C.
 
 
 Besides these advantages ParparVM also embeds the a concurrent GC logic directly into the code, this is very similar to
-ARC in some aspects. 
+ARC in some aspects.
 
 ## Performance
 
@@ -66,7 +73,7 @@ ParparVM doesn't support JNI and just invokes C code directly when needed which 
 
 ## Java Level Support
 
-We aimed the VM at Java 5 support and overlay the Java 8 support with retrolambda, it should work for some Java 8 syntax out of the box simply because of ASM's ability to parse newer class files. 
+We aimed the VM at Java 5 support and overlay the Java 8 support with retrolambda, it should work for some Java 8 syntax out of the box simply because of ASM's ability to parse newer class files.
 
 The API is relatively limited in scope to keep the size low, we occasionally add additional API's ideally with very concise implementations to avoid bringing over the full JDK. Check out [this post](https://www.codenameone.com/blog/why-we-dont-support-the-full-java-api.html) explaining why we don't think supporting the entire JDK makes sense.
 

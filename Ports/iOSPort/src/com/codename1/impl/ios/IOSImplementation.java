@@ -5743,6 +5743,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         protected void initComponent() {
+            super.initComponent();
             if(nativePeer != null && nativePeer[0] != 0) {
                 nativeInstance.peerInitialized(nativePeer[0], getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
             }
@@ -5753,6 +5754,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 setPeerImage(generatePeerImage());
                 nativeInstance.peerDeinitialized(nativePeer[0]);
             }
+            super.deinitialize();
         }
         
         protected void setLightweightMode(boolean l) {

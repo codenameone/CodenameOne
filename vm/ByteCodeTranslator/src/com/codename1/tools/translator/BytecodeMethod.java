@@ -742,7 +742,9 @@ public class BytecodeMethod {
             b.append(cls);
             b.append("(threadStateData);\n    ");
         }
-        b.append("if(__cn1ThisObject == JAVA_NULL) THROW_NULL_POINTER_EXCEPTION();\n    ");
+        if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+            b.append("\n    if(__cn1ThisObject == JAVA_NULL) THROW_NULL_POINTER_EXCEPTION();\n    ");
+        } 
         if(!returnType.isVoid()) {
             b.append("return (*(functionPtr_");
         } else {

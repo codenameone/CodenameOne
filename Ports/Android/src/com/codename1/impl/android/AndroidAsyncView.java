@@ -625,16 +625,21 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                         }
                     }
                 });
+
             }
             pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
-                    drawChild(underlying.canvas, v, getDrawingTime());
+                    if (v.getParent() != null) {
+                        drawChild(underlying.canvas, v, getDrawingTime());
+                    }
                 }
+
                 public String toString() {
                     return "drawView(PeerComponent)";
                 }
             });
+
         }
 
         @Override

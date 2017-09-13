@@ -61,6 +61,21 @@ public class BrowserComponent extends Container {
     private boolean pinchToZoom = true;
     private boolean nativeScrolling = true;
     
+    /**
+     * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
+     */
+    public static final String onStart = "onStart";
+
+    /**
+     * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
+     */
+    public static final String onLoad = "onLoad";
+
+    /**
+     * String constant for web event listener {@link #addWebEventListener(java.lang.String, com.codename1.ui.events.ActionListener)}
+     */
+    public static final String onError = "onError";
+    
     private BrowserNavigationCallback browserNavigationCallback = new BrowserNavigationCallback(){
         public boolean shouldNavigate(String url) {
             return true;

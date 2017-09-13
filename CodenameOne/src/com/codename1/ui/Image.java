@@ -1162,6 +1162,6 @@ public class Image {
      * @return true if a drawImage call is a required
      */
     public boolean requiresDrawImage() {
-        return false;
+        return getImage() == null;
     }
 }

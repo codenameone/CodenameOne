@@ -201,11 +201,23 @@ public class ByteCodeTranslator {
 
             File cn1Globals = new File(srcRoot, "cn1_globals.h");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
+            if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+                replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
+            }
             File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
             File nativeMethods = new File(srcRoot, "nativeMethods.m");
             copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
 
+            if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
+                File malloc = new File(srcRoot, "malloc.c");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
+                File rpmalloc = new File(srcRoot, "rpmalloc.c");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
+                File rpmalloch = new File(srcRoot, "rpmalloc.h");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+            }
+            
             Parser.writeOutput(srcRoot);
             
             File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");

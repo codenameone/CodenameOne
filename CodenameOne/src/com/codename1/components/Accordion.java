@@ -33,6 +33,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
 
 /**
  * <p>The {@code Accordion} ui pattern is a vertically stacked list of items. 
@@ -63,18 +64,17 @@ import com.codename1.ui.plaf.UIManager;
 public class Accordion extends Container {
 
     private Image closeIcon;
-
     private Image openIcon;
-
     private boolean autoClose = true;
+    private final EventDispatcher listeners = new EventDispatcher();
     
     /**
      * Empty Constructor
      */ 
     public Accordion() {
         super.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-        closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("Label"));
-        openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("Label"));
+        closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("AccordionArrow"));
         setScrollableY(true);
     }
 
@@ -129,7 +129,6 @@ public class Accordion extends Container {
         add(new AccordionContent(header, body));
     }
 
-
     /**
      * Returns the body component of the currently expanded accordion element or null if none is expanded
      * @return a component
@@ -143,7 +142,6 @@ public class Accordion extends Container {
         }
         return null;
     }
-
 
     /**
      * Expands the accordion with the given "body" 
@@ -195,6 +193,40 @@ public class Accordion extends Container {
     }
 
     /**
+     * Sets the closed icon using material image
+     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
+     */ 
+    public void setCloseIcon(char closeIcon) {
+        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+    }
+
+    /**
+     * Sets the open icon using material image
+     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
+     */ 
+    public void setOpenIcon(char openIcon) {
+        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+    }
+    
+    /**
+     * Sets the closed icon using material image with a custom uiid
+     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
+     * @param uiid to custom icon from res file
+     */ 
+    public void setCloseIcon(char closeIcon, String uiid) {
+        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiid));
+    }
+
+    /**
+     * Sets the open icon using material image with a custom uiid
+     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
+     * @param uiid to custom icon from res file
+     */ 
+    public void setOpenIcon(char openIcon, String uiid) {
+        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiid));
+    }
+    
+    /**
      * Sets the auto close flag, if this flag is true clicking on an item to open 
      * an item will automatically close the previous opened item.
      * 
@@ -240,6 +272,7 @@ public class Accordion extends Container {
                         }
                     }
                     Accordion.this.animateLayout(250);
+                    fireEvent(evt);
                 }
             });
             top.add(BorderLayout.EAST, arrow);
@@ -264,6 +297,25 @@ public class Accordion extends Container {
         }
 
 
+    }
+    
+    /**
+     * To listen item click in accordion component
+     * @param ActionListener to implement the method
+     */ 
+    public void addOnClickItemListener(ActionListener a) {
+        listeners.addListener(a);
+    }
+    /**
+     * To remove item click in accordion component
+     * @param ActionListener to implement the method
+     */ 
+    public void removeOnClickItemListener(ActionListener a) {
+        listeners.removeListener(a);
+    }
+    
+    private void fireEvent(ActionEvent ev) {
+        listeners.fireActionEvent(ev);
     }
 
 }

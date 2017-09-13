@@ -82,20 +82,16 @@ public class BorderLayout extends Layout {
      * Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
      */
     public static final int CENTER_BEHAVIOR_SCALE = 0;
-
     /**
      * Defines the behavior of the component placed in the center position of the layout, places the component in the center of
      * the space available to the center component.
      */
     public static final int CENTER_BEHAVIOR_CENTER = 1;
-
-
     /**
      * Defines the behavior of the component placed in the center position of the layout, places the component in the center of
      * the surrounding container
      */
     public static final int CENTER_BEHAVIOR_CENTER_ABSOLUTE = 2;
-
     /**
      * Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
      * The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
@@ -103,7 +99,6 @@ public class BorderLayout extends Layout {
      * @deprecated Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
      */
     public static final int CENTER_BEHAVIOR_TOTAL_BELLOW = 3;
-
     /**
      * The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
      * a layered effect
@@ -163,7 +158,31 @@ public class BorderLayout extends Layout {
     public BorderLayout(int behavior) {
         setCenterBehavior(behavior);
     }
-
+ 
+    /**
+     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER)}
+     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
+     */
+    public static BorderLayout center() {
+        return new BorderLayout(CENTER_BEHAVIOR_CENTER);
+    }
+    
+    /**
+     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE)}
+     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_CENTER_ABSOLUTE} constraint applied
+     */
+    public static BorderLayout absolute() {
+        return new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+    }
+    
+    /**
+     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW)}
+     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
+     */
+    public static BorderLayout totalBelow() {
+        return new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW);
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -656,6 +675,7 @@ public class BorderLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isOverlapSupported(){
         return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW || overlay != null;
     }
@@ -680,7 +700,7 @@ public class BorderLayout extends Layout {
      * {@inheritDoc}
      */
     public boolean isConstraintTracking() {
-        return false;
+        return true;
     }    
     
     /**
@@ -748,6 +768,54 @@ public class BorderLayout extends Layout {
     }
     
     /**
+     * Convenience method that creates a border layout center container and places the given component in the center
+     * east and west respectively with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
+     * @param center the center component
+     * @param east component or null to ignore
+     * @param west component or null to ignore
+     * @return the created component
+     */
+    public static Container centerCenterEastWest(Component center, Component east, Component west) {
+        Container c;
+        if(center != null) {
+            c = centerCenter(center);
+        } else {
+            c = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER));
+        }
+        if(east != null) {
+            c.add(BorderLayout.EAST, east);
+        }
+        if(west != null) {
+            c.add(BorderLayout.WEST, west);
+        }
+        return c;
+    }
+    
+    /**
+     * Convenience method that creates a border layout center container and places the given component in the center
+     * east and west respectively with the {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
+     * @param center the center component
+     * @param east component or null to ignore
+     * @param west component or null to ignore
+     * @return the created component
+     */
+    public static Container centerTotalBelowEastWest(Component center, Component east, Component west) {
+        Container c;
+        if(center != null) {
+            c = centerTotalBelow(center);
+        } else {
+            c = new Container(new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW));
+        }
+        if(east != null) {
+            c.add(BorderLayout.EAST, east);
+        }
+        if(west != null) {
+            c.add(BorderLayout.WEST, west);
+        }
+        return c;
+    }
+    
+    /**
      * Convenience method that creates a border layout container and places the given component in the center
      * with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
      * @param center the center component
@@ -765,6 +833,16 @@ public class BorderLayout extends Layout {
      */
     public static Container centerAbsolute(Component center) {
         return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE), center, BorderLayout.CENTER);
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerTotalBelow(Component center) {
+        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW), center, BorderLayout.CENTER);
     }
 
     /**

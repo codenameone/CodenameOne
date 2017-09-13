@@ -36,6 +36,7 @@ import java.util.Hashtable;
 public class Accessor {
     public static final int TYPE_EMPTY = 0;
     public static final int TYPE_LINE = 1;
+    public static final int TYPE_UNDERLINE = 21;
     public static final int TYPE_ROUNDED = 2;
     public static final int TYPE_ROUNDED_PRESSED = 3;
     public static final int TYPE_ETCHED_LOWERED = 4;
@@ -78,6 +79,8 @@ public class Accessor {
                 return "Empty";
             case TYPE_LINE:
                 return "Line";
+            case TYPE_UNDERLINE:
+                return "Underline";
             case TYPE_ROUNDED:
             case TYPE_ROUNDED_PRESSED:
                 return "Rounded";
@@ -125,8 +128,12 @@ public class Accessor {
         return b.colorD;
     }
     
-    public static int getThickness(Border b) {
+    public static float getThickness(Border b) {
         return b.thickness;
+    }
+
+    public static boolean isMillimeters(Border b) {
+        return b.millimeters;
     }
 
     public static int getArcWidth(Border b) {

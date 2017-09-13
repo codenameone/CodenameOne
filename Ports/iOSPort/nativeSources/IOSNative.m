@@ -4162,6 +4162,13 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_sqlDbCreateAndOpen___java_lang_String
     
     NSString* foofile = [documentsPath stringByAppendingPathComponent:nsSrc];
     
+    int retCode = sqlite3_config(SQLITE_CONFIG_SERIALIZED);
+    if (retCode != SQLITE_OK) {
+        sqlite3_shutdown();
+        sqlite3_config(SQLITE_CONFIG_SERIALIZED);
+        sqlite3_initialize();
+    }
+
     sqlite3 *db;
     int rc = sqlite3_open([foofile UTF8String], &db);
     

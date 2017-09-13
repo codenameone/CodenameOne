@@ -27,6 +27,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -50,7 +51,7 @@ import com.codename1.ui.layouts.LayeredLayout;
  * @author Shai Almog
  */
 public class FloatingHint extends Container {
-    private final TextField tf;
+    private final TextArea tf;
     private final Button hintButton;
     private final Label hintLabel;
     
@@ -58,7 +59,7 @@ public class FloatingHint extends Container {
      * Wraps a text field in a floating hint
      * @param tf the text field
      */
-    public FloatingHint(final TextField tf) {
+    public FloatingHint(final TextArea tf) {
         super(new LayeredLayout());
         this.tf = tf;
         Container content = new Container(new BorderLayout());

@@ -191,7 +191,7 @@ class TDivision {
             } else {
                 /*
                  * make the dividend positive shifting it right by 1 bit then
-                 * get the quotient an remainder and correct them properly
+                 * get the quotient a remainder and correct them properly
                  */
                 long aPos = temp >>> 1;
                 long bPos = divisor >>> 1;
@@ -279,7 +279,7 @@ class TDivision {
         } else {
             /*
              * Make the dividend positive shifting it right by 1 bit then get
-             * the quotient an remainder and correct them properly
+             * the quotient a remainder and correct them properly
              */
             long aPos = a >>> 1;
             long bPos = b >>> 1;

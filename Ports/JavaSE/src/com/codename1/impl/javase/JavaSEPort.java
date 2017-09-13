@@ -97,6 +97,7 @@ import com.codename1.l10n.L10NManager;
 import com.codename1.location.Location;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
 import com.codename1.payment.Receipt;
@@ -179,7 +180,9 @@ public class JavaSEPort extends CodenameOneImplementation {
     private InputEvent lastInputEvent;
     static double retinaScale = 1.0;
     
-    private static boolean isRetina() {
+    static JMenuItem pause;
+    
+    public static boolean isRetina() {
         //if (true) return false;
         boolean isRetina = false;
         GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
@@ -197,6 +200,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             //e.printStackTrace();
         }
         return isRetina;
+    }
+    
+    public static double getRetinaScale() {
+        return retinaScale;
     }
     
     /**
@@ -397,6 +404,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     private static String fontFaceProportional = "SansSerif";
     private static String fontFaceMonospace = "Monospaced";
+    private static boolean alwaysOnTop = false;
     private static boolean useNativeInput = true;
     private static boolean simulateAndroidKeyboard = false;
     private static boolean scrollableSkin = true;
@@ -558,6 +566,88 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
     }
+
+    private static long getRepeatPeriod(int repeat) {
+        switch (repeat) {
+            case LocalNotification.REPEAT_DAY:
+                return 24 * 60 * 60 * 1000L;
+            case LocalNotification.REPEAT_HOUR:
+                return 60 * 60 * 1000L;
+            case LocalNotification.REPEAT_MINUTE:
+                return 60 * 1000L;
+            case LocalNotification.REPEAT_WEEK:
+                return 7 * 24 * 60 * 60 * 1000L;
+            default:
+                return 0L;
+        }
+    }
+    
+    private Map<String,TimerTask> localNotifications = new HashMap<String,TimerTask>();
+    private java.util.Timer localNotificationsTimer;
+    
+    @Override
+    public void scheduleLocalNotification(final LocalNotification notif, long firstTime, int repeat) {
+        if (isSimulator()) {
+            if (localNotificationsTimer == null) {
+                localNotificationsTimer = new java.util.Timer();
+            }
+            TimerTask task = new TimerTask() {
+                public void run() {
+                    if (!SystemTray.isSupported()) {
+                        System.out.println("Local notification not supported on this OS!!!");
+                        return;
+                    }
+                    if (isMinimized()) {
+                        SystemTray sysTray = SystemTray.getSystemTray();
+                        TrayIcon tray = new TrayIcon(Toolkit.getDefaultToolkit().getImage("/CodenameOne_Small.png"));
+                        tray.setImageAutoSize(true);
+                        tray.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                Display.getInstance().callSerially(new Runnable() {
+                                    public void run() {
+                                        Executor.startApp();
+                                        minimized = false;
+                                    }
+                                });
+                                canvas.setEnabled(true);
+                                pause.setText("Pause App");
+                            }
+                        });
+                        try {
+                            sysTray.add(tray);
+                            tray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(), TrayIcon.MessageType.INFO);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            };
+            if (localNotifications.containsKey(notif.getId())) {
+                TimerTask old = localNotifications.get(notif.getId());
+                old.cancel();
+            }
+            localNotifications.put(notif.getId(), task);
+            if (repeat == LocalNotification.REPEAT_NONE) {
+                localNotificationsTimer.schedule(task, new Date(firstTime));
+            } else {
+                localNotificationsTimer.schedule(task, new Date(firstTime), getRepeatPeriod(repeat));
+            }
+        }
+    }
+
+    @Override
+    public void cancelLocalNotification(String notificationId) {
+        if (isSimulator()) {
+            if (localNotifications.containsKey(notificationId)) {
+                TimerTask n = localNotifications.get(notificationId);
+                n.cancel();
+                localNotifications.remove(notificationId);
+            }
+        }
+    }
+    
+    
     
     
     public static void blockMonitors() {
@@ -1197,7 +1287,10 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         public void keyTyped(KeyEvent e) {
         }
-
+        // We only know if meta/ctrl/alt etc is down when the key is pressed, but we 
+        // are taking action when the key is released... so we need to track whether the
+        // control key was down while a key was pressed.
+        private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
         public void keyPressed(KeyEvent e) {
             if (!isEnabled()) {
                 return;
@@ -1205,6 +1298,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastInputEvent = e;
             // block key combos that might generate unreadable events
             if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+                ignorePressedKeys.add(e.getKeyCode());
                 return;
             }
             int code = getCode(e);
@@ -1215,12 +1309,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void keyReleased(KeyEvent e) {
+            boolean ignore = ignorePressedKeys.contains(e.getKeyCode());
+            if (ignore) ignorePressedKeys.remove(e.getKeyCode());
             if (!isEnabled()) {
                 return;
             }
             lastInputEvent = e;
             // block key combos that might generate unreadable events
-            if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+            if (ignore || e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
                 return;
             }
             int code = getCode(e);
@@ -2617,7 +2713,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Motion.setSlowMotion(slowMotionFlag.isSelected());
                 }
             });
-            final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 permissions", android6PermissionsFlag);
+            final JCheckBoxMenuItem permFlag = new JCheckBoxMenuItem("Android 6 Permissions", android6PermissionsFlag);
             simulatorMenu.add(permFlag);
             permFlag.addActionListener(new ActionListener() {
 
@@ -2629,7 +2725,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
-            final JMenuItem pause = new JMenuItem("Pause App");
+            pause = new JMenuItem("Pause App");
             simulatorMenu.add(pause);
             pause.addActionListener(new ActionListener() {
 
@@ -2657,6 +2753,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
+            final JCheckBoxMenuItem alwaysOnTopFlag = new JCheckBoxMenuItem("Always on Top", alwaysOnTop);
+            simulatorMenu.add(alwaysOnTopFlag);
+            
             simulatorMenu.addSeparator();
 
 
@@ -2898,6 +2997,16 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             
+            alwaysOnTopFlag.addItemListener(new ItemListener() {
+
+                public void itemStateChanged(ItemEvent ie) {
+                    alwaysOnTop = !alwaysOnTop;
+                    Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
+                    pref.putBoolean("AlwaysOnTop", alwaysOnTop);
+                    window.setAlwaysOnTop(alwaysOnTop);
+                }
+            });
+            
             simulateAndroidVKBFlag.addItemListener(new ItemListener() {
 
                 public void itemStateChanged(ItemEvent ie) {
@@ -2960,6 +3069,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (skinNames.length() < DEFAULT_SKINS.length()) {
                 skinNames = DEFAULT_SKINS;
             }
+            ButtonGroup skinGroup = new ButtonGroup();
             StringTokenizer tkn = new StringTokenizer(skinNames, ";");
             while (tkn.hasMoreTokens()) {
                 final String current = tkn.nextToken();
@@ -2982,7 +3092,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                         continue;
                     }
                 }
-                JMenuItem i = new JMenuItem(name);
+                String d = System.getProperty("dskin");
+                JRadioButtonMenuItem i = new JRadioButtonMenuItem(name, name.equals(pref.get("skin", d)));
                 i.addActionListener(new ActionListener() {
 
                     public void actionPerformed(ActionEvent ae) {
@@ -3008,6 +3119,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
                     }
                 });
+                skinGroup.add(i);
                 skinMenu.add(i);
             }
         }
@@ -3108,6 +3220,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         }
 
                         if (data.size() == 0) {
+                            pleaseWait.setVisible(false);
                             JOptionPane.showMessageDialog(frm, "No New Skins to Install");
                             return;
                         }
@@ -3611,6 +3724,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
             
+            alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
+            window.setAlwaysOnTop(alwaysOnTop);
+            
             String reset = System.getProperty("resetSkins");
             if(reset != null && reset.equals("true")){
                 System.setProperty("resetSkins", "");
@@ -3652,6 +3768,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                 window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
             }
+            
             window.setVisible(true);
         }
         if (useNativeInput) {
@@ -4922,17 +5039,31 @@ public class JavaSEPort extends CodenameOneImplementation {
         drawingNativePeer = true;
     
         try {
-            synchronized(cmp) {
-                if (cmp.getClientProperty("__buffer") != null) {
-                    BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
-                    Graphics2D nativeGraphics = getGraphics(graphics);
-                    nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
+            
+            // This should only be run on EDT to avoid deadlocks
+            if (Display.getInstance().isEdt()) {
+                synchronized(cmp) {
+                    drawNativePeerImpl(graphics, cmp, jcmp);
                 }
+            } else if (!EventQueue.isDispatchThread()){ // I can just imagine bad things if we're already inside an EventQueue.invokeAndWait()
+                Display.getInstance().callSeriallyAndWait(new Runnable() {
+                    public void run() {
+                        drawNativePeer(graphics, cmp, jcmp);
+                    }
+                });
             }
         } finally {
             drawingNativePeer = false;
         }
         
+    }
+    
+    private void drawNativePeerImpl(Object graphics, PeerComponent cmp, JComponent jcmp) {
+        if (cmp.getClientProperty("__buffer") != null) {
+            BufferedImage img = (BufferedImage)cmp.getClientProperty("__buffer");
+            Graphics2D nativeGraphics = getGraphics(graphics);
+            nativeGraphics.drawImage(img, cmp.getAbsoluteX(), cmp.getAbsoluteY(), jcmp);
+        }
     }
 
     /**
@@ -6316,6 +6447,16 @@ public class JavaSEPort extends CodenameOneImplementation {
     class CN1JFXPanel extends javafx.embed.swing.JFXPanel {
 
         @Override
+        public void revalidate() {
+            // We need to override this with an empty implementation to workaround
+            // Deadlock bug  http://bugs.java.com/view_bug.do?bug_id=8058870
+            // If we allow the default implementation, then it will periodically deadlock
+            // when displaying a browser component
+        }
+
+        
+        
+        @Override
         protected void processMouseEvent(MouseEvent e) {
             //super.processMouseEvent(e); //To change body of generated methods, choose Tools | Templates.
             if (!sendToCn1(e)) {
@@ -6745,8 +6886,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D g2d = getGraphics(graphics);
         if (a) {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                   RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         } else {
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                   RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         }
     }
 
@@ -7471,6 +7616,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             return StubLocationManager.getLocationManager();
         }
         return new LocationManager() {
+            
+            
+            
             @Override
             public Location getCurrentLocation() throws IOException {
                 return new Location();
@@ -7488,6 +7636,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             @Override
             protected void clearListener() {
             }
+
+            
+            
         };
     }
 
@@ -8075,17 +8226,35 @@ public class JavaSEPort extends CodenameOneImplementation {
             // drawNativePeer will also synchronize on this
             // This prevents simulataneous reads and writes to/from the
             // buffered image.
-            synchronized(VideoComponent.this) {
-                                
-                final BufferedImage buf = getBuffer();
-                Graphics2D g2d = buf.createGraphics();
-                AffineTransform t = g2d.getTransform();
-                double tx = t.getTranslateX();
-                double ty = t.getTranslateY();
-                vid.paint(g2d);
-                g2d.dispose();
-                VideoComponent.this.putClientProperty("__buffer", buf);
+            if (EventQueue.isDispatchThread()) {
+                // Only run this on the AWT event dispatch thread
+                // to avoid deadlocks
+                synchronized(VideoComponent.this) {
+                    paintOnBufferImpl();
+                }
+            } else if (!Display.getInstance().isEdt()){
+                // I can only imagine bad things 
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
             }
+        }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            AffineTransform t = g2d.getTransform();
+            double tx = t.getTranslateX();
+            double ty = t.getTranslateY();
+            vid.paint(g2d);
+            g2d.dispose();
+            VideoComponent.this.putClientProperty("__buffer", buf);
         }
         
         public VideoComponent(JFrame frm, final javafx.embed.swing.JFXPanel vid, javafx.scene.media.MediaPlayer player) {
@@ -8094,6 +8263,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    
+                    
                     
                     cnt = new JPanel() {
                         
@@ -8139,7 +8310,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             Group root = new Group();
             
             v = new MediaView(player);
-            
+            final Runnable oldOnReady = player.getOnPlaying();
+            player.setOnPlaying(new Runnable() {
+                public void run() {
+                    if (oldOnReady != null) oldOnReady.run();
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            if (VideoComponent.this.getParent() != null) {
+                                VideoComponent.this.getParent().revalidate();
+                            }
+                        }
+                    });
+                }
+            });
             
             root.getChildren().add(v);
             vid.setScene(new Scene(root));
@@ -9589,17 +9772,34 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (cnt.getWidth() == 0 || cnt.getHeight() == 0) {
                 return;
             }
-            synchronized(Peer.this) {
-                final BufferedImage buf = getBuffer();
-                Graphics2D g2d = buf.createGraphics();
-                g2d.scale(retinaScale / zoomLevel, retinaScale / zoomLevel);
+            if (EventQueue.isDispatchThread()) {
+                synchronized(Peer.this) {
+                    paintOnBufferImpl();
 
-                cmp.paintAll(g2d);
-                g2d.dispose();
-                Peer.this.putClientProperty("__buffer", buf);
-
+                }
+            } else if (!Display.getInstance().isEdt()){
+                try {
+                    EventQueue.invokeAndWait(new Runnable() {
+                        public void run() {
+                            paintOnBuffer();
+                        }
+                    });
+                } catch (Throwable t ) {
+                    t.printStackTrace();
+                }
+                
             }
             
+        }
+        
+        private void paintOnBufferImpl() {
+            final BufferedImage buf = getBuffer();
+            Graphics2D g2d = buf.createGraphics();
+            g2d.scale(retinaScale / zoomLevel, retinaScale / zoomLevel);
+
+            cmp.paintAll(g2d);
+            g2d.dispose();
+            Peer.this.putClientProperty("__buffer", buf);
         }
         
         // HOLY LORD!! Because we're adding the peer directly to the JFrame

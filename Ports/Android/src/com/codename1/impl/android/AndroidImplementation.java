@@ -3047,6 +3047,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         protected void setLightweightMode(boolean l) {
             if(superPeerMode) {
+                if (l != lightweightMode) {
+                    lightweightMode = l;
+                    if (lightweightMode) {
+                        Image img = generatePeerImage();
+                        if (img != null) {
+                            peerImage = img;
+                        }
+                    }
+
+                }
                 return;
             }
             doSetVisibility(!l);
@@ -3105,12 +3115,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
                 deinit();
             }else{
-                if (peerImage == null) {
-                    peerImage = generatePeerImage();
+                Image img = generatePeerImage();
+                if (img != null) {
+                    peerImage = img;
                 }
+
                 if(myView instanceof AndroidAsyncView){
                     ((AndroidAsyncView)myView).removePeerView(v);
                 }
+                super.deinitialize();
             }
         }
 
@@ -3124,23 +3137,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             final boolean [] removed = new boolean[1];
             getActivity().runOnUiThread(new Runnable() {
                 public void run() {
-                    if (layoutWrapper != null && AndroidImplementation.this.relativeLayout != null) {
-                        AndroidImplementation.this.relativeLayout.removeView(layoutWrapper);
-                        AndroidImplementation.this.relativeLayout.requestLayout();
-                        layoutWrapper = null;
-                    }
-                    removed[0] = true;
-                }
-            });
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                public void run() {
-                    while (!removed[0]) {
-                        try {
-                            Thread.sleep(5);
-                        } catch(InterruptedException er) {}
+                    try {
+                        if (layoutWrapper != null && AndroidImplementation.this.relativeLayout != null) {
+                            AndroidImplementation.this.relativeLayout.removeView(layoutWrapper);
+                            AndroidImplementation.this.relativeLayout.requestLayout();
+                            layoutWrapper = null;
+                        }
+                    } finally {
+                        removed[0] = true;
                     }
                 }
             });
+            while (!removed[0]) {
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    public void run() {
+                        if (!removed[0]) {
+                            try {
+                                Thread.sleep(5);
+                            } catch(InterruptedException er) {}
+                        }
+                    }
+                });
+            }
         }
         
         protected void initComponent() {
@@ -3290,9 +3308,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     g.drawImage(peerImage, getX(), getY());
                     return;
                 }
-                peerImage = null;
-
-                ((AndroidGraphics)nativeGraphics).drawView(v, lp);
+                ((AndroidGraphics) nativeGraphics).drawView(v, lp);
+                if (lightweightMode && peerImage != null) {
+                    g.drawImage(peerImage, getX(), getY(), getWidth(), getHeight());
+                }
             } else {
                 super.paint(g);
             }
@@ -3591,83 +3610,93 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return null;
         }
         final AndroidImplementation.AndroidBrowserComponent[] bc = new AndroidImplementation.AndroidBrowserComponent[1];
-
+        final Throwable[] error = new Throwable[1];
         final Object lock = new Object();
 
         getActivity().runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                
                 synchronized (lock) {
-                    WebView wv = new WebView(getActivity()) {
+                    try {
+                        WebView wv = new WebView(getActivity()) {
 
-                        public boolean onKeyDown(int keyCode, KeyEvent event) {
-                            switch (keyCode) {
-                                case KeyEvent.KEYCODE_BACK:
-                                    Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                    return true;
-                                case KeyEvent.KEYCODE_MENU:
-                                    //if the native commands are used don't handle the keycode
-                                    if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                            public boolean onKeyDown(int keyCode, KeyEvent event) {
+                                switch (keyCode) {
+                                    case KeyEvent.KEYCODE_BACK:
+                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_BACK);
                                         return true;
-                                    }
+                                    case KeyEvent.KEYCODE_MENU:
+                                        //if the native commands are used don't handle the keycode
+                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                            return true;
+                                        }
+                                }
+                                return super.onKeyDown(keyCode, event);
                             }
-                            return super.onKeyDown(keyCode, event);
-                        }
 
-                        public boolean onKeyUp(int keyCode, KeyEvent event) {
-                            switch (keyCode) {
-                                case KeyEvent.KEYCODE_BACK:
-                                    Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
-                                    return true;
-                                case KeyEvent.KEYCODE_MENU:
-                                    //if the native commands are used don't handle the keycode
-                                    if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
-                                        Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                            public boolean onKeyUp(int keyCode, KeyEvent event) {
+                                switch (keyCode) {
+                                    case KeyEvent.KEYCODE_BACK:
+                                        Display.getInstance().keyReleased(AndroidImplementation.DROID_IMPL_KEY_BACK);
                                         return true;
-                                    }
+                                    case KeyEvent.KEYCODE_MENU:
+                                        //if the native commands are used don't handle the keycode
+                                        if (Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_NATIVE) {
+                                            Display.getInstance().keyPressed(AndroidImplementation.DROID_IMPL_KEY_MENU);
+                                            return true;
+                                        }
+                                }
+                                return super.onKeyUp(keyCode, event);
                             }
-                            return super.onKeyUp(keyCode, event);
-                        }
-                    };
-                    wv.setOnTouchListener(new View.OnTouchListener() {
+                        };
+                        wv.setOnTouchListener(new View.OnTouchListener() {
 
-                        @Override
-                        public boolean onTouch(View v, MotionEvent event) {
-                            switch (event.getAction()) {
-                                case MotionEvent.ACTION_DOWN:
-                                case MotionEvent.ACTION_UP:
-                                    if (!v.hasFocus()) {
-                                        v.requestFocus();
-                                    }
-                                    break;
+                            @Override
+                            public boolean onTouch(View v, MotionEvent event) {
+                                switch (event.getAction()) {
+                                    case MotionEvent.ACTION_DOWN:
+                                    case MotionEvent.ACTION_UP:
+                                        if (!v.hasFocus()) {
+                                            v.requestFocus();
+                                        }
+                                        break;
+                                }
+                                return false;
                             }
-                            return false;
-                        }
-                    });
-                    wv.getSettings().setDomStorageEnabled(true);
-                    wv.requestFocus(View.FOCUS_DOWN);
-                    wv.setFocusableInTouchMode(true);
-                    bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
-                    lock.notify();
-                }
-            }
-        });
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            public void run() {
-                synchronized (lock) {
-                    while (bc[0] == null) {
-                        try {
-                            lock.wait();
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
+                        });
+                        wv.getSettings().setDomStorageEnabled(true);
+                        wv.requestFocus(View.FOCUS_DOWN);
+                        wv.setFocusableInTouchMode(true);
+                        bc[0] = new AndroidImplementation.AndroidBrowserComponent(wv, getActivity(), parent);
+                        lock.notify();
+                    } catch (Throwable t) {
+                        error[0] = t;
+                        lock.notify();
                     }
                 }
             }
-
         });
+        while (bc[0] == null && error[0] == null) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    synchronized (lock) {
+                        if (bc[0] == null && error[0] == null) {
+                            try {
+                                lock.wait(20);
+                            } catch (InterruptedException ex) {
+                                ex.printStackTrace();
+                            }
+                        }
+                    }
+                }
 
+            });
+        }
+        if (error[0] != null) {
+            throw new RuntimeException(error[0]);
+        }
         return bc[0];
     }
 
@@ -3750,6 +3779,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
 
+    private int jsCallbackIndex=0;
+    
     /**
      * Executes javascript and returns a string result where appropriate.
      * @param browserPeer
@@ -3759,16 +3790,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public String browserExecuteAndReturnString(final PeerComponent browserPeer, final String javaScript) {
         final AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
-
+        jsCallbackIndex = (++jsCallbackIndex) % 1024;
+        int index = jsCallbackIndex;
+        
         // The jsCallback is a special java object exposed to javascript that we use
         // to return values from javascript to java.
         synchronized (bc.jsCallback){
             // Initialize the return value to null
-            bc.jsCallback.setReturnValue(null);
-
-            // Reset the callback so that it will fire the notify() when
-            // a value is set.
-            bc.jsCallback.reset();
+            while (!bc.jsCallback.isIndexAvailable(index)) {
+                index++;
+            }
+            jsCallbackIndex = index+1;
         }
 
         // We are placing the javascript inside eval() so we need to escape
@@ -3777,48 +3809,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         escaped = StringUtil.replaceAll(escaped, "'", "\\'");
 
         final String js = "javascript:(function(){"
-                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"=null;try{"
-                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME
+
+                + "try{"
+                +bc.jsCallback.jsInit()
+                +bc.jsCallback.jsCleanup()
+                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
                 + "=eval('"+escaped +"');} catch (e){console.log(e)};"
-                + AndroidBrowserComponentCallback.JS_VAR_NAME+".setReturnValue(''+"
-                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME
+                + AndroidBrowserComponentCallback.JS_VAR_NAME+".addReturnValue(" + index+", ''+"
+                
+                + AndroidBrowserComponentCallback.JS_RETURNVAL_VARNAME+"["+index+"]"
                 + ");})()";
 
         // Send the Javascript string via SetURL.
         // NOTE!! This is sent asynchronously so we will need to wait for
         // the result to come in.
         bc.setURL(js);
+        int maxTries = 500;
+        int tryCounter = 0;
         if(Display.getInstance().isEdt()) {
             // If we are on the EDT then we need to invokeAndBlock
             // so that we wait for the javascript result, but we don't
             // prevent the EDT from executing the rest of the pipeline.
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                public void run() {
-                    // Loop/wait until the callback value has been set.
-                    // The callback.setReturnValue() method, which will
-                    // be called from Javascript issues a notify() to
-                    // let us know it is done.
-                    while (!bc.jsCallback.isValueSet()) {
-                        synchronized(bc.jsCallback){
-                            try {
-                                bc.jsCallback.wait(200);
-                            } catch (InterruptedException ex) {}
+            
+            while (!bc.jsCallback.isValueSet(index) && tryCounter++ < maxTries) {
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    public void run() {
+                        // Loop/wait until the callback value has been set.
+                        // The callback.setReturnValue() method, which will
+                        // be called from Javascript issues a notify() to
+                        // let us know it is done.
+                        
+                        synchronized (bc.jsCallback) {
+                            Util.wait(bc.jsCallback, 20);
                         }
+                        
                     }
-                }
-            });
+                });
+            }
+            
         } else {
             // If we are not on the EDT, then it is safe to just loop and wait.
-            while (!bc.jsCallback.isValueSet()) {
+            while (!bc.jsCallback.isValueSet(index) && tryCounter++ < maxTries) {
                 synchronized(bc.jsCallback){
-                    try {
-                        bc.jsCallback.wait(200);
-                    } catch (InterruptedException ex) {
-                    }
+                    Util.wait(bc.jsCallback, 20);
                 }
             }
         }
-        return bc.jsCallback.getReturnValue();
+        if (bc.jsCallback.isValueSet(index)) {
+            String retval = bc.jsCallback.getReturnValue(index);
+            bc.jsCallback.remove(index);
+            return retval;
+        } else {
+            com.codename1.io.Log.e(new RuntimeException("Failed to execute javascript "+js+" after maximum wait time."));
+            return null;
+        }
     }
 
     
@@ -4258,47 +4302,58 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public String getTitle() {
             final String[] retVal = new String[1];
-            
+            final boolean[] complete = new boolean[1];
             act.runOnUiThread(new Runnable() {
                 public void run() {
-                    retVal[0] = web.getTitle();
-                }
-            });
-            
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                @Override
-                public void run() {
-                    while (retVal[0] == null) {
-                        try {
-                            Thread.sleep(200);
-                        } catch (InterruptedException ex) {
-                        }
+                    try {
+                
+                        retVal[0] = web.getTitle();
+                    } finally {
+                        complete[0] = true;
                     }
                 }
             });
+            while (!complete[0]) {
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!complete[0]) {
+                            try {
+                                Thread.sleep(20);
+                            } catch (InterruptedException ex) {
+                            }
+                        }
+                    }
+                });
+            }
             return retVal[0];
         }
 
         public String getURL() {
             final String[] retVal = new String[1];
-            
+            final boolean[] complete = new boolean[1];
             act.runOnUiThread(new Runnable() {
                 public void run() {
-                    retVal[0] = web.getUrl();
-                }
-            });
-            
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                @Override
-                public void run() {
-                    while (retVal[0] == null) {
-                        try {
-                            Thread.sleep(200);
-                        } catch (InterruptedException ex) {
-                        }
+                    try {
+                        retVal[0] = web.getUrl();
+                    } finally {
+                        complete[0] = true;
                     }
                 }
             });
+            while (!complete[0]) {
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!complete[0]) {
+                            try {
+                                Thread.sleep(20);
+                            } catch (InterruptedException ex) {
+                            }
+                        }
+                    }
+                });
+            }
             return retVal[0];
         }
 
@@ -4320,47 +4375,60 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         public boolean hasBack() {
             final Boolean [] retVal = new Boolean[1];
+            final boolean[] complete = new boolean[1];
             
             act.runOnUiThread(new Runnable() {
                 public void run() {
-                    retVal[0] = web.canGoBack();
-                }
-            });
-            
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                @Override
-                public void run() {
-                    while (retVal[0] == null) {
-                        try {
-                            Thread.sleep(200);
-                        } catch (InterruptedException ex) {
-                        }
+                    try {
+                        retVal[0] = web.canGoBack();
+                    } finally {
+                        complete[0] = true;
                     }
                 }
             });
+            while (!complete[0]) {
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!complete[0]) {
+                            try {
+                                Thread.sleep(20);
+                            } catch (InterruptedException ex) {
+                            }
+                        }
+                    }
+                });
+            }
             return retVal[0].booleanValue();
         }
 
         public boolean hasForward() {
             final Boolean [] retVal = new Boolean[1];
+            final boolean[] complete = new boolean[1];
             
             act.runOnUiThread(new Runnable() {
                 public void run() {
-                    retVal[0] = web.canGoForward();
-                }
-            });
-            
-            Display.getInstance().invokeAndBlock(new Runnable() {
-                @Override
-                public void run() {
-                    while (retVal[0] == null) {
-                        try {
-                            Thread.sleep(200);
-                        } catch (InterruptedException ex) {
-                        }
+                    try {
+                        retVal[0] = web.canGoForward();
+                    } finally {
+                        complete[0] = true;
                     }
                 }
             });
+            
+            while (!complete[0]) {
+                Display.getInstance().invokeAndBlock(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!complete[0]) {
+                            try {
+                                Thread.sleep(20);
+                            } catch (InterruptedException ex) {
+                            }
+                        }
+                    }
+                });
+            }
             return retVal[0].booleanValue();
         }
 
@@ -5686,13 +5754,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         
         @Override
-        public void setWidth(int width) {
+        public void setWidth(final int width) {
             super.setWidth(width);
+            final int currH = getHeight();
             if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
-                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+                        float nh = nativeVideo.getHeight();
+                        float nw = nativeVideo.getWidth();
+                        float w = width;
+                        float h = currH;
+                        if (nh != 0 && nw != 0) {
+                            h = width * nh / nw;
+                            if (h > getHeight()) {
+                                h = getHeight();
+                                w = h * nw / nh;
+                            }
+                            if (w > getWidth()) {
+                                w = getWidth();
+                                h = w * nh / nw;
+                            }
+                        }
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int)w, (int)h);
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);
@@ -5704,13 +5788,29 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         @Override
-        public void setHeight(int height) {
+        public void setHeight(final int height) {
             super.setHeight(height);
+            final int currW = getWidth();
             if(nativeVideo != null){
                 activity.runOnUiThread(new Runnable() {
 
                     public void run() {
-                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams(getWidth(), getHeight());
+                        float nh = nativeVideo.getHeight();
+                        float nw = nativeVideo.getWidth();
+                        float h = height;
+                        float w = currW;
+                        if (nh != 0 && nw != 0) {
+                            w = h * nw / nh;
+                            if (h > getHeight()) {
+                                h = getHeight();
+                                w = h * nw / nh;
+                            }
+                            if (w > getWidth()) {
+                                w = getWidth();
+                                h = w * nh / nw;
+                            }
+                        }
+                        RelativeLayout.LayoutParams layout = new RelativeLayout.LayoutParams((int)w, (int)h);
                         layout.addRule(RelativeLayout.CENTER_HORIZONTAL);
                         layout.addRule(RelativeLayout.CENTER_VERTICAL);                        
                         nativeVideo.setLayoutParams(layout);

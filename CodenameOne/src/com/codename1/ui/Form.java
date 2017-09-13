@@ -1111,7 +1111,19 @@ public class Form extends Container {
      */
     public Container getFormLayeredPane(Class c, boolean top) {
         if(formLayeredPane == null) {
-            formLayeredPane = new Container(new LayeredLayout());
+            formLayeredPane = new Container(new LayeredLayout()) {
+                @Override
+                protected void paintBackground(Graphics g) {
+                    boolean v = isVisible();
+                    setVisible(false);
+                    Form.this.paint(g);
+                    setVisible(v);
+                }
+
+                @Override
+                public void paintBackgrounds(Graphics g) {
+                }
+            };
             addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
         }
         if(c == null) {
@@ -2498,7 +2510,11 @@ public class Form extends Container {
         }
         autoRelease(x, y);
         if (pointerDraggedListeners != null) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
+            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+            pointerDraggedListeners.fireActionEvent(av);
+            if(av.isConsumed()) {
+                return;
+            }
         }
 
         rippleMotion = null;
@@ -2557,7 +2573,11 @@ public class Form extends Container {
         }
         autoRelease(x[0], y[0]);
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]));
+            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]);
+            pointerDraggedListeners.fireActionEvent(av);
+            if(av.isConsumed()) {
+                return;
+            }
         }
 
         rippleMotion = null;
