@@ -331,7 +331,7 @@ public class ToastBar {
         /**
          * Schedules this status message to be shown after a specified number of milliseconds,
          * if it hasn't been cleared or shown first.  
-         * <p>This is handy if you want to show an status for an operation that usually completes very quickly, but could 
+         * <p>This is handy if you want to show a status for an operation that usually completes very quickly, but could 
          * potentially hang.  In such a case you might decide not to display a status message at all unless the operation
          * takes more than 500ms to complete.</p>
          * 
@@ -599,15 +599,19 @@ public class ToastBar {
                         Dimension oldTextAreaSize = UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true);
                         Dimension newTexAreaSize = UIManager.getInstance().getLookAndFeel().getTextAreaSize(newLabel, true);
                         
-                        c.label.getParent().replaceAndWait(c.label, newLabel, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 300));
-                        c.label = newLabel;
-                        
-                        if (oldTextAreaSize.getHeight() != newTexAreaSize.getHeight()) {
-                            
-                            c.label.setPreferredH(newTexAreaSize.getHeight());
-                            c.getParent().animateHierarchyAndWait(300);
+                        // this can happen in an edge case where animateHierarchyAndWait and replaceAndWait
+                        // are stuck in blocking mode between them and the label just got discarded see:
+                        // https://stackoverflow.com/questions/46172993/codename-one-toastbar-nullpointerexception
+                        if(c.label.getParent() != null) {
+                            c.label.getParent().replaceAndWait(c.label, newLabel, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 300));
+                            c.label = newLabel;
+
+                            if (oldTextAreaSize.getHeight() != newTexAreaSize.getHeight()) {
+
+                                c.label.setPreferredH(newTexAreaSize.getHeight());
+                                c.getParent().animateHierarchyAndWait(300);
+                            }
                         }
-                        
                         
                     } else {
                         if (s.getMessageUIID() != null) {

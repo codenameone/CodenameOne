@@ -3724,6 +3724,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
             
+            alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
+            window.setAlwaysOnTop(alwaysOnTop);
+            
             String reset = System.getProperty("resetSkins");
             if(reset != null && reset.equals("true")){
                 System.setProperty("resetSkins", "");
@@ -3765,9 +3768,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                 window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
             }
-            
-            alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
-            window.setAlwaysOnTop(alwaysOnTop);
             
             window.setVisible(true);
         }

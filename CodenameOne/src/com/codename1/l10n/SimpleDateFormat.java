@@ -636,7 +636,7 @@ public class SimpleDateFormat extends DateFormat {
     }
 
     /**
-     * Read an substring from source.
+     * Read a substring from source.
      *
      * @param ofs start index of substring
      * @param end end index of substring
@@ -650,7 +650,7 @@ public class SimpleDateFormat extends DateFormat {
     }
 
     /**
-     * Read an substring from source.
+     * Read a substring from source.
      *
      * @param ofs start index of substring
      * @throws ParseException if substring is out of bounds.

@@ -305,7 +305,7 @@ abstract class AbstractEvaluator implements Evaluator {
     }
 
     /**
-     * Utility method for subclasses to convert an string to an array, delimited
+     * Utility method for subclasses to convert a string to an array, delimited
      * by comma, optionally enclosed in brackets, and elements optionally
      * enclosed in quotes.
      *

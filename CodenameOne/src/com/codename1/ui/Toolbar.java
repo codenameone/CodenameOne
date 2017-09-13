@@ -879,15 +879,18 @@ public class Toolbar extends Container {
             } catch(Throwable t) {
                 Log.e(t);
             }
-            addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    if(sidemenuDialog.isShowing()) {
-                        closeSideMenu();
-                        return;
+            
+            if (!parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
+                addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        if(sidemenuDialog.isShowing()) {
+                            closeSideMenu();
+                            return;
+                        }
+                        showOnTopSidemenu(-1, false);
                     }
-                    showOnTopSidemenu(-1, false);
-                }
-            });
+                });
+            }
         }
     }
     

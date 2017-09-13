@@ -2567,9 +2567,9 @@ class TBigDecimal  {
     }
 
     /**
-     * Returns this {@code BigDecimal} as an long value. Any fractional part is
+     * Returns this {@code BigDecimal} as a long value. Any fractional part is
      * discarded. If the integral part of {@code this} is too big to be
-     * represented as an long, then {@code this} % 2^64 is returned.
+     * represented as a long, then {@code this} % 2^64 is returned.
      *
      * @return this {@code BigDecimal} as a long value.
      */
@@ -2653,7 +2653,7 @@ class TBigDecimal  {
 
     /**
      * Returns this {@code BigDecimal} as a float value. If {@code this} is too
-     * big to be represented as an float, then {@code Float.POSITIVE_INFINITY}
+     * big to be represented as a float, then {@code Float.POSITIVE_INFINITY}
      * or {@code Float.NEGATIVE_INFINITY} is returned.
      * <p>
      * Note, that if the unscaled value has more than 24 significant digits,
@@ -2689,7 +2689,7 @@ class TBigDecimal  {
 
     /**
      * Returns this {@code BigDecimal} as a double value. If {@code this} is too
-     * big to be represented as an float, then {@code Double.POSITIVE_INFINITY}
+     * big to be represented as a float, then {@code Double.POSITIVE_INFINITY}
      * or {@code Double.NEGATIVE_INFINITY} is returned.
      * <p>
      * Note, that if the unscaled value has more than 53 significant digits,
