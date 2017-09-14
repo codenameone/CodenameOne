@@ -557,6 +557,20 @@ public class TextArea extends Component {
         return editable;
     }
 
+    
+    
+    private boolean isTypedKey(int code) {
+        if (true) return code > 0;
+        
+        return (code >= 48 && code <= 90) // 0-9a-z
+                || 
+                (code >= 96 && code <= 111) // number pad and arithmetic
+                ||
+                (code >= 186 && code <= 192) // punctuation
+                || 
+                (code >= 219 && code <= 222); // brackets & quotes
+    }
+    
     /**
      * {@inheritDoc}
      */
@@ -570,7 +584,8 @@ public class TextArea extends Component {
                 onClick();
                 return;
             }
-            if(action == 0 && keyCode > 0) {
+            Display d = Display.getInstance();
+            if(action == 0 && isTypedKey(keyCode)) {
                 Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText(), keyCode);
             }
         }
@@ -614,14 +629,18 @@ public class TextArea extends Component {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-        requestFocus();
+        if (!Display.getInstance().isDesktop()) {
+            requestFocus();
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        requestFocus();
+        if (!Display.getInstance().isDesktop()) {
+            requestFocus();
+        }
     }
 
     boolean showLightweightVKB() {

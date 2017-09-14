@@ -2662,7 +2662,7 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                 setFocused(cmp);
             }
             cmp.pointerHoverPressed(x, y);
@@ -2686,7 +2686,7 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
+                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 cmp.pointerHover(x, y);
