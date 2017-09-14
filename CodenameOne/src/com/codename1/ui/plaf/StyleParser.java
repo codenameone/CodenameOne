@@ -28,8 +28,13 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.Resources;
+import com.codename1.util.CaseInsensitiveOrder;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -227,11 +232,17 @@ public class StyleParser {
          * @param styleString One or more style strings.
          */
         public StyleInfo(String... styleString) {
-            HashMap<String,String> vals = new HashMap<String,String>();
-            for (String str : styleString) {
-                parseString(vals, str);
+            if (styleString == null) {
+                this.values = new HashMap<String,String>();
+            } else {
+                HashMap<String,String> vals = new HashMap<String,String>();
+                for (String str : styleString) {
+                    if (str != null && str.length() > 0) {
+                        parseString(vals, str);
+                    }
+                }
+                this.values = vals;
             }
-            this.values = vals;
         }
         
         /**
@@ -247,6 +258,14 @@ public class StyleParser {
          */
         public StyleInfo() {
             this(new HashMap<String,String>());
+        }
+        
+        /**
+         * Creates a new style info by copying styles from existing style info.
+         * @param info Style to copy.
+         */
+        public StyleInfo(StyleInfo info) {
+            this(info.toStyleString());
         }
         
         /**
@@ -294,6 +313,65 @@ public class StyleParser {
         }
         
         /**
+         * Sets the font in the style info.
+         * @param font A valid font style string.  E.g. "2mm native:MainRegular"
+         * @return Self for chaining.
+         */
+        public StyleInfo setFont(String font) {
+            values.put("font", font);
+            return this;
+        }
+        
+        /**
+         * Sets the font size in the style.
+         * @param fontSize A valid font size.  E.g. "2mm"
+         * @return Self for chaining.
+         */
+        public StyleInfo setFontSize(String fontSize) {
+            FontInfo finfo = getFont();
+            if (finfo == null) {
+                finfo = parseFont(new FontInfo(), fontSize);
+                if (finfo != null) {
+                    setFont(finfo.toString());
+                }
+            } else {
+                FontInfo tmp = parseFont(new FontInfo(), fontSize);
+                if (tmp != null) {
+                    finfo.setSize(tmp.getSize());
+                    finfo.setSizeUnit(tmp.getSizeUnit());
+                    setFont(finfo.toString());
+                }
+            }
+            
+            return this;
+        }
+        
+        /**
+         * Sets the font name.
+         * @param fontName A valid font name.  E.g. "native:MainRegular"
+         * @return Self for chaining.
+         */
+        public StyleInfo setFontName(String fontName) {
+            FontInfo finfo = getFont();
+            if (finfo == null) {
+                finfo = parseFont(new FontInfo(), fontName);
+                if (finfo != null) {
+                    setFont(finfo.toString());
+                }
+            } else {
+                FontInfo tmp = parseFont(new FontInfo(), fontName);
+                if (tmp != null) {
+                    finfo.setName(tmp.getName());
+                    finfo.setFile(tmp.getFile());
+                    setFont(finfo.toString());
+                }
+            }
+            return this;
+        }
+        
+        
+        
+        /**
          * 
          * @return The background color of the style.  Will return {@literal null} if bgColor wasn't specified.
          */
@@ -313,6 +391,104 @@ public class StyleParser {
                 return Integer.parseInt(values.get("fgColor"), 16);
             }
             return null;
+        }
+        
+        /**
+         * Sets the foreground color.
+         * @param fgColor A valid color string.  E.g. "ff0000"
+         * @return Self for chaining.
+         */
+        public StyleInfo setFgColor(String fgColor) {
+            if (fgColor == null || fgColor.trim().length() == 0) {
+                values.remove("fgColor");
+            } else {
+                values.put("fgColor", fgColor);
+            }
+            return this;
+        }
+        
+        /**
+         * Sets the background color.
+         * @param bgColor A valid color string.  E.g. "ff0000"
+         * @return 
+         */
+        public StyleInfo setBgColor(String bgColor) {
+            if (bgColor == null || bgColor.trim().length() == 0) {
+                values.remove("bgColor");
+            } else {
+                values.put("bgColor", bgColor);
+            }
+            return this;
+        }
+        
+        /**
+         * Sets the transparency.
+         * @param transparency A valid transparency string (0-255).  E.g. "255"
+         * @return Self for chaining.
+         */
+        public StyleInfo setTransparency(String transparency) {
+            if (transparency == null || transparency.trim().length() == 0) {
+                values.remove("transparency");
+            } else {
+                values.put("transparency", transparency);
+            }
+            return this;
+        }
+        
+        /**
+         * Sets the opacity.
+         * @param opacity A valid opacity string (0-255).  E.g. "255"
+         * @return Self for chaining.
+         */
+        public StyleInfo setOpacity(String opacity) {
+            if (opacity == null || opacity.trim().length() == 0) {
+                values.remove("opacity");
+            } else {
+                values.put("opacity", opacity);
+            }
+            return this;
+        }
+        
+        /**
+         * Sets the padding.
+         * @param padding A valid padding string.  E.g. "1mm", or "2mm 3px 0 5mm"
+         * @return Self for chaining.
+         */
+        public StyleInfo setPadding(String padding) {
+            if (padding == null || padding.trim().length() == 0) {
+                values.remove("padding");
+            } else {
+                values.put("padding", padding);
+            }
+            return this;
+        }
+        
+        /**
+         * Sets the margin.
+         * @param margin A valid margin string.  E.g. "1mm", or "2mm 3px 0 0"
+         * @return Self for chaining.
+         */
+        public StyleInfo setMargin(String margin) {
+            if (margin == null || margin.trim().length() == 0) {
+                values.remove("margin");
+            } else {
+                values.put("margin", margin);
+            }
+            return this;
+        }
+        
+        /**
+         * Sets the border
+         * @param border A valid border string. E.g. "1px solid ff0000", or "splicedImage notes.png 0.25 0.25 0.25 0.25"
+         * @return Self for chaining.
+         */
+        public StyleInfo setBorder(String border) {
+            if (border == null || border.trim().length() == 0) {
+                values.remove("border");
+            } else {
+                values.put("border", border);
+            }
+            return this;
         }
         
         /**
@@ -369,6 +545,26 @@ public class StyleParser {
         }
         
         /**
+         * Sets the background type as a string.
+         * @param type A valid background type string.  E.g. "image_scaled_fit"
+         * @return Self for chaining.
+         */
+        public StyleInfo setBgType(String type) {
+            values.put("bgType", type);
+            return this;
+        }
+        
+        /**
+         * Sets the background type as one of the Style.BACKGROUND_XXX constants.
+         * @param i A background type.  One of Style.BACKGROUND_XXX constants.
+         * @return Self for chaining.
+         */
+        public StyleInfo setBgType(Integer i) {
+            setBgType(flip(bgTypes).get(i));
+            return this;
+        }
+        
+        /**
          * Gets the bgType as a string.
          * @return 
          */
@@ -396,6 +592,16 @@ public class StyleParser {
             }
             return null;
             
+        }
+        
+        /**
+         * Sets the background image.
+         * @param bgImage A valid image string.  E.g. "notes.png" (to refer to the notes.png image in the theme), or "/notes.png" to refer to notes.png in the src directory.
+         * @return Self for chaining.
+         */
+        public StyleInfo setBgImage(String bgImage) {
+            values.put("bgImage", bgImage);
+            return this;
         }
         
         /**
@@ -435,6 +641,85 @@ public class StyleParser {
                 
             }
             return null;
+        }
+        
+        /**
+         * Gets the text decoration as a string.
+         * @return A valid text decoration string or null.  Text decoration strings include "3d", "3d_lowered", "3d_shadow_north", "none", "strikethru", "overline", and "underline"
+         */
+        public String getTextDecorationAsString() {
+            if (values.containsKey("textDecoration")) {
+                return values.get("textDecoration");
+            }
+            return null;
+        }
+        
+        /**
+         * Builds a style string that is encapsulated by this style object.  The output of this can be passed to methods like {@link Component#setInlineAllStyles(java.lang.String) }
+         * @return A style string.
+         */
+        public String toStyleString() {
+            StringBuilder sb = new StringBuilder();
+            FontInfo finfo = getFont();
+            if (finfo != null) {
+                sb.append("font:").append(finfo.toString()).append("; ");
+            }
+            BorderInfo binfo = getBorder();
+            if (binfo != null) {
+                sb.append("border:").append(binfo.toString()).append("; ");
+            }
+            
+            Integer bgColor = getBgColor();
+            if (bgColor != null) {
+                sb.append("bgColor:").append(Integer.toHexString(bgColor)).append("; ");
+            }
+            
+            Integer fgColor = getFgColor();
+            if (fgColor != null) {
+                sb.append("fgColor:").append(Integer.toHexString(fgColor)).append("; ");
+            }
+            
+            Integer transparency = getTransparency();
+            if (transparency != null) {
+                sb.append("transparency:").append(transparency).append("; ");
+            }
+            
+            Integer opacity = getOpacity();
+            if (opacity != null) {
+                sb.append("opacity:").append(opacity).append("; ");
+            }
+            
+            Integer bgType = getBgType();
+            if (bgType != null) {
+                sb.append("bgType:").append(getBgTypeAsString()).append("; ");
+            }
+            
+            ImageInfo image = getBgImage();
+            if (image != null) {
+                sb.append("bgImage:").append(getBgImage().toString()).append("; ");
+            }
+            
+            Integer alignment = getAlignment();
+            if (alignment != null) {
+                sb.append("alignment:").append(getAlignmentAsString()).append("; ");
+            }
+            
+            MarginInfo margin = getMargin();
+            if (margin != null) {
+                sb.append("margin:").append(margin.toString()).append("; ");
+            }
+            
+            PaddingInfo padding = getPadding();
+            if (padding != null) {
+                sb.append("padding:").append(padding.toString()).append("; ");
+            }
+            
+            Integer textDecoration = getTextDecoration();
+            if (textDecoration != null) {
+                sb.append("textDecoration:").append(getTextDecorationAsString()).append("; ");
+            }
+            
+            return sb.toString().trim();
         }
     }
     
@@ -1253,7 +1538,7 @@ public class StyleParser {
          */
         @Override
         public String toString() {
-            return (sizeString("")+unitString()+nameString(" ")+fileString(" ")).trim();
+            return (sizeString("")+nameString(" ")+fileString(" ")).trim();
         }
         
         /**
@@ -1389,8 +1674,9 @@ public class StyleParser {
             Font f = name == null ? baseStyle.getFont() : Font.createTrueTypeFont(name, file);
             if (f == null) {
                 f = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR);
+                
             }
-            return f.derive(getSizeInPixels(baseStyle), 0);
+            return f.derive(getSizeInPixels(baseStyle), f.getStyle());
         }
     }
     
@@ -1620,6 +1906,17 @@ public class StyleParser {
             
         }
         return bgTypes;
+    }
+    
+    /**
+     * Gets the available background type strings (which can be passed to {@link StyleInfo#setBgType(java.lang.String) }
+     * @return 
+     */
+    public static List<String> getBackgroundTypes() {
+        ArrayList<String> out = new ArrayList<String>();
+        out.addAll(bgTypes().keySet());
+        Collections.sort(out, new CaseInsensitiveOrder());
+        return out;
     }
     
     private static <T,V> Map<T,V> flip(Map<V,T> map) {
