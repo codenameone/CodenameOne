@@ -5394,6 +5394,9 @@ public class FontImage extends Image {
         return f;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Image rotate90Degrees(boolean maintainOpacity) {
         FontImage f = createFixed(text, fnt, color, width, height);
@@ -5401,9 +5404,32 @@ public class FontImage extends Image {
         f.opacity = maintainOpacity ? opacity : 255;
         return f; 
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Image rotate270Degrees(boolean maintainOpacity) {
+        FontImage f = createFixed(text, fnt, color, width, height);
+        f.rotated = 270;
+        f.opacity = maintainOpacity ? opacity : 255;
+        return f; 
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Image rotate180Degrees(boolean maintainOpacity) {
+        FontImage f = createFixed(text, fnt, color, width, height);
+        f.rotated = 180;
+        f.opacity = maintainOpacity ? opacity : 255;
+        return f; 
+    }
     
     
 
+        
     /**
      * Converts the icon image to an encoded image if possible
      *
