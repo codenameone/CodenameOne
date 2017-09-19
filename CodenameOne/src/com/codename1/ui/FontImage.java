@@ -5277,6 +5277,7 @@ public class FontImage extends Image {
         g.setColor(color);
         g.setFont(t);
         int ww = t.stringWidth(text);
+        int hh = t.getHeight();
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
         if (rotated != 0) {
             int tX = g.getTranslateX();
@@ -5287,11 +5288,7 @@ public class FontImage extends Image {
             g.resetAffine();
             g.translate(tX, tY);
         } else {
-            int tX = g.getTranslateX();
-            int tY = g.getTranslateY();
-            g.translate(-tX, -tY);
-            g.drawString(text, x + w / 2 - ww / 2, y);
-            g.translate(tX, tY);
+            g.drawString(text, x + w / 2 - ww / 2, y + h/2 - hh/2);
         }
         g.setFont(oldFont);
         g.setColor(oldColor);
