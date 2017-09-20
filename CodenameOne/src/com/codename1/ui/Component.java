@@ -4410,7 +4410,7 @@ public class Component implements Animation, StyleListener {
      */
     public Style getPressedStyle() {
         if (pressedStyle == null) {
-            if (hasInlineUnselectedStyle()) {
+            if (hasInlinePressedStyle()) {
                 pressedStyle = getUIManager().parseComponentCustomStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), "press", getInlinePressedStyleStrings());
             } else {
                 pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
