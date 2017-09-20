@@ -23,6 +23,7 @@
 package com.codename1.ui.plaf;
 
 import com.codename1.io.Util;
+import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -148,6 +149,7 @@ import java.util.Map;
  * @author shannah
  */
 public class StyleParser {
+    
     public static final byte UNIT_INHERIT=99;
     
     /**
@@ -363,6 +365,10 @@ public class StyleParser {
                 if (tmp != null) {
                     finfo.setName(tmp.getName());
                     finfo.setFile(tmp.getFile());
+                    setFont(finfo.toString());
+                } else {
+                    finfo.setName(null);
+                    finfo.setFile(null);
                     setFont(finfo.toString());
                 }
             }
@@ -754,6 +760,7 @@ public class StyleParser {
         }
     }
     
+    
     /**
      * Parses a style string into a Map
      * @param out
@@ -768,9 +775,11 @@ public class StyleParser {
         return out;
     }
     
+    
     static StyleInfo parseString(String str) {
         return parseString(new StyleInfo(), str);
     }
+    
     
     static Map<String,String> parseString(Map<String,String> out, String str) {
         String[] rules = Util.split(str, ";");
@@ -1271,15 +1280,34 @@ public class StyleParser {
                 }
                 return sb.toString().trim();
             } else if ("line".equals(getType()) || "dashed".equals(getType()) || "dotted".equals(getType()) || "underline".equals(getType())) {
-                return widthString()+" "+lineTypeString()+" "+Integer.toHexString(getColor());
+                int color = getColor() == null ? 0 : getColor();
+                
+                return widthString()+" "+lineTypeString()+" "+Integer.toHexString(color);
             } else {
                 return "none";
             }
         }
         
-        
-        private String widthString() {
+        /**
+         * Returns width as a string, including units.  If the width isn't set, this outputs "1px".
+         * @return 
+         */
+        public String widthString() {
+            if (width == null) {
+                return "1px";
+            }
             return getWidth() + widthUnitString();
+        }
+        
+        /**
+         * Returns the border color as a hex string.  If no color is set, this returns the empty string.
+         * @return 
+         */
+        public String colorString() {
+            if (color == null) {
+                return "";
+            }
+            return Integer.toHexString(color);
         }
         
         private String widthUnitString() {
@@ -1466,6 +1494,42 @@ public class StyleParser {
         public void setSpliceInsets(double[] insets) {
             this.spliceInsets = insets[Component.TOP] + " "+insets[Component.RIGHT] +" "+ insets[Component.BOTTOM]+" "+insets[Component.LEFT];
         }
+        
+        /**
+         * Sets the splicedImage border insets as a 4-element array and rounds each entry to the specified number of decimal places
+         * @param insets 4-element array of insets.Indices {@literal Component#TOP} , {@literal Component#BOTTOM}, {@literal Component#LEFT}, and {@literal Component#RIGHT}.
+         * @param decimalPlaces Number of decimal places to round to.
+         */
+        public void setSpliceInsets(double[] insets, int decimalPlaces) {
+            L10NManager l = L10NManager.getInstance();
+            this.spliceInsets = 
+                    round(insets[Component.TOP], decimalPlaces) + " "+
+                    round(insets[Component.RIGHT], decimalPlaces) +" "+ 
+                    round(insets[Component.BOTTOM], decimalPlaces) +" "+
+                    round(insets[Component.LEFT], decimalPlaces);
+        }
+        
+        private static double round(double d, int decimalPlaces) {
+            for (int i=0; i<decimalPlaces; i++) {
+                d *= 10;
+            }
+            d = Math.round(d);
+            for (int i=0; i<decimalPlaces; i++) {
+                d /= 10;
+            }
+            
+            String dStr = String.valueOf(d);
+            int decPos = dStr.indexOf(".");
+            if (decPos != -1) {
+                int decLen = dStr.length() - decPos;
+                if (decLen > decimalPlaces) {
+                    dStr = dStr.substring(0, dStr.length() - (decLen - decimalPlaces));
+                    d = Double.parseDouble(dStr);
+                }
+            }
+            
+            return d;
+        }
 
         /**
          * For a line/dashed/dotted/underline border, the thickness value.
@@ -1474,6 +1538,22 @@ public class StyleParser {
          */
         public Float getWidth() {
             return width;
+        }
+        
+        /**
+         * For line/dashed/dotted/underline border.  The thickness in pixels.
+         * @return The thickness in pixels of the border line.
+         * @asee #getWidth()
+         */
+        public Integer getWidthInPixels() {
+            if (width == null) {
+                return null;
+            }
+            if (widthUnit == Style.UNIT_TYPE_DIPS) {
+                return Display.getInstance().convertToPixels(width);
+            } else {
+                return width.intValue();
+            }
         }
 
         /**
@@ -1565,11 +1645,14 @@ public class StyleParser {
         public float getSizeInPixels(Style baseStyle) {
             if (getSize() == null) {
                 Font f = baseStyle.getFont();
-                if (f != null) {
-                    return f.getPixelSize();
-                } else {
-                    return Display.getInstance().convertToPixels(3f);
+                if (f == null) f = Font.getDefaultFont();
+                
+                float pixS = f.getPixelSize();
+                if (pixS < 1) {
+                    pixS = f.getHeight();
                 }
+                return pixS;
+                
             } else {
                 switch (getSizeUnit()) {
                     case Style.UNIT_TYPE_DIPS:
@@ -1692,21 +1775,31 @@ public class StyleParser {
         arg = arg.trim();
         if (arg.length() > 0 && arg.charAt(0) == '/') {
             arg = arg.substring(1);
+        }
+        if (arg.indexOf('/') != -1) {
+            arg = arg.substring(0, arg.indexOf('/')).trim();
+        } else {
             int len = arg.length();
             if (len > 3 && arg.charAt(len-4) == '.') {
                 arg = arg.substring(0, len-4);
             }
-            out.setName(arg);
         }
+        out.setName(arg);
+        
         return out;
     }
     
     private static FontInfo parseFontFile(FontInfo out, String arg) {
         arg = arg.trim();
+        if (arg.indexOf('/') != -1) {
+            arg = arg.substring(arg.indexOf('/'));
+        }
         if (arg.length() > 0 && arg.charAt(0) == '/') {
             arg = arg.substring(1);
         } else {
-            arg = arg.indexOf("native:") == 0 ? arg : arg + ".ttf";
+            arg = arg.indexOf("native:") == 0 ? arg : 
+                    arg.indexOf(".ttf") != arg.length()-4 ? arg + ".ttf" : 
+                    arg;
         }
         out.setFile(arg);
         return out;
@@ -1943,4 +2036,51 @@ public class StyleParser {
         
         return null;
     }
+    
+    
+    /**
+     * Checks if a string is a valid scalar value.  A scalar value should be in the 
+     * format {@literal <magnitude><unit>} where {@literal <magnitude>} is an integer
+     * or decimal number, and {@literal <unit>} is a unit - one of {@literal mm}, {@literal px}, or {@literal %}.
+     * 
+     * <p>There is one special value: "inherit" which indicates that the scalar value just inherits from its
+     * parent.</p>
+     * @param val String value to validate.
+     * @return True if the value is a valid scalar value.
+     */
+    public static boolean validateScalarValue(String val) {
+        try {
+            parseSingleTRBLValue(val);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+    
+    /**
+     * Parses a string into a scalar value.  A scalar value should be in the 
+     * format {@literal <magnitude><unit>} where {@literal <magnitude>} is an integer
+     * or decimal number, and {@literal <unit>} is a unit - one of {@literal mm}, {@literal px}, or {@literal %}.
+     * 
+     * <p>There is one special value: "inherit" which indicates that the scalar value just inherits from its
+     * parent.</p>
+     * @param val String that should be a valid scalar value.
+     * @return 
+     */
+    public static ScalarValue parseScalarValue(String val) {
+        return parseSingleTRBLValue(val);
+    }
+    
+    
+    /**
+     * Gets a list of the background types that are supported.
+     * @return 
+     */
+    public static List<String> getSupportedBackgroundTypes() {
+        ArrayList<String> out = new ArrayList<String>();
+        out.addAll(bgTypes.keySet());
+        return out;
+    }
+    
+    
 }
