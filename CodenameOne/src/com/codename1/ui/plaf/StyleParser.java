@@ -378,6 +378,9 @@ public class StyleParser {
                     finfo.setSize(tmp.getSize());
                     finfo.setSizeUnit(tmp.getSizeUnit());
                     setFont(finfo.toString());
+                } else {
+                    finfo.setSizeUnit(UNIT_INHERIT);
+                    setFont(finfo.toString());
                 }
             }
             
@@ -829,7 +832,25 @@ public class StyleParser {
                 continue;
             }
             String key = rule.substring(0, pos);
-            out.put(key, rule.substring(pos+1));
+            if ("font".equals(key) && out.containsKey("font")) {
+                // We may need to merge font rules
+                FontInfo newFinfo = StyleParser.parseFont(new FontInfo(), rule.substring(pos+1));
+                FontInfo origFinfo = StyleParser.parseFont(new FontInfo(), out.get("font"));
+                Float newSize = newFinfo.getSize();
+                if (newSize != null && newFinfo.getSizeUnit() != StyleParser.UNIT_INHERIT) {
+                    origFinfo.setSize(newSize);
+                    origFinfo.setSizeUnit(newFinfo.getSizeUnit());
+                }
+                if (newFinfo.getName() != null) {
+                    origFinfo.setName(newFinfo.getName());
+                }
+                if (newFinfo.getFile() != null) {
+                    origFinfo.setFile(newFinfo.getFile());
+                }
+                out.put(key, origFinfo.toString());
+            } else {
+                out.put(key, rule.substring(pos+1));
+            }
 
         }
         return out;
@@ -2068,7 +2089,7 @@ public class StyleParser {
          * @return 
          */
         public float getSizeInPixels(Style baseStyle) {
-            if (getSize() == null) {
+            if (getSize() == null || getSizeUnit() == UNIT_INHERIT) {
                 Font f = baseStyle.getFont();
                 if (f == null) f = Font.getDefaultFont();
                 
