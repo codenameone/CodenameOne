@@ -4827,6 +4827,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return (int)new File(getContext().getFilesDir(), name).length();
     }
     
+    private String addFile(String s) {
+        // I explicitly don't create a "proper URL" since code might rely on the fact that the file isn't encoded
+        if(s != null && s.startsWith("/")) {
+            return "file:/" + s;
+        }
+        return s;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -4840,10 +4848,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(storageDirs != null){
             String [] roots = new String[storageDirs.length + 1];
             System.arraycopy(storageDirs, 0, roots, 0, storageDirs.length);
-            roots[roots.length - 1] = Environment.getRootDirectory().getAbsolutePath();
+            roots[roots.length - 1] = addFile(Environment.getRootDirectory().getAbsolutePath());
             return roots;
         }
-        return new String[]{Environment.getRootDirectory().getAbsolutePath()};
+        return new String[]{addFile(Environment.getRootDirectory().getAbsolutePath())};
     }
 
     @Override

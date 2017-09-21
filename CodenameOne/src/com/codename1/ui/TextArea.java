@@ -301,7 +301,7 @@ public class TextArea extends Component {
     public TextArea(String text, int maxSize){
         this(text,maxSize, 1, 3, ANY);
     }
-    
+
     /**
      * Creates an area with the given text, this constructor
      * will create a single line text area similar to a text field! 

@@ -85,6 +85,7 @@ public class Calendar extends Container {
     static final long WEEK = DAY * 7;
     private EventDispatcher dispatcher = new EventDispatcher();
     private EventDispatcher dataChangedListeners = new EventDispatcher();
+    private EventDispatcher monthChangedListeners = new EventDispatcher();
     private long[] dates = new long[42];
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
@@ -120,14 +121,38 @@ public class Calendar extends Container {
      * @param tmz a reference timezone
      */
     public Calendar(long time, TimeZone tmz) {
+        this(time, java.util.TimeZone.getDefault(), null, null);
+    }
+
+    /**
+     * Constructs a calendar with the current date and time with left and right
+     * images set
+     *
+     * @param leftArrowImage an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(Image leftArrowImage, Image rightArrowImage) {
+        this(System.currentTimeMillis(), java.util.TimeZone.getDefault(), leftArrowImage, rightArrowImage);
+    }
+
+    /**
+     * Creates a new instance of Calendar set to the given date based on time
+     * since epoch (the java.util.Date convention)
+     *
+     * @param time time since epoch
+     * @param tmz a reference timezone
+     * @param leftArrowImage an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(long time, TimeZone tmz, Image leftArrowImage, Image rightArrowImage) {
         super(new BorderLayout());
         this.tmz = tmz;
         setUIID("Calendar");
         mv = new MonthView(time);
 
-        Image leftArrow = UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
-        if (leftArrow != null) {
-            Image rightArrow = UIManager.getInstance().getThemeImageConstant("calendarRightImage");
+        Image leftArrow = leftArrowImage != null ? leftArrowImage : UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
+        Image rightArrow = rightArrowImage != null ? rightArrowImage : UIManager.getInstance().getThemeImageConstant("calendarRightImage");
+        if (leftArrow != null && rightArrow != null) {
             final Button left = new Button(leftArrow, "CalendarLeft");
             final Button right = new Button(rightArrow, "CalendarRight");
             ActionListener progress = new ActionListener() {
@@ -412,6 +437,24 @@ public class Calendar extends Container {
      */
     public void removeActionListener(ActionListener l) {
         mv.removeActionListener(l);
+    }
+
+    /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to add
+     */
+    public void addMonthChangedListener(ActionListener l) {
+        mv.addMonthChangedListener(l);
+    }
+
+    /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to remove
+     */
+    public void removeMonthChangedListener(ActionListener l) {
+        mv.removeMonthChangedListener(l);
     }
 
     /**
@@ -1105,6 +1148,7 @@ public class Calendar extends Container {
         }
 
         private void setMonth(int year, int month) {
+            fireMonthChangedEvent();
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
             cal.setTimeZone(TimeZone.getDefault());
             cal.set(java.util.Calendar.MONTH, month);
@@ -1148,6 +1192,14 @@ public class Calendar extends Container {
             dispatcher.removeListener(l);
         }
 
+        public void addMonthChangedListener(ActionListener l) {
+            monthChangedListeners.addListener(l);
+        }
+
+        public void removeMonthChangedListener(ActionListener l) {
+            monthChangedListeners.removeListener(l);
+        }
+
         public void addDayActionListener(ActionListener l) {
             dayListeners.add(l);
             for (Component cmp : components) {
@@ -1184,6 +1236,10 @@ public class Calendar extends Container {
             componentChanged();
             super.fireActionEvent();
             dispatcher.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));
+        }
+
+        protected void fireMonthChangedEvent() {
+            monthChangedListeners.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));
         }
 
         public void actionPerformed(ActionEvent evt) {
