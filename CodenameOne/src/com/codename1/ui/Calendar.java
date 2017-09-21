@@ -85,6 +85,7 @@ public class Calendar extends Container {
     static final long WEEK = DAY * 7;
     private EventDispatcher dispatcher = new EventDispatcher();
     private EventDispatcher dataChangedListeners = new EventDispatcher();
+    private EventDispatcher monthChangedListeners = new EventDispatcher();
     private long[] dates = new long[42];
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
@@ -124,7 +125,8 @@ public class Calendar extends Container {
     }
 
     /**
-     * Constructs a calendar with the current date and time with left and right images set
+     * Constructs a calendar with the current date and time with left and right
+     * images set
      *
      * @param leftArrowImage an image for calendar left arrow
      * @param rightArrowImage an image for calendar right arrow
@@ -435,6 +437,24 @@ public class Calendar extends Container {
      */
     public void removeActionListener(ActionListener l) {
         mv.removeActionListener(l);
+    }
+
+    /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to add
+     */
+    public void addMonthChangedListener(ActionListener l) {
+        mv.addMonthChangedListener(l);
+    }
+
+    /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to remove
+     */
+    public void removeMonthChangedListener(ActionListener l) {
+        mv.removeMonthChangedListener(l);
     }
 
     /**
@@ -1144,6 +1164,7 @@ public class Calendar extends Container {
                 cal.setTime(new Date(d));
             }
             setCurrentDay(d);
+            fireMonthChangedEvent();
         }
 
         public void decrementMonth() {
@@ -1169,6 +1190,14 @@ public class Calendar extends Container {
 
         public void removeActionListener(ActionListener l) {
             dispatcher.removeListener(l);
+        }
+
+        public void addMonthChangedListener(ActionListener l) {
+            monthChangedListeners.addListener(l);
+        }
+
+        public void removeMonthChangedListener(ActionListener l) {
+            monthChangedListeners.removeListener(l);
         }
 
         public void addDayActionListener(ActionListener l) {
@@ -1207,6 +1236,10 @@ public class Calendar extends Container {
             componentChanged();
             super.fireActionEvent();
             dispatcher.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));
+        }
+
+        protected void fireMonthChangedEvent() {
+            monthChangedListeners.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));
         }
 
         public void actionPerformed(ActionEvent evt) {
