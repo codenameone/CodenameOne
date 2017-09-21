@@ -120,14 +120,37 @@ public class Calendar extends Container {
      * @param tmz a reference timezone
      */
     public Calendar(long time, TimeZone tmz) {
+        this(time, java.util.TimeZone.getDefault(), null, null);
+    }
+
+    /**
+     * Constructs a calendar with the current date and time with left and right images set
+     *
+     * @param leftArrowImage an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(Image leftArrowImage, Image rightArrowImage) {
+        this(System.currentTimeMillis(), java.util.TimeZone.getDefault(), leftArrowImage, rightArrowImage);
+    }
+
+    /**
+     * Creates a new instance of Calendar set to the given date based on time
+     * since epoch (the java.util.Date convention)
+     *
+     * @param time time since epoch
+     * @param tmz a reference timezone
+     * @param leftArrowImage an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(long time, TimeZone tmz, Image leftArrowImage, Image rightArrowImage) {
         super(new BorderLayout());
         this.tmz = tmz;
         setUIID("Calendar");
         mv = new MonthView(time);
 
-        Image leftArrow = UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
-        if (leftArrow != null) {
-            Image rightArrow = UIManager.getInstance().getThemeImageConstant("calendarRightImage");
+        Image leftArrow = leftArrowImage != null ? leftArrowImage : UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
+        Image rightArrow = rightArrowImage != null ? rightArrowImage : UIManager.getInstance().getThemeImageConstant("calendarRightImage");
+        if (leftArrow != null && rightArrow != null) {
             final Button left = new Button(leftArrow, "CalendarLeft");
             final Button right = new Button(rightArrow, "CalendarRight");
             ActionListener progress = new ActionListener() {
