@@ -118,16 +118,24 @@ public class Label extends Component {
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
 
+    // workaround for potential infinite recursion situation https://github.com/codenameone/CodenameOne/commit/54a4092003b0ee5631c05250824a6466b84e757f#commitcomment-24244448
+    private boolean autoSizeLaidOutLock;
+    
     /**
      * {@inheritDoc}
      * This is overriden for auto size mode
      */
     @Override
     protected void laidOut() {
+        if(autoSizeLaidOutLock) {
+            return;
+        }
+        autoSizeLaidOutLock = true;
         super.laidOut();
         if(autoSizeMode) {
             initAutoResize();
         }
+        autoSizeLaidOutLock = false;
     }
     
     

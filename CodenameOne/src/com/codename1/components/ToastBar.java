@@ -599,15 +599,19 @@ public class ToastBar {
                         Dimension oldTextAreaSize = UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true);
                         Dimension newTexAreaSize = UIManager.getInstance().getLookAndFeel().getTextAreaSize(newLabel, true);
                         
-                        c.label.getParent().replaceAndWait(c.label, newLabel, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 300));
-                        c.label = newLabel;
-                        
-                        if (oldTextAreaSize.getHeight() != newTexAreaSize.getHeight()) {
-                            
-                            c.label.setPreferredH(newTexAreaSize.getHeight());
-                            c.getParent().animateHierarchyAndWait(300);
+                        // this can happen in an edge case where animateHierarchyAndWait and replaceAndWait
+                        // are stuck in blocking mode between them and the label just got discarded see:
+                        // https://stackoverflow.com/questions/46172993/codename-one-toastbar-nullpointerexception
+                        if(c.label.getParent() != null) {
+                            c.label.getParent().replaceAndWait(c.label, newLabel, CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, true, 300));
+                            c.label = newLabel;
+
+                            if (oldTextAreaSize.getHeight() != newTexAreaSize.getHeight()) {
+
+                                c.label.setPreferredH(newTexAreaSize.getHeight());
+                                c.getParent().animateHierarchyAndWait(300);
+                            }
                         }
-                        
                         
                     } else {
                         if (s.getMessageUIID() != null) {
