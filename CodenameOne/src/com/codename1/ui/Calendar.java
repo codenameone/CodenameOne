@@ -1148,6 +1148,7 @@ public class Calendar extends Container {
         }
 
         private void setMonth(int year, int month) {
+            fireMonthChangedEvent();
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
             cal.setTimeZone(TimeZone.getDefault());
             cal.set(java.util.Calendar.MONTH, month);
@@ -1164,7 +1165,6 @@ public class Calendar extends Container {
                 cal.setTime(new Date(d));
             }
             setCurrentDay(d);
-            fireMonthChangedEvent();
         }
 
         public void decrementMonth() {
