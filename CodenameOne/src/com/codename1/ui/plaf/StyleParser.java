@@ -30,6 +30,7 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.Resources;
 import com.codename1.util.CaseInsensitiveOrder;
+import com.codename1.util.StringUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -219,6 +220,41 @@ public class StyleParser {
             }
         }
         
+        /**
+         * Formats this scalar value (including units) but rounding to the given number
+         * of decimal places.
+         * @param decimalPlaces
+         * @return 
+         */
+        public String toString(int decimalPlaces) {
+            switch (unit) {
+                case UNIT_INHERIT:
+                    return "inherit";
+                case Style.UNIT_TYPE_DIPS:
+                    return StyleParser.format(value, decimalPlaces) + "mm";
+                case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+                    return StyleParser.format(value, decimalPlaces) + "%";
+                default:
+                    return ((int)Math.round(value))+"px";
+            }
+        }
+        
+        /**
+         * Gets the magnitude of this scalar value in pixels.
+         * @return 
+         */
+        public int getPixelValue() {
+            switch (unit) {
+                case UNIT_INHERIT:
+                    return 0;
+                case Style.UNIT_TYPE_DIPS:
+                    return Display.getInstance().convertToPixels((float)value);
+                case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+                    return (int)(Display.getInstance().getDisplayWidth() * value / 100f);
+                default:
+                    return ((int)Math.round(value));
+            }
+        }
         
     }
     
@@ -1172,6 +1208,117 @@ public class StyleParser {
             return out;
         }
         
+        if ("round".equals(parts1[0])) {
+            out.setType("round");
+            if (plen > 1) {
+                int nextSpacePos;
+                String rem = args;
+                while ((nextSpacePos = rem.indexOf(" ")) != -1) {
+                    rem = rem.substring(nextSpacePos+1).trim();
+                    if (rem.startsWith("rect")) {
+                        out.setRectangle((Boolean) true);
+                    } else if (rem.startsWith("stroke")) {
+                        // parse the stroke
+                        int p1 = rem.indexOf("(");
+                        int p2 = rem.indexOf(")");
+                        if (p1 != -1 && p2 != -1) {
+                            String strokeStr = rem.substring(p1+1, p2).trim();
+                            String[] strokeArgs = Util.split(strokeStr, " ");
+                            for (String strokeArg : strokeArgs) {
+                                strokeArg = strokeArg.trim();
+                                if (strokeArg.endsWith("mm") || strokeArg.endsWith("px")) {
+                                    ScalarValue sv = parseScalarValue(strokeArg);
+                                    out.width = (float)sv.value;
+                                    out.widthUnit = sv.unit;
+                                } else if (strokeArg.length() > 0) {
+                                    //int strokeColor = Integer.parseInt(strokeArg, 16);
+                                    if (strokeArg.length() == 8) {
+                                        // there is an alpha bit
+                                        out.setStrokeOpacity(Integer.parseInt(strokeArg.substring(0, 2), 16) & 0xff);
+                                        out.setStrokeColor(Integer.parseInt(strokeArg.substring(2), 16) & 0xffffff);
+                                    } else {
+                                        out.setStrokeOpacity(0xff);
+                                        out.setStrokeColor(Integer.parseInt(strokeArg, 16) & 0xffffff);
+                                    }
+                                }
+                            }
+                            rem = rem.substring(p2+1);
+                        } else {
+                            
+                            rem = rem.substring(6); // at least get past stroke
+                        }
+                        
+                        
+                    } else if (rem.startsWith("shadow")) {
+                        int p1 = rem.indexOf("(");
+                        int p2 = rem.indexOf(")");
+                        if (p1 != -1 && p2 != -1) {
+                            String shadowStr = rem.substring(p1+1, p2);
+                            String[] shadowArgs = Util.split(shadowStr, " ");
+                            for (String shadowArg : shadowArgs) {
+                                shadowArg = shadowArg.trim();
+                                if (shadowArg.startsWith("shadowSpread:") || shadowArg.endsWith("mm") || shadowArg.endsWith("px")) {
+                                    int colonPos = shadowArg.indexOf(":");
+                                    if (colonPos != -1) {
+                                        shadowArg = shadowArg.substring(colonPos+1);
+                                    }
+                                    out.setShadowSpread(parseScalarValue(shadowArg));
+                                } else if (shadowArg.startsWith("x:")) {
+                                    out.setShadowX((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                                } else if (shadowArg.startsWith("y:")) {
+                                    out.setShadowY((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                                } else if (shadowArg.startsWith("blur:")) {
+                                    out.setShadowBlur((Float) Float.parseFloat(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                                } else if (shadowArg.startsWith("opacity:")) {
+                                    out.setShadowOpacity((Integer) Integer.parseInt(shadowArg.substring(shadowArg.indexOf(":")+1).trim()));
+                                }
+                            }
+                            
+                            if (out.getShadowSpread() == null) {
+                                out.setShadowSpread(parseScalarValue("0.5mm"));
+                            }
+                            if (out.getShadowX() == null) {
+                                out.setShadowX((Float) (float)0.5);
+                            }
+                            if (out.getShadowY() == null) {
+                                out.setShadowY((Float) (float)0.5);
+                            }
+                            if (out.getShadowBlur() == null) {
+                                out.setShadowBlur((Float) (float)0.1);
+                            }
+                            if (out.getShadowOpacity() == null) {
+                                out.setShadowOpacity((Integer) 128);
+                            }
+                            rem = rem.substring(p2+1);
+                        } else {
+                            rem = rem.substring(6); // at least get past the shadow param
+                        }
+                    } else if (rem.length() == 8 || rem.indexOf(" ") == 8) {
+                        String colorStr = rem.substring(0, 8);
+                        out.color = Integer.parseInt(colorStr.substring(2), 16) & 0xffffff;
+                        out.setOpacity((Integer) Integer.parseInt(colorStr.substring(0, 2), 16) & 0xff);
+                        rem = rem.substring(8);
+                    } else {
+                        int spacePos = rem.indexOf(" ");
+                        
+                        String colorStr = rem;
+                        if (spacePos != -1) {
+                            colorStr = colorStr.substring(0, spacePos);
+                        }
+                        if (colorStr.length() > 0 && colorStr.length() <= 6) {
+                            out.color = Integer.parseInt(colorStr, 16) & 0xffffff;
+                            out.setOpacity((Integer) 255);
+                        }
+                        rem = rem.substring(colorStr.length());
+                        
+                    
+                    }
+                }
+            }
+            return out;
+            
+        }
+        
         if (plen == 3) {
             String type = parts1[1];
             out.setColor((Integer) Integer.parseInt(parts1[2], 16));
@@ -1229,6 +1376,19 @@ public class StyleParser {
      * Encapsulates information about the {@literal border} property of a style string.
      */
     public static class BorderInfo {
+        
+        // Used for round border
+        private Integer opacity;
+        private Integer strokeColor;
+        private Integer strokeOpacity;
+        private Integer shadowOpacity;
+        private Float shadowX;
+        private Float shadowY;
+        private Float shadowBlur;
+        private ScalarValue shadowSpread;
+        private Boolean rectangle;
+        
+        
         /**
          * The type of the border.  E.g. {@literal line}, {@literal dashed}, {@literal image}, etc..
          */
@@ -1283,6 +1443,67 @@ public class StyleParser {
                 int color = getColor() == null ? 0 : getColor();
                 
                 return widthString()+" "+lineTypeString()+" "+Integer.toHexString(color);
+            } else if ("round".equals(getType())) {
+                StringBuilder sb = new StringBuilder();
+                
+                sb.append("round ");
+                if (color != null) {
+                    String hex = Integer.toHexString(color & 0xffffff);
+                    while (hex.length() < 6) hex = "0" + hex;
+                    
+                    if (getOpacity() != null) {
+                        String opacityStr = Integer.toHexString(getOpacity() & 0xff);
+                        while (opacityStr.length() < 2) opacityStr = "0" + opacityStr;
+                        hex = opacityStr + hex;
+                    }
+                    sb.append(hex).append(" ");
+                }
+                if (getShadowOpacity() != null && getShadowOpacity() != 0) {
+                    sb.append("shadow(");
+                    sb.append("opacity:").append(getShadowOpacity()).append(" ");
+                    if (getShadowSpread() != null) {
+                        sb.append("spread:").append(getShadowSpread().toString()).append(" ");
+                    }
+                    if (getShadowX() != null) {
+                        sb.append("x:").append(round(getShadowX(), 3)).append(" ");
+                    }
+                    if (getShadowY() != null) {
+                        sb.append("y:").append(round(getShadowY(), 3)).append(" ");
+                    }
+                    if (getShadowBlur() != null) {
+                        sb.append("blur:").append(round(getShadowBlur(), 3)).append(" ");
+                    }
+                    
+                    sb.append(") ");
+                    
+                }
+                if (width != null && width != 0 && getStrokeColor() != null) {
+                    sb.append("stroke(");
+                    if (width != null) {
+                        sb.append(widthString()).append(" ");
+                    }
+                    int c = getStrokeColor() & 0xffffff;
+                    String hex = Integer.toHexString(c);
+                    while (hex.length() < 6) {
+                        hex = "0" + hex;
+                    }
+                    if (getStrokeOpacity() != null && getStrokeOpacity() != 255) {
+                        String opacityStr = Integer.toHexString(getStrokeOpacity());
+                        while (opacityStr.length() < 2) {
+                            opacityStr = "0"+opacityStr;
+                        }
+                        hex = opacityStr + hex;
+                    }
+                    sb.append(hex).append(") ");
+
+                }
+                if (getRectangle() != null && getRectangle()) {
+                    sb.append("rect").append(" ");
+                }
+                
+                return sb.toString().trim();
+                
+                        
             } else {
                 return "none";
             }
@@ -1404,6 +1625,44 @@ public class StyleParser {
                 return Border.createImageSplicedBorder(getImage(theme, getSpliceImage()), insets[Component.TOP], insets[Component.RIGHT], insets[Component.BOTTOM], insets[Component.LEFT]);
             }
             
+            if ("round".equals(getType())) {
+                RoundBorder b = RoundBorder.create();
+                if (width != null) {
+                    b.stroke(getWidthInPixels(), false);
+                }
+                if (getOpacity() != null) {
+                    b.opacity(getOpacity());
+                }
+                if (getStrokeColor() != null) {
+                    b.strokeColor(getStrokeColor());
+                }
+                if (getStrokeOpacity() != null) {
+                    b.strokeOpacity(getStrokeOpacity());
+                }
+                if (getShadowOpacity() != null) {
+                    b.shadowOpacity(getShadowOpacity());
+                }
+                if (getShadowSpread() != null) {
+                    b.shadowSpread(getShadowSpread().getPixelValue(), false);
+                }
+                if (getShadowX() != null) {
+                    b.shadowX(getShadowX());
+                }
+                if (getShadowY() != null) {
+                    b.shadowY(getShadowY());
+                }
+                if (getShadowBlur() != null) {
+                    b.shadowBlur(getShadowBlur());
+                }
+                if (getRectangle() != null && getRectangle()) {
+                    b.rectangle(getRectangle());
+                }
+                if (color != null) {
+                    b.color(color);
+                }
+                return b;
+                        
+            }
             return Border.createEmpty();
              
         }
@@ -1532,12 +1791,21 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline border, the thickness value.
+         * For a line/dashed/dotted/underline/round border, the thickness value.
          * @return the width
          * @see #getWidthUnit() 
          */
         public Float getWidth() {
             return width;
+        }
+        
+        /**
+         * Gets the border thickness as a scalar value.  This is effectively the same
+         * value as returned by {@link #getWidth() } and {@link #getWidthUnit() }
+         * @return The thickness of the border.  Used with line, dashed, dotted, underline, and round borders.
+         */
+        public ScalarValue getThickness() {
+            return new ScalarValue(width, widthUnit);
         }
         
         /**
@@ -1557,7 +1825,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline border, gets the thickness value.
+         * For a line/dashed/dotted/underline/round border, gets the thickness value.
          * @param width the width to set
          * @see #setWidthUnit(byte) 
          */
@@ -1566,7 +1834,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline border, gets the unit of the thickness value.
+         * For a line/dashed/dotted/underline/round border, gets the unit of the thickness value.
          * @return the widthUnit
          * @see #getWidth() 
          */
@@ -1575,7 +1843,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline border, sets the unit of the thickness value.
+         * For a line/dashed/dotted/underline/round border, sets the unit of the thickness value.
          * 
          * @param widthUnit the widthUnit to set
          * @see #setWidth(java.lang.Float) 
@@ -1585,7 +1853,8 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline border, sets the color.
+         * For a line/dashed/dotted/underline/round border, sets the color.  For round border
+         * this gets the fill color.  For line border variants, it gets the stroke color.
          * @return the color
          * 
          */
@@ -1594,11 +1863,167 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline border, gets the color.
+         * For a line/dashed/dotted/underline/round border, gets the color.  For
+         * round border, this sets the fill color.  For line border variants, it sets the stroke color.
          * @param color the color to set
          */
         public void setColor(Integer color) {
             this.color = color;
+        }
+
+        /**
+         * Gets the fill opacity of round border.  Only used for round border
+         * @return the opacity The opacity of the round border.
+         */
+        public Integer getOpacity() {
+            return opacity;
+        }
+
+        /**
+         * Sets teh fill opacity of round border.  Only used for round border.
+         * @param opacity the opacity to set
+         */
+        public void setOpacity(Integer opacity) {
+            this.opacity = opacity;
+        }
+
+        /**
+         * Gets the stroke color for round border.  This is only used for round border.
+         * Line border variants should use {@link #getColor() }
+         * @return the strokeColor
+         */
+        public Integer getStrokeColor() {
+            return strokeColor;
+        }
+
+        /**
+         * Sets the stroke color for round border.  This is only used for round border.  
+         * Line border variants should use {@link #setColor(java.lang.Integer) }
+         * @param strokeColor the strokeColor to set
+         */
+        public void setStrokeColor(Integer strokeColor) {
+            this.strokeColor = strokeColor;
+        }
+
+        /**
+         * Gets the stroke opacity for round border.  This is only used for round border.
+         * @return the strokeOpacity
+         */
+        public Integer getStrokeOpacity() {
+            return strokeOpacity;
+        }
+
+        /**
+         * Sets the stroke opacity for round border.  This is only used for round border.
+         * @param strokeOpacity the strokeOpacity to set
+         */
+        public void setStrokeOpacity(Integer strokeOpacity) {
+            this.strokeOpacity = strokeOpacity;
+        }
+
+        /**
+         * Sets the shadow opacity for round border.  This is only used for round border.
+         * @return the shadowOpacity
+         */
+        public Integer getShadowOpacity() {
+            return shadowOpacity;
+        }
+
+        /**
+         * Sets the shadow opacity for round border.  This is only used for round border.
+         * @param shadowOpacity the shadowOpacity to set
+         */
+        public void setShadowOpacity(Integer shadowOpacity) {
+            this.shadowOpacity = shadowOpacity;
+        }
+
+        /**
+         * Gets the shadowX property of round border.
+         * @return the shadowX
+         */
+        public Float getShadowX() {
+            return shadowX;
+        }
+
+        /**
+         * Sets the shadowX property of round border.
+         * @param shadowX the shadowX to set
+         */
+        public void setShadowX(Float shadowX) {
+            this.shadowX = shadowX;
+        }
+
+        /**
+         * Gets the shadowY property of round border.
+         * @return the shadowY
+         */
+        public Float getShadowY() {
+            return shadowY;
+        }
+
+        /**
+         * Sets the shadowY property of round border.
+         * @param shadowY the shadowY to set
+         */
+        public void setShadowY(Float shadowY) {
+            this.shadowY = shadowY;
+        }
+
+        /**
+         * Gets the blur for round border.
+         * @return the shadowBlur
+         */
+        public Float getShadowBlur() {
+            return shadowBlur;
+        }
+
+        /**
+         * Sets the blur for round border.
+         * @param shadowBlur the shadowBlur to set
+         */
+        public void setShadowBlur(Float shadowBlur) {
+            this.shadowBlur = shadowBlur;
+        }
+
+        /**
+         * Gets the shadow spread for round border.
+         * @return the shadowSpread
+         */
+        public ScalarValue getShadowSpread() {
+            return shadowSpread;
+        }
+
+        /**
+         * Sets the shadow spread for round border.
+         * @param shadowSpread the shadowSpread to set
+         */
+        public void setShadowSpread(ScalarValue shadowSpread) {
+            this.shadowSpread = shadowSpread;
+        }
+        
+        /**
+         * Sets the shadow spread for round border as a string.  String must be valid scalar
+         * value.  E.g. 2mm, or 3px.
+         * @param val 
+         */
+        public void setShadowSpread(String val) {
+            this.shadowSpread = parseScalarValue(val);
+        }
+
+        /**
+         * Checks whether round border should grow to a rectangle.  Only used for round border.
+         * @return the rectangle
+         */
+        public Boolean getRectangle() {
+            return rectangle;
+        }
+
+        /**
+         * Sets whether round border should grow to a rectangle.  Only used for round border.
+         * @param rectangle the rectangle to set
+         */
+        public void setRectangle(Boolean rectangle) {
+            this.rectangle = rectangle;
         }
         
     }
@@ -2082,5 +2507,26 @@ public class StyleParser {
         return out;
     }
     
+    
+    private static String format(double d, int decimalPlaces) {
+        for (int i=0; i<decimalPlaces; i++) {
+            d *= 10;
+        }
+        d = Math.round(d);
+        for (int i=0; i<decimalPlaces; i++) {
+            d /= 10;
+        }
+
+        String dStr = String.valueOf(d);
+        int decPos = dStr.indexOf(".");
+        if (decPos != -1) {
+            int decLen = dStr.length() - decPos;
+            if (decLen > decimalPlaces) {
+                dStr = dStr.substring(0, dStr.length() - (decLen - decimalPlaces));
+                
+            }
+        }
+        return dStr;
+    }
     
 }
