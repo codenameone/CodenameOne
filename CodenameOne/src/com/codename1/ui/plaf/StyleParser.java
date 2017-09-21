@@ -2180,11 +2180,18 @@ public class StyleParser {
          */
         public Font createFont(Style baseStyle) {
             Font f = name == null ? baseStyle.getFont() : Font.createTrueTypeFont(name, file);
-            if (f == null) {
+            if (f == null || (getSize() != null && !f.isTTFNativeFont())) {
                 f = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR);
-                
             }
-            return f.derive(getSizeInPixels(baseStyle), f.getStyle());
+            if (f != null) {
+                if (f.isTTFNativeFont()) {
+                    return f.derive(getSizeInPixels(baseStyle), f.getStyle());
+                } else {
+                    return Font.getDefaultFont();
+                }
+            } else {
+                return Font.getDefaultFont();
+            }
         }
     }
     
