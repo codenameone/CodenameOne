@@ -1286,16 +1286,20 @@ public class UIManager {
         
         MarginInfo margin = styleInfo.getMargin();
         if (margin != null) {
-            themeProps.put(id + Style.MARGIN, fromFloatArray(margin.createMargin(base)));
-            themeProps.put(id + Style.MARGIN_UNIT, margin.createMarginUnit(base));
+            float[] marginArr = margin.createMargin(base);
+            themeProps.put(id + Style.MARGIN, marginArr[Component.TOP]+","+marginArr[Component.BOTTOM]+","+marginArr[Component.LEFT]+","+marginArr[Component.RIGHT]);
+            byte[] unitArr = margin.createMarginUnit(base);
+            themeProps.put(id + Style.MARGIN_UNIT, new byte[]{unitArr[Component.TOP], unitArr[Component.BOTTOM], unitArr[Component.LEFT], unitArr[Component.RIGHT]});
         } else {
             themeProps.remove(id + Style.MARGIN);
             themeProps.remove(id + Style.MARGIN_UNIT);
         }
         PaddingInfo padding = styleInfo.getPadding();
         if (padding != null) {
-            themeProps.put(id + Style.PADDING, fromFloatArray(padding.createPadding(base)));
-            themeProps.put(id + Style.PADDING_UNIT, padding.createPaddingUnit(base));
+            float[] paddingArr = padding.createPadding(base);
+            themeProps.put(id + Style.PADDING, paddingArr[Component.TOP] + "," + paddingArr[Component.BOTTOM] + "," + paddingArr[Component.LEFT] + ","+paddingArr[Component.RIGHT]);
+            byte[] unitArr = padding.createPaddingUnit(base);
+            themeProps.put(id + Style.PADDING_UNIT, new byte[]{unitArr[Component.TOP], unitArr[Component.BOTTOM], unitArr[Component.LEFT], unitArr[Component.RIGHT]});
         } else {
             themeProps.remove(id + Style.PADDING);
             themeProps.remove(id + Style.PADDING_UNIT);

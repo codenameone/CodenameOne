@@ -1391,7 +1391,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineAllStyles) {
+        if (styles == null ? inlineAllStyles != null : !styles.equals(inlineAllStyles)) {
             this.inlineAllStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -1413,7 +1413,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineUnselectedStyles) {
+        if (styles == null ? inlineUnselectedStyles != null : !styles.equals(inlineUnselectedStyles)) {
             this.inlineUnselectedStyles = styles;
 
             unSelectedStyle = null;
@@ -1437,7 +1437,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineSelectedStyles) {
+        if (styles == null ? inlineSelectedStyles != null : !styles.equals(inlineSelectedStyles)) {
             this.inlineSelectedStyles = styles;
 
             unSelectedStyle = null;
@@ -1461,7 +1461,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineDisabledStyles) {
+        if (styles == null ? inlineDisabledStyles != null : !styles.equals(inlineDisabledStyles)) {
             this.inlineDisabledStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -1483,7 +1483,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlinePressedStyles) {
+        if (styles == null ? inlinePressedStyles != null : !styles.equals(inlinePressedStyles)) {
             this.inlinePressedStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -4410,7 +4410,7 @@ public class Component implements Animation, StyleListener {
      */
     public Style getPressedStyle() {
         if (pressedStyle == null) {
-            if (hasInlineUnselectedStyle()) {
+            if (hasInlinePressedStyle()) {
                 pressedStyle = getUIManager().parseComponentCustomStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), "press", getInlinePressedStyleStrings());
             } else {
                 pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
@@ -6072,6 +6072,10 @@ public class Component implements Animation, StyleListener {
                 Image img = s.getBgImage();
                 if(img != null && img.requiresDrawImage()) {
                     // damn no native painting...
+                    int oldX = x;
+                    int oldY = y;
+                    x = rect.getX();
+                    y = rect.getY();
                     int iW = img.getWidth();
                     int iH = img.getHeight();
                     switch (s.getBackgroundType()) {
@@ -6203,6 +6207,8 @@ public class Component implements Animation, StyleListener {
                             g.drawImage(img, x + width - iW, y + (height - iH));
                             return;
                     }
+                    x = oldX;
+                    y = oldY;
                 } 
                 
                 impl.paintComponentBackground(g.getGraphics(), x, y, width, height, s);

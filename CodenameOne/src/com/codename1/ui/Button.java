@@ -579,14 +579,18 @@ public class Button extends Label {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-        requestFocus();
+        if (!Display.getInstance().isDesktop()) {
+            requestFocus();
+        }
     }
     
     /**
      * {@inheritDoc}
      */
     public void pointerHoverReleased(int[] x, int[] y) {
-        requestFocus();
+        if (!Display.getInstance().isDesktop()) {
+            requestFocus();
+        }
     }
 
     /**

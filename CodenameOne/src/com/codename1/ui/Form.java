@@ -2662,7 +2662,7 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                 setFocused(cmp);
             }
             cmp.pointerHoverPressed(x, y);
@@ -2686,7 +2686,7 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
+                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 cmp.pointerHover(x, y);
@@ -2731,9 +2731,11 @@ public class Form extends Container {
         rippleMotion = null;
 
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        Container actual = getActualPane();
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
-            Component atXY = getComponentAt(x, y);
+            Component atXY = actual.getComponentAt(x, y);
+            
             Component pendingButton = (Component)buttonsAwatingRelease.get(0);
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
@@ -2744,7 +2746,7 @@ public class Form extends Container {
             if(pendingButton instanceof Button) {
                 Button b = (Button)pendingButton;
                 int relRadius = b.getReleaseRadius();
-                if(relRadius > 0) {
+                if(relRadius > 0 || b.contains(x, y)) {
                     Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
                     if(r.contains(x, y)) {
                         buttonsAwatingRelease = null;
@@ -2782,7 +2784,7 @@ public class Form extends Container {
                 stickyDrag.pointerReleased(x, y);
                 repaint();
             } else {
-                Container actual = getActualPane();
+                //Container actual = getActualPane();
                 if (y >= actual.getY() && x >= actual.getX()) {
                     Component cmp = actual.getComponentAt(x, y);
                     while (cmp != null && cmp.isIgnorePointerEvents()) {

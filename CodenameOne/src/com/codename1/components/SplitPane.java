@@ -334,6 +334,60 @@ public class SplitPane extends Container {
     }
     
     /**
+     * Gets the component that is currently placed in the bottom or right of the split pane.
+     * @return 
+     */
+    public Component getBottomOrRightComponent() {
+        for (Component c : bottomOrRight) {
+            return c;
+        }
+        return null;
+    }
+    
+    /**
+     * Gets the component that is currently placed in the bottom of the split pane.
+     * @return 
+     */
+    public Component getBottom() {
+        return getBottomOrRightComponent();
+    }
+    
+    /**
+     * Gets the component that is currently placed in the right of the split pane.
+     * @return 
+     */
+    public Component getRight() {
+        return getBottomOrRightComponent();
+    }
+    
+    /**
+     * Gets the component that is currently placed in the top or left of the split pane.
+     * @return 
+     */
+    public Component getTopOrLeftComponent() {
+        for (Component c : bottomOrRight) {
+            return c;
+        }
+        return null;
+    }
+    
+    /**
+     * Gets the component that is currently placed in the top of the split pane.
+     * @return 
+     */
+    public Component getTop() {
+        return getTopOrLeftComponent();
+    }
+    
+    /**
+     * Gets the component that is currently placed in the left of the split pane.
+     * @return 
+     */
+    public Component getLeft() {
+        return getTopOrLeftComponent();
+    }
+    
+    /**
      * Sets the component to be placed on the right of the split pane.
      * @param cmp The component to place on the right.
      */

@@ -5277,6 +5277,7 @@ public class FontImage extends Image {
         g.setColor(color);
         g.setFont(t);
         int ww = t.stringWidth(text);
+        int hh = t.getHeight();
         //int paddingPixels = Display.getInstance().convertToPixels(padding, true);
         if (rotated != 0) {
             int tX = g.getTranslateX();
@@ -5287,11 +5288,7 @@ public class FontImage extends Image {
             g.resetAffine();
             g.translate(tX, tY);
         } else {
-            int tX = g.getTranslateX();
-            int tY = g.getTranslateY();
-            g.translate(-tX, -tY);
-            g.drawString(text, x + w / 2 - ww / 2, y);
-            g.translate(tX, tY);
+            g.drawString(text, x + w / 2 - ww / 2, y + h/2 - hh/2);
         }
         g.setFont(oldFont);
         g.setColor(oldColor);
@@ -5394,6 +5391,9 @@ public class FontImage extends Image {
         return f;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Image rotate90Degrees(boolean maintainOpacity) {
         FontImage f = createFixed(text, fnt, color, width, height);
@@ -5401,9 +5401,32 @@ public class FontImage extends Image {
         f.opacity = maintainOpacity ? opacity : 255;
         return f; 
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Image rotate270Degrees(boolean maintainOpacity) {
+        FontImage f = createFixed(text, fnt, color, width, height);
+        f.rotated = 270;
+        f.opacity = maintainOpacity ? opacity : 255;
+        return f; 
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Image rotate180Degrees(boolean maintainOpacity) {
+        FontImage f = createFixed(text, fnt, color, width, height);
+        f.rotated = 180;
+        f.opacity = maintainOpacity ? opacity : 255;
+        return f; 
+    }
     
     
 
+        
     /**
      * Converts the icon image to an encoded image if possible
      *
