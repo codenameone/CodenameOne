@@ -308,6 +308,19 @@ public class TextArea extends Component {
      * 
      * @param text the text to be displayed; if text is null, the empty 
      * string "" will be displayed
+     * @param uiid the uiid to apply
+     */
+    public TextArea(String text, String uiid) {
+        this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);
+        setUIID(uiid);
+    }
+    
+    /**
+     * Creates an area with the given text, this constructor
+     * will create a single line text area similar to a text field! 
+     * 
+     * @param text the text to be displayed; if text is null, the empty 
+     * string "" will be displayed
      */
     public TextArea(String text) {
         this(text, Math.max(defaultMaxSize, nl(text)), 1, numCols(text), ANY);
