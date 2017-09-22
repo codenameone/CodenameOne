@@ -2990,6 +2990,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    static final Map<View,AndroidPeer> activePeers = new HashMap<View,AndroidPeer>();
+
+    
     /**
      * wrapper component that capsules a native view object in a Codename One
      * component. this involves A LOT of back and forth between the Codename One
@@ -3308,6 +3311,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     g.drawImage(peerImage, getX(), getY());
                     return;
                 }
+                synchronized(activePeers) {
+                    activePeers.put(v, this);
+                }
                 ((AndroidGraphics) nativeGraphics).drawView(v, lp);
                 if (lightweightMode && peerImage != null) {
                     g.drawImage(peerImage, getX(), getY(), getWidth(), getHeight());
@@ -3315,6 +3321,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 super.paint(g);
             }
+        }
+        
+        boolean _initialized() {
+            return isInitialized();
         }
 
         @Override

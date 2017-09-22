@@ -622,6 +622,29 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                         if(v.getParent() == null) {
                             v.setLayoutParams(lp);
                             addView(v);
+                            ArrayList<View> toRemove = new ArrayList<View>();
+                            ViewGroup parentGroup = (ViewGroup)v.getParent();
+                            int childCount = parentGroup.getChildCount();
+                            for (int i=0; i<childCount; i++) {
+                                View child = parentGroup.getChildAt(i);
+                                if (child == v) {
+                                    continue;
+                                }
+                                AndroidImplementation.AndroidPeer peer = AndroidImplementation.activePeers.get(child);
+
+                                if (peer != null) {
+                                    if (!peer._initialized()) {
+                                        toRemove.add(child);
+                                    }
+                                }
+                            }
+                            for (View child : toRemove) {
+                                removeView(child);
+                                synchronized(AndroidImplementation.activePeers) {
+                                    AndroidImplementation.activePeers.remove(child);
+                                }
+                            }
+
                         }
                     }
                 });
