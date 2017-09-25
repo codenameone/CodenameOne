@@ -2137,20 +2137,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             rotate.setEnabled(!desktopSkin);
 
             simulatorMenu.add(rotate);
-            JMenu zoomMenu = new JMenu("Zoom");
+            final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
             simulatorMenu.add(zoomMenu);
 
             JMenu debugEdtMenu = new JMenu("Debug EDT");
             simulatorMenu.add(debugEdtMenu);
-
-            JMenuItem zoom25 = new JMenuItem("25%");
-            zoomMenu.add(zoom25);
-            JMenuItem zoom50 = new JMenuItem("50%");
-            zoomMenu.add(zoom50);
-            JMenuItem zoom100 = new JMenuItem("100%");
-            zoomMenu.add(zoom100);
-            JMenuItem zoom200 = new JMenuItem("200%");
-            zoomMenu.add(zoom200);
             
             zoomMenu.setEnabled(!desktopSkin);
 
@@ -2922,80 +2913,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 }
             });
-            zoom100.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 1;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            zoom25.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 0.25f;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            zoom50.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 0.5f;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            zoom200.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() * 2 / retinaScale), (int)(getSkin().getHeight() * 2 / retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 2;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            touchFlag.addItemListener(new ItemListener() {
-
-                public void itemStateChanged(ItemEvent ie) {
-                    touchDevice = !touchDevice;
-                    Display.getInstance().setTouchScreenDevice(touchDevice);
-                    Display.getInstance().getCurrent().repaint();
-                }
-            });
-            nativeInputFlag.addItemListener(new ItemListener() {
-
-                public void itemStateChanged(ItemEvent ie) {
-                    useNativeInput = !useNativeInput;
-                }
-            });
             
             alwaysOnTopFlag.addItemListener(new ItemListener() {
 
@@ -3013,8 +2930,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     simulateAndroidKeyboard = !simulateAndroidKeyboard;
                 }
             });
-
-            scrollFlag.addItemListener(new ItemListener() {
+            
+            ItemListener zoomListener = new ItemListener() {
 
                 public void itemStateChanged(ItemEvent ie) {
                     scrollableSkin = !scrollableSkin;
@@ -3041,7 +2958,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Display.getInstance().getCurrent().repaint();
                     frm.repaint();
                 }
-            });
+            };
+
+            zoomMenu.addItemListener(zoomListener);
+            
+            scrollFlag.addItemListener(zoomListener);
 
 
 
