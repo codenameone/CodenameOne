@@ -1161,8 +1161,8 @@ public class Form extends Container {
      */ 
     private Container getLayeredPaneImpl() {
         if(layeredPane == null){
-            Container parent = contentPane.wrapInLayeredPane();
             layeredPane = new Container(new LayeredLayout());
+            Container parent = contentPane.wrapInLayeredPane();
             // adds the global layered pane
             layeredPane.add(new Container());
             parent.addComponent(layeredPane);
