@@ -3486,7 +3486,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (fsFile.exists()) {
                 f = fsFile.toURI().toString();
             }
-            if (f.contains("://")) {
+            if (f.contains(":")) {
                 try {
                     // load Via URL loading
                     loadSkinFile(new URL(f).openStream(), frm);
@@ -3494,6 +3494,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     String d = System.getProperty("dskin");
                     loadSkinFile(d, frm);
                     return;
+                } catch (MalformedURLException ex) {
+                    loadSkinFile(getResourceAsStream(getClass(), "/iphone3gs.skin"), frm);
+                    
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
