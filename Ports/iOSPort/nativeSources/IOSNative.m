@@ -5423,6 +5423,10 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
     __block CGRect cgrect = CGRectMake(0,0,0,0);
     if (useRect){
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
+        cgrect.origin.x = cgrect.origin.x / scaleValue;
+        cgrect.origin.y = cgrect.origin.y / scaleValue;
+        cgrect.size.width = cgrect.size.width / scaleValue;
+        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();

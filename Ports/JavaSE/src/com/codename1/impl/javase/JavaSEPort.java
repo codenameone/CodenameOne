@@ -3486,7 +3486,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (fsFile.exists()) {
                 f = fsFile.toURI().toString();
             }
-            if (f.contains(":")) {
+            if (f.contains("://") || f.startsWith("file:")) {
+
                 try {
                     // load Via URL loading
                     loadSkinFile(new URL(f).openStream(), frm);
