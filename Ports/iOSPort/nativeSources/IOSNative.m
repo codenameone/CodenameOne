@@ -4665,6 +4665,7 @@ void com_codename1_impl_ios_IOSNative_scanQRCode__(CN1_THREAD_STATE_MULTI_ARG JA
 
 #ifdef NEW_CODENAME_ONE_VM
 NSData* arrayToData(JAVA_OBJECT arr) {
+    if (arr == JAVA_NULL) return nil;
     JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
     void* data = (void*)byteArray->data;
     NSData* d = [NSData dataWithBytes:data length:byteArray->length];
@@ -4736,6 +4737,7 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
 }
 #else // NEW_CODENAME_ONE_VM
 NSData* arrayToData(JAVA_OBJECT arr) {
+    if (arr == JAVA_NULL) return nil;
     org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
     void* data = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
