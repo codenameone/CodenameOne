@@ -1870,7 +1870,7 @@ public class Container extends Component implements Iterable<Component>{
                             return c;
                         }
                     }
-                    return component;
+                    //return component;
                 }
                 if (cmp instanceof Container) {
                     Component c = ((Container) cmp).getComponentAt(x, y);

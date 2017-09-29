@@ -1172,9 +1172,11 @@ public class Form extends Container {
     }
     
     Container getActualPane(){
-        if(layeredPane != null){
+        if (formLayeredPane != null) {
+            return this;
+        }else if(layeredPane != null){
             return layeredPane.getParent();
-        }else{
+        } else {
             return contentPane;
         }
     }
@@ -2356,6 +2358,7 @@ public class Form extends Container {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         //check if the click is relevant to the menu bar.
+        /*
         if (menuBar.contains(x, y)) {
             Component cmp = menuBar.getComponentAt(x, y);
             while (cmp != null && cmp.isIgnorePointerEvents()) {
@@ -2368,6 +2371,7 @@ public class Form extends Container {
             }
             return;
         }
+        */
         Container actual = getActualPane();
         if (y >= actual.getY() && x >= actual.getX()) {
             Component cmp = actual.getComponentAt(x, y);
@@ -2729,7 +2733,7 @@ public class Form extends Container {
      */
     public void pointerReleased(int x, int y) {
         rippleMotion = null;
-
+        
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         Container actual = getActualPane();
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
@@ -2739,7 +2743,7 @@ public class Form extends Container {
             Component pendingButton = (Component)buttonsAwatingRelease.get(0);
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
-                pointerReleased(x, y);
+                pendingButton.pointerReleased(x, y);
                 return;
             }
             
