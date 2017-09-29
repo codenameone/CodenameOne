@@ -1146,6 +1146,7 @@ public class Component implements Animation, StyleListener {
         setPreferredSize(null);
         if (!"".equals(value) && value != null) {
             Dimension dim = getPreferredSize();
+            dim = new Dimension(dim.getWidth(), dim.getHeight());
             int oldW = dim.getWidth();
             int oldH = dim.getHeight();
             Component.parsePreferredSize((String)value, dim);
