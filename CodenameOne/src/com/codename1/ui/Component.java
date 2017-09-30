@@ -1111,7 +1111,7 @@ public class Component implements Animation, StyleListener {
     public int getBaselineResizeBehavior() {
         return BRB_OTHER;
     }
-
+    
     /**
      * Sets the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be
@@ -1136,7 +1136,60 @@ public class Component implements Animation, StyleListener {
         sizeRequestedByUser = true;
     }
 
-
+    /**
+     * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
+     * to reach similar functionality 
+     * @param preferredSize The preferred size to set in format "width height", where width and height can be a scalar
+     * value with px or mm units. Or the special value "inherit" which will just inherit the default preferred size.
+     */
+    public void setPreferredSizeStr(String value) {
+        setPreferredSize(null);
+        if (!"".equals(value) && value != null) {
+            Dimension dim = getPreferredSize();
+            dim = new Dimension(dim.getWidth(), dim.getHeight());
+            int oldW = dim.getWidth();
+            int oldH = dim.getHeight();
+            Component.parsePreferredSize((String)value, dim);
+            if (oldW != dim.getWidth() || oldH != dim.getHeight()) {
+                setPreferredSize(dim);
+            }
+        }
+    }
+    
+    public static Dimension parsePreferredSize(String preferredSize, Dimension baseSize) {
+        String strVal = (String)preferredSize;
+        int spacePos = strVal.indexOf(" ");
+        if (spacePos == -1) {
+            return baseSize;
+        }
+        String wStr = strVal.substring(0, spacePos).trim();
+        String hStr = strVal.substring(spacePos+1).trim();
+        int unitPos=-1;
+        float pixelsPerMM = Display.getInstance().convertToPixels(1000f)/1000f;
+        try {
+            
+            
+            if ((unitPos=wStr.indexOf("mm")) != -1) {
+                baseSize.setWidth((int)Math.round(Float.parseFloat(wStr.substring(0, unitPos))*pixelsPerMM));
+            } else if ((unitPos=wStr.indexOf("px")) != -1) {
+                baseSize.setWidth(Integer.parseInt(wStr.substring(0, unitPos)));
+            } else if (!"inherit".equals(wStr)){
+                baseSize.setWidth(Integer.parseInt(wStr));
+            }
+        } catch (Throwable t){}
+        
+        try {
+            if ((unitPos=hStr.indexOf("mm")) != -1) {
+                baseSize.setHeight((int)Math.round(Float.parseFloat(hStr.substring(0, unitPos))*pixelsPerMM));
+            } else if ((unitPos=hStr.indexOf("px")) != -1) {
+                baseSize.setHeight(Integer.parseInt(hStr.substring(0, unitPos)));
+            } else if (!"inherit".equals(hStr)){
+                baseSize.setHeight(Integer.parseInt(hStr));
+            }
+        } catch (Throwable t){}
+        return baseSize;
+    }
+    
     /**
      * Returns the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be

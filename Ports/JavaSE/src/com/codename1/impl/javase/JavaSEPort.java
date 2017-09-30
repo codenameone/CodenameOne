@@ -1346,6 +1346,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Integer triggeredKeyCode;
 
         public void mousePressed(MouseEvent e) {
+            cn1GrabbedDrag = true;
             e.consume();
             if (!isEnabled()) {
                 return;
@@ -1400,6 +1401,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseReleased(MouseEvent e) {
+            cn1GrabbedDrag = false;
             e.consume();
             if (!isEnabled()) {
                 return;
@@ -1803,6 +1805,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
     }
+    boolean cn1GrabbedDrag=false;
     C canvas;
 
     protected java.awt.Container getCanvas() {
@@ -6408,18 +6411,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         
         
-        
-        
+        private boolean peerGrabbedDrag=false;
         
         private boolean sendToCn1(MouseEvent e) {
             
             int cn1X = getCN1X(e);
             int cn1Y = getCN1Y(e);
-            if (Display.isInitialized()) {
+            if (!peerGrabbedDrag && Display.isInitialized()) {
                 Form f = Display.getInstance().getCurrent();
                 if (f != null) {
                     Component cmp = f.getComponentAt(cn1X, cn1Y);
-                    if (cmp != null && !(cmp instanceof PeerComponent)) {
+                    if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
                         // It's not a peer component, so we should pass the event to the canvas
                         e = SwingUtilities.convertMouseEvent(this, e, canvas);
                         switch (e.getID()) {
@@ -6433,9 +6435,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 canvas.mouseMoved(e);
                                 break;
                             case MouseEvent.MOUSE_PRESSED:
+                                cn1GrabbedDrag = true;
                                 canvas.mousePressed(e);
                                 break;
                             case MouseEvent.MOUSE_RELEASED:
+                                cn1GrabbedDrag = false;
                                 canvas.mouseReleased(e);
                                 break;
                             case MouseEvent.MOUSE_WHEEL:
@@ -6449,6 +6453,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         //canvas.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, canvas));
                     }
                 }
+            }
+            if (e.getID() == MouseEvent.MOUSE_RELEASED) {
+                cn1GrabbedDrag = false;
+                peerGrabbedDrag = false;
+            } else if (e.getID() == MouseEvent.MOUSE_PRESSED) {
+                peerGrabbedDrag = true;
             }
             return false;
         }
