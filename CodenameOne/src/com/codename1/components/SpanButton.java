@@ -233,8 +233,6 @@ public class SpanButton extends Container {
      * @param cmd the command
      */
     public void setCommand(Command cmd) {
-        actualButton.setCommand(cmd);
-        actualButton.setText(""); //remove any text set by cmd for the actualButton since text from Command should only be shown for the TextArea
         setText(cmd.getCommandName()); //use the text of the Command (since Button is hidden)
     }
 
