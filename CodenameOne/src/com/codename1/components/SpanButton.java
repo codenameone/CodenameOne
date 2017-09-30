@@ -233,7 +233,7 @@ public class SpanButton extends Container {
      * @param cmd the command
      */
     public void setCommand(Command cmd) {
-        setText(cmd.getCommandName()); //use the text of the Command (since Button is hidden)
+        actualButton.setCommand(cmd);
     }
 
     /**
