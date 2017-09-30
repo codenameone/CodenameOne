@@ -290,7 +290,7 @@ public class FlowLayout extends Layout{
         }
     }
 
-    private Dimension dim = new Dimension(0, 0);
+//    private Dimension dim = new Dimension(0, 0);//moved into getPreferredSize, otherwise the same dim instance can be used both as preferredSize and scrollSize which creates side effects when preferredSize is forced to (0,0) in setHidden(true)
 
     /**
      * {@inheritDoc}
@@ -322,6 +322,7 @@ public class FlowLayout extends Layout{
 
         width = Math.max(w, width);
 
+        Dimension dim = new Dimension(0, 0);
         dim.setWidth(width + parent.getStyle().getPaddingLeftNoRTL()+ parent.getStyle().getPaddingRightNoRTL());
         dim.setHeight(height + parent.getStyle().getPaddingTop()+ parent.getStyle().getPaddingBottom());
         return dim;
