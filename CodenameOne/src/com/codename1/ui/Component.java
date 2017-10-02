@@ -1135,25 +1135,35 @@ public class Component implements Animation, StyleListener {
         dim.setHeight(d.getHeight());
         sizeRequestedByUser = true;
     }
-
+    
+    /**
+     * Optional string the specifies the preferred size of the component. Format is {@literal <width> <height>} 
+     * where {@literal <width>} and {@literal <height>} are both scalar values.  E.g. "15px", "20.5mm", or "inherit"
+     * to indicate that it should inherit the value returned from {@link #calcPreferredSize() } for that coordinate.
+     */
+    private String preferredSizeStr;
+    
     /**
      * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
      * to reach similar functionality 
-     * @param preferredSize The preferred size to set in format "width height", where width and height can be a scalar
+     * @param value The preferred size to set in format "width height", where width and height can be a scalar
      * value with px or mm units. Or the special value "inherit" which will just inherit the default preferred size.
      */
     public void setPreferredSizeStr(String value) {
+        preferredSizeStr = value;
         setPreferredSize(null);
-        if (!"".equals(value) && value != null) {
-            Dimension dim = getPreferredSize();
-            dim = new Dimension(dim.getWidth(), dim.getHeight());
-            int oldW = dim.getWidth();
-            int oldH = dim.getHeight();
-            Component.parsePreferredSize((String)value, dim);
-            if (oldW != dim.getWidth() || oldH != dim.getHeight()) {
-                setPreferredSize(dim);
-            }
-        }
+    }
+    
+    /**
+     * Returns the preferred size string that can be used to specify the preferred size of the component
+     * using pixels or millimetres.  This string is applied to the preferred size just after is is initially
+     * calculated using {@link #calcPreferredSize() }. 
+     * @return 
+     * @deprecated This method is primarily for use by the GUI builder.  Use {@link #getPreferredSize() } to find
+     * the preferred size of a component.
+     */
+    public String getPreferredSizeStr() {
+        return preferredSizeStr;
     }
     
     public static Dimension parsePreferredSize(String preferredSize, Dimension baseSize) {
@@ -2640,6 +2650,9 @@ public class Component implements Animation, StyleListener {
                 preferredSize = new Dimension(0, 0);
             } else {
                 preferredSize = calcPreferredSize();
+                if (preferredSizeStr != null) {
+                    Component.parsePreferredSize(preferredSizeStr, preferredSize);
+                }
             }
         }
         return preferredSize;
