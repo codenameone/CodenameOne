@@ -3074,7 +3074,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public void play() {
             if(isVideo) {
-                if(nativePlayer) {
+                if(component == null && nativePlayer) {
+                    // Mass source of confusion.  If getVideoComponent() has been called, then
+                    // we can't use the native player.
                     if(uri != null) {
                         moviePlayerPeer = nativeInstance.createNativeVideoComponent(uri, onCompletionCallbackId);
                     } else {
