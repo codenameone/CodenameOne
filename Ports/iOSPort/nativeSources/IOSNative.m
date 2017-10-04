@@ -2390,8 +2390,14 @@ void com_codename1_impl_ios_IOSNative_removeNotificationCenterObserver___long(CN
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG str)];
+        POOL_BEGIN()
+        NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
+        NSURL *u = nil;
+        if([s hasPrefix:@"file:"]) {
+            u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
+        } else {
+            u = [NSURL URLWithString:s];
+        }
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
 #ifndef AUTO_PLAY_VIDEO
