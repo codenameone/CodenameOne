@@ -2365,6 +2365,7 @@ public class LayeredLayout extends Layout {
                             break;
                         case UNIT_BASELINE:
                             preferredValue = 0;
+                            break;
                         default:
                             throw new RuntimeException("Invalid unit " + unit);
                     }

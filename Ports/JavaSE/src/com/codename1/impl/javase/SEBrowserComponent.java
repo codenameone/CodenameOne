@@ -26,15 +26,11 @@ import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.EventQueue;
 import java.awt.Graphics2D;
-import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseWheelEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -52,14 +48,10 @@ import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebErrorEvent;
 import javafx.scene.web.WebEvent;
 import javafx.scene.web.WebView;
-import javax.swing.JComponent;
 import javax.swing.JFrame;
-import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollBar;
 import javax.swing.SwingUtilities;
-import javax.swing.event.MenuDragMouseEvent;
-import netscape.javascript.JSException;
 
 /**
  *
@@ -114,7 +106,11 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
             return true;
-        }        
+        } 
+        
+        public void log(String val) {
+            System.out.println("[JS Console] "+val);
+        }
     }
     
     
@@ -306,6 +302,18 @@ public class SEBrowserComponent extends PeerComponent {
             public void changed(ObservableValue ov, State oldState, State newState) {
                 SEBrowserComponent self = weakSelf.get();
                 BrowserComponent p = weakP.get();
+                try {
+                    netscape.javascript.JSObject w = (netscape.javascript.JSObject)self.web.getEngine().executeScript("window");
+                    if (w == null) {
+                        System.err.println("Could not get window");
+                    } else {
+                        Bridge b = new Bridge(p);
+                        self.putClientProperty("SEBrowserComponent.Bridge.jconsole", b);
+                        w.setMember("jconsole", b);
+                    }
+                } catch (Throwable t) {
+                    Log.e(t);
+                }
                 if (self == null || p == null) {
                     return;
                 }
@@ -326,7 +334,10 @@ public class SEBrowserComponent extends PeerComponent {
                         self.web.getEngine().executeScript("if (!document.getElementById('FirebugLite')){E = document['createElement' + 'NS'] && document.documentElement.namespaceURI;E = E ? document['createElement' + 'NS'](E, 'script') : document['createElement']('script');E['setAttribute']('id', 'FirebugLite');E['setAttribute']('src', 'https://getfirebug.com/' + 'firebug-lite.js' + '#startOpened');E['setAttribute']('FirebugLite', '4');(document['getElementsByTagName']('head')[0] || document['getElementsByTagName']('body')[0]).appendChild(E);E = new Image;E['setAttribute']('src', 'https://getfirebug.com/' + '#startOpened');}");
                     }
                     netscape.javascript.JSObject window = (netscape.javascript.JSObject)self.web.getEngine().executeScript("window");
-                    window.setMember("cn1application", new Bridge(p));
+                    Bridge b = new Bridge(p);
+                    self.putClientProperty("SEBrowserComponent.Bridge.cn1application", b);
+                    window.setMember("cn1application", b);
+                    
                     self.web.getEngine().executeScript("while (window._cn1ready && window._cn1ready.length > 0) {var f = window._cn1ready.shift(); f();}");
                     //System.out.println("cn1application is "+self.web.getEngine().executeScript("window.cn1application && window.cn1application.shouldNavigate"));
                     self.web.getEngine().executeScript("window.addEventListener('unload', function(e){console.log('unloading...');return 'foobar';});");

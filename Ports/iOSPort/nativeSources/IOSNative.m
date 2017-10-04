@@ -4665,6 +4665,7 @@ void com_codename1_impl_ios_IOSNative_scanQRCode__(CN1_THREAD_STATE_MULTI_ARG JA
 
 #ifdef NEW_CODENAME_ONE_VM
 NSData* arrayToData(JAVA_OBJECT arr) {
+    if (arr == JAVA_NULL) return nil;
     JAVA_ARRAY byteArray = (JAVA_ARRAY)arr;
     void* data = (void*)byteArray->data;
     NSData* d = [NSData dataWithBytes:data length:byteArray->length];
@@ -4736,6 +4737,7 @@ JAVA_OBJECT nsDataToDoubleArray(NSData *data) {
 }
 #else // NEW_CODENAME_ONE_VM
 NSData* arrayToData(JAVA_OBJECT arr) {
+    if (arr == JAVA_NULL) return nil;
     org_xmlvm_runtime_XMLVMArray* byteArray = (org_xmlvm_runtime_XMLVMArray*)arr;
     void* data = (void*)byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
     NSData* d = [NSData dataWithBytes:data length:byteArray->fields.org_xmlvm_runtime_XMLVMArray.length_];
@@ -5423,6 +5425,10 @@ void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_co
     __block CGRect cgrect = CGRectMake(0,0,0,0);
     if (useRect){
         cgrect = cn1RectToCGRect(CN1_THREAD_GET_STATE_PASS_ARG rectangle);
+        cgrect.origin.x = cgrect.origin.x / scaleValue;
+        cgrect.origin.y = cgrect.origin.y / scaleValue;
+        cgrect.size.width = cgrect.size.width / scaleValue;
+        cgrect.size.height = cgrect.size.height / scaleValue;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();

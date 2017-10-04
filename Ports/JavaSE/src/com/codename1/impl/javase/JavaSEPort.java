@@ -1346,6 +1346,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         Integer triggeredKeyCode;
 
         public void mousePressed(MouseEvent e) {
+            cn1GrabbedDrag = true;
             e.consume();
             if (!isEnabled()) {
                 return;
@@ -1400,6 +1401,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         public void mouseReleased(MouseEvent e) {
+            cn1GrabbedDrag = false;
             e.consume();
             if (!isEnabled()) {
                 return;
@@ -1803,6 +1805,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
     }
+    boolean cn1GrabbedDrag=false;
     C canvas;
 
     protected java.awt.Container getCanvas() {
@@ -2137,20 +2140,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             rotate.setEnabled(!desktopSkin);
 
             simulatorMenu.add(rotate);
-            JMenu zoomMenu = new JMenu("Zoom");
+            final JCheckBoxMenuItem zoomMenu = new JCheckBoxMenuItem("Zoom", scrollableSkin);
             simulatorMenu.add(zoomMenu);
 
             JMenu debugEdtMenu = new JMenu("Debug EDT");
             simulatorMenu.add(debugEdtMenu);
-
-            JMenuItem zoom25 = new JMenuItem("25%");
-            zoomMenu.add(zoom25);
-            JMenuItem zoom50 = new JMenuItem("50%");
-            zoomMenu.add(zoom50);
-            JMenuItem zoom100 = new JMenuItem("100%");
-            zoomMenu.add(zoom100);
-            JMenuItem zoom200 = new JMenuItem("200%");
-            zoomMenu.add(zoom200);
             
             zoomMenu.setEnabled(!desktopSkin);
 
@@ -2922,80 +2916,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.sizeChanged(getScreenCoordinates().width, getScreenCoordinates().height);
                 }
             });
-            zoom100.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth()/retinaScale), (int)(getSkin().getHeight()/retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 1;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            zoom25.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 0.25f;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            zoom50.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / 2 / retinaScale), (int)(getSkin().getHeight() / 2 / retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 0.5f;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            zoom200.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent ae) {
-                    Container parent = canvas.getParent();
-                    parent.remove(canvas);
-                    canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() * 2 / retinaScale), (int)(getSkin().getHeight() * 2 / retinaScale)));
-                    parent.add(BorderLayout.CENTER, canvas);
-                    frm.pack();
-                    zoomLevel = 2;
-                    if(Display.getInstance().getCurrent() != null) {
-                        Display.getInstance().getCurrent().repaint();
-                    }
-                    frm.repaint();
-                }
-            });
-            touchFlag.addItemListener(new ItemListener() {
-
-                public void itemStateChanged(ItemEvent ie) {
-                    touchDevice = !touchDevice;
-                    Display.getInstance().setTouchScreenDevice(touchDevice);
-                    Display.getInstance().getCurrent().repaint();
-                }
-            });
-            nativeInputFlag.addItemListener(new ItemListener() {
-
-                public void itemStateChanged(ItemEvent ie) {
-                    useNativeInput = !useNativeInput;
-                }
-            });
             
             alwaysOnTopFlag.addItemListener(new ItemListener() {
 
@@ -3013,8 +2933,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                     simulateAndroidKeyboard = !simulateAndroidKeyboard;
                 }
             });
-
-            scrollFlag.addItemListener(new ItemListener() {
+            
+            ItemListener zoomListener = new ItemListener() {
 
                 public void itemStateChanged(ItemEvent ie) {
                     scrollableSkin = !scrollableSkin;
@@ -3041,7 +2961,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Display.getInstance().getCurrent().repaint();
                     frm.repaint();
                 }
-            });
+            };
+
+            zoomMenu.addItemListener(zoomListener);
+            
+            scrollFlag.addItemListener(zoomListener);
 
 
 
@@ -3565,7 +3489,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (fsFile.exists()) {
                 f = fsFile.toURI().toString();
             }
-            if (f.contains(":")) {
+            if (f.contains("://") || f.startsWith("file:")) {
+
                 try {
                     // load Via URL loading
                     loadSkinFile(new URL(f).openStream(), frm);
@@ -3573,6 +3498,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                     String d = System.getProperty("dskin");
                     loadSkinFile(d, frm);
                     return;
+                } catch (MalformedURLException ex) {
+                    loadSkinFile(getResourceAsStream(getClass(), "/iphone3gs.skin"), frm);
+                    
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
@@ -3724,6 +3652,9 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             android6PermissionsFlag = pref.getBoolean("Android6Permissions", false);
             
+            alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
+            window.setAlwaysOnTop(alwaysOnTop);
+            
             String reset = System.getProperty("resetSkins");
             if(reset != null && reset.equals("true")){
                 System.setProperty("resetSkins", "");
@@ -3765,9 +3696,6 @@ public class JavaSEPort extends CodenameOneImplementation {
                 canvas.setForcedSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
                 window.setSize(new java.awt.Dimension((int)(getSkin().getWidth() / retinaScale), (int)(getSkin().getHeight() / retinaScale)));
             }
-            
-            alwaysOnTop = pref.getBoolean("AlwaysOnTop", false);
-            window.setAlwaysOnTop(alwaysOnTop);
             
             window.setVisible(true);
         }
@@ -6483,18 +6411,17 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         
         
-        
-        
+        private boolean peerGrabbedDrag=false;
         
         private boolean sendToCn1(MouseEvent e) {
             
             int cn1X = getCN1X(e);
             int cn1Y = getCN1Y(e);
-            if (Display.isInitialized()) {
+            if (!peerGrabbedDrag && Display.isInitialized()) {
                 Form f = Display.getInstance().getCurrent();
                 if (f != null) {
                     Component cmp = f.getComponentAt(cn1X, cn1Y);
-                    if (cmp != null && !(cmp instanceof PeerComponent)) {
+                    if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
                         // It's not a peer component, so we should pass the event to the canvas
                         e = SwingUtilities.convertMouseEvent(this, e, canvas);
                         switch (e.getID()) {
@@ -6508,9 +6435,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 canvas.mouseMoved(e);
                                 break;
                             case MouseEvent.MOUSE_PRESSED:
+                                cn1GrabbedDrag = true;
                                 canvas.mousePressed(e);
                                 break;
                             case MouseEvent.MOUSE_RELEASED:
+                                cn1GrabbedDrag = false;
                                 canvas.mouseReleased(e);
                                 break;
                             case MouseEvent.MOUSE_WHEEL:
@@ -6524,6 +6453,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                         //canvas.dispatchEvent(SwingUtilities.convertMouseEvent(this, e, canvas));
                     }
                 }
+            }
+            if (e.getID() == MouseEvent.MOUSE_RELEASED) {
+                cn1GrabbedDrag = false;
+                peerGrabbedDrag = false;
+            } else if (e.getID() == MouseEvent.MOUSE_PRESSED) {
+                peerGrabbedDrag = true;
             }
             return false;
         }

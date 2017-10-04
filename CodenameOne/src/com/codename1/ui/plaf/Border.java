@@ -304,6 +304,22 @@ public class Border {
         int leftInsetPx = (int)Math.round(w * leftInset);
         int rightInsetPx = (int)Math.round(w * rightInset);
         int bottomInsetPx = (int)Math.round(h * bottomInset);
+        
+        //We need to make sure that every splice has a positive width and height
+        if (topInsetPx + bottomInsetPx >= h) {
+            bottomInsetPx = h - topInsetPx -1;
+            if (bottomInsetPx < 1) {
+                bottomInsetPx = 1;
+                topInsetPx = h - bottomInsetPx - 1;
+            }
+        }
+        if (leftInsetPx + rightInsetPx >= w) {
+            rightInsetPx = w - leftInsetPx - 1;
+            if (rightInsetPx < 1) {
+                rightInsetPx = 1;
+                leftInsetPx = w - rightInsetPx - 1;
+            }
+        }
         Image top = img.subImage(leftInsetPx, 0, w - leftInsetPx - rightInsetPx, topInsetPx, true);
         Image bottom = img.subImage(leftInsetPx, h - bottomInsetPx, w - leftInsetPx - rightInsetPx, bottomInsetPx, true);
         Image left = img.subImage(0, topInsetPx, leftInsetPx, h - topInsetPx - bottomInsetPx, true);

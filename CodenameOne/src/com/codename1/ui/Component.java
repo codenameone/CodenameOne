@@ -1111,7 +1111,7 @@ public class Component implements Animation, StyleListener {
     public int getBaselineResizeBehavior() {
         return BRB_OTHER;
     }
-
+    
     /**
      * Sets the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be
@@ -1135,8 +1135,71 @@ public class Component implements Animation, StyleListener {
         dim.setHeight(d.getHeight());
         sizeRequestedByUser = true;
     }
-
-
+    
+    /**
+     * Optional string the specifies the preferred size of the component. Format is {@literal <width> <height>} 
+     * where {@literal <width>} and {@literal <height>} are both scalar values.  E.g. "15px", "20.5mm", or "inherit"
+     * to indicate that it should inherit the value returned from {@link #calcPreferredSize() } for that coordinate.
+     */
+    private String preferredSizeStr;
+    
+    /**
+     * @deprecated this method shouldn't be used, use sameWidth/Height, padding, margin or override calcPeferredSize
+     * to reach similar functionality 
+     * @param value The preferred size to set in format "width height", where width and height can be a scalar
+     * value with px or mm units. Or the special value "inherit" which will just inherit the default preferred size.
+     */
+    public void setPreferredSizeStr(String value) {
+        preferredSizeStr = value;
+        setPreferredSize(null);
+    }
+    
+    /**
+     * Returns the preferred size string that can be used to specify the preferred size of the component
+     * using pixels or millimetres.  This string is applied to the preferred size just after is is initially
+     * calculated using {@link #calcPreferredSize() }. 
+     * @return 
+     * @deprecated This method is primarily for use by the GUI builder.  Use {@link #getPreferredSize() } to find
+     * the preferred size of a component.
+     */
+    public String getPreferredSizeStr() {
+        return preferredSizeStr;
+    }
+    
+    public static Dimension parsePreferredSize(String preferredSize, Dimension baseSize) {
+        String strVal = (String)preferredSize;
+        int spacePos = strVal.indexOf(" ");
+        if (spacePos == -1) {
+            return baseSize;
+        }
+        String wStr = strVal.substring(0, spacePos).trim();
+        String hStr = strVal.substring(spacePos+1).trim();
+        int unitPos=-1;
+        float pixelsPerMM = Display.getInstance().convertToPixels(1000f)/1000f;
+        try {
+            
+            
+            if ((unitPos=wStr.indexOf("mm")) != -1) {
+                baseSize.setWidth((int)Math.round(Float.parseFloat(wStr.substring(0, unitPos))*pixelsPerMM));
+            } else if ((unitPos=wStr.indexOf("px")) != -1) {
+                baseSize.setWidth(Integer.parseInt(wStr.substring(0, unitPos)));
+            } else if (!"inherit".equals(wStr)){
+                baseSize.setWidth(Integer.parseInt(wStr));
+            }
+        } catch (Throwable t){}
+        
+        try {
+            if ((unitPos=hStr.indexOf("mm")) != -1) {
+                baseSize.setHeight((int)Math.round(Float.parseFloat(hStr.substring(0, unitPos))*pixelsPerMM));
+            } else if ((unitPos=hStr.indexOf("px")) != -1) {
+                baseSize.setHeight(Integer.parseInt(hStr.substring(0, unitPos)));
+            } else if (!"inherit".equals(hStr)){
+                baseSize.setHeight(Integer.parseInt(hStr));
+            }
+        } catch (Throwable t){}
+        return baseSize;
+    }
+    
     /**
      * Returns the Component Preferred Size, there is no guarantee the Component will 
      * be sized at its Preferred Size. The final size of the component may be
@@ -1391,7 +1454,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineAllStyles) {
+        if (styles == null ? inlineAllStyles != null : !styles.equals(inlineAllStyles)) {
             this.inlineAllStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -1413,7 +1476,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineUnselectedStyles) {
+        if (styles == null ? inlineUnselectedStyles != null : !styles.equals(inlineUnselectedStyles)) {
             this.inlineUnselectedStyles = styles;
 
             unSelectedStyle = null;
@@ -1437,7 +1500,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineSelectedStyles) {
+        if (styles == null ? inlineSelectedStyles != null : !styles.equals(inlineSelectedStyles)) {
             this.inlineSelectedStyles = styles;
 
             unSelectedStyle = null;
@@ -1461,7 +1524,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlineDisabledStyles) {
+        if (styles == null ? inlineDisabledStyles != null : !styles.equals(inlineDisabledStyles)) {
             this.inlineDisabledStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -1483,7 +1546,7 @@ public class Component implements Animation, StyleListener {
         if (styles != null && styles.trim().length() == 0) {
             styles = null;
         }
-        if (styles != inlinePressedStyles) {
+        if (styles == null ? inlinePressedStyles != null : !styles.equals(inlinePressedStyles)) {
             this.inlinePressedStyles = styles;
             unSelectedStyle = null;
             selectedStyle = null;
@@ -2587,6 +2650,9 @@ public class Component implements Animation, StyleListener {
                 preferredSize = new Dimension(0, 0);
             } else {
                 preferredSize = calcPreferredSize();
+                if (preferredSizeStr != null) {
+                    Component.parsePreferredSize(preferredSizeStr, preferredSize);
+                }
             }
         }
         return preferredSize;
@@ -4410,7 +4476,7 @@ public class Component implements Animation, StyleListener {
      */
     public Style getPressedStyle() {
         if (pressedStyle == null) {
-            if (hasInlineUnselectedStyle()) {
+            if (hasInlinePressedStyle()) {
                 pressedStyle = getUIManager().parseComponentCustomStyle(getInlineStylesTheme(), getUIID(), getInlineStylesUIID(), "press", getInlinePressedStyleStrings());
             } else {
                 pressedStyle = getUIManager().getComponentCustomStyle(getUIID(), "press");
@@ -6072,6 +6138,10 @@ public class Component implements Animation, StyleListener {
                 Image img = s.getBgImage();
                 if(img != null && img.requiresDrawImage()) {
                     // damn no native painting...
+                    int oldX = x;
+                    int oldY = y;
+                    x = rect.getX();
+                    y = rect.getY();
                     int iW = img.getWidth();
                     int iH = img.getHeight();
                     switch (s.getBackgroundType()) {
@@ -6203,6 +6273,8 @@ public class Component implements Animation, StyleListener {
                             g.drawImage(img, x + width - iW, y + (height - iH));
                             return;
                     }
+                    x = oldX;
+                    y = oldY;
                 } 
                 
                 impl.paintComponentBackground(g.getGraphics(), x, y, width, height, s);

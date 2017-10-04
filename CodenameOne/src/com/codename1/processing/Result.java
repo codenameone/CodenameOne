@@ -394,7 +394,7 @@ public class Result {
     }
 
     /**
-     * Get an long value from the requested path.
+     * Get a long value from the requested path.
      *
      * For example: <b>JSON</b>
      *
@@ -737,7 +737,7 @@ public class Result {
      * @throws IllegalArgumentException on error traversing the document, ie.
      * traversing into an array without using subscripts.
      * @throws NumberFormatException if the value at path can not be converted
-     * to an long.
+     * to a long.
      */
     public long[] getAsLongArray(final String path)
             throws IllegalArgumentException {
@@ -764,7 +764,7 @@ public class Result {
      * @throws IllegalArgumentException on error traversing the document, ie.
      * traversing into an array without using subscripts.
      * @throws NumberFormatException if the value at path can not be converted
-     * to an double.
+     * to a double.
      */
     public double[] getAsDoubleArray(final String path)
             throws IllegalArgumentException {

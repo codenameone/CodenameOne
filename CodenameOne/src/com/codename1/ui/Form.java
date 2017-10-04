@@ -1111,7 +1111,19 @@ public class Form extends Container {
      */
     public Container getFormLayeredPane(Class c, boolean top) {
         if(formLayeredPane == null) {
-            formLayeredPane = new Container(new LayeredLayout());
+            formLayeredPane = new Container(new LayeredLayout()) {
+                @Override
+                protected void paintBackground(Graphics g) {
+                    boolean v = isVisible();
+                    setVisible(false);
+                    Form.this.paint(g);
+                    setVisible(v);
+                }
+
+                @Override
+                public void paintBackgrounds(Graphics g) {
+                }
+            };
             addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
         }
         if(c == null) {
@@ -1149,8 +1161,8 @@ public class Form extends Container {
      */ 
     private Container getLayeredPaneImpl() {
         if(layeredPane == null){
-            Container parent = contentPane.wrapInLayeredPane();
             layeredPane = new Container(new LayeredLayout());
+            Container parent = contentPane.wrapInLayeredPane();
             // adds the global layered pane
             layeredPane.add(new Container());
             parent.addComponent(layeredPane);
@@ -1160,9 +1172,11 @@ public class Form extends Container {
     }
     
     Container getActualPane(){
-        if(layeredPane != null){
+        if (formLayeredPane != null) {
+            return this;
+        }else if(layeredPane != null){
             return layeredPane.getParent();
-        }else{
+        } else {
             return contentPane;
         }
     }
@@ -2344,6 +2358,7 @@ public class Form extends Container {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         //check if the click is relevant to the menu bar.
+        /*
         if (menuBar.contains(x, y)) {
             Component cmp = menuBar.getComponentAt(x, y);
             while (cmp != null && cmp.isIgnorePointerEvents()) {
@@ -2356,6 +2371,7 @@ public class Form extends Container {
             }
             return;
         }
+        */
         Container actual = getActualPane();
         if (y >= actual.getY() && x >= actual.getX()) {
             Component cmp = actual.getComponentAt(x, y);
@@ -2498,7 +2514,11 @@ public class Form extends Container {
         }
         autoRelease(x, y);
         if (pointerDraggedListeners != null) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
+            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+            pointerDraggedListeners.fireActionEvent(av);
+            if(av.isConsumed()) {
+                return;
+            }
         }
 
         rippleMotion = null;
@@ -2557,7 +2577,11 @@ public class Form extends Container {
         }
         autoRelease(x[0], y[0]);
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]));
+            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]);
+            pointerDraggedListeners.fireActionEvent(av);
+            if(av.isConsumed()) {
+                return;
+            }
         }
 
         rippleMotion = null;
@@ -2642,7 +2666,7 @@ public class Form extends Container {
             cmp = cmp.getParent();
         }
         if (cmp != null) {
-            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                 setFocused(cmp);
             }
             cmp.pointerHoverPressed(x, y);
@@ -2666,7 +2690,7 @@ public class Form extends Container {
                 cmp = cmp.getParent();
             }
             if (cmp != null) {
-                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
+                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 cmp.pointerHover(x, y);
@@ -2709,22 +2733,24 @@ public class Form extends Container {
      */
     public void pointerReleased(int x, int y) {
         rippleMotion = null;
-
+        
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        Container actual = getActualPane();
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
-            Component atXY = getComponentAt(x, y);
+            Component atXY = actual.getComponentAt(x, y);
+            
             Component pendingButton = (Component)buttonsAwatingRelease.get(0);
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
-                pointerReleased(x, y);
+                pendingButton.pointerReleased(x, y);
                 return;
             }
             
             if(pendingButton instanceof Button) {
                 Button b = (Button)pendingButton;
                 int relRadius = b.getReleaseRadius();
-                if(relRadius > 0) {
+                if(relRadius > 0 || b.contains(x, y)) {
                     Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
                     if(r.contains(x, y)) {
                         buttonsAwatingRelease = null;
@@ -2762,7 +2788,7 @@ public class Form extends Container {
                 stickyDrag.pointerReleased(x, y);
                 repaint();
             } else {
-                Container actual = getActualPane();
+                //Container actual = getActualPane();
                 if (y >= actual.getY() && x >= actual.getX()) {
                     Component cmp = actual.getComponentAt(x, y);
                     while (cmp != null && cmp.isIgnorePointerEvents()) {

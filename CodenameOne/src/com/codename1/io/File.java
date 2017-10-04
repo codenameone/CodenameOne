@@ -136,9 +136,10 @@ public class File {
             for(int iter = 0 ; iter < result.length ; iter++) {
                 int len = result[iter].length();
                 if(result[iter].endsWith("/")) {
-                    result[iter] = result[iter].substring(result[iter].lastIndexOf("/", len - 1), len - 1);
-                } else {
-                    result[iter] = result[iter].substring(result[iter].lastIndexOf("/"), len);
+                    result[iter] = result[iter].substring(0, len - 1);
+                }
+                if (result[iter].indexOf("/") != -1) {
+                    result[iter] = result[iter].substring(result[iter].lastIndexOf("/")+1, len);
                 }
             }
             return result;

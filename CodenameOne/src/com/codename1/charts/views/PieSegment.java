@@ -20,7 +20,7 @@ import com.codename1.ui.geom.Shape;
 
 
 /**
- * Holds An PieChart Segment
+ * Holds A PieChart Segment
  */
 public class PieSegment  {
   private float mStartAngle;

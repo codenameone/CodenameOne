@@ -84,7 +84,8 @@ public class Calendar extends Container {
     static final long DAY = HOUR * 24;
     static final long WEEK = DAY * 7;
     private EventDispatcher dispatcher = new EventDispatcher();
-    private EventDispatcher dataChangeListeners = new EventDispatcher();
+    private EventDispatcher dataChangedListeners = new EventDispatcher();
+    private EventDispatcher monthChangedListeners = new EventDispatcher();
     private long[] dates = new long[42];
     private boolean changesSelectedDateEnabled = true;
     private TimeZone tmz;
@@ -93,6 +94,7 @@ public class Calendar extends Container {
     private boolean multipleSelectionEnabled = false;
     private String selectedDaysUIID = "CalendarMultipleDay";
     private Map<String, Collection<Date>> highlightGroup = new HashMap<String, Collection<Date>>();
+    private ArrayList<ActionListener> dayListeners = new ArrayList<ActionListener>();
 
     /**
      * Creates a new instance of Calendar set to the given date based on time
@@ -119,14 +121,38 @@ public class Calendar extends Container {
      * @param tmz a reference timezone
      */
     public Calendar(long time, TimeZone tmz) {
+        this(time, java.util.TimeZone.getDefault(), null, null);
+    }
+
+    /**
+     * Constructs a calendar with the current date and time with left and right
+     * images set
+     *
+     * @param leftArrowImage an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(Image leftArrowImage, Image rightArrowImage) {
+        this(System.currentTimeMillis(), java.util.TimeZone.getDefault(), leftArrowImage, rightArrowImage);
+    }
+
+    /**
+     * Creates a new instance of Calendar set to the given date based on time
+     * since epoch (the java.util.Date convention)
+     *
+     * @param time time since epoch
+     * @param tmz a reference timezone
+     * @param leftArrowImage an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(long time, TimeZone tmz, Image leftArrowImage, Image rightArrowImage) {
         super(new BorderLayout());
         this.tmz = tmz;
         setUIID("Calendar");
         mv = new MonthView(time);
 
-        Image leftArrow = UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
-        if (leftArrow != null) {
-            Image rightArrow = UIManager.getInstance().getThemeImageConstant("calendarRightImage");
+        Image leftArrow = leftArrowImage != null ? leftArrowImage : UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
+        Image rightArrow = rightArrowImage != null ? rightArrowImage : UIManager.getInstance().getThemeImageConstant("calendarRightImage");
+        if (leftArrow != null && rightArrow != null) {
             final Button left = new Button(leftArrow, "CalendarLeft");
             final Button right = new Button(rightArrow, "CalendarRight");
             ActionListener progress = new ActionListener() {
@@ -414,12 +440,50 @@ public class Calendar extends Container {
     }
 
     /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to add
+     */
+    public void addMonthChangedListener(ActionListener l) {
+        mv.addMonthChangedListener(l);
+    }
+
+    /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to remove
+     */
+    public void removeMonthChangedListener(ActionListener l) {
+        mv.removeMonthChangedListener(l);
+    }
+
+    /**
+     * Adds an ActionListener to the day buttons. This is different from
+     * {@code Calendar.addActionListener} and will only fire when an active day
+     * is selected.
+     *
+     * @param l listener to add
+     */
+    public void addDayActionListener(ActionListener l) {
+        mv.addDayActionListener(l);
+    }
+
+    /**
+     * Removes ActionListener from day buttons
+     *
+     * @param l listener to remove
+     */
+    public void removeDayActionListener(ActionListener l) {
+        mv.removeDayActionListener(l);
+    }
+
+    /**
      * Allows tracking selection changes in the calendar in real time
      *
      * @param l listener to add
      */
     public void addDataChangedListener(DataChangedListener l) {
-        mv.addDataChangeListener(l);
+        mv.addDataChangedListener(l);
     }
 
     /**
@@ -428,7 +492,7 @@ public class Calendar extends Container {
      * @param l listener to remove
      */
     public void removeDataChangedListener(DataChangedListener l) {
-        mv.removeDataChangeListener(l);
+        mv.removeDataChangedListener(l);
     }
 
     /**
@@ -438,7 +502,7 @@ public class Calendar extends Container {
      * @deprecated use #addDataChangedListener(DataChangedListener) instead
      */
     public void addDataChangeListener(DataChangedListener l) {
-        mv.addDataChangeListener(l);
+        mv.addDataChangedListener(l);
     }
 
     /**
@@ -448,7 +512,7 @@ public class Calendar extends Container {
      * @deprecated use #removeDataChangedListener(DataChangedListener) instead
      */
     public void removeDataChangeListener(DataChangedListener l) {
-        mv.removeDataChangeListener(l);
+        mv.removeDataChangedListener(l);
     }
 
     /**
@@ -476,11 +540,11 @@ public class Calendar extends Container {
      * This method creates the Day Button Component for the Month View
      *
      * @return a Button that corresponds to the Days Components
+     * @deprecated override {@code createDayComponent()} instead
      */
     protected Button createDay() {
-        Button day = new Button();
+        Button day = new Button("", "CalendarDay");
         day.setAlignment(CENTER);
-        day.setUIID("CalendarDay");
         day.setEndsWith3Points(false);
         day.setTickerEnabled(false);
         return day;
@@ -504,9 +568,37 @@ public class Calendar extends Container {
      * This method updates the Button day.
      *
      * @param dayButton the button to be updated
-     * @param year
+     * @param year the current year
      * @param currentMonth the current month
      * @param day the new button day
+     */
+    protected void updateButtonDayDate(Component dayButton, int year, int currentMonth, int day) {
+        if (dayButton instanceof Button) {
+            updateButtonDayDate((Button) dayButton, currentMonth, day);
+        }
+    }
+
+    /**
+     * This method updates the Button day.
+     *
+     * @param dayButton the button to be updated
+     * @param currentMonth the current month
+     * @param day the new button day
+     */
+    protected void updateButtonDayDate(Component dayButton, int currentMonth, int day) {
+        if (dayButton instanceof Button) {
+            updateButtonDayDate((Button) dayButton, currentMonth, day);
+        }
+    }
+
+    /**
+     * This method updates the Button day.
+     *
+     * @param dayButton the button to be updated
+     * @param year the current year
+     * @param currentMonth the current month
+     * @param day the new button day
+     * @deprecated override the method that accepts a generic component
      */
     protected void updateButtonDayDate(Button dayButton, int year, int currentMonth, int day) {
         updateButtonDayDate(dayButton, currentMonth, day);
@@ -518,6 +610,7 @@ public class Calendar extends Container {
      * @param dayButton the button to be updated
      * @param currentMonth the current month
      * @param day the new button day
+     * @deprecated override the method that accepts a generic component
      */
     protected void updateButtonDayDate(Button dayButton, int currentMonth, int day) {
         if (twoDigitMode) {
@@ -778,11 +871,100 @@ public class Calendar extends Container {
         this.multipleSelectionEnabled = multipleSelectionEnabled;
     }
 
+    /**
+     * Creates a day within the Calendar, this method is protected allowing
+     * Calendar to be subclassed to replace the rendering logic of individual
+     * day buttons.
+     *
+     * @return a button representing the day within the Calendar
+     */
+    protected Component createDayComponent() {
+        return createDay();
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for binding the click listener to the given
+     * component.
+     *
+     * @param l listener interface
+     * @param cmp day component returned by createDayComponent()
+     */
+    protected void bindDayListener(Component cmp, ActionListener l) {
+        if (cmp instanceof Button) {
+            ((Button) cmp).addActionListener(l);
+        }
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for removing the click listener from the given
+     * component.
+     *
+     * @param l listener interface
+     * @param cmp day component returned by createDayComponent()
+     */
+    private void unBindDayListener(Component cmp, ActionListener l) {
+        if (cmp instanceof Button) {
+            ((Button) cmp).removeActionListener(l);
+        }
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for setting the displayed string.
+     *
+     * @param text the text set the component to
+     * @param cmp day component returned by createDayComponent()
+     */
+    protected void setDayText(Component cmp, String text) {
+        if (cmp instanceof Button) {
+            ((Button) cmp).setText(text);
+        }
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for removing the click listener from the given
+     * component.
+     *
+     * @param cmp day component returned by createDayComponent
+     * @return the day text
+     */
+    protected String getDayText(Component cmp) {
+        if (cmp instanceof Button) {
+            return ((Button) cmp).getText();
+        }
+        return null;
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for setting the right component's UIID.
+     *
+     * @param cmp day component returned by createDayComponent()
+     * @param uiid the text set the component to
+     */
+    protected void setDayUIID(Component cmp, String uiid) {
+        cmp.setUIID(uiid);
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for enabling or disabling the right component.
+     *
+     * @param cmp day component returned by createDayComponent()
+     * @param enable the text set the component to
+     */
+    protected void setDayEnabled(Component cmp, boolean enable) {
+        cmp.setEnabled(enable);
+    }
+
     class MonthView extends Container implements ActionListener {
 
         long currentDay;
-        private final Button[] buttons = new Button[42];
-        private Button selected;
+        private final Component[] components = new Component[42];
+        private Component selected;
         private final Container titles;
         private final Container days;
 
@@ -804,13 +986,16 @@ public class Calendar extends Container {
             for (int iter = 0; iter < DAYS.length; iter++) {
                 titles.addComponent(createDayTitle(iter));
             }
-            for (int iter = 0; iter < buttons.length; iter++) {
-                buttons[iter] = createDay();
-                days.addComponent(buttons[iter]);
+            for (int iter = 0; iter < components.length; iter++) {
+                components[iter] = createDayComponent();
+                days.add(components[iter]);
                 if (iter <= 7) {
-                    buttons[iter].setNextFocusUp(year);
+                    components[iter].setNextFocusUp(year);
                 }
-                buttons[iter].addActionListener(this);
+                bindDayListener(components[iter], this);
+                for (ActionListener dayListener : dayListeners) {
+                    bindDayListener(components[iter], dayListener);
+                }
             }
             setCurrentDay(time);
 
@@ -878,9 +1063,9 @@ public class Calendar extends Container {
                     }
                     int previousMonthSunday = cal.get(java.util.Calendar.DAY_OF_MONTH);
                     for (; i <= lastDay - previousMonthSunday; i++) {
-                        buttons[i].setUIID("CalendarDay");
-                        buttons[i].setEnabled(false);
-                        buttons[i].setText("" + (previousMonthSunday + i));
+                        setDayUIID(components[i], "CalendarDay");
+                        setDayEnabled(components[i], false);
+                        setDayText(components[i], "" + (previousMonthSunday + i));
                     }
                 }
                 //last day of current month
@@ -891,35 +1076,35 @@ public class Calendar extends Container {
                 lastDay = cal.get(java.util.Calendar.DAY_OF_MONTH);
 
                 int j = i;
-                for (; j < buttons.length && (j - i + 1) <= lastDay; j++) {
-                    buttons[j].setEnabled(true);
+                for (; j < components.length && (j - i + 1) <= lastDay; j++) {
+                    setDayEnabled(components[j], true);
                     dates[j] = startDate;
                     if (dates[j] == SELECTED_DAY) {
-                        buttons[j].setUIID("CalendarSelectedDay");
-                        selected = buttons[j];
+                        setDayUIID(components[j], "CalendarSelectedDay");
+                        selected = components[j];
                     } else {
-                        buttons[j].setUIID("CalendarDay");
+                        setDayUIID(components[j], "CalendarDay");
                     }
 
                     for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                         if (entry.getValue().contains(new Date(dates[j]))) {
-                            buttons[j].setUIID(entry.getKey());
+                            setDayUIID(components[j], entry.getKey());
                         }
                     }
 
                     if (multipleSelectionEnabled) {
                         if (selectedDays.contains(new Date(dates[j]))) {
-                            buttons[j].setUIID(selectedDaysUIID);
+                            setDayUIID(components[j], selectedDaysUIID);
                         }
                     }
-                    updateButtonDayDate(buttons[j], yearNew, month, j - i + 1);
+                    updateButtonDayDate(components[j], yearNew, month, j - i + 1);
                     startDate += DAY;
                 }
                 int d = 1;
-                for (; j < buttons.length; j++) {
-                    buttons[j].setUIID("CalendarDay");
-                    buttons[j].setEnabled(false);
-                    buttons[j].setText("" + d++);
+                for (; j < components.length; j++) {
+                    setDayUIID(components[j], "CalendarDay");
+                    setDayEnabled(components[j], false);
+                    setDayText(components[j], "" + d++);
                 }
             }
         }
@@ -963,6 +1148,7 @@ public class Calendar extends Container {
         }
 
         private void setMonth(int year, int month) {
+            fireMonthChangedEvent();
             java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
             cal.setTimeZone(TimeZone.getDefault());
             cal.set(java.util.Calendar.MONTH, month);
@@ -1006,13 +1192,35 @@ public class Calendar extends Container {
             dispatcher.removeListener(l);
         }
 
+        public void addMonthChangedListener(ActionListener l) {
+            monthChangedListeners.addListener(l);
+        }
+
+        public void removeMonthChangedListener(ActionListener l) {
+            monthChangedListeners.removeListener(l);
+        }
+
+        public void addDayActionListener(ActionListener l) {
+            dayListeners.add(l);
+            for (Component cmp : components) {
+                bindDayListener(cmp, l);
+            }
+        }
+
+        public void removeDayActionListener(ActionListener l) {
+            dayListeners.remove(l);
+            for (Component cmp : components) {
+                unBindDayListener(cmp, l);
+            }
+        }
+
         /**
          * Allows tracking selection changes in the calendar in real time
          *
          * @param l listener to add
          */
-        public void addDataChangeListener(DataChangedListener l) {
-            dataChangeListeners.addListener(l);
+        public void addDataChangedListener(DataChangedListener l) {
+            dataChangedListeners.addListener(l);
         }
 
         /**
@@ -1020,8 +1228,8 @@ public class Calendar extends Container {
          *
          * @param l listener to remove
          */
-        public void removeDataChangeListener(DataChangedListener l) {
-            dataChangeListeners.removeListener(l);
+        public void removeDataChangedListener(DataChangedListener l) {
+            dataChangedListeners.removeListener(l);
         }
 
         protected void fireActionEvent() {
@@ -1030,60 +1238,71 @@ public class Calendar extends Container {
             dispatcher.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));
         }
 
+        protected void fireMonthChangedEvent() {
+            monthChangedListeners.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));
+        }
+
         public void actionPerformed(ActionEvent evt) {
             Object src = evt.getSource();
             if (src instanceof ComboBox) {
-                setMonth(Integer.parseInt((String) year.getSelectedItem()),
-                        month.getSelectedIndex());
+                setMonth(Integer.parseInt((String) year.getSelectedItem()), month.getSelectedIndex());
                 componentChanged();
                 return;
             }
             if (changesSelectedDateEnabled) {
-                for (int iter = 0; iter < buttons.length; iter++) {
-                    if (src == buttons[iter]) {
+                for (int iter = 0; iter < components.length; iter++) {
+                    boolean isContained = false;
+                    if (components[iter] instanceof Container) {
+                        isContained = ((Container) components[iter]).contains((Component) src);
+                    }
+
+                    if (src == components[iter] || isContained) {
+                        System.out.println(src);
                         if (multipleSelectionEnabled) {
                             if (selectedDays.contains(new Date(dates[iter]))) {
                                 if (SELECTED_DAY == dates[iter]) {
-                                    buttons[iter].setUIID("CalendarSelectedDay");
+                                    setDayUIID(components[iter], "CalendarSelectedDay");
                                 } else {
-                                    buttons[iter].setUIID("CalendarDay");
+                                    setDayUIID(components[iter], "CalendarDay");
                                 }
-                                for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
-                                    if (entry.getValue().contains(new Date(dates[iter]))) {
-                                        buttons[iter].setUIID(entry.getKey());
-                                        break;
+                                if (!highlightGroup.isEmpty()) {
+                                    for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
+                                        if (entry.getValue().contains(new Date(dates[iter]))) {
+                                            setDayUIID(components[iter], entry.getKey());
+                                            break;
+                                        }
                                     }
                                 }
 
                                 selectedDays.remove(new Date(dates[iter]));
                             } else {
-                                buttons[iter].setUIID(selectedDaysUIID);
+                                setDayUIID(components[iter], selectedDaysUIID);
                                 selectedDays.add(new Date(dates[iter]));
                             }
                         } else {
-                            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
-                            cal.setTime(new Date(currentDay));
-                            cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(selected.getText().trim()));
-                            cal.set(java.util.Calendar.HOUR, 1);
-                            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
-                            cal.set(java.util.Calendar.MINUTE, 0);
-                            cal.set(java.util.Calendar.SECOND, 0);
-                            cal.set(java.util.Calendar.MILLISECOND, 0);
                             if (selected != null) {
-                                selected.setUIID("CalendarDay");
+                                setDayUIID(selected, "CalendarDay");
+                                java.util.Calendar cal = java.util.Calendar.getInstance(tmz);
+                                cal.setTime(new Date(currentDay));
+                                cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(getDayText(selected).trim()));
+                                cal.set(java.util.Calendar.HOUR, 1);
+                                cal.set(java.util.Calendar.HOUR_OF_DAY, 1);
+                                cal.set(java.util.Calendar.MINUTE, 0);
+                                cal.set(java.util.Calendar.SECOND, 0);
+                                cal.set(java.util.Calendar.MILLISECOND, 0);
                                 if (!highlightGroup.isEmpty()) {
                                     for (Map.Entry<String, Collection<Date>> entry : highlightGroup.entrySet()) {
                                         if (entry.getValue().contains(cal.getTime())) {
-                                            selected.setUIID(entry.getKey());
+                                            setDayUIID(selected, entry.getKey());
                                             break;
                                         }
                                     }
                                 }
                             }
-                            buttons[iter].setUIID("CalendarSelectedDay");
+                            setDayUIID(components[iter], "CalendarSelectedDay");
 
                             SELECTED_DAY = dates[iter];
-                            selected = buttons[iter];
+                            selected = components[iter];
                         }
                         fireActionEvent();
                         if (!getComponentForm().isSingleFocusMode()) {

@@ -1834,7 +1834,6 @@ public class Container extends Component implements Iterable<Component>{
      * @see Component#contains
      */
     public Component getComponentAt(int x, int y) {
-        
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
@@ -1871,12 +1870,14 @@ public class Container extends Component implements Iterable<Component>{
                             return c;
                         }
                     }
-                    return component;
+                    //return component;
                 }
                 if (cmp instanceof Container) {
                     Component c = ((Container) cmp).getComponentAt(x, y);
                     if(c != null){
-                        component = c;
+                        if (c.isFocusable() || c.isGrabsPointerEvents() || !(cmp.isFocusable() || cmp.isGrabsPointerEvents())) {
+                            component = c;
+                        }
                     }
                 }
                 if (!overlaps || component.isFocusable() || component.isGrabsPointerEvents()) {

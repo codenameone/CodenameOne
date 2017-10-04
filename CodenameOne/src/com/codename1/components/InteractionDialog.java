@@ -328,21 +328,29 @@ public class InteractionDialog extends Container {
      * Removes the interaction dialog from view with an animation to the left
      */
     public void disposeToTheLeft() {
-        Container p = getParent();
+        final Container p = getParent();
         if(p != null) {
-            Form f = p.getComponentForm();
+            final Form f = p.getComponentForm();
             if(f != null) {
                 setX(-getWidth());
                 if(animateShow) {
-                    p.animateUnlayoutAndWait(400, 255);
+                    p.animateUnlayout(400, 255, new Runnable() {
+                        public void run() {
+                            Container pp = getLayeredPane(f);
+                            remove();
+                            p.remove();
+                            pp.removeAll();
+                            pp.revalidate();
+                        }
+                    });
                 } else {
                     p.revalidate();
+                    Container pp = getLayeredPane(f);
+                    remove();
+                    p.remove();
+                    pp.removeAll();
+                    pp.revalidate();
                 }
-                Container pp = getLayeredPane(f);
-                remove();
-                p.remove();
-                pp.removeAll();
-                pp.revalidate();
             } else {
                 remove();
             }

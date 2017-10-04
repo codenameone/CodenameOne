@@ -2990,6 +2990,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    static final Map<View,AndroidPeer> activePeers = new HashMap<View,AndroidPeer>();
+
+    
     /**
      * wrapper component that capsules a native view object in a Codename One
      * component. this involves A LOT of back and forth between the Codename One
@@ -3308,6 +3311,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     g.drawImage(peerImage, getX(), getY());
                     return;
                 }
+                synchronized(activePeers) {
+                    activePeers.put(v, this);
+                }
                 ((AndroidGraphics) nativeGraphics).drawView(v, lp);
                 if (lightweightMode && peerImage != null) {
                     g.drawImage(peerImage, getX(), getY(), getWidth(), getHeight());
@@ -3315,6 +3321,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } else {
                 super.paint(g);
             }
+        }
+        
+        boolean _initialized() {
+            return isInitialized();
         }
 
         @Override
@@ -4827,6 +4837,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return (int)new File(getContext().getFilesDir(), name).length();
     }
     
+    private String addFile(String s) {
+        // I explicitly don't create a "proper URL" since code might rely on the fact that the file isn't encoded
+        if(s != null && s.startsWith("/")) {
+            return "file:/" + s;
+        }
+        return s;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -4840,10 +4858,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(storageDirs != null){
             String [] roots = new String[storageDirs.length + 1];
             System.arraycopy(storageDirs, 0, roots, 0, storageDirs.length);
-            roots[roots.length - 1] = Environment.getRootDirectory().getAbsolutePath();
+            roots[roots.length - 1] = addFile(Environment.getRootDirectory().getAbsolutePath());
             return roots;
         }
-        return new String[]{Environment.getRootDirectory().getAbsolutePath()};
+        return new String[]{addFile(Environment.getRootDirectory().getAbsolutePath())};
     }
 
     @Override

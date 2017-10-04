@@ -473,6 +473,7 @@ public class Slider extends Label {
             previousX = x;
         
         }
+        
     }
 
     /**
@@ -483,11 +484,11 @@ public class Slider extends Label {
             return;
         }
         if(vertical && previousY == -1){
-            previousY = y;
+            previousY = y - getAbsoluteY();
             return;
         }
         if(!vertical && previousX == -1){
-            previousX = x;
+            previousX = x - getAbsoluteX();
             return;
         }
         int per = 0;
