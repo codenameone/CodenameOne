@@ -243,7 +243,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
-    private Media background;
+    private AudioService background;
     private boolean asyncEditMode = false;
     private boolean compatPaintMode;
     private MediaRecorder recorder = null;
@@ -2642,40 +2642,57 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
     
-   
+    private int nextMediaId;
     @Override
-    public Media createBackgroundMedia(String uri) throws IOException {
+    public Media createBackgroundMedia(final String uri) throws IOException {
+        int mediaId = nextMediaId++;
+
 
         Intent serviceIntent = new Intent(getContext(), AudioService.class);
         serviceIntent.putExtra("mediaLink", uri);
-        
+        serviceIntent.putExtra("mediaId", mediaId);
         final ServiceConnection mConnection = new ServiceConnection() {
 
             public void onServiceDisconnected(ComponentName name) {
+
                 background = null;
             }
 
             public void onServiceConnected(ComponentName name, IBinder service) {
                 AudioService.LocalBinder mLocalBinder = (AudioService.LocalBinder) service;
-                background = mLocalBinder.getService();
+                AudioService svc = (AudioService)mLocalBinder.getService();
+                background = svc;
             }
         };
 
-        getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
+        boolean boundSuccess = getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
+        if (!boundSuccess) {
+            throw new RuntimeException("Failed to bind background media service for uri "+uri);
+        }
         getContext().startService(serviceIntent);
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            @Override
-            public void run() {
-                while (background == null) {
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException ex) {
-                    }
+        while (background == null) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    Util.sleep(200);
                 }
-            }
-        });
+            });
+        }
 
-        Media retVal = new MediaProxy(background) {
+        while (background.getMedia(mediaId) == null) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    Util.sleep(200);
+                }
+
+            });
+        }
+        Media ret = new MediaProxy(background.getMedia(mediaId)) {
+
+            @Override
+            public void play() {
+                super.play();
+            }
 
             @Override
             public void cleanup() {
@@ -2683,7 +2700,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 getContext().unbindService(mConnection);
             }
         };
-        return retVal;
+        return ret;
+
     }
 
     
