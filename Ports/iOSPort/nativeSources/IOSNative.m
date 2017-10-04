@@ -2916,7 +2916,6 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         NSObject* obj = (BRIDGE_CAST NSObject*)peer;
         if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
             MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            mv.moviePlayer.shouldAutoplay = NO;
             [[CodenameOne_GLViewController instance] presentMoviePlayerViewControllerAnimated:mv];
         }
         POOL_END();
