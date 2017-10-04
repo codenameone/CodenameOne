@@ -37,8 +37,11 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.UITimer;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * <p>Video playback component with control buttons for back, play/pause and 
@@ -296,7 +299,23 @@ public class MediaPlayer extends Container {
                 } else {
                     play.setText("pause");
                 }
-                video.play();
+                Timer t = new Timer();
+                t.schedule(new TimerTask() {
+                    public void run() {
+                        if (isInitialized()) {
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    if (video != null && !video.isPlaying() && isInitialized()) {
+                                        video.play();
+                                    }
+                                }
+                            });
+                        }
+                    }
+                        
+                }, 300l);
+                
+                //video.play();
             }
         }
         play.addActionListener(new ActionListener() {
