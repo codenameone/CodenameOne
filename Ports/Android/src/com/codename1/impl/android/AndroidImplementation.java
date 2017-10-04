@@ -5653,6 +5653,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         }
         
+        private void setNativeController(final boolean nativeController) {
+            if (nativeController != this.nativeController) {
+                this.nativeController = nativeController;
+                if (nativeVideo != null) {
+                    Activity activity = getActivity();
+                    if (activity != null) {
+                        activity.runOnUiThread(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                if (nativeVideo != null) {
+                                    MediaController mc = new AndroidImplementation.CN1MediaController();
+                                    nativeVideo.setMediaController(mc);
+                                    if (!nativeController) mc.setVisibility(View.GONE);
+                                    else mc.setVisibility(View.VISIBLE);
+                                    
+                                }
+                            }
+
+                        });
+                    }
+
+                }
+            }
+        }
+        
         @Override
         public void init() {
             super.init();
@@ -5664,7 +5690,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void play() {
-            if (nativePlayer && curentForm == null) {
+            Component cmp = getVideoComponent();
+            if (cmp.getParent() == null && nativePlayer && curentForm == null) {
                 curentForm = Display.getInstance().getCurrent();
                 Form f = new Form();
                 f.setBackCommand(new Command("") {
@@ -5680,7 +5707,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 });
                 f.setLayout(new BorderLayout());
-                Component cmp = getVideoComponent();
+                
                 if(cmp.getParent() != null) {
                     cmp.getParent().removeComponent(cmp);
                 }
@@ -5876,6 +5903,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void setVariable(String key, Object value) {
+            if (nativeVideo != null && Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED.equals(key) && value instanceof Boolean) {
+                setNativeController((Boolean)value);
+            }
         }
 
         public Object getVariable(String key) {

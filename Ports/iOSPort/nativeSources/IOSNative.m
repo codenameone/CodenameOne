@@ -2782,6 +2782,31 @@ void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(CN1_THREAD_STATE
      });*/
 }
 
+void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN value) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            POOL_END();
+            return;
+        }
+
+        if (value) {
+            m.controlStyle = MPMovieControlStyleEmbedded;
+        } else {
+            m.controlStyle = MPMovieControlStyleNone;
+        }
+        POOL_END();
+    });
+}
+
 void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
