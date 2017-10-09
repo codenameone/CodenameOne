@@ -89,6 +89,14 @@ public class SpanButton extends Container {
     }
 
     /**
+     * Returns the TextArea holding the actual text
+     * @return the component
+     */
+    public TextArea getTextComponent() {
+        return text;
+    }
+    
+    /**
      * Sets the UIID for the actual text
      *
      * @param uiid the uiid
