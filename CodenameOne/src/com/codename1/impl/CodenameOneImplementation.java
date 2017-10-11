@@ -29,7 +29,6 @@ import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
-import com.codename1.db.Row;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
@@ -74,12 +73,8 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.Vector;
 
 /**
@@ -1068,6 +1063,7 @@ public abstract class CodenameOneImplementation {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
+        cr.setReadResponseForErrors(false);
         cr.setDuplicateSupported(true);
         cr.setUrl(url);
         cr.downloadImageToStorage(fileName, onSuccess, onFail);
@@ -1089,6 +1085,7 @@ public abstract class CodenameOneImplementation {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
+        cr.setReadResponseForErrors(false);
         cr.setDuplicateSupported(true);
         cr.setUrl(url);
         cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
@@ -5960,6 +5957,7 @@ public abstract class CodenameOneImplementation {
             };
             r.setPost(false);
             r.setFailSilently(true);
+            r.setReadResponseForErrors(false);
             r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "registerPush");
             long val = Preferences.get("push_id", (long)-1);
             if(val > -1) {
