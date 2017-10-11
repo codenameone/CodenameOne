@@ -4614,6 +4614,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void scaleArray(BufferedImage currentImage, int srcWidth, int srcHeight, int height, int width, int[] currentArray, int[] destinationArray) {
+        // disable EDT logging for this method
+        boolean edtLog = showEDTWarnings;
+        showEDTWarnings = false;
+        
         // Horizontal Resize
         int yRatio = (srcHeight << 16) / height;
         int xRatio = (srcWidth << 16) / width;
@@ -4636,6 +4640,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             yPos += yRatio;
             xPos = xRatio / 2;
         }
+        showEDTWarnings = edtLog;
     }
 
     private static int round(double d) {

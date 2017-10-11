@@ -135,7 +135,7 @@ public class SwipeableContainer extends Container {
      * to expose on the left.
      */ 
     public void openToRight() {
-        if (open) {
+        if (open || openedToRight) {
             return;
         }
         if(bottomLeftWrapper.getComponentCount() == 0){
@@ -161,7 +161,7 @@ public class SwipeableContainer extends Container {
      * to expose on the right.
      */ 
     public void openToLeft() {
-        if (open) {
+        if (open || openedToLeft) {
             return;
         }
         if(bottomRightWrapper.getComponentCount() == 0){
