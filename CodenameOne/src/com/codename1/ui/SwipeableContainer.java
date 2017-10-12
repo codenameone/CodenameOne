@@ -273,7 +273,18 @@ public class SwipeableContainer extends Container {
     public boolean isOpenedToLeft() {
         return openedToLeft;
     }
-    
+
+    @Override
+    void doLayout() {
+        if(openedToLeft || openedToRight) {
+            int x = topWrapper.getX();
+            super.doLayout();
+            topWrapper.setX(x);
+        } else {
+            super.doLayout();
+        }
+    }
+
     
 
     /**
