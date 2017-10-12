@@ -306,6 +306,15 @@ public class SwipeableContainer extends Container {
             this.type = type;
         }
 
+        private void dragInitiatedRecursive(Container cnt) {
+            for(Component c : cnt) {
+                if(c instanceof Container) {
+                    dragInitiatedRecursive((Container)c);
+                }
+                c.dragInitiated();
+            }
+        }
+        
         public void actionPerformed(ActionEvent evt) {
 
             if (getComponentCount() == 0 || !swipeActivated || animate()) {
@@ -349,6 +358,9 @@ public class SwipeableContainer extends Container {
                     }
                     Component top = topWrapper.getComponentAt(0);
                     top.dragInitiated();
+                    if(top instanceof Container && top.getLeadComponent() == null) {
+                        dragInitiatedRecursive((Container)top);
+                    }
 
                     if (initialX != -1) {
                         int diff = x - initialX;
