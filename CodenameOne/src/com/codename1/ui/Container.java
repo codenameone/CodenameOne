@@ -1875,10 +1875,7 @@ public class Container extends Component implements Iterable<Component>{
                 }
             }
         }
-        if ((isFocusable() || isGrabsPointerEvents())) {
-            return this;
-        }
-        return null;  
+        return this;
     }
     
     /**
