@@ -1825,18 +1825,8 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * Returns the top-most Component in the current container that exists 
-     * in the given absolute x, y coordinates, and responds to pointer events.
-     * 
-     * <p>This will only return components with either {@link #isFocusable() } = {@literal true} 
-     * {@link #isGrabsPointerEvents() } = {@literal true}.  Other components are ignored.</p>
-     * 
-     * <p>This method will return {@literal null} if no qualifying components are found.  In the case
-     * that this container's has no qualifying children, but the container itself is either
-     * focusable or grabs pointer events, then this will return the container.</p>
-     * 
-     * <p>Matching components with {@link #isBlockLead() } = {@literal true} take priority over any
-     * of its descendents.</p>
+     * Returns a Component that exists in the given x, y coordinates by traversing
+     * component objects and invoking contains
      * 
      * @param x absolute screen location
      * @param y absolute screen location
@@ -1844,9 +1834,7 @@ public class Container extends Component implements Iterable<Component>{
      * @see Component#contains
      */
     public Component getComponentAt(int x, int y) {
-        if (!contains(x, y)) {
-            return null;
-        }
+        
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
@@ -1864,20 +1852,46 @@ public class Container extends Component implements Iterable<Component>{
                 count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
             }
         }
-        for (int i=count-1; i>=0; i--) {
+        boolean overlaps = getLayout().isOverlapSupported();
+        Component component = null;
+        for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y)) {
-                if (!cmp.isBlockLead() && cmp instanceof Container) {
-                    cmp = ((Container)cmp).getComponentAt(x, y);
+                // this is a workaround for the issue mentioned here: https://stackoverflow.com/questions/44112337/action-listening-for-container-itself-and-sub-buttons/44125364
+                // the block lead has some weird behaviors with overlap hierarchies, not sure if this is the best solution
+                if(component != null && component.isBlockLead()) {
+                    return component;
                 }
-                if (cmp != null && (cmp.isFocusable() || cmp.isGrabsPointerEvents())) {
-                    return cmp;
+                component = cmp;
+                if (!overlaps && component.isFocusable()) {
+                    // special case for lead blocking
+                    if(component instanceof Container && ((Container)component).getLeadParent() == component) {
+                        Component c = ((Container)component).getComponentAt(x, y);
+                        if(c.isBlockLead()) {
+                            return c;
+                        }
+                    }
+                    return component;
+                }
+                if (cmp instanceof Container) {
+                    Component c = ((Container) cmp).getComponentAt(x, y);
+                    if(c != null){
+                        component = c;
+                    }
+                }
+                if (!overlaps || component.isFocusable() || component.isGrabsPointerEvents()) {
+                    return component;
                 }
             }
         }
-        return this;
-    }
-    
+        if (component != null){
+            return component;
+        }
+        if (contains(x, y)) {
+            return this;
+        }
+        return null;
+    }    
     /**
      * Recursively searches the container hierarchy for a drop target
      * 

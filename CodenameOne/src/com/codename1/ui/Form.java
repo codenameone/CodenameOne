@@ -1172,9 +1172,7 @@ public class Form extends Container {
     }
     
     Container getActualPane(){
-        if (formLayeredPane != null) {
-            return this;
-        }else if(layeredPane != null){
+        if(layeredPane != null){
             return layeredPane.getParent();
         } else {
             return contentPane;
