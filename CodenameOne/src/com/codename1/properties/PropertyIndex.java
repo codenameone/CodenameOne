@@ -29,6 +29,9 @@ import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.util.Base64;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -310,6 +313,18 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                         p.setImpl(Util.toDoubleValue(val));
                         continue;
                     } 
+                    if(p.getGenericType() == Image.class || p.getGenericType() == EncodedImage.class) {
+                        if(val instanceof Image) {
+                            p.setImpl(val);                                    
+                        } else {
+                            if(val instanceof byte[]) {
+                                p.setImpl(EncodedImage.create((byte[])val));
+                            } else {
+                                p.setImpl(EncodedImage.create(Base64.decode(((String)val).getBytes())));
+                            }
+                        }
+                        continue;
+                    }
                     p.setImpl(val);                
                 }
             }
