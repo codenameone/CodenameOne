@@ -49,6 +49,7 @@ public class PeerComponent extends Component {
      * @param nativePeer the native platform specific peer component.
      */
     protected PeerComponent(Object nativePeer) {
+        setGrabsPointerEvents(true);
         this.nativePeer = nativePeer;
     }
 
