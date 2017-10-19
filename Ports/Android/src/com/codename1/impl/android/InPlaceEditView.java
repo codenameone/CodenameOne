@@ -544,7 +544,7 @@ public class InPlaceEditView extends FrameLayout{
         if (!impl.isAsyncEditMode()) {
             boolean leaveVKBOpen = false;
             if (mEditText != null && mEditText.mTextArea != null && mEditText.mTextArea.getComponentForm() != null) {
-                Component c = mEditText.mTextArea.getComponentForm().getComponentAt((int) event.getX(), (int) event.getY());
+                Component c = mEditText.mTextArea.getComponentForm().getResponderAt((int) event.getX(), (int) event.getY());
                 if ( mEditText.mTextArea.getClientProperty("leaveVKBOpen") != null
                         || (c != null && c instanceof TextArea && ((TextArea) c).isEditable() && ((TextArea) c).isEnabled())) {
                     leaveVKBOpen = true;

@@ -3732,6 +3732,16 @@ public class Component implements Animation, StyleListener {
     }
     
     /**
+     * Checks if the component responds to pointer events.  A component is considered
+     * to respond to pointer events if it is visible and enabled, and is either scrollable,
+     * focusable, or has the {@link #isGrabsPointerEvents() } flag {@literal true}.
+     * @return True if the pointer responds to pointer events.
+     */
+    public boolean respondsToPointerEvents() {
+        return isVisible() && isEnabled() && (isScrollable() || isFocusable() || isGrabsPointerEvents());
+    }
+    
+    /**
      * If this Component is focused, the pointer dragged event
      * will call this method
      * 

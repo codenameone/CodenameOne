@@ -900,7 +900,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     static boolean hitTest(int x, int y) {
         Form f = Display.getInstance().getCurrent();
         if (f != null) {
-            Component cmp = f.getComponentAt(x, y);
+            Component cmp = f.getResponderAt(x, y);
             return cmp == null || !(cmp instanceof PeerComponent);
         }
         return true;
