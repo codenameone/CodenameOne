@@ -6032,7 +6032,8 @@ public class Component implements Animation, StyleListener {
 
     /**
      * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
-     * This method also optionally sets the margin to 0 so the component will be truly hidden
+     * This method also optionally sets the margin to 0 so the component will be truly hidden. Notice that this might 
+     * not behave as expected with scrollable containers or layouts that ignore preferred size.
      * 
      * @param b true to hide the component and false to show it
      * @param changeMargin indicates margin should be set to 0
@@ -6059,7 +6060,8 @@ public class Component implements Animation, StyleListener {
      * Makes the components preferred size equal 0 when hidden and restores it to the default size when not.
      * Also toggles the UIID to "Container" and back to allow padding/margin to be removed. Since the visible flag
      * just hides the component without "removing" the space it occupies this is the flag that can be used to truly
-     * hide a component within the UI.
+     * hide a component within the UI. Notice that this might 
+     * not behave as expected with scrollable containers or layouts that ignore preferred size.
      * 
      * @param b true to hide the component and false to show it
      */
