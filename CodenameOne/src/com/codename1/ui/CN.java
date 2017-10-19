@@ -128,6 +128,31 @@ public class CN extends  CN1Constants {
     }
 
     /**
+     * Creates a soft/weak reference to an object that allows it to be collected
+     * yet caches it. This method is in the porting layer since CLDC only includes
+     * weak references while some platforms include nothing at all and some include
+     * the superior soft references.
+     *
+     * @param o object to cache
+     * @return a caching object or null  if caching isn't supported
+     */
+    public static Object createSoftWeakRef(Object o) {
+        return Display.impl.createSoftWeakRef(o);
+    }
+
+    /**
+     * Extracts the hard reference from the soft/weak reference given
+     *
+     * @param o the reference returned by createSoftWeakRef
+     * @return the original object submitted or null
+     */
+    public static Object extractHardRef(Object o) {
+        return Display.impl.extractHardRef(o);
+    }
+
+    
+    
+    /**
      * This method allows us to manipulate the drag started detection logic.
      * If the pointer was dragged for more than this percentage of the display size it
      * is safe to assume that a drag is in progress.

@@ -1335,6 +1335,10 @@ public class Tabs extends Container {
                                 // start drag not imediately, giving components some sort
                                 // of weight.
                                 dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
+                                Form parent = getComponentForm();
+                                if(parent.buttonsAwatingRelease != null) {
+                                    parent.buttonsAwatingRelease = null;
+                                }
                             }
                         }
                     } 

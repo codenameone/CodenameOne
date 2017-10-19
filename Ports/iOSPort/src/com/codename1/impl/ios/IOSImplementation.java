@@ -900,7 +900,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     static boolean hitTest(int x, int y) {
         Form f = Display.getInstance().getCurrent();
         if (f != null) {
-            Component cmp = f.getComponentAt(x, y);
+            Component cmp = f.getResponderAt(x, y);
             return cmp == null || !(cmp instanceof PeerComponent);
         }
         return true;
@@ -3046,6 +3046,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         private boolean nativePlayer;
         private long moviePlayerPeer;
         private boolean fullScreen;
+        private boolean embedNativeControls=true;
+        
         
         public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
             this.uri = uri;
@@ -3203,6 +3205,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if (component == null) {
                 if(uri != null) {
                     moviePlayerPeer = nativeInstance.createVideoComponent(uri, onCompletionCallbackId);
+                    nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
                     component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
                 } else {
                     try {
@@ -3272,6 +3275,12 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
             if(key.equals(Media.VARIABLE_BACKGROUND_TITLE)) {
                 nativeInstance.setMediaBgTitle((String)value);
+            }
+            if(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED.equals(key) && value instanceof Boolean) {
+                embedNativeControls = (Boolean)value;
+                if (moviePlayerPeer != 0) {
+                    nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, (Boolean)value);
+                }
             }
         }
 

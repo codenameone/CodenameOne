@@ -240,6 +240,7 @@ public final class IOSNative {
     native void setMediaBgDuration(long duration);
     native void setMediaBgPosition(long position);
     native void setMediaBgAlbumCover(long cover);
+    native void setNativeVideoControlsEmbedded(long peer, boolean value);
     
     native boolean isVideoPlaying(long peer);
 

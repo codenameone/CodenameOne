@@ -395,7 +395,7 @@ public class CodenameOneView {
         }
         if (!cn1GrabbedPointer) {
             if (x == null) {
-                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
+                Component componentAt = this.implementation.getCurrentForm().getResponderAt((int)event.getX(), (int)event.getY());
                 if (componentAt != null && (componentAt instanceof PeerComponent)) {
                     
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -407,7 +407,7 @@ public class CodenameOneView {
                 }
 
             } else {
-                Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
+                Component componentAt = this.implementation.getCurrentForm().getResponderAt((int)x[0], (int)y[0]);
                 if (componentAt != null && (componentAt instanceof PeerComponent)) {
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
                         nativePeerGrabbedPointer = true;

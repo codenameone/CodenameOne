@@ -73,7 +73,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("checkBoxUncheckedImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("checkBoxUncheckedFocusImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("comboImage", "Combo image to use instead of Codename One drawing it on its own");
-        helpMap.put("commandBehavior", "Indicates how commands should act, as a touch menu, native menu etc. Possible values: SoftKey, Touch, Bar, Title, Right, Native, ics, Side");
+        helpMap.put("commandBehavior", "Deprecated: Don't use this constant as it conflicts with the Toolbar. Indicates how commands should act, as a touch menu, native menu etc. Possible values: SoftKey, Touch, Bar, Title, Right, Native, ics, Side");
         helpMap.put("ComponentGroupBool", "Enables component group which allows components to be logically grouped together so the UIID's of components would be modified based on their group placement. This allows for some unique styling effects where the first/last elements have different styles from the rest of the elements. Its disabled by default thus leaving its usage up to the designer.");
         helpMap.put("dialogTransitionIn", "Default transition for dialog Possible values: empty, slide, cover, uncover, fade, pulse, bubble");
         helpMap.put("dialogTransitionInImage", "Default transition Image for dialog, causes a Timeline transition effect");

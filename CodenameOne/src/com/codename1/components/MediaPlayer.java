@@ -37,8 +37,11 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.UITimer;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * <p>Video playback component with control buttons for back, play/pause and 
@@ -55,6 +58,10 @@ public class MediaPlayer extends Container {
     private Image pauseIcon;
     private Image backIcon;
     private Image fwdIcon;
+    private Container buttonsBar;
+    private boolean hideNativeVideoControls;
+    private boolean showControls=true;
+    
     
     private boolean userSetIcons = false;
     private Media video;
@@ -76,12 +83,91 @@ public class MediaPlayer extends Container {
     }
     
     /**
+     * On platforms that include native video player controls (Android and iOS), this allows you
+     * to hide those controls.
+     * @param hideNativeControls Set {@literal true} to hide the native video controls for this player.
+     * @see Display#isNativeVideoPlayerControlsIncluded() 
+     * @see #setHideNativeVideoControls(boolean) 
+     * @see #usesNativeVideoControls() 
+     */
+    public void setHideNativeVideoControls(boolean hideNativeControls) {
+        this.hideNativeVideoControls = hideNativeControls;
+        if (video != null) {
+            video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, !hideNativeControls && showControls);
+        }
+    }
+    
+    /**
+     * On platforms that include native video player controls (Android and iOS), this indicates whether
+     * these controls should be hidden for this media player.
+     * @return {@literal true} if native video player controls should be hidden.
+     * @see Display#isNativeVideoPlayerControlsIncluded() 
+     * @see #setHideNativeVideoControls(boolean) 
+     * @see #usesNativeVideoControls() 
+     */
+    public boolean isHideNativeVideoControls() {
+        return hideNativeVideoControls;
+    }
+    
+    /**
+     * Checks to see if this player uses native video controls.  For this to be {@literal true},
+     * the platform must support native video controls (iOS and Android) (See {@link Display#isNativeVideoPlayerControlsIncluded() }
+     * to find out if current platform supports this; <strong>AND</strong> {@link #isHideNativeVideoControls() }
+     * must be false.
+     * @return True if this player uses native video controls.
+     * @see #isHideNativeVideoControls() 
+     * @see #setHideNativeVideoControls(boolean) 
+     * @see Display#isNativeVideoPlayerControlsIncluded() 
+     */
+    public boolean usesNativeVideoControls() {
+        return Display.getInstance().isNativeVideoPlayerControlsIncluded() && !hideNativeVideoControls;
+    }
+    
+    /**
+     * Shows the controls for this media player.  If the player is set to use 
+     * native controls, then this will show the native controls.  Otherwise it
+     * shows the lightweight controls.
+     */
+    public void showControls() {
+        if (!showControls) {
+            showControls = true;
+            if (isInitialized()) {
+                buttonsBar.setVisible(true);
+                buttonsBar.setHidden(false);
+                animateLayoutFade(300, 0);
+            }
+        }
+        if (video != null && usesNativeVideoControls()) {
+            video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, true);
+        }
+    }
+    
+    /**
+     * Hides the controls for this media player.  If the player is set to use native 
+     * controls, then this will hide the native controls.  Otherwise it hides the 
+     * lightweight controls.
+     */
+    public void hideControls() {
+        if (showControls) {
+            showControls = false;
+            if (isInitialized()) {
+                buttonsBar.setVisible(false);
+                buttonsBar.setHidden(true);
+                animateLayoutFade(300, 0);
+            }
+        }
+        if (video != null && usesNativeVideoControls()) {
+            video.setVariable(Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED, false);
+        }
+    }
+    
+    /**
      * Empty constructor
      */
     public MediaPlayer(Media video) {
         this();
         this.video = video;
-        initUI();
+        //initUI();
     }
     
     /**
@@ -195,7 +281,9 @@ public class MediaPlayer extends Container {
             this.onCompletion = onCompletion;
             video = MediaManager.createMedia(uri, true, new CompletionWrapper());
         }
-        initUI();
+        if (isInitialized()) {
+            initUI();
+        }
     }
     
     /**
@@ -245,7 +333,9 @@ public class MediaPlayer extends Container {
             this.onCompletion = onCompletion;
             video = MediaManager.createMedia(is, mimeType, new CompletionWrapper());
         }
-        initUI();
+        if (isInitialized()) {
+            initUI();
+        }
     }
 
     private void initUI() {
@@ -256,31 +346,33 @@ public class MediaPlayer extends Container {
             addComponent(BorderLayout.CENTER, video.getVideoComponent());        
         }
         
-        Container buttonsBar = new Container(new FlowLayout(Container.CENTER));
-        if(!Display.getInstance().isNativeVideoPlayerControlsIncluded()) {
-            addComponent(BorderLayout.SOUTH, buttonsBar);
+        buttonsBar = new Container(new FlowLayout(Container.CENTER));
+        addComponent(BorderLayout.SOUTH, buttonsBar);
+        if (usesNativeVideoControls() || !showControls) {
+            buttonsBar.setVisible(false);
+            buttonsBar.setHidden(true);
         }
         
-        if(video == null || !video.isNativePlayerMode()){
-            Button back = new Button();
-            back.setUIID("MediaPlayerBack");
-            if(backIcon != null){
-                back.setIcon(backIcon);
-            }else{
-                back.setText("Back");
-            }
-            buttonsBar.addComponent(back);
-            back.addActionListener(new ActionListener() {
-
-                public void actionPerformed(ActionEvent evt) {
-                    if(video == null){
-                        return;
-                    }
-                    int t = video.getTime();
-                    video.setTime(t - 2);
-                }
-            });        
+        //if(video == null || !video.isNativePlayerMode()){
+        Button back = new Button();
+        back.setUIID("MediaPlayerBack");
+        if(backIcon != null){
+            back.setIcon(backIcon);
+        }else{
+            back.setText("Back");
         }
+        buttonsBar.addComponent(back);
+        back.addActionListener(new ActionListener() {
+
+            public void actionPerformed(ActionEvent evt) {
+                if(video == null){
+                    return;
+                }
+                int t = video.getTime();
+                video.setTime(t - 2);
+            }
+        });        
+        //}
         
         final Button play = new Button();
         play.setUIID("MediaPlayerPlay");
@@ -296,7 +388,23 @@ public class MediaPlayer extends Container {
                 } else {
                     play.setText("pause");
                 }
-                video.play();
+                Timer t = new Timer();
+                t.schedule(new TimerTask() {
+                    public void run() {
+                        if (isInitialized()) {
+                            Display.getInstance().callSerially(new Runnable() {
+                                public void run() {
+                                    if (video != null && !video.isPlaying() && isInitialized()) {
+                                        video.play();
+                                    }
+                                }
+                            });
+                        }
+                    }
+                        
+                }, 300l);
+                
+                //video.play();
             }
         }
         play.addActionListener(new ActionListener() {
@@ -327,28 +435,47 @@ public class MediaPlayer extends Container {
                 }
             }
         });
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                if (video != null && video.isPlaying()) {
+                    play.setUIID("MediaPlayerPause");
+                    if (getPauseIcon() != null) {
+                        play.setIcon(getPauseIcon());
+                    } else {
+                        play.setText("pause");
+                    }
+                } else if (video != null && !video.isPlaying()) {
+                    play.setUIID("MediaPlayerPlay");
+                    if (getPlayIcon() != null) {
+                        play.setIcon(getPlayIcon());
+                    } else {
+                        play.setText("play");
+                    }
+                }
+            }
+        });
         buttonsBar.addComponent(play);
 
-        if(video == null || !video.isNativePlayerMode()){        
-            Button fwd = new Button();
-            fwd.addActionListener(new ActionListener() {
+        //if(video == null || !video.isNativePlayerMode()){        
+        Button fwd = new Button();
+        fwd.addActionListener(new ActionListener() {
 
-                public void actionPerformed(ActionEvent evt) {
-                    if(video == null){
-                        return;
-                    }
-                    int t = video.getTime();
-                    video.setTime(t + 1);
+            public void actionPerformed(ActionEvent evt) {
+                if(video == null){
+                    return;
                 }
-            });
-            fwd.setUIID("MediaPlayerFwd");
-            if(fwdIcon != null){
-                fwd.setIcon(fwdIcon);
-            }else{
-                fwd.setText("fwd");
+                int t = video.getTime();
+                video.setTime(t + 1);
             }
-            buttonsBar.addComponent(fwd);           
+        });
+        fwd.setUIID("MediaPlayerFwd");
+        if(fwdIcon != null){
+            fwd.setIcon(fwdIcon);
+        }else{
+            fwd.setText("fwd");
         }
+        buttonsBar.addComponent(fwd);           
+        //}
         if(isInitialized()) {
             revalidate();
         }

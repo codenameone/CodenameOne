@@ -2390,8 +2390,14 @@ void com_codename1_impl_ios_IOSNative_removeNotificationCenterObserver___long(CN
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str, JAVA_INT onCompletionCallbackId) {
     __block MPMoviePlayerViewController* moviePlayerInstance;
     dispatch_sync(dispatch_get_main_queue(), ^{
-        POOL_BEGIN();
-        NSURL* u = [NSURL URLWithString:toNSString(CN1_THREAD_GET_STATE_PASS_ARG str)];
+        POOL_BEGIN()
+        NSString *s = toNSString(CN1_THREAD_GET_STATE_PASS_ARG str);
+        NSURL *u = nil;
+        if([s hasPrefix:@"file:"]) {
+            u = [NSURL fileURLWithPath:[s substringFromIndex:5]];
+        } else {
+            u = [NSURL URLWithString:s];
+        }
         moviePlayerInstance = [[MPMoviePlayerViewController alloc] initWithContentURL:u];
         registerVideoCallback(CN1_THREAD_GET_STATE_PASS_ARG moviePlayerInstance.moviePlayer, onCompletionCallbackId);
 #ifndef AUTO_PLAY_VIDEO
@@ -2782,6 +2788,31 @@ void com_codename1_impl_ios_IOSNative_setMediaBgPosition___long(CN1_THREAD_STATE
      });*/
 }
 
+void com_codename1_impl_ios_IOSNative_setNativeVideoControlsEmbedded___long_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_BOOLEAN value) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        
+        NSObject* obj = (BRIDGE_CAST NSObject*)peer;
+        MPMoviePlayerController* m = nil;;
+        if([obj isKindOfClass:[MPMoviePlayerController class]]) {
+            m = (MPMoviePlayerController*)obj;
+        } else if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
+            MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
+            m = mv.moviePlayer;
+        } else {
+            POOL_END();
+            return;
+        }
+
+        if (value) {
+            m.controlStyle = MPMovieControlStyleEmbedded;
+        } else {
+            m.controlStyle = MPMovieControlStyleNone;
+        }
+        POOL_END();
+    });
+}
+
 void com_codename1_impl_ios_IOSNative_setMediaBgAlbumCover___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_async(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -2885,7 +2916,6 @@ void com_codename1_impl_ios_IOSNative_showNativePlayerController___long(CN1_THRE
         NSObject* obj = (BRIDGE_CAST NSObject*)peer;
         if ([obj isKindOfClass:[MPMoviePlayerViewController class]]) {
             MPMoviePlayerViewController *mv = (MPMoviePlayerViewController*)obj;
-            mv.moviePlayer.shouldAutoplay = NO;
             [[CodenameOne_GLViewController instance] presentMoviePlayerViewControllerAnimated:mv];
         }
         POOL_END();

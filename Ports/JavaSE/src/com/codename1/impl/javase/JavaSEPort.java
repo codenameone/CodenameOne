@@ -1503,7 +1503,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
-                    Component cmp = f.getComponentAt(x, y);
+                    Component cmp = f.getResponderAt(x, y);
                     if (cmp != null) {
                         int cursor = cmp.getCursor();
                         if (cursor != currentCursor) {
@@ -1689,7 +1689,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         boolean ignoreWheelMovements = false;
         int lastX;
         int lastY;
-        public void mouseWheelMoved(MouseWheelEvent e) {
+        public void mouseWheelMoved(final MouseWheelEvent e) {
             e.consume();
             if (!isEnabled()) {
                 return;
@@ -1703,7 +1703,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     // NOTE:  This is off edt... I've noticed an NPE
                     // inset getComponentAt() because of this
                     // we should move to EDT
-                    Component cmp = f.getContentPane().getComponentAt(x, y);
+                    Component cmp = f.getResponderAt(x, y);
                     if(cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                         if (!ignoreWheelMovements) {
                             ignoreWheelMovements = true;
@@ -1729,7 +1729,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                         scrollWheeling = true;
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            Component cmp = f.getResponderAt(x, y);
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerPressed(x, y);
@@ -1747,7 +1747,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            Component cmp = f.getResponderAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 return;
                             }
@@ -1765,7 +1765,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            Component cmp = f.getResponderAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 return;
                             }
@@ -1783,7 +1783,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getContentPane().getComponentAt(x, y);
+                            Component cmp = f.getResponderAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 f.pointerReleased(x, y + units);
                                 return;
@@ -4614,6 +4614,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void scaleArray(BufferedImage currentImage, int srcWidth, int srcHeight, int height, int width, int[] currentArray, int[] destinationArray) {
+        // disable EDT logging for this method
+        boolean edtLog = showEDTWarnings;
+        showEDTWarnings = false;
+        
         // Horizontal Resize
         int yRatio = (srcHeight << 16) / height;
         int xRatio = (srcWidth << 16) / width;
@@ -4636,6 +4640,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             yPos += yRatio;
             xPos = xRatio / 2;
         }
+        showEDTWarnings = edtLog;
     }
 
     private static int round(double d) {
@@ -6420,7 +6425,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!peerGrabbedDrag && Display.isInitialized()) {
                 Form f = Display.getInstance().getCurrent();
                 if (f != null) {
-                    Component cmp = f.getComponentAt(cn1X, cn1Y);
+                    Component cmp = f.getResponderAt(cn1X, cn1Y);
                     if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
                         // It's not a peer component, so we should pass the event to the canvas
                         e = SwingUtilities.convertMouseEvent(this, e, canvas);

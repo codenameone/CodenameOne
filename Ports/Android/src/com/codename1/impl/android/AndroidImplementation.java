@@ -243,7 +243,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static int belowSpacing;
     public static boolean asyncView = false;
     public static boolean textureView = false;
-    private Media background;
+    private AudioService background;
     private boolean asyncEditMode = false;
     private boolean compatPaintMode;
     private MediaRecorder recorder = null;
@@ -2642,40 +2642,57 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return true;
     }
     
-   
+    private int nextMediaId;
     @Override
-    public Media createBackgroundMedia(String uri) throws IOException {
+    public Media createBackgroundMedia(final String uri) throws IOException {
+        int mediaId = nextMediaId++;
+
 
         Intent serviceIntent = new Intent(getContext(), AudioService.class);
         serviceIntent.putExtra("mediaLink", uri);
-        
+        serviceIntent.putExtra("mediaId", mediaId);
         final ServiceConnection mConnection = new ServiceConnection() {
 
             public void onServiceDisconnected(ComponentName name) {
+
                 background = null;
             }
 
             public void onServiceConnected(ComponentName name, IBinder service) {
                 AudioService.LocalBinder mLocalBinder = (AudioService.LocalBinder) service;
-                background = mLocalBinder.getService();
+                AudioService svc = (AudioService)mLocalBinder.getService();
+                background = svc;
             }
         };
 
-        getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
+        boolean boundSuccess = getContext().bindService(serviceIntent, mConnection, getContext().BIND_AUTO_CREATE);
+        if (!boundSuccess) {
+            throw new RuntimeException("Failed to bind background media service for uri "+uri);
+        }
         getContext().startService(serviceIntent);
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            @Override
-            public void run() {
-                while (background == null) {
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException ex) {
-                    }
+        while (background == null) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
+                public void run() {
+                    Util.sleep(200);
                 }
-            }
-        });
+            });
+        }
 
-        Media retVal = new MediaProxy(background) {
+        while (background.getMedia(mediaId) == null) {
+            Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    Util.sleep(200);
+                }
+
+            });
+        }
+        Media ret = new MediaProxy(background.getMedia(mediaId)) {
+
+            @Override
+            public void play() {
+                super.play();
+            }
 
             @Override
             public void cleanup() {
@@ -2683,7 +2700,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 getContext().unbindService(mConnection);
             }
         };
-        return retVal;
+        return ret;
+
     }
 
     
@@ -5635,6 +5653,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         }
         
+        private void setNativeController(final boolean nativeController) {
+            if (nativeController != this.nativeController) {
+                this.nativeController = nativeController;
+                if (nativeVideo != null) {
+                    Activity activity = getActivity();
+                    if (activity != null) {
+                        activity.runOnUiThread(new Runnable() {
+
+                            @Override
+                            public void run() {
+                                if (nativeVideo != null) {
+                                    MediaController mc = new AndroidImplementation.CN1MediaController();
+                                    nativeVideo.setMediaController(mc);
+                                    if (!nativeController) mc.setVisibility(View.GONE);
+                                    else mc.setVisibility(View.VISIBLE);
+                                    
+                                }
+                            }
+
+                        });
+                    }
+
+                }
+            }
+        }
+        
         @Override
         public void init() {
             super.init();
@@ -5646,7 +5690,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         @Override
         public void play() {
-            if (nativePlayer && curentForm == null) {
+            Component cmp = getVideoComponent();
+            if (cmp.getParent() == null && nativePlayer && curentForm == null) {
                 curentForm = Display.getInstance().getCurrent();
                 Form f = new Form();
                 f.setBackCommand(new Command("") {
@@ -5662,7 +5707,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 });
                 f.setLayout(new BorderLayout());
-                Component cmp = getVideoComponent();
+                
                 if(cmp.getParent() != null) {
                     cmp.getParent().removeComponent(cmp);
                 }
@@ -5858,6 +5903,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         public void setVariable(String key, Object value) {
+            if (nativeVideo != null && Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED.equals(key) && value instanceof Boolean) {
+                setNativeController((Boolean)value);
+            }
         }
 
         public Object getVariable(String key) {
