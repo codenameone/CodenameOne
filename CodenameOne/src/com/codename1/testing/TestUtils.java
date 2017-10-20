@@ -395,21 +395,30 @@ public class TestUtils {
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
      * @param title the title of the form to wait for
+     * @param timeout Timeout in ms.
      */
-    public static void waitForFormTitle(final String title) {
+    public static void waitForFormTitle(final String title, final long timeout) {
         if(verbose) {
             log("waitForFormTitle(" + title + ")");
         }
         if(Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
-                    waitForFormTitleImpl(title);
+                    waitForFormTitleImpl(title, timeout);
                 }
             });
         } else {
-            waitForFormTitleImpl(title);
+            waitForFormTitleImpl(title, timeout);
         }
         waitFor(50);
+    }
+    
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test.  Timeout is 90 seconds.
+     * @param title the title of the form to wait for
+     */
+    public static void waitForFormTitle(final String title) {
+        waitForFormTitle(title, 90000);
     }
 
     private static String getFormTitle(Form f) {
@@ -424,10 +433,14 @@ public class TestUtils {
         }
     }
     
-    private static void waitForFormTitleImpl(String title) {
+    private static void waitForFormTitleImpl(String title, long timeout) {
+        long t = System.currentTimeMillis() + timeout;
         while(!title.equals(getFormTitle(Display.getInstance().getCurrent()))) {
             try {
                 Thread.sleep(50);
+                if(System.currentTimeMillis() > t) {
+                    assertBool(false, "Waiting for form " + title + " timed out! Current form title is: " + Display.getInstance().getCurrent().getTitle());
+                }
             } catch (InterruptedException ex) {
             }
         }
@@ -436,25 +449,34 @@ public class TestUtils {
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
      * @param name the name of the form to wait for
+     * @param timeout Timeout in ms
      */
-    public static void waitForFormName(final String name) {
+    public static void waitForFormName(final String name, final long timeout) {
         if(verbose) {
             log("waitForFormName(" + name + ")");
         }
         if(Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
-                    waitForFormNameImpl(name);
+                    waitForFormNameImpl(name, timeout);
                 }
             });
         } else {
-            waitForFormNameImpl(name);
+            waitForFormNameImpl(name, timeout);
         }
         waitFor(50);
     }
     
-    private static void waitForFormNameImpl(String title) {
-        long t = System.currentTimeMillis() + 90000;
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test.  Timeout is 90 seconds.
+     * @param name the name of the form to wait for
+     */
+    public static void waitForFormName(final String name) {
+        waitForFormName(name, 90000);
+    }
+    
+    private static void waitForFormNameImpl(String title, long timeout) {
+        long t = System.currentTimeMillis() + timeout;
         while(!title.equals(Display.getInstance().getCurrent().getName())) {
             try {
                 Thread.sleep(50);
@@ -468,25 +490,34 @@ public class TestUtils {
     
     /**
      * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     * @param timeout Timeout in milliseconds.
      */
-    public static void waitForUnnamedForm() {
+    public static void waitForUnnamedForm(final long timeout) {
         if(verbose) {
             log("waitForUnnamedForm()");
         }
         if(Display.getInstance().isEdt()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 public void run() {
-                    waitForUnnamedFormImpl();
+                    waitForUnnamedFormImpl(timeout);
                 }
             });
         } else {
-            waitForUnnamedFormImpl();
+            waitForUnnamedFormImpl(timeout);
         }
         waitFor(50);
     }
+    
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     */
+    public static void waitForUnnamedForm() {
+        waitForUnnamedForm(90000);
+    }
+    
 
-    private static void waitForUnnamedFormImpl() {
-        long t = System.currentTimeMillis() + 90000;
+    private static void waitForUnnamedFormImpl(long timeout) {
+        long t = System.currentTimeMillis() + timeout;
         while(Display.getInstance().getCurrent().getName() != null) {
             try {
                 Thread.sleep(50);
