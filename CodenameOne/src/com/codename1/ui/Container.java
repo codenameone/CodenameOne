@@ -1897,7 +1897,9 @@ public class Container extends Component implements Iterable<Component>{
      * @see #getResponderAt(int, int) 
      */
     public Component getComponentAt(int x, int y) {
-        
+        if (!contains(x, y)) {
+            return null;
+        }
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
@@ -1960,10 +1962,7 @@ public class Container extends Component implements Iterable<Component>{
         if (component != null){
             return component;
         }
-        if (contains(x, y)) {
-            return this;
-        }
-        return null;
+        return this;
     }    
     /**
      * Recursively searches the container hierarchy for a drop target
