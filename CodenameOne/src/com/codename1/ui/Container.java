@@ -1942,8 +1942,18 @@ public class Container extends Component implements Iterable<Component>{
                         component = c;
                     }
                 }
-                if (!overlaps || component.isFocusable() || component.isGrabsPointerEvents()) {
+                if (!overlaps || component.respondsToPointerEvents()) {
                     return component;
+                } else if (cmp != component) {
+                    // Check if there is anything between component and cmp that grabs pointer events
+                    // if so - we stop the chain
+                    Container tmp = component.getParent();
+                    while (tmp != cmp && tmp != null) {
+                        if (tmp.respondsToPointerEvents()) {
+                            return component;
+                        }
+                        tmp = tmp.getParent();
+                    }
                 }
             }
         }
