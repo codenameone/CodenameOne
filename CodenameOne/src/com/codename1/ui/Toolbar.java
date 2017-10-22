@@ -145,7 +145,7 @@ public class Toolbar extends Container {
     /**
      * Sets the side menu to "on-top" mode
      */
-    private static boolean onTopSideMenu;
+    private static boolean onTopSideMenu = true;
     
     private InteractionDialog sidemenuDialog;
     
