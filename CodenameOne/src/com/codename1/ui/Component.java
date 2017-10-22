@@ -5312,7 +5312,10 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * {@inheritDoc}
+     * Invoked to indicate a change in a propertyName of a Style
+     * 
+     * @param propertyName the property name that was changed
+     * @param source The changed Style object
      */
     public void styleChanged(String propertyName, Style source) {
         //changing the Font, Padding, Margin may casue the size of the Component to Change
