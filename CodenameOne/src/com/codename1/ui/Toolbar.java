@@ -956,6 +956,9 @@ public class Toolbar extends Container {
         }
         sidemenuDialog.setRepositionAnimation(false);
         sidemenuDialog.layoutContainer();
+        if (!getUIManager().isThemeConstant("sideMenuTensileDragBool", true)) {
+            sidemenuDialog.getContentPane().setTensileDragEnabled(false);
+        }
         
         float f = ((float)v) / ((float)dw) * 80.0f;
         Style s = getComponentForm().getLayeredPane(Toolbar.class, false).getUnselectedStyle();
