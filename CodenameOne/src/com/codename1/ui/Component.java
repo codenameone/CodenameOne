@@ -3069,6 +3069,15 @@ public class Component implements Animation, StyleListener {
         this.inlineStylesTheme = inlineStylesTheme;
     }
 
+    /**
+     * A component can indicate whether it is interested in rendering it's selection explicitly, this defaults to 
+     * true in non-touch UI's and false in touch UI's except for the case where a user clicks the screen. 
+     * @return Defaults to false
+     */
+    protected boolean shouldRenderSelection() {
+        return false;
+    }
+
     class AnimationTransitionPainter implements Painter{
         int alpha;
         Style originalStyle;

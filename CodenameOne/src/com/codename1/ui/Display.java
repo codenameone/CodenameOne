@@ -2684,7 +2684,7 @@ public final class Display extends CN1Constants {
         if(c.isCellRenderer()) {
             return shouldRenderSelection();
         }
-        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY));
+        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY)) || c.shouldRenderSelection();
     }
 
     /**
