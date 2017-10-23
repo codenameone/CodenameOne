@@ -327,7 +327,7 @@ public final class CommonTransitions extends Transition {
      * @deprecated this is not faster than slide on modern devices, you should use that {@link #createSlide(int, boolean, int, boolean) }
      */
     public static CommonTransitions createFastSlide(int type, boolean forward, int duration, boolean drawDialogMenu) {
-        CommonTransitions t = new CommonTransitions(TYPE_FAST_SLIDE);
+        CommonTransitions t = new CommonTransitions(TYPE_SLIDE);
         t.slideType = type;
         t.forward = forward;
         t.speed = duration;
@@ -560,6 +560,7 @@ public final class CommonTransitions extends Transition {
 
             if(!Display.getInstance().areMutableImagesFast()) {
                 motion.start();
+                buffer = null;
                 return;
             }
             
@@ -589,7 +590,7 @@ public final class CommonTransitions extends Transition {
                         drawDialogCmp(secondaryBuffer.getGraphics(), d);
                     }
                 } else {
-                    paint(g, source, -source.getAbsoluteX(), -source.getAbsoluteY());
+                    paint(g, source, -source.getAbsoluteX(), -source.getAbsoluteY(), true);
                     if(transitionType == TYPE_FAST_SLIDE) {
                         secondaryBuffer = createMutableImage(destination.getWidth(), destination.getHeight());
                         paint(secondaryBuffer.getGraphics(), destination, -destination.getAbsoluteX(), -destination.getAbsoluteY());
@@ -675,20 +676,13 @@ public final class CommonTransitions extends Transition {
     public void paint(Graphics g) {
         try {
             switch (transitionType) {
+                case TYPE_FAST_SLIDE:
                 case TYPE_SLIDE:
                     // if this is an up or down slide
                     if (slideType == SLIDE_HORIZONTAL) {
                         paintSlideAtPosition(g, position, 0);
                     } else {
                         paintSlideAtPosition(g, 0, position);
-                    }
-                    return;
-                case TYPE_FAST_SLIDE:
-                    // if this is an up or down slide
-                    if (slideType == SLIDE_HORIZONTAL) {
-                        paintFastSlideAtPosition(g, position, 0);
-                    } else {
-                        paintFastSlideAtPosition(g, 0, position);
                     }
                     return;
                 case TYPE_UNCOVER:
@@ -1073,65 +1067,6 @@ public final class CommonTransitions extends Transition {
         }
     }
     
-    private void paintFastSlideAtPosition(Graphics g, int slideX, int slideY) {
-        if(secondaryBuffer != null) {
-            Component source = getSource();
-
-            // if this is the first form we can't do a slide transition since we have no source form
-            if (source == null) {
-                return;
-            }
-
-            Component dest = getDestination();
-
-            int w = buffer.getWidth();
-            int h = buffer.getHeight();
-
-            if (slideType == SLIDE_HORIZONTAL) {
-                h = 0;
-            } else {
-                w = 0;
-            }
-
-            boolean dir = forward;
-            if(dest != null && dest.getUIManager().getLookAndFeel().isRTL()) {
-                dir = !dir;
-            }
-            if(dir) {
-                w = -w;
-                h = -h;
-            } else {
-                slideX = -slideX;
-                slideY = -slideY;
-            }
-            g.setClip(source.getAbsoluteX()+source.getScrollX(), source.getAbsoluteY()+source.getScrollY(), source.getWidth(), source.getHeight());
-
-            // dialog animation is slightly different...
-            if(source instanceof Dialog) {
-                g.drawImage(buffer, 0, 0);
-                slideX -= getDialogParent(source).getX();
-                slideY -= getDialogParent(source).getY();
-                g.drawImage(secondaryBuffer, -slideX, -slideY);
-                return;
-            }
-
-            if(dest instanceof Dialog) {
-                g.drawImage(buffer, 0, 0);
-                slideY -= getDialogParent(dest).getY();
-                slideX -= getDialogParent(dest).getX();
-                g.drawImage(secondaryBuffer, -slideX - w, -slideY - h);
-                return;
-            }
-
-            g.drawImage(buffer, slideX, slideY);
-            g.drawImage(secondaryBuffer, slideX + w, slideY + h);
-
-        } else {
-            paintSlideAtPosition(g, slideX, slideY);
-        }
-
-    }
-
     private int getDialogTitleHeight(Dialog d) {
         return 0;
     }
@@ -1158,6 +1093,8 @@ public final class CommonTransitions extends Transition {
     }
 
     private void paint(Graphics g, Component cmp, int x, int y, boolean background) {
+        boolean b = cmp.isVisible();
+        cmp.setVisible(true);
         int cx = g.getClipX();
         int cy = g.getClipY();
         int cw = g.getClipWidth();
@@ -1197,6 +1134,7 @@ public final class CommonTransitions extends Transition {
          g.translate(-x, -y);
         
         g.setClip(cx, cy, cw, ch);
+        cmp.setVisible(b);
     }
     
     /**
