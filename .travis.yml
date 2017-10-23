@@ -2,14 +2,14 @@ language: java
 
 # Set JDK needed for JavaTestApplication
 jdk:
-  - oraclejdk8    
-  
+  - oraclejdk8
+
  # Enable initializing of GUI context required for running tests
 before_script:
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
-  
-script: 
+
+script:
  - wget https://github.com/codenameone/cn1-binaries/archive/master.zip
  - unzip master.zip -d ../
  - mv ../cn1-binaries-master ../cn1-binaries
@@ -27,3 +27,12 @@ script:
  - mkdir dist
  - mkdir dist/lib
  - ant release
+ - mkdir ../../codenameone-cli
+ - cd ../../codenameone-cli
+ - npm install codenameone-cli
+ - wget https://github.com/shannah/cn1-unit-tests/archive/master.zip
+ - unzip master.zip -d ../
+ - mv ../cn1-unit-tests-master ../cn1-unit-tests
+ - rm master.zip
+ - cd ../cn1-unit-tests
+ - ../codenameone-cli/node_modules/.bin/cn1 test -cn1Sources ../cn1 -s -e
