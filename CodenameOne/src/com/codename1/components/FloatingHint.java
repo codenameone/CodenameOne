@@ -66,7 +66,7 @@ public class FloatingHint extends Container {
         add(content);
         hintButton = new Button(tf.getHint()) {
             @Override
-            protected boolean shouldRenderSelection() {
+            protected boolean shouldRenderComponentSelection() {
                 return true;
             }
         };

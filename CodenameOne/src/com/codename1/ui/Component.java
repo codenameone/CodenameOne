@@ -3074,7 +3074,7 @@ public class Component implements Animation, StyleListener {
      * true in non-touch UI's and false in touch UI's except for the case where a user clicks the screen. 
      * @return Defaults to false
      */
-    protected boolean shouldRenderSelection() {
+    protected boolean shouldRenderComponentSelection() {
         return false;
     }
 

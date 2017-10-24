@@ -1806,8 +1806,8 @@ public class TextArea extends Component {
      * {@inheritDoc}
      * @return true if editing
      */
-    protected boolean shouldRenderSelection() {
-        return isEditing() || super.shouldRenderSelection();
+    protected boolean shouldRenderComponentSelection() {
+        return isEditing() || super.shouldRenderComponentSelection();
     }
     
 
