@@ -801,6 +801,9 @@ public class Toolbar extends Container {
             final Form parent = getComponentForm();
             parent.addPointerPressedListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
+                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                        return;
+                    }
                     if(sidemenuDialog.isShowing()) {
                         if(evt.getX() > sidemenuDialog.getWidth()) {
                             parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
@@ -831,6 +834,9 @@ public class Toolbar extends Container {
             });
             parent.addPointerDraggedListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
+                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                        return;
+                    }
                     Boolean b = (Boolean)parent.getClientProperty("cn1$sidemenuCharged");
                     if(b != null && b.booleanValue()) {
                         parent.putClientProperty("cn1$sidemenuActivated", Boolean.TRUE);
@@ -846,6 +852,9 @@ public class Toolbar extends Container {
             });
             parent.addPointerReleasedListener(new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
+                    if (Display.getInstance().getImplementation().isScrollWheeling()) {
+                        return;
+                    }
                     Boolean b = (Boolean)parent.getClientProperty("cn1$sidemenuActivated");
                     if(b != null && b.booleanValue()) {
                         parent.putClientProperty("cn1$sidemenuActivated", null);

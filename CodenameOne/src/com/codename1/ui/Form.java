@@ -1133,6 +1133,7 @@ public class Form extends Container {
                 public void paintBackgrounds(Graphics g) {
                 }
             };
+            formLayeredPane.setName("FormLayeredPane");
             addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
         }
         if(c == null) {

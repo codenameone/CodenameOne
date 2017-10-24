@@ -4685,7 +4685,7 @@ public class Component implements Animation, StyleListener {
      * @return  a string representation of this component's state
      */
     protected String paramString() {
-        return "x=" + getX() + " y=" + getY() + " width=" + getWidth() + " height=" + getHeight();
+        return "x=" + getX() + " y=" + getY() + " width=" + getWidth() + " height=" + getHeight() + " name=" + getName();
     }
 
     /**
