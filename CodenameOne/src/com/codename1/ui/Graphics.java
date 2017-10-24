@@ -1031,7 +1031,7 @@ public final class Graphics {
      * @return true if anti aliasing is supported
      */
     public boolean isAntiAliasingSupported() {
-        return impl.isAntiAliasingSupported();
+        return impl.isAntiAliasingSupported(nativeGraphics);
     }
     
     /**
@@ -1041,7 +1041,7 @@ public final class Graphics {
      * @return true if text anti aliasing is supported
      */
     public boolean isAntiAliasedTextSupported() {
-        return impl.isAntiAliasedTextSupported();
+        return impl.isAntiAliasedTextSupported(nativeGraphics);
     }
 
     

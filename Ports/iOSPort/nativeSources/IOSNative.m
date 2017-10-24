@@ -124,6 +124,8 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShape
 extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 (int x, int y, int width, int height, int clipApplied);
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl(JAVA_BOOLEAN antialiased);
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
 (int color, int alpha, int x1, int y1, int x2, int y2);
 
@@ -625,6 +627,12 @@ void com_codename1_impl_ios_IOSNative_setNativeClippingPolygonGlobal___float_1AR
     Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGlobalImpl(points);
     POOL_END();
 }
+
+void com_codename1_impl_ios_IOSNative_setAntiAliasedMutable___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN antialiased)
+{
+    Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl(antialiased);
+}
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {

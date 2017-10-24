@@ -682,6 +682,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
     }
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl
+(JAVA_BOOLEAN antialiased) {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSetAllowsAntialiasing(context, antialiased);
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal() {
     ResetAffine* f = [[ResetAffine alloc] init];
     [CodenameOne_GLViewController upcoming:f];

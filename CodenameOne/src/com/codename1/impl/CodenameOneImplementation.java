@@ -1290,6 +1290,10 @@ public abstract class CodenameOneImplementation {
     public boolean isAntiAliasingSupported() {
         return false;
     }
+    
+    public boolean isAntiAliasingSupported(Object graphics) {
+        return isAntiAliasingSupported();
+    }
 
     /**
      * Indicates whether the underlying implementation allows for anti-aliased fonts
@@ -1298,6 +1302,10 @@ public abstract class CodenameOneImplementation {
      */
     public boolean isAntiAliasedTextSupported() {
         return false;
+    }
+    
+    public boolean isAntiAliasedTextSupported(Object graphics) {
+        return isAntiAliasedTextSupported();
     }
 
     /**

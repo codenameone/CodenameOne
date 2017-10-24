@@ -3672,7 +3672,41 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean transformApplied = false;
         ClipShape[] clipStack = new ClipShape[20];
         private int clipStackPtr = 0; 
+        private boolean antialiased;
+        private boolean antialiasedSet;
+        private boolean antialiasedText;
+        private boolean antialiasedTextSet;
         
+        boolean isAntiAliasingSupported() {
+            return true;
+        }
+
+        boolean isAntiAliasTextSupported() {
+            return true;
+        }
+        
+        void setAntiAliasedText(boolean a) {
+            antialiasedText = a;
+            antialiasedTextSet = true;
+            
+        }
+        
+        boolean isAntiAliasedText() {
+            return !antialiasedTextSet || antialiasedText;
+        }
+        
+        void setAntiAliased(boolean antialiased) {
+            antialiasedSet = true;
+            this.antialiased = antialiased;
+            nativeInstance.setAntiAliasedMutable(antialiased);
+        }
+        
+        
+        boolean isAntiAliased() {
+            // If antialiasing hasn't been set, then it defaults to 
+            // antialiased
+            return !antialiasedSet || antialiased;
+        }
         
         void setClip(Shape newClip) {
             if ( clip == null) {
@@ -4008,7 +4042,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
 
         void nativeDrawString(int color, int alpha, long fontPeer, String str, int x, int y) {
+            boolean antialiasTextChanged = false;
+            if (isAntiAliased() != isAntiAliasedText()) {
+                // We want text to be antialiased
+                antialiasTextChanged = true;
+                setAntiAliased(isAntiAliasedText());
+                
+            }
             nativeDrawStringMutable(color, alpha, fontPeer, str, x, y);
+            if (antialiasTextChanged) {
+                setAntiAliased(!isAntiAliasedText());
+            }
         }
 
         void nativeDrawImage(long peer, int alpha, int x, int y, int width, int height) {
@@ -4212,9 +4256,52 @@ public class IOSImplementation extends CodenameOneImplementation {
         public void nativeClearRect(int x, int y, int width, int height) {
             nativeInstance.clearRectMutable(x, y, width, height);
         }
+
+        
     }
 
     class GlobalGraphics extends NativeGraphics {
+
+        @Override
+        void setAntiAliased(boolean antialiased) {
+            // Don't do anything here because the global graphcis doesn't support antialiasing.
+        }
+
+        @Override
+        boolean isAntiAliased() {
+            // Currently global graphics doesn't support antialiasing.
+            return false;
+        }
+        
+        @Override
+        boolean isAntiAliasingSupported() {
+            // Currently global graphics are drawn with opengl
+            // and don't support antialiasing on drawLine, drawRect, functions
+            // etc...
+            return false;
+        }
+
+        @Override
+        boolean isAntiAliasTextSupported() {
+            
+            // In global context antialias text is the default, and we don't
+            // support turning it off right now.  I guess the most appropriate
+            // value here is "false" to indicate that this setting
+            // can't be manipulated
+            return false;
+        }
+
+        @Override
+        void setAntiAliasedText(boolean a) {
+            
+        }
+
+        @Override
+        boolean isAntiAliasedText() {
+            // Currently text is always antialiased in global context.
+            return true;
+        }
+        
         public void applyPaint() {
             if (paint != null && paint instanceof RadialGradient) {
                 RadialGradient g = (RadialGradient)paint;
@@ -5281,14 +5368,13 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isAntiAliased(Object graphics) {
-        // TODO
-        return super.isAntiAliased(graphics);
+        return ((NativeGraphics)graphics).isAntiAliased();
     }
+    
 
     @Override
     public boolean isAntiAliasedText(Object graphics) {
-        // TODO
-        return super.isAntiAliasedText(graphics);
+        return ((NativeGraphics)graphics).isAntiAliasedText();
     }
 
     @Override
@@ -5297,8 +5383,17 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isAntiAliasedTextSupported(Object graphics) {
+        return ((NativeGraphics)graphics).isAntiAliasTextSupported();
+    }
+    
+    @Override
     public boolean isAntiAliasingSupported() {
         return true;
+    }
+    
+    public boolean isAntiAliasingSupported(Object graphics) {
+        return ((NativeGraphics)graphics).isAntiAliasingSupported();
     }
 
     @Override
@@ -5635,14 +5730,12 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void setAntiAliased(Object graphics, boolean a) {
-        // TODO
-        super.setAntiAliased(graphics, a);
+        ((NativeGraphics)graphics).setAntiAliased(a);
     }
 
     @Override
     public void setAntiAliasedText(Object graphics, boolean a) {
-        // TODO
-        super.setAntiAliasedText(graphics, a);
+        ((NativeGraphics)graphics).setAntiAliasedText(a);
     }
 
     /*@Override
