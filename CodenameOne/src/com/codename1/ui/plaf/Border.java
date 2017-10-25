@@ -68,6 +68,8 @@ public class Border {
     private static final int TYPE_OUTSET = 18;
     private static final int TYPE_IMAGE_SCALED = 19;
     private static final int TYPE_UNDERLINE = 21;
+    private static final int TYPE_STRIKETHROUGH_H = 22;
+    private static final int TYPE_STRIKETHROUGH_V = 23;
 
     // variables are package protected for the benefit of the resource editor!
     int type;
@@ -529,6 +531,72 @@ public class Border {
     public static Border createUnderlineBorder(float thickness, int color) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
+        b.themeColors = false;
+        b.thickness = thickness;
+        b.millimeters = true;
+        b.colorA = color;
+        return b;
+    }
+    
+    /**
+     * Creates a strike through border that uses the color of the component foreground for drawing
+     * 
+     * @param thickness thickness of the border in pixels
+     * @param horizontal specify if horizontal or vertical
+     * @return new border instance
+     */
+    public static Border createStrikeThroughBorder(int thickness, boolean horizontal) {
+        Border b = new Border();
+        b.type = horizontal ? TYPE_STRIKETHROUGH_H : TYPE_STRIKETHROUGH_V;
+        b.themeColors = true;
+        b.thickness = thickness;
+        return b;
+    }
+
+    /**
+     * Creates a strike through border that uses the color of the component foreground for drawing
+     * 
+     * @param thickness thickness of the border in millimeters
+     * @param horizontal specify if horizontal or vertical
+     * @return new border instance
+     */
+    public static Border createStrikeThroughBorder(float thickness, boolean horizontal) {
+        Border b = new Border();
+        b.type = horizontal ? TYPE_STRIKETHROUGH_H : TYPE_STRIKETHROUGH_V;
+        b.themeColors = true;
+        b.thickness = thickness;
+        b.millimeters = true;
+        return b;
+    }
+    
+    /**
+     * Creates a strike through border that uses the given color
+     * 
+     * @param thickness thickness of the border in pixels
+     * @param color the color
+     * @param horizontal specify if horizontal or vertical
+     * @return new border instance
+     */
+    public static Border createStrikeThroughBorder(int thickness, int color, boolean horizontal) {
+        Border b = new Border();
+        b.type = horizontal ? TYPE_STRIKETHROUGH_H : TYPE_STRIKETHROUGH_V;
+        b.themeColors = false;
+        b.thickness = thickness;
+        b.colorA = color;
+        return b;
+    }
+
+    /**
+     * Creates a strike through border that uses the given color
+     * 
+     * @param thickness thickness of the border in millimeters
+     * @param color the color
+     * @param horizontal specify if horizontal or vertical
+     * @return new border instance
+     */
+    public static Border createStrikeThroughBorder(float thickness, int color, boolean horizontal) {
+        Border b = new Border();
+        b.type = horizontal ? TYPE_STRIKETHROUGH_H : TYPE_STRIKETHROUGH_V;
         b.themeColors = false;
         b.thickness = thickness;
         b.millimeters = true;
@@ -1727,6 +1795,12 @@ public class Border {
                 break;
             case TYPE_UNDERLINE:
                 g.fillRect(x, y + height - ac - 1, width, ac);
+                break;
+            case TYPE_STRIKETHROUGH_H:
+                g.fillRect(x, (y + height - ac - 1) / 2, width, ac);
+                break;
+            case TYPE_STRIKETHROUGH_V:
+                g.fillRect((x + width - ac - 1) / 2, y, ac, height);
                 break;
             case TYPE_BEVEL_LOWERED: 
                 if(themeColors) {
