@@ -1099,7 +1099,7 @@ public class TextArea extends Component {
     }
 
     void paintHint(Graphics g) {
-        if(Display.getInstance().isTextEditing(this)) {
+        if(Display.getInstance().isNativeEditorVisible(this)) {
             return;
         }
         super.paintHint(g);
