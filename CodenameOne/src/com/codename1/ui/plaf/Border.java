@@ -446,6 +446,7 @@ public class Border {
     /**
      * Creates an underline border that uses the color of the component foreground for drawing
      * 
+     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(int thickness)}
      * @param thickness thickness of the border in pixels
      * @return new border instance
      */
@@ -456,14 +457,44 @@ public class Border {
         b.thickness = thickness;
         return b;
     }
+    
+    /**
+     * Creates an underline border that uses the color of the component foreground for drawing
+     * 
+     * @param thickness thickness of the border in pixels
+     * @return new border instance
+     */
+    public static Border createUnderlineBorder(int thickness) {
+        Border b = new Border();
+        b.type = TYPE_UNDERLINE;
+        b.themeColors = true;
+        b.thickness = thickness;
+        return b;
+    }
 
+    /**
+     * Creates an underline border that uses the color of the component foreground for drawing
+     * 
+     * @deprecated due to a spelling mistake. Use {@link #createUnderlineBorder(float thickness)}
+     * @param thickness thickness of the border in millimeters
+     * @return new border instance
+     */
+    public static Border createUndelineBorder(float thickness) {
+        Border b = new Border();
+        b.type = TYPE_UNDERLINE;
+        b.themeColors = true;
+        b.thickness = thickness;
+        b.millimeters = true;
+        return b;
+    }
+    
     /**
      * Creates an underline border that uses the color of the component foreground for drawing
      * 
      * @param thickness thickness of the border in millimeters
      * @return new border instance
      */
-    public static Border createUndelineBorder(float thickness) {
+    public static Border createUnderlineBorder(float thickness) {
         Border b = new Border();
         b.type = TYPE_UNDERLINE;
         b.themeColors = true;
