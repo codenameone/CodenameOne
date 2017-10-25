@@ -1125,7 +1125,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
-        assertBool(expected == actual);
+        assertBool(expected == actual, "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
@@ -1136,7 +1136,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected == actual, errorMessage);
+        assertBool(expected == actual, errorMessage+";" + "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
@@ -1147,7 +1147,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
-        assertBool(expected == actual);
+        assertBool(expected == actual, "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
@@ -1159,7 +1159,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected == actual, errorMessage);
+        assertBool(expected == actual, errorMessage + "; " + "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
@@ -1172,7 +1172,7 @@ public class TestUtils {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError);
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, "Expected ["+expected+"], Actual ["+actual+"]");
         }
     }
 
@@ -1186,7 +1186,7 @@ public class TestUtils {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage);
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + "; " + "Expected ["+expected+"], Actual ["+actual+"]");
         }
     }
 
@@ -1200,7 +1200,7 @@ public class TestUtils {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError);
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, "Expected ["+expected+"], Actual ["+actual+"]");
         }
     }
 
@@ -1214,7 +1214,7 @@ public class TestUtils {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
         if (expected != actual) {
-            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage);
+            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
         }
     }
 
@@ -1225,7 +1225,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ")");
         }
-        assertBool(expected.equals(actual));
+        assertBool(expected.equals(actual), "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
@@ -1236,7 +1236,7 @@ public class TestUtils {
         if(verbose) {
             log("assertEqual(" + expected + ", " + actual + ", " + errorMessage + ")");
         }
-        assertBool(expected.equals(actual), errorMessage);
+        assertBool(expected.equals(actual), errorMessage + "; "+ "Expected ["+expected+"], Actual ["+actual+"]");
     }
 
     /**
