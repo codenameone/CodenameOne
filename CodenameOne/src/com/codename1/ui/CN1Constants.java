@@ -94,6 +94,15 @@ public class CN1Constants {
      * Strings native picker type, it returns a String result and accepts a String array.
      */
     public static final int PICKER_TYPE_STRINGS = 4;
+    
+    /**
+     * Duration picker type.  It returns Long result (milliseconds).
+     */
+    public static final int PICKER_TYPE_DURATION = 5;
+    
+    public static final int PICKER_TYPE_DURATION_HOURS = 6;
+    
+    public static final int PICKER_TYPE_DURATION_MINUTES = 7;
 
     /**
      * Used by getSMSSupport to indicate that SMS is not supported
