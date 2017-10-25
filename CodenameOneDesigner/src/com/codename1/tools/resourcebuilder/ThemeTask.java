@@ -173,6 +173,30 @@ public class ThemeTask extends ResourceTask implements ThemeTaskConstants {
                 } else {
                     return Border.createLineBorder(thinkness, Integer.valueOf(tokenizer.nextToken(), 16));
                 }
+            case TYPE_UNDERLINE:
+                // use theme colors?
+                int thicknessU = Integer.parseInt(tokenizer.nextToken());
+                if(!tokenizer.hasMoreTokens()) {
+                    return Border.createUnderlineBorder(thicknessU);
+                } else {
+                    return Border.createLineBorder(thicknessU, Integer.valueOf(tokenizer.nextToken(), 16));
+                }
+            case TYPE_STRIKETHROUGH_H:
+                // use theme colors?
+                int thicknessH = Integer.parseInt(tokenizer.nextToken());
+                if(!tokenizer.hasMoreTokens()) {
+                    return Border.createStrikeThroughBorder(thicknessH, true);
+                } else {
+                    return Border.createStrikeThroughBorder(thicknessH, Integer.valueOf(tokenizer.nextToken(), 16), true);
+                }
+            case TYPE_STRIKETHROUGH_V:
+                // use theme colors?
+                int thicknessV = Integer.parseInt(tokenizer.nextToken());
+                if(!tokenizer.hasMoreTokens()) {
+                    return Border.createStrikeThroughBorder(thicknessV, false);
+                } else {
+                    return Border.createStrikeThroughBorder(thicknessV, Integer.valueOf(tokenizer.nextToken(), 16), false);
+                }
             case TYPE_ROUNDED:
                 // use theme colors?
                 int arcWidth = Integer.parseInt(tokenizer.nextToken());

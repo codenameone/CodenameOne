@@ -37,6 +37,8 @@ public class Accessor {
     public static final int TYPE_EMPTY = 0;
     public static final int TYPE_LINE = 1;
     public static final int TYPE_UNDERLINE = 21;
+    public static final int TYPE_STRIKETHROUGH_H = 22;
+    public static final int TYPE_STRIKETHROUGH_V = 23;
     public static final int TYPE_ROUNDED = 2;
     public static final int TYPE_ROUNDED_PRESSED = 3;
     public static final int TYPE_ETCHED_LOWERED = 4;
@@ -81,6 +83,10 @@ public class Accessor {
                 return "Line";
             case TYPE_UNDERLINE:
                 return "Underline";
+            case TYPE_STRIKETHROUGH_H:
+                return "Strike Through Horizontal";
+            case TYPE_STRIKETHROUGH_V:
+                return "Strike Through Vertical";
             case TYPE_ROUNDED:
             case TYPE_ROUNDED_PRESSED:
                 return "Rounded";

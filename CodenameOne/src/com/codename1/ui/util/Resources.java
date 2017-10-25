@@ -132,6 +132,8 @@ public class Resources {
     static final int BORDER_TYPE_IMAGE_SCALED = 19;
     static final int BORDER_TYPE_IMAGE_ROUND = 20;
     static final int BORDER_TYPE_UNDERLINE = 21;
+    static final int BORDER_TYPE_STRIKETHROUGH_H = 22;
+    static final int BORDER_TYPE_STRIKETHROUGH_V = 23;
 
     // for use by the resource editor
     private static Class classLoader = Resources.class;
@@ -1520,14 +1522,44 @@ public class Resources {
                 // use theme colors?
                 if(input.readBoolean()) {
                     if(input.readBoolean()) {
-                        return Border.createUndelineBorder(input.readFloat());
+                        return Border.createUnderlineBorder(input.readFloat());
                     }
-                    return Border.createUndelineBorder((int)input.readFloat());
+                    return Border.createUnderlineBorder((int)input.readFloat());
                 } else {
                     if(input.readBoolean()) {
                         return Border.createUnderlineBorder(input.readFloat(), input.readInt());
                     }
                     return Border.createUnderlineBorder((int)input.readFloat(), input.readInt());
+                }
+
+            // Strike through horizontal border
+            case 0xff15:
+                // use theme colors?
+                if(input.readBoolean()) {
+                    if(input.readBoolean()) {
+                        return Border.createStrikeThroughBorder(input.readFloat(), true);
+                    }
+                    return Border.createStrikeThroughBorder((int)input.readFloat(), true);
+                } else {
+                    if(input.readBoolean()) {
+                        return Border.createStrikeThroughBorder(input.readFloat(), input.readInt(), true);
+                    }
+                    return Border.createStrikeThroughBorder((int)input.readFloat(), input.readInt(), true);
+                }
+
+            // Strike through vertical border
+            case 0xff16:
+                // use theme colors?
+                if(input.readBoolean()) {
+                    if(input.readBoolean()) {
+                        return Border.createStrikeThroughBorder(input.readFloat(), false);
+                    }
+                    return Border.createStrikeThroughBorder((int)input.readFloat(), false);
+                } else {
+                    if(input.readBoolean()) {
+                        return Border.createStrikeThroughBorder(input.readFloat(), input.readInt(), false);
+                    }
+                    return Border.createStrikeThroughBorder((int)input.readFloat(), input.readInt(), false);
                 }
 
             // Rounded border
