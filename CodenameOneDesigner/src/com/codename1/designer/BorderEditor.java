@@ -492,7 +492,7 @@ public class BorderEditor extends javax.swing.JPanel {
         jPanel6.setName("jPanel6"); // NOI18N
         jPanel6.setLayout(new java.awt.BorderLayout());
 
-        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Underline", "Rounded (Deprecated)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)", "Rounded Rectangle" }));
+        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Underline", "Strike Through Horizontal", "Strike Through Vertical", "Rounded (Deprecated)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)", "Rounded Rectangle" }));
         borderType.setName("borderType"); // NOI18N
         borderType.addActionListener(formListener);
         jPanel6.add(borderType, java.awt.BorderLayout.CENTER);
