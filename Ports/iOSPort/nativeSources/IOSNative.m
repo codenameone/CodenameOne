@@ -5070,6 +5070,7 @@ JAVA_OBJECT pickerStringArray = JAVA_NULL;
 #endif
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
+JAVA_LONG currentDatePickerDuration=-1;
 UIPopoverController* popoverControllerInstance;
 extern UIView *currentActionSheet;
 JAVA_LONG defaultDatePickerDate;
@@ -5173,6 +5174,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
     pickerStringArray = stringArray;
 #endif
     currentDatePickerDate = nil;
+    currentDatePickerDuration = -1;
     defaultDatePickerDate = 0;
     stringPickerSelection = selection;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5291,11 +5293,12 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 }
 
 
-void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg) {
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg, JAVA_INT minuteStep) {
     __block JAVA_INT preferredHeight = preferredHeightArg;
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
+    currentDatePickerDuration = -1;
     if (preferredWidth == 0) {
         preferredWidth = 320 * scaleValue;
     }
@@ -5332,13 +5335,43 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             case 3:
                 datePickerView.datePickerMode = UIDatePickerModeDateAndTime;
                 break;
+            case 5:
+            case 6:
+            case 7:
+                datePickerView.datePickerMode = UIDatePickerModeCountDownTimer;
+                break;
         }
-        datePickerView.tag = 10;
-        datePickerView.date = date;
-        currentDatePickerDate = date;
+        switch (type) {
+            case 1:
+            case 2:
+            case 3:
+                datePickerView.tag = 10;
+                datePickerView.date = date;
+                currentDatePickerDate = date;
 #ifndef CN1_USE_ARC
-        [currentDatePickerDate retain];
+                [currentDatePickerDate retain];
 #endif
+                break;
+            case 5:
+            case 6:
+            case 7:
+                datePickerView.countDownDuration = time / 1000;
+                
+                // To workaround a bug in UIDatePickerView that causes
+                // the change event to not be fired the first time.
+                // https://stackoverflow.com/a/22777664/2935174
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                    [datePickerView setCountDownDuration: datePickerView.countDownDuration];
+                });
+
+                datePickerView.minuteInterval = minuteStep;
+                currentDatePickerDuration = time;
+                break;
+                
+        }
+        
+        
+
         defaultDatePickerDate = time;
         [datePickerView addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerChangeDate:) forControlEvents:UIControlEventValueChanged];
         if(isIPad()) {

@@ -80,6 +80,7 @@ int CN1lastTouchY=0;
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
+extern JAVA_LONG currentDatePickerDuration;
 extern bool datepickerPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
@@ -3163,12 +3164,17 @@ extern SKPayment *paymentInstance;
 }
 
 - (void)datePickerChangeDate:(UIDatePicker *)sender {
+    if (sender.datePickerMode == UIDatePickerModeCountDownTimer) {
+        currentDatePickerDuration = sender.countDownDuration * 1000;
+        return;
+    } 
     if(currentDatePickerDate != nil) {
 #ifndef CN1_USE_ARC
         [currentDatePickerDate release];
 #endif
     }
     currentDatePickerDate = sender.date;
+    
 #ifndef CN1_USE_ARC
     [currentDatePickerDate retain];
 #endif
@@ -3182,6 +3188,11 @@ extern JAVA_OBJECT pickerStringArray;
 #endif
 extern JAVA_LONG defaultDatePickerDate;
 - (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex {
+    if (currentDatePickerDuration >= 0) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+        currentDatePickerDuration = -1;
+        return;
+    }
     if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
@@ -3206,6 +3217,7 @@ extern JAVA_LONG defaultDatePickerDate;
     if (currentActionSheet != nil) {
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         currentDatePickerDate = nil;
+        currentDatePickerDuration = -1;
         pickerStringArray = nil;
         NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
         UIView* v = (UIView*)[arr objectAtIndex:0];
@@ -3216,7 +3228,10 @@ extern JAVA_LONG defaultDatePickerDate;
 }
 
 - (void)datePickerDismiss {
-    if(currentDatePickerDate == nil) {
+    if (currentDatePickerDuration >= 0) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+        currentDatePickerDuration = -1;
+    } else if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         } else {
@@ -3243,7 +3258,10 @@ extern JAVA_LONG defaultDatePickerDate;
     UISegmentedControl* s = sender;
     UIActionSheet* sheet = (UIActionSheet*)[s superview];
     [sheet dismissWithClickedButtonIndex:0 animated:YES];
-    if(currentDatePickerDate == nil) {
+    if (currentDatePickerDuration >= 0) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+        currentDatePickerDuration = -1;
+    } else if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         } else {
@@ -3265,7 +3283,12 @@ UIPopoverController* popoverControllerInstance;
     if(popoverControllerInstance != nil) {
         [popoverControllerInstance dismissPopoverAnimated:YES];
         popoverControllerInstance = nil;
-        if(currentDatePickerDate == nil) {
+        if (currentDatePickerDuration >= 0) {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+            currentDatePickerDuration = -1;
+            defaultDatePickerDate = nil;
+            currentDatePickerDate = nil;
+        } else if(currentDatePickerDate == nil) {
             if(pickerStringArray == nil) {
                 if(defaultDatePickerDate != 0) {
                     com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG defaultDatePickerDate);

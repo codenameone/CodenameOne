@@ -420,9 +420,9 @@ public final class IOSNative {
 
     native String getUserAgentString();
     
-    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
+    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight, int minuteStep);
     native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
-
+    
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
     // facebook connect
@@ -621,6 +621,7 @@ public final class IOSNative {
 
     native void blockCopyPaste(boolean blockCopyPaste);
 
+    
     
 
 

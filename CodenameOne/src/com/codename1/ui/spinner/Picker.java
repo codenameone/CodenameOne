@@ -78,6 +78,16 @@ public class Picker extends Button {
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 if(Display.getInstance().isNativePickerTypeSupported(type)) {
+                    
+                    switch (type) {
+                        case Display.PICKER_TYPE_DURATION:
+                        case Display.PICKER_TYPE_DURATION_HOURS:
+                        case Display.PICKER_TYPE_DURATION_MINUTES: {
+                            metaData = "minuteStep="+minuteStep;
+                            break;
+                        }
+                    }
+                    
                     setEnabled(false);
                     Object val = Display.getInstance().showNativePicker(type, Picker.this, value, metaData);
                     if(val != null) {
