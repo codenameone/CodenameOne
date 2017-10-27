@@ -32,6 +32,9 @@ package com.codename1.tools.resourcebuilder;
 public interface ThemeTaskConstants {
     public static final int TYPE_EMPTY = 0;
     public static final int TYPE_LINE = 1;
+    public static final int TYPE_UNDERLINE = 9;
+    public static final int TYPE_STRIKETHROUGH_H = 10;
+    public static final int TYPE_STRIKETHROUGH_V = 11;
     public static final int TYPE_ROUNDED = 2;
     public static final int TYPE_ETCHED_LOWERED = 4;
     public static final int TYPE_ETCHED_RAISED = 5;

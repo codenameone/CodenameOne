@@ -680,7 +680,7 @@ public class StyleParser {
                     return (int)Style.TEXT_DECORATION_STRIKETHRU;
                 }
                 
-                if ("underine".equalsIgnoreCase(val)) {
+                if ("underline".equalsIgnoreCase(val)) {
                     return (int)Style.TEXT_DECORATION_UNDERLINE;
                 }
                 
@@ -1354,6 +1354,10 @@ public class StyleParser {
                 out.setType("dotted");
             } else if ("underline".equals(type)) {
                 out.setType("underline");
+            } else if ("strikeThroughH".equals(type)) {
+                out.setType("strikeThroughH");
+            } else if ("strikeThroughH".equals(type)) {
+                out.setType("strikeThroughV");
             }
             return out;
         }
@@ -1431,17 +1435,17 @@ public class StyleParser {
         private String spliceInsets;
         
         /**
-         * The thickness for line/dashed/dotted/underline border
+         * The thickness for line/dashed/dotted/underline/strike-through border
          */
         private Float width;
         
         /**
-         * The unit for line/dashed/dotted/underline border
+         * The unit for line/dashed/dotted/underline/strike-through border
          */
         private byte widthUnit;
         
         /**
-         * The color for a line/dashed/dotted/underline border.
+         * The color for a line/dashed/dotted/underline/strike-through border.
          */
         private Integer color;
 
@@ -1460,7 +1464,7 @@ public class StyleParser {
                     sb.append(img).append(" ");
                 }
                 return sb.toString().trim();
-            } else if ("line".equals(getType()) || "dashed".equals(getType()) || "dotted".equals(getType()) || "underline".equals(getType())) {
+            } else if ("line".equals(getType()) || "dashed".equals(getType()) || "dotted".equals(getType()) || "underline".equals(getType()) || "strikeThroughH".equals(getType()) || "strikeThroughV".equals(getType())) {
                 int color = getColor() == null ? 0 : getColor();
                 
                 return widthString()+" "+lineTypeString()+" "+Integer.toHexString(color);
@@ -1603,6 +1607,20 @@ public class StyleParser {
                     return Border.createUnderlineBorder(getWidth().intValue(), getColor());
                 }
             }
+            if ("strikeThroughH".equals(getType())) {
+                if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
+                    return Border.createStrikeThroughBorder(Display.getInstance().convertToPixels(getWidth()), getColor(), true);
+                } else {
+                    return Border.createStrikeThroughBorder(getWidth().intValue(), getColor(), true);
+                }
+            }
+            if ("strikeThroughV".equals(getType())) {
+                if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
+                    return Border.createStrikeThroughBorder(Display.getInstance().convertToPixels(getWidth()), getColor(), false);
+                } else {
+                    return Border.createStrikeThroughBorder(getWidth().intValue(), getColor(), false);
+                }
+            }
             if ("image".equals(getType())) {
                 int ilen = getImages().length;
                 if (ilen == 9) {
@@ -1704,7 +1722,7 @@ public class StyleParser {
         }
 
         /**
-         * The border type.  E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
+         * The border type.  E.g. line, dashed, dotted, underline, strikeThroughH, strikeThroughV, image, horizontalImage, verticalImage, splicedImage.
          * @return the type
          */
         public String getType() {
@@ -1713,7 +1731,7 @@ public class StyleParser {
 
         /**
          * Sets the border type.
-         * @param type the type to set. E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
+         * @param type the type to set. E.g. line, dashed, dotted, underline, strikeThroughH, strikeThroughV, image, horizontalImage, verticalImage, splicedImage.
          */
         public void setType(String type) {
             this.type = type;
@@ -1812,7 +1830,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline/round border, the thickness value.
+         * For a line/dashed/dotted/underline/strike-through/round border, the thickness value.
          * @return the width
          * @see #getWidthUnit() 
          */
@@ -1823,14 +1841,14 @@ public class StyleParser {
         /**
          * Gets the border thickness as a scalar value.  This is effectively the same
          * value as returned by {@link #getWidth() } and {@link #getWidthUnit() }
-         * @return The thickness of the border.  Used with line, dashed, dotted, underline, and round borders.
+         * @return The thickness of the border.  Used with line, dashed, dotted, underline, strike-through, and round borders.
          */
         public ScalarValue getThickness() {
             return new ScalarValue(width, widthUnit);
         }
         
         /**
-         * For line/dashed/dotted/underline border.  The thickness in pixels.
+         * For line/dashed/dotted/underline/strike-through border.  The thickness in pixels.
          * @return The thickness in pixels of the border line.
          * @asee #getWidth()
          */
@@ -1846,7 +1864,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline/round border, gets the thickness value.
+         * For a line/dashed/dotted/underline/strike-through/round border, gets the thickness value.
          * @param width the width to set
          * @see #setWidthUnit(byte) 
          */
@@ -1855,7 +1873,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline/round border, gets the unit of the thickness value.
+         * For a line/dashed/dotted/underline/strike-through/round border, gets the unit of the thickness value.
          * @return the widthUnit
          * @see #getWidth() 
          */
@@ -1864,7 +1882,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline/round border, sets the unit of the thickness value.
+         * For a line/dashed/dotted/underline/strike-through/round border, sets the unit of the thickness value.
          * 
          * @param widthUnit the widthUnit to set
          * @see #setWidth(java.lang.Float) 
@@ -1874,7 +1892,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline/round border, sets the color.  For round border
+         * For a line/dashed/dotted/underline/strike-through/round border, sets the color.  For round border
          * this gets the fill color.  For line border variants, it gets the stroke color.
          * @return the color
          * 
@@ -1884,7 +1902,7 @@ public class StyleParser {
         }
 
         /**
-         * For a line/dashed/dotted/underline/round border, gets the color.  For
+         * For a line/dashed/dotted/underline/strike-through/round border, gets the color.  For
          * round border, this sets the fill color.  For line border variants, it sets the stroke color.
          * @param color the color to set
          */

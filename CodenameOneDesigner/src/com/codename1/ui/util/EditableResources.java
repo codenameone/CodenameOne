@@ -637,9 +637,27 @@ public class EditableResources extends Resources implements TreeModel {
 
                                         if("underline".equals(b.getType())) {
                                             if(b.getColor() == null) {
-                                                theme.put(b.getKey(), Border.createUndelineBorder(b.getThickness().intValue()));
+                                                theme.put(b.getKey(), Border.createUnderlineBorder(b.getThickness().intValue()));
                                             } else {
                                                 theme.put(b.getKey(), Border.createUnderlineBorder(b.getThickness().intValue(), b.getColor().intValue()));
+                                            }
+                                            continue;
+                                        }
+
+                                        if("strikeThroughH".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createStrikeThroughBorder(b.getThickness().intValue(), true));
+                                            } else {
+                                                theme.put(b.getKey(), Border.createStrikeThroughBorder(b.getThickness().intValue(), b.getColor().intValue(), true));
+                                            }
+                                            continue;
+                                        }
+
+                                        if("strikeThroughV".equals(b.getType())) {
+                                            if(b.getColor() == null) {
+                                                theme.put(b.getKey(), Border.createStrikeThroughBorder(b.getThickness().intValue(), false));
+                                            } else {
+                                                theme.put(b.getKey(), Border.createStrikeThroughBorder(b.getThickness().intValue(), b.getColor().intValue(), false));
                                             }
                                             continue;
                                         }
@@ -1149,6 +1167,32 @@ public class EditableResources extends Resources implements TreeModel {
                                                     "\" thickness=\"" + Accessor.getThickness(border) + "\" />\n");
                                         } else {
                                             bw.write("        <border key=\"" + key + "\" type=\"underline\"  millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +"\" thickness=\"" + 
+                                                    Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_STRIKETHROUGH_H:
+                                        // use theme colors?
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"strikeThroughH\" millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +
+                                                    "\" thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"strikeThroughH\"  millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +"\" thickness=\"" + 
+                                                    Accessor.getThickness(border) + "\" color=\""
+                                                    + Accessor.getColorA(border) + "\" />\n");
+                                        }
+                                        continue;
+                                    case BORDER_TYPE_STRIKETHROUGH_V:
+                                        // use theme colors?
+                                        if(Accessor.isThemeColors(border)) {
+                                            bw.write("        <border key=\"" + key + "\" type=\"strikeThroughV\" millimeters=\"" + 
+                                                    Accessor.isMillimeters(border) +
+                                                    "\" thickness=\"" + Accessor.getThickness(border) + "\" />\n");
+                                        } else {
+                                            bw.write("        <border key=\"" + key + "\" type=\"strikeThroughV\"  millimeters=\"" + 
                                                     Accessor.isMillimeters(border) +"\" thickness=\"" + 
                                                     Accessor.getThickness(border) + "\" color=\""
                                                     + Accessor.getColorA(border) + "\" />\n");
@@ -2121,6 +2165,36 @@ public class EditableResources extends Resources implements TreeModel {
                 return;
             case BORDER_TYPE_UNDERLINE:
                 output.writeShort(0xff14);
+
+                // use theme colors?
+                if(Accessor.isThemeColors(border)) {
+                    output.writeBoolean(true);
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
+                } else {
+                    output.writeBoolean(false);
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
+                    output.writeInt(Accessor.getColorA(border));
+                }
+                return;
+            case BORDER_TYPE_STRIKETHROUGH_H:
+                output.writeShort(0xff15);
+
+                // use theme colors?
+                if(Accessor.isThemeColors(border)) {
+                    output.writeBoolean(true);
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
+                } else {
+                    output.writeBoolean(false);
+                    output.writeBoolean(Accessor.isMillimeters(border));
+                    output.writeFloat(Accessor.getThickness(border));
+                    output.writeInt(Accessor.getColorA(border));
+                }
+                return;
+            case BORDER_TYPE_STRIKETHROUGH_V:
+                output.writeShort(0xff16);
 
                 // use theme colors?
                 if(Accessor.isThemeColors(border)) {

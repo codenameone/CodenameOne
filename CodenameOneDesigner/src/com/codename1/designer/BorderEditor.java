@@ -29,14 +29,12 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Image;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Accessor;
-import com.codename1.designer.ResourceEditorView;
 import com.codename1.ui.Display;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.util.EditableResources;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JButton;
@@ -218,35 +216,43 @@ public class BorderEditor extends javax.swing.JPanel {
                         case Accessor.TYPE_EMPTY:
                             borderType.setSelectedIndex(1);
                             break;
+                        case Accessor.TYPE_BEVEL_LOWERED:
+                            borderType.setSelectedIndex(2);
+                            fourColorBorder = true;
+                            break;
+                        case Accessor.TYPE_ETCHED_LOWERED:
+                            borderType.setSelectedIndex(3);
+                            break;
                         case Accessor.TYPE_LINE:
                             borderType.setSelectedIndex(4);
                             break;
                         case Accessor.TYPE_UNDERLINE:
                             borderType.setSelectedIndex(5);
                             break;
+                        case Accessor.TYPE_STRIKETHROUGH_H:
+                            borderType.setSelectedIndex(6);
+                            break;
+                        case Accessor.TYPE_STRIKETHROUGH_V:
+                            borderType.setSelectedIndex(7);
+                            break;
                         case Accessor.TYPE_ROUNDED:
                         case Accessor.TYPE_ROUNDED_PRESSED:
-                            borderType.setSelectedIndex(6);
+                            borderType.setSelectedIndex(8);
+                            break;
+                        case Accessor.TYPE_IMAGE:
+                            borderType.setSelectedIndex(9);
+                            break;
+                        case Accessor.TYPE_IMAGE_HORIZONTAL:
+                            borderType.setSelectedIndex(10);
+                            break;
+                        case Accessor.TYPE_IMAGE_VERTICAL:
+                            borderType.setSelectedIndex(11);
                             break;
                         case Accessor.TYPE_ETCHED_RAISED:
                             raisedBorder.setSelected(true);
-                        case Accessor.TYPE_ETCHED_LOWERED:
-                            borderType.setSelectedIndex(3);
                             break;
                         case Accessor.TYPE_BEVEL_RAISED:
                             raisedBorder.setSelected(true);
-                        case Accessor.TYPE_BEVEL_LOWERED:
-                            borderType.setSelectedIndex(2);
-                            fourColorBorder = true;
-                            break;
-                        case Accessor.TYPE_IMAGE:
-                            borderType.setSelectedIndex(7);
-                            break;
-                        case Accessor.TYPE_IMAGE_HORIZONTAL:
-                            borderType.setSelectedIndex(8);
-                            break;
-                        case Accessor.TYPE_IMAGE_VERTICAL:
-                            borderType.setSelectedIndex(9);
                             break;
                     }
                 }
@@ -486,7 +492,7 @@ public class BorderEditor extends javax.swing.JPanel {
         jPanel6.setName("jPanel6"); // NOI18N
         jPanel6.setLayout(new java.awt.BorderLayout());
 
-        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Underline", "Rounded (Deprecated)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)", "Rounded Rectangle" }));
+        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Underline", "Strike Through Horizontal", "Strike Through Vertical", "Rounded (Deprecated)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)", "Rounded Rectangle" }));
         borderType.setName("borderType"); // NOI18N
         borderType.addActionListener(formListener);
         jPanel6.add(borderType, java.awt.BorderLayout.CENTER);
@@ -1444,7 +1450,81 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                             }
                         }
                         break;
-                    case 7: {
+                    case 4:
+                        // line border
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue());
+                            } else {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
+                            }
+                        } else {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue());
+                            } else {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                            }
+                        }
+                        break;
+                    case 5:
+                        // underline border
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).floatValue());
+                            } else {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
+                            }
+                        } else {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).intValue());
+                            } else {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                            }
+                        }
+                        break;
+                    case 6:
+                        // strike through horizontal border
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).floatValue(), true);
+                            } else {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor), true);
+                            }
+                        } else {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).intValue(), true);
+                            } else {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor), true);
+                            }
+                        }
+                        break;
+                    case 7:
+                        // strike through vertical border
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).floatValue(), false);
+                            } else {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor), false);
+                            }
+                        } else {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).intValue(), false);
+                            } else {
+                                currentBorder = Border.createStrikeThroughBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor), false);
+                            }
+                        }
+                        break;
+                    case 8:
+                        // rounded border
+                        if(themeColors.isSelected()) {
+                            currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
+                                ((Number)arcHeight.getValue()).intValue());
+                        } else {
+                            currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
+                                ((Number)arcHeight.getValue()).intValue(), getColor(lineColor));
+                        }
+                        break;
+                    case 9: {
                         // this is a theme with no images
                         if(borderType.getItemCount() < 8) {
                             break;
@@ -1469,7 +1549,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                         }
                         break;
                     }
-                    case 8: {
+                    case 10: {
                         Image c = getButtonImageBorderIcon(this.center);
 
                         currentBorder = Border.createHorizonalImageBorder(
@@ -1478,7 +1558,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                             c);
                         break;
                     }
-                    case 9: {
+                    case 11: {
                         Image c = getButtonImageBorderIcon(this.center);
 
                         currentBorder = Border.createVerticalImageBorder(
@@ -1487,48 +1567,6 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                             c);
                         break;
                     }
-                    case 4:
-                        // line border
-                        if(thicknessMillimeters.isSelected()) {
-                            if(themeColors.isSelected()) {
-                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue());
-                            } else {
-                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
-                            }
-                        } else {
-                            if(themeColors.isSelected()) {
-                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue());
-                            } else {
-                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
-                            }
-                        }
-                        break;
-                    case 5:
-                        // underline border
-                        if(thicknessMillimeters.isSelected()) {
-                            if(themeColors.isSelected()) {
-                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).floatValue());
-                            } else {
-                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
-                            }
-                        } else {
-                            if(themeColors.isSelected()) {
-                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).intValue());
-                            } else {
-                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
-                            }
-                        }
-                        break;
-                    case 6:
-                        // rounded border
-                        if(themeColors.isSelected()) {
-                            currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
-                                ((Number)arcHeight.getValue()).intValue());
-                        } else {
-                            currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
-                                ((Number)arcHeight.getValue()).intValue(), getColor(lineColor));
-                        }
-                        break;
                 }
             }
         }
