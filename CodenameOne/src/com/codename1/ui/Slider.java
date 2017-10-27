@@ -444,6 +444,9 @@ public class Slider extends Label {
     }    
    
     public void pointerPressed(int x, int y) {
+        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+            return;
+        }
         if(!editable) {
             return;
         }
@@ -480,6 +483,9 @@ public class Slider extends Label {
      * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
+        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+            return;
+        }
         if(!editable) {
             return;
         }
@@ -540,6 +546,9 @@ public class Slider extends Label {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+            return;
+        }
         if(!editable) {
             return;
         }
