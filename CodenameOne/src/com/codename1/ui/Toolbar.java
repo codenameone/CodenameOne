@@ -285,7 +285,7 @@ public class Toolbar extends Container {
      */
     public void closeSideMenu() {
         if(onTopSideMenu) {
-            if(sidemenuDialog.isShowing()) {
+            if(sidemenuDialog != null && sidemenuDialog.isShowing()) {
                 sidemenuDialog.disposeToTheLeft();
                 Style s = getComponentForm().getLayeredPane(Toolbar.class, false).getUnselectedStyle();
                 s.setBgTransparency(0);
