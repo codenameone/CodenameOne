@@ -2376,10 +2376,13 @@ public class Form extends Container {
         }
     }
 
+    private Component pressedCmp;
+    
     /**
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
+        pressedCmp = null;
         stickyDrag = null;
         dragStopFlag = false;
         dragged = null;
@@ -2428,6 +2431,7 @@ public class Form extends Container {
                     if (!isScrollWheeling) {
                         setFocused(leadParent);
                     }
+                    pressedCmp = cmp.getLeadComponent();
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
                     
@@ -2441,6 +2445,7 @@ public class Form extends Container {
                         if (!isScrollWheeling && cmp.isFocusable()) {
                             setFocused(cmp);
                         }
+                        pressedCmp = cmp;
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -2454,6 +2459,7 @@ public class Form extends Container {
                     cmp = cmp.getParent();
                 }
                 if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                    pressedCmp = cmp;
                     cmp.pointerPressed(x, y);
                     tactileTouchVibe(x, y, cmp);
                     initRippleEffect(x, y, cmp);
@@ -2479,6 +2485,7 @@ public class Form extends Container {
                             cmp = cmp.getLeadComponent();
                         }
                         cmp.initDragAndDrop(x, y);
+                        pressedCmp = cmp;
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
                         initRippleEffect(x, y, cmp);
@@ -2558,6 +2565,10 @@ public class Form extends Container {
             return;
         }
 
+        if (pressedCmp != null && pressedCmp.isStickyDrag()) {
+            stickyDrag = pressedCmp;
+        }
+        
         if(stickyDrag != null) {
             stickyDrag.pointerDragged(x, y);
             repaint();
@@ -2575,7 +2586,7 @@ public class Form extends Container {
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if(cmp.isStickyDrag()) {
+                    if(cmp == pressedCmp && cmp.isStickyDrag()) {
                         stickyDrag = cmp;
                     }
                 }
@@ -2592,7 +2603,7 @@ public class Form extends Container {
             }
             cmp.pointerDragged(x, y);
             cmp.repaint();
-            if(cmp.isStickyDrag()) {
+            if(cmp == pressedCmp && cmp.isStickyDrag()) {
                 stickyDrag = cmp;
             }
         }
@@ -2620,7 +2631,9 @@ public class Form extends Container {
             dragged.pointerDragged(x, y);
             return;
         }
-
+        if (pressedCmp != null && pressedCmp.isStickyDrag()) {
+            stickyDrag = pressedCmp;
+        }
         if(stickyDrag != null) {
             stickyDrag.pointerDragged(x, y);
             repaint();
@@ -2638,7 +2651,7 @@ public class Form extends Container {
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if(cmp.isStickyDrag()) {
+                    if(cmp == pressedCmp && cmp.isStickyDrag()) {
                         stickyDrag = cmp;
                     }
                 }
@@ -2655,7 +2668,7 @@ public class Form extends Container {
             }
             cmp.pointerDragged(x, y);
             cmp.repaint();
-            if(cmp.isStickyDrag()) {
+            if(cmp == pressedCmp && cmp.isStickyDrag()) {
                 stickyDrag = cmp;
             }
         }
@@ -2781,7 +2794,7 @@ public class Form extends Container {
      */
     public void pointerReleased(int x, int y) {
         rippleMotion = null;
-        
+        pressedCmp = null;
         boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         Container actual = getActualPane(formLayeredPane, x, y);
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
