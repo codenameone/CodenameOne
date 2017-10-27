@@ -35,4 +35,4 @@ script:
  - mv ../cn1-unit-tests-master ../cn1-unit-tests
  - rm master.zip
  - cd ../cn1-unit-tests
- - ../codenameone-cli/node_modules/.bin/cn1 test -cn1Sources ../cn1 -s -e
+ - ../codenameone-cli/node_modules/.bin/cn1 test -cn1Sources ../cn1 -s -v
