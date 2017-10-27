@@ -1503,7 +1503,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
-                    Component cmp = f.getResponderAt(x, y);
+                    Component cmp = f.getComponentAt(x, y);
                     if (cmp != null) {
                         int cursor = cmp.getCursor();
                         if (cursor != currentCursor) {
