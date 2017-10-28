@@ -24,6 +24,7 @@
 package com.codename1.ui.plaf;
 
 import com.codename1.components.InfiniteProgress;
+import com.codename1.io.Util;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -1702,6 +1703,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             pull.addComponent(BorderLayout.CENTER, updating);
             pull.layoutContainer();
             pull.setHeight(Math.max(pullDown.getPreferredH(), pull.getPreferredH()));
+        }
+        String s = UIManager.getInstance().getThemeConstant("pullToRefreshHeight", null);
+        if(s != null) {
+            float f = Util.toFloatValue(s);
+            if(f > 0) {
+                return Display.getInstance().convertToPixels(f);
+            }
         }
         return pull.getHeight();
     }
