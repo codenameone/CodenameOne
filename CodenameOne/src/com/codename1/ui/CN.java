@@ -199,6 +199,19 @@ public class CN extends  CN1Constants {
     }
 
     /**
+     * Causes the runnable to be invoked on the event dispatch thread when the event 
+     * dispatch thread is idle. This method returns immediately and will not wait for the serial call 
+     * to occur. Notice this method is identical to call serially but will perform the runnable only when
+     * the EDT is idle
+     *
+     * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+     * the paint and key handling events
+     */
+    public static void callSeriallyOnIdle(Runnable r){
+        Display.INSTANCE.callSeriallyOnIdle(r);
+    }    
+    
+    /**
      * Allows executing a background task in a separate low priority thread. Tasks are serialized
      * so they don't overload the CPU.
      * 
