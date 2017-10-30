@@ -57,6 +57,7 @@ public class InteractionDialog extends Container {
     private final Container contentPane;
     private boolean animateShow = true;
     private boolean repositionAnimation = true;
+    private boolean disposed;
     
     /**
      * Whether the interaction dialog uses the form layered pane of the regular layered pane
@@ -224,6 +225,27 @@ public class InteractionDialog extends Container {
         
         return c;
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        if(disposed) {
+            Form f = getComponentForm();
+            if(f != null) {
+                Container pp = getLayeredPane(f);
+                Container p = getParent();
+                remove();
+                p.remove();
+                pp.removeAll();
+                pp.revalidate();
+            }
+        }
+    }
+    
+    
     
     /**
      * This method shows the form as a modal alert allowing us to produce a behavior
@@ -240,7 +262,7 @@ public class InteractionDialog extends Container {
      * @param right space in pixels between the right of the screen and the form
      */
     public void show(int top, int bottom, int left, int right) {
-        
+        disposed = false;
         Form f = Display.getInstance().getCurrent();
         getUnselectedStyle().setMargin(TOP, top);
         getUnselectedStyle().setMargin(BOTTOM, bottom);
@@ -300,6 +322,7 @@ public class InteractionDialog extends Container {
      * Removes the interaction dialog from view
      */
     public void dispose() {
+        disposed = true;
         Container p = getParent();
         if(p != null) {
             Form f = p.getComponentForm();
@@ -328,6 +351,7 @@ public class InteractionDialog extends Container {
      * Removes the interaction dialog from view with an animation to the left
      */
     public void disposeToTheLeft() {
+        disposed = true;
         final Container p = getParent();
         if(p != null) {
             final Form f = p.getComponentForm();
@@ -389,6 +413,7 @@ public class InteractionDialog extends Container {
      * @param c the context component which is used to position the dialog and can also be pointed at
      */
     public void showPopupDialog(Component c) {
+        disposed = false;
         Rectangle componentPos = c.getSelectedRect();
         componentPos.setX(componentPos.getX() - c.getScrollX());
         componentPos.setY(componentPos.getY() - c.getScrollY());
@@ -404,6 +429,7 @@ public class InteractionDialog extends Container {
      * @param rect the screen rectangle to which the popup should point
      */
     public void showPopupDialog(Rectangle rect) {
+        disposed = false;
         if(getUIID().equals("Dialog")) {
             setUIID("PopupDialog");
             if(getTitleComponent().getUIID().equals("DialogTitle")) {
