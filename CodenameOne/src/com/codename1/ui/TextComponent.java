@@ -135,11 +135,16 @@ public class TextComponent extends Container {
     private Boolean focusAnimation;
     private final Label errorMessage = new Label("", "ErrorLabel");
     private static int animationSpeed = 100;
+    private static Boolean guiBuilderMode;
     
     /**
      * Default constructor allows us to create an arbitrary text component
      */
     public TextComponent() {
+        if(guiBuilderMode == null) {
+            guiBuilderMode = Display.getInstance().getProperty("GUIBuilderDesignMode", null) != null;
+        }
+        
         setUIID("TextComponent");
         field.setLabelForComponent(lbl);
         lbl.setFocusable(false);
@@ -147,10 +152,10 @@ public class TextComponent extends Container {
         if(tuid != null) {
             field.setUIID(tuid);
         }
+        refreshForGuiBuilder();
     }
 
-    @Override
-    void initComponentImpl() {
+    private void constructUI() {
         if(getComponentCount() == 0) {
             if(isOnTopMode()) {
                 lbl.setUIID("FloatingHint");
@@ -182,12 +187,32 @@ public class TextComponent extends Container {
                 add(BorderLayout.SOUTH, errorMessage);
             }
         }
+    }
+    
+    private void refreshForGuiBuilder() {
+        if(guiBuilderMode) {
+            removeAll();
+            field.remove();
+            lbl.remove();
+            errorMessage.remove();
+            if(animationLayer != null) {
+                animationLayer.remove();
+            }
+            constructUI();
+        }
+    }
+    
+    @Override
+    void initComponentImpl() {
+        constructUI();
         super.initComponentImpl();
     }
     
     
     /**
-     * Groups together multiple text components and labels so they align properly
+     * Groups together multiple text components and labels so they align properly, this is implicitly invoked 
+     * by {@link com.codename1.ui.layouts.TextModeLayout} so this method is unnecessary when using that 
+     * layout
      * @param cmps a list of components if it's a text component that is not in the on top mode the width of the labels 
      * will be aligned
      */
@@ -217,6 +242,7 @@ public class TextComponent extends Container {
      */
     public TextComponent onTopMode(boolean onTopMode) {
         this.onTopMode = Boolean.valueOf(onTopMode);
+        refreshForGuiBuilder();
         return this;
     }
     
@@ -259,6 +285,7 @@ public class TextComponent extends Container {
      */
     public TextComponent focusAnimation(boolean focusAnimation) {
         this.focusAnimation = Boolean.valueOf(focusAnimation);
+        refreshForGuiBuilder();
         return this;
     }
     
@@ -269,6 +296,7 @@ public class TextComponent extends Container {
      */
     public TextComponent text(String text) {
         field.setText(text);
+        refreshForGuiBuilder();
         return this;
     }
     
@@ -290,15 +318,16 @@ public class TextComponent extends Container {
                 lbl.setUIID(lbl.getUIID());
                 field.setUIID(field.getUIID());
             }
-            return this;
+        } else {
+            this.errorMessage.setText(errorMessage);
+            if(col != null) {
+                int val = Integer.parseInt(col, 16);
+                lbl.getAllStyles().setFgColor(val);
+                Border b = Border.createUnderlineBorder(2, val);
+                field.getAllStyles().setBorder(b);
+            }
         }
-        this.errorMessage.setText(errorMessage);
-        if(col != null) {
-            int val = Integer.parseInt(col, 16);
-            lbl.getAllStyles().setFgColor(val);
-            Border b = Border.createUnderlineBorder(2, val);
-            field.getAllStyles().setBorder(b);
-        }
+        refreshForGuiBuilder();
         return this;
     }
     
@@ -309,6 +338,7 @@ public class TextComponent extends Container {
      */
     public TextComponent label(String text) {
         lbl.setText(text);
+        refreshForGuiBuilder();
         return this;
     }
 
@@ -319,6 +349,7 @@ public class TextComponent extends Container {
      */
     public TextComponent hint(String hint) {
         field.setHint(hint);
+        refreshForGuiBuilder();
         return this;
     }
 
@@ -329,6 +360,7 @@ public class TextComponent extends Container {
      */
     public TextComponent hint(Image hint) {
         field.setHintIcon(hint);
+        refreshForGuiBuilder();
         return this;
     }
     
@@ -339,6 +371,7 @@ public class TextComponent extends Container {
      */
     public TextComponent multiline(boolean multiline) {
         field.setSingleLineTextArea(!multiline);
+        refreshForGuiBuilder();
         return this;
     }
     
@@ -349,6 +382,7 @@ public class TextComponent extends Container {
      */
     public TextComponent columns(int columns) {
         field.setColumns(columns);
+        refreshForGuiBuilder();
         return this;
     }
 
@@ -359,6 +393,7 @@ public class TextComponent extends Container {
      */
     public TextComponent rows(int rows) {
         field.setRows(rows);
+        refreshForGuiBuilder();
         return this;
     }
 

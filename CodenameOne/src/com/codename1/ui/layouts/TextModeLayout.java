@@ -25,9 +25,11 @@ package com.codename1.ui.layouts;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.TextComponent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.table.TableLayout;
+import java.util.ArrayList;
 
 /**
  * This is a special case layout specifically designed for {@link com.codename1.ui.TextComponent}. When the 
@@ -43,6 +45,13 @@ public class TextModeLayout extends Layout {
     public final TableLayout table;
     private Layout actual;
     
+    /**
+     * Automatically invokes the {@link com.codename1.ui.TextComponent#group(com.codename1.ui.Component...)} 
+     * method on the text components in a BoxY layout scenario
+     */
+    private boolean autoGrouping = true;
+    
+    private int lastComponentCount = 0;
     
     /**
      * The constructor works like the standard table layout constructor and will behave as such with the on 
@@ -98,6 +107,20 @@ public class TextModeLayout extends Layout {
 
     @Override
     public void layoutContainer(Container parent) {
+        if(autoGrouping && actual != table && lastComponentCount != parent.getComponentCount()) {
+            lastComponentCount = parent.getComponentCount();
+            ArrayList<Component> tc = new ArrayList<Component>();
+            for(Component c : parent) {
+                if(c instanceof TextComponent) {
+                    tc.add(c);
+                }
+            }
+            if(tc.size() > 0) {
+                Component[] tcArr = new Component[tc.size()];
+                tc.toArray(tcArr);
+                TextComponent.group(tcArr);
+            }
+        } 
         actual.layoutContainer(parent);
     }
 
@@ -124,5 +147,23 @@ public class TextModeLayout extends Layout {
      */
     public TableLayout.Constraint createConstraint(int row, int column) {
         return table.createConstraint(row, column);
+    }
+
+    /**
+     * Automatically invokes the {@link com.codename1.ui.TextComponent#group(com.codename1.ui.Component...)}
+     * method on the text components in a BoxY layout scenario
+     * @return the autoGrouping
+     */
+    public boolean isAutoGrouping() {
+        return autoGrouping;
+    }
+
+    /**
+     * Automatically invokes the {@link com.codename1.ui.TextComponent#group(com.codename1.ui.Component...)}
+     * method on the text components in a BoxY layout scenario
+     * @param autoGrouping the autoGrouping to set
+     */
+    public void setAutoGrouping(boolean autoGrouping) {
+        this.autoGrouping = autoGrouping;
     }
 }
