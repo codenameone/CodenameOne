@@ -381,4 +381,89 @@ public class TextComponent extends Container {
     public TextField getField() {
         return field;
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+        return new String[] {"text", "label", "hint", "multiline", "columns", "rows", "constraint"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+       return new Class[] {String.class, String.class, String.class, Boolean.class, Integer.class, Integer.class, Integer.class};
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+        return new String[] {"String", "String", "String", "Boolean", "Integer", "Integer", "Integer"};
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+        if(name.equals("text")) {
+            return field.getText();
+        }
+        if(name.equals("label")) {
+            return lbl.getText();
+        }
+        if(name.equals("hint")) {
+            return field.getHint();
+        }
+        if(name.equals("multiline")) {
+            return Boolean.valueOf(!field.isSingleLineTextArea());
+        }
+        if(name.equals("columns")) {
+            return field.getColumns();
+        }
+        if(name.equals("rows")) {
+            return field.getRows();
+        }
+        if(name.equals("constraint")) {
+            return field.getConstraint();
+        }
+        
+        return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+        if(name.equals("text")) {
+            text((String)value);
+            return null;
+        }
+        if(name.equals("label")) {
+            label((String)value);
+            return null;
+        }
+        if(name.equals("hint")) {
+            hint((String)value);
+            return null;
+        }
+        if(name.equals("multiline")) {
+            field.setSingleLineTextArea(!((Boolean)value).booleanValue());
+            return null;
+        }
+        if(name.equals("columns")) {
+            field.setColumns((Integer)value);
+            return null;
+        }
+        if(name.equals("rows")) {
+            field.setRows((Integer)value);
+            return null;
+        }
+        if(name.equals("constraint")) {
+            field.setConstraint((Integer)value);
+            return null;
+        }
+        return super.setPropertyValue(name, value);
+    }
 }
