@@ -49,6 +49,7 @@ import com.codename1.ui.layouts.LayeredLayout;
  * <img src="http://www.codenameone.com/img/blog/floatinghint.gif" alt="Animation" />
  *
  * @author Shai Almog
+ * @deprecated this class is superceded by {@link com.codename1.ui.TextComponent} which includes a more thorough implementation of the functionality and improved API
  */
 public class FloatingHint extends Container {
     private final TextArea tf;
