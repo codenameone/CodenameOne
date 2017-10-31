@@ -4166,6 +4166,15 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
+    private void purgeOldCookies(Map<String,Cookie> cookies) {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<String,Cookie> e : cookies.entrySet()) {
+            if (e.getValue().getExpires() != 0 && e.getValue().getExpires() < now) {
+                cookies.remove(e.getKey());
+            }
+        }
+    }
+    
     public void addCookie(Cookie [] cookiesArray) {
         if(cookies == null){
             cookies = new Hashtable();
@@ -4178,7 +4187,12 @@ public abstract class CodenameOneImplementation {
                 h = new Hashtable();
                 cookies.put(cookie.getDomain(), h);
             }
-            h.put(cookie.getName(), cookie);
+            purgeOldCookies(h);
+            if (cookie.getExpires() != 0 && cookie.getExpires() < System.currentTimeMillis()) {
+                h.remove(cookie.getName());
+            } else {
+                h.put(cookie.getName(), cookie);
+            }
         }
         
         if(Cookie.isAutoStored()){
