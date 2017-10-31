@@ -53,7 +53,7 @@ import java.util.ArrayList;
  *
  * @author Shai Almog
  */
-public class TextComponent extends Container {
+public class TextComponent extends InputComponent {
     private final TextField field = new TextField() {
         @Override
         void paintHint(Graphics g) {
@@ -70,8 +70,8 @@ public class TextComponent extends Container {
         void focusGainedInternal() {
             super.focusGainedInternal();
             if(isInitialized() && isFocusAnimation()) {
-                lbl.setFocus(true);
-                if(!lbl.isVisible()) {
+                getLabel().setFocus(true);
+                if(!getLabel().isVisible()) {
                     final Label text = new Label(getHint(), "TextHint");
                     setHint("");
                     final Label placeholder = new Label();
@@ -88,7 +88,7 @@ public class TextComponent extends Container {
                             Component.setSameSize(field);
                             text.remove();
                             placeholder.remove();
-                            lbl.setVisible(true);
+                            getLabel().setVisible(true);
                         }
                     });
                 }
@@ -99,23 +99,23 @@ public class TextComponent extends Container {
         void focusLostInternal() {
             super.focusLostInternal();
             if(isInitialized() && isFocusAnimation()) {
-                lbl.setFocus(false);
-                if(getText().length() == 0 && lbl.isVisible()) {
-                    final Label text = new Label(lbl.getText(), lbl.getUIID());
+                getLabel().setFocus(false);
+                if(getText().length() == 0 && getLabel().isVisible()) {
+                    final Label text = new Label(getLabel().getText(), getLabel().getUIID());
                     final Label placeholder = new Label();
-                    Component.setSameSize(placeholder, lbl);
+                    Component.setSameSize(placeholder, getLabel());
                     animationLayer.add(BorderLayout.NORTH, placeholder);
                     animationLayer.add(BorderLayout.CENTER, text);
-                    text.setX(lbl.getX());
-                    text.setY(lbl.getY());
-                    text.setWidth(lbl.getWidth());
-                    text.setHeight(lbl.getHeight());
+                    text.setX(getLabel().getX());
+                    text.setY(getLabel().getY());
+                    text.setWidth(getLabel().getWidth());
+                    text.setHeight(getLabel().getHeight());
                     ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(getHintLabel().getUIID(), animationSpeed));
                     getAnimationManager().addAnimation(anim, new Runnable() {
                         public void run() {
-                            setHint(lbl.getText());
-                            lbl.setVisible(false);
-                            Component.setSameSize(lbl);
+                            setHint(getLabel().getText());
+                            getLabel().setVisible(false);
+                            Component.setSameSize(getLabel());
                             text.remove();
                             placeholder.remove();
                         }
@@ -124,141 +124,58 @@ public class TextComponent extends Container {
             }
         }
     };
-    private final Button lbl = new Button("", "Label") {
-            @Override
-            protected boolean shouldRenderComponentSelection() {
-                return true;
-            }
-        };
     private Container animationLayer;
-    private Boolean onTopMode;
     private Boolean focusAnimation;
-    private final Label errorMessage = new Label("", "ErrorLabel");
     private static int animationSpeed = 100;
-    private static Boolean guiBuilderMode;
     
     /**
      * Default constructor allows us to create an arbitrary text component
      */
     public TextComponent() {
-        if(guiBuilderMode == null) {
-            guiBuilderMode = Display.getInstance().getProperty("GUIBuilderDesignMode", null) != null;
-        }
-        
-        setUIID("TextComponent");
-        field.setLabelForComponent(lbl);
-        lbl.setFocusable(false);
-        String tuid = getUIManager().getThemeConstant("textComponentFieldUIID", null);
-        if(tuid != null) {
-            field.setUIID(tuid);
-        }
-        refreshForGuiBuilder();
+        initInput();
     }
 
-    private void constructUI() {
+    void constructUI() {
         if(getComponentCount() == 0) {
-            if(isOnTopMode()) {
-                lbl.setUIID("FloatingHint");
-                if(isFocusAnimation()) {                    
-                    setLayout(new LayeredLayout());
-                    Container tfContainer = BorderLayout.center(field).
-                            add(BorderLayout.NORTH, lbl).
-                            add(BorderLayout.SOUTH, errorMessage);
-                    add(tfContainer);
-                    
-                    Label errorMessageFiller = new Label();
-                    Component.setSameSize(errorMessageFiller, errorMessage);
-                    animationLayer = BorderLayout.south(errorMessageFiller);
-                    add(animationLayer);
-                    if(field.getText() == null || field.getText().length() == 0) {
-                        field.setHint(lbl.getText());
-                        lbl.setVisible(false);
-                    }  
-                } else {
-                    setLayout(new BorderLayout());
-                    add(BorderLayout.CENTER, field);
-                    add(BorderLayout.NORTH, lbl);
-                    add(BorderLayout.SOUTH, errorMessage);
-                }
+            if(isOnTopMode() && isFocusAnimation()) {
+                getLabel().setUIID("FloatingHint");
+                setLayout(new LayeredLayout());
+                Container tfContainer = BorderLayout.center(field).
+                        add(BorderLayout.NORTH, getLabel()).
+                        add(BorderLayout.SOUTH, getErrorMessage());
+                add(tfContainer);
+
+                Label errorMessageFiller = new Label();
+                Component.setSameSize(errorMessageFiller, getErrorMessage());
+                animationLayer = BorderLayout.south(errorMessageFiller);
+                add(animationLayer);
+                if(field.getText() == null || field.getText().length() == 0) {
+                    field.setHint(getLabel().getText());
+                    getLabel().setVisible(false);
+                }  
             } else {
-                setLayout(new BorderLayout());
-                add(BorderLayout.CENTER, field);
-                add(BorderLayout.WEST, lbl);
-                add(BorderLayout.SOUTH, errorMessage);
+                super.constructUI();
             }
         }
     }
     
-    private void refreshForGuiBuilder() {
+    /**
+     * Returns the editor component e.g. text field picker etc.
+     * @return the editor component
+     */
+    public Component getEditor() {
+        return field;
+    }
+    
+    void refreshForGuiBuilder() {
         if(guiBuilderMode) {
-            removeAll();
-            field.remove();
-            lbl.remove();
-            errorMessage.remove();
             if(animationLayer != null) {
                 animationLayer.remove();
             }
-            constructUI();
+            super.refreshForGuiBuilder();
         }
     }
-    
-    @Override
-    void initComponentImpl() {
-        constructUI();
-        super.initComponentImpl();
-    }
-    
-    
-    /**
-     * Groups together multiple text components and labels so they align properly, this is implicitly invoked 
-     * by {@link com.codename1.ui.layouts.TextModeLayout} so this method is unnecessary when using that 
-     * layout
-     * @param cmps a list of components if it's a text component that is not in the on top mode the width of the labels 
-     * will be aligned
-     */
-    public static void group(Component... cmps) {
-        ArrayList<Component> al = new ArrayList<Component>();
-        for(Component c : cmps) {
-            if(c instanceof TextComponent) {
-                TextComponent t = (TextComponent)c;
-                if(!t.isOnTopMode()) {
-                    al.add(t.lbl);
-                }
-            } else {
-                al.add(c);
-            }
-        }
-        Component[] cc = new Component[al.size()];
-        al.toArray(cc);
-        Component.setSameWidth(cc);
-    }
-    
-    /**
-     * Sets the on top mode which places the label above the text when true. It's to the left of the text otherwise 
-     * (right in bidi languages). This is determined by the platform theme using the {@code textComponentOnTopBool}
-     * theme constant which defaults to false
-     * @param onTopMode true for the label to be above the text
-     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
-     */
-    public TextComponent onTopMode(boolean onTopMode) {
-        this.onTopMode = Boolean.valueOf(onTopMode);
-        refreshForGuiBuilder();
-        return this;
-    }
-    
-    /**
-     * Indicates the on top mode which places the label above the text when true. It's to the left of the text otherwise 
-     * (right in bidi languages). This is determined by the platform theme using the {@code textComponentOnTopBool}
-     * theme constant which defaults to false
-     * 
-     * @return true if the text should be on top
-     */
-    public boolean isOnTopMode() {
-        if(onTopMode != null) {
-            return onTopMode.booleanValue();
-        }
-        return getUIManager().isThemeConstant("textComponentOnTopBool", false);
-    }
+        
     
     /**
      * The focus animation mode forces the hint and text to be identical and animates the hint to the label when
@@ -301,44 +218,29 @@ public class TextComponent extends Container {
     }
     
     /**
-     * Sets the text of the error label
-     * @param errorMessage the text
-     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent onTopMode(boolean onTopMode) {
+        return (TextComponent)super.onTopMode(onTopMode);
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
      */
     public TextComponent errorMessage(String errorMessage) {
-        String col = getUIManager().getThemeConstant("textComponentErrorColor", null);
-        if(errorMessage == null || errorMessage.length() == 0) {
-            // no need for double showing of error
-            if(this.errorMessage.getText().length() == 0) {
-                return this;
-            }
-            // clear the error mode
-            this.errorMessage.setText("");
-            if(col != null) {
-                lbl.setUIID(lbl.getUIID());
-                field.setUIID(field.getUIID());
-            }
-        } else {
-            this.errorMessage.setText(errorMessage);
-            if(col != null) {
-                int val = Integer.parseInt(col, 16);
-                lbl.getAllStyles().setFgColor(val);
-                Border b = Border.createUnderlineBorder(2, val);
-                field.getAllStyles().setBorder(b);
-            }
-        }
-        refreshForGuiBuilder();
+        super.errorMessage(errorMessage);
         return this;
     }
     
     /**
-     * Sets the text of the label
-     * @param text the text
-     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
+     * Overridden for covariant return type
+     * {@inheritDoc}
+ }
      */
     public TextComponent label(String text) {
-        lbl.setText(text);
-        refreshForGuiBuilder();
+        super.label(text);
         return this;
     }
 
@@ -445,9 +347,6 @@ public class TextComponent extends Container {
         if(name.equals("text")) {
             return field.getText();
         }
-        if(name.equals("label")) {
-            return lbl.getText();
-        }
         if(name.equals("hint")) {
             return field.getHint();
         }
@@ -464,7 +363,7 @@ public class TextComponent extends Container {
             return field.getConstraint();
         }
         
-        return null;
+        return super.getPropertyValue(name);
     }
 
     /**
@@ -473,10 +372,6 @@ public class TextComponent extends Container {
     public String setPropertyValue(String name, Object value) {
         if(name.equals("text")) {
             text((String)value);
-            return null;
-        }
-        if(name.equals("label")) {
-            label((String)value);
             return null;
         }
         if(name.equals("hint")) {

@@ -100,8 +100,14 @@ public class CN1Constants {
      */
     public static final int PICKER_TYPE_DURATION = 5;
     
+    /**
+     * Duration picker type.  It returns Long result (milliseconds).
+     */
     public static final int PICKER_TYPE_DURATION_HOURS = 6;
     
+    /**
+     * Duration picker type.  It returns Long result (milliseconds).
+     */
     public static final int PICKER_TYPE_DURATION_MINUTES = 7;
 
     /**

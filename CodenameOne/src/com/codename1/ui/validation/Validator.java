@@ -36,6 +36,7 @@ import com.codename1.ui.List;
 import com.codename1.ui.Painter;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.InputComponent;
 import com.codename1.ui.TextComponent;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
@@ -380,8 +381,8 @@ public class Validator {
      * @return  the object value
      */
     protected Object getComponentValue(Component cmp) {
-        if(cmp instanceof TextComponent) {
-            return ((TextComponent)cmp).getField().getText();
+        if(cmp instanceof InputComponent) {
+            cmp = ((InputComponent)cmp).getEditor();
         }
         if(cmp instanceof TextArea) {
             return ((TextArea)cmp).getText();
@@ -412,7 +413,7 @@ public class Validator {
      */
     public void bindDataListener(Component cmp) {
         if(showErrorMessageForFocusedComponent) {
-            if(!(cmp instanceof TextComponent && ((TextComponent)cmp).isOnTopMode())) {
+            if(!(cmp instanceof InputComponent && ((InputComponent)cmp).isOnTopMode())) {
                 cmp.addFocusListener(new FocusListener() {
                     public void focusGained(Component cmp) {
                         // special case. Before the form is showing don't show error dialogs
@@ -554,8 +555,8 @@ public class Validator {
             }
         }
 
-        if(cmp instanceof TextComponent && ((TextComponent)cmp).isOnTopMode()) {
-            TextComponent tc = (TextComponent)cmp;
+        if(cmp instanceof InputComponent && ((InputComponent)cmp).isOnTopMode()) {
+            InputComponent tc = (InputComponent)cmp;
             if(v) {
                 tc.errorMessage(null);
             } else {
@@ -612,7 +613,7 @@ public class Validator {
         public void paint(Graphics g, Rectangle rect) {
             for(Component c : constraintList.keySet()) {
                 if(!isValid(c)) {
-                    if(c instanceof TextComponent && ((TextComponent)c).isOnTopMode()) {
+                    if(c instanceof InputComponent && ((InputComponent)c).isOnTopMode()) {
                         continue;
                     }
                     int xpos = c.getAbsoluteX();

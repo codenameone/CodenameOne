@@ -25,16 +25,22 @@ package com.codename1.ui.layouts;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.TextComponent;
+import com.codename1.ui.InputComponent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.table.TableLayout;
 import java.util.ArrayList;
 
 /**
- * This is a special case layout specifically designed for {@link com.codename1.ui.TextComponent}. When the 
- * on top mode of text layout is used this layout acts exactly like a table layout and uses the give constraints. When
- * this mode is false it uses a regular box Y layout mode and orders the elements one on top of the other.
+ * <p>This is a special case layout specifically designed for {@link com.codename1.ui.InputComponent}. 
+ * When the  on top mode of text layout is used this layout acts exactly like a table layout and uses the 
+ * given constraints. When this mode is false it uses a regular box Y layout mode and orders the elements one 
+ * on top of the other.</p>
+ * <p>One important difference between this layout and the default table layout is that the vertical alignment 
+ * here is set to {@code TOP} so the error label below doesn't break component alignment if two components
+ * are on the same row and only one has an error message.
+ * </p> 
+ *
  *
  * @author Shai Almog
  */
@@ -46,7 +52,7 @@ public class TextModeLayout extends Layout {
     private Layout actual;
     
     /**
-     * Automatically invokes the {@link com.codename1.ui.TextComponent#group(com.codename1.ui.Component...)} 
+     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)} 
      * method on the text components in a BoxY layout scenario
      */
     private boolean autoGrouping = true;
@@ -68,62 +74,93 @@ public class TextModeLayout extends Layout {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
         if(actual == table) {
+            // forcing default constraint to still be aligned top
+            if(!(value instanceof TableLayout.Constraint)) {
+                value = createConstraint();
+            }
             table.addLayoutComponent(value, comp, c);
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Object cloneConstraint(Object constraint) {
         return actual.cloneConstraint(constraint);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Object getComponentConstraint(Component comp) {
         return actual.getComponentConstraint(comp);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isConstraintTracking() {
         return actual.isConstraintTracking();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isOverlapSupported() {
         return actual.isOverlapSupported();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean obscuresPotential(Container parent) {
         return actual.obscuresPotential(parent);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void removeLayoutComponent(Component comp) {
         actual.removeLayoutComponent(comp);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void layoutContainer(Container parent) {
         if(autoGrouping && actual != table && lastComponentCount != parent.getComponentCount()) {
             lastComponentCount = parent.getComponentCount();
             ArrayList<Component> tc = new ArrayList<Component>();
             for(Component c : parent) {
-                if(c instanceof TextComponent) {
+                if(c instanceof InputComponent) {
                     tc.add(c);
                 }
             }
             if(tc.size() > 0) {
                 Component[] tcArr = new Component[tc.size()];
                 tc.toArray(tcArr);
-                TextComponent.group(tcArr);
+                InputComponent.group(tcArr);
             }
         } 
         actual.layoutContainer(parent);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Dimension getPreferredSize(Container parent) {
         return actual.getPreferredSize(parent);
@@ -135,7 +172,7 @@ public class TextModeLayout extends Layout {
      * @return the default constraint
      */
     public TableLayout.Constraint createConstraint() {
-        return table.createConstraint();
+        return table.createConstraint().verticalAlign(Component.TOP);
     }
 
     /**
@@ -146,11 +183,11 @@ public class TextModeLayout extends Layout {
      * @return the new constraint
      */
     public TableLayout.Constraint createConstraint(int row, int column) {
-        return table.createConstraint(row, column);
+        return table.createConstraint(row, column).verticalAlign(Component.TOP);
     }
 
     /**
-     * Automatically invokes the {@link com.codename1.ui.TextComponent#group(com.codename1.ui.Component...)}
+     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
      * method on the text components in a BoxY layout scenario
      * @return the autoGrouping
      */
@@ -159,7 +196,7 @@ public class TextModeLayout extends Layout {
     }
 
     /**
-     * Automatically invokes the {@link com.codename1.ui.TextComponent#group(com.codename1.ui.Component...)}
+     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
      * method on the text components in a BoxY layout scenario
      * @param autoGrouping the autoGrouping to set
      */
