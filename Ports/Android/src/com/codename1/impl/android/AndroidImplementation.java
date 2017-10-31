@@ -4000,6 +4000,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
+    @Override
+    public void clearNativeCookies() {
+        CookieManager mgr = CookieManager.getInstance();
+        mgr.removeAllCookie();
+    }
+
+    
     
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
@@ -4036,12 +4043,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         try {
                             URI uri = new URI(url);
                             CookieManager mgr = CookieManager.getInstance();
+                            mgr.removeExpiredCookie();
+                            String domain = uri.getHost();
+                            removeCookiesForDomain(domain);
                             String cookieStr = mgr.getCookie(url);
                             if (cookieStr != null) {
                                 String[] cookies = cookieStr.split(";");
                                 int len = cookies.length;
-                                Vector out = new Vector();
-                                String domain = uri.getHost();
+                                ArrayList out = new ArrayList();
                                 for (int i = 0; i < len; i++) {
                                     Cookie c = new Cookie();
                                     String[] parts = cookies[i].split("=");
@@ -6764,11 +6773,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 syncer = CookieSyncManager.createInstance(this.getContext());
                 mgr = CookieManager.getInstance();
             }
+            com.codename1.l10n.SimpleDateFormat format = new com.codename1.l10n.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
             String cookieString = c.getName()+"="+c.getValue()+
                     "; Domain="+c.getDomain()+
                     "; Path="+c.getPath()+
                     "; "+(c.isSecure()?"Secure;":"")
-                    +(c.isHttpOnly()?"httpOnly;":"");
+                    +(c.isHttpOnly()?"httpOnly;":"")
+                    + (c.getExpires() != 0 ? ("Expires="+format.format(new Date(c.getExpires()))+";") : "")
+                    ;
             mgr.setCookie("http"+
                     (c.isSecure()?"s":"")+"://"+
                     c.getDomain()+
@@ -6794,11 +6806,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 syncer = CookieSyncManager.createInstance(this.getContext());
                 mgr = CookieManager.getInstance();
             }
+            com.codename1.l10n.SimpleDateFormat format = new com.codename1.l10n.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
             for (Cookie c : cs) {
                 String cookieString = c.getName() + "=" + c.getValue() +
                         "; Domain=" + c.getDomain() +
                         "; Path=" + c.getPath() +
                         "; " + (c.isSecure() ? "Secure;" : "")
+                        + (c.getExpires() != 0 ? (" Expires="+format.format(new Date(c.getExpires()))+";") : "")
                         + (c.isHttpOnly() ? "httpOnly;" : "");
                 mgr.setCookie("http" +
                         (c.isSecure() ? "s" : "") + "://" +

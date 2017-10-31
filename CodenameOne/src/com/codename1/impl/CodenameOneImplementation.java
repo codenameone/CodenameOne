@@ -4175,6 +4175,21 @@ public abstract class CodenameOneImplementation {
         }
     }
     
+    protected final void removeCookiesForDomain(String domain) {
+        Hashtable h = (Hashtable)cookies.get(domain);
+        if (h == null) {
+            return;
+        }
+        h.clear();
+        if(Cookie.isAutoStored()){
+            if(Storage.getInstance().exists(Cookie.STORAGE_NAME)){
+                Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
+            }
+            Storage.getInstance().writeObject(Cookie.STORAGE_NAME, cookies);
+        }
+        
+    }
+    
     public void addCookie(Cookie [] cookiesArray) {
         if(cookies == null){
             cookies = new Hashtable();
