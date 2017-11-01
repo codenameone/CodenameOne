@@ -890,15 +890,32 @@ public class Toolbar extends Container {
             }
             
             if (!parent.getUIManager().isThemeConstant("hideLeftSideMenuBool", false)) {
-                addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {
-                        if(sidemenuDialog.isShowing()) {
-                            closeSideMenu();
-                            return;
+                Image i = (Image) parent.getUIManager().getThemeImageConstant("sideMenuImage");
+                if(i != null) {
+                    Command cmd = addCommandToLeftBar("", i, new ActionListener() {
+                        public void actionPerformed(ActionEvent evt) {
+                            if(sidemenuDialog.isShowing()) {
+                                closeSideMenu();
+                                return;
+                            }
+                            showOnTopSidemenu(-1, false);
                         }
-                        showOnTopSidemenu(-1, false);
+                    });
+                    Image p = (Image) parent.getUIManager().getThemeImageConstant("sideMenuPressImage");
+                    if (p != null) {
+                        findCommandComponent(cmd).setPressedIcon(p);
                     }
-                });
+                } else {
+                    addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                        public void actionPerformed(ActionEvent evt) {
+                            if(sidemenuDialog.isShowing()) {
+                                closeSideMenu();
+                                return;
+                            }
+                            showOnTopSidemenu(-1, false);
+                        }
+                    });
+                }
             }
         }
     }
@@ -1478,7 +1495,20 @@ public class Toolbar extends Container {
     
 
     class ToolbarSideMenu extends SideMenuBar {
-                
+
+        @Override
+        protected void removeCommand(Command cmd) {
+            if(onTopSideMenu || permanentSideMenu) {
+                Button b = findCommandComponent(cmd);
+                if(b != null) {
+                    b.remove();
+                }
+            } else {
+                super.removeCommand(cmd);
+            }
+        }
+
+        
         @Override
         protected Container createSideNavigationComponent(Vector commands, String placement) {
             return Toolbar.this.createSideNavigationComponent(commands, placement);
