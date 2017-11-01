@@ -5678,6 +5678,11 @@ public class Component implements Animation, StyleListener {
      * Indicates whether scrolling this component should jump to a specific location
      * in a grid
      * @param snapToGrid the snapToGrid to set
+     * @deprecated this feature should work but it isn't maintained and isn't guaranteed to function properly. 
+     *    There are issues covering this but at this time we can't dedicate resources to address them specifically:
+     *    <a href="https://github.com/codenameone/CodenameOne/issues/2122">#2122</a>,
+     *    <a href="https://github.com/codenameone/CodenameOne/issues/1966">#1966</a> &amp;
+     *    <a href="https://github.com/codenameone/CodenameOne/issues/1947">#1947</a>. 
      */
     public void setSnapToGrid(boolean snapToGrid) {
         this.snapToGrid = snapToGrid;
