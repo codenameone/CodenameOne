@@ -701,21 +701,16 @@ public class ConnectionRequest implements IOProgressListener {
             if(isCookiesEnabled()) {
                 String[] cookies = impl.getHeaderFields("Set-Cookie", connection);
                 if(cookies != null && cookies.length > 0){
-                    Vector cook = new Vector();
+                    ArrayList cook = new ArrayList();
                     int clen = cookies.length;
                     for(int iter = 0 ; iter < clen ; iter++) {
                         Cookie coo = parseCookieHeader(cookies[iter]);
                         if(coo != null) {
-                            cook.addElement(coo);
+                            cook.add(coo);
                             cookieReceived(coo);
                         }
                     }
-                    Cookie [] arr = new Cookie[cook.size()];
-                    int arlen = arr.length;
-                    for (int i = 0; i < arlen; i++) {
-                        arr[i] = (Cookie) cook.elementAt(i);
-                    }
-                    impl.addCookie(arr);
+                    impl.addCookie((Cookie[])cook.toArray(new Cookie[cook.size()]));
                 }
             }
             
@@ -1029,10 +1024,13 @@ public class ConnectionRequest implements IOProgressListener {
                 c.setHttpOnly(true);
             } else if ( part.indexOf("expires") == 0) {
                 SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+                String date = part.substring(part.indexOf("=")+1);
                 try {
-                    java.util.Date dt = format.parse(part.substring(part.indexOf("=")+1));
+                    java.util.Date dt = format.parse(date);
                     c.setExpires(dt.getTime());
                 } catch (ParseException ex) {
+                    Log.p("Failed to parse expiration date of cookie "+lowerH);
+                    Log.p("Parsing date "+date);
                     Log.e(ex);
                 }
             }
