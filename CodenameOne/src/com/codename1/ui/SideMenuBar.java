@@ -700,7 +700,7 @@ public class SideMenuBar extends MenuBar {
      * Closes the menu if it is currently open
      */
     public void closeMenu() {
-        if(Toolbar.isOnTopSideMenu()) {
+        if(Toolbar.isOnTopSideMenu() && Display.getInstance().getCurrent().getToolbar() != null) {
             Display.getInstance().getCurrent().getToolbar().closeSideMenu();
             return;
         }
