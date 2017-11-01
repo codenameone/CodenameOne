@@ -277,6 +277,7 @@ public class Picker extends Button {
                 if(!(value instanceof Integer)) {
                     setTime(0);
                 }
+                break;
             case Display.PICKER_TYPE_DURATION:
             case Display.PICKER_TYPE_DURATION_HOURS:
             case Display.PICKER_TYPE_DURATION_MINUTES:
