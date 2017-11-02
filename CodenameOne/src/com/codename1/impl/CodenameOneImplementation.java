@@ -4176,6 +4176,9 @@ public abstract class CodenameOneImplementation {
     }
     
     protected final void removeCookiesForDomain(String domain) {
+	if(domain==null){
+            return;
+        }
         Hashtable h = (Hashtable)cookies.get(domain);
         if (h == null) {
             return;
