@@ -36,11 +36,16 @@ import java.io.InputStream;
  */
 public abstract class DeviceRunner {
     private static final int VERSION = 1;
+    private int failedTests;
+    private int passedTests;
     
     /**
      * Run all the test cases
      */
     public void runTests() {
+        failedTests = 0;
+        passedTests = 0;
+        Log.p("-----STARTING TESTS-----");
         try {
             InputStream is = getClass().getResourceAsStream("/tests.dat");
             
@@ -74,6 +79,12 @@ public abstract class DeviceRunner {
             TestReporting.getInstance().logException(err);
         }
         TestReporting.getInstance().testExecutionFinished();
+        if(failedTests > 0) {
+            Log.p("Test execution finished, some failed tests occured. Passed: " + passedTests + " tests. Failed: " + failedTests + " tests.");
+        } else {
+            Log.p("All tests passed. Total " + passedTests + " tests passed");
+        }
+        Log.p("-----FINISHED TESTS-----");
     }
     
     /**
@@ -100,10 +111,16 @@ public abstract class DeviceRunner {
                 startApplicationInstance();
                 t.prepare();
                 boolean result = t.runTest();
+                if (result) {
+                    passedTests++;
+                } else {
+                    failedTests++;
+                }
                 t.cleanup();
                 stopApplicationInstance();
                 TestReporting.getInstance().finishedTestCase(t, result);
             } catch(Throwable err) {
+                failedTests++;
                 TestReporting.getInstance().logException(err);
                 TestReporting.getInstance().finishedTestCase(t, false);
             }
