@@ -1189,7 +1189,10 @@ public class Toolbar extends Container {
                 continue;
             }
             if(c instanceof Button) {
-                cmds.add(((Button)c).getCommand());
+                Command b = ((Button)c).getCommand();
+                if(b != null) {
+                    cmds.add(b);
+                }
             }
         }
     }
