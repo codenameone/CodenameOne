@@ -4006,7 +4006,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         mgr.removeAllCookie();
     }
 
-    
+    @Override
+    public Vector getCookiesForURL(String url) {
+        if (isUseNativeCookieStore()) {
+            try {
+                URI uri = new URI(url);
+                CookieManager mgr = CookieManager.getInstance();
+                mgr.removeExpiredCookie();
+                String domain = uri.getHost();
+                String cookieStr = mgr.getCookie(url);
+                if (cookieStr != null) {
+                    String[] cookies = cookieStr.split(";");
+                    int len = cookies.length;
+                    Vector out = new Vector();
+                    for (int i = 0; i < len; i++) {
+                        Cookie c = new Cookie();
+                        String[] parts = cookies[i].split("=");
+                        c.setName(parts[0].trim());
+                        if (parts.length > 1) {
+                            c.setValue(parts[1].trim());
+                        } else {
+                            c.setValue("");
+                        }
+                        c.setDomain(domain);
+                        out.add(c);
+                    }
+                    return out;
+                }
+            } catch (Exception ex) {
+                com.codename1.io.Log.e(ex);
+            }
+            return new Vector();
+        }
+        return super.getCookiesForURL(url);
+    }
     
     class AndroidBrowserComponent extends AndroidImplementation.AndroidPeer {
 
@@ -4039,7 +4072,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
             web.setWebViewClient(new WebViewClient() {
                 public void onLoadResource(WebView view, String url) {
-                    if (Display.getInstance().getProperty("syncNativeCookies", "true").equals("true")) {
+                    if (Display.getInstance().getProperty("syncNativeCookies", "false").equals("true")) {
                         try {
                             URI uri = new URI(url);
                             CookieManager mgr = CookieManager.getInstance();
@@ -6773,7 +6806,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 syncer = CookieSyncManager.createInstance(this.getContext());
                 mgr = CookieManager.getInstance();
             }
-            com.codename1.l10n.SimpleDateFormat format = new com.codename1.l10n.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+            java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+            format.setTimeZone(TimeZone.getTimeZone("GMT"));
             String cookieString = c.getName()+"="+c.getValue()+
                     "; Domain="+c.getDomain()+
                     "; Path="+c.getPath()+
@@ -6806,7 +6840,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 syncer = CookieSyncManager.createInstance(this.getContext());
                 mgr = CookieManager.getInstance();
             }
-            com.codename1.l10n.SimpleDateFormat format = new com.codename1.l10n.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+            java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+            format.setTimeZone(TimeZone.getTimeZone("GMT"));
+
             for (Cookie c : cs) {
                 String cookieString = c.getName() + "=" + c.getValue() +
                         "; Domain=" + c.getDomain() +
@@ -6818,7 +6854,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         (c.isSecure() ? "s" : "") + "://" +
                         c.getDomain() +
                         c.getPath(), cookieString);
+                
             }
+
             if(sync) {
                 syncer.sync();
             }
