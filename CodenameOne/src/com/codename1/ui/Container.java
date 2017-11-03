@@ -665,6 +665,8 @@ public class Container extends Component implements Iterable<Component>{
             }
             cmp.setParent(this);
             a.addAnimation(new ComponentAnimation() {
+                private boolean alreadyAdded;
+                
                 @Override
                 public boolean isInProgress() {
                     return false;
@@ -672,12 +674,20 @@ public class Container extends Component implements Iterable<Component>{
 
                 @Override
                 protected void updateState() {
-                    cmp.setParent(null);
-                    if(constraint != null) {
-                        layout.addLayoutComponent(constraint, cmp, Container.this);
+                    if(!alreadyAdded) {
+                        alreadyAdded = true;
+                        cmp.setParent(null);
+                        if(constraint != null) {
+                            layout.addLayoutComponent(constraint, cmp, Container.this);
+                        }
+                        insertComponentAtImpl(index, cmp);
+                        revalidate();
                     }
-                    insertComponentAtImpl(index, cmp);
-                    revalidate();
+                }
+
+                @Override
+                public void flush() {
+                    updateState();
                 }
             });
         } else {
@@ -1025,6 +1035,7 @@ public class Container extends Component implements Iterable<Component>{
             layout.removeLayoutComponent(cmp);
             cmp.setParent(null);
             a.addAnimation(new ComponentAnimation() {
+                private boolean alreadyRemoved;
                 @Override
                 public boolean isInProgress() {
                     return false;
@@ -1032,8 +1043,16 @@ public class Container extends Component implements Iterable<Component>{
 
                 @Override
                 protected void updateState() {
-                    removeComponentImplNoAnimationSafety(cmp);
-                    revalidate();
+                    if(!alreadyRemoved) {
+                        alreadyRemoved = true;
+                        removeComponentImplNoAnimationSafety(cmp);
+                        revalidate();
+                    }
+                }
+
+                @Override
+                public void flush() {
+                    updateAnimationState();
                 }
             });
         } else {
