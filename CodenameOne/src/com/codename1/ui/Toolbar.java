@@ -1084,7 +1084,7 @@ public class Toolbar extends Container {
             Component current = cnt.getComponentAt(iter);
             if (current instanceof Button) {
                 Button b = (Button) current;
-                if (b.getCommand() == c) {
+                if (b.getCommand() == c || sideMenu.unwrapCommand(b.getCommand()) == c) {
                     return b;
                 }
             } else {
@@ -1501,13 +1501,12 @@ public class Toolbar extends Container {
 
         @Override
         protected void removeCommand(Command cmd) {
+            super.removeCommand(cmd);
             if(onTopSideMenu || permanentSideMenu) {
-                Button b = findCommandComponent(cmd);
+                Button b = Toolbar.this.findCommandComponent(cmd);
                 if(b != null) {
                     b.remove();
                 }
-            } else {
-                super.removeCommand(cmd);
             }
         }
 

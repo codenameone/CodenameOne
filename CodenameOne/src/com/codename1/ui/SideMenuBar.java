@@ -1682,6 +1682,13 @@ public class SideMenuBar extends MenuBar {
         }
     }
     
+    Command unwrapCommand(Command cmd) {
+        if(cmd instanceof CommandWrapper) {
+            return ((CommandWrapper)cmd).cmd;
+        }
+        return cmd;
+    }
+    
     Command wrapCommand(Command cmd) {
         return new CommandWrapper(cmd);
     }
