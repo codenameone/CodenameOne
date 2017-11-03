@@ -4002,16 +4002,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void clearNativeCookies() {
-        CookieManager mgr = CookieManager.getInstance();
+        CookieManager mgr = getCookieManager();
         mgr.removeAllCookie();
     }
-
+    private static CookieManager cookieManager;
+    private static CookieManager getCookieManager() {
+        if (android.os.Build.VERSION.SDK_INT >= 21) {
+            return CookieManager.getInstance();
+        }
+        if (cookieManager == null) {
+            CookieSyncManager.createInstance(getContext()); // Fixes a crash on Android 4.3
+                                                                // https://stackoverflow.com/a/20552998/2935174
+            cookieManager = CookieManager.getInstance();
+        }
+        return CookieManager.getInstance();
+    }
+    
     @Override
     public Vector getCookiesForURL(String url) {
         if (isUseNativeCookieStore()) {
             try {
                 URI uri = new URI(url);
-                CookieManager mgr = CookieManager.getInstance();
+                
+                
+                CookieManager mgr = getCookieManager();
                 mgr.removeExpiredCookie();
                 String domain = uri.getHost();
                 String cookieStr = mgr.getCookie(url);
@@ -4075,7 +4089,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (Display.getInstance().getProperty("syncNativeCookies", "false").equals("true")) {
                         try {
                             URI uri = new URI(url);
-                            CookieManager mgr = CookieManager.getInstance();
+                            CookieManager mgr = getCookieManager();
                             mgr.removeExpiredCookie();
                             String domain = uri.getHost();
                             removeCookiesForDomain(domain);
@@ -6801,10 +6815,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             CookieSyncManager syncer;
             try {
                 syncer = CookieSyncManager.getInstance();
-                mgr = CookieManager.getInstance();
+                mgr = getCookieManager();
             } catch(IllegalStateException ex) {
                 syncer = CookieSyncManager.createInstance(this.getContext());
-                mgr = CookieManager.getInstance();
+                mgr = getCookieManager();
             }
             java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
             format.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -6835,10 +6849,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             CookieSyncManager syncer;
             try {
                 syncer = CookieSyncManager.getInstance();
-                mgr = CookieManager.getInstance();
+                mgr = getCookieManager();
             } catch(IllegalStateException ex) {
                 syncer = CookieSyncManager.createInstance(this.getContext());
-                mgr = CookieManager.getInstance();
+                mgr = getCookieManager();
             }
             java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
             format.setTimeZone(TimeZone.getTimeZone("GMT"));
