@@ -1,3 +1,8 @@
+# Build script for Codename One
+# To trigger building other repos you need to set the GH_TOKEN and CN1_TRIGGER_REPOS
+# environment variables:
+# - GH_TOKEN : Your github personal access token. Must include user and public_repo scopes
+# - CN1_TRIGGER_REPOS : A space-delimited list of repos.  E.g. shannah/cn1-unit-tests-android shannah/cn1-unit-tests-ios
 language: java
 
 # Set JDK needed for JavaTestApplication
@@ -8,7 +13,8 @@ jdk:
 before_script:
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
-
+install:
+  - gem install travis
 script:
  - wget https://github.com/codenameone/cn1-binaries/archive/master.zip
  - unzip master.zip -d ../
@@ -35,4 +41,8 @@ script:
  - mv ../cn1-unit-tests-master ../cn1-unit-tests
  - rm master.zip
  - cd ../cn1-unit-tests
- - ../codenameone-cli/node_modules/.bin/cn1 test -cn1Sources ../cn1 -s -e
+ - ../codenameone-cli/node_modules/.bin/cn1 test -cn1Sources ../cn1 -s -e -skipCompileCn1Sources
+ - cd ..
+ - mkdir triggers
+ - cd triggers
+ - bash ../cn1/.travis/trigger-builds.sh
