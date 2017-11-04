@@ -8759,7 +8759,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
-        if(url.startsWith("file:") && url.indexOf("/html/") < 0) {
+        if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
             url = "file://" + unfile(url);
         }
         if (url.startsWith("jar:")) {
