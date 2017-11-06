@@ -40,7 +40,15 @@ import java.util.ArrayList;
  * here is set to {@code TOP} so the error label below doesn't break component alignment if two components
  * are on the same row and only one has an error message.
  * </p> 
- *
+  * <p>
+ * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with 
+ * validation errors
+ * </p>
+ * <script src="https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js"></script>
+ * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-ios.png" alt="Running on iOS" />
+ * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-android.png" alt="Running on Android" />
+ * <img src="https://www.codenameone.com/img/blog/pixel-perfect-text-field-error-handling-blank.png" alt="Android validation errors" />
+*
  *
  * @author Shai Almog
  */
