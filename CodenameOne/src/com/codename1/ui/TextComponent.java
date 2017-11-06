@@ -245,6 +245,19 @@ public class TextComponent extends InputComponent {
     }
 
     /**
+     * Convenience method for setting the label and hint together
+     * 
+     * @param text the text and hint
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label");
+ }
+     */
+    public TextComponent labelAndHint(String text) {
+        super.label(text);
+        hint(text);
+        return this;
+    }
+
+    /**
      * Sets the hint of the field
      * @param hint the text of the hint
      * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text("Text").label("Label"); }
