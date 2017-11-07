@@ -75,6 +75,7 @@ public class TextModeLayout extends Layout {
      */
     public TextModeLayout(int rows, int columns) {
         table = new TableLayout(rows, columns);    
+        table.setGrowHorizontally(true);
         if(!UIManager.getInstance().isThemeConstant("textComponentOnTopBool", false)) {
             actual = BoxLayout.y();
         } else {
