@@ -598,6 +598,18 @@
         <copy file="../CodenameOneDesigner/dist/designer.jar"
             tofile="${ideaplugin}/files/designer.jar" />
 
+        <copy file="../Ports/JavaSE/dist/JavaSE.jar"
+            tofile="${eclipseplugin}/CodenameOnePlugin/src/CodenameOneTemplate/JavaSE.jar" />
+
+        <copy file="dist/CodenameOne.jar"
+            tofile="${eclipseplugin}/CodenameOnePlugin/src/CodenameOneTemplate/lib/CodenameOne.jar" />
+
+        <copy file="../Ports/CLDC11/dist/CLDC11.jar"
+            tofile="${eclipseplugin}/CodenameOnePlugin/src/CodenameOneTemplate/lib/CLDC11.jar" />
+        
+        <copy file="build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip"
+            tofile="${eclipseplugin}/CodenameOnePlugin/src/CodenameOneTemplate/lib/CodenameOne_SRC.zip" />
+
         <copy file="../CodenameOneDesigner/dist/designer.jar"
             tofile="${eclipseplugin}/CodenameOnePlugin/src/codenameoneplugin/designer.jar" />
                 
