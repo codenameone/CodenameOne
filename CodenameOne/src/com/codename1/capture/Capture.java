@@ -124,6 +124,9 @@ public class Capture {
             // workaround for threading issues in iOS https://github.com/codenameone/CodenameOne/issues/2246
             capturePhoto(c);
             Display.getInstance().invokeAndBlock(c);
+            if(c.url == null) {
+                return null;
+            }
             ImageIO scale = Display.getInstance().getImageIO();
             if(scale != null) {
                 try {
