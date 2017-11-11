@@ -153,7 +153,7 @@ public class SideMenuBar extends MenuBar {
      * @param callback will be invoked when the menu is actually closed
      */
     public static void closeCurrentMenu(final Runnable callback) {
-        if(Toolbar.isOnTopSideMenu() && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+        if(Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
             Display.getInstance().getCurrent().getToolbar().closeSideMenu();
             callback.run();
             return;
@@ -1774,7 +1774,7 @@ public class SideMenuBar extends MenuBar {
         }
 
         public void actionPerformed(final ActionEvent evt) {
-            if(Toolbar.isOnTopSideMenu() && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+            if(Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
                 Display.getInstance().getCurrent().getToolbar().closeSideMenu();
                 cmd.actionPerformed(evt);
                 return;
