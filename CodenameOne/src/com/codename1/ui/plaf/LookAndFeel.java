@@ -1014,6 +1014,7 @@ public abstract class LookAndFeel {
                 return;
             }
             if(c.equalsIgnoreCase("SIDE")) {
+                Log.p("WARNING: Theme sets the commandBehavior constant which is deprecated.  Please update the theme to NOT include this theme constant.  Using commandBehavior may cause your app to perform in unexpected ways.  In particular, using SIDE command behavior in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime exceptions.", Log.WARNING);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
                 setMenuBarClass(SideMenuBar.class);
                 return;
