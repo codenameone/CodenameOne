@@ -1868,7 +1868,7 @@ public class TestUtils {
         }
         TextArea l = (TextArea)findByName(name);
         assertBool(l != null, "Null area " + text);
-        assertBool(l.getText().contains(text), "assertTextArea: \"" + l.getText() + "\" is not containing: \"" + text + "\"");
+        assertBool(l.getText().indexOf(text) > -1, "assertTextArea: \"" + l.getText() + "\" is not containing: \"" + text + "\"");
 }
 
 
