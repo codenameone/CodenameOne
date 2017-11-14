@@ -2788,6 +2788,10 @@ public final class Display extends CN1Constants {
      * behavior can't be manipulated
      */
     public void setCommandBehavior(int commandBehavior) {
+        if (commandBehavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+            String message = "WARNING: Display.setCommandBehaviour() is deprecated, Using it may result in unexpected behaviour. In particular, using COMMAND_BEHAVIOR_SIDE_NAVIGATION in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime errors.";
+            Log.p(message, Log.WARNING);
+        }
         impl.setCommandBehavior(commandBehavior);
     }
 
