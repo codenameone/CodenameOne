@@ -1844,9 +1844,9 @@ public class TestUtils {
     }
 
     /**
-     * Asserts that we have a label with the given text baring the given name
-     * @param name the name of the label
-     * @param text the text of the label
+     * Asserts that we have a TextArea with the given text and the given name
+     * @param name the name of the TextArea
+     * @param text the text of the TextArea
      */
     public static void assertTextArea(String name, String text) {
         if(verbose) {
@@ -1855,7 +1855,50 @@ public class TestUtils {
         TextArea l = (TextArea)findByName(name);
         assertBool(l != null, "Null area " + text);
         assertBool(l.getText().equals(text), "assertTextArea: " + l.getText() + " != " + text);
-    }
+}
+
+    /**
+     * Asserts that we have a TextArea with the a text contains the given text and with the given name
+     * @param name the name of the TextArea
+     * @param text the sequence to search for in the TextArea
+     */
+    public static void assertTextAreaContaining(String name, String text) {
+        if(verbose) {
+            log("assertTextAreaContaining(" + name + ", " + text + ")");
+        }
+        TextArea l = (TextArea)findByName(name);
+        assertBool(l != null, "Null area " + text);
+        assertBool(l.getText().indexOf(text) > -1, "assertTextArea: \"" + l.getText() + "\" is not containing: \"" + text + "\"");
+}
+
+
+    /**
+     * Asserts that we have a TextArea with the a text starting with the given text and with the given name
+     * @param name the name of the TextArea
+     * @param text the prefix to search for in the TextArea
+     */
+    public static void assertTextAreaStartingWith(String name, String text) {
+        if(verbose) {
+            log("assertTextAreaStartingWith(" + name + ", " + text + ")");
+        }
+        TextArea l = (TextArea)findByName(name);
+        assertBool(l != null, "Null area " + text);
+        assertBool(l.getText().startsWith(text), "assertTextArea: \"" + l.getText() + "\" is not starting with: \"" + text + "\"");
+}
+
+    /**
+     * Asserts that we have a TextArea with the a text ending with the given text and with the given name
+     * @param name the name of the TextArea
+     * @param text the suffix to search for in the TextArea
+     */
+    public static void assertTextAreaEndingWith(String name, String text) {
+        if(verbose) {
+            log("assertTextAreaEndingWith(" + name + ", " + text + ")");
+        }
+        TextArea l = (TextArea)findByName(name);
+        assertBool(l != null, "Null area " + text);
+        assertBool(l.getText().endsWith(text), "assertTextArea: \"" + l.getText() + "\" is not ending with: \"" + text + "\"");
+}
 
     /**
      * Asserts that we have a label with the given text baring the given name
