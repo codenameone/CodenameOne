@@ -211,6 +211,14 @@ public class InteractionDialog extends Container {
         this.title.setText(title);
     }
     
+    private void cleanupLayer(Form f) {
+        if(formMode) {
+            Container c = (Container)f.getFormLayeredPane(InteractionDialog.class, false);
+            c.removeAll();
+            c.remove();
+        }        
+    }
+    
     private Container getLayeredPane(Form f) {
         //return f.getLayeredPane();
         Container c;
@@ -241,6 +249,7 @@ public class InteractionDialog extends Container {
                 p.remove();
                 pp.removeAll();
                 pp.revalidate();
+                cleanupLayer(f);
             }
         }
     }
@@ -341,6 +350,7 @@ public class InteractionDialog extends Container {
                 p.remove();
                 pp.removeAll();
                 pp.revalidate();
+                cleanupLayer(f);
             } else {
                 p.remove();
             }
@@ -360,11 +370,14 @@ public class InteractionDialog extends Container {
                 if(animateShow) {
                     p.animateUnlayout(400, 255, new Runnable() {
                         public void run() {
-                            Container pp = getLayeredPane(f);
-                            remove();
-                            p.remove();
-                            pp.removeAll();
-                            pp.revalidate();
+                            if(p.getParent() != null) {
+                                Container pp = getLayeredPane(f);
+                                remove();
+                                p.remove();
+                                pp.removeAll();
+                                pp.revalidate();
+                                cleanupLayer(f);
+                            } 
                         }
                     });
                 } else {

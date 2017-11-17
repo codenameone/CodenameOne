@@ -1123,10 +1123,13 @@ public class Form extends Container {
             formLayeredPane = new Container(new LayeredLayout()) {
                 @Override
                 protected void paintBackground(Graphics g) {
-                    boolean v = isVisible();
-                    setVisible(false);
-                    Form.this.paint(g);
-                    setVisible(v);
+                    if(getComponentCount() > 0) {
+                        if(isVisible()) {
+                            setVisible(false);
+                            Form.this.paint(g);
+                            setVisible(true);
+                        }
+                    }
                 }
 
                 @Override
@@ -1143,6 +1146,10 @@ public class Form extends Container {
                  }
              } 
              Container cnt = new Container();
+             cnt.setWidth(getWidth());
+             cnt.setHeight(getHeight());
+             cnt.setShouldLayout(false);
+             cnt.setName("FormLayer: " + c.getName());
              formLayeredPane.add(cnt);
              return cnt;
         }
@@ -1153,6 +1160,10 @@ public class Form extends Container {
             }
         } 
         Container cnt = new Container();
+        cnt.setWidth(getWidth());
+        cnt.setHeight(getHeight());
+        cnt.setShouldLayout(false);
+        cnt.setName("FormLayer: " + c.getName());
         if(top) {
             formLayeredPane.add(cnt);
         } else {

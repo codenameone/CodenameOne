@@ -877,7 +877,6 @@ public class Toolbar extends Container {
             
             sidemenuDialog = new InteractionDialog(new BorderLayout());
             
-            // change this to true when stable
             sidemenuDialog.setFormMode(true);
             sidemenuDialog.setUIID("Container");
             sidemenuDialog.setDialogUIID("Container");
