@@ -60,11 +60,21 @@ While Codename One itself works with all major IDE's the code in this repository
 
 <img src="http://codenameone.com/img/eclipse-logo.png" width="120">
 
-**Current Unit Test Status**
+### Quick Start
 
-* Desktop: [![Desktop Tests Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
-* Android: [![Android Tests Status](https://travis-ci.org/shannah/cn1-unit-tests-android.svg?branch=master)](https://travis-ci.org/shannah/cn1-unit-tests-android)
+**Getting and Building Sources**
 
+~~~~
+$ git clone https://github.com/codenameone/CodenameOne
+$ cd CodenameOne
+$ ant
+~~~~
+
+**Running Unit Tests**
+
+~~~~
+$ ant test-javase
+~~~~
 
 ## ParparVM
 Codename One's iOS VM is quite unique and is open source as well. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).

@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project name="AppiumTests" default="test-ios-appium-simulator" basedir=".">
+    <description>Appium tests</description>
+    <import file="build.xml"/>
+    <property name="cn1.iphone.target" value="iphone"/>
+    <property name="cn1.android.target" value="android"/>
+    
+    <target name="compile-iosport" unless="iOSPort.present">
+        <ant antfile="build.xml" dir="${project.iOSPort}" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+    <target name="compile-bytecodetranslator" unless="ByteCodeTranslator.present">
+        <ant antfile="build.xml" dir="${project.ByteCodeTranslator}" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+    <target name="compile-javaapi" unless="JavaAPI.present">
+        <ant antfile="build.xml" dir="${project.JavaAPI}" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+    <target name="test-ios-appium-simulator-with-sources">
+        <property name="cn1.sources" value="../cn1"/>
+        <property name="project.iOSPort" value="${cn1.sources}/Ports/iOSPort"/>
+        <property name="project.ByteCodeTranslator" value="${cn1.sources}/vm/ByteCodeTranslator"/>
+        <property name="project.JavaAPI" value="${cn1.sources}/vm/JavaAPI"/>
+        
+        <available file="${project.iOSPort}/dist/iOSPort.jar" property="iOSPort.present"/>
+        <available file="${project.ByteCodeTranslator}/dist/ByteCodeTranslator.jar" property="ByteCodeTranslator.present"/>
+        <available file="${project.JavaAPI}/dist/JavaAPI.jar" property="JavaAPI.present"/>
+        <antcall target="compile-iosport"/>
+        <antcall target="compile-bytecodetranslator"/>
+        <antcall target="compile-javaapi"/>
+        <property name="override.iOSPort.jar" value="${project.iOSPort}/dist/iOSPort.jar"/>
+        <property name="override.nativeios.jar" value="${project.iOSPort}/dist/nativeios.jar"/>
+        <property name="override.JavaAPI.jar" value="${project.JavaAPI}/dist/JavaAPI.jar"/>
+        <property name="override.ByteCodeTranslator.jar" value="${project.ByteCodeTranslator}/dist/ByteCodeTranslator.jar"/>
+        <antcall target="test-ios-appium-simulator"/>
+    </target>
+    
+    <target name="test-ios-appium-simulator" 
+            description="Test in iOS simulator"
+            depends="clean,copy-ios-override,copy-libs,compile-test,clean-override">
+        <echo message="iOSPort = ${override.iOSPort.jar}"/>
+        <echo message="nativeios = ${override.nativeios.jar}"/>
+        <echo message="${cn1.iphone.target}"/>
+        
+        <codeNameOne 
+            jarFile="dist/unitTests.jar"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+            buildArgs="build.unitTest=1,ios.buildForSimulator=true,ios.fastbuild=true"
+            targetType="${cn1.iphone.target}"
+            certificate="${codename1.ios.debug.certificate}"
+            certPassword="${codename1.ios.debug.certificatePassword}"
+            provisioningProfile="${codename1.ios.debug.provision}"
+            appid="${codename1.ios.appid}"
+            automated="true"
+        />
+        <unzip src="dist/result.zip" dest="dist" overwrite="true"/>
+        <unzip src="dist/CodenameOneUnitTestExecutor.app.ipa" dest="dist/CodenameOneUnitTestExecutor.app" overwrite="true"/>
+        <!-- it's not really an .ipa file.  just a zip file with an .app inside
+        it -->
+            
+        <get src="https://github.com/shannah/cn1-appium-ios/archive/master.zip"
+             dest="dist"/>
+        <unzip src="dist/master.zip" dest="dist" overwrite="true"/>
+        <exec executable="mvn" dir="dist/cn1-appium-ios-master" failonerror="true">
+            <arg value="test"/>
+            <arg value="-e"/>
+            <arg value="-Dapp=../CodenameOneUnitTestExecutor.app"/>
+            <!--  Uncomment/Customize as appropriate for your environment -->
+            <!-- <arg value="-Dappium.url=http://127.0.0.1:4723/wd/hub"/> -->
+            <!-- <arg value="-DdeviceName='iPhone 6s'"/> -->
+            <!-- <arg value="-DplatformVersion=10.2"/> -->
+            
+        </exec>
+    </target>
+    <target name="test-ios-appium-device" 
+            description="Test on iOS Device"
+            depends="clean,copy-ios-override,copy-libs,compile-test,clean-override">
+        <codeNameOne 
+            jarFile="dist/unitTests.jar"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+            buildArgs="build.unitTest=1,ios.fastbuild=true"
+            targetType="${cn1.iphone.target}"
+            certificate="${codename1.ios.debug.certificate}"
+            certPassword="${codename1.ios.debug.certificatePassword}"
+            provisioningProfile="${codename1.ios.debug.provision}"
+            appid="${codename1.ios.appid}"
+            automated="true"
+        />
+        <unzip src="dist/result.zip" dest="dist" overwrite="true"/>
+        
+        <!-- it's not really an .ipa file.  just a zip file with an .app inside
+        it -->
+        <get src="https://github.com/shannah/cn1-appium-ios/archive/master.zip"
+             dest="dist"/>
+        <unzip src="dist/master.zip" dest="dist" overwrite="true"/>
+        <exec executable="mvn" dir="dist/cn1-appium-ios-master" failonerror="true">
+            <arg value="test"/>
+            <arg value="-e"/>
+            <arg value="-Dapp=../CodenameOneUnitTestExecutor.ipa"/>
+            <!--  Uncomment/Customize as appropriate for your environment -->
+            <!-- <arg value="-Dappium.url=http://127.0.0.1:4723/wd/hub"/> -->
+            <!-- <arg value="-DdeviceName='iPhone 6s'"/> -->
+            <!-- <arg value="-DplatformVersion=10.2"/> -->
+            
+        </exec>
+    </target>
+    
+    
+    <target name="test-android-appium-emulator" 
+            description="Test in Android Emulator"
+            depends="clean,copy-android-override,copy-libs,compile-test,clean-override">
+        
+        <condition property="dist.apk" value="${codename1.mainName}-debug.apk" else="${codename1.mainName}-release.apk">
+            <istrue value="${codename1.arg.android.debug}"/>
+        </condition>
+        <codeNameOne 
+            jarFile="dist/unitTests.jar"
+            displayName="${codename1.displayName}"
+            packageName = "${codename1.packageName}"
+            mainClassName = "${codename1.mainName}"
+            version="${codename1.version}"
+            icon="${codename1.icon}"
+            vendor="${codename1.vendor}"
+            subtitle="${codename1.secondaryTitle}"
+            buildArgs="build.unitTest=1"
+            targetType="${cn1.android.target}"
+            keystoreAlias="${codename1.android.keystoreAlias}"
+            keystore="${codename1.android.keystore}"
+            certPassword="${codename1.android.keystorePassword}"
+            automated="true"
+            />
+        
+        <unzip src="dist/result.zip" dest="dist" overwrite="true"/>
+            
+        <get src="https://github.com/shannah/cn1-appium-android/archive/master.zip"
+             dest="dist"/>
+        <unzip src="dist/master.zip" dest="dist" overwrite="true"/>
+        <exec executable="mvn" dir="dist/cn1-appium-android-master" failonerror="true">
+            <arg value="test"/>
+            <arg value="-e"/>
+            <arg value="-Dapp=../${dist.apk}"/>
+            <!--  Uncomment/Customize as appropriate for your environment -->
+            <!-- <arg value="-Dappium.url=http://127.0.0.1:4723/wd/hub"/> -->
+            <!-- <arg value="-DdeviceName='iPhone 6s'"/> -->
+            <!-- <arg value="-DplatformVersion=10.2"/> -->
+            
+        </exec>
+    </target>
+    
+</project>
