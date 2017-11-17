@@ -623,6 +623,7 @@ public final class Display extends CN1Constants {
      * @param showDuringEdit one of the following: SHOW_DURING_EDIT_IGNORE,
      * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
      * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     * @deprecated this method isn't applicable in modern devices
      */
     public void setShowDuringEditBehavior(int showDuringEdit) {
         this.showDuringEdit = showDuringEdit;
@@ -634,6 +635,7 @@ public final class Display extends CN1Constants {
      * @return one of the following: SHOW_DURING_EDIT_IGNORE,
      * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
      * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     * @deprecated this method isn't applicable in modern devices
      */
     public int getShowDuringEditBehavior() {
         return showDuringEdit;
