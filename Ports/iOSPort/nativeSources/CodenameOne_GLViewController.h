@@ -78,8 +78,8 @@
 //#define BACKGROUND_LOCATION_ENABLED
 #define CN1_REQUEST_LOCATION_AUTH requestWhenInUseAuthorization
 
-#define CN1Log(str,...) printf([[NSString stringWithFormat:str,##__VA_ARGS__] UTF8String])
-
+//#define CN1Log(str,...) printf([[NSString stringWithFormat:str,##__VA_ARGS__] UTF8String])
+#define CN1Log(str,...) NSLog(str,##__VA_ARGS__)
 #define IOS8_LOCATION_WARNING CN1Log(@"As of iOS8, location services requires the ios.locationUsageDescription build hint to be set.");
 //#define CN1_ENABLE_BACKGROUND_LOCATION 1
 
