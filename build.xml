@@ -44,6 +44,10 @@
       <ant dir="Ports/JavaSE" target="clean" inheritAll="false" useNativeBasedir="true"/>
       <ant dir="Ports/Android" target="clean" inheritAll="false" useNativeBasedir="true"/>
       <ant dir="Ports/iOSPort" target="clean" inheritAll="false" useNativeBasedir="true"/>
+      <delete dir="tests/node_modules"/>
+      <delete>
+        <fileset dir="tests" includes="**/*.jar"/>
+      </delete>
     </target>
 
     <target name="install-cli">

@@ -10,7 +10,9 @@ import com.codename1.components.ToastBar;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
 import com.codename1.io.Util;
+import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.maps.Coord;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
@@ -39,13 +41,9 @@ public class TestComponent extends AbstractTest {
 
         getComponentAt_int_int();
         List_shouldRenderSelection();
-        if (!"ios".equals(Display.getInstance().getPlatformName()) && !Display.getInstance().isSimulator()) {
-            
-            // Cookies not working correctly on iOS right now... commenting out these
-            // tests so we can set up automated tests... need to fix this ASAP
-            testCookies();
-            testCookiesInBrowserComponent();
-        }
+        testSimpleDateFormat();
+        testCookies();
+        testCookiesInBrowserComponent();
         
         testBrowserComponent2267();
         findCommandComponent();
@@ -603,5 +601,19 @@ public class TestComponent extends AbstractTest {
         TestUtils.waitForFormName("testOverflowMenuNPE", 2000);
         hi.getToolbar().closeSideMenu();
 
+    }
+    
+    public void testSimpleDateFormat() {
+        
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+            format.parse("mon, 20-nov-2017 19:49:58 gmt");
+            format = new SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z");
+            format.parse("mon 20-nov-2017 19:49:58 gmt");
+        } catch (Throwable t) {
+            Log.e(t);
+            throw new RuntimeException("Failed to parse date mon 20-nov-2017 19:49:58 gmt: "+t.getMessage());
+            
+        }
     }
 }

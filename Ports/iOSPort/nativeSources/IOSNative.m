@@ -4923,7 +4923,7 @@ void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_u
         JAVA_OBJECT domain = fromNSString(CN1_THREAD_STATE_PASS_ARG [cookie domain]);
         JAVA_OBJECT path = fromNSString(CN1_THREAD_STATE_PASS_ARG [cookie path]);
         JAVA_OBJECT value = fromNSString(CN1_THREAD_STATE_PASS_ARG [cookie value]);
-        JAVA_LONG expires = [[cookie expiresDate] timeIntervalSince1970];
+        JAVA_LONG expires = [[cookie expiresDate] timeIntervalSince1970] * 1000L;
         JAVA_BOOLEAN secure = [cookie isSecure];
         JAVA_BOOLEAN httpOnly = [cookie isHTTPOnly];
         
@@ -4957,8 +4957,8 @@ void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_Str
                                  toNSString(CN1_THREAD_STATE_PASS_ARG value), NSHTTPCookieValue,
                                  toNSString(CN1_THREAD_STATE_PASS_ARG domain), NSHTTPCookieDomain,
                                  toNSString(CN1_THREAD_STATE_PASS_ARG path), NSHTTPCookiePath,
-                                 (secure ? @"1" : @""), NSHTTPCookieSecure,
-                                 [NSDate dateWithTimeIntervalSince1970:expires], NSHTTPCookieExpires, Nil];
+                                 secure?@YES:@NO , secure?NSHTTPCookieSecure:@"___",
+                                 expires == 0 ? Nil : [NSDate dateWithTimeIntervalSince1970:expires/1000L], NSHTTPCookieExpires, Nil];
     NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties: stringProps];
     [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
     

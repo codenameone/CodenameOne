@@ -49,6 +49,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
@@ -1023,15 +1024,13 @@ public class ConnectionRequest implements IOProgressListener {
             } else if ( part.indexOf("httponly") == 0 ){
                 c.setHttpOnly(true);
             } else if ( part.indexOf("expires") == 0) {
-                SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+                //SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
                 String date = part.substring(part.indexOf("=")+1);
-                try {
-                    java.util.Date dt = format.parse(date);
+                java.util.Date dt = parseDate(date, "EEE, dd-MMM-yyyy HH:mm:ss z", "EEE dd-MMM-yyyy HH:mm:ss z");
+                if (date != null) {
                     c.setExpires(dt.getTime());
-                } catch (ParseException ex) {
-                    Log.p("Failed to parse expiration date of cookie "+lowerH);
-                    Log.p("Parsing date "+date);
-                    Log.e(ex);
+                } else {
+                    Log.p("Failed to parse expires date "+date+" for cookie", Log.WARNING);
                 }
             }
         }
@@ -1039,6 +1038,17 @@ public class ConnectionRequest implements IOProgressListener {
         
 
         return c;
+    }
+    
+    private Date parseDate(String date, String... formats) {
+        for (String format : formats) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(format);
+                return sdf.parse(date);
+            } catch (Throwable t){}
+        }
+        return null;
+        
     }
 
     /**

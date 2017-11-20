@@ -47,3 +47,6 @@ Ports/iOSPort/nbproject/private/private.properties
 nightly_builds/.DS_Store
 /tests/iOSTests/build/
 node_modules
+/tests/core/nbproject/private/
+/tests/core/dist/
+/tests/core/build/
