@@ -610,6 +610,21 @@ public class TestComponent extends AbstractTest {
             format.parse("mon, 20-nov-2017 19:49:58 gmt");
             format = new SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z");
             format.parse("mon 20-nov-2017 19:49:58 gmt");
+            
+            format = new SimpleDateFormat("EEE dd-MMM-yyyy HH:mm:ss z");
+            java.util.Date dt = format.parse("tue 21-nov-2017 17:04:27 gmt");
+            TestUtils.assertBool(dt.getTime() / 1000L == 1511283867L, "Incorrect date for simple date format parse");
+            
+            format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
+            com.codename1.l10n.ParseException pex = null;
+            try {
+                format.parse("tue 21-nov-2017 17:04:27 gmt");
+            } catch (com.codename1.l10n.ParseException pex2)
+            {
+                pex = pex2;
+            }
+            TestUtils.assertTrue(pex!=null, "Parsing date with wrong format should give parse exception");
+            
         } catch (Throwable t) {
             Log.e(t);
             throw new RuntimeException("Failed to parse date mon 20-nov-2017 19:49:58 gmt: "+t.getMessage());
