@@ -1027,7 +1027,7 @@ public class ConnectionRequest implements IOProgressListener {
                 //SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
                 String date = part.substring(part.indexOf("=")+1);
                 java.util.Date dt = parseDate(date, "EEE, dd-MMM-yyyy HH:mm:ss z", "EEE dd-MMM-yyyy HH:mm:ss z");
-                if (date != null) {
+                if (dt != null) {
                     c.setExpires(dt.getTime());
                 } else {
                     Log.p("Failed to parse expires date "+date+" for cookie", Log.WARNING);
