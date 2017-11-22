@@ -3,6 +3,14 @@
 # set -e so that this script will exit if any of the commands fail
 set -e
 
+if [ -z "${CN1USER}" ] || [ -z "${CN1PASS}" ]; then
+  if [ -n "${CN1_RUNTESTS_ANDROID_EMULATOR}" ] || [ -n "${CN1_RUNTESTS_IOS_SIMULATOR}" ]; then
+    echo "Running tests on android or iOS requires the CN1USER and CN1PASS environment variables to be set to your Codename One username and password"
+    echo "NOTE: Running tests on iOS and Android requires an enterprise account or higher, since they rely on automated build support"
+    exit 1
+  fi
+fi
+
 if [ "${CN1_PLATFORM}" == "android" ]; then
   echo "Installing Node 6"
 
