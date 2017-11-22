@@ -104,17 +104,46 @@ public class FloatingActionButton extends Button {
      * @param size the size in millimeters
      */
     protected FloatingActionButton(char icon, String text, float size) {
-        FontImage image = FontImage.createMaterial(icon, "FloatingActionButton", size);
+        this(icon, text, "FloatingActionButton", size);
+    }
+    
+    /**
+     * Constructor
+     *
+     * @param icon one of the FontImage.MATERIAL_* constants
+     * @param text the text of the sub FloatingActionButton
+     * @string uiid the uiid of the FAB
+     * @param size the size in millimeters
+     */
+    protected FloatingActionButton(char icon, String text, String uiid, float size) {
+        FontImage image = FontImage.createMaterial(icon, uiid, size);
         sizeMm = size;
         setIcon(image);
         setText("");
         this.text = text;
-        setUIID("FloatingActionButton");
+        setUIID(uiid);
         Style all = getAllStyles();
         all.setAlignment(CENTER);
         updateBorder();
     }
-        
+
+    /**
+     * Overriden to update the icon
+     * {@inheritDoc}
+     */
+    @Override
+    public void setUIID(String id) {
+        super.setUIID(id);
+        FontImage i = (FontImage)getIcon();
+        if(i != null) {
+            Style all = getAllStyles();
+            all.setAlignment(CENTER);
+            updateBorder();
+            FontImage image = FontImage.createMaterial(i.getText().charAt(0), id, sizeMm);
+            setIcon(image);
+        }
+    }
+    
     /**
      * This constructor is used by text badges
      */
@@ -173,6 +202,17 @@ public class FloatingActionButton extends Button {
      */
     public static FloatingActionButton createFAB(char icon) {
         return new FloatingActionButton(icon, null, fabDefaultSize);
+    }
+
+    /**
+     * a factory method to create a FloatingActionButton.
+     *
+     * @param icon one of the FontImage.MATERIAL_* constants
+     * @param uiid the uiid for the fab
+     * @return a FloatingActionButton instance
+     */
+    public static FloatingActionButton createFAB(char icon, String uiid) {
+        return new FloatingActionButton(icon, null, uiid, fabDefaultSize);
     }
 
     /**
