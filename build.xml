@@ -39,11 +39,17 @@
       <ant dir="Ports/JavaSE" target="jar" inheritAll="false" useNativeBasedir="true"/>
     </target>
 
+    <target name="cldc11" depends="core" description="Build CLDC11 Jar">
+      <ant dir="Ports/CLDC11" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+
+
     <target name="clean">
       <ant dir="CodenameOne" target="clean" inheritAll="false" useNativeBasedir="true"/>
       <ant dir="Ports/JavaSE" target="clean" inheritAll="false" useNativeBasedir="true"/>
       <ant dir="Ports/Android" target="clean" inheritAll="false" useNativeBasedir="true"/>
       <ant dir="Ports/iOSPort" target="clean" inheritAll="false" useNativeBasedir="true"/>
+      <ant dir="Ports/CLDC11" target="clean" inheritAll="false" useNativeBasedir="true"/>
       <delete dir="tests/node_modules"/>
       <delete>
         <fileset dir="tests" includes="**/*.jar"/>
@@ -151,11 +157,11 @@
         <arg value="${deviceName}"/>
         <!-- -Ddebug=1 flag causes it to use the debug_iphone_steve target instead of iphone target
             Used only by Steve for testing changes to IPhoneBuilder -->
-        <!--<arg value="-Ddebug=1"/>-->
+        <!-- <arg value="-Ddebug=1"/> -->
       </exec>
     </target>
 
-    <target name="all" depends="core,ios,android,javase" description="Build all targets">
+    <target name="all" depends="core,ios,android,javase,cldc11" description="Build all targets">
 
     </target>
 
