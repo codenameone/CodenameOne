@@ -1026,11 +1026,24 @@ public class ConnectionRequest implements IOProgressListener {
             } else if ( part.indexOf("expires") == 0) {
                 //SimpleDateFormat format = new SimpleDateFormat("EEE, dd-MMM-yyyy HH:mm:ss z");
                 String date = part.substring(part.indexOf("=")+1);
-                java.util.Date dt = parseDate(date, "EEE, dd-MMM-yyyy HH:mm:ss z", "EEE dd-MMM-yyyy HH:mm:ss z");
+                java.util.Date dt = parseDate(date, 
+                        "EEE, dd-MMM-yyyy HH:mm:ss z", 
+                        "EEE dd-MMM-yyyy HH:mm:ss z",
+                        "EEE, dd MMM yyyy HH:mm:ss z",
+                        "EEE dd-MMM-yyyy HH:mm:ss z",
+                        "EEE, dd-MMM-yyyy HH:mm:ss Z", 
+                        "EEE dd-MMM-yyyy HH:mm:ss Z",
+                        "EEE, dd MMM yyyy HH:mm:ss Z",
+                        "EEE dd-MMM-yyyy HH:mm:ss Z"
+                        );
                 if (dt != null) {
                     c.setExpires(dt.getTime());
                 } else {
-                    Log.p("Failed to parse expires date "+date+" for cookie", Log.WARNING);
+                    if ("true".equals(Display.getInstance().getProperty("com.codename1.io.ConnectionRequest.throwExceptionOnFailedCookieParse", "false"))) {
+                        throw new RuntimeException("Failed to parse expires date "+date+" for cookie");
+                    } else {
+                        Log.p("Failed to parse expires date "+date+" for cookie", Log.WARNING);
+                    }
                 }
             }
         }

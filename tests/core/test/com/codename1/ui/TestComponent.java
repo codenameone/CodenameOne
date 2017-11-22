@@ -9,8 +9,11 @@ import com.codename1.components.InteractionDialog;
 import com.codename1.components.ToastBar;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.maps.Coord;
@@ -38,7 +41,7 @@ public class TestComponent extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
 
-
+        //testIOSThreadsError35();
         getComponentAt_int_int();
         List_shouldRenderSelection();
         testSimpleDateFormat();
@@ -256,6 +259,50 @@ public class TestComponent extends AbstractTest {
         ConnectionRequest.fetchJSON(setCookiesUrlSession);
         res = ConnectionRequest.fetchJSON(checkCookiesUrl);
         TestUtils.assertEqual("hello", res.get("cookieval"), "Cookie set to incorrect value.");
+        
+        Throwable[] t = new Throwable[1];
+        // Now test a different cookie date format.
+        ConnectionRequest req = new ConnectionRequest() {
+
+            @Override
+            protected void handleException(Exception err) {
+                Log.p("handling exception "+err);
+                t[0] = err;
+            }
+
+            @Override
+            protected void handleRuntimeException(RuntimeException err) {
+                Log.p("handling runtime exception "+err);
+                t[0] = err;
+            }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                Log.p("Error response "+code+", "+message);
+            }
+            
+            
+            
+        };
+        
+       
+        String oldProp = (String)Display.getInstance().getProperty("com.codename1.io.ConnectionRequest.throwExceptionOnFailedCookieParse", null);
+        Display.getInstance().setProperty("com.codename1.io.ConnectionRequest.throwExceptionOnFailedCookieParse", "true");
+        req.setUrl(baseUrl + "/test_rfc822cookie.php");
+        req.setFollowRedirects(true);
+        req.setPost(false);
+        req.setDuplicateSupported(true);
+        
+        //req.setFailSilently(true);
+        try {
+            NetworkManager.getInstance().addToQueueAndWait(req);
+            
+        } finally {
+            //NetworkManager.getInstance().removeErrorListener(errorListener);
+            Display.getInstance().setProperty("com.codename1.io.ConnectionRequest.throwExceptionOnFailedCookieParse", oldProp);
+        }
+        TestUtils.assertTrue(req.getResponseCode() == 200, "Unexpected response code.  Expected 200 but found "+req.getResponseCode());
+        TestUtils.assertTrue(t[0] == null, t[0] != null ? ("Exception was thrown getting URL "+t[0].getMessage()):"");
 
 
     }
@@ -625,10 +672,52 @@ public class TestComponent extends AbstractTest {
             }
             TestUtils.assertTrue(pex!=null, "Parsing date with wrong format should give parse exception");
             
+            format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z");
+            dt = format.parse("sun, 22 nov 2037 13:20:46 -0000");
+            //2142508846
+            //Log.p("Difference = "+(dt.getTime() - 2142508846000L));
+            TestUtils.assertEqual(dt.getTime()/1000L,  2142508846L, "Failed to parse RFC822 datetime.  "+dt);
+            
+            
         } catch (Throwable t) {
             Log.e(t);
             throw new RuntimeException("Failed to parse date mon 20-nov-2017 19:49:58 gmt: "+t.getMessage());
             
         }
+        
+        
+        
     }
+    
+    public void testIOSThreadsError35() {
+        if ("ios".equals(Display.getInstance().getPlatformName()) && !Display.getInstance().isSimulator()) {
+            
+            // We get the number 11002 from http://www.scsc.no/blog/2007/11-15-thread-creation-using-pthreadcreate-on-leopard.html
+            final int numThreads = 11002;
+            int blockSize = 10;
+            int pos = 0;
+            while (pos < numThreads) {
+                
+                Log.p("Creating threads "+pos+" to "+(pos+blockSize)+"...");
+                final int[] remainingThreads = new int[]{blockSize};
+                for (int i=0; i<blockSize; i++) {
+                    new Thread(new Runnable() {
+                        public void run() {
+                            synchronized (remainingThreads) {
+                                remainingThreads[0]--;
+                            }
+                        }
+                    }).start();
+                }
+                while (remainingThreads[0] > 0) {
+                    Display.getInstance().invokeAndBlock(()->{
+                        Util.sleep(100);
+                    });
+                }
+                pos += blockSize;
+                Log.p("Finished with threads "+(pos-blockSize)+" to "+pos);
+            }
+        }
+    }
+    
 }
