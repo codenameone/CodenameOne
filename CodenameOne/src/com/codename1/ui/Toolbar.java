@@ -159,6 +159,11 @@ public class Toolbar extends Container {
     private static boolean centeredDefault = true;
 
     private Command searchCommand;
+
+    /**
+     * Component placed on the bottom (south) portion of the permanent/on-top side menu. 
+     */
+    private Component sidemenuSouthComponent;
     
     /**
      * Empty Constructor
@@ -790,7 +795,13 @@ public class Toolbar extends Container {
         if(permanentSideMenuContainer == null) {
             permanentSideMenuContainer = constructSideNavigationComponent();
             Form parent = getComponentForm();
-            parent.addComponentToForm(BorderLayout.WEST, permanentSideMenuContainer);
+            if(sidemenuSouthComponent != null) {
+                Container c = BorderLayout.center(permanentSideMenuContainer);
+                c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
+                parent.addComponentToForm(BorderLayout.WEST, c);
+            } else {
+                parent.addComponentToForm(BorderLayout.WEST, permanentSideMenuContainer);
+            }
         }
     }
 
@@ -881,6 +892,9 @@ public class Toolbar extends Container {
             sidemenuDialog.setUIID("Container");
             sidemenuDialog.setDialogUIID("Container");
             sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
+            if(sidemenuSouthComponent != null) {
+                sidemenuDialog.add(BorderLayout.SOUTH, permanentSideMenuContainer);
+            }
             float size = 4.5f;
             try {
                 size = Float.parseFloat(getUIManager().getThemeConstant("menuImageSize", "4.5"));
@@ -993,6 +1007,33 @@ public class Toolbar extends Container {
         sidemenuDialog.show(0, 0, 0, dw - actualV);
         if(draggedX > 0) {
             sidemenuDialog.setX(Math.min(0, draggedX - actualV));
+        }
+    }
+        
+    /**
+     * Places a component in the south portion (bottom) of the side menu. Notice this only works with on-top 
+     * side menu and the permanent side menu. Setting this value to null will remove the existing component. Only
+     * one component can be placed in the south but it can be a container that includes many components
+     * @param sidemenuSouthComponent the new component to place in the south or null to remove the current
+     * component
+     */
+    public void setComponentToSideMenuSouth(Component sidemenuSouthComponent) {
+        if(this.sidemenuSouthComponent != null) {
+            sidemenuSouthComponent.remove();
+        }
+        this.sidemenuSouthComponent = sidemenuSouthComponent;
+        if(this.sidemenuSouthComponent != null) {
+            if(sidemenuDialog != null) {
+                sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
+            } else {
+                if(permanentSideMenu && permanentSideMenuContainer != null) {
+                    Form parent = getComponentForm();
+                    parent.removeComponentFromForm(permanentSideMenuContainer);
+                    Container c = BorderLayout.center(permanentSideMenuContainer);
+                    c.add(BorderLayout.SOUTH, sidemenuSouthComponent);
+                    parent.addComponentToForm(BorderLayout.WEST, c);
+                }
+            }
         }
     }
     
