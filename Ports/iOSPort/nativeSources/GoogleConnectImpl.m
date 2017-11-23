@@ -76,9 +76,13 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
             CN1Log(@"Could not login to Google Plus because 'ios.gplus.clientId' property is not set.  Ensure that the ios.gplus.clientId build hint is set");
             return;
         }
-
+#ifdef GOOGLE_SIGNIN
+        NSString *requireGplusApp = @"false";
+#else
         NSString *requireGplusApp = toNSString(CN1_THREAD_STATE_PASS_ARG virtual_com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, fromNSString(CN1_THREAD_STATE_PASS_ARG @"ios.gplus.requireGplusAppForLogin"), fromNSString(CN1_THREAD_STATE_PASS_ARG @"true"))
         );
+#endif
+        
         
         if ([requireGplusApp isEqualToString:@"true"]) {
             BOOL isGooglePlusInstalled = [[UIApplication sharedApplication] canOpenURL: [NSURL
