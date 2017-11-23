@@ -1290,6 +1290,10 @@ public abstract class CodenameOneImplementation {
     public boolean isAntiAliasingSupported() {
         return false;
     }
+    
+    public boolean isAntiAliasingSupported(Object graphics) {
+        return isAntiAliasingSupported();
+    }
 
     /**
      * Indicates whether the underlying implementation allows for anti-aliased fonts
@@ -1298,6 +1302,10 @@ public abstract class CodenameOneImplementation {
      */
     public boolean isAntiAliasedTextSupported() {
         return false;
+    }
+    
+    public boolean isAntiAliasedTextSupported(Object graphics) {
+        return isAntiAliasedTextSupported();
     }
 
     /**
@@ -4158,6 +4166,33 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
+    private void purgeOldCookies(Map<String,Cookie> cookies) {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<String,Cookie> e : cookies.entrySet()) {
+            if (e.getValue().getExpires() != 0 && e.getValue().getExpires() < now) {
+                cookies.remove(e.getKey());
+            }
+        }
+    }
+    
+    protected final void removeCookiesForDomain(String domain) {
+	if(cookies == null || domain==null){
+            return;
+        }
+        Hashtable h = (Hashtable)cookies.get(domain);
+        if (h == null) {
+            return;
+        }
+        h.clear();
+        if(Cookie.isAutoStored()){
+            if(Storage.getInstance().exists(Cookie.STORAGE_NAME)){
+                Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
+            }
+            Storage.getInstance().writeObject(Cookie.STORAGE_NAME, cookies);
+        }
+        
+    }
+    
     public void addCookie(Cookie [] cookiesArray) {
         if(cookies == null){
             cookies = new Hashtable();
@@ -4170,7 +4205,12 @@ public abstract class CodenameOneImplementation {
                 h = new Hashtable();
                 cookies.put(cookie.getDomain(), h);
             }
-            h.put(cookie.getName(), cookie);
+            purgeOldCookies(h);
+            if (cookie.getExpires() != 0 && cookie.getExpires() < System.currentTimeMillis()) {
+                h.remove(cookie.getName());
+            } else {
+                h.put(cookie.getName(), cookie);
+            }
         }
         
         if(Cookie.isAutoStored()){

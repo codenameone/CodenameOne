@@ -120,10 +120,13 @@ public class Capture {
      */
     public static String capturePhoto(int width, int height) {
         CallBack c = new CallBack();
-        if("ios".equals(Display.getInstance().getPlatformName())) {
+        if("ios".equals(Display.getInstance().getPlatformName()) && (width != -1 || height != -1)) {
             // workaround for threading issues in iOS https://github.com/codenameone/CodenameOne/issues/2246
             capturePhoto(c);
             Display.getInstance().invokeAndBlock(c);
+            if(c.url == null) {
+                return null;
+            }
             ImageIO scale = Display.getInstance().getImageIO();
             if(scale != null) {
                 try {

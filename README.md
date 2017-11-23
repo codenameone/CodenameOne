@@ -1,10 +1,12 @@
 # Codename One
 
+[![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
+
 ## Write Once Run Anywhere Native Mobile Apps for Java & Kotlin Developers
 
 <img align="right" src="https://www.codenameone.com/img/iphone-and-android.png" height="250">
 
-[Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.). 
+[Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.).
 It is a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) thru a portable abstraction which enables 100% code reuse.
 
 Codename One is the only platform that...
@@ -58,6 +60,22 @@ While Codename One itself works with all major IDE's the code in this repository
 
 <img src="http://codenameone.com/img/eclipse-logo.png" width="120">
 
+### Quick Start
+
+**Getting and Building Sources**
+
+~~~~
+$ git clone https://github.com/codenameone/CodenameOne
+$ cd CodenameOne
+$ ant
+~~~~
+
+**Running Unit Tests**
+
+~~~~
+$ ant test-javase
+~~~~
+
 ## ParparVM
 Codename One's iOS VM is quite unique and is open source as well. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).
 
@@ -71,7 +89,7 @@ Traditional compilers fall flat in these cases.
 
 ## Modified iKVM
 
-Codename One maintains a fork of iKVM which is a JVM for CLR. This modified port allows us to run the Universal Windows Platform implementation of Codename One natively on Windows 10 devices. 
+Codename One maintains a fork of iKVM which is a JVM for CLR. This modified port allows us to run the Universal Windows Platform implementation of Codename One natively on Windows 10 devices.
 
 ## Getting Help & FAQ
 

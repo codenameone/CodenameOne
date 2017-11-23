@@ -623,6 +623,7 @@ public final class Display extends CN1Constants {
      * @param showDuringEdit one of the following: SHOW_DURING_EDIT_IGNORE,
      * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
      * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     * @deprecated this method isn't applicable in modern devices
      */
     public void setShowDuringEditBehavior(int showDuringEdit) {
         this.showDuringEdit = showDuringEdit;
@@ -634,6 +635,7 @@ public final class Display extends CN1Constants {
      * @return one of the following: SHOW_DURING_EDIT_IGNORE,
      * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
      * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     * @deprecated this method isn't applicable in modern devices
      */
     public int getShowDuringEditBehavior() {
         return showDuringEdit;
@@ -2684,7 +2686,7 @@ public final class Display extends CN1Constants {
         if(c.isCellRenderer()) {
             return shouldRenderSelection();
         }
-        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY));
+        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY)) || c.shouldRenderComponentSelection();
     }
 
     /**
@@ -2788,6 +2790,10 @@ public final class Display extends CN1Constants {
      * behavior can't be manipulated
      */
     public void setCommandBehavior(int commandBehavior) {
+        if (commandBehavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+            String message = "WARNING: Display.setCommandBehavior() is deprecated, Using it may result in unexpected behaviour. In particular, using COMMAND_BEHAVIOR_SIDE_NAVIGATION in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime errors.";
+            Log.p(message, Log.WARNING);
+        }
         impl.setCommandBehavior(commandBehavior);
     }
 

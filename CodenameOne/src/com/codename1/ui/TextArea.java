@@ -1099,7 +1099,7 @@ public class TextArea extends Component {
     }
 
     void paintHint(Graphics g) {
-        if(Display.getInstance().isTextEditing(this)) {
+        if(Display.getInstance().isNativeEditorVisible(this)) {
             return;
         }
         super.paintHint(g);
@@ -1800,6 +1800,15 @@ public class TextArea extends Component {
     public void setActAsLabel(boolean actAsLabel) {
         this.actAsLabel = actAsLabel;
     }
+
+    /**
+     * Special case for text components, if they are editing they should always render the selected state
+     * {@inheritDoc}
+     * @return true if editing
+     */
+    protected boolean shouldRenderComponentSelection() {
+        return isEditing() || super.shouldRenderComponentSelection();
+    }
     
-    
+
 }

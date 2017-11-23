@@ -388,22 +388,27 @@ public class ByteCodeTranslator {
                         frameworks2.append("18E9ABBC002F3D1D /* ");
                         frameworks2.append(file);
                         frameworks2.append(" */,\n");
+                        /*
                         
+                        // Removing this because it causes crashes in cocoapods.
+                        // Why was it necessary to add .a files to the same group
+                        // as the sources, if we've already added it to frameworks.
+                        // Related to https://stackoverflow.com/questions/47210585/codename-one-issue-devilering-binary-for-ios
                         if(file.endsWith(".a")) {
                             fileTwoEntry.append("				0");
                             fileTwoEntry.append(fileOneValue);
                             fileTwoEntry.append("18E9ABBC002F3D1D /* ");
                             fileTwoEntry.append(file);
-                            fileTwoEntry.append(" */,\n");
+                            fileTwoEntry.append(" *").append("/,\n");
 
                             if(!file.endsWith(".h") && !file.endsWith(".bundle") && !file.endsWith(".xcdatamodeld")) {
                                 fileThreeEntry.append("				0");
                                 fileThreeEntry.append(referenceValue);
                                 fileThreeEntry.append("18E9ABBC002F3D1D /* ");
                                 fileThreeEntry.append(file);
-                                fileThreeEntry.append(" */,\n");
+                                fileThreeEntry.append(" *").append("/,\n");
                             }
-                        }
+                        }*/
                     } else {
                         // standard resource file
                         resources.append("\n				0");

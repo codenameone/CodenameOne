@@ -3069,6 +3069,15 @@ public class Component implements Animation, StyleListener {
         this.inlineStylesTheme = inlineStylesTheme;
     }
 
+    /**
+     * A component can indicate whether it is interested in rendering it's selection explicitly, this defaults to 
+     * true in non-touch UI's and false in touch UI's except for the case where a user clicks the screen. 
+     * @return Defaults to false
+     */
+    protected boolean shouldRenderComponentSelection() {
+        return false;
+    }
+
     class AnimationTransitionPainter implements Painter{
         int alpha;
         Style originalStyle;
@@ -4676,7 +4685,7 @@ public class Component implements Animation, StyleListener {
      * @return  a string representation of this component's state
      */
     protected String paramString() {
-        return "x=" + getX() + " y=" + getY() + " width=" + getWidth() + " height=" + getHeight();
+        return "x=" + getX() + " y=" + getY() + " width=" + getWidth() + " height=" + getHeight() + " name=" + getName();
     }
 
     /**
@@ -5312,7 +5321,10 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
-     * {@inheritDoc}
+     * Invoked to indicate a change in a propertyName of a Style
+     * 
+     * @param propertyName the property name that was changed
+     * @param source The changed Style object
      */
     public void styleChanged(String propertyName, Style source) {
         //changing the Font, Padding, Margin may casue the size of the Component to Change
@@ -5666,6 +5678,11 @@ public class Component implements Animation, StyleListener {
      * Indicates whether scrolling this component should jump to a specific location
      * in a grid
      * @param snapToGrid the snapToGrid to set
+     * @deprecated this feature should work but it isn't maintained and isn't guaranteed to function properly. 
+     *    There are issues covering this but at this time we can't dedicate resources to address them specifically:
+     *    <a href="https://github.com/codenameone/CodenameOne/issues/2122">#2122</a>,
+     *    <a href="https://github.com/codenameone/CodenameOne/issues/1966">#1966</a> &amp;
+     *    <a href="https://github.com/codenameone/CodenameOne/issues/1947">#1947</a>. 
      */
     public void setSnapToGrid(boolean snapToGrid) {
         this.snapToGrid = snapToGrid;

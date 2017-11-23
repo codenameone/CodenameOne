@@ -59,6 +59,8 @@ public final class IOSNative {
     native long scale(long peer, int width, int height);
     native void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip);
     native void setNativeClippingGlobal(int x, int y, int width, int height, boolean firstClip);
+    native void setAntiAliasedMutable(boolean antialiased) ;
+
     native void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2);
     native void nativeDrawLineGlobal(int color, int alpha, int x1, int y1, int x2, int y2);
     native void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height);
@@ -418,9 +420,9 @@ public final class IOSNative {
 
     native String getUserAgentString();
     
-    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
+    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight, int minuteStep);
     native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
-
+    
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
     // facebook connect
@@ -618,6 +620,9 @@ public final class IOSNative {
     native void nativeClearRectGlobal(int x, int y, int width, int height);
 
     native void blockCopyPaste(boolean blockCopyPaste);
+
+    
+    
 
 
 

@@ -153,7 +153,7 @@ public class SideMenuBar extends MenuBar {
      * @param callback will be invoked when the menu is actually closed
      */
     public static void closeCurrentMenu(final Runnable callback) {
-        if(Toolbar.isOnTopSideMenu()) {
+        if(Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
             Display.getInstance().getCurrent().getToolbar().closeSideMenu();
             callback.run();
             return;
@@ -700,7 +700,7 @@ public class SideMenuBar extends MenuBar {
      * Closes the menu if it is currently open
      */
     public void closeMenu() {
-        if(Toolbar.isOnTopSideMenu()) {
+        if(Toolbar.isOnTopSideMenu() && Display.getInstance().getCurrent().getToolbar() != null  && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
             Display.getInstance().getCurrent().getToolbar().closeSideMenu();
             return;
         }
@@ -1682,6 +1682,13 @@ public class SideMenuBar extends MenuBar {
         }
     }
     
+    Command unwrapCommand(Command cmd) {
+        if(cmd instanceof CommandWrapper) {
+            return ((CommandWrapper)cmd).cmd;
+        }
+        return cmd;
+    }
+    
     Command wrapCommand(Command cmd) {
         return new CommandWrapper(cmd);
     }
@@ -1767,7 +1774,7 @@ public class SideMenuBar extends MenuBar {
         }
 
         public void actionPerformed(final ActionEvent evt) {
-            if(Toolbar.isOnTopSideMenu()) {
+            if(Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
                 Display.getInstance().getCurrent().getToolbar().closeSideMenu();
                 cmd.actionPerformed(evt);
                 return;

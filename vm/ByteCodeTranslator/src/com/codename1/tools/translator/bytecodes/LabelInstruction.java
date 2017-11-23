@@ -25,6 +25,7 @@ package com.codename1.tools.translator.bytecodes;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,8 +49,21 @@ public class LabelInstruction extends Instruction {
     private static Map<Label, List<Pair>> tryBeginLabels = new HashMap<Label, List<Pair>>();
     private static Map<Label, Integer> tryEndLabels = new HashMap<Label, Integer>();
     private static Map<Label, Integer> labelCatchDepth = new HashMap<Label, Integer>();
-    private static Set<String> usedLabels = new TreeSet<String>();
+    // [ddyer 4/2017] convert this from a tree of strings to use the label itself
+    // this fixes the problem of mysterious "statement expected" errors from builds,
+    // caused because labels created by the assembler are not globally unique.
+    // this also reduced memory use by a lot because we no longer create
+    // a lot of strings.
+    private static Map<Label,Label> usedLabels = new Hashtable<Label,Label>();
     
+    // cleanup between passes, free the garbage!
+    public static void cleanup()
+    {
+    	tryBeginLabels.clear();
+    	tryEndLabels.clear();
+    	labelCatchDepth.clear();
+    	usedLabels.clear();
+    }
     public LabelInstruction(org.objectweb.asm.Label parent) {
         super(-1);
         this.parent = parent;
@@ -102,15 +116,14 @@ public class LabelInstruction extends Instruction {
     }
     
     public static void labelIsUsed(Label l) {
-        String s = l.toString();
-        if(!usedLabels.contains(s)) {
-            usedLabels.add(s);
+         if(usedLabels.get(l)==null) {
+            usedLabels.put(l,l);
         }
     }
         
     @Override
     public void appendInstruction(StringBuilder b) {
-        if(!usedLabels.contains(parent.toString())) {
+        if(usedLabels.get(parent)==null) {
             return;
         }
         b.append("\nlabel_"); 

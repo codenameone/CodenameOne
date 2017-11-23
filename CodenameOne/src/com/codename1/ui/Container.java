@@ -665,6 +665,8 @@ public class Container extends Component implements Iterable<Component>{
             }
             cmp.setParent(this);
             a.addAnimation(new ComponentAnimation() {
+                private boolean alreadyAdded;
+                
                 @Override
                 public boolean isInProgress() {
                     return false;
@@ -672,12 +674,20 @@ public class Container extends Component implements Iterable<Component>{
 
                 @Override
                 protected void updateState() {
-                    cmp.setParent(null);
-                    if(constraint != null) {
-                        layout.addLayoutComponent(constraint, cmp, Container.this);
+                    if(!alreadyAdded) {
+                        alreadyAdded = true;
+                        cmp.setParent(null);
+                        if(constraint != null) {
+                            layout.addLayoutComponent(constraint, cmp, Container.this);
+                        }
+                        insertComponentAtImpl(index, cmp);
+                        revalidate();
                     }
-                    insertComponentAtImpl(index, cmp);
-                    revalidate();
+                }
+
+                @Override
+                public void flush() {
+                    updateState();
                 }
             });
         } else {
@@ -1025,6 +1035,7 @@ public class Container extends Component implements Iterable<Component>{
             layout.removeLayoutComponent(cmp);
             cmp.setParent(null);
             a.addAnimation(new ComponentAnimation() {
+                private boolean alreadyRemoved;
                 @Override
                 public boolean isInProgress() {
                     return false;
@@ -1032,8 +1043,16 @@ public class Container extends Component implements Iterable<Component>{
 
                 @Override
                 protected void updateState() {
-                    removeComponentImplNoAnimationSafety(cmp);
-                    revalidate();
+                    if(!alreadyRemoved) {
+                        alreadyRemoved = true;
+                        removeComponentImplNoAnimationSafety(cmp);
+                        revalidate();
+                    }
+                }
+
+                @Override
+                public void flush() {
+                    updateAnimationState();
                 }
             });
         } else {
@@ -1897,7 +1916,9 @@ public class Container extends Component implements Iterable<Component>{
      * @see #getResponderAt(int, int) 
      */
     public Component getComponentAt(int x, int y) {
-        
+        if (!contains(x, y)) {
+            return null;
+        }
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
@@ -1942,18 +1963,25 @@ public class Container extends Component implements Iterable<Component>{
                         component = c;
                     }
                 }
-                if (!overlaps || component.isFocusable() || component.isGrabsPointerEvents()) {
+                if (!overlaps || component.respondsToPointerEvents()) {
                     return component;
+                } else if (cmp != component) {
+                    // Check if there is anything between component and cmp that grabs pointer events
+                    // if so - we stop the chain
+                    Container tmp = component.getParent();
+                    while (tmp != cmp && tmp != null) {
+                        if (tmp.respondsToPointerEvents()) {
+                            return component;
+                        }
+                        tmp = tmp.getParent();
+                    }
                 }
             }
         }
         if (component != null){
             return component;
         }
-        if (contains(x, y)) {
-            return this;
-        }
-        return null;
+        return this;
     }    
     /**
      * Recursively searches the container hierarchy for a drop target

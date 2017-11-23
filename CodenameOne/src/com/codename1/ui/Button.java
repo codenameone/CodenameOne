@@ -237,7 +237,7 @@ public class Button extends Label {
     }
     
     /**
-     * Constructor a button with text and image
+     * Constructor a button with image and UIID
      * 
      * @param icon image appearing on the button
      * @param id UIID unique identifier for button
@@ -247,7 +247,7 @@ public class Button extends Label {
     }
     
     /**
-     * Constructor a button with text and image
+     * Constructor a button with text and UIID
      * 
      * @param text label appearing on the button
      * @param id UIID unique identifier for button

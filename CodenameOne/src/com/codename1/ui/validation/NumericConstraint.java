@@ -53,7 +53,7 @@ public class NumericConstraint implements Constraint {
      * @param dec whether the number is decimal or integer, true for decimal
      */
     public NumericConstraint(boolean dec) {
-        this(dec, Double.NaN, Double.NaN, null);
+        this(dec, Integer.MIN_VALUE, Integer.MAX_VALUE, null);
     }
     
     /**

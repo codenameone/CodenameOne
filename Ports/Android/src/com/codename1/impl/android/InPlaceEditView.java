@@ -962,6 +962,22 @@ public class InPlaceEditView extends FrameLayout{
         mEditText.setFilters(FilterArray);
         mEditText.setSelection(mEditText.getText().length());
         showVirtualKeyboard(true);
+        
+        /*
+        // Leaving this hack here for posterity.  It seems that this manually
+        // blinking cursor causes the paste menu to disappear
+        // https://github.com/codenameone/CodenameOne/issues/2147
+        // Removing the hack below, fixes this issue.  And in the test device
+        // I'm using the blinking of text doesn't seem to occur, so perhaps
+        // it was fixed via other means.  Test device:
+        // Name: Samsung Galaxy S3 (T-Mobile)
+        //    OS: 4.3
+        //    Manufacturer: Samsung
+        //    Model: 4.3
+        //    Chipset: armeabi-v7a 1512MHz
+        //    Memory: 16000000000
+        //    Heap: 256000000
+        //    Display: 720 x 1280
         if (Build.VERSION.SDK_INT < 21) {
             // HACK!!!  On Android 4.4, it seems that the natural blinking cursor
             // causes text to disappear when it blinks.  Manually blinking the
@@ -989,6 +1005,7 @@ public class InPlaceEditView extends FrameLayout{
             };
             cursorTimer.schedule(cursorTimerTask, 100, 500);
         }
+        */
     }
 
     /**

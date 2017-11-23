@@ -124,6 +124,8 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShape
 extern void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 (int x, int y, int width, int height, int clipApplied);
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl(JAVA_BOOLEAN antialiased);
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
 (int color, int alpha, int x1, int y1, int x2, int y2);
 
@@ -625,6 +627,12 @@ void com_codename1_impl_ios_IOSNative_setNativeClippingPolygonGlobal___float_1AR
     Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGlobalImpl(points);
     POOL_END();
 }
+
+void com_codename1_impl_ios_IOSNative_setAntiAliasedMutable___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN antialiased)
+{
+    Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl(antialiased);
+}
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawLineMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
@@ -4915,7 +4923,7 @@ void com_codename1_impl_ios_IOSNative_getCookiesForURL___java_lang_String_java_u
         JAVA_OBJECT domain = fromNSString(CN1_THREAD_STATE_PASS_ARG [cookie domain]);
         JAVA_OBJECT path = fromNSString(CN1_THREAD_STATE_PASS_ARG [cookie path]);
         JAVA_OBJECT value = fromNSString(CN1_THREAD_STATE_PASS_ARG [cookie value]);
-        JAVA_LONG expires = [[cookie expiresDate] timeIntervalSince1970];
+        JAVA_LONG expires = [[cookie expiresDate] timeIntervalSince1970] * 1000L;
         JAVA_BOOLEAN secure = [cookie isSecure];
         JAVA_BOOLEAN httpOnly = [cookie isHTTPOnly];
         
@@ -4949,8 +4957,8 @@ void com_codename1_impl_ios_IOSNative_addCookie___java_lang_String_java_lang_Str
                                  toNSString(CN1_THREAD_STATE_PASS_ARG value), NSHTTPCookieValue,
                                  toNSString(CN1_THREAD_STATE_PASS_ARG domain), NSHTTPCookieDomain,
                                  toNSString(CN1_THREAD_STATE_PASS_ARG path), NSHTTPCookiePath,
-                                 (secure ? @"1" : @""), NSHTTPCookieSecure,
-                                 [NSDate dateWithTimeIntervalSince1970:expires], NSHTTPCookieExpires, Nil];
+                                 secure?@YES:@NO , secure?NSHTTPCookieSecure:@"___",
+                                 expires == 0 ? Nil : [NSDate dateWithTimeIntervalSince1970:expires/1000L], NSHTTPCookieExpires, Nil];
     NSHTTPCookie *cookie = [NSHTTPCookie cookieWithProperties: stringProps];
     [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookie:cookie];
     
@@ -5062,6 +5070,7 @@ JAVA_OBJECT pickerStringArray = JAVA_NULL;
 #endif
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
+JAVA_LONG currentDatePickerDuration=-1;
 UIPopoverController* popoverControllerInstance;
 extern UIView *currentActionSheet;
 JAVA_LONG defaultDatePickerDate;
@@ -5165,6 +5174,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
     pickerStringArray = stringArray;
 #endif
     currentDatePickerDate = nil;
+    currentDatePickerDuration = -1;
     defaultDatePickerDate = 0;
     stringPickerSelection = selection;
     dispatch_sync(dispatch_get_main_queue(), ^{
@@ -5283,11 +5293,12 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 }
 
 
-void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg) {
+void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg, JAVA_INT minuteStep) {
     __block JAVA_INT preferredHeight = preferredHeightArg;
     com_codename1_impl_ios_IOSImplementation_foldKeyboard__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     pickerStringArray = nil;
     currentDatePickerDate = nil;
+    currentDatePickerDuration = -1;
     if (preferredWidth == 0) {
         preferredWidth = 320 * scaleValue;
     }
@@ -5324,13 +5335,43 @@ void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_
             case 3:
                 datePickerView.datePickerMode = UIDatePickerModeDateAndTime;
                 break;
+            case 5:
+            case 6:
+            case 7:
+                datePickerView.datePickerMode = UIDatePickerModeCountDownTimer;
+                break;
         }
-        datePickerView.tag = 10;
-        datePickerView.date = date;
-        currentDatePickerDate = date;
+        switch (type) {
+            case 1:
+            case 2:
+            case 3:
+                datePickerView.tag = 10;
+                datePickerView.date = date;
+                currentDatePickerDate = date;
 #ifndef CN1_USE_ARC
-        [currentDatePickerDate retain];
+                [currentDatePickerDate retain];
 #endif
+                break;
+            case 5:
+            case 6:
+            case 7:
+                datePickerView.countDownDuration = time / 1000;
+                
+                // To workaround a bug in UIDatePickerView that causes
+                // the change event to not be fired the first time.
+                // https://stackoverflow.com/a/22777664/2935174
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                    [datePickerView setCountDownDuration: datePickerView.countDownDuration];
+                });
+
+                datePickerView.minuteInterval = minuteStep;
+                currentDatePickerDuration = time;
+                break;
+                
+        }
+        
+        
+
         defaultDatePickerDate = time;
         [datePickerView addTarget:[CodenameOne_GLViewController instance] action:@selector(datePickerChangeDate:) forControlEvents:UIControlEventValueChanged];
         if(isIPad()) {

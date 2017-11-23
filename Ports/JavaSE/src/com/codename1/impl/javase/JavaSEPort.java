@@ -1503,7 +1503,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
                 if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
-                    Component cmp = f.getResponderAt(x, y);
+                    Component cmp = f.getComponentAt(x, y);
                     if (cmp != null) {
                         int cursor = cmp.getCursor();
                         if (cursor != currentCursor) {
@@ -8759,7 +8759,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
-        if(url.startsWith("file:") && url.indexOf("/html/") < 0) {
+        if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
             url = "file://" + unfile(url);
         }
         if (url.startsWith("jar:")) {

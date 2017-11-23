@@ -72,9 +72,46 @@ public class Accordion extends Container {
      * Empty Constructor
      */ 
     public Accordion() {
-        super.setLayout(new BoxLayout(BoxLayout.Y_AXIS));
-        closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("AccordionArrow"));
-        openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        super.setLayout(BoxLayout.y());
+        this.closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        this.openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        setScrollableY(true);
+    }
+    
+    /**
+     * Create an accordion with open and close icons set
+     * @param openIcon the open icon of the accordion
+     * @param closeIcon the close icon of the accordion
+     */ 
+    public Accordion(Image openIcon, Image closeIcon) {
+        super.setLayout(BoxLayout.y());
+        this.closeIcon = openIcon;
+        this.openIcon = closeIcon;
+        setScrollableY(true);
+    }
+    
+    /**
+     * Create an accordion with open and close icons set
+     * @param openIcon the open icon of the accordion
+     * @param closeIcon the close icon of the accordion
+     */ 
+    public Accordion(char openIcon, char closeIcon) {
+        super.setLayout(BoxLayout.y());
+        this.closeIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        this.openIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        setScrollableY(true);
+    }
+    
+    /**
+     * Create an accordion with open and close icons set
+     * @param openIcon the open icon of the accordion
+     * @param closeIcon the close icon of the accordion
+     * @param openCloseUIID the uiid of the open and close icons
+     */ 
+    public Accordion(char openIcon, char closeIcon, String openCloseUIID) {
+        super.setLayout(BoxLayout.y());
+        this.closeIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(openCloseUIID));
+        this.openIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(openCloseUIID));
         setScrollableY(true);
     }
 
@@ -240,7 +277,7 @@ public class Accordion extends Container {
         
         private boolean closed = true;
         
-        private Button arrow = new Button();
+        private final Button arrow = new Button();
         
         private Component body;
         Component header;
@@ -301,14 +338,14 @@ public class Accordion extends Container {
     
     /**
      * To listen item click in accordion component
-     * @param ActionListener to implement the method
+     * @param a ActionListener to implement the method
      */ 
     public void addOnClickItemListener(ActionListener a) {
         listeners.addListener(a);
     }
     /**
      * To remove item click in accordion component
-     * @param ActionListener to implement the method
+     * @param a ActionListener to implement the method
      */ 
     public void removeOnClickItemListener(ActionListener a) {
         listeners.removeListener(a);

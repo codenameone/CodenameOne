@@ -49,6 +49,7 @@ import com.codename1.ui.layouts.LayeredLayout;
  * <img src="http://www.codenameone.com/img/blog/floatinghint.gif" alt="Animation" />
  *
  * @author Shai Almog
+ * @deprecated this class is superceded by {@link com.codename1.ui.TextComponent} which includes a more thorough implementation of the functionality and improved API
  */
 public class FloatingHint extends Container {
     private final TextArea tf;
@@ -64,7 +65,12 @@ public class FloatingHint extends Container {
         this.tf = tf;
         Container content = new Container(new BorderLayout());
         add(content);
-        hintButton = new Button(tf.getHint());
+        hintButton = new Button(tf.getHint()) {
+            @Override
+            protected boolean shouldRenderComponentSelection() {
+                return true;
+            }
+        };
         hintLabel = new Label(tf.getHint());
         tf.setHint("");
         hintButton.setFocusable(false);
@@ -105,6 +111,7 @@ public class FloatingHint extends Container {
 
     private void focusGainedImpl() {
         if(isInitialized()) {
+            hintButton.setFocus(true);
             if(!hintButton.isVisible()) {
                 hintButton.setVisible(true);
                 if(getComponentForm().grabAnimationLock()) {
@@ -129,6 +136,7 @@ public class FloatingHint extends Container {
     
     private void focusLostImpl() {
         if(isInitialized()) {
+            hintButton.setFocus(false);
             if(tf.getText().length() == 0) {
                 hintLabel.setVisible(true);
                 if(getComponentForm().grabAnimationLock()) {

@@ -968,8 +968,17 @@ public class UIManager {
             themeProps.put("FloatingActionText.fgColor", "a0a0a0");
             themeProps.put("FloatingActionText.align", rightAlign);
         }
-        
-        
+        if(installedTheme == null || !installedTheme.containsKey("ErrorLabel.derive")) {
+            themeProps.put("ErrorLabel.derive", "FloatingHint");
+            themeProps.put("ErrorLabel.sel#derive", "FloatingHint");
+            themeProps.put("ErrorLabel.press#derive", "FloatingHint");
+            themeProps.put("ErrorLabel.fgColor", "ff1744");
+            themeProps.put("ErrorLabel.sel#fgColor", "ff1744");
+            themeProps.put("ErrorLabel.press#fgColor", "ff1744");
+        }        
+        if(installedTheme == null || !installedTheme.containsKey("TextComponent.derive")) {
+            themeProps.put("TextComponent.derive", "Container");
+        }
     }
 
     /**
