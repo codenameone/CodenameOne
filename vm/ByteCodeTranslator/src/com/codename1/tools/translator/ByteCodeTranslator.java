@@ -368,7 +368,7 @@ public class ByteCodeTranslator {
                     fileTwoEntry.append(file);
                     fileTwoEntry.append(" */,\n");
 
-                    if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh") && !file.endsWith(".bundle") ) {
+                    if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh") && !file.endsWith(".bundle")) {
                         fileThreeEntry.append("				0");
                         fileThreeEntry.append(referenceValue);
                         fileThreeEntry.append("18E9ABBC002F3D1D /* ");
@@ -376,7 +376,7 @@ public class ByteCodeTranslator {
                         fileThreeEntry.append(" */,\n");
                     }
                 } else {
-                    if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith("Info.plist") || file.endsWith(".pch")) {
+                    if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
                         frameworks.append("				0");
                         frameworks.append(referenceValue);
                         frameworks.append("18E9ABBC002F3D1D /* ");
@@ -388,6 +388,9 @@ public class ByteCodeTranslator {
                         frameworks2.append("18E9ABBC002F3D1D /* ");
                         frameworks2.append(file);
                         frameworks2.append(" */,\n");
+                        
+                        
+                            
                         /*
                         
                         // Removing this because it causes crashes in cocoapods.
