@@ -678,7 +678,11 @@ public class TestComponent extends AbstractTest {
             //Log.p("Difference = "+(dt.getTime() - 2142508846000L));
             TestUtils.assertEqual(dt.getTime()/1000L,  2142508846L, "Failed to parse RFC822 datetime.  "+dt);
             
+            String dateStr = "sun 22 nov 2037 13:20:46 -0000";
+            format = new SimpleDateFormat("EEE dd MMM yyyy HH:mm:ss Z");
+            dt = format.parse("sun 22 nov 2037 13:20:46 -0000");
             
+            TestUtils.assertEqual(dt.getTime()/1000L,  2142508846L, "Failed to parse RFC822 datetime no comma.  "+dt);
         } catch (Throwable t) {
             Log.e(t);
             throw new RuntimeException("Failed to parse date mon 20-nov-2017 19:49:58 gmt: "+t.getMessage());
