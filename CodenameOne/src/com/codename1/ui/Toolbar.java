@@ -891,6 +891,7 @@ public class Toolbar extends Container {
             sidemenuDialog.setFormMode(true);
             sidemenuDialog.setUIID("Container");
             sidemenuDialog.setDialogUIID("Container");
+            sidemenuDialog.getTitleComponent().remove();
             sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
             if(sidemenuSouthComponent != null) {
                 sidemenuDialog.add(BorderLayout.SOUTH, permanentSideMenuContainer);
