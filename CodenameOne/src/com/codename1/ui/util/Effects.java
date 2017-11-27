@@ -258,4 +258,25 @@ public class Effects {
         return shadow;
                 
     }
+
+    /**
+     * Generates a square shadow and returns it
+     * 
+     * @param width the width of the shadow image
+     * @param height the height of the shadow image
+     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+     * @param opacity the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @return an image containing the shadow for source
+     */
+    public static Image squareShadow(int width, int height, int blurRadius, float opacity) {
+        Image img = Image.createImage(width + blurRadius * 2, height + blurRadius * 2, 0 );
+        Graphics g = img.getGraphics();
+        g.setAlpha((int)(opacity * 255.0));
+        g.setColor(0);
+        g.fillRect(blurRadius, blurRadius, width, height);
+        if(Display.getInstance().isGaussianBlurSupported()) {
+            img = Display.getInstance().gaussianBlurImage(img, blurRadius);
+        }
+        return img;                
+    }
 }
