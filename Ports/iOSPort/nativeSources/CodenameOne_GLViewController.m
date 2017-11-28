@@ -77,6 +77,14 @@
 // needs a source rect that the java API doesn't pass through.
 int CN1lastTouchX=0;
 int CN1lastTouchY=0;
+BOOL skipNextTouch = NO;
+
+// A flag to enable/disable the CN1TapGestureRecognizer for handling pointer events
+// The new way of handing pointer events is with the gesture recognizer rather 
+// than directly in the view controller because it can catch all events without
+// consuming them, so it plays nicer with native peer components.
+// This flag is turned on by [CN1TapGestureRecognizer install:]
+BOOL CN1useTapGestureRecognizer=NO;
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
@@ -2745,9 +2753,15 @@ BOOL prefersStatusBarHidden = NO;
     }
 }
 
-static BOOL skipNextTouch = NO;
+
 
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
 	POOL_BEGIN();
     if(touchesArray == nil) {
         touchesArray = [[NSMutableArray alloc] init];
@@ -2808,6 +2822,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch) {
         skipNextTouch = NO;
         return;
@@ -2838,6 +2858,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch) {
         skipNextTouch = NO;
         return;
@@ -2874,6 +2900,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
         return;
     }
