@@ -110,7 +110,7 @@ public class FloatingHint extends Container {
     }
 
     private void focusGainedImpl() {
-        if(isInitialized()) {
+        if(isInitializedImpl()) {
             hintButton.setFocus(true);
             if(!hintButton.isVisible()) {
                 hintButton.setVisible(true);
@@ -134,8 +134,12 @@ public class FloatingHint extends Container {
         }
     }
     
+    private boolean isInitializedImpl() {
+        return isInitialized() && getComponentForm() == Display.getInstance().getCurrent();
+    }
+    
     private void focusLostImpl() {
-        if(isInitialized()) {
+        if(isInitializedImpl()) {
             hintButton.setFocus(false);
             if(tf.getText().length() == 0) {
                 hintLabel.setVisible(true);
