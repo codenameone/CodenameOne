@@ -3024,6 +3024,11 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             if(popoverSupported() && sourceType != UIImagePickerControllerSourceTypeCamera)
             {
 #ifndef CN1_USE_ARC
+                if (popoverController != nil) {
+                    [popoverController release];
+                    popoverController = nil;
+                }
+                
                 popoverController = [[[NSClassFromString(@"UIPopoverController") alloc]
                                       initWithContentViewController:pickerController] autorelease];
 #else
