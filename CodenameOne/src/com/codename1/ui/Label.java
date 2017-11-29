@@ -59,7 +59,9 @@ public class Label extends Component {
 
     private int textPosition = RIGHT;
     
-    private int gap = 2;
+    private static int defaultGap = 2;
+    
+    private int gap = defaultGap;
     
     private int shiftText = 0;
     
@@ -459,6 +461,24 @@ public class Label extends Component {
      */
     public int getGap() {
         return gap;
+    }
+    
+    /**
+     * Set the default gap in pixels between the icon/text to the Label boundaries
+     * 
+     * @param gap the gap in pixels
+     */
+    public static void setDefaultGap(int gap) {
+        defaultGap = gap;
+    }
+    
+    /**
+     * Returns the default gap in pixels between the icon/text to the Label boundaries
+     * 
+     * @return the gap in pixels between the icon/text to the Label boundaries
+     */
+    public static int getDefaultGap() {
+        return defaultGap;
     }
     
     /**
