@@ -301,18 +301,13 @@ public class RoundRectBorder extends Border {
             shapeH -= shadowSpreadL;
             shapeX += Math.round(((float)shadowSpreadL) * shadowX);
             shapeY += Math.round(((float)shadowSpreadL) * shadowY);
-            
-            int initialOffsetX = Math.round(((float)shadowSpreadL) * (1 - shadowX));
-            int initialOffsetY = Math.round(((float)shadowSpreadL) * (1 - shadowY));
-            tg.translate(initialOffsetX, initialOffsetY);
-            
+                        
             // draw a gradient of sort for the shadow
             for(int iter = shadowSpreadL - 1 ; iter >= 0 ; iter--) {            
                 tg.translate(iter, iter);
                 fillShape(tg, 0, shadowOpacity / shadowSpreadL, w - (iter * 2), h - (iter * 2), false);
                 tg.translate(-iter, -iter);
             }
-            tg.translate(-initialOffsetX, -initialOffsetY);
             
             if(Display.getInstance().isGaussianBlurSupported() && !fast) {
                 Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur/2);
