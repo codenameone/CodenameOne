@@ -108,6 +108,8 @@
         <arg value="android"/>
         <arg value="-d"/>
         <arg value="${deviceName}"/>
+        <arg value="-p"/>
+        <arg value="300"/>
       </exec>
     </target>
 
