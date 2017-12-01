@@ -498,6 +498,68 @@ public class Component implements Animation, StyleListener {
     }
     
     /**
+     * The native overlay object.  Used in Javascript port for some components so that there is 
+     * an inivisible "native" peer overlaid on the component itself to catch events.  E.g.
+     * TextFields on iOS can't be programmatically focused except through a user-initiated event -
+     * but since CN1 runs on the EDT, CN1 events aren't considered user-initiated so we can't create
+     * a native text editor on demand the way we do in desktop port - the native text editor must
+     * be *always* present.
+     */
+    private Object nativeOverlay = null;
+    
+    /**
+     * Creates the native overlay for this component. A native overlay is used on some platforms (e.g. Javascript)
+     * to help with user interaction of the component in a native way.
+     * @see #hideNativeOverlay() 
+     * @see #updateNativeOverlay() 
+     * @see #getNativeOverlay() 
+     */
+    protected void showNativeOverlay() {
+        if (nativeOverlay == null) {
+            nativeOverlay = Display.getInstance().getImplementation().createNativeOverlay(this);
+        }
+    }
+
+    /**
+     * Hides the native overlay for this component.
+     * @see #showNativeOverlay() 
+     * @see #updateNativeOverlay() 
+     * @see #getNativeOverlay() 
+     */
+    protected void hideNativeOverlay() {
+        if (nativeOverlay != null) {
+            Display.getInstance().getImplementation().hideNativeOverlay(this, nativeOverlay);
+            nativeOverlay = null;
+        }
+    }
+
+    /**
+     * Updates the native overlay for this component.  This is called each time the component
+     * is laid out, so it can change the position and visibility to match the current context.
+     * @see #showNativeOverlay() 
+     * @see #hideNativeOverlay() 
+     * @see #getNativeOverlay() 
+     */
+    protected void updateNativeOverlay() {
+        if (nativeOverlay != null) {
+            Display.getInstance().getImplementation().updateNativeOverlay(this, nativeOverlay);
+        }
+    }
+    
+    /**
+     * Gets the native overlay for this component.  May be null. Native overlays are used in the Javascript
+     * port to assist with user interaction on touch devices.  Text fields use native overlays to position
+     * an invisible native text field above themselves so that the keyboard will be activated properly when
+     * the user taps the text field.
+     * @return 
+     */
+    public Object getNativeOverlay() {
+        return nativeOverlay;
+    }
+    
+    
+    
+    /**
      * Checks to see if this platform supports cursors.  If the platform doesn't support cursors then any cursors
      * set with {@link #setCursor(int) } will simply be ignored.
      * @return True if the platform supports custom cursors.
@@ -5220,6 +5282,7 @@ public class Component implements Animation, StyleListener {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
             initComponent();
+            showNativeOverlay();
         }
     }
 
@@ -5231,6 +5294,7 @@ public class Component implements Animation, StyleListener {
      */
     void deinitializeImpl() {
         if (isInitialized()) {
+            hideNativeOverlay();
             paintLockRelease();
             setInitialized(false);
             setDirtyRegion(null);
@@ -5279,6 +5343,7 @@ public class Component implements Animation, StyleListener {
             if(!isScrollableX() && getScrollX() > 0){
                 setScrollX(0);
             }
+            updateNativeOverlay();
         }
     }
 
