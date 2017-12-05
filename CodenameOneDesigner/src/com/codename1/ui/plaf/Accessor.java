@@ -74,6 +74,9 @@ public class Accessor {
         if(b instanceof RoundBorder) {
             return "Round";
         }
+        if(b instanceof RoundRectBorder) {
+            return "Round Rect";
+        }
         switch(b.type) {
             case TYPE_EMPTY:
                 return "Empty";

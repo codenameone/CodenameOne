@@ -41,6 +41,8 @@ import com.codename1.ui.animations.Timeline;
 import com.codename1.impl.javase.SVG;
 import com.codename1.ui.Display;
 import com.codename1.ui.animations.AnimationObject;
+import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UIBuilder;
 import com.codename1.ui.util.UIBuilderOverride;
@@ -4801,6 +4803,12 @@ public static void openInIDE(File f, int lineNumber) {
         }
 
         private String borderToString(Border border) {
+            if(border instanceof RoundRectBorder) {
+                return "RoundRect";
+            }
+            if(border instanceof RoundBorder) {
+                return "Round";
+            }
             int type = Accessor.getType(border);
             switch(type) {
                 case ThemeTaskConstants.TYPE_EMPTY:
