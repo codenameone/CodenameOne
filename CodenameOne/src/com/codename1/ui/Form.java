@@ -2816,14 +2816,23 @@ public class Form extends Container {
             Component pendingButton = (Component)buttonsAwatingRelease.get(0);
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
-                pendingButton.pointerReleased(x, y);
-                if (dragged != null) {
-                    if (dragged.isDragAndDropInitialized()) {
-                        dragged.dragFinishedImpl(x, y);
-                        dragged = null;
+                if (dragged == pendingButton) {
+                    if (pendingButton.isDragAndDropInitialized()) {
+                        pendingButton.dragFinishedImpl(x, y);
                     } else {
-                        dragged.pointerReleased(x, y);
-                        dragged = null;
+                        pendingButton.pointerReleased(x, y);
+                    }
+                    dragged = null;
+                } else {
+                    pendingButton.pointerReleased(x, y);
+                    if (dragged != null) {
+                        if (dragged.isDragAndDropInitialized()) {
+                            dragged.dragFinishedImpl(x, y);
+                            dragged = null;
+                        } else {
+                            dragged.pointerReleased(x, y);
+                            dragged = null;
+                        }
                     }
                 }
                 return;
