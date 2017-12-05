@@ -432,6 +432,10 @@ public class RoundBorder extends Border {
                     y = (height - width) / 2;
                 }
             }
+            if(size < 5) {
+                // probably won't be visible anyway so do nothing, otherwise it might throw an exception
+                return;
+            }
             if(stroke && this.stroke != null) {
                 int sw = (int)Math.ceil((stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0);
                 GeneralPath arc = new GeneralPath();
