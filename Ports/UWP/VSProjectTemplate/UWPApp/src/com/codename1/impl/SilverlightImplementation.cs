@@ -2499,7 +2499,7 @@ namespace com.codename1.impl
                 ActionEvent ev = new ActionEvent(e == null ? null : e.Uri == null ? null : e.Uri.OriginalString);
                 sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerdown', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerPressed='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
                 sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerup', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerReleased='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
-                sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointermove', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerMoved='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
+                //sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointermove', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerMoved='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
 
                 bc.fireWebEvent("onLoad", ev);
             }
@@ -2517,8 +2517,8 @@ namespace com.codename1.impl
 
                     string value = e.Uri.Fragment.Substring(e.Uri.Fragment.LastIndexOf("=") + 1);
                     string[] parts = value.Split(',');
-                    int xCoord = java.lang.Integer.parseInt(parts[0]);
-                    int yCoord = java.lang.Integer.parseInt(parts[1]);
+                    int xCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[0])).intValue();
+                    int yCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[1])).intValue();
                     Windows.Foundation.Point point = new Windows.Foundation.Point(Canvas.GetLeft(sender) + xCoord, Canvas.GetTop(sender) + yCoord);
                     
                     pointerPressed(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
@@ -2529,8 +2529,8 @@ namespace com.codename1.impl
 
                     string value = e.Uri.Fragment.Substring(e.Uri.Fragment.LastIndexOf("=") + 1);
                     string[] parts = value.Split(',');
-                    int xCoord = java.lang.Integer.parseInt(parts[0]);
-                    int yCoord = java.lang.Integer.parseInt(parts[1]);
+                    int xCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[0])).intValue();
+                    int yCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[1])).intValue();
                     Windows.Foundation.Point point = new Windows.Foundation.Point(Canvas.GetLeft(sender) + xCoord, Canvas.GetTop(sender) + yCoord);
 
                     pointerReleased(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
@@ -2541,8 +2541,8 @@ namespace com.codename1.impl
 
                     string value = e.Uri.Fragment.Substring(e.Uri.Fragment.LastIndexOf("=") + 1);
                     string[] parts = value.Split(',');
-                    int xCoord = java.lang.Integer.parseInt(parts[0]);
-                    int yCoord = java.lang.Integer.parseInt(parts[1]);
+                    int xCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[0])).intValue();
+                    int yCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[1])).intValue();
                     Windows.Foundation.Point point = new Windows.Foundation.Point(Canvas.GetLeft(sender) + xCoord, Canvas.GetTop(sender) + yCoord);
 
                     pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
