@@ -6448,7 +6448,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 canvas.mouseMoved(e);
                                 break;
                             case MouseEvent.MOUSE_PRESSED:
-                                System.out.println("Mouse pressed in native component - passed to lightweight cmp ");
+                                // Mouse pressed in native component - passed to lightweight cmp
                                 if (!(cmp instanceof PeerComponent)) {
                                     cn1GrabbedDrag = true;
                                 }
