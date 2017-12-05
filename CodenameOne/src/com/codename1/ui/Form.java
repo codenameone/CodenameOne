@@ -2817,6 +2817,15 @@ public class Form extends Container {
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
                 pendingButton.pointerReleased(x, y);
+                if (dragged != null) {
+                    if (dragged.isDragAndDropInitialized()) {
+                        dragged.dragFinishedImpl(x, y);
+                        dragged = null;
+                    } else {
+                        dragged.pointerReleased(x, y);
+                        dragged = null;
+                    }
+                }
                 return;
             }
             
