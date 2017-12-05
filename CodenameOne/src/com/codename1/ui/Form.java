@@ -2281,15 +2281,6 @@ public class Form extends Container {
     }
 
     /**
-     * Returns the form's actual layout.
-     * @return 
-     */
-    @Override
-    public Layout getActualLayout() {
-        return super.getLayout();
-    }
-    
-    /**
      * Returns the layout manager of the form's content pane.
      * @see #getActualLayout() For the actual layout of the form.
      */
