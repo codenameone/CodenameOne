@@ -464,7 +464,7 @@ public class Container extends Component implements Iterable<Component>{
      * layout.
      * @return 
      */
-    public final Layout getActualLayout() {
+    final Layout getActualLayout() {
         return layout;
     }
     
