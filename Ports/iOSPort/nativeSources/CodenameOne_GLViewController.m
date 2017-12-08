@@ -2956,67 +2956,48 @@ extern int popoverSupported();
 
 //#define LOW_MEM_CAMERA
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
-	POOL_BEGIN();
-	NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
-	if ([mediaType isEqualToString:@"public.image"]) {
-		// get the image
-		UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
-#ifndef CN1_USE_ARC
-        [originalImage retain];
-#endif
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            POOL_BEGIN();
-            UIImage* image = originalImage;
-            BOOL releaseImage = YES;
+
+    NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
+    if ([mediaType isEqualToString:@"public.image"]) {
+        // get the image
+        UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
+
+        UIImage* image = originalImage;
+
 #ifndef LOW_MEM_CAMERA
-            if (image.imageOrientation != UIImageOrientationUp) {
-                UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
-                [image drawInRect:(CGRect){0, 0, image.size}];
-                releaseImage = NO;
-#ifndef CN1_USE_ARC
-                [originalImage release];
+        if (image.imageOrientation != UIImageOrientationUp) {
+            UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+            [image drawInRect:(CGRect){0, 0, image.size}];
+            image = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+        }
 #endif
-                image = UIGraphicsGetImageFromCurrentImageContext();
-                UIGraphicsEndImageContext();
-            }
-#endif
-            
-            NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
-            
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
-            [data writeToFile:path atomically:YES];
-            if(releaseImage) {
-#ifndef CN1_USE_ARC
-                [originalImage release];
-#endif
-            }
-            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
-            POOL_END();
-        });
         
-	} else {
+        NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+        
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+        [data writeToFile:path atomically:YES];
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+    
+        
+    } else {
         // was movie type
         NSString *moviePath = [[info objectForKey: UIImagePickerControllerMediaURL] absoluteString];
         com_codename1_impl_ios_IOSImplementation_captureMovieResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG moviePath));
     }
-	
-	if(popoverSupported() && popoverController != nil) {
-		[popoverController dismissPopoverAnimated:YES];
-        popoverController.delegate = nil;
-        popoverController = nil;
-	} else {
-#ifdef LOW_MEM_CAMERA
-		[picker dismissModalViewControllerAnimated:NO];
-#else
-		[picker dismissModalViewControllerAnimated:YES];
-#endif
-	}
     
-	//picker.delegate = nil;
-    //picker = nil;
-    POOL_END();
+    if(popoverSupported() && popoverController != nil) {
+        [popoverController dismissPopoverAnimated:YES];
+    } else {
+#ifdef LOW_MEM_CAMERA
+        [picker dismissModalViewControllerAnimated:NO];
+#else
+        [picker dismissModalViewControllerAnimated:YES];
+#endif
+    }
+
 }
 
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
