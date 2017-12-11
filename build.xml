@@ -3,6 +3,7 @@
     <available file="../cn1-binaries" property="cn1.binaries" value="true"/>
     <available file="../codenameone-skins" property="codenameone.skins" value="true"/>
     <property name="cn1.cli" value="node_modules/.bin/cn1"/>
+    <property name="cn1.iphone.target" value="iphone" />
 
     <target name="get-cn1-binaries" unless="cn1.binaries">
       <get src="https://github.com/codenameone/cn1-binaries/archive/master.zip" dest="master.zip"/>
@@ -157,9 +158,7 @@
         <arg value="ios"/>
         <arg value="-d"/>
         <arg value="${deviceName}"/>
-        <!-- -Ddebug=1 flag causes it to use the debug_iphone_steve target instead of iphone target
-            Used only by Steve for testing changes to IPhoneBuilder -->
-        <!-- <arg value="-Ddebug=1"/> -->
+        <arg value="-Dcn1.iphone.target=${cn1.iphone.target}"/>
       </exec>
     </target>
 
