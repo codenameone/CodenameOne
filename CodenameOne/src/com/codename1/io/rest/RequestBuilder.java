@@ -62,11 +62,23 @@ public class RequestBuilder {
     
     private boolean isGzip = false;
     
+    private String contentType;
+    
     RequestBuilder(String method, String url) {
         this.method = method;
         this.url = url;
     }
 
+    /**
+     * Sets the value of the content type
+     * @param s the content type
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder contentType(String s) {
+        contentType = s;
+        return this;
+    } 
+    
     /**
      * Add a path param to the request.
      * For example if the request url is: http://domain.com/users/{id}
@@ -149,6 +161,15 @@ public class RequestBuilder {
         return this;
     }
 
+    /**
+     * Sets both the content type and accept headers to "application/json"
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder jsonContent() {
+        return contentType("application/json").
+                header("Accept", "application/json");
+    }
+    
     /**
      * Add a basic authentication Authorization header
      * 
@@ -283,7 +304,10 @@ public class RequestBuilder {
         }
         for (String key : pathParams.keySet()) {
             url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", pathParams.get(key));
-        }        
+        }       
+        if(contentType != null) {
+            req.setContentType(contentType);
+        }
         req.setReadResponseForErrors(true);
         req.setDuplicateSupported(true);
         req.setUrl(url);
