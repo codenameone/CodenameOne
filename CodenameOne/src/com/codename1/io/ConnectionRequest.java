@@ -282,11 +282,13 @@ public class ConnectionRequest implements IOProgressListener {
     private int contentLength = -1;
     private boolean duplicateSupported = true;
     private EventDispatcher responseCodeListeners;
+    private EventDispatcher exceptionListeners;
     private Hashtable userHeaders;
     private Dialog showOnInit;
     private Dialog disposeOnCompletion;
     private byte[] data;
     private int responseCode;
+    private String responseErrorMessge;
     private String httpMethod;
     private int silentRetryCount = 0;
     private boolean failSilently;
@@ -755,7 +757,8 @@ public class ConnectionRequest implements IOProgressListener {
                     return;
                 }
 
-                handleErrorResponseCode(responseCode, impl.getResponseMessage(connection));
+                responseErrorMessge = impl.getResponseMessage(connection);
+                handleErrorResponseCode(responseCode, responseErrorMessge);
                 if(!isReadResponseForErrors()) {
                     return;
                 }
@@ -1089,11 +1092,18 @@ public class ConnectionRequest implements IOProgressListener {
      * @param err the exception thrown
      */
     protected void handleException(Exception err) {
+        if(exceptionListeners != null) {
+            if(!isKilled()) {
+                NetworkEvent n = new NetworkEvent(this, err);
+                exceptionListeners.fireActionEvent(n);
+            }
+            return;
+        }
         if(killed || failSilently) {
             failureException = err;
             return;
         }
-        err.printStackTrace();
+        Log.e(err);
         if(silentRetryCount > 0) {
             silentRetryCount--;
             NetworkManager.getInstance().resetAPN();
@@ -1216,15 +1226,15 @@ public class ConnectionRequest implements IOProgressListener {
      * @param message the response message from the server
      */
     protected void handleErrorResponseCode(int code, String message) {
-        if(failSilently) {
-            failureErrorCode = code;
-            return;
-        }
         if(responseCodeListeners != null) {
             if(!isKilled()) {
                 NetworkEvent n = new NetworkEvent(this, code, message);
                 responseCodeListeners.fireActionEvent(n);
             }
+            return;
+        }
+        if(failSilently) {
+            failureErrorCode = code;
             return;
         }
         if(Display.isInitialized() && !Display.getInstance().isMinimized() &&
@@ -1922,6 +1932,21 @@ public class ConnectionRequest implements IOProgressListener {
     }
 
     /**
+     * Adds a listener that would be notified on the CodenameOne thread of an exception
+     * in this connection request
+     *
+     * @param a listener
+     */
+    public void addExceptionListener(ActionListener<NetworkEvent> a) {
+        if(exceptionListeners == null) {
+            exceptionListeners = new EventDispatcher();
+            exceptionListeners.setBlocking(false);
+        }
+        exceptionListeners.addListener(a);
+    }
+
+
+    /**
      * Removes the given listener
      *
      * @param a listener
@@ -1933,6 +1958,21 @@ public class ConnectionRequest implements IOProgressListener {
         responseCodeListeners.removeListener(a);
         if(responseCodeListeners.getListenerCollection()== null || responseCodeListeners.getListenerCollection().size() == 0) {
             responseCodeListeners = null;
+        }
+    }
+
+    /**
+     * Removes the given listener
+     *
+     * @param a listener
+     */
+    public void removeExceptionListener(ActionListener<NetworkEvent> a) {
+        if(exceptionListeners == null) {
+            return;
+        }
+        exceptionListeners.removeListener(a);
+        if(exceptionListeners.getListenerCollection() == null || exceptionListeners.getListenerCollection().size() == 0) {
+            exceptionListeners = null;
         }
     }
 
@@ -2445,5 +2485,13 @@ public class ConnectionRequest implements IOProgressListener {
             throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
         }
         this.requestBody = requestBody;
+    }
+    
+    /**
+     * Returns error message associated with an error response code
+     * @return the system error message
+     */
+    public String getResponseErrorMessage() {
+        return responseErrorMessge;
     }
 }
