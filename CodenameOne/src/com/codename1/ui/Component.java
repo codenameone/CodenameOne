@@ -2237,9 +2237,30 @@ public class Component implements Animation, StyleListener {
         paintTensile(g);
     }
 
+    /**
+     * Returns the area of this component that is currently hidden by the virtual keyboard.
+     * @return 
+     */
+    private int getInvisibleAreaUnderVKB() {
+        Form f = getComponentForm();
+        if (f != null) {
+            int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(f);
+            if (invisibleAreaUnderVKB == 0) {
+                return 0;
+            }
+            int bottomGap = f.getHeight() - getAbsoluteY() - getHeight();
+            if (bottomGap < invisibleAreaUnderVKB) {
+                return invisibleAreaUnderVKB - bottomGap;
+            } else {
+                return 0;
+            }
+        }
+        return 0;
+    }
+    
     void paintTensile(Graphics g) {
         if(tensileHighlightIntensity > 0) {
-            int i = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
+            int i = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
             if(scrollY >= i - 1) {
                 getUIManager().getLookAndFeel().paintTensileHighlight(this, g, false , tensileHighlightIntensity);
             } else {
@@ -2554,7 +2575,7 @@ public class Component implements Animation, StyleListener {
         int scrollYtmp = scrollY;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
             Form parentForm = getComponentForm();
-            int v = Form.getInvisibleAreaUnderVKB(parentForm);
+            int v = getInvisibleAreaUnderVKB();
             int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
@@ -2592,7 +2613,7 @@ public class Component implements Animation, StyleListener {
     
     private void updateTensileHighlightIntensity(int lastScroll, int scroll, boolean motion) {
         if(tensileHighlightEnabled) {
-            int h = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
+            int h = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
             if(h <= 0) {
                 // layout hasn't completed yet
                 tensileHighlightIntensity = 0;
@@ -3887,7 +3908,7 @@ public class Component implements Animation, StyleListener {
                 int h = getHeight() - s.getVerticalPadding();
 
                 Rectangle view;
-                int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
+                int invisibleAreaUnderVKB = getInvisibleAreaUnderVKB();
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
                 //if the dragging component is out of bounds move the scrollable parent
                 if(!view.contains(draggedx - scrollParent.getAbsoluteX(), draggedy - scrollParent.getAbsoluteY(), getWidth(), getHeight())){
@@ -3955,12 +3976,12 @@ public class Component implements Animation, StyleListener {
                 }
                 int scroll = getScrollY() + (lastScrollY - y);
                 
-                if(isAlwaysTensile() && getScrollDimension().getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) <= getHeight()) {
+                if(isAlwaysTensile() && getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() <= getHeight()) {
                     if (scroll >= -tl && scroll < getHeight() + tl) {
                         setScrollY(scroll);
                     }
                 } else {
-                    if (scroll >= -tl && scroll < getScrollDimension().getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) - getHeight() + tl) {
+                    if (scroll >= -tl && scroll < getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() - getHeight() + tl) {
                         setScrollY(scroll);
                     }
                 }
@@ -4425,7 +4446,7 @@ public class Component implements Animation, StyleListener {
                         startedTensileY = true;
                     }
                 } else {
-                    int scrh = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
+                    int scrh = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
                     if(scrollY > scrh) {
                         startTensile(scrollY, Math.max(scrh, 0), true);
                         startedTensileY = true;
@@ -4464,10 +4485,10 @@ public class Component implements Animation, StyleListener {
                     if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
                         int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
                         draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() - 
-                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2,  speed, timeConstant);
+                                getHeight() + getInvisibleAreaUnderVKB() + tl/2,  speed, timeConstant);
                     } else {
                         draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
-                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2, speed, 0.0007f);
+                                getHeight() + getInvisibleAreaUnderVKB() + tl/2, speed, 0.0007f);
                     }
                 }
             } else {
@@ -4932,7 +4953,7 @@ public class Component implements Animation, StyleListener {
                 if (dragVal < 0) {
                     startTensile(dragVal, 0, true);
                 } else {
-                    int iv = Form.getInvisibleAreaUnderVKB(getComponentForm());
+                    int iv = getInvisibleAreaUnderVKB();
                     int edge = (getScrollDimension().getHeight() - getHeight() + iv);
                     if (dragVal > edge && edge > 0) {
                         startTensile(dragVal, getScrollDimension().getHeight() - getHeight() + iv, true);
@@ -4956,7 +4977,7 @@ public class Component implements Animation, StyleListener {
                 
                 // special callback to scroll Y to allow developers to override the setScrollY method effectively
                 setScrollY(dragVal);
-                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()), false);            
+                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB(), false);            
             }
 
             if(scrollListeners != null){
@@ -5082,9 +5103,11 @@ public class Component implements Animation, StyleListener {
             int h = getHeight() - s.getVerticalPadding();
 
             Rectangle view;
-            int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
+            int invisibleAreaUnderVKB = getInvisibleAreaUnderVKB();
+            
             if (isSmoothScrolling() && destScrollY > -1) {
                 view = new Rectangle(getScrollX(), destScrollY, w, h - invisibleAreaUnderVKB);
+                
             } else {
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
             }
@@ -5327,7 +5350,7 @@ public class Component implements Animation, StyleListener {
                 return;
             }
             Form f = getComponentForm();
-            int ivk = Form.getInvisibleAreaUnderVKB(f);
+            int ivk = getInvisibleAreaUnderVKB();
             
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
                     getScrollDimension().getHeight() + ivk) {
@@ -5407,6 +5430,8 @@ public class Component implements Animation, StyleListener {
         }
     }
 
+    
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
