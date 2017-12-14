@@ -33,12 +33,14 @@ import java.io.InputStream;
 public class Response<T> {
     private int responseCode;
     private T responseData;
+    private String responseMessage;
 
-    Response(int responseCode, T responseData) {
+    Response(int responseCode, T responseData, String responseMessage) {
         this.responseCode = responseCode;
         this.responseData = responseData;
+        this.responseMessage = responseMessage;
     }
-
+    
     /**
      * The http response data
      * 
@@ -57,5 +59,11 @@ public class Response<T> {
         return responseCode;
     }
     
-    
+    /**
+     * Returns the error message that accompanies the response
+     * @return the response
+     */
+    public String getResponseMessage() {
+        return responseMessage;
+    }
 }
