@@ -87,7 +87,7 @@ public class Capture {
     
     /**
      * Same as captureAudio only a blocking version that holds the EDT
-     * @return the photo file location or null if the user canceled
+     * @return the audio file location or null if the user canceled
      */
     public static String captureAudio() {
         CallBack c = new CallBack();
