@@ -1470,6 +1470,9 @@ public final class Display extends CN1Constants {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        if (isTextEditing(cmp)) {
+            return;
+        }
         Form f = cmp.getComponentForm();
         
         // this can happen in the spinner in the simulator where the key press should in theory start native 
