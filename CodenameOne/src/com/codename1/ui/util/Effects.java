@@ -271,9 +271,15 @@ public class Effects {
     public static Image squareShadow(int width, int height, int blurRadius, float opacity) {
         Image img = Image.createImage(width + blurRadius * 2, height + blurRadius * 2, 0 );
         Graphics g = img.getGraphics();
-        g.setAlpha((int)(opacity * 255.0));
+        int destAlpha = (int)(opacity * 255.0);
         g.setColor(0);
-        g.fillRect(blurRadius, blurRadius, width, height);
+
+        // draw a gradient of sort for the shadow
+        for(int iter = blurRadius - 1 ; iter >= 0 ; iter--) {            
+            g.setAlpha(Math.max(10, destAlpha - (blurRadius - iter)));
+            g.drawRect(blurRadius + iter, blurRadius +iter, width - iter * 2, height - iter * 2);
+        }
+        
         if(Display.getInstance().isGaussianBlurSupported()) {
             img = Display.getInstance().gaussianBlurImage(img, blurRadius);
         }
