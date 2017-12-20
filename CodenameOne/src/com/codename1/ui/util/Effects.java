@@ -28,6 +28,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.RGBImage;
+import com.codename1.ui.animations.Motion;
 
 /**
  * Static utility class useful for simple visual effects that don't quite fit 
@@ -274,9 +275,12 @@ public class Effects {
         int destAlpha = (int)(opacity * 255.0);
         g.setColor(0);
 
+        Motion lin = Motion.createLinearMotion(2, destAlpha, blurRadius);
+        
         // draw a gradient of sort for the shadow
         for(int iter = blurRadius - 1 ; iter >= 0 ; iter--) {            
-            g.setAlpha(Math.max(10, destAlpha - (blurRadius - iter)));
+            lin.setCurrentMotionTime(iter);
+            g.setAlpha(lin.getValue());
             g.drawRect(blurRadius + iter, blurRadius +iter, width - iter * 2, height - iter * 2);
         }
         
