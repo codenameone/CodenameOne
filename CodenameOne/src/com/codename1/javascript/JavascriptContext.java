@@ -403,7 +403,7 @@ public class JavascriptContext  {
                 callback.onSucess(args[0]);
                 getWindow().set(callbackMethod, null, true);
             }
-        });
+        }, true);
         String js2 = callbackMethod+"("+javascript+")";
         exec(js2, true);
     }
