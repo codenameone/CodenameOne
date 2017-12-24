@@ -23,7 +23,7 @@
  */
 package com.codename1.io;
 
-import com.codename1.util.StringUtil;
+import com.codename1.processing.Result;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
@@ -639,10 +639,10 @@ public class JSONParser implements JSONParseCallback {
      * Static method to convert the given {@link java.util.Map} to a valid JSON
      * representation. The values allowed types are: {@link java.lang.Number}, {@link java.lang.String}, {@link java.lang.Boolean},
      * {@link java.util.List}, {@link java.util.Map} or null.
-     * 
+     *
      * Limited whitespace is inserted be make the resulting JSON string more
      * readable.
-     * 
+     *
      * Simple example of usage:
      * <pre>{@code
      * Map<String, Object> person = new LinkedHashMap<>();
@@ -653,23 +653,19 @@ public class JSONParser implements JSONParseCallback {
      * person.put("weight (kg)", 70.7);
      *
      * Log.p("--- mapToJson() test");
-     * try {
-     *     Log.p("\n" + mapToJson(person));
-     * } catch (Exception ex) {
-     *     Log.e(ex);
-     * }
+     * Log.p("\n" + mapToJson(person));
      * }</pre>
      *
      * The output will be:
      * <pre>{@code
      * {
-     *   "firstName" : "Paco",
-     *   "lastName" : "Bellèz",
-     *   "isAlive" : true,
-     *   "age" : 35,
-     *   "weight (kg)" : 70.7
-     * }
-     * }</pre>
+     *  "firstName": "Paco",
+     *  "lastName": "Bellèz",
+     *  "isAlive": true,
+     *  "age": 35,
+     *  "weight (kg)": 70.7
+     *}
+     *}</pre>
      *
      * More complex example of usage:
      * <pre>{@code
@@ -724,179 +720,58 @@ public class JSONParser implements JSONParseCallback {
      * firstPerson.put("friends", friends);
      *
      * Log.p("--- mapToJson() test");
-     * try {
-     *     Log.p("\n" + mapToJson(firstPerson));
-     * } catch (Exception ex) {
-     *     Log.e(ex);
-     * }
+     * Log.p("\n" + mapToJson(firstPerson));
      * }</pre>
      *
      * The output will be:
      * <pre>{@code
      * {
-     *   "firstName" : "Paco",
-     *   "lastName" : "Bellèz",
-     *   "isAlive" : true,
-     *   "age" : 35,
-     *   "weight (kg)" : 70.7,
-     *   "address" : {
-     *     "streetAddress" : "53, London Street",
-     *     "city" : "Paris",
-     *     "state" : "FR",
-     *     "postalCode" : "54856"
-     *   },
-     *   "partner" : {
-     *     "firstName" : "Gioia",
-     *     "lastName" : "Mia",
-     *     "isAlive" : true,
-     *     "age" : 34,
-     *     "weight (kg)" : 60.2,
-     *     "address" : {
-     *       "streetAddress" : "21 2nd Street",
-     *       "city" : "New York",
-     *       "state" : "NY",
-     *       "postalCode" : "10021-3100",
-     *       "phoneNumbers" : [{
-     *         "mobile" : "06124578965"
-     *       }]
-     *     }
-     *   },
-     *   "children" : [],
-     *   "extraInfo" : null,
-     *   "phoneNumbers" : [{
-     *     "home" : "212 555-1234"
-     *   },{
-     *     "office" : "646 555-4567"
-     *   },{
-     *     "mobile" : "123 456-7890"
-     *   }],
-     *   "onVacation" : false,
-     *   "friends" : ["Paul","Karl","Mary"]
-     * }
-     * }</pre>
+     *  "firstName": "Paco",
+     *  "lastName": "Bellèz",
+     *  "isAlive": true,
+     *  "age": 35,
+     *  "weight (kg)": 70.7,
+     *  "address": {
+     *    "streetAddress": "53, London Street",
+     *    "city": "Paris",
+     *    "state": "FR",
+     *    "postalCode": "54856"
+     *  },
+     *  "partner": {
+     *    "firstName": "Gioia",
+     *    "lastName": "Mia",
+     *    "isAlive": true,
+     *    "age": 34,
+     *    "weight (kg)": 60.2,
+     *    "address": {
+     *      "streetAddress": "21 2nd Street",
+     *      "city": "New York",
+     *      "state": "NY",
+     *      "postalCode": "10021-3100",
+     *      "phoneNumbers": [{"mobile": "06124578965"}]
+     *    }
+     *  },
+     *  "children": [],
+     *  "extraInfo": null,
+     *  "phoneNumbers": [
+     *    {"home": "212 555-1234"},
+     *    {"office": "646 555-4567"},
+     *    {"mobile": "123 456-7890"}
+     *  ],
+     *  "onVacation": false,
+     *  "friends": [
+     *    "Paul",
+     *    "Karl",
+     *    "Mary"
+     *  ]
+     *}
+     *}</pre>
      *
      * @param map The map to be converted to a JSON string
      * @return The JSON string
-     * @throws Exception A generic exception thrown when converting the map to a
-     * JSON string fails.
-     * @author Francesco Galgani
      */
-    public static String mapToJson(Map<String, Object> map) throws Exception {
-        String indent = "  ";
-        StringBuilder json = new StringBuilder();
-        json.append("{\n");
-        int remainingItems = map.size();
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            json.append(indent).append("\"").append(entry.getKey()).append("\" : ");
-            if (entry.getValue() instanceof String) {
-                String value = (String) entry.getValue();
-                json.append("\"").append(value).append("\"");
-            } else if (entry.getValue() instanceof Number) {
-                String value;
-                if (entry.getValue() instanceof Byte) {
-                    value = ((Byte) entry.getValue()).toString();
-                } else if (entry.getValue() instanceof Double) {
-                    value = ((Double) entry.getValue()).toString();
-                } else if (entry.getValue() instanceof Float) {
-                    value = ((Float) entry.getValue()).toString();
-                } else if (entry.getValue() instanceof Integer) {
-                    value = ((Integer) entry.getValue()).toString();
-                } else if (entry.getValue() instanceof Long) {
-                    value = ((Long) entry.getValue()).toString();
-                } else {
-                    throw new Exception("Cast error in converting map to json");
-                }
-                json.append(value);
-            } else if (entry.getValue() instanceof Boolean) {
-                String value = ((Boolean) entry.getValue()).toString();
-                json.append(value);
-            } else if (entry.getValue() instanceof List) {
-                List myList = (List) (entry.getValue());
-                StringBuilder value = new StringBuilder();
-                value.append("[");
-                if (!myList.isEmpty() && (myList.get(0) instanceof String)) {
-                    for (int i = 0; i < myList.size(); i++) {
-                        String item = (String) (myList.get(i));
-                        value.append("\"").append((String) item).append("\"");
-                        if (i < myList.size() - 1) {
-                            value.append(",");
-                        }
-                    }
-                } else if (!myList.isEmpty() && myList.get(0) instanceof Number) {
-                    for (int i = 0; i < myList.size(); i++) {
-                        String item;
-                        if (myList.get(i) instanceof Byte) {
-                            item = ((Byte) myList.get(i)).toString();
-                        } else if (myList.get(i) instanceof Double) {
-                            item = ((Double) myList.get(i)).toString();
-                        } else if (myList.get(i) instanceof Float) {
-                            item = ((Float) myList.get(i)).toString();
-                        } else if (myList.get(i) instanceof Integer) {
-                            item = ((Integer) myList.get(i)).toString();
-                        } else if (myList.get(i) instanceof Long) {
-                            item = ((Long) myList.get(i)).toString();
-                        } else {
-                            throw new Exception("Cast error in converting map to json");
-                        }
-                        value.append((String) item);
-                        if (i < myList.size() - 1) {
-                            value.append(",");
-                        }
-                    }
-                } else if (!myList.isEmpty() && myList.get(0) instanceof Boolean) {
-                    for (int i = 0; i < myList.size(); i++) {
-                        Boolean item = (Boolean) (myList.get(i));
-                        value.append((Boolean) item);
-                        if (i < myList.size() - 1) {
-                            value.append(",");
-                        }
-                    }
-                } else if (!myList.isEmpty() && myList.get(0) instanceof Map) {
-                    for (int i = 0; i < myList.size(); i++) {
-                        String item = mapToJson((Map) (myList.get(i)));
-                        List<String> lines = StringUtil.tokenize(item, '\n');
-                        for (int k = 0; k < lines.size(); k++) {
-                            if (k > 0) {
-                                value.append(indent);
-                            }
-                            value.append(lines.get(k));
-                            if (k < lines.size() - 1) {
-                                value.append("\n");
-                            }
-                        }
-                        if (i < myList.size() - 1) {
-                            value.append(",");
-                        }
-                    }
-                }
-                value.append("]");
-                json.append(value.toString());
-            } else if (entry.getValue() instanceof Map) {
-                String value = mapToJson((Map) entry.getValue());
-                List<String> lines = StringUtil.tokenize(value, '\n');
-                for (int i = 0; i < lines.size(); i++) {
-                    if (i > 0) {
-                        json.append(indent);
-                    }
-                    json.append(lines.get(i));
-                    if (i < lines.size() - 1) {
-                        json.append("\n");
-                    }
-                }
-            } else if (entry.getValue() == null) {
-                json.append("null");
-            } else {
-                throw new Exception("Cast error in converting map to json");
-            }
-
-            remainingItems--;
-            if (remainingItems > 0) {
-                json.append(",\n");
-            }
-        }
-
-        json.append("\n}");
-        return json.toString();
+    public static String mapToJson(Map<String, ?> map) {
+        return Result.fromContent(map).toString();
     }
 
 	
