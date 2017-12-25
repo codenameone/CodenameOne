@@ -449,7 +449,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * Returns the layout manager responsible for arranging this container
+     * Returns the layout manager responsible for arranging this container. 
      * 
      * @return the container layout manager
      */
@@ -457,6 +457,17 @@ public class Container extends Component implements Iterable<Component>{
         return layout;
     }
 
+    /**
+     * Returns the actual layout of this container.  For most components this just
+     * wraps {@link #getLayout()}, but some classes (e.g. Form) don't return their
+     * *actual* layout.  In such cases, this method will return the component's *actual*
+     * layout.
+     * @return 
+     */
+    final Layout getActualLayout() {
+        return layout;
+    }
+    
     /**
      * Sets the layout manager responsible for arranging this container
      * 
@@ -665,6 +676,8 @@ public class Container extends Component implements Iterable<Component>{
             }
             cmp.setParent(this);
             a.addAnimation(new ComponentAnimation() {
+                private boolean alreadyAdded;
+                
                 @Override
                 public boolean isInProgress() {
                     return false;
@@ -672,12 +685,20 @@ public class Container extends Component implements Iterable<Component>{
 
                 @Override
                 protected void updateState() {
-                    cmp.setParent(null);
-                    if(constraint != null) {
-                        layout.addLayoutComponent(constraint, cmp, Container.this);
+                    if(!alreadyAdded) {
+                        alreadyAdded = true;
+                        cmp.setParent(null);
+                        if(constraint != null) {
+                            layout.addLayoutComponent(constraint, cmp, Container.this);
+                        }
+                        insertComponentAtImpl(index, cmp);
+                        revalidate();
                     }
-                    insertComponentAtImpl(index, cmp);
-                    revalidate();
+                }
+
+                @Override
+                public void flush() {
+                    updateState();
                 }
             });
         } else {
@@ -1025,6 +1046,7 @@ public class Container extends Component implements Iterable<Component>{
             layout.removeLayoutComponent(cmp);
             cmp.setParent(null);
             a.addAnimation(new ComponentAnimation() {
+                private boolean alreadyRemoved;
                 @Override
                 public boolean isInProgress() {
                     return false;
@@ -1032,8 +1054,16 @@ public class Container extends Component implements Iterable<Component>{
 
                 @Override
                 protected void updateState() {
-                    removeComponentImplNoAnimationSafety(cmp);
-                    revalidate();
+                    if(!alreadyRemoved) {
+                        alreadyRemoved = true;
+                        removeComponentImplNoAnimationSafety(cmp);
+                        revalidate();
+                    }
+                }
+
+                @Override
+                public void flush() {
+                    updateAnimationState();
                 }
             });
         } else {
@@ -1157,6 +1187,7 @@ public class Container extends Component implements Iterable<Component>{
             
             // for complex hierarchies 
             if(getParent() != null) {
+                getParent().shouldLayout = true;
                 getParent().layoutContainer();
             } else {
                 layoutContainer();
@@ -1824,16 +1855,28 @@ public class Container extends Component implements Iterable<Component>{
     }
     
     /**
-     * Returns a Component that exists in the given x, y coordinates by traversing
-     * component objects and invoking contains
+     * Returns the top-most component that responds to pointer events at absolute 
+     * coordinate {@literal (x, y)}.  This may return {@literal null} if there are 
+     * no components at this coordinate that respond to pointer events.
      * 
-     * @param x absolute screen location
-     * @param y absolute screen location
-     * @return a Component if found, null otherwise
-     * @see Component#contains
+     * <p><strong>Note:</strong> This method is stricter than {@link #getComponentAt(int, int) }
+     * about which component is returned.  Whereas {@link #getComponentAt(int, int) } will return
+     * {@literal this } when there are no matches, as long as it contains {@literal (x, y)}, {@link #getResponderAt(int, int) }
+     * will return null in this case.  {@link #getComponentAt(int, int) } may also return components
+     * that are not visible or are not enabled.  In generaly, if you are trying to retrieve a component
+     * that responds to pointer events, you should use this method over {@link #getComponentAt(int, int) } unless
+     * you have a good reason and really know what you are doing.</p>
+     * 
+     * 
+     * @param x Absolute x-coordinate.
+     * @param y Absolute y-coordinate.
+     * @return Top-most component that responds to pointer events at given coordinate.  May be {@literal null}.
+     * @see Component#respondsToPointerEvents() 
      */
-    public Component getComponentAt(int x, int y) {
-        
+    public Component getResponderAt(int x, int y) {
+        if (!isVisible() || !contains(x, y)) {
+            return null;
+        }
         int startIter = 0;
         int count = getComponentCount();
         if (count > 30) {
@@ -1851,11 +1894,69 @@ public class Container extends Component implements Iterable<Component>{
                 count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
             }
         }
-        boolean overlaps = getLayout().isOverlapSupported();
+        for (int i=count-1; i>=startIter; i--) {
+            Component cmp = getComponentAt(i);
+            if (cmp.contains(x, y)) {
+                if (!cmp.isBlockLead() && cmp instanceof Container) {
+                    cmp = ((Container)cmp).getResponderAt(x, y);
+                }
+                if (cmp != null && cmp.respondsToPointerEvents()) {
+                    return cmp;
+                }
+            }
+        }
+        if (respondsToPointerEvents()) {
+            return this;
+        }
+        return null;  
+    }
+    
+    /**
+     * Returns a Component at coordinate {@literal (x, y)}.
+     * 
+     * <p><strong>WARNING:</strong>  This method may return components that are disabled,
+     * or invisible, or that do not respond to pointer events.  If you are looking for the
+     * top-most component that responds to pointer events, you should use {@link #getResponderAt(int, int) }
+     * as it is guaranteed to return a component with {@link Component#respondsToPointerEvents() } {@literal true}; 
+     * or {@literal null} if none is found at the coordinate.</p>
+     * 
+     * @param x absolute screen location
+     * @param y absolute screen location
+     * @return a Component if found, null otherwise
+     * @see Component#contains
+     * @see #getResponderAt(int, int) 
+     */
+    public Component getComponentAt(int x, int y) {
+        if (!contains(x, y)) {
+            return null;
+        }
+        int startIter = 0;
+        int count = getComponentCount();
+        if (count > 30) {
+            int relx = x - getAbsoluteX();
+            int rely = y - getAbsoluteY();
+            
+            startIter = calculateFirstPaintableOffset(relx, rely, relx, rely);
+            if (startIter < 0) {
+                // There was no efficient way to calculate the first paintable offset
+                // start counting from 0
+                startIter = 0;
+            } else if (startIter < count) {
+                // We found a start offset using an efficient method
+                // Find an appropriate end offset.
+                count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
+            }
+        }
+        boolean overlaps = getActualLayout().isOverlapSupported();
         Component component = null;
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);
             if (cmp.contains(x, y)) {
+                // this is a workaround for the issue mentioned here: https://stackoverflow.com/questions/44112337/action-listening-for-container-itself-and-sub-buttons/44125364
+                // the block lead has some weird behaviors with overlap hierarchies, not sure if this is the best solution
+                if(component != null && component.isBlockLead()) {
+                    return component;
+                }
                 component = cmp;
                 if (!overlaps && component.isFocusable()) {
                     // special case for lead blocking
@@ -1873,20 +1974,26 @@ public class Container extends Component implements Iterable<Component>{
                         component = c;
                     }
                 }
-                if (!overlaps || component.isFocusable() || component.isGrabsPointerEvents()) {
+                if (!overlaps || component.respondsToPointerEvents()) {
                     return component;
+                } else if (cmp != component) {
+                    // Check if there is anything between component and cmp that grabs pointer events
+                    // if so - we stop the chain
+                    Container tmp = component.getParent();
+                    while (tmp != cmp && tmp != null) {
+                        if (tmp.respondsToPointerEvents()) {
+                            return component;
+                        }
+                        tmp = tmp.getParent();
+                    }
                 }
             }
         }
         if (component != null){
             return component;
         }
-        if (contains(x, y)) {
-            return this;
-        }
-        return null;
-    }
-
+        return this;
+    }    
     /**
      * Recursively searches the container hierarchy for a drop target
      * 
@@ -2901,6 +3008,12 @@ public class Container extends Component implements Iterable<Component>{
             thisContainer.replace(current, next, growSpeed > 0 || layoutAnimationSpeed > 0);
             //release the events blocking
             t.cleanup();
+            if (current != null) {
+                current.setLightweightMode(false);
+            }
+            if (next != null) {
+                next.setLightweightMode(false);
+            }
             if(thisContainer.cmpTransitions != null && thisContainer.cmpTransitions.size() == 0 && growSpeed > -1){
                 if(growSpeed > 0) {
                     current.growShrink(growSpeed);
@@ -3017,4 +3130,3 @@ public class Container extends Component implements Iterable<Component>{
         
     }
 }
-

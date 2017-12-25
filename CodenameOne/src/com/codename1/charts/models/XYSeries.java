@@ -249,7 +249,7 @@ public class XYSeries{
   }
 
   /**
-   * Add an String at (x,y) coordinates
+   * Add a String at (x,y) coordinates
    * 
    * @param annotation String text
    * @param x
@@ -264,7 +264,7 @@ public class XYSeries{
   }
 
   /**
-   * Add an String at (x,y) coordinates
+   * Add a String at (x,y) coordinates
    * 
    * @param annotation String text
    * @param index the index to add the annotation to
@@ -280,7 +280,7 @@ public class XYSeries{
   }
 
   /**
-   * Remove an String at index
+   * Remove a String at index
    * 
    * @param index
    */

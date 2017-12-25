@@ -24,6 +24,7 @@
 package com.codename1.ui.plaf;
 
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.*;
 import com.codename1.ui.animations.BubbleTransition;
@@ -925,6 +926,10 @@ public abstract class LookAndFeel {
         } catch(NumberFormatException err) {
             Log.e(err);
         }
+        
+        Button.setCapsTextDefault(manager.isThemeConstant("capsButtonTextBool", false));
+        Button.setButtonRippleEffectDefault(manager.isThemeConstant("buttonRippleBool", false));
+        
         defaultFormTintColor = (int)Long.parseLong(manager.getThemeConstant("tintColor", Integer.toHexString(defaultFormTintColor)), 16);
         disableColor = Integer.parseInt(manager.getThemeConstant("disabledColor", Integer.toHexString(disableColor)), 16);
         Dialog.setDefaultDialogPosition(manager.getThemeConstant("dialogPosition", Dialog.getDefaultDialogPosition()));
@@ -956,6 +961,12 @@ public abstract class LookAndFeel {
         initCommandBehaviorConstant(manager.getThemeConstant("commandBehavior", null), completeClear);
         reverseSoftButtons = manager.isThemeConstant("reverseSoftButtonsBool", reverseSoftButtons);
         textFieldCursorColor = manager.getThemeConstant("textFieldCursorColorInt", 0);
+        
+        String gap = manager.getThemeConstant("labelGap", null);
+        if(gap != null) {
+            Label.setDefaultGap(Display.getInstance().convertToPixels(Util.toFloatValue(gap)));
+        }
+        
         TextArea.setDefaultValign(manager.getThemeConstant("textCmpVAlignInt", TextArea.getDefaultValign()));
         defaultSnapToGrid = manager.isThemeConstant("snapGridBool", false);
         defaultAlwaysTensile = manager.isThemeConstant("alwaysTensileBool", false);
@@ -1010,6 +1021,7 @@ public abstract class LookAndFeel {
                 return;
             }
             if(c.equalsIgnoreCase("SIDE")) {
+                Log.p("WARNING: Theme sets the commandBehavior constant which is deprecated.  Please update the theme to NOT include this theme constant.  Using commandBehavior may cause your app to perform in unexpected ways.  In particular, using SIDE command behavior in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime exceptions.", Log.WARNING);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
                 setMenuBarClass(SideMenuBar.class);
                 return;

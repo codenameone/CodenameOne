@@ -348,7 +348,7 @@ public class Style {
 
     /**
      * Indicates the unit type for padding/margin in device independent pixels. Device independent pixels try to aim
-     * at roghly 1 milimeter of the screen per DIP but make no guarantee for accuracy.
+     * at roughly 1 millimeter of the screen per DIP but make no guarantee for accuracy.
      */
     public static final byte UNIT_TYPE_DIPS = 2;
 
@@ -357,20 +357,20 @@ public class Style {
     private int bgColor = 0xFFFFFF;
     private Font font = Font.getDefaultFont();
     private Image bgImage;
-    private int[] padding = new int[4];
-    private int[] margin = new int[4];
+    float[] padding = new float[4];
+    float[] margin = new float[4];
 
     /**
      * Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
      */
-    private byte[] paddingUnit;
+    byte[] paddingUnit;
 
     /**
      * Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
      * of UNIT_TYPE_PIXELS, UNIT_TYPE_DIPS or UNIT_TYPE_SCREEN_PERCENTAGE
      */
-    private byte[] marginUnit;
+    byte[] marginUnit;
     private byte transparency = (byte) 0xFF; //no transparency
     private byte opacity = (byte) 0xFF; //full opacity
     private Painter bgPainter;
@@ -1224,12 +1224,24 @@ public class Style {
     /**
      * Sets the Style Padding
      *  
-     * @param top number of pixels to padd
-     * @param bottom number of pixels to padd
-     * @param left number of pixels to padd
-     * @param right number of pixels to padd
+     * @param top number of pixels to pad the top
+     * @param bottom number of pixels to pad the bottom
+     * @param left number of pixels to pad the left
+     * @param right number of pixels to pad the right
      */
     public void setPadding(int top, int bottom, int left, int right) {
+        this.setPadding((float)top, (float)bottom, (float)left, (float)right);
+    }
+    
+    /**
+     * Sets the Style Padding
+     *  
+     * @param top number of pixels to pad the top
+     * @param bottom number of pixels to pad the bottom
+     * @param left number of pixels to pad the left
+     * @param right number of pixels to pad the right
+     */
+    public void setPadding(float top, float bottom, float left, float right) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPadding(top, bottom, left, right);
@@ -1257,12 +1269,22 @@ public class Style {
      * Sets the Style Padding
      * 
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap number of pixels to padd
+     * @param gap number of pixels to pad the orientation
      */
     public void setPadding(int orientation, int gap) {
         setPadding(orientation, gap, false);
     }
 
+    /**
+     * Sets the Style Padding
+     * 
+     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+     * @param gap number of pixels to pad the orientation
+     */
+    public void setPadding(int orientation, float gap) {
+        setPadding(orientation, gap, false);
+    }
+    
     /**
      * Sets the Style Margin
      *  
@@ -1272,6 +1294,18 @@ public class Style {
      * @param right number of margin using the current unit
      */
     public void setMargin(int top, int bottom, int left, int right) {
+        setMargin((float)top, (float)bottom, (float)left, (float)right);
+    }
+    
+    /**
+     * Sets the Style Margin
+     *  
+     * @param top number of margin using the current unit
+     * @param bottom number of margin using the current unit
+     * @param left number of margin using the current unit
+     * @param right number of margin using the current unit
+     */
+    public void setMargin(float top, float bottom, float left, float right) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMargin(top, bottom, left, right);
@@ -1304,6 +1338,18 @@ public class Style {
     public void setMargin(int orientation, int gap) {
         setMargin(orientation, gap, false);
     }
+    
+
+    /**
+     * Sets the Style Margin
+     * 
+     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+     * @param gap number of margin using the current unit
+     */
+    public void setMargin(int orientation, float gap) {
+        setMargin(orientation, gap, false);
+    }
+    
     /**
      * Returns the Padding in the internal value regardless of the unit
      *
@@ -1327,7 +1373,7 @@ public class Style {
             }
         }
 
-        return padding[orientation];
+        return (int)padding[orientation];
     }
     
     /**
@@ -1366,9 +1412,18 @@ public class Style {
     /**
      * Sets the Style Padding on the top, this is equivalent to calling {@code setPadding(Component.TOP, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of pixels to pad the top
      */
     public void setPaddingTop(int gap) {
+        this.setPaddingTop((float)gap);
+    }
+    
+    /**
+     * Sets the Style Padding on the top, this is equivalent to calling {@code setPadding(Component.TOP, gap, false);}
+     * 
+     * @param gap number of pixels to pad the top
+     */
+    public void setPaddingTop(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPaddingTop(gap);
@@ -1388,9 +1443,18 @@ public class Style {
     /**
      * Sets the Style Padding on the bottom, this is equivalent to calling {@code setPadding(Component.BOTTOM, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of pixels to pad the bottom
      */
     public void setPaddingBottom(int gap) {
+        this.setPaddingBottom((float)gap);
+    }
+    
+    /**
+     * Sets the Style Padding on the bottom, this is equivalent to calling {@code setPadding(Component.BOTTOM, gap, false);}
+     * 
+     * @param gap number of pixels to pad the bottom
+     */
+    public void setPaddingBottom(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPaddingBottom(gap);
@@ -1410,9 +1474,18 @@ public class Style {
     /**
      * Sets the Style Padding on the left, this is equivalent to calling {@code setPadding(Component.LEFT, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of pixels to pad the left
      */
     public void setPaddingLeft(int gap) {
+        this.setPaddingLeft((float)gap);
+    }
+    
+    /**
+     * Sets the Style Padding on the left, this is equivalent to calling {@code setPadding(Component.LEFT, gap, false);}
+     * 
+     * @param gap number of pixels to pad the left
+     */
+    public void setPaddingLeft(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPaddingLeft(gap);
@@ -1432,9 +1505,18 @@ public class Style {
     /**
      * Sets the Style Padding on the right, this is equivalent to calling {@code setPadding(Component.RIGHT, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of pixels to pad the right
      */
     public void setPaddingRight(int gap) {
+        this.setPaddingRight((float)gap);
+    }
+    
+    /**
+     * Sets the Style Padding on the right, this is equivalent to calling {@code setPadding(Component.RIGHT, gap, false);}
+     * 
+     * @param gap number of pixels to pad the right
+     */
+    public void setPaddingRight(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPaddingRight(gap);
@@ -1455,9 +1537,18 @@ public class Style {
     /**
      * Sets the Style margin on the top, this is equivalent to calling {@code setMargin(Component.TOP, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of top margin using the current unit
      */
     public void setMarginTop(int gap) {
+        this.setMarginTop((float)gap);
+    }
+
+    /**
+     * Sets the Style margin on the top, this is equivalent to calling {@code setMargin(Component.TOP, gap, false);}
+     * 
+     * @param gap number of top margin using the current unit
+     */
+    public void setMarginTop(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMarginTop(gap);
@@ -1477,9 +1568,18 @@ public class Style {
     /**
      * Sets the Style Margin on the bottom, this is equivalent to calling {@code setMargin(Component.BOTTOM, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of bottom margin using the current unit
      */
     public void setMarginBottom(int gap) {
+        this.setMarginBottom((float)gap);
+    }
+    
+    /**
+     * Sets the Style Margin on the bottom, this is equivalent to calling {@code setMargin(Component.BOTTOM, gap, false);}
+     * 
+     * @param gap number of bottom margin using the current unit
+     */
+    public void setMarginBottom(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMarginBottom(gap);
@@ -1499,9 +1599,18 @@ public class Style {
     /**
      * Sets the Style Margin on the left, this is equivalent to calling {@code setMargin(Component.LEFT, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of left margin using the current unit
      */
     public void setMarginLeft(int gap) {
+        this.setMarginLeft((float)gap);
+    }
+    
+    /**
+     * Sets the Style Margin on the left, this is equivalent to calling {@code setMargin(Component.LEFT, gap, false);}
+     * 
+     * @param gap number of left margin using the current unit
+     */
+    public void setMarginLeft(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMarginLeft(gap);
@@ -1521,9 +1630,18 @@ public class Style {
     /**
      * Sets the Style Margin on the right, this is equivalent to calling {@code setMargin(Component.RIGHT, gap, false);}
      * 
-     * @param gap number of pixels to pad
+     * @param gap number of right margin using the current unit
      */
     public void setMarginRight(int gap) {
+        this.setMarginRight((float)gap);
+    }
+    
+    /**
+     * Sets the Style Margin on the right, this is equivalent to calling {@code setMargin(Component.RIGHT, gap, false);}
+     * 
+     * @param gap number of right margin using the current unit
+     */
+    public void setMarginRight(float gap) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMarginRight(gap);
@@ -1668,26 +1786,26 @@ public class Style {
         return convertUnit(paddingUnit, v, orientation);
     }
 
-    private int convertUnit(byte[] unitType, int v, int orientation) {
+    private int convertUnit(byte[] unitType, float v, int orientation) {
         if(unitType != null) {
             switch(unitType[orientation]) {
                 case UNIT_TYPE_DIPS:
-                    return Display.getInstance().convertToPixels(v, orientation == Component.LEFT || orientation == Component.RIGHT);
+                    return Display.getInstance().convertToPixels(v);
                 case UNIT_TYPE_SCREEN_PERCENTAGE:
                     if(orientation == Component.TOP || orientation == Component.BOTTOM) {
                         float h = Display.getInstance().getDisplayHeight();
-                        h = h / 100.0f * ((float)v);
+                        h = h / 100.0f * v;
                         return (int)h;
                     } else {
                         float w = Display.getInstance().getDisplayWidth();
-                        w = w / 100.0f * ((float)v);
+                        w = w / 100.0f * v;
                         return (int)w;
                     }
                 default:
-                    return v;
+                    return (int)v;
             }
         }
-        return v;
+        return (int)v;
     }
 
     /**
@@ -1743,7 +1861,7 @@ public class Style {
                     break;
             }
         }
-        return margin[orientation];
+        return (int)margin[orientation];
     }
 
     /**
@@ -2066,11 +2184,23 @@ public class Style {
      * Sets the Style Padding
      * 
      * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
-     * @param gap number of pixels to padd
+     * @param gap number of pixels to pad the orientation
      * @param override If set to true allows the look and feel/theme to override 
      * the value in this attribute when changing a theme/look and feel
      */
-    public void setPadding(int orientation, int gap,boolean override) {
+    public void setPadding(int orientation, int gap, boolean override) {
+        setPadding(orientation, (float)gap, override);
+    }
+    
+    /**
+     * Sets the Style Padding
+     * 
+     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+     * @param gap number of pixels to pad the orientation
+     * @param override If set to true allows the look and feel/theme to override 
+     * the value in this attribute when changing a theme/look and feel
+     */
+    public void setPadding(int orientation, float gap, boolean override) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setPadding(orientation, gap, override);
@@ -2093,7 +2223,6 @@ public class Style {
         }
     }
 
-
     /**
      * Sets the Style Margin
      * 
@@ -2103,6 +2232,18 @@ public class Style {
      * the value in this attribute when changing a theme/look and feel
      */
     public void setMargin(int orientation, int gap, boolean override) {
+        setMargin(orientation, (float)gap, override);
+    }
+    
+    /**
+     * Sets the Style Margin
+     * 
+     * @param orientation one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+     * @param gap number of margin using the current unit
+     * @param override If set to true allows the look and feel/theme to override 
+     * the value in this attribute when changing a theme/look and feel
+     */
+    public void setMargin(int orientation, float gap, boolean override) {
         if(proxyTo != null) {
             for(Style s : proxyTo) {
                 s.setMargin(orientation, gap, override);

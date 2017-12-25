@@ -32,16 +32,16 @@ extern void logGlErrorAt(const char *f, int l) {
     if(err != GL_NO_ERROR) {
         switch(err) {
             case GL_INVALID_ENUM:
-                NSLog(@"GL Error at %@:%i - GL_INVALID_ENUM", [NSString stringWithUTF8String:f], l);
+                CN1Log(@"GL Error at %@:%i - GL_INVALID_ENUM", [NSString stringWithUTF8String:f], l);
                 break;
             case GL_INVALID_VALUE:
-                NSLog(@"GL Error at %@:%i - GL_INVALID_VALUE", [NSString stringWithUTF8String:f], l);
+                CN1Log(@"GL Error at %@:%i - GL_INVALID_VALUE", [NSString stringWithUTF8String:f], l);
                 break;
             case GL_INVALID_OPERATION:
-                NSLog(@"GL Error at %@:%i - GL_INVALID_OPERATION", [NSString stringWithUTF8String:f], l);
+                CN1Log(@"GL Error at %@:%i - GL_INVALID_OPERATION", [NSString stringWithUTF8String:f], l);
                 break;
             default:
-                NSLog(@"GL Error at %@:%i - %i", [NSString stringWithUTF8String:f], l, err);
+                CN1Log(@"GL Error at %@:%i - %i", [NSString stringWithUTF8String:f], l, err);
                 break;
         }
     }
@@ -78,7 +78,7 @@ static BOOL blockDrawing = NO;
     host_page_size(host_port, &pagesize);
     vm_statistics_data_t vm_stat;
     if (host_statistics(host_port, HOST_VM_INFO, (host_info_t)&vm_stat, &host_size) != KERN_SUCCESS) {
-        NSLog(@"Failed to fetch vm statistics");
+        CN1Log(@"Failed to fetch vm statistics");
         return 0;
     }
     /* Stats in bytes */
@@ -96,7 +96,7 @@ static BOOL blockDrawing = NO;
     if( kerr == KERN_SUCCESS ) {
         return info.resident_size;
     } else {
-        NSLog(@"Error with task_info(): %s", mach_error_string(kerr));
+        CN1Log(@"Error with task_info(): %s", mach_error_string(kerr));
     }
     return 0;
 }
@@ -104,16 +104,16 @@ static BOOL blockDrawing = NO;
 
 -(void)executeWithLog {
     if(blockDrawing) {
-        NSLog(@"%@ was blocked due to clipping", [self getName]);
+        CN1Log(@"%@ was blocked due to clipping", [self getName]);
         return;
     }
     natural_t mem = [ExecutableOp get_free_memory];
-    NSLog(@"%@ starting total memory %i bytes", [self getName], mem);
+    CN1Log(@"%@ starting total memory %i bytes", [self getName], mem);
     NSDate *start = [NSDate date];
     [self executeWithClipping];
     NSDate *finish = [NSDate date];
     NSTimeInterval t = [finish timeIntervalSinceDate:start];
-    NSLog(@"%@ took %f seconds, and %i bytes", [self getName], t, [ExecutableOp get_free_memory] - mem);
+    CN1Log(@"%@ took %f seconds, and %i bytes", [self getName], t, [ExecutableOp get_free_memory] - mem);
 }
 
 -(NSString*)getName {

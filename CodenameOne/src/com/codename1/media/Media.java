@@ -85,6 +85,12 @@ public interface Media {
      * in the lock screen. This will return null or Boolean.TRUE.
      */
     public static final String VARIABLE_BACKGROUND_SUPPORTED = "bgInfoSupported";
+    
+    /**
+     * Write-only variable that can be used with getVariable() to set whether this
+     * video should include embedded native controls.
+     */
+    public static final String VARIABLE_NATIVE_CONTRLOLS_EMBEDDED = "nativeControlsVisible";
             
     /**
      * Starts playing the audio file

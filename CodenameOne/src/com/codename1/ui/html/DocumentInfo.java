@@ -209,7 +209,7 @@ public class DocumentInfo {
     }
 
     /**
-     * Returns the request paramter as an percentage-encoded string
+     * Returns the request paramter as a percentage-encoded string
      *
      * @return the request paramter as an encoded string
      */

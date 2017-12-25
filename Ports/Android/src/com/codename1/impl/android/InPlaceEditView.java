@@ -200,15 +200,55 @@ public class InPlaceEditView extends FrameLayout{
         mInputTypeMap.append(TextArea.PASSWORD, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         mInputTypeMap.append(TextArea.PHONENUMBER, InputType.TYPE_CLASS_PHONE);
         mInputTypeMap.append(TextArea.URL, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        
     }
 
+    private boolean hasConstraint(int inputType, int constraint) {
+        return ((inputType & constraint) == constraint);
+    }
+    private boolean isNonPredictive(int inputType) {
+        return hasConstraint(inputType, TextArea.NON_PREDICTIVE);
+    }
+    
+    private int makeNonPredictive(int codenameOneInputType, int inputType) {
+        if (isNonPredictive(codenameOneInputType)) {
+            return inputType | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+        }
+        return inputType;
+    }
+    
     /**
      * Get the Android equivalent input type for a given Codename One input-type
      * @param codenameOneInputType One of the com.codename1.ui.TextArea input type constants
      * @return The Android equivalent of the given input type
      */
     private int getAndroidInputType(int codenameOneInputType) {
-        int type = mInputTypeMap.get(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
+        int type = mInputTypeMap.get(codenameOneInputType, -1);
+        if (type == -1) {
+            
+            if (hasConstraint(codenameOneInputType, TextArea.NUMERIC)) {
+                type = InputType.TYPE_CLASS_NUMBER;
+            } else if (hasConstraint(codenameOneInputType, TextArea.DECIMAL)) {
+                type = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED;
+            } else if (hasConstraint(codenameOneInputType, TextArea.EMAILADDR)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                
+            } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_SENTENCE)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+                
+            } else if (hasConstraint(codenameOneInputType, TextArea.INITIAL_CAPS_WORD)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+
+            } else if (hasConstraint(codenameOneInputType, TextArea.PASSWORD)) {
+                type = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
+            } else if (hasConstraint(codenameOneInputType, TextArea.PHONENUMBER)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_PHONE);
+            } else if (hasConstraint(codenameOneInputType, TextArea.URL)) {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+            } else {
+                type = makeNonPredictive(codenameOneInputType, InputType.TYPE_CLASS_TEXT);
+            }
+        }
 
         // If we're editing standard text, disable auto complete.
         // The name of the flag is a little misleading. From the docs:
@@ -504,7 +544,7 @@ public class InPlaceEditView extends FrameLayout{
         if (!impl.isAsyncEditMode()) {
             boolean leaveVKBOpen = false;
             if (mEditText != null && mEditText.mTextArea != null && mEditText.mTextArea.getComponentForm() != null) {
-                Component c = mEditText.mTextArea.getComponentForm().getComponentAt((int) event.getX(), (int) event.getY());
+                Component c = mEditText.mTextArea.getComponentForm().getResponderAt((int) event.getX(), (int) event.getY());
                 if ( mEditText.mTextArea.getClientProperty("leaveVKBOpen") != null
                         || (c != null && c instanceof TextArea && ((TextArea) c).isEditable() && ((TextArea) c).isEnabled())) {
                     leaveVKBOpen = true;
@@ -922,6 +962,22 @@ public class InPlaceEditView extends FrameLayout{
         mEditText.setFilters(FilterArray);
         mEditText.setSelection(mEditText.getText().length());
         showVirtualKeyboard(true);
+        
+        /*
+        // Leaving this hack here for posterity.  It seems that this manually
+        // blinking cursor causes the paste menu to disappear
+        // https://github.com/codenameone/CodenameOne/issues/2147
+        // Removing the hack below, fixes this issue.  And in the test device
+        // I'm using the blinking of text doesn't seem to occur, so perhaps
+        // it was fixed via other means.  Test device:
+        // Name: Samsung Galaxy S3 (T-Mobile)
+        //    OS: 4.3
+        //    Manufacturer: Samsung
+        //    Model: 4.3
+        //    Chipset: armeabi-v7a 1512MHz
+        //    Memory: 16000000000
+        //    Heap: 256000000
+        //    Display: 720 x 1280
         if (Build.VERSION.SDK_INT < 21) {
             // HACK!!!  On Android 4.4, it seems that the natural blinking cursor
             // causes text to disappear when it blinks.  Manually blinking the
@@ -949,6 +1005,7 @@ public class InPlaceEditView extends FrameLayout{
             };
             cursorTimer.schedule(cursorTimerTask, 100, 500);
         }
+        */
     }
 
     /**

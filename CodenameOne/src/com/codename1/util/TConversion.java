@@ -387,7 +387,7 @@ class TConversion {
         } else {
             /*
              * Make the dividend positive shifting it right by 1 bit then get
-             * the quotient an remainder and correct them properly
+             * the quotient a remainder and correct them properly
              */
             long aPos = a >>> 1;
             long bPos = 1000000000L >>> 1;

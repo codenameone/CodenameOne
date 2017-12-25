@@ -27,7 +27,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.geom.*;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.plaf.UIManager;
 
 /**
  * <p>Layout manager that places elements in a row (<code>X_AXIS</code>) or column (<code>Y_AXIS</code>) 
@@ -102,7 +101,6 @@ public class BoxLayout extends Layout{
     public static BoxLayout y() {
         return new BoxLayout(BoxLayout.Y_AXIS);
     }
-    
     
     /**
      * Shorthand for {@code new BoxLayout(BoxLayout.X_AXIS)}
@@ -207,7 +205,6 @@ public class BoxLayout extends Layout{
     
     private Dimension dim = new Dimension(0, 0);
 
-
     /**
      * {@inheritDoc}
      */
@@ -271,7 +268,6 @@ public class BoxLayout extends Layout{
     public static Container encloseY(Component... cmps) {
         return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS), cmps);
     }
-
     
     /**
      * The equivalent of Container.enclose() with a box layout X

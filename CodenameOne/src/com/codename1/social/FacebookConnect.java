@@ -25,6 +25,7 @@ package com.codename1.social;
 import com.codename1.facebook.FaceBookAccess;
 import com.codename1.io.AccessToken;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Log;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
 import com.codename1.util.Callback;
@@ -62,6 +63,7 @@ public class FacebookConnect extends Login{
                 try {
                     instance = (FacebookConnect) implClass.newInstance();
                 } catch (Throwable t) {
+                    Log.e(t);
                     instance = new FacebookConnect();
                 }
             } else {

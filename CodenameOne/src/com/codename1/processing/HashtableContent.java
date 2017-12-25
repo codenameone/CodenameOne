@@ -101,7 +101,7 @@ class MapContent implements StructuredContent {
     }
 
     /**
-     * Convert the object back to an JSON string.
+     * Convert the object back to a JSON string.
      *
      * @return the object as a string
      */

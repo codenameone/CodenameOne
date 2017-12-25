@@ -1,29 +1,142 @@
-language: java
+matrix:
+  include:
+    - language: java
+      env: CN1_PLATFORM=javase CN1_RUNTESTS_JAVASE=1
+      jdk: oraclejdk8
+      before_script:
+        - "export DISPLAY=:99.0"
+        - "sh -e /etc/init.d/xvfb start"
 
-# Set JDK needed for JavaTestApplication
-jdk:
-  - oraclejdk8    
-  
- # Enable initializing of GUI context required for running tests
-before_script:
-  - "export DISPLAY=:99.0"
-  - "sh -e /etc/init.d/xvfb start"
-  
-script: 
- - wget https://github.com/codenameone/cn1-binaries/archive/master.zip
- - unzip master.zip -d ../
- - mv ../cn1-binaries-master ../cn1-binaries
- - rm master.zip
- - wget https://github.com/codenameone/codenameone-skins/archive/master.zip
- - unzip master.zip -d ../
- - mv ../codenameone-skins-master ../codenameone-skins
- - cd ../codenameone-skins
- - ./build_skins.sh
- - mv ../CodenameOne ../cn1
- - cd ../cn1
- - cd CodenameOne
- - ant jar
- - cd ../CodenameOneDesigner
- - mkdir dist
- - mkdir dist/lib
- - ant release
+# ##<CN1:android-15>##
+# Having trouble with emulator not starting on travis, so disabling for now
+#     - language: android
+#       jdk: oraclejdk8
+#       env: CN1_PLATFORM=android API=15 CN1_RUNTESTS_ANDROID_EMULATOR=1
+#       addons:
+#         apt:
+#           packages:
+#             - ant
+#             - maven
+#       android:
+#         components:
+#           - platform-tools
+#           - android-15
+#           - addon-google_apis-google-15
+#           - sys-img-armeabi-v7a-google_apis-15
+# ##</CN1:android-15>##
+##<CN1:android-16>##
+    - language: android
+      jdk: oraclejdk8
+      env: CN1_PLATFORM=android API=16 CN1_RUNTESTS_ANDROID_EMULATOR=1
+      addons:
+        apt:
+          packages:
+            - ant
+            - maven
+      android:
+        components:
+          - platform-tools
+          - android-16
+          - sys-img-armeabi-v7a-android-16
+##</CN1:android-16>##
+##<CN1:android-17>##
+    - language: android
+      jdk: oraclejdk8
+      env: CN1_PLATFORM=android API=17 CN1_RUNTESTS_ANDROID_EMULATOR=1
+      addons:
+        apt:
+          packages:
+            - ant
+            - maven
+      android:
+        components:
+          - platform-tools
+          - android-17
+          - addon-google_apis-google-17
+          - sys-img-armeabi-v7a-google_apis-17
+##</CN1:android-17>##
+##<CN1:android-18>##
+    - language: android
+      jdk: oraclejdk8
+      env: CN1_PLATFORM=android API=18 CN1_RUNTESTS_ANDROID_EMULATOR=1
+      addons:
+        apt:
+          packages:
+            - ant
+            - maven
+      android:
+        components:
+          - platform-tools
+          - android-18
+          - addon-google_apis-google-18
+          - sys-img-armeabi-v7a-google_apis-18
+##</CN1:android-18>##
+##<CN1:android-19>##
+    - language: android
+      jdk: oraclejdk8
+      env: CN1_PLATFORM=android API=19 CN1_RUNTESTS_ANDROID_EMULATOR=1
+      addons:
+        apt:
+          packages:
+            - ant
+            - maven
+      android:
+        components:
+          - platform-tools
+          - android-19
+          - sys-img-armeabi-v7a-android-19
+          - sys-img-armeabi-v7a-addon-google_apis-google-19
+##</CN1:android-19>##
+##<CN1:android-21>##
+    - language: android
+      jdk: oraclejdk8
+      env: CN1_PLATFORM=android API=21 CN1_RUNTESTS_ANDROID_EMULATOR=1
+      addons:
+        apt:
+          packages:
+            - ant
+            - maven
+      android:
+        components:
+          - platform-tools
+          - android-21
+          - sys-img-armeabi-v7a-android-21
+          - sys-img-armeabi-v7a-addon-google_apis-google-21
+##</CN1:android-21>##
+##<CN1:android-22>##
+    - language: android
+      jdk: oraclejdk8
+      env: CN1_PLATFORM=android API=22 CN1_RUNTESTS_ANDROID_EMULATOR=1
+      addons:
+        apt:
+          packages:
+            - ant
+            - maven
+      android:
+        components:
+          - platform-tools
+          - android-22
+          - sys-img-armeabi-v7a-android-22
+##</CN1:android-22>##
+# Need to wait for iOS build server update before  iOS automated tests
+# will work, so we comment them out for now.
+# TODO: Uncomment when build server is updated.
+##<CN1:ios-9_3>##
+    - osx_image: xcode7.3
+      node_js: "6"
+      env: CN1_PLATFORM=ios DEVICE=9.3 CN1_RUNTESTS_IOS_SIMULATOR=1
+      sudo: required
+      os: osx
+      language: node_js
+##</CN1:ios-9_3>##
+##<CN1:ios-10_3>##
+    - osx_image: xcode8.3
+      node_js: "6"
+      env: CN1_PLATFORM=ios DEVICE=10.3 CN1_RUNTESTS_IOS_SIMULATOR=1
+      sudo: required
+      os: osx
+      language: node_js
+##</CN1:ios-10_3>##
+
+script:
+  - bash .travis/build.sh;

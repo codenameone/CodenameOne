@@ -24,6 +24,7 @@
 package com.codename1.ui.plaf;
 
 import com.codename1.components.InfiniteProgress;
+import com.codename1.io.Util;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -1703,6 +1704,13 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             pull.layoutContainer();
             pull.setHeight(Math.max(pullDown.getPreferredH(), pull.getPreferredH()));
         }
+        String s = UIManager.getInstance().getThemeConstant("pullToRefreshHeight", null);
+        if(s != null) {
+            float f = Util.toFloatValue(s);
+            if(f > 0) {
+                return Display.getInstance().convertToPixels(f);
+            }
+        }
         return pull.getHeight();
     }
      
@@ -1783,9 +1791,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 return;
             }
             UIManager uim = UIManager.getInstance();
-            Style unsel = uim.createStyle("CheckBox", "", false);
-            Style sel = uim.createStyle("CheckBox", "sel#", true);
-            Style dis = uim.createStyle("CheckBox", "dis#", false);
+            Style unsel = uim.createStyle("CheckBox.", "", false);
+            Style sel = uim.createStyle("CheckBox.", "sel#", true);
+            Style dis = uim.createStyle("CheckBox.", "dis#", false);
             FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX, dis);
             FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK, sel);
             if(focus) {
@@ -1824,9 +1832,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 return;
             }
             UIManager uim = UIManager.getInstance();
-            Style unsel = uim.createStyle("RadioButton", "", false);
-            Style sel = uim.createStyle("RadioButton", "sel#", true);
-            Style dis = uim.createStyle("RadioButton", "dis#", false);
+            Style unsel = uim.createStyle("RadioButton.", "", false);
+            Style sel = uim.createStyle("RadioButton.", "sel#", true);
+            Style dis = uim.createStyle("RadioButton.", "dis#", false);
             FontImage checkedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_CHECKED, dis);
             FontImage uncheckedDis = FontImage.createMaterial(FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED, sel);
             if(focus) {

@@ -1328,6 +1328,7 @@ public class Util {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
+        cr.setReadResponseForErrors(false);
         cr.setDuplicateSupported(true);
         cr.setUrl(url);
         if(callback != null) {
@@ -1380,6 +1381,38 @@ public class Util {
             }
         }
     }    
+    
+    /**
+     * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
+     * includes the synchronized block to further reduce code clutter
+     * @param o the object to wait on
+     */
+    public static void wait(Object o) {
+        synchronized(o) {
+            try {
+                o.wait();
+            } catch(InterruptedException e) {
+            }
+        }
+    }    
+    
+    /**
+     * Returns true or false based on a "soft" object
+     * @param val a boolean value as a Boolean object, String or number
+     * @return true or false
+     */
+    public static boolean toBooleanValue(Object val) {
+        if(val == null) {
+            return false;
+        }
+        if(val instanceof Boolean) {
+            return ((Boolean)val).booleanValue();
+        }
+        if(val instanceof String) {
+            return ((String)val).toLowerCase().startsWith("t");
+        }
+        return toIntValue(val) != 0;
+    }
     
     /**
      * Returns the number object as an int

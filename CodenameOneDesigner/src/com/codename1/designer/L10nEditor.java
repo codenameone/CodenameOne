@@ -265,12 +265,12 @@ public class L10nEditor extends BaseForm {
                                 fireEditingStoppedExt();
                                 return;
                             }
-                            if(editedKey.startsWith("@vkb")) {
+                            /*if(editedKey.startsWith("@vkb")) {
                                 VKBEditor v = new VKBEditor(button, editedKey.substring(5), (String)currentValue);
                                 currentValue = v.getValue();
                                 fireEditingStoppedExt();
                                 return;
-                            }
+                            }*/
                             if(editedKey.startsWith("@im")) {
                                 currentValue = editTextFieldInputMode((String)currentValue);
                                 fireEditingStoppedExt();

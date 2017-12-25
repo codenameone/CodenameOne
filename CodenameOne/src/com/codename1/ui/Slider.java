@@ -444,6 +444,9 @@ public class Slider extends Label {
     }    
    
     public void pointerPressed(int x, int y) {
+        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+            return;
+        }
         if(!editable) {
             return;
         }
@@ -473,21 +476,25 @@ public class Slider extends Label {
             previousX = x;
         
         }
+        
     }
 
     /**
      * {@inheritDoc}
      */
     public void pointerDragged(int x, int y) {
+        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+            return;
+        }
         if(!editable) {
             return;
         }
         if(vertical && previousY == -1){
-            previousY = y;
+            previousY = y - getAbsoluteY();
             return;
         }
         if(!vertical && previousX == -1){
-            previousX = x;
+            previousX = x - getAbsoluteX();
             return;
         }
         int per = 0;
@@ -539,6 +546,9 @@ public class Slider extends Label {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        if (Display.getInstance().getImplementation().isScrollWheeling()) {
+            return;
+        }
         if(!editable) {
             return;
         }

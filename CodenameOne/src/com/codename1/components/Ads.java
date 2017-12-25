@@ -55,6 +55,7 @@ import java.util.Vector;
  * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
  * 
  * @author Chen
+ * @deprecated we recommend developers check out newer ad options in the cn1lib section of the Codename One website
  */
 public class Ads extends Container implements HTMLCallback {
 

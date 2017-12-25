@@ -45,6 +45,7 @@ import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
@@ -376,9 +377,28 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         ArrayList<AsyncOp> tmp = renderingOperations;
         renderingOperations = pendingRenderingOperations;
         pendingRenderingOperations = tmp;
-        
-        for (AsyncOp o : renderingOperations) {
-            o.prepare();
+        try {
+            for (AsyncOp o : renderingOperations) {
+                o.prepare();
+            }
+        } catch (java.util.ConcurrentModificationException ex) {
+            // This is a race condition that sometimes occurs
+            // Rather than add synchronized here (which may have performance implications)
+            // we'll just "give up" and issue a repaint.
+            Log.p("NOTICE: Hit concurrent modification race condition in flushGraphics.  Skipping flush, and issuing another repaint.");
+            Log.e(ex);
+            Display.getInstance().callSerially(new Runnable() {
+
+                @Override
+                public void run() {
+                    Form f = Display.getInstance().getCurrent();
+                    if (f != null) {
+                        f.repaint();
+                    }
+                }
+                
+            });
+            return;
         }
 
         int children = getChildCount();
@@ -622,19 +642,47 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
                         if(v.getParent() == null) {
                             v.setLayoutParams(lp);
                             addView(v);
+                            ArrayList<View> toRemove = new ArrayList<View>();
+                            ViewGroup parentGroup = (ViewGroup)v.getParent();
+                            int childCount = parentGroup.getChildCount();
+                            for (int i=0; i<childCount; i++) {
+                                View child = parentGroup.getChildAt(i);
+                                if (child == v) {
+                                    continue;
+                                }
+                                AndroidImplementation.AndroidPeer peer = AndroidImplementation.activePeers.get(child);
+
+                                if (peer != null) {
+                                    if (!peer._initialized()) {
+                                        toRemove.add(child);
+                                    }
+                                }
+                            }
+                            for (View child : toRemove) {
+                                removeView(child);
+                                synchronized(AndroidImplementation.activePeers) {
+                                    AndroidImplementation.activePeers.remove(child);
+                                }
+                            }
+
                         }
                     }
                 });
+
             }
             pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
                 @Override
                 public void execute(AndroidGraphics underlying) {
-                    drawChild(underlying.canvas, v, getDrawingTime());
+                    if (v.getParent() != null) {
+                        drawChild(underlying.canvas, v, getDrawingTime());
+                    }
                 }
+
                 public String toString() {
                     return "drawView(PeerComponent)";
                 }
             });
+
         }
 
         @Override

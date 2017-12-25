@@ -194,7 +194,7 @@ public class L10NManager {
         for(int iter = 1 ; iter < decimalPlaces ; iter++) {
             pos *= 10;
         }
-        long ln = (long)(number * pos);
+        long ln = Math.round(number * pos);
         number = ((double)ln) / pos;
         return format(number);
     }

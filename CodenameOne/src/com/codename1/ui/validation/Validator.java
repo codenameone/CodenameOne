@@ -36,6 +36,8 @@ import com.codename1.ui.List;
 import com.codename1.ui.Painter;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.InputComponent;
+import com.codename1.ui.TextComponent;
 import com.codename1.ui.TextField;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -45,6 +47,7 @@ import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.Picker;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -378,8 +381,14 @@ public class Validator {
      * @return  the object value
      */
     protected Object getComponentValue(Component cmp) {
+        if(cmp instanceof InputComponent) {
+            cmp = ((InputComponent)cmp).getEditor();
+        }
         if(cmp instanceof TextArea) {
             return ((TextArea)cmp).getText();
+        }
+        if(cmp instanceof Picker) {
+            ((Picker)cmp).getValue();
         }
         if(cmp instanceof RadioButton || cmp instanceof CheckBox) {
             if(((Button)cmp).isSelected()) {
@@ -404,62 +413,72 @@ public class Validator {
      */
     public void bindDataListener(Component cmp) {
         if(showErrorMessageForFocusedComponent) {
-            cmp.addFocusListener(new FocusListener() {
-                public void focusGained(Component cmp) {
-                    // special case. Before the form is showing don't show error dialogs
-                    Form p = cmp.getComponentForm();
-                    if(p != Display.getInstance().getCurrent()) {
-                        return;
-                    }
-                    if(message != null) {
-                        message.dispose();
-                    }
-                    if(!isValid(cmp)) {
-                        String err = getErrorMessage(cmp);
-                        if(err != null && err.length() > 0) {
-                            message = new InteractionDialog(err);
-                            message.getTitleComponent().setUIID(errorMessageUIID);
-                            message.setAnimateShow(false);
-                            if(validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
-                                int xpos = cmp.getAbsoluteX();
-                                int ypos = cmp.getAbsoluteY();
-                                Component scr = cmp.getScrollable();
-                                if(scr != null) {
-                                    xpos -= scr.getScrollX();
-                                    ypos -= scr.getScrollY();
-                                    scr.addScrollListener(new ScrollListener() {
-                                        public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-                                            if (message != null) {
-                                                message.dispose();
+            if(!(cmp instanceof InputComponent && ((InputComponent)cmp).isOnTopMode())) {
+                cmp.addFocusListener(new FocusListener() {
+                    public void focusGained(Component cmp) {
+                        // special case. Before the form is showing don't show error dialogs
+                        Form p = cmp.getComponentForm();
+                        if(p != Display.getInstance().getCurrent()) {
+                            return;
+                        }
+                        if(message != null) {
+                            message.dispose();
+                        }
+                        if(!isValid(cmp)) {
+                            String err = getErrorMessage(cmp);
+                            if(err != null && err.length() > 0) {
+                                message = new InteractionDialog(err);
+                                message.getTitleComponent().setUIID(errorMessageUIID);
+                                message.setAnimateShow(false);
+                                if(validationFailureHighlightMode == HighlightMode.EMBLEM || validationFailureHighlightMode == HighlightMode.UIID_AND_EMBLEM) {
+                                    int xpos = cmp.getAbsoluteX();
+                                    int ypos = cmp.getAbsoluteY();
+                                    Component scr = cmp.getScrollable();
+                                    if(scr != null) {
+                                        xpos -= scr.getScrollX();
+                                        ypos -= scr.getScrollY();
+                                        scr.addScrollListener(new ScrollListener() {
+                                            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+                                                if (message != null) {
+                                                    message.dispose();
+                                                }
+                                                message = null;
                                             }
-                                            message = null;
-                                        }
-                                    });
+                                        });
+                                    }
+                                    float width = cmp.getWidth();
+                                    float height = cmp.getHeight();
+                                    xpos += Math.round(width * validationEmblemPositionX);
+                                    ypos += Math.round(height * validationEmblemPositionY);
+                                    if(message != null) {
+                                        message.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(), 
+                                                validationFailedEmblem.getHeight()));
+                                    }
+                                } else {
+                                    message.showPopupDialog(cmp);
                                 }
-                                float width = cmp.getWidth();
-                                float height = cmp.getHeight();
-                                xpos += Math.round(width * validationEmblemPositionX);
-                                ypos += Math.round(height * validationEmblemPositionY);
-                                if(message != null) {
-                                    message.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(), 
-                                            validationFailedEmblem.getHeight()));
-                                }
-                            } else {
-                                message.showPopupDialog(cmp);
                             }
                         }
                     }
-                }
 
-                public void focusLost(Component cmp) {
-                }
-            });
+                    public void focusLost(Component cmp) {
+                    }
+                });
+            }
         }
         if(validateOnEveryKey) {
+            if(cmp instanceof TextComponent) {
+                ((TextComponent)cmp).getField().addDataChangedListener(new ComponentListener(cmp));
+                return;
+            }
             if(cmp instanceof TextField) {
                 ((TextField)cmp).addDataChangedListener(new ComponentListener(cmp));
                 return;
             }
+        }
+        if(cmp instanceof TextComponent) {
+            ((TextComponent)cmp).getField().addActionListener(new ComponentListener(cmp));
+            return;
         }
         if(cmp instanceof TextArea) {
             ((TextArea)cmp).addActionListener(new ComponentListener(cmp));
@@ -518,13 +537,6 @@ public class Validator {
     void setValid(Component cmp, boolean v) {
         Boolean b = (Boolean)cmp.getClientProperty(VALID_MARKER);
         if(b != null && b.booleanValue() == v) {
-            /*
-            if (!v) {
-                for(Component c : submitButtons) {
-                    c.setEnabled(false);
-                }
-            }
-            */
             return;
         }
         cmp.putClientProperty(VALID_MARKER, v);
@@ -540,6 +552,15 @@ public class Validator {
             }
             if(message != null && cmp.hasFocus()) {
                 message.dispose();
+            }
+        }
+
+        if(cmp instanceof InputComponent && ((InputComponent)cmp).isOnTopMode()) {
+            InputComponent tc = (InputComponent)cmp;
+            if(v) {
+                tc.errorMessage(null);
+            } else {
+                tc.errorMessage(getErrorMessage(cmp));
             }
         }
         
@@ -592,13 +613,20 @@ public class Validator {
         public void paint(Graphics g, Rectangle rect) {
             for(Component c : constraintList.keySet()) {
                 if(!isValid(c)) {
+                    if(c instanceof InputComponent && ((InputComponent)c).isOnTopMode()) {
+                        continue;
+                    }
                     int xpos = c.getAbsoluteX();
                     int ypos = c.getAbsoluteY();
                     float width = c.getWidth();
                     float height = c.getHeight();
                     xpos += Math.round(width * validationEmblemPositionX);
                     ypos += Math.round(height * validationEmblemPositionY);
-                    g.drawImage(validationFailedEmblem, xpos - validationFailedEmblem.getWidth() / 2, ypos - validationFailedEmblem.getHeight() / 2);
+                    if(xpos + validationFailedEmblem.getWidth() > Display.getInstance().getDisplayWidth()) {
+                        g.drawImage(validationFailedEmblem, xpos - validationFailedEmblem.getWidth(), ypos - validationFailedEmblem.getHeight() / 2);
+                    } else {
+                        g.drawImage(validationFailedEmblem, xpos - validationFailedEmblem.getWidth() / 2, ypos - validationFailedEmblem.getHeight() / 2);
+                    }
                 }
             }
         }

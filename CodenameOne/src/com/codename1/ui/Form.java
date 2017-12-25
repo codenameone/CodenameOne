@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.io.Log;
 import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -61,11 +62,18 @@ public class Form extends Container {
     static int activePeerCount;
     private Painter glassPane;
     private Container layeredPane;
+    private Container formLayeredPane;
     private Container contentPane;
     Container titleArea = new Container(new BorderLayout());
     private Label title = new Label("", "Title");
     private MenuBar menuBar;
     private Component dragged;
+    private boolean enableCursors;
+    static Motion rippleMotion;
+    static Component rippleComponent;
+    static int rippleX;
+    static int rippleY;
+    
     ArrayList<Component> buttonsAwatingRelease;
     
     private AnimationManager animMananger = new AnimationManager(this);
@@ -199,6 +207,26 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+    }
+    
+    /**
+     * Checks if custom cursors are enabled on this form.  They are turned off by default since 
+     * they incur some overhead.
+     * @return True if cursors are enabled on this form.
+     * @see #setEnableCursors(boolean) 
+     * @see Component#setCursor(int) 
+     */
+    public boolean isEnableCursors() {
+        return enableCursors;
+    }
+    
+    /**
+     * Enable or disable custom cursors on this form.  They are turned off by default since they incur some overhead.
+     * @param e True to enable cursors.  False to disable them.
+     * @see Component#setCursor(int) 
+     */
+    public void setEnableCursors(boolean e) {
+        this.enableCursors = e;
     }
     
     /**
@@ -593,8 +621,14 @@ public class Form extends Container {
         if(getMenuBar().isDragRegion(x, y)) {
             return true;
         }
+        if (formLayeredPane != null && formLayeredPane.isDragRegion(x, y)) {
+            return true;
+        }
         Container actual = getActualPane();
         Component c = actual.getComponentAt(x, y);
+        while (c != null && c.isIgnorePointerEvents()) {
+            c = c.getParent();
+        }
         return c != null && c.isDragRegion(x, y);
     }
     
@@ -612,11 +646,20 @@ public class Form extends Container {
         if(menuBarDrag != DRAG_REGION_NOT_DRAGGABLE) {
             return menuBarDrag;
         }
+        int formLayeredPaneDrag = formLayeredPane != null ? 
+                formLayeredPane.getDragRegionStatus(x, y) : 
+                DRAG_REGION_NOT_DRAGGABLE;
+        if (formLayeredPaneDrag != DRAG_REGION_NOT_DRAGGABLE) {
+            return formLayeredPaneDrag;
+        }
         Container actual = getActualPane();
         
         // no idea how this can happen
         if(actual != null) {
             Component c = actual.getComponentAt(x, y);
+            while (c != null && c.isIgnorePointerEvents()) {
+                c = c.getParent();
+            }
             if(c != null) {
                 return c.getDragRegionStatus(x, y);
             }
@@ -1065,6 +1108,70 @@ public class Form extends Container {
         cnt.putClientProperty("cn1$_cls", n);
         return cnt;
     }
+
+    /**
+     * Returns the layered pane for the class and if one doesn't exist a new one is created 
+     * dynamically and returned. This version of the method returns a layered pane on the whole
+     * form
+     * @param c the class with which this layered pane is associated, null for the global layered pane which
+     * is always on the bottom
+     * @param top if created this indicates whether the layered pane should be added on top or bottom
+     * @return the layered pane instance
+     */
+    public Container getFormLayeredPane(Class c, boolean top) {
+        if(formLayeredPane == null) {
+            formLayeredPane = new Container(new LayeredLayout()) {
+                @Override
+                protected void paintBackground(Graphics g) {
+                    if(getComponentCount() > 0) {
+                        if(isVisible()) {
+                            setVisible(false);
+                            Form.this.paint(g);
+                            setVisible(true);
+                        }
+                    }
+                }
+
+                @Override
+                public void paintBackgrounds(Graphics g) {
+                }
+            };
+            formLayeredPane.setName("FormLayeredPane");
+            addComponentToForm(BorderLayout.OVERLAY, formLayeredPane);
+        }
+        if(c == null) {
+             for(Component cmp : formLayeredPane) {
+                 if(cmp.getClientProperty("cn1$_cls") == null) {
+                     return (Container)cmp;
+                 }
+             } 
+             Container cnt = new Container();
+             cnt.setWidth(getWidth());
+             cnt.setHeight(getHeight());
+             cnt.setShouldLayout(false);
+             cnt.setName("FormLayer: " + c.getName());
+             formLayeredPane.add(cnt);
+             return cnt;
+        }
+        String n = c.getName();
+        for(Component cmp : formLayeredPane) {
+            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container)cmp;
+            }
+        } 
+        Container cnt = new Container();
+        cnt.setWidth(getWidth());
+        cnt.setHeight(getHeight());
+        cnt.setShouldLayout(false);
+        cnt.setName("FormLayer: " + c.getName());
+        if(top) {
+            formLayeredPane.add(cnt);
+        } else {
+            formLayeredPane.addComponent(0, cnt);            
+        }
+        cnt.putClientProperty("cn1$_cls", n);
+        return cnt;
+    }
     
     /**
      * This method returns the layered pane of the Form, the layered pane is laid
@@ -1075,8 +1182,8 @@ public class Form extends Container {
      */ 
     private Container getLayeredPaneImpl() {
         if(layeredPane == null){
-            Container parent = contentPane.wrapInLayeredPane();
             layeredPane = new Container(new LayeredLayout());
+            Container parent = contentPane.wrapInLayeredPane();
             // adds the global layered pane
             layeredPane.add(new Container());
             parent.addComponent(layeredPane);
@@ -1088,9 +1195,25 @@ public class Form extends Container {
     Container getActualPane(){
         if(layeredPane != null){
             return layeredPane.getParent();
-        }else{
+        } else {
             return contentPane;
         }
+    }
+    
+    /**
+     * Gets the actual pane, but first checks to see if the provided overlay
+     * responds to events at the provided absolute x and y coordinates.
+     * @param overlay
+     * @param x
+     * @param y
+     * @return If {@literal overlay} responds to events at {@literal (x,y)} then
+     * it returns {@literal overlay}, otherwise it returns the result of {@link #getActualPane() }
+     */
+    private Container getActualPane(Container overlay, int x, int y) {
+        if (overlay != null && overlay.getResponderAt(x, y) != null) {
+            return overlay;
+        }
+        return getActualPane();
     }
     
 
@@ -1356,6 +1479,12 @@ public class Form extends Container {
      * frame
      */
     void repaintAnimations() {
+        if(rippleComponent != null) {
+            rippleComponent.repaint();
+            if(rippleMotion == null) {
+                rippleComponent = null;
+            } 
+        }
         if (animatableComponents != null) {
             loopAnimations(animatableComponents, null);
         }
@@ -1617,7 +1746,13 @@ public class Form extends Container {
 
     void initFocused() {
         if (focused == null) {
-            setFocused(getActualPane().findFirstFocusable());
+            Component focusable = formLayeredPane != null ? 
+                    formLayeredPane.findFirstFocusable() : 
+                    null;
+            if (focusable == null) {
+                focusable = getActualPane().findFirstFocusable();
+            }
+            setFocused(focusable);
             if (!Display.getInstance().shouldRenderSelection()) {
                 return;
             }
@@ -1774,9 +1909,9 @@ public class Form extends Container {
                     }
                 }
             }
-
-            previousForm.tint = true;
         }
+
+        previousForm.tint = true;
         Painter p = getStyle().getBgPainter();
         if (top > 0 || bottom > 0 || left > 0 || right > 0) {
             if (!title.isVisible()) {
@@ -2146,7 +2281,8 @@ public class Form extends Container {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the layout manager of the form's content pane.
+     * @see #getActualLayout() For the actual layout of the form.
      */
     public Layout getLayout() {
         return contentPane.getLayout();
@@ -2235,6 +2371,16 @@ public class Form extends Container {
             keyReleased(keyCode);
         }
     }
+    
+    private void initRippleEffect(int x, int y, Component cmp) {
+        if(cmp.isRippleEffect()) {
+            rippleMotion = Motion.createEaseInMotion(0, 1000, 800);
+            rippleMotion.start();
+            rippleComponent = cmp;
+            rippleX = x;
+            rippleY = y;
+        }
+    }
 
     private void tactileTouchVibe(int x, int y, Component cmp) {
         if (tactileTouchDuration > 0 && cmp.isTactileTouch(x, y)) {
@@ -2242,28 +2388,41 @@ public class Form extends Container {
         }
     }
 
+    private Component pressedCmp;
+    
     /**
      * {@inheritDoc}
      */
     public void pointerPressed(int x, int y) {
+        pressedCmp = null;
         stickyDrag = null;
         dragStopFlag = false;
         dragged = null;
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         //check if the click is relevant to the menu bar.
+        /*
         if (menuBar.contains(x, y)) {
             Component cmp = menuBar.getComponentAt(x, y);
+            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                cmp = cmp.getParent();
+            }
             if (cmp != null && cmp.isEnabled()) {
                 cmp.pointerPressed(x, y);
                 tactileTouchVibe(x, y, cmp);
+                initRippleEffect(x, y, cmp);
             }
             return;
         }
-        Container actual = getActualPane();
+        */
+        Container actual = getActualPane(formLayeredPane, x, y);
         if (y >= actual.getY() && x >= actual.getX()) {
             Component cmp = actual.getComponentAt(x, y);
+            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                cmp = cmp.getParent();
+            }
             if (cmp != null) {
                 cmp.initDragAndDrop(x, y);
                 if (cmp.hasLead) {
@@ -2281,7 +2440,10 @@ public class Form extends Container {
                         leadParent = cmp.getParent().getLeadParent();
                     }
                     leadParent.repaint();
-                    setFocused(leadParent);
+                    if (!isScrollWheeling) {
+                        setFocused(leadParent);
+                    }
+                    pressedCmp = cmp.getLeadComponent();
                     cmp.getLeadComponent().pointerPressed(x, y);
                 } else {
                     
@@ -2292,25 +2454,35 @@ public class Form extends Container {
                     }
                     
                     if (cmp.isEnabled()) {
-                        if (cmp.isFocusable()) {
+                        if (!isScrollWheeling && cmp.isFocusable()) {
                             setFocused(cmp);
                         }
+                        pressedCmp = cmp;
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
+                        initRippleEffect(x, y, cmp);
                     }
                 }
             }
         } else {
             if(y < actual.getY()) {
                 Component cmp = getTitleArea().getComponentAt(x, y);
+                while (cmp != null && cmp.isIgnorePointerEvents()) {
+                    cmp = cmp.getParent();
+                }
                 if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
+                    pressedCmp = cmp;
                     cmp.pointerPressed(x, y);
                     tactileTouchVibe(x, y, cmp);
+                    initRippleEffect(x, y, cmp);
                 }   
             } else {
                 Component cmp = ((BorderLayout)super.getLayout()).getWest();
                 if(cmp != null) {
                     cmp = ((Container)cmp).getComponentAt(x, y);
+                    while (cmp != null && cmp.isIgnorePointerEvents()) {
+                        cmp = cmp.getParent();
+                    }
                     if (cmp != null && cmp.isEnabled() && cmp.isFocusable()) {
                         if(cmp.hasLead) {
                             Container leadParent;
@@ -2319,12 +2491,16 @@ public class Form extends Container {
                             } else {
                                 leadParent = cmp.getParent().getLeadParent();
                             }
-                            setFocused(leadParent);
+                            if (!isScrollWheeling) {
+                                setFocused(leadParent);
+                            }
                             cmp = cmp.getLeadComponent();
                         }
                         cmp.initDragAndDrop(x, y);
+                        pressedCmp = cmp;
                         cmp.pointerPressed(x, y);
                         tactileTouchVibe(x, y, cmp);
+                        initRippleEffect(x, y, cmp);
                     }   
                 }
             }
@@ -2381,34 +2557,48 @@ public class Form extends Container {
      */
     public void pointerDragged(int x, int y) {
         // disable the drag stop flag if we are dragging again
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if(dragStopFlag) {
             pointerPressed(x, y);
         }
         autoRelease(x, y);
         if (pointerDraggedListeners != null) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y));
+            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag, x, y);
+            pointerDraggedListeners.fireActionEvent(av);
+            if(av.isConsumed()) {
+                return;
+            }
         }
 
+        rippleMotion = null;
+        
         if (dragged != null) {
             dragged.pointerDragged(x, y);
             return;
         }
 
+        if (pressedCmp != null && pressedCmp.isStickyDrag()) {
+            stickyDrag = pressedCmp;
+        }
+        
         if(stickyDrag != null) {
             stickyDrag.pointerDragged(x, y);
             repaint();
             return;
         }
-        Container actual = getActualPane();
+        Container actual = getActualPane(formLayeredPane, x, y);
         if(x < actual.getX()) {
             // special case for sidemenu
             Component cmp = ((BorderLayout)super.getLayout()).getWest();
             if(cmp != null) {
                 cmp = ((Container)cmp).getComponentAt(x, y);
+                while (cmp != null && cmp.isIgnorePointerEvents()) {
+                    cmp = cmp.getParent();
+                }
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if(cmp.isStickyDrag()) {
+                    if(cmp == pressedCmp && cmp.isStickyDrag()) {
                         stickyDrag = cmp;
                     }
                 }
@@ -2416,13 +2606,16 @@ public class Form extends Container {
             return;
         }
         Component cmp = actual.getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
             cmp.pointerDragged(x, y);
             cmp.repaint();
-            if(cmp.isStickyDrag()) {
+            if(cmp == pressedCmp && cmp.isStickyDrag()) {
                 stickyDrag = cmp;
             }
         }
@@ -2431,35 +2624,46 @@ public class Form extends Container {
     @Override
     public void pointerDragged(int[] x, int[] y) {
         // disable the drag stop flag if we are dragging again
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if(dragStopFlag) {
             pointerPressed(x, y);
         }
         autoRelease(x[0], y[0]);
         if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
-            pointerDraggedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]));
+            ActionEvent av = new ActionEvent(this, ActionEvent.Type.PointerDrag,x[0], y[0]);
+            pointerDraggedListeners.fireActionEvent(av);
+            if(av.isConsumed()) {
+                return;
+            }
         }
+
+        rippleMotion = null;
 
         if (dragged != null) {
             dragged.pointerDragged(x, y);
             return;
         }
-
+        if (pressedCmp != null && pressedCmp.isStickyDrag()) {
+            stickyDrag = pressedCmp;
+        }
         if(stickyDrag != null) {
             stickyDrag.pointerDragged(x, y);
             repaint();
             return;
         }
-
-        Container actual = getActualPane();
+        Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         if(x[0] < actual.getX()) {
             // special case for sidemenu
             Component cmp = ((BorderLayout)super.getLayout()).getWest();
             if(cmp != null) {
                 cmp = ((Container)cmp).getComponentAt(x[0], y[0]);
+                while (cmp != null && cmp.isIgnorePointerEvents()) {
+                    cmp = cmp.getParent();
+                }
                 if (cmp != null && cmp.isEnabled()) {
                     cmp.pointerDragged(x, y);
                     cmp.repaint();
-                    if(cmp.isStickyDrag()) {
+                    if(cmp == pressedCmp && cmp.isStickyDrag()) {
                         stickyDrag = cmp;
                     }
                 }
@@ -2467,13 +2671,16 @@ public class Form extends Container {
             return;
         }
         Component cmp = actual.getComponentAt(x[0], y[0]);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled()) {
                 setFocused(cmp);
             }
             cmp.pointerDragged(x, y);
             cmp.repaint();
-            if(cmp.isStickyDrag()) {
+            if(cmp == pressedCmp && cmp.isStickyDrag()) {
                 stickyDrag = cmp;
             }
         }
@@ -2492,8 +2699,11 @@ public class Form extends Container {
             return;
         }
 
-        Container actual = getActualPane();
+        Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         Component cmp = actual.getComponentAt(x[0], y[0]);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
             cmp.pointerHoverReleased(x, y);
         }
@@ -2503,10 +2713,15 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerHoverPressed(int[] x, int[] y) {
-        Container actual = getActualPane();
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        
+        Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         Component cmp = actual.getComponentAt(x[0], y[0]);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
         if (cmp != null) {
-            if (cmp.isFocusable() && cmp.isEnabled()) {
+            if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                 setFocused(cmp);
             }
             cmp.pointerHoverPressed(x, y);
@@ -2517,17 +2732,20 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerHover(int[] x, int[] y) {
-
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
         if (dragged != null) {
             dragged.pointerHover(x, y);
             return;
         }
 
-        Container actual = getActualPane();
+        Container actual = getActualPane(formLayeredPane, x[0], y[0]);
         if(actual != null) {
             Component cmp = actual.getComponentAt(x[0], y[0]);
+            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                cmp = cmp.getParent();
+            }
             if (cmp != null) {
-                if (cmp.isFocusable() && cmp.isEnabled()) {
+                if (!isScrollWheeling && cmp.isFocusable() && cmp.isEnabled() && !Display.getInstance().isDesktop()) {
                     setFocused(cmp);
                 }
                 cmp.pointerHover(x, y);
@@ -2542,9 +2760,27 @@ public class Form extends Container {
      * @return true if there is one focusable component in this form, false for 0 or more
      */
     public boolean isSingleFocusMode() {
+        if (formLayeredPane != null) {
+            return countFocusables(formLayeredPane) + countFocusables(getActualPane()) < 2;
+        }
         return isSingleFocusMode(0, getActualPane()) == 1;
     }
 
+    private int countFocusables(Container c) {
+        int count=0;
+        int t = c.getComponentCount();
+        for (int iter = 0; iter < t; iter++) {
+            Component cmp = c.getComponentAt(iter);
+            if (cmp.isFocusable()) {
+                count++;
+            }
+            if (cmp instanceof Container) {
+                count += countFocusables((Container)cmp);
+            }
+        }
+        return count;
+    }
+    
     private int isSingleFocusMode(int b, Container c) {
         int t = c.getComponentCount();
         for (int iter = 0; iter < t; iter++) {
@@ -2569,20 +2805,43 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     public void pointerReleased(int x, int y) {
+        rippleMotion = null;
+        pressedCmp = null;
+        boolean isScrollWheeling = Display.INSTANCE.impl.isScrollWheeling();
+        Container actual = getActualPane(formLayeredPane, x, y);
         if(buttonsAwatingRelease != null && buttonsAwatingRelease.size() == 1) {
             // special case allowing drag within a button
-            Component atXY = getComponentAt(x, y);
+            Component atXY = actual.getComponentAt(x, y);
+            
             Component pendingButton = (Component)buttonsAwatingRelease.get(0);
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
-                pointerReleased(x, y);
+                if (dragged == pendingButton) {
+                    if (pendingButton.isDragAndDropInitialized()) {
+                        pendingButton.dragFinishedImpl(x, y);
+                    } else {
+                        pendingButton.pointerReleased(x, y);
+                    }
+                    dragged = null;
+                } else {
+                    pendingButton.pointerReleased(x, y);
+                    if (dragged != null) {
+                        if (dragged.isDragAndDropInitialized()) {
+                            dragged.dragFinishedImpl(x, y);
+                            dragged = null;
+                        } else {
+                            dragged.pointerReleased(x, y);
+                            dragged = null;
+                        }
+                    }
+                }
                 return;
             }
             
             if(pendingButton instanceof Button) {
                 Button b = (Button)pendingButton;
                 int relRadius = b.getReleaseRadius();
-                if(relRadius > 0) {
+                if(relRadius > 0 || b.contains(x, y)) {
                     Rectangle r = new Rectangle(b.getAbsoluteX() - relRadius, b.getAbsoluteY() - relRadius, b.getWidth() + relRadius * 2, b.getHeight() + relRadius * 2);
                     if(r.contains(x, y)) {
                         buttonsAwatingRelease = null;
@@ -2620,9 +2879,12 @@ public class Form extends Container {
                 stickyDrag.pointerReleased(x, y);
                 repaint();
             } else {
-                Container actual = getActualPane();
+                //Container actual = getActualPane();
                 if (y >= actual.getY() && x >= actual.getX()) {
                     Component cmp = actual.getComponentAt(x, y);
+                    while (cmp != null && cmp.isIgnorePointerEvents()) {
+                        cmp = cmp.getParent();
+                    }
                     if (cmp != null && cmp.isEnabled()) {
                         if (cmp.hasLead) {
                             Container leadParent;
@@ -2632,11 +2894,13 @@ public class Form extends Container {
                                 leadParent = cmp.getParent().getLeadParent();
                             }
                             leadParent.repaint();
-                            setFocused(leadParent);
+                            if (!isScrollWheeling) {
+                                setFocused(leadParent);
+                            }
                             cmp.getLeadComponent().pointerReleased(x, y);
                         } else {
                             if (cmp.isEnabled()) {
-                                if (cmp.isFocusable()) {
+                                if (!isScrollWheeling && cmp.isFocusable()) {
                                     setFocused(cmp);
                                 }
                                 cmp.pointerReleased(x, y);
@@ -2646,6 +2910,9 @@ public class Form extends Container {
                 } else {
                     if(y < actual.getY()) {
                         Component cmp = getTitleArea().getComponentAt(x, y);
+                        while (cmp != null && cmp.isIgnorePointerEvents()) {
+                            cmp = cmp.getParent();
+                        }
                         if (cmp != null && cmp.isEnabled()) {
                             cmp.pointerReleased(x, y);
                         }
@@ -2653,6 +2920,9 @@ public class Form extends Container {
                         Component cmp = ((BorderLayout)super.getLayout()).getWest();
                         if(cmp != null) {
                             cmp = ((Container)cmp).getComponentAt(x, y);
+                            while (cmp != null && cmp.isIgnorePointerEvents()) {
+                                cmp = cmp.getParent();
+                            }
                             if (cmp != null && cmp.isEnabled()) {                                
                                 if(cmp.hasLead) {
                                     Container leadParent;
@@ -2662,7 +2932,9 @@ public class Form extends Container {
                                         leadParent = cmp.getParent().getLeadParent();
                                     }
                                     leadParent.repaint();
-                                    setFocused(leadParent);
+                                    if (!isScrollWheeling) {
+                                        setFocused(leadParent);
+                                    }
                                     cmp = cmp.getLeadComponent();
                                     cmp.pointerReleased(x, y);
                                 } else {
@@ -2895,8 +3167,15 @@ public class Form extends Container {
      * @return a focusable Component or null if not found
      */
     public Component findNextFocusVertical(boolean down) {
+        Component c = null;
+        if (formLayeredPane != null) {
+            c = findNextFocusVertical(focused, null, formLayeredPane, down);
+            if (c != null) {
+                return c;
+            }
+        }
         Container actual = getActualPane();
-        Component c = findNextFocusVertical(focused, null, actual, down);
+        c = findNextFocusVertical(focused, null, actual, down);
         if (c != null) {
             return c;
         }
@@ -2921,8 +3200,15 @@ public class Form extends Container {
      * @return a focusable Component or null if not found
      */
     public Component findNextFocusHorizontal(boolean right) {
+        Component c = null;
+        if (formLayeredPane != null) {
+            c = findNextFocusHorizontal(focused, null, formLayeredPane, right);
+            if (c != null) {
+                return c;
+            }
+        }
         Container actual = getActualPane();
-        Component c = findNextFocusHorizontal(focused, null, actual, right);
+        c = findNextFocusHorizontal(focused, null, actual, right);
         if (c != null) {
             return c;
         }
@@ -3168,6 +3454,22 @@ public class Form extends Container {
      */
     public boolean isScrollable() {
         return getContentPane().isScrollable();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isScrollableX() {
+        return getContentPane().isScrollableX();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isScrollableY() {
+        return getContentPane().isScrollableY();
     }
 
     /**

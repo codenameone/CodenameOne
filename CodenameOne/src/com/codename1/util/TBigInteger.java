@@ -841,8 +841,8 @@ class TBigInteger  {
     }
 
     /**
-     * Returns this {@code BigInteger} as an long value. If {@code this} is too
-     * big to be represented as an long, then {@code this} % 2^64 is returned.
+     * Returns this {@code BigInteger} as a long value. If {@code this} is too
+     * big to be represented as a long, then {@code this} % 2^64 is returned.
      *
      * @return this {@code BigInteger} as a long value.
      */
@@ -854,8 +854,8 @@ class TBigInteger  {
     }
 
     /**
-     * Returns this {@code BigInteger} as an float value. If {@code this} is too
-     * big to be represented as an float, then {@code Float.POSITIVE_INFINITY}
+     * Returns this {@code BigInteger} as a float value. If {@code this} is too
+     * big to be represented as a float, then {@code Float.POSITIVE_INFINITY}
      * or {@code Float.NEGATIVE_INFINITY} is returned. Note, that not all
      * integers x in the range [-Float.MAX_VALUE, Float.MAX_VALUE] can be
      * represented as a float. The float representation has a mantissa of length
@@ -869,8 +869,8 @@ class TBigInteger  {
     }
 
     /**
-     * Returns this {@code BigInteger} as an double value. If {@code this} is
-     * too big to be represented as an double, then
+     * Returns this {@code BigInteger} as a double value. If {@code this} is
+     * too big to be represented as a double, then
      * {@code Double.POSITIVE_INFINITY} or {@code Double.NEGATIVE_INFINITY} is
      * returned. Note, that not all integers x in the range [-Double.MAX_VALUE,
      * Double.MAX_VALUE] can be represented as a double. The double

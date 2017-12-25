@@ -44,6 +44,8 @@ import java.util.Vector;
  * to Google+/Facbook apps navigation
  *
  * @author Chen
+ * @deprecated this class is still used internally but code should be migrated to use the 
+ *              {@link com.codename1.ui.Toolbar}
  */
 public class SideMenuBar extends MenuBar {
 
@@ -151,6 +153,11 @@ public class SideMenuBar extends MenuBar {
      * @param callback will be invoked when the menu is actually closed
      */
     public static void closeCurrentMenu(final Runnable callback) {
+        if(Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
+            Display.getInstance().getCurrent().getToolbar().closeSideMenu();
+            callback.run();
+            return;
+        }
         Form f = Display.getInstance().getCurrent();
         final SideMenuBar b = (SideMenuBar) f.getClientProperty("cn1$sideMenuParent");
         if (b != null && !b.transitionRunning) {
@@ -693,6 +700,10 @@ public class SideMenuBar extends MenuBar {
      * Closes the menu if it is currently open
      */
     public void closeMenu() {
+        if(Toolbar.isOnTopSideMenu() && Display.getInstance().getCurrent().getToolbar() != null  && Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+            Display.getInstance().getCurrent().getToolbar().closeSideMenu();
+            return;
+        }
         if (transitionRunning) {
             return;
         }
@@ -979,6 +990,7 @@ public class SideMenuBar extends MenuBar {
         Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));
         menu.setUIID("SideNavigationPanel");
         menu.setScrollableY(true);
+        menu.setScrollVisible(getUIManager().isThemeConstant("sideMenuScrollVisibleBool", false));
         return menu;
     }
     
@@ -1670,6 +1682,17 @@ public class SideMenuBar extends MenuBar {
             }
         }
     }
+    
+    Command unwrapCommand(Command cmd) {
+        if(cmd instanceof CommandWrapper) {
+            return ((CommandWrapper)cmd).cmd;
+        }
+        return cmd;
+    }
+    
+    Command wrapCommand(Command cmd) {
+        return new CommandWrapper(cmd);
+    }
 
     class CommandWrapper extends Command {
 
@@ -1752,6 +1775,11 @@ public class SideMenuBar extends MenuBar {
         }
 
         public void actionPerformed(final ActionEvent evt) {
+            if(Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
+                Display.getInstance().getCurrent().getToolbar().closeSideMenu();
+                cmd.actionPerformed(evt);
+                return;
+            }
             if (transitionRunning) {
                 return;
             }

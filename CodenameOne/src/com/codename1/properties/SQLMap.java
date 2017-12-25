@@ -538,7 +538,7 @@ public class SQLMap {
             if(p instanceof Property) {
                 if(((Property)p).get() != null) {
                     if(found) {
-                        createStatement.append(", ");
+                        createStatement.append(" AND ");
                     }
                     found = true;
                     params.add(((Property)p).get());

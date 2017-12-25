@@ -73,7 +73,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("checkBoxUncheckedImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("checkBoxUncheckedFocusImage", "CheckBox image to use instead of Codename One drawing it on its own");
         helpMap.put("comboImage", "Combo image to use instead of Codename One drawing it on its own");
-        helpMap.put("commandBehavior", "Indicates how commands should act, as a touch menu, native menu etc. Possible values: SoftKey, Touch, Bar, Title, Right, Native, ics, Side");
+        helpMap.put("commandBehavior", "Deprecated: Don't use this constant as it conflicts with the Toolbar. Indicates how commands should act, as a touch menu, native menu etc. Possible values: SoftKey, Touch, Bar, Title, Right, Native, ics, Side");
         helpMap.put("ComponentGroupBool", "Enables component group which allows components to be logically grouped together so the UIID's of components would be modified based on their group placement. This allows for some unique styling effects where the first/last elements have different styles from the rest of the elements. Its disabled by default thus leaving its usage up to the designer.");
         helpMap.put("dialogTransitionIn", "Default transition for dialog Possible values: empty, slide, cover, uncover, fade, pulse, bubble");
         helpMap.put("dialogTransitionInImage", "Default transition Image for dialog, causes a Timeline transition effect");
@@ -154,6 +154,7 @@ public class ConstantEditor extends javax.swing.JPanel {
         helpMap.put("rightSideMenuImage","Same as sideMenuImage only for the right side, optional and defaults to sideMenuImage");
         helpMap.put("rightSideMenuPressImage","Same as sideMenuPressImage only for the right side, optional and defaults to sideMenuPressImage");
         helpMap.put("showBackCommandOnTitleBool","Used by the Toolbar API to indicate whether the back button should appear on the title");
+        helpMap.put("scrollVisibleBool", "true/false default is platform dependent. Toggles whether the scroll bar is visible");
         helpMap.put("shrinkPopupTitleBool","Indicates the title of the popup should be set to 0 if its missing");
         helpMap.put("sideMenuAnimSpeedInt","The speed at which a sidemenu moves defaults to 300 milliseconds");
         helpMap.put("sideMenuFoldedSwipeBool","Indicates the side menu could be opened via swiping");

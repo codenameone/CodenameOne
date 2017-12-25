@@ -239,14 +239,14 @@ public class AddThemeEntry extends javax.swing.JPanel {
         initImagesCombo();
         bitmapFontValue.setModel(new DefaultComboBoxModel(resources.getFontResourceNames()));
         
-        paddingBottom.setModel(new SpinnerNumberModel(0, 0, 100, 1));
-        paddingLeft.setModel(new SpinnerNumberModel(0, 0, 100, 1));
-        paddingRight.setModel(new SpinnerNumberModel(0, 0, 100, 1));
-        paddingTop.setModel(new SpinnerNumberModel(0, 0, 100, 1));
-        marginBottom.setModel(new SpinnerNumberModel(0, 0, 100, 1));
-        marginLeft.setModel(new SpinnerNumberModel(0, 0, 100, 1));
-        marginRight.setModel(new SpinnerNumberModel(0, 0, 100, 1));
-        marginTop.setModel(new SpinnerNumberModel(0, 0, 100, 1));
+        paddingBottom.setModel(new SpinnerNumberModelThatWorks(0, 0, 100.0, 0.5));
+        paddingLeft.setModel(new SpinnerNumberModelThatWorks(0, 0, 100.0, 0.5));
+        paddingRight.setModel(new SpinnerNumberModelThatWorks(0, 0, 100.0, 0.5));
+        paddingTop.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginBottom.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginLeft.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginRight.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
+        marginTop.setModel(new SpinnerNumberModelThatWorks(0, 0, 100, 0.5));
         transparencyValue.setModel(new SpinnerNumberModel(0, 0, 255, 1));
         gradientX.setModel(new SpinnerNumberModel(0.5, 0, 1, 0.01));
         gradientY.setModel(new SpinnerNumberModel(0.5, 0, 1, 0.01));
@@ -659,10 +659,10 @@ public class AddThemeEntry extends javax.swing.JPanel {
             paddingLeftUnit.setEnabled(true);
             paddingRightUnit.setEnabled(true);
             StringTokenizer tokenizer = new StringTokenizer((String)value, ", ");
-            paddingTop.setValue(Integer.parseInt(tokenizer.nextToken()));
-            paddingBottom.setValue(Integer.parseInt(tokenizer.nextToken()));
-            paddingLeft.setValue(Integer.parseInt(tokenizer.nextToken()));
-            paddingRight.setValue(Integer.parseInt(tokenizer.nextToken()));
+            paddingTop.setValue(Float.parseFloat(tokenizer.nextToken()));
+            paddingBottom.setValue(Float.parseFloat(tokenizer.nextToken()));
+            paddingLeft.setValue(Float.parseFloat(tokenizer.nextToken()));
+            paddingRight.setValue(Float.parseFloat(tokenizer.nextToken()));
             return;
         }
 
@@ -687,10 +687,10 @@ public class AddThemeEntry extends javax.swing.JPanel {
             marginLeftUnit.setEnabled(true);
             marginRightUnit.setEnabled(true);
             StringTokenizer tokenizer = new StringTokenizer((String)value, ", ");
-            marginTop.setValue(Integer.parseInt(tokenizer.nextToken()));
-            marginBottom.setValue(Integer.parseInt(tokenizer.nextToken()));
-            marginLeft.setValue(Integer.parseInt(tokenizer.nextToken()));
-            marginRight.setValue(Integer.parseInt(tokenizer.nextToken()));
+            marginTop.setValue(Float.parseFloat(tokenizer.nextToken()));
+            marginBottom.setValue(Float.parseFloat(tokenizer.nextToken()));
+            marginLeft.setValue(Float.parseFloat(tokenizer.nextToken()));
+            marginRight.setValue(Float.parseFloat(tokenizer.nextToken()));
             return;
         }
 

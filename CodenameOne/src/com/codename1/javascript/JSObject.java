@@ -243,7 +243,7 @@ public class JSObject {
      * </pre></code>
      * @param context The javascript context in which this object is being created.
      * 
-     * @param expr A javascript expression that resolves to an Javascript Object.
+     * @param expr A javascript expression that resolves to a Javascript Object.
      */
     public JSObject(JavascriptContext context, String expr) {
         this.context = context;
@@ -383,7 +383,7 @@ public class JSObject {
     /**
      * Wrapper around the get() method to return a JSObject.
      * @param key The name of the property in the object to retrieve.  Value of this property
-     * must be an Javascript object or function.
+     * must be a Javascript object or function.
      * @return The property value as a JSObject.
      */
     public JSObject getObject(String key){

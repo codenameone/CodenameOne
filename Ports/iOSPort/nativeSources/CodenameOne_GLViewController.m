@@ -65,7 +65,11 @@
 #include "java_lang_System.h"
 
 #ifdef INCLUDE_GOOGLE_CONNECT
-#import "GoogleOpenSource.h"
+#ifndef GOOGLE_SIGNIN
+#import <GoogleOpenSource/GoogleOpenSource.h>
+#else
+#import <GoogleSignIn/GoogleSignIn.h>
+#endif
 #endif
 #import "com_codename1_payment_Purchase.h"
 
@@ -73,9 +77,18 @@
 // needs a source rect that the java API doesn't pass through.
 int CN1lastTouchX=0;
 int CN1lastTouchY=0;
+BOOL skipNextTouch = NO;
+
+// A flag to enable/disable the CN1TapGestureRecognizer for handling pointer events
+// The new way of handing pointer events is with the gesture recognizer rather 
+// than directly in the view controller because it can catch all events without
+// consuming them, so it plays nicer with native peer components.
+// This flag is turned on by [CN1TapGestureRecognizer install:]
+BOOL CN1useTapGestureRecognizer=NO;
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
+extern JAVA_LONG currentDatePickerDuration;
 extern bool datepickerPopover;
 //int lastWindowSize = -1;
 extern void stringEdit(int finished, int cursorPos, NSString* text);
@@ -149,35 +162,35 @@ extern void pointerReleased(int* x, int* y, int length);
 extern void screenSizeChanged(int width, int height);
 
 void pointerPressedC(int* x, int* y, int length) {
-    //NSLog(@"pointerPressedC started");
+    //CN1Log(@"pointerPressedC started");
     pointerPressed(x, y, length);
-    //NSLog(@"pointerPressedC finished");
+    //CN1Log(@"pointerPressedC finished");
 }
 
 void pointerDraggedC(int* x, int* y, int length) {
-    //NSLog(@"pointerDraggedC started");
+    //CN1Log(@"pointerDraggedC started");
     pointerDragged(x, y, length);
-    //NSLog(@"pointerDraggedC finished");
+    //CN1Log(@"pointerDraggedC finished");
 }
 void pointerReleasedC(int* x, int* y, int length) {
-    //NSLog(@"pointerReleasedC started");
+    //CN1Log(@"pointerReleasedC started");
     pointerReleased(x, y, length);
-    //NSLog(@"pointerReleasedC finished");
+    //CN1Log(@"pointerReleasedC finished");
 }
 void screenSizeChangedC(int width, int height) {
-    //NSLog(@"screenSizeChangedC started");
+    //CN1Log(@"screenSizeChangedC started");
     screenSizeChanged(width, height);
-    //NSLog(@"screenSizeChangedC finished");
+    //CN1Log(@"screenSizeChangedC finished");
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
 (void* data, int dataLength, int* widthAndHeightReturnValue) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl started for dataLength %i", dataLength);
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl started for dataLength %i", dataLength);
     NSData* nd = [NSData dataWithBytes:data length:dataLength];
     UIImage* img = [UIImage imageWithData:nd];
     widthAndHeightReturnValue[0] = (int)img.size.width;
     widthAndHeightReturnValue[1] = (int)img.size.height;
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl finished width %i, height %i", (int)widthAndHeightReturnValue[0], (int)widthAndHeightReturnValue[1]);
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl finished width %i, height %i", (int)widthAndHeightReturnValue[0], (int)widthAndHeightReturnValue[1]);
     
 #ifndef CN1_USE_ARC
     return [[GLUIImage alloc] initWithImage:img];
@@ -229,12 +242,12 @@ BOOL isVKBAlwaysOpen() {
 void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
 (CN1_THREAD_STATE_MULTI_ARG int x, int y, int w, int h, void* font, int isSingleLine, int rows, int maxSize,
  int constraint, const char* str, int len, BOOL forceSlideUp,
- int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste) {
+ int color, JAVA_LONG imagePeer, int padTop, int padBottom, int padLeft, int padRight, NSString* hintString, BOOL showToolbar, BOOL blockCopyPaste, int alignment, int verticalAlignment) {
     // don't show toolbar in iOS 8 in landscape since there is just no room for that...
     if(isIOS8() && displayHeight < displayWidth) {
         showToolbar = NO;
     }
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl");
     currentlyEditingMaxLength = maxSize;
     dispatch_sync(dispatch_get_main_queue(), ^{
         if(editingComponent != nil) {
@@ -267,6 +280,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             utf.blockPaste = CN1_blockPaste || blockCopyPaste;
             utf.blockCopy = CN1_blockCopy || blockCopyPaste;
             utf.blockCut = CN1_blockCut || blockCopyPaste;
+            utf.contentVerticalAlignment = verticalAlignment == 4 ? UIControlContentVerticalAlignmentCenter :
+                verticalAlignment == 2 ? UIControlContentVerticalAlignmentBottom : UIControlContentVerticalAlignmentTop;
+            utf.textAlignment = alignment == 4 ? NSTextAlignmentCenter :
+                alignment == 3 ? NSTextAlignmentRight : NSTextAlignmentLeft;
             editingComponent = utf;
             [utf setTextColor:UIColorFromRGB(color, 255)];
             
@@ -510,7 +527,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
         [editingComponent setNeedsDisplay];
         
     });
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl finished");
 }
 
 
@@ -543,7 +560,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
     CGColorSpaceRef colorSpaceRef = CGColorSpaceCreateDeviceRGB();
     
     if(colorSpaceRef == NULL) {
-        NSLog(@"Error allocating color space");
+        CN1Log(@"Error allocating color space");
         CGDataProviderRelease(provider);
         return nil;
     }
@@ -566,7 +583,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
     uint32_t* pixels = (uint32_t*)malloc(bufferLength);
     
     if(pixels == NULL) {
-        NSLog(@"Error: Memory not allocated for bitmap");
+        CN1Log(@"Error: Memory not allocated for bitmap");
         CGDataProviderRelease(provider);
         CGColorSpaceRelease(colorSpaceRef);
         CGImageRelease(iref);
@@ -583,7 +600,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
                                                  kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
     
     if(context == NULL) {
-        NSLog(@"Error context not created");
+        CN1Log(@"Error context not created");
         free(pixels);
         return NULL;
     }
@@ -674,6 +691,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectMutableImp
     }
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_setAntiAliasedMutableImpl
+(JAVA_BOOLEAN antialiased) {
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    CGContextSetAllowsAntialiasing(context, antialiased);
+}
+
 void Java_com_codename1_impl_ios_IOSImplementation_resetAffineGlobal() {
     ResetAffine* f = [[ResetAffine alloc] init];
     [CodenameOne_GLViewController upcoming:f];
@@ -700,7 +723,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRoundRectGlobalImpl
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextStrokePath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
@@ -730,7 +753,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRoundRectGlobalImpl
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextFillPath(roundRect(context, color, alpha, 0, 0, width, height, arcWidth, arcHeight));
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
@@ -859,7 +882,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_fillConvexPolygonImpl(JAVA_OB
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
     int len = ((JAVA_ARRAY)points)->length;
 #endif
-    //NSLog(@"Len is %d", len);
+    //CN1Log(@"Len is %d", len);
     JAVA_FLOAT x[len/2];
     JAVA_FLOAT y[len/2];
     
@@ -1036,7 +1059,7 @@ CGContextRef Java_com_codename1_impl_ios_IOSImplementation_drawPath(CN1_THREAD_S
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
 (void* peer, int alpha, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl %i started at %i, %i", (int)peer, x, y);
     UIImage* i = [(BRIDGE_CAST GLUIImage*)peer getImage];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1047,20 +1070,20 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageMutableImpl finished");
 }
 
 int Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl
 (void* peer, const char* str, int len) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl started");
     if(len == 0 || str == NULL) {
         return 0;
     }
     UIFont* f = (BRIDGE_CAST UIFont*)peer;
 	NSString* s = [NSString stringWithUTF8String:str];
-    //NSLog(@"String is %@", s);
-    //NSLog(@"Font is %i", (int)f);
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl finished");
+    //CN1Log(@"String is %@", s);
+    //CN1Log(@"Font is %i", (int)f);
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_stringWidthNativeImpl finished");
     return (int)[s sizeWithFont:f].width;
 }
 
@@ -1097,7 +1120,7 @@ void vibrateDevice() {
 void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
 (int face, int style, int size) {
 	POOL_BEGIN();
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl started");
     int pSize = 14;
     
     // size small
@@ -1134,7 +1157,7 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
     [fnt retain];
 #endif
     POOL_END();
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl finished %i", (int)fnt);
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl finished %i", (int)fnt);
     return (BRIDGE_CAST void*)fnt;
 }
 
@@ -1148,7 +1171,7 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
     //if(displayWidth <= 0) {
     displayWidth = [CodenameOne_GLViewController instance].view.bounds.size.width * scaleValue;
     //}
-    //NSLog(@"Display width %i", displayWidth);
+    //CN1Log(@"Display width %i", displayWidth);
     return displayWidth;
 }
 
@@ -1170,29 +1193,29 @@ Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
 
 void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
 (void* peer, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl started");
     [[CodenameOne_GLViewController instance] flushBuffer:(BRIDGE_CAST UIImage *)peer x:x y:y width:width height:height];
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl finished");
 }
 
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied) {
     CGContextRef context = UIGraphicsGetCurrentContext();
-    //NSLog(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
+    //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
     CGContextRestoreGState(context);
     //}
     CGContextSaveGState(context);
     UIRectClip(CGRectMake(x, y, width, height));
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutableImpl
 (int numCommands, JAVA_OBJECT commands, int numPoints, JAVA_OBJECT points)
 {
     CGContextRef context = UIGraphicsGetCurrentContext();
-    //NSLog(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
+    //CN1Log(@"Native mutable clipping applied %i on context %i x: %i y: %i width: %i height: %i", clipApplied, (int)context, x, y, width, height);
     //if(clipApplied) {
     CGContextRestoreGState(context);
     //}
@@ -1202,13 +1225,13 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingShapeMutable
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl
 (int x, int y, int width, int height, int clipApplied) {
-    //    NSLog(@"Native global clipping applied: %i x: %i y: %i width: %i height: %i", clipApplied, x, y, width, height);
+    //    CN1Log(@"Native global clipping applied: %i x: %i y: %i width: %i height: %i", clipApplied, x, y, width, height);
     ClipRect* f = [[ClipRect alloc] initWithArgs:x ypos:y w:width h:height f:clipApplied];
     [[CodenameOne_GLViewController instance] upcomingAddClip:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingGlobalImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMaskGlobalImpl(JAVA_LONG textureName, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h)
@@ -1232,7 +1255,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
     JAVA_ARRAY_FLOAT* data = (JAVA_ARRAY_FLOAT*)((JAVA_ARRAY)points)->data;
     int len = ((JAVA_ARRAY)points)->length;
 #endif
-    //NSLog(@"Len is %d", len);
+    //CN1Log(@"Len is %d", len);
     JAVA_FLOAT x[len/2];
     JAVA_FLOAT y[len/2];
     
@@ -1254,7 +1277,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingPolygonGloba
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1267,34 +1290,34 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl
 (int color, int alpha, int x1, int y1, int x2, int y2) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
     DrawLine* f = [[DrawLine alloc] initWithArgs:color a:alpha xpos1:x1 ypos1:y1 xpos2:x2 ypos2:y2];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeRotateGlobalImpl
 (float angle, int x, int y) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl started");
     Rotate* f = [[Rotate alloc] initWithArgs:angle xx:x yy:y];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1305,7 +1328,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h) {
@@ -1331,18 +1354,18 @@ void Java_com_codename1_impl_ios_IOSImplementation_clearRectGlobal(int x, int y,
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl started");
     FillRect* f = [[FillRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeFillRectGlobalImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
 (int color, int alpha, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl started");
     [UIColorFromRGB(color, alpha) set];
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (currentMutableTransformSet) {
@@ -1353,41 +1376,41 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectGlobalImpl
 (int color, int alpha, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectImpl started");
     DrawRect* f = [[DrawRect alloc] initWithArgs:color a:alpha xpos:x ypos:y w:width h:height];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawRectImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl
 (int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl started");
     [[CodenameOne_GLViewController instance] drawString:color alpha:alpha font:(BRIDGE_CAST UIFont*)fontPeer str:str x:x y:y];
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringMutableImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringGlobalImpl
 (int color, int alpha, void* fontPeer, NSString* str, int x, int y) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringImpl started");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringImpl started");
     DrawString* f = [[DrawString alloc] initWithArgs:color a:alpha xpos:x ypos:y s:str f:(BRIDGE_CAST UIFont*)fontPeer];
     [CodenameOne_GLViewController upcoming:f];
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawStringImpl finished");
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
 (int width, int height, int argb) {
-    //NSLog(@"createNativeMutableImageImpl");
+    //CN1Log(@"createNativeMutableImageImpl");
     BOOL opaque = ((argb & 0xff000000) == 0xff000000);
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), opaque, 1.0);
     [UIColorFromARGB(argb) set];
@@ -1395,14 +1418,14 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createNativeMutableImageImpl
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     //[img retain];
-    //NSLog(@"createNativeMutableImageImpl finished %i ", (int)img);
+    //CN1Log(@"createNativeMutableImageImpl finished %i ", (int)img);
     GLUIImage* gl = [[GLUIImage alloc] initWithImage:img];
     return (BRIDGE_CAST void*)gl;
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
 (int width, int height, void *peer) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl");
     UIImage* original = [(BRIDGE_CAST GLUIImage*)peer getImage];
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(width, height), NO, 1.0);
     if(original != NULL) {
@@ -1413,12 +1436,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl
     CGContextSaveGState(context);
     [CodenameOne_GLViewController instance].currentMutableImage = (BRIDGE_CAST GLUIImage*)peer;
     currentMutableTransformSet = NO;
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl finished");
 }
 
 void* Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl() {
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl %i", ((int)img));
     UIGraphicsEndImageContext();
     GLUIImage *gl = [CodenameOne_GLViewController instance].currentMutableImage;
     [gl setImage:img];
@@ -1464,7 +1487,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
 (void* peer, int alpha, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl %i started at %i, %i", (int)peer, x, y);
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl %i started at %i, %i", (int)peer, x, y);
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
@@ -1473,12 +1496,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeDrawImageGlobalImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl
 (void* peer, int alpha, int x, int y, int width, int height) {
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl %i started at %i, %i", (int)peer, x, y);
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl %i started at %i, %i", (int)peer, x, y);
     if(((BRIDGE_CAST void*)[CodenameOne_GLViewController instance].currentMutableImage) == peer) {
         Java_com_codename1_impl_ios_IOSImplementation_finishDrawingOnImageImpl();
     }
@@ -1487,12 +1510,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl
 #ifndef CN1_USE_ARC
     [f release];
 #endif
-    //NSLog(@"Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl finished");
+    //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_nativeTileImageGlobalImpl finished");
 }
 
 void Java_com_codename1_impl_ios_IOSImplementation_deleteNativePeerImpl(void* peer) {
     GLUIImage* original = (BRIDGE_CAST GLUIImage*)peer;
-    //NSLog(@"deleteNativePeerImpl retainCount: %i", [original retainCount]);
+    //CN1Log(@"deleteNativePeerImpl retainCount: %i", [original retainCount]);
 #ifndef CN1_USE_ARC
     [original release];
 #endif
@@ -1500,7 +1523,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_deleteNativePeerImpl(void* pe
 
 void Java_com_codename1_impl_ios_IOSImplementation_deleteNativeFontPeerImpl(void* peer) {
     UIFont* original = (BRIDGE_CAST UIFont*)peer;
-    //NSLog(@"deleteNativeFontPeerImpl retainCount: %i", [original retainCount]);
+    //CN1Log(@"deleteNativeFontPeerImpl retainCount: %i", [original retainCount]);
 #ifndef CN1_USE_ARC
     [original release];
 #endif
@@ -1508,24 +1531,24 @@ void Java_com_codename1_impl_ios_IOSImplementation_deleteNativeFontPeerImpl(void
 
 void loadResourceFile
 (const char* name, int nameLen, const char* type, int typeLen, void* data) {
-    //NSLog(@"loadResourceFile started");
+    //CN1Log(@"loadResourceFile started");
     NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithUTF8String:name] ofType:[NSString stringWithUTF8String:type]];
     NSData* iData = [NSData dataWithContentsOfFile:path];
     [iData getBytes:data];
-    //NSLog(@"loadResourceFile finished");
+    //CN1Log(@"loadResourceFile finished");
 }
 
 int getResourceSize(const char* name, int nameLen, const char* type, int typeLen) {
     NSString* nameNS = [NSString stringWithUTF8String:name];
     NSString* typeNS = type == NULL ? nil : [NSString stringWithUTF8String:type];
-    //NSLog(@"getResourceSize %@ %@ started", nameNS, typeNS);
+    //CN1Log(@"getResourceSize %@ %@ started", nameNS, typeNS);
     NSString* path = [[NSBundle mainBundle] pathForResource:nameNS ofType:typeNS];
     if(path == nil) {
         return -1;
     }
     NSData* iData = [NSData dataWithContentsOfFile:path];
     int size = [iData length];
-    //NSLog(@"getResourceSize %i finished", size);
+    //CN1Log(@"getResourceSize %i finished", size);
     return size;
 }
 
@@ -1622,29 +1645,58 @@ static CodenameOne_GLViewController *sharedSingleton;
 
 - (void)initGoogleConnect {
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
   GPPSignIn *signIn = [GPPSignIn sharedInstance];
   signIn.shouldFetchGooglePlusUser = YES;
+#else
+  GIDSignIn* signIn = [GIDSignIn sharedInstance];
+  signIn.shouldFetchBasicProfile = YES;
+#endif
+  
   //signIn.shouldFetchGoogleUserEmail = YES;  // Uncomment to get the user's email
 
   // You previously set kClientId in the "Initialize the Google+ client" step
   // signIn.clientID = googleClientId;
 
   // Uncomment one of these two statements for the scope you chose in the previous step
+#ifndef GOOGLE_SIGNIN
   signIn.scopes = @[ kGTLAuthScopePlusLogin ];  // "https://www.googleapis.com/auth/plus.login" scope
   //signIn.scopes = @[ @"profile" ];            // "profile" scope
+#else
+  signIn.scopes = @[ @"profile", @"email" ];
+#endif
 
   // Optional: declare signIn.actions, see "app activities"
   signIn.delegate = self;
+#ifdef GOOGLE_SIGNIN
+    signIn.uiDelegate = self;
 #endif
+#endif
+    
 }
 
 #ifdef INCLUDE_GOOGLE_CONNECT
+#ifndef GOOGLE_SIGNIN
 extern void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authentication *auth, NSError * error);
-
+#else
+extern void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *user, NSError * error);
+extern void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me);
+#endif
+#ifndef GOOGLE_SIGNIN
 - (void)finishedWithAuth: (GTMOAuth2Authentication *)auth
                    error: (NSError *) error {
     com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(auth, error);
 }
+#else
+- (void)signIn:(GIDSignIn *)signIn didSignInForUser:(GIDGoogleUser *)user withError:(NSError *)error {
+    // Perform any operations on signed in user here.
+    com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(user, error);
+}
+- (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error {
+    // Perform any operations when the user disconnects from app here.
+    com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG user.userID));
+}
+#endif
 #endif
 
 bool lockDrawing;
@@ -1689,19 +1741,19 @@ bool lockDrawing;
             case UIEventSubtypeRemoteControlPlay:
             case UIEventSubtypeRemoteControlPause:
             case UIEventSubtypeRemoteControlTogglePlayPause:
-                NSLog(@"Play or stop invoked");
+                CN1Log(@"Play or stop invoked");
                 com_codename1_impl_CodenameOneImplementation_keyPressed___int(CN1_THREAD_GET_STATE_PASS_ARG o, -24);
                 com_codename1_impl_CodenameOneImplementation_keyReleased___int(CN1_THREAD_GET_STATE_PASS_ARG o, -24);
                 break;
                 
             case UIEventSubtypeRemoteControlPreviousTrack:
-                NSLog(@"Previous invoked");
+                CN1Log(@"Previous invoked");
                 com_codename1_impl_CodenameOneImplementation_keyPressed___int(CN1_THREAD_GET_STATE_PASS_ARG o, -21);
                 com_codename1_impl_CodenameOneImplementation_keyReleased___int(CN1_THREAD_GET_STATE_PASS_ARG o, -21);
                 break;
                 
             case UIEventSubtypeRemoteControlNextTrack:
-                NSLog(@"Next invoked");
+                CN1Log(@"Next invoked");
                 com_codename1_impl_CodenameOneImplementation_keyPressed___int(CN1_THREAD_GET_STATE_PASS_ARG o, -20);
                 com_codename1_impl_CodenameOneImplementation_keyReleased___int(CN1_THREAD_GET_STATE_PASS_ARG o, -20);
                 break;
@@ -1745,9 +1797,9 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     }
 #endif
     if (!aContext)
-        NSLog(@"Failed to create ES context");
+        CN1Log(@"Failed to create ES context");
     else if (![EAGLContext setCurrentContext:aContext])
-        NSLog(@"Failed to set ES context current");
+        CN1Log(@"Failed to set ES context current");
     
 	self.context = aContext;
 #ifndef CN1_USE_ARC
@@ -1769,7 +1821,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     
     const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
     drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
-    //NSLog(@"Draw texture extension %i", (int)drawTextureSupported);
+    //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
     
     // register for keyboard notifications
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -1885,7 +1937,7 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
                 dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:imgHeight h:imgWidth];
             }
             
-            NSLog(@"Drew image on %i, %i for display %i, %i", imgHeight, imgWidth, wi, he);
+            CN1Log(@"Drew image on %i, %i for display %i, %i", imgHeight, imgWidth, wi, he);
             [(EAGLView *)self.view setFramebuffer];
         }
 
@@ -2234,13 +2286,13 @@ BOOL prefersStatusBarHidden = NO;
     }
 #endif
     
-    //NSLog(@"%d %d x %d %d", interfaceOrientation, displayWidth, displayHeight, self.interfaceOrientation);
+    //CN1Log(@"%d %d x %d %d", interfaceOrientation, displayWidth, displayHeight, self.interfaceOrientation);
     if (!isIOS8()) {
         
         if (self.interfaceOrientation == UIInterfaceOrientationLandscapeLeft) {
             upsideDownMultiplier = -1;
         }
-        //NSLog(@"multiplier %d", upsideDownMultiplier);
+        //CN1Log(@"multiplier %d", upsideDownMultiplier);
         if (isIPad() && self.interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
             upsideDownMultiplier = -1;
         }
@@ -2341,7 +2393,7 @@ BOOL prefersStatusBarHidden = NO;
     if(currentTarget != nil) {
         if([currentTarget count] > 0) {
             [ClipRect setDrawRect:rect];
-            //NSLog(@"Clipping rect to: %i, %i, %i %i", (int)rect.origin.x, (int)rect.origin.y, (int)rect.size.width, (int)rect.size.height );
+            //CN1Log(@"Clipping rect to: %i, %i, %i %i", (int)rect.origin.x, (int)rect.origin.y, (int)rect.size.width, (int)rect.size.height );
             _glScalef(1, -1, 1);
             GLErrorLog;
             _glTranslatef(0, -displayHeight, 0);
@@ -2354,7 +2406,7 @@ BOOL prefersStatusBarHidden = NO;
              glClear(GL_COLOR_BUFFER_BIT);
              }*/
             
-            //NSLog(@"self.view.bounds.size.height %i displayHeight %i", (int)self.view.bounds.size.height, displayHeight);
+            //CN1Log(@"self.view.bounds.size.height %i displayHeight %i", (int)self.view.bounds.size.height, displayHeight);
             NSMutableArray* cp = nil;
             @synchronized([CodenameOne_GLViewController instance]) {
                 cp = [currentTarget copy];
@@ -2366,7 +2418,7 @@ BOOL prefersStatusBarHidden = NO;
                 //[ex executeWithLog];
                 GLErrorLog;
             }
-            //NSLog(@"Total memory is: %i", [ExecutableOp get_free_memory]);
+            //CN1Log(@"Total memory is: %i", [ExecutableOp get_free_memory]);
 #ifndef CN1_USE_ARC
             [cp release];
 #endif
@@ -2443,7 +2495,7 @@ BOOL prefersStatusBarHidden = NO;
 -(void)searchHierarchy:(UIView*)view {
     if(view.subviews != nil) {
         for(UIView *v in view.subviews) {
-            NSLog(@"Found entry: %@", [[v class] description]);
+            CN1Log(@"Found entry: %@", [[v class] description]);
             [self searchHierarchy:v];
         }
     }
@@ -2457,7 +2509,7 @@ BOOL prefersStatusBarHidden = NO;
     source = (GLchar *)[[NSString stringWithContentsOfFile:file encoding:NSUTF8StringEncoding error:nil] UTF8String];
     if (!source)
     {
-        NSLog(@"Failed to load vertex shader");
+        CN1Log(@"Failed to load vertex shader");
         return FALSE;
     }
     
@@ -2472,7 +2524,7 @@ BOOL prefersStatusBarHidden = NO;
     {
         GLchar *log = (GLchar *)malloc(logLength);
         glGetShaderInfoLog(*shader, logLength, &logLength, log);
-        NSLog(@"Shader compile log:\n%s", log);
+        CN1Log(@"Shader compile log:\n%s", log);
         free(log);
     }
 #endif
@@ -2500,7 +2552,7 @@ BOOL prefersStatusBarHidden = NO;
     {
         GLchar *log = (GLchar *)malloc(logLength);
         glGetProgramInfoLog(prog, logLength, &logLength, log);
-        NSLog(@"Program link log:\n%s", log);
+        CN1Log(@"Program link log:\n%s", log);
         free(log);
     }
 #endif
@@ -2522,7 +2574,7 @@ BOOL prefersStatusBarHidden = NO;
     {
         GLchar *log = (GLchar *)malloc(logLength);
         glGetProgramInfoLog(prog, logLength, &logLength, log);
-        NSLog(@"Program validate log:\n%s", log);
+        CN1Log(@"Program validate log:\n%s", log);
         free(log);
     }
     
@@ -2545,7 +2597,7 @@ BOOL prefersStatusBarHidden = NO;
     vertShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"vsh"];
     if (![self compileShader:&vertShader type:GL_VERTEX_SHADER file:vertShaderPathname])
     {
-        NSLog(@"Failed to compile vertex shader");
+        CN1Log(@"Failed to compile vertex shader");
         return FALSE;
     }
     
@@ -2553,7 +2605,7 @@ BOOL prefersStatusBarHidden = NO;
     fragShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"fsh"];
     if (![self compileShader:&fragShader type:GL_FRAGMENT_SHADER file:fragShaderPathname])
     {
-        NSLog(@"Failed to compile fragment shader");
+        CN1Log(@"Failed to compile fragment shader");
         return FALSE;
     }
     
@@ -2571,7 +2623,7 @@ BOOL prefersStatusBarHidden = NO;
     // Link program.
     if (![self linkProgram:program])
     {
-        NSLog(@"Failed to link program: %d", program);
+        CN1Log(@"Failed to link program: %d", program);
         
         if (vertShader)
         {
@@ -2655,7 +2707,7 @@ BOOL prefersStatusBarHidden = NO;
     if (currentMutableTransformSet) {
         CGContextRestoreGState(context);
     }
-    //NSLog(@"Drawing the string %@ at %i, %i", str, x, y);
+    //CN1Log(@"Drawing the string %@ at %i, %i", str, x, y);
 	POOL_END();
 }
 
@@ -2701,9 +2753,15 @@ BOOL prefersStatusBarHidden = NO;
     }
 }
 
-static BOOL skipNextTouch = NO;
+
 
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
 	POOL_BEGIN();
     if(touchesArray == nil) {
         touchesArray = [[NSMutableArray alloc] init];
@@ -2764,6 +2822,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch) {
         skipNextTouch = NO;
         return;
@@ -2794,6 +2858,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch) {
         skipNextTouch = NO;
         return;
@@ -2809,7 +2879,7 @@ static BOOL skipNextTouch = NO;
     int xArray[[touches count]];
     int yArray[[touches count]];
     CGPoint point = [touch locationInView:self.view];
-    //NSLog(@"Released %i fingers", [touches count]);
+    //CN1Log(@"Released %i fingers", [touches count]);
     if([touches count] > 1) {
         for(int iter = 0 ; iter < [ts count] ; iter++) {
             UITouch* currentTouch = [ts objectAtIndex:iter];
@@ -2830,6 +2900,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
         return;
     }
@@ -2844,7 +2920,7 @@ static BOOL skipNextTouch = NO;
             CGPoint currentPoint = [currentTouch locationInView:self.view];
             xArray[iter] = (int)currentPoint.x * scaleValue;
             yArray[iter] = (int)currentPoint.y * scaleValue;
-            //NSLog(@"Dragging x: %i y: %i id: %i", xArray[iter], yArray[iter], currentTouch);
+            //CN1Log(@"Dragging x: %i y: %i id: %i", xArray[iter], yArray[iter], currentTouch);
         }
         pointerDraggedC(xArray, yArray, [touchesArray count]);
     } else {
@@ -2880,67 +2956,48 @@ extern int popoverSupported();
 
 //#define LOW_MEM_CAMERA
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
-	POOL_BEGIN();
-	NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
-	if ([mediaType isEqualToString:@"public.image"]) {
-		// get the image
-		UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
-#ifndef CN1_USE_ARC
-        [originalImage retain];
-#endif
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            POOL_BEGIN();
-            UIImage* image = originalImage;
-            BOOL releaseImage = YES;
+
+    NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
+    if ([mediaType isEqualToString:@"public.image"]) {
+        // get the image
+        UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
+
+        UIImage* image = originalImage;
+
 #ifndef LOW_MEM_CAMERA
-            if (image.imageOrientation != UIImageOrientationUp) {
-                UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
-                [image drawInRect:(CGRect){0, 0, image.size}];
-                releaseImage = NO;
-#ifndef CN1_USE_ARC
-                [originalImage release];
+        if (image.imageOrientation != UIImageOrientationUp) {
+            UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+            [image drawInRect:(CGRect){0, 0, image.size}];
+            image = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+        }
 #endif
-                image = UIGraphicsGetImageFromCurrentImageContext();
-                UIGraphicsEndImageContext();
-            }
-#endif
-            
-            NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
-            
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
-            [data writeToFile:path atomically:YES];
-            if(releaseImage) {
-#ifndef CN1_USE_ARC
-                [originalImage release];
-#endif
-            }
-            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
-            POOL_END();
-        });
         
-	} else {
+        NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+        
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+        [data writeToFile:path atomically:YES];
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+    
+        
+    } else {
         // was movie type
         NSString *moviePath = [[info objectForKey: UIImagePickerControllerMediaURL] absoluteString];
         com_codename1_impl_ios_IOSImplementation_captureMovieResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG moviePath));
     }
-	
-	if(popoverSupported() && popoverController != nil) {
-		[popoverController dismissPopoverAnimated:YES];
-        popoverController.delegate = nil;
-        popoverController = nil;
-	} else {
-#ifdef LOW_MEM_CAMERA
-		[picker dismissModalViewControllerAnimated:NO];
-#else
-		[picker dismissModalViewControllerAnimated:YES];
-#endif
-	}
     
-	//picker.delegate = nil;
-    //picker = nil;
-    POOL_END();
+    if(popoverSupported() && popoverController != nil) {
+        [popoverController dismissPopoverAnimated:YES];
+    } else {
+#ifdef LOW_MEM_CAMERA
+        [picker dismissModalViewControllerAnimated:NO];
+#else
+        [picker dismissModalViewControllerAnimated:YES];
+#endif
+    }
+
 }
 
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {
@@ -3027,23 +3084,23 @@ extern SKPayment *paymentInstance;
                 continue;
             case SKPaymentTransactionStateFailed:
                 if (transaction.error.code != SKErrorPaymentCancelled) {
-                    NSLog(@"Transaction error %@", transaction.error);
+                    CN1Log(@"Transaction error %@", transaction.error);
                     com_codename1_impl_ios_IOSImplementation_itemPurchaseError___java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.payment.productIdentifier), fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.error.localizedDescription));
                 }
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
                 continue;
                 
             case SKPaymentTransactionStateRestored:
-                NSLog(@"Transaction restored SKPaymentTransactionStateRestored %@", transaction.originalTransaction.payment.productIdentifier);
+                CN1Log(@"Transaction restored SKPaymentTransactionStateRestored %@", transaction.originalTransaction.payment.productIdentifier);
                 
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
                 com_codename1_impl_ios_IOSImplementation_itemRestored___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG transaction.originalTransaction.payment.productIdentifier));
                 continue;
             case SKPaymentTransactionStatePurchasing:
-                NSLog(@"SKPaymentTransactionStatePurchasing");
+                CN1Log(@"SKPaymentTransactionStatePurchasing");
                 continue;
             default:
-                NSLog(@"Transaction error %i", transaction.transactionState);
+                CN1Log(@"Transaction error %i", transaction.transactionState);
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
                 continue;
         }
@@ -3052,24 +3109,24 @@ extern SKPayment *paymentInstance;
 
 -(void)paymentQueueRestoreCompletedTransactionsFinished:(SKPaymentQueue *)queue
 {
-    NSLog(@"Restore transactions finished");
+    CN1Log(@"Restore transactions finished");
     com_codename1_impl_ios_IOSImplementation_restoreRequestComplete__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 -(void)paymentQueue:(SKPaymentQueue *)queue restoreCompletedTransactionsFailedWithError:(NSError *)error
 {
-    NSLog(@"Restore error");
+    CN1Log(@"Restore error");
     com_codename1_impl_ios_IOSImplementation_restoreRequestError___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG error.localizedDescription));
 }
 
 - (void)audioRecorderDidFinishRecording:(AVAudioRecorder *)recorder successfully:(BOOL)flag {
-    NSLog(@"audioRecorderDidFinishRecording: %i", (int)flag);
+    CN1Log(@"audioRecorderDidFinishRecording: %i", (int)flag);
 }
 
 - (void)audioRecorderEncodeErrorDidOccur:(AVAudioRecorder *)recorder error:(NSError *)error {
     if(error != nil) {
-        NSLog(@"audioRecorderEncodeErrorDidOccur: %@", [error localizedDescription]);
+        CN1Log(@"audioRecorderEncodeErrorDidOccur: %@", [error localizedDescription]);
     } else {
-        NSLog(@"audioRecorderEncodeErrorDidOccur with null argument");
+        CN1Log(@"audioRecorderEncodeErrorDidOccur with null argument");
     }
 }
 
@@ -3120,12 +3177,17 @@ extern SKPayment *paymentInstance;
 }
 
 - (void)datePickerChangeDate:(UIDatePicker *)sender {
+    if (sender.datePickerMode == UIDatePickerModeCountDownTimer) {
+        currentDatePickerDuration = sender.countDownDuration * 1000;
+        return;
+    } 
     if(currentDatePickerDate != nil) {
 #ifndef CN1_USE_ARC
         [currentDatePickerDate release];
 #endif
     }
     currentDatePickerDate = sender.date;
+    
 #ifndef CN1_USE_ARC
     [currentDatePickerDate retain];
 #endif
@@ -3139,6 +3201,11 @@ extern JAVA_OBJECT pickerStringArray;
 #endif
 extern JAVA_LONG defaultDatePickerDate;
 - (void)actionSheet:(UIActionSheet *)actionSheet didDismissWithButtonIndex:(NSInteger)buttonIndex {
+    if (currentDatePickerDuration >= 0) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+        currentDatePickerDuration = -1;
+        return;
+    }
     if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
@@ -3163,6 +3230,7 @@ extern JAVA_LONG defaultDatePickerDate;
     if (currentActionSheet != nil) {
         com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         currentDatePickerDate = nil;
+        currentDatePickerDuration = -1;
         pickerStringArray = nil;
         NSArray* arr = [CodenameOne_GLViewController instance].view.subviews;
         UIView* v = (UIView*)[arr objectAtIndex:0];
@@ -3173,7 +3241,10 @@ extern JAVA_LONG defaultDatePickerDate;
 }
 
 - (void)datePickerDismiss {
-    if(currentDatePickerDate == nil) {
+    if (currentDatePickerDuration >= 0) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+        currentDatePickerDuration = -1;
+    } else if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         } else {
@@ -3200,7 +3271,10 @@ extern JAVA_LONG defaultDatePickerDate;
     UISegmentedControl* s = sender;
     UIActionSheet* sheet = (UIActionSheet*)[s superview];
     [sheet dismissWithClickedButtonIndex:0 animated:YES];
-    if(currentDatePickerDate == nil) {
+    if (currentDatePickerDuration >= 0) {
+        com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+        currentDatePickerDuration = -1;
+    } else if(currentDatePickerDate == nil) {
         if(pickerStringArray == nil) {
             com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG -1);
         } else {
@@ -3222,7 +3296,12 @@ UIPopoverController* popoverControllerInstance;
     if(popoverControllerInstance != nil) {
         [popoverControllerInstance dismissPopoverAnimated:YES];
         popoverControllerInstance = nil;
-        if(currentDatePickerDate == nil) {
+        if (currentDatePickerDuration >= 0) {
+            com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG currentDatePickerDuration);
+            currentDatePickerDuration = -1;
+            defaultDatePickerDate = nil;
+            currentDatePickerDate = nil;
+        } else if(currentDatePickerDate == nil) {
             if(pickerStringArray == nil) {
                 if(defaultDatePickerDate != 0) {
                     com_codename1_impl_ios_IOSImplementation_datePickerResult___long(CN1_THREAD_GET_STATE_PASS_ARG defaultDatePickerDate);
@@ -3313,7 +3392,7 @@ extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_
  @param error The error.
  */
 - (void)appInviteDialog:(FBSDKAppInviteDialog *)appInviteDialog didFailWithError:(NSError *)error {
-    NSLog(@"%@", [error localizedDescription]);
+    CN1Log(@"%@", [error localizedDescription]);
     com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG 0, fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]));
 }
 #endif
@@ -3326,6 +3405,9 @@ extern void com_codename1_social_FacebookImpl_inviteDidFailWithError___int_java_
 {
     return self;
 }
+
+
+
 @end
 
 

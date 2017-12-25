@@ -78,7 +78,7 @@ import java.util.Timer;
  *
  * @author Chen Fishbein, Shai Almog
  */
-public final class Display {
+public final class Display extends CN1Constants {
     private CrashReport crashReporter;
     private EventDispatcher errorHandler;
     boolean codenameOneExited;
@@ -139,40 +139,6 @@ public final class Display {
      * Half QWERTY which needs software assistance for completion
      */
     public static final int KEYBOARD_TYPE_HALF_QWERTY = 4;
-    /**
-     * Used by getSMSSupport to indicate that SMS is not supported
-     */
-    public static final int SMS_NOT_SUPPORTED = 1;
-    
-    /**
-     * Used by getSMSSupport to indicate that SMS is sent in the background without a compose UI
-     */
-    public static final int SMS_SEAMLESS = 2;
-    
-    /**
-     * Used by getSMSSupport to indicate that SMS triggers the native SMS app which will show a compose UI
-     */
-    public static final int SMS_INTERACTIVE = 3;
-    
-    /**
-     * Used by getSMSSupport to indicate that SMS can be sent in either seamless or interactive mode
-     */
-    public static final int SMS_BOTH = 4;
-    
-    /**
-     * Used by openGallery 
-     */
-    public static final int GALLERY_IMAGE = 0;
-    
-    /**
-     * Used by openGallery 
-     */
-    public static final int GALLERY_VIDEO = 1;
-
-    /**
-     * Used by openGallery 
-     */
-    public static final int GALLERY_ALL = 2;
     
     private static final int POINTER_PRESSED = 1;
     private static final int POINTER_RELEASED = 2;
@@ -190,71 +156,6 @@ public final class Display {
     private static final int POINTER_RELEASED_MULTI = 22;
     private static final int POINTER_DRAGGED_MULTI = 23;
     
-    /**
-     * Very Low Density 176x220 And Smaller
-     */
-    public static final int DENSITY_VERY_LOW = 10;
-
-    /**
-     * Low Density Up To 240x320
-     */
-    public static final int DENSITY_LOW = 20;
-
-    /**
-     * Medium Density Up To 360x480
-     */
-    public static final int DENSITY_MEDIUM = 30;
-
-    /**
-     * Hi Density Up To 480x854
-     */
-    public static final int DENSITY_HIGH = 40;
-
-    /**
-     * Very Hi Density Up To 1440x720
-     */
-    public static final int DENSITY_VERY_HIGH = 50;
-
-    /**
-     * HD Up To 1920x1080
-     */
-    public static final int DENSITY_HD = 60;
-
-    /**
-     * Intermediate density for screens that sit somewhere between HD to 2HD
-     */
-    public static final int DENSITY_560 = 65;
-    
-    /**
-     * Double the HD level density
-     */
-    public static final int DENSITY_2HD = 70;
-
-    /**
-     * 4K level density 
-     */
-    public static final int DENSITY_4K = 80;
-
-
-    /**
-     * Date native picker type, it returns a java.util.Date result.
-     */
-    public static final int PICKER_TYPE_DATE = 1;
-
-    /**
-     * Time native picker type, it returns an integer with minutes since midnight.
-     */
-    public static final int PICKER_TYPE_TIME = 2;
-
-    /**
-     * Date and time native picker type, it returns a java.util.Date result.
-     */
-    public static final int PICKER_TYPE_DATE_AND_TIME = 3;
-
-    /**
-     * Strings native picker type, it returns a String result and accepts a String array.
-     */
-    public static final int PICKER_TYPE_STRINGS = 4;
 
     /**
      * A pure touch device has no focus showing when the user is using the touch
@@ -363,7 +264,7 @@ public final class Display {
      */
     public static final int KEY_POUND = '#';
 
-    private static final Display INSTANCE = new Display();
+    static final Display INSTANCE = new Display();
 
     static int transitionDelay = -1;
 
@@ -376,6 +277,12 @@ public final class Display {
      * Contains the call serially pending elements
      */
     private ArrayList<Runnable> pendingSerialCalls = new ArrayList<Runnable>();
+
+    /**
+     * Contains the call serially idle elements
+     */
+    private ArrayList<Runnable> pendingIdleSerialCalls = new ArrayList<Runnable>();
+
 
     /**
      * This is the instance of the EDT used internally to indicate whether
@@ -527,9 +434,9 @@ public final class Display {
      */
     public static final int COMMAND_BEHAVIOR_NATIVE = 10;
 
-    private static String selectedVirtualKeyboard = VirtualKeyboard.NAME;
+    private static String selectedVirtualKeyboard = null;
 
-    private static Hashtable virtualKeyboards = new Hashtable();
+    private static Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
 
     private boolean dropEvents;
     
@@ -540,6 +447,8 @@ public final class Display {
     
     private ActionListener virtualKeyboardListener;
     
+    private int lastSizeChangeEventWH = -1;
+
     /**
      * Private constructor to prevent instanciation
      */
@@ -714,6 +623,7 @@ public final class Display {
      * @param showDuringEdit one of the following: SHOW_DURING_EDIT_IGNORE,
      * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
      * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     * @deprecated this method isn't applicable in modern devices
      */
     public void setShowDuringEditBehavior(int showDuringEdit) {
         this.showDuringEdit = showDuringEdit;
@@ -725,6 +635,7 @@ public final class Display {
      * @return one of the following: SHOW_DURING_EDIT_IGNORE,
      * SHOW_DURING_EDIT_EXCEPTION, SHOW_DURING_EDIT_ALLOW_DISCARD,
      * SHOW_DURING_EDIT_ALLOW_SAVE, SHOW_DURING_EDIT_SET_AS_NEXT
+     * @deprecated this method isn't applicable in modern devices
      */
     public int getShowDuringEditBehavior() {
         return showDuringEdit;
@@ -769,6 +680,26 @@ public final class Display {
         if(codenameOneRunning) {
             synchronized(lock) {
                 pendingSerialCalls.add(r);
+                lock.notifyAll();
+            }
+        } else {
+            r.run();
+        }
+    }
+
+    /**
+     * Causes the runnable to be invoked on the event dispatch thread when the event 
+     * dispatch thread is idle. This method returns immediately and will not wait for the serial call 
+     * to occur. Notice this method is identical to call serially but will perform the runnable only when
+     * the EDT is idle
+     *
+     * @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+     * the paint and key handling events
+     */
+    public void callSeriallyOnIdle(Runnable r){
+        if(codenameOneRunning) {
+            synchronized(lock) {
+                pendingIdleSerialCalls.add(r);
                 lock.notifyAll();
             }
         } else {
@@ -951,14 +882,22 @@ public final class Display {
     void mainEDTLoop() {
         impl.initEDT();
         UIManager.getInstance();
-        com.codename1.ui.VirtualKeyboard vkb = new com.codename1.ui.VirtualKeyboard();
-        INSTANCE.registerVirtualKeyboard(vkb);
         try {
             // when there is no current form the EDT is useful only
             // for features such as call serially
             while(impl.getCurrentForm() == null) {
                 synchronized(lock){
+                    breakOut2:
+                    
                     if(shouldEDTSleep()) {
+                        while(pendingIdleSerialCalls.size() > 0) {
+                            Runnable r = pendingIdleSerialCalls.get(0);
+                            pendingIdleSerialCalls.remove(0);
+                            callSerially(r);
+
+                            break breakOut2;
+                        }
+                        
                         lock.wait();
                     }
 
@@ -990,12 +929,21 @@ public final class Display {
                 // wait indefinetly Lock surrounds the should method to prevent serial calls from
                 // getting "lost"
                  synchronized(lock){
-                     if(shouldEDTSleep()) {
+                    breakOut1:
+
+                    if(shouldEDTSleep()) {
+                         while(pendingIdleSerialCalls.size() > 0) {
+                            Runnable r = pendingIdleSerialCalls.get(0);
+                            pendingIdleSerialCalls.remove(0);
+                            callSerially(r);
+                            break breakOut1;
+                         }
                          impl.edtIdle(true);
                          lock.wait();
                          impl.edtIdle(false);
                      }
                  }
+                 
 
                 edtLoopImpl();
             } catch(Throwable err) {
@@ -1059,19 +1007,32 @@ public final class Display {
             lastDragOffset = -1;
             int[] qt = inputEventStackTmp;
             inputEventStackTmp = inputEventStack;
-            inputEventStack = qt;
-        }
-        
-        int offset = 0;
-        while(offset < inputEventStackPointerTmp) {            
-            if(offset == inputEventStackPointer) {
-                inputEventStackPointer = 0;
-                lastDragOffset = -1;
+
+            // We have a special flag here for a case where the input event stack might still be processing this can 
+            // happen if an event callback calls something like invokeAndBlock while processing and might reach
+            // this code again
+            if(qt[qt.length - 1] == Integer.MAX_VALUE) {
+                inputEventStack = new int[qt.length];
+            } else {
+                inputEventStack = qt;
+                qt[qt.length - 1] = 0;
             }
-            offset = handleEvent(offset);
+        }
+
+        // we copy the variables to the stack since the array might be replaced while we are working if the EDT
+        // is nested into an "invokeAndBlock"
+        int actualTmpPointer = inputEventStackPointerTmp;
+        inputEventStackPointerTmp = 0;
+        int[] actualStack = inputEventStackTmp;
+        int offset = 0;
+        actualStack[actualStack.length - 1] = Integer.MAX_VALUE;
+        while(offset < actualTmpPointer) {            
+            offset = handleEvent(offset, actualStack);
         }
         
-        if(!impl.isInitialized()){
+        actualStack[actualStack.length - 1] = 0;
+
+    if(!impl.isInitialized()){
             return;
         }
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
@@ -1195,6 +1156,10 @@ public final class Display {
                 RunnableWrapper.pushToThreadPool(w);
 
                 synchronized(lock) {
+                    // prevent an invoke and block loop from breaking the ongoing event processing
+                    if(inputEventStackPointerTmp > 0) {
+                        inputEventStackPointerTmp = inputEventStackPointer;
+                    }
                     try {
                         // yeald the CPU for a very short time to let the invoke thread
                         // get started
@@ -1505,6 +1470,9 @@ public final class Display {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        if (isTextEditing(cmp)) {
+            return;
+        }
         Form f = cmp.getComponentForm();
         
         // this can happen in the spinner in the simulator where the key press should in theory start native 
@@ -1580,6 +1548,46 @@ public final class Display {
             inputEventStackPointer++;
             lock.notify();
         }        
+    }
+    
+    /**
+     * Checks if the control key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isControlKeyDown() {
+        return impl.isControlKeyDown();
+    }
+    
+    /**
+     * Checks if the meta key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isMetaKeyDown() {
+        return impl.isMetaKeyDown();
+    }
+    
+    /**
+     * Checks if the alt key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isAltKeyDown() {
+        return impl.isAltKeyDown();
+    }
+    
+    /**
+     * Checks if the altgraph key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isAltGraphKeyDown() {
+        return impl.isAltGraphKeyDown();
+    }
+    
+    /**
+     * Checks if shift key is currently down.  Only relevant for desktop ports.
+     * @return 
+     */
+    public boolean isShiftKeyDown() {
+        return impl.isShiftKeyDown();
     }
     
     /**
@@ -1860,9 +1868,12 @@ public final class Display {
             return;
         }
         if(w == current.getWidth() && h == current.getHeight()) {
-            return;
+            // a workaround for a race condition on pixel 2 where size change events can happen really quickly 
+            if(lastSizeChangeEventWH == -1 || lastSizeChangeEventWH == current.getWidth() + current.getHeight()) {
+                return;            
+            }
         }
-
+        lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
     }
 
@@ -1945,7 +1956,7 @@ public final class Display {
     /**
      * Invoked on the EDT to propagate the event
      */
-    private int handleEvent(int offset) {
+    private int handleEvent(int offset, int[] inputEventStackTmp) {
         Form f = getCurrentUpcomingForm(true);
 
         // might happen when returning from a deinitialized version of Codename One
@@ -2402,9 +2413,8 @@ public final class Display {
     public String [] getSupportedVirtualKeyboard(){
         String [] retVal = new String[virtualKeyboards.size()];
         int index = 0;
-        Enumeration keys = virtualKeyboards.keys();
-        while (keys.hasMoreElements()) {
-            retVal[index++] = (String) keys.nextElement();
+        for(String k : virtualKeyboards.keySet()) {
+            retVal[index++] = k;
         }
         return retVal;
     }
@@ -2679,7 +2689,7 @@ public final class Display {
         if(c.isCellRenderer()) {
             return shouldRenderSelection();
         }
-        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY));
+        return !pureTouch || lastInteractionWasKeypad || (pointerPressedAndNotReleasedOrDragged && c.contains(pointerX, pointerY)) || c.shouldRenderComponentSelection();
     }
 
     /**
@@ -2783,6 +2793,10 @@ public final class Display {
      * behavior can't be manipulated
      */
     public void setCommandBehavior(int commandBehavior) {
+        if (commandBehavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {
+            String message = "WARNING: Display.setCommandBehavior() is deprecated, Using it may result in unexpected behaviour. In particular, using COMMAND_BEHAVIOR_SIDE_NAVIGATION in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime errors.";
+            Log.p(message, Log.WARNING);
+        }
         impl.setCommandBehavior(commandBehavior);
     }
 
@@ -3577,7 +3591,7 @@ hi.show();}</pre></noscript>
      * 
      * @param text String to share.
      * @param image file path to the image or null
-     * @param mime type of the image or null if no image to share
+     * @param mimeType type of the image or null if no image to share
      */
     public void share(String text, String image, String mimeType){
         share(text, image, mimeType, null);
@@ -3627,7 +3641,7 @@ hi.show();}</pre></noscript>
      * @param noFallback some devices don't support an efficient push API and will resort to polling 
      * to provide push like functionality. If this flag is set to true no polling will occur and 
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
-     * @deprecated use the version that doesn't take an id argument this argument is effectively ignored!
+     * @deprecated use {@link #registerPush()} the Android push id should be set with the build hint {@code gcm.sender_id} which will work for Chrome JavaScript builds too
      */
     public void registerPush(String id, boolean noFallback) {
         Hashtable h = new Hashtable();
@@ -3644,6 +3658,7 @@ hi.show();}</pre></noscript>
      * @param noFallback some devices don't support an efficient push API and will resort to polling 
      * to provide push like functionality. If this flag is set to true no polling will occur and 
      * the error PushCallback.REGISTRATION_ERROR_SERVICE_NOT_AVAILABLE will be sent to the push interface.
+     * @deprecated use {@link #registerPush()} the Android push id should be set with the build hint {@code gcm.sender_id} which will work for Chrome JavaScript builds too
      */
     public void registerPush(Hashtable metaData, boolean noFallback) {
         if(Preferences.get("push_id", (long)-1) == -1) {
@@ -3651,6 +3666,14 @@ hi.show();}</pre></noscript>
         }
     }
 
+    /**
+     * Register to receive push notification, invoke this method once (ever) to receive push
+     * notifications.
+     */
+    public void registerPush() {
+        impl.registerPush(new Hashtable(), false);
+    }
+    
     /**
      * Stop receiving push notifications to this client application
      */

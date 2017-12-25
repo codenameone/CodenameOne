@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+    <head>
+        <title>Local Notifications</title>
+    </head>
+    <body>
+        <h1>Local Notification API</h1>
+        <p>Local notifications are similar to push notifications, except that they are initiated locally by the app, rather than remotely.
+          They are useful for communicating information to the user while the app is running in the background, since they manifest
+          themselves as pop-up notifications on supported devices.
+        </p>
+
+        <h2>Sending Notifications</h2>
+
+        <p>The process for sending a notification is:</p>
+
+        <ul>
+          <li>Create a {@link com.codename1.notifications.LocalNotification} object with the information you want to send in the notification.</li>
+          <li>Pass the object to {@link com.codename1.ui.Display#scheduleLocalNotification(LocalNotification,long,int)}.</li>
+        </ul>
+
+        <p>Notifications can either be set up as one-time only or as repeating.</p>
+
+        <h3>Example Sending Notification</h3>
+        <pre>
+        {@code
+        LocalNotification n = new LocalNotification();
+        n.setId("demo-notification");
+        n.setAlertBody("It's time to take a break and look at me");
+        n.setAlertTitle("Break Time!");
+        n.setAlertSound("/notification_sound_bells.mp3"); //file name must begin with notification_sound
+
+
+        Display.getInstance().scheduleLocalNotification(
+                n,
+                System.currentTimeMillis() + 10 * 1000, // fire date/time
+                LocalNotification.REPEAT_MINUTE  // Whether to repeat and what frequency
+        );
+      }
+    </pre>
+        <p>The resulting notification will look like </p>
+
+        <p><img src="https://cloud.githubusercontent.com/assets/2677562/10207046/f7200840-677e-11e5-8fd7-41eb027f8a6c.png"/></p>
+
+        <p>The above screenshot was taken on the iOS simulator.</p>
+
+        <h2>Receiving Notifications</h2>
+
+        <p>The API for receiving/handling local notifications is also similar to push.  Your application's main lifecycle class needs
+           to implement the {@link com.codename1.notifications.LocalNotificationCallback} interface which includes a single method: {@link com.codename1.notifications.LocalNotificationCallback#notificationReceived(String)}</p>
+
+
+        <p>The {@literal notificationId } parameter will match the {@literal id} value of the notification as set using
+          {@link com.codename1.notifications.LocalNotification#setId(String)}.</p>
+
+        <h3>Example Receiving Notification</h3>
+        <pre>
+        {@code
+        public class BackgroundLocationDemo implements LocalNotificationCallback {
+            //...
+
+            public void init(Object context) {
+                //...
+            }
+
+            public void start() {
+                //...
+
+            }
+
+            public void stop() {
+                //...
+            }
+
+            public void destroy() {
+                //...
+            }
+
+            public void localNotificationReceived(String notificationId) {
+                System.out.println("Received local notification "+notificationId);
+            }
+        }
+       }
+     </pre>
+
+        <p><strong>NOTE:</strong> {@link com.codename1.notifications.LocalNotificationCallback#localNotificationReceived(String)}
+          is only called when the user responds to the notification by tapping on the alert.  If the user doesn't opt to
+          click on the notification, then this event handler will never be fired.</p>
+
+        <h2>Cancelling Notifications</h2>
+
+        <p>Repeating notifications will continue until they are canceled by the app. You can cancel a single notification by calling {@link com.codename1.ui.Display#cancelLocalNotification(String)}</p>
+
+        <p>Where {@literal notificationId} is the string id that was set for the notification using {@link com.codename1.notifications.LocalNotification#setId(String)}.
+
+        <h2>Sample App</h2>
+
+        <p>You can see a full sample that uses the new local notifications API
+          <a href="https://github.com/codenameone/codenameone-demos/blob/master/LocalNotificationTest/src/com/codename1/tests/localnotifications/LocalNotificationTest.java">here</a>.</p>
+    </body>
+</html>

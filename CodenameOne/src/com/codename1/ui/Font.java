@@ -109,6 +109,52 @@ public class Font {
      * Constant allowing us to author portable system fonts
      */
     public static final int STYLE_UNDERLINED = 4;
+    
+    /**
+     * Constant for the name of the main thin native font.
+     */
+    public static final String NATIVE_MAIN_THIN="native:MainThin";
+    
+    /**
+     * Constant for the main light native font.
+     */
+    public static final String NATIVE_MAIN_LIGHT="native:MainLight";
+    
+    /**
+     * Constant for the main regular native font.
+     */
+    public static final String NATIVE_MAIN_REGULAR="native:MainRegular";
+    
+    /**
+     * Constant for the main bold native font.
+     */
+    public static final String NATIVE_MAIN_BOLD="native:MainBold";
+    
+    /**
+     * Constant for the main black native font.
+     */
+    public static final String NATIVE_MAIN_BLACK="native:MainBlack";
+    
+    /**
+     * Constant for the italic thin native font.
+     */
+    public static final String NATIVE_ITALIC_THIN="native:ItalicThin";
+    
+    /**
+     * Constant for the italic light native font.
+     */
+    public static final String NATIVE_ITALIC_LIGHT="native:ItalicLight";
+    
+    /**
+     * Constant for the italic bold native font.
+     */
+    public static final String NATIVE_ITALIC_BOLD="native:ItalicBold";
+    
+    /**
+     * Constant for the italic black native font.
+     */
+    public static final String NATIVE_ITALIC_BLACK="native:ItalicBlack";
+    
 
     /**
      * Constant allowing us to author portable system fonts

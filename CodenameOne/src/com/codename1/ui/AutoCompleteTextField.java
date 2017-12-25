@@ -211,7 +211,7 @@ public class AutoCompleteTextField extends TextField {
         boolean res = filter(text);
         if(filter != null && popup != null) {
             boolean v = filter.getSize() > 0 && text.length() >= minimumLength;
-            if(v != popup.isVisible()) {
+            if(v != popup.isVisible() && popup.getComponentCount() > 0) {
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(v);
                 popup.setEnabled(v);

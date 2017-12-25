@@ -1278,7 +1278,7 @@ public class Tabs extends Container {
                 case PRESS: {
                     blockSwipe = false;
                     riskySwipe = false;
-                    if (contentPane.contains(x, y)) {
+                    if (contentPane.visibleBoundsContains(x, y)) {
                         Component testCmp = contentPane.getComponentAt(x, y);
                         if(testCmp != null && testCmp != contentPane) {
                             while(testCmp != null && testCmp != contentPane) {
@@ -1312,6 +1312,7 @@ public class Tabs extends Container {
                         lastX = -1;
                         initialX = -1;
                         initialY = -1;
+                        blockSwipe = true;
                     }
                     dragStarted = false;
                     break;
@@ -1334,6 +1335,10 @@ public class Tabs extends Container {
                                 // start drag not imediately, giving components some sort
                                 // of weight.
                                 dragStarted = Math.abs(x - initialX) > (contentPane.getWidth() / 8);
+                                Form parent = getComponentForm();
+                                if(parent.buttonsAwatingRelease != null) {
+                                    parent.buttonsAwatingRelease = null;
+                                }
                             }
                         }
                     } 

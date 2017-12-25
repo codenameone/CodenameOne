@@ -32,6 +32,7 @@ import com.codename1.ui.plaf.Accessor;
 import com.codename1.designer.ResourceEditorView;
 import com.codename1.ui.Display;
 import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.util.EditableResources;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -92,7 +93,7 @@ public class BorderEditor extends javax.swing.JPanel {
                     arcHeight, arcWidth, bottom, bottomLeft, bottomRight, center,
                     changeHighlightColor, changeLineColor, changeSecondaryHighlightColor,
                     changeSecondaryShadowColor, changeShadowColor, highlightColor, imageMode,
-                    left, lineColor, thickness, raisedBorder, right, secondaryHighlightColor,
+                    left, lineColor, thickness, thicknessMillimeters, raisedBorder, right, secondaryHighlightColor,
                     secondaryShadowColor, shadowColor, top, topLeft, topRight,
                     themeColors, imageBorderPreview, roundBorderSettings
                 };
@@ -129,7 +130,11 @@ public class BorderEditor extends javax.swing.JPanel {
                 },
                 // Line
                 {
-                    lineColor, changeLineColor, themeColors, thickness
+                    lineColor, changeLineColor, themeColors, thickness, thicknessMillimeters
+                },
+                // Underline
+                {
+                    lineColor, changeLineColor, themeColors, thickness, thicknessMillimeters
                 },
                 // Round
                 {
@@ -151,21 +156,34 @@ public class BorderEditor extends javax.swing.JPanel {
                 // round
                 {
                     lineColor, roundBorderSettings
+                },
+                // round rect
+                {
+                    lineColor, roundBorderSettings
                 }
             };    
         
 
         arcWidth.setModel(new SpinnerNumberModel(1, 1, 100, 1));
         arcHeight.setModel(new SpinnerNumberModel(1, 1, 100, 1));
-        thickness.setModel(new SpinnerNumberModel(1, 1, 100, 1));
+        thickness.setModel(new SpinnerNumberModelThatWorks(1, 0.1, 100, 0.1));
         opacity.setModel(new SpinnerNumberModel(255, 0, 255, 1));
         shadowBlur.setModel(new SpinnerNumberModelThatWorks(10.0, 1, 100, 1));
-        shadowOpacity.setModel(new SpinnerNumberModel(0, 0, 255, 1));;
-        shadowSpread.setModel(new SpinnerNumberModel(10, 0, 255, 1));;
-        shadowX.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));;
-        shadowY.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));;
+        shadowOpacity.setModel(new SpinnerNumberModel(0, 0, 255, 1));
+        shadowSpread.setModel(new SpinnerNumberModel(10, 0, 255, 1));
+        shadowX.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));
+        shadowY.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));
         strokeOpacity.setModel(new SpinnerNumberModel(255, 0, 255, 1));
         strokeThickness.setModel(new SpinnerNumberModelThatWorks(0.0, 0, 30, 0.5));
+
+        rrRadius.setModel(new SpinnerNumberModelThatWorks(2.0, 0.1, 100, 0.1));
+        rrShadowBlur.setModel(new SpinnerNumberModelThatWorks(10.0, 1, 100, 0.1));
+        rrShadowOpacity.setModel(new SpinnerNumberModel(0, 0, 255, 1));
+        rrShadowSpread.setModel(new SpinnerNumberModelThatWorks(10, 0, 255, 0.5));
+        rrShadowX.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));
+        rrShadowY.setModel(new SpinnerNumberModelThatWorks(0.5, 0, 1, 0.01));
+        rrStrokeOpacity.setModel(new SpinnerNumberModel(255, 0, 255, 1));
+        rrStrokeThickness.setModel(new SpinnerNumberModelThatWorks(0.0, 0, 30, 0.5));
         
         okButton.setPreferredSize(cancelButton.getPreferredSize());
         ((AbstractDocument)highlightColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
@@ -182,45 +200,55 @@ public class BorderEditor extends javax.swing.JPanel {
         new ButtonColorIcon(backgroundColor, backgroundColorPicker);
         ((AbstractDocument)strokeColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
         ((AbstractDocument)backgroundColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
+        new ButtonColorIcon(rrStrokeColor, rrStrokeColorPicker);
+        ((AbstractDocument)rrStrokeColor.getDocument()).setDocumentFilter(new ColorDocmentFilter());
 
         boolean fourColorBorder = false;
         if(border != null) {
             if(border instanceof RoundBorder) {
-                borderType.setSelectedIndex(borderType.getItemCount() - 1);
+                borderType.setSelectedIndex(borderType.getItemCount() - 2);
                 jTabbedPane1.setSelectedIndex(2);
             } else {
-                jTabbedPane1.setEnabledAt(2, false);
-                switch(Accessor.getType(border)) {
-                    case Accessor.TYPE_EMPTY:
-                        borderType.setSelectedIndex(1);
-                        break;
-                    case Accessor.TYPE_LINE:
-                        borderType.setSelectedIndex(4);
-                        break;
-                    case Accessor.TYPE_ROUNDED:
-                    case Accessor.TYPE_ROUNDED_PRESSED:
-                        borderType.setSelectedIndex(5);
-                        break;
-                    case Accessor.TYPE_ETCHED_RAISED:
-                        raisedBorder.setSelected(true);
-                    case Accessor.TYPE_ETCHED_LOWERED:
-                        borderType.setSelectedIndex(3);
-                        break;
-                    case Accessor.TYPE_BEVEL_RAISED:
-                        raisedBorder.setSelected(true);
-                    case Accessor.TYPE_BEVEL_LOWERED:
-                        borderType.setSelectedIndex(2);
-                        fourColorBorder = true;
-                        break;
-                    case Accessor.TYPE_IMAGE:
-                        borderType.setSelectedIndex(6);
-                        break;
-                    case Accessor.TYPE_IMAGE_HORIZONTAL:
-                        borderType.setSelectedIndex(7);
-                        break;
-                    case Accessor.TYPE_IMAGE_VERTICAL:
-                        borderType.setSelectedIndex(8);
-                        break;
+                if(border instanceof RoundRectBorder) {
+                    borderType.setSelectedIndex(borderType.getItemCount() - 1);
+                    jTabbedPane1.setSelectedIndex(3);
+                } else {
+                    jTabbedPane1.setEnabledAt(2, false);
+                    switch(Accessor.getType(border)) {
+                        case Accessor.TYPE_EMPTY:
+                            borderType.setSelectedIndex(1);
+                            break;
+                        case Accessor.TYPE_LINE:
+                            borderType.setSelectedIndex(4);
+                            break;
+                        case Accessor.TYPE_UNDERLINE:
+                            borderType.setSelectedIndex(5);
+                            break;
+                        case Accessor.TYPE_ROUNDED:
+                        case Accessor.TYPE_ROUNDED_PRESSED:
+                            borderType.setSelectedIndex(6);
+                            break;
+                        case Accessor.TYPE_ETCHED_RAISED:
+                            raisedBorder.setSelected(true);
+                        case Accessor.TYPE_ETCHED_LOWERED:
+                            borderType.setSelectedIndex(3);
+                            break;
+                        case Accessor.TYPE_BEVEL_RAISED:
+                            raisedBorder.setSelected(true);
+                        case Accessor.TYPE_BEVEL_LOWERED:
+                            borderType.setSelectedIndex(2);
+                            fourColorBorder = true;
+                            break;
+                        case Accessor.TYPE_IMAGE:
+                            borderType.setSelectedIndex(7);
+                            break;
+                        case Accessor.TYPE_IMAGE_HORIZONTAL:
+                            borderType.setSelectedIndex(8);
+                            break;
+                        case Accessor.TYPE_IMAGE_VERTICAL:
+                            borderType.setSelectedIndex(9);
+                            break;
+                    }
                 }
             }
         }
@@ -240,64 +268,87 @@ public class BorderEditor extends javax.swing.JPanel {
                 strokeThickness.setValue(rb.getStrokeThickness());
                 strokeMillimeter.setSelected(rb.isStrokeMM());
             } else {
-                arcHeight.setValue(new Integer(Math.max(1, Accessor.getArcHeight(border))));
-                arcWidth.setValue(new Integer(Math.max(1, Accessor.getArcWidth(border))));
-                highlightColor.setText(Integer.toHexString(Accessor.getColorA(border)));
-                lineColor.setText(Integer.toHexString(Accessor.getColorA(border)));
-                thickness.setValue(new Integer(Math.max(1, Accessor.getThickness(border))));
-                secondaryShadowColor.setText(Integer.toHexString(Accessor.getColorD(border)));
-                if(fourColorBorder) {
-                    secondaryHighlightColor.setText(Integer.toHexString(Accessor.getColorB(border)));
-                    shadowColor.setText(Integer.toHexString(Accessor.getColorC(border)));
-                } else {
-                    secondaryHighlightColor.setText(Integer.toHexString(Accessor.getColorC(border)));
-                    shadowColor.setText(Integer.toHexString(Accessor.getColorB(border)));
-                }
-                themeColors.setSelected(Accessor.isThemeColors(border));
-
-                Image[] images = Accessor.getImages(border);
-                if(images != null) {
-                    if(images.length == 9) {
-                        String[] imageNames = new String[9];
-                        for(int iter = 0 ; iter < 9 ; iter++) {
-                            imageNames[iter] = findImageName(images[iter]);
-                            if(imageNames[iter] == null && iter < 8) {
-                                // ok this means that this is probably a 3 image mode border...
-                                imageMode.setSelected(true);
-                                topLeft.setSelectedItem(images[4]);
-                                top.setSelectedItem(images[0]);
-                                center.setSelectedItem(images[8]);
-                                updateBorder();
-                                return;
-                            }
-                        }
-
-                        // top, bottom, left, right, topLeft, topRight, bottomLeft,
-                        // bottomRight, background
-                        imageMode.setSelected(false);
-                        top.setSelectedItem(images[0]);
-                        bottom.setSelectedItem(images[1]);
-                        left.setSelectedItem(images[2]);
-                        right.setSelectedItem(images[3]);
-                        topLeft.setSelectedItem(images[4]);
-                        topRight.setSelectedItem(images[5]);
-                        bottomLeft.setSelectedItem(images[6]);
-                        bottomRight.setSelectedItem(images[7]);
-                        center.setSelectedItem(images[8]);
+                if(border instanceof RoundRectBorder) {
+                    RoundRectBorder rb = (RoundRectBorder)border;
+                    rrShadowBlur.setValue(rb.getShadowBlur());
+                    rrShadowOpacity.setValue(rb.getShadowOpacity());
+                    rrShadowSpread.setValue(rb.getShadowSpread());
+                    rrShadowX.setValue(rb.getShadowX());
+                    rrShadowY.setValue(rb.getShadowY());
+                    rrStrokeColor.setText(Integer.toHexString(rb.getStrokeColor()));                
+                    rrStrokeOpacity.setValue(rb.getStrokeOpacity());
+                    rrStrokeThickness.setValue(rb.getStrokeThickness());
+                    rrBezier.setSelected(rb.isBezierCorners());
+                    if(rb.isTopOnlyMode()) {
+                        rrMode.setSelectedIndex(1);
                     } else {
-                        String[] imageNames = new String[3];
-                        for(int iter = 0 ; iter < 3 ; iter++) {
-                            imageNames[iter] = findImageName(images[iter]);
+                        if(rb.isBottomOnlyMode()) {
+                            rrMode.setSelectedIndex(2);
                         }
+                    }
+                    rrStrokeMillimeter.setSelected(rb.isStrokeMM());
+                    rrRadius.setValue(rb.getCornerRadius());
+                } else {
+                    arcHeight.setValue(new Integer(Math.max(1, Accessor.getArcHeight(border))));
+                    arcWidth.setValue(new Integer(Math.max(1, Accessor.getArcWidth(border))));
+                    highlightColor.setText(Integer.toHexString(Accessor.getColorA(border)));
+                    lineColor.setText(Integer.toHexString(Accessor.getColorA(border)));
+                    thickness.setValue(new Double(Accessor.getThickness(border)));
+                    thicknessMillimeters.setSelected(Accessor.isMillimeters(border));
+                    secondaryShadowColor.setText(Integer.toHexString(Accessor.getColorD(border)));
+                    if(fourColorBorder) {
+                        secondaryHighlightColor.setText(Integer.toHexString(Accessor.getColorB(border)));
+                        shadowColor.setText(Integer.toHexString(Accessor.getColorC(border)));
+                    } else {
+                        secondaryHighlightColor.setText(Integer.toHexString(Accessor.getColorC(border)));
+                        shadowColor.setText(Integer.toHexString(Accessor.getColorB(border)));
+                    }
+                    themeColors.setSelected(Accessor.isThemeColors(border));
 
-                        if(Accessor.getType(border) == Accessor.TYPE_IMAGE_HORIZONTAL) {
-                            left.setSelectedItem(images[0]);
-                            right.setSelectedItem(images[1]);
-                            center.setSelectedItem(images[2]);
-                        } else {
+                    Image[] images = Accessor.getImages(border);
+                    if(images != null) {
+                        if(images.length == 9) {
+                            String[] imageNames = new String[9];
+                            for(int iter = 0 ; iter < 9 ; iter++) {
+                                imageNames[iter] = findImageName(images[iter]);
+                                if(imageNames[iter] == null && iter < 8) {
+                                    // ok this means that this is probably a 3 image mode border...
+                                    imageMode.setSelected(true);
+                                    topLeft.setSelectedItem(images[4]);
+                                    top.setSelectedItem(images[0]);
+                                    center.setSelectedItem(images[8]);
+                                    updateBorder();
+                                    return;
+                                }
+                            }
+
+                            // top, bottom, left, right, topLeft, topRight, bottomLeft,
+                            // bottomRight, background
+                            imageMode.setSelected(false);
                             top.setSelectedItem(images[0]);
                             bottom.setSelectedItem(images[1]);
-                            center.setSelectedItem(images[2]);
+                            left.setSelectedItem(images[2]);
+                            right.setSelectedItem(images[3]);
+                            topLeft.setSelectedItem(images[4]);
+                            topRight.setSelectedItem(images[5]);
+                            bottomLeft.setSelectedItem(images[6]);
+                            bottomRight.setSelectedItem(images[7]);
+                            center.setSelectedItem(images[8]);
+                        } else {
+                            String[] imageNames = new String[3];
+                            for(int iter = 0 ; iter < 3 ; iter++) {
+                                imageNames[iter] = findImageName(images[iter]);
+                            }
+
+                            if(Accessor.getType(border) == Accessor.TYPE_IMAGE_HORIZONTAL) {
+                                left.setSelectedItem(images[0]);
+                                right.setSelectedItem(images[1]);
+                                center.setSelectedItem(images[2]);
+                            } else {
+                                top.setSelectedItem(images[0]);
+                                bottom.setSelectedItem(images[1]);
+                                center.setSelectedItem(images[2]);
+                            }
                         }
                     }
                 }
@@ -362,6 +413,7 @@ public class BorderEditor extends javax.swing.JPanel {
         themeColors = new javax.swing.JCheckBox();
         jLabel7 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
+        thicknessMillimeters = new javax.swing.JCheckBox();
         imageBorderSettings = new javax.swing.JPanel();
         imageMode = new javax.swing.JCheckBox();
         jPanel4 = new javax.swing.JPanel();
@@ -400,6 +452,31 @@ public class BorderEditor extends javax.swing.JPanel {
         jLabel21 = new javax.swing.JLabel();
         backgroundColor = new javax.swing.JTextField();
         backgroundColorPicker = new javax.swing.JButton();
+        jPanel2 = new javax.swing.JPanel();
+        jLabel22 = new javax.swing.JLabel();
+        rrStrokeColor = new javax.swing.JTextField();
+        rrStrokeColorPicker = new javax.swing.JButton();
+        jLabel23 = new javax.swing.JLabel();
+        rrStrokeOpacity = new javax.swing.JSpinner();
+        jLabel24 = new javax.swing.JLabel();
+        rrStrokeThickness = new javax.swing.JSpinner();
+        rrStrokeMillimeter = new javax.swing.JCheckBox();
+        jLabel25 = new javax.swing.JLabel();
+        rrShadowOpacity = new javax.swing.JSpinner();
+        jLabel26 = new javax.swing.JLabel();
+        rrShadowSpread = new javax.swing.JSpinner();
+        jLabel27 = new javax.swing.JLabel();
+        rrShadowX = new javax.swing.JSpinner();
+        jLabel28 = new javax.swing.JLabel();
+        rrShadowY = new javax.swing.JSpinner();
+        jLabel29 = new javax.swing.JLabel();
+        rrShadowBlur = new javax.swing.JSpinner();
+        jLabel30 = new javax.swing.JLabel();
+        rrRadius = new javax.swing.JSpinner();
+        jLabel31 = new javax.swing.JLabel();
+        rrBezier = new javax.swing.JCheckBox();
+        jLabel32 = new javax.swing.JLabel();
+        rrMode = new javax.swing.JComboBox();
 
         FormListener formListener = new FormListener();
 
@@ -409,7 +486,7 @@ public class BorderEditor extends javax.swing.JPanel {
         jPanel6.setName("jPanel6"); // NOI18N
         jPanel6.setLayout(new java.awt.BorderLayout());
 
-        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Rounded (square with rounded corners)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)" }));
+        borderType.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "[Null]", "[Empty]", "Bevel", "Etched", "Line", "Underline", "Rounded (Deprecated)", "Image", "Horizontal Image", "Vertical Image", "Round (circle or square whose corners are completely round)", "Rounded Rectangle" }));
         borderType.setName("borderType"); // NOI18N
         borderType.addActionListener(formListener);
         jPanel6.add(borderType, java.awt.BorderLayout.CENTER);
@@ -544,6 +621,10 @@ public class BorderEditor extends javax.swing.JPanel {
         jLabel5.setText("Secondary");
         jLabel5.setName("jLabel5"); // NOI18N
 
+        thicknessMillimeters.setText("Millimeters");
+        thicknessMillimeters.setName("thicknessMillimeters"); // NOI18N
+        thicknessMillimeters.addActionListener(formListener);
+
         org.jdesktop.layout.GroupLayout generalSettingsLayout = new org.jdesktop.layout.GroupLayout(generalSettings);
         generalSettings.setLayout(generalSettingsLayout);
         generalSettingsLayout.setHorizontalGroup(
@@ -560,45 +641,43 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(6, 6, 6)
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(generalSettingsLayout.createSequentialGroup()
-                        .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(thickness, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 389, Short.MAX_VALUE)
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(highlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeHighlightColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jLabel5)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(secondaryHighlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeSecondaryHighlightColor))
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(shadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeShadowColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jLabel6)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(secondaryShadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeSecondaryShadowColor)))
-                        .add(14, 14, 14))
+                        .add(highlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeHighlightColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jLabel5)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(secondaryHighlightColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeSecondaryHighlightColor))
                     .add(generalSettingsLayout.createSequentialGroup()
-                        .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(raisedBorder)
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(arcWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE)
-                                .add(56, 56, 56)
-                                .add(jLabel9)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(arcHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE))
-                            .add(generalSettingsLayout.createSequentialGroup()
-                                .add(lineColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(changeLineColor)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(themeColors)))
-                        .add(6, 6, 6))))
+                        .add(shadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeShadowColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jLabel6)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(secondaryShadowColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeSecondaryShadowColor))
+                    .add(generalSettingsLayout.createSequentialGroup()
+                        .add(thickness, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 143, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(18, 18, 18)
+                        .add(thicknessMillimeters))
+                    .add(raisedBorder)
+                    .add(generalSettingsLayout.createSequentialGroup()
+                        .add(arcWidth, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE)
+                        .add(56, 56, 56)
+                        .add(jLabel9)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(arcHeight, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 62, Short.MAX_VALUE))
+                    .add(generalSettingsLayout.createSequentialGroup()
+                        .add(lineColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(changeLineColor)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(themeColors)))
+                .addContainerGap(41, Short.MAX_VALUE))
         );
 
         generalSettingsLayout.linkSize(new java.awt.Component[] {arcHeight, arcWidth, highlightColor, lineColor, secondaryHighlightColor, secondaryShadowColor, shadowColor}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
@@ -616,7 +695,8 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(3, 3, 3)
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel12)
-                    .add(thickness, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(thickness, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(thicknessMillimeters))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(arcWidth, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -643,7 +723,7 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(generalSettingsLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(raisedBorder)
                     .add(jLabel7))
-                .add(0, 187, Short.MAX_VALUE))
+                .add(0, 209, Short.MAX_VALUE))
         );
 
         jTabbedPane1.addTab("General", generalSettings);
@@ -719,7 +799,7 @@ public class BorderEditor extends javax.swing.JPanel {
                 .addContainerGap(214, Short.MAX_VALUE))
         );
 
-        jTabbedPane1.addTab("Image Border", imageBorderSettings);
+        jTabbedPane1.addTab("Image", imageBorderSettings);
 
         roundBorderSettings.setName("roundBorderSettings"); // NOI18N
 
@@ -903,7 +983,184 @@ public class BorderEditor extends javax.swing.JPanel {
                 .add(15, 15, 15))
         );
 
-        jTabbedPane1.addTab("Round Border", roundBorderSettings);
+        jTabbedPane1.addTab("Round", roundBorderSettings);
+
+        jPanel2.setName("jPanel2"); // NOI18N
+
+        jLabel22.setText("Stroke Color");
+        jLabel22.setName("jLabel22"); // NOI18N
+
+        rrStrokeColor.setText("0");
+        rrStrokeColor.setName("rrStrokeColor"); // NOI18N
+        rrStrokeColor.addActionListener(formListener);
+
+        rrStrokeColorPicker.setText("...");
+        rrStrokeColorPicker.setName("rrStrokeColorPicker"); // NOI18N
+        rrStrokeColorPicker.addActionListener(formListener);
+
+        jLabel23.setText("Stroke Opacity");
+        jLabel23.setName("jLabel23"); // NOI18N
+
+        rrStrokeOpacity.setName("rrStrokeOpacity"); // NOI18N
+        rrStrokeOpacity.addChangeListener(formListener);
+
+        jLabel24.setText("Stroke Thickness");
+        jLabel24.setName("jLabel24"); // NOI18N
+
+        rrStrokeThickness.setName("rrStrokeThickness"); // NOI18N
+        rrStrokeThickness.addChangeListener(formListener);
+
+        rrStrokeMillimeter.setText("In Millimeters");
+        rrStrokeMillimeter.setToolTipText("Is the thickness in millimeters or pixels");
+        rrStrokeMillimeter.setName("rrStrokeMillimeter"); // NOI18N
+        rrStrokeMillimeter.addActionListener(formListener);
+
+        jLabel25.setText("Shadow Opacity");
+        jLabel25.setName("jLabel25"); // NOI18N
+
+        rrShadowOpacity.setName("rrShadowOpacity"); // NOI18N
+        rrShadowOpacity.addChangeListener(formListener);
+
+        jLabel26.setText("Shadow Spread");
+        jLabel26.setName("jLabel26"); // NOI18N
+
+        rrShadowSpread.setName("rrShadowSpread"); // NOI18N
+        rrShadowSpread.addChangeListener(formListener);
+
+        jLabel27.setText("Shadow X");
+        jLabel27.setName("jLabel27"); // NOI18N
+
+        rrShadowX.setName("rrShadowX"); // NOI18N
+        rrShadowX.addChangeListener(formListener);
+
+        jLabel28.setText("Shadow Y");
+        jLabel28.setName("jLabel28"); // NOI18N
+
+        rrShadowY.setName("rrShadowY"); // NOI18N
+        rrShadowY.addChangeListener(formListener);
+
+        jLabel29.setText("Shadow Blur");
+        jLabel29.setName("jLabel29"); // NOI18N
+
+        rrShadowBlur.setName("rrShadowBlur"); // NOI18N
+        rrShadowBlur.addChangeListener(formListener);
+
+        jLabel30.setText("Radius Millimeters");
+        jLabel30.setName("jLabel30"); // NOI18N
+
+        rrRadius.setName("rrRadius"); // NOI18N
+        rrRadius.addChangeListener(formListener);
+
+        jLabel31.setText("Bezier Corners");
+        jLabel31.setName("jLabel31"); // NOI18N
+
+        rrBezier.setName("rrBezier"); // NOI18N
+        rrBezier.addActionListener(formListener);
+
+        jLabel32.setText("Mode");
+        jLabel32.setName("jLabel32"); // NOI18N
+
+        rrMode.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Standard", "Top Only", "Bottom Only" }));
+        rrMode.setName("rrMode"); // NOI18N
+        rrMode.addActionListener(formListener);
+
+        org.jdesktop.layout.GroupLayout jPanel2Layout = new org.jdesktop.layout.GroupLayout(jPanel2);
+        jPanel2.setLayout(jPanel2Layout);
+        jPanel2Layout.setHorizontalGroup(
+            jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel2Layout.createSequentialGroup()
+                .addContainerGap()
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jLabel24)
+                    .add(jLabel22)
+                    .add(jLabel23)
+                    .add(jLabel25)
+                    .add(jLabel26)
+                    .add(jLabel27)
+                    .add(jLabel28)
+                    .add(jLabel29)
+                    .add(jLabel30)
+                    .add(jLabel31)
+                    .add(jLabel32))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel2Layout.createSequentialGroup()
+                        .add(rrStrokeThickness)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(rrStrokeMillimeter))
+                    .add(jPanel2Layout.createSequentialGroup()
+                        .add(rrBezier)
+                        .add(0, 0, Short.MAX_VALUE))
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel2Layout.createSequentialGroup()
+                        .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrMode, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrStrokeOpacity)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrShadowOpacity)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrShadowSpread)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrShadowX)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrShadowY)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrShadowBlur)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, rrRadius)
+                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel2Layout.createSequentialGroup()
+                                .add(rrStrokeColor, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 173, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(rrStrokeColorPicker)))
+                        .add(124, 124, 124)))
+                .addContainerGap())
+        );
+        jPanel2Layout.setVerticalGroup(
+            jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel2Layout.createSequentialGroup()
+                .addContainerGap()
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel30)
+                    .add(rrRadius, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel22)
+                    .add(rrStrokeColor, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(rrStrokeColorPicker))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel23)
+                    .add(rrStrokeOpacity, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel24)
+                    .add(rrStrokeMillimeter)
+                    .add(rrStrokeThickness, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel25)
+                    .add(rrShadowOpacity, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel26)
+                    .add(rrShadowSpread, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel27)
+                    .add(rrShadowX, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel28)
+                    .add(rrShadowY, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel29)
+                    .add(rrShadowBlur, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel31)
+                    .add(rrBezier))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel32)
+                    .add(rrMode, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(44, Short.MAX_VALUE))
+        );
+
+        jTabbedPane1.addTab("Round Rect", jPanel2);
 
         add(jTabbedPane1, java.awt.BorderLayout.CENTER);
     }
@@ -970,6 +1227,24 @@ public class BorderEditor extends javax.swing.JPanel {
             else if (evt.getSource() == backgroundColor) {
                 BorderEditor.this.backgroundColorActionPerformed(evt);
             }
+            else if (evt.getSource() == rrStrokeColor) {
+                BorderEditor.this.rrStrokeColorActionPerformed(evt);
+            }
+            else if (evt.getSource() == rrStrokeColorPicker) {
+                BorderEditor.this.rrStrokeColorPickerActionPerformed(evt);
+            }
+            else if (evt.getSource() == rrStrokeMillimeter) {
+                BorderEditor.this.rrStrokeMillimeterActionPerformed(evt);
+            }
+            else if (evt.getSource() == rrBezier) {
+                BorderEditor.this.rrBezierActionPerformed(evt);
+            }
+            else if (evt.getSource() == rrMode) {
+                BorderEditor.this.rrModeActionPerformed(evt);
+            }
+            else if (evt.getSource() == thicknessMillimeters) {
+                BorderEditor.this.thicknessMillimetersActionPerformed(evt);
+            }
         }
 
         public void stateChanged(javax.swing.event.ChangeEvent evt) {
@@ -1006,18 +1281,47 @@ public class BorderEditor extends javax.swing.JPanel {
             else if (evt.getSource() == shadowBlur) {
                 BorderEditor.this.shadowBlurStateChanged(evt);
             }
+            else if (evt.getSource() == rrStrokeOpacity) {
+                BorderEditor.this.rrStrokeOpacityStateChanged(evt);
+            }
+            else if (evt.getSource() == rrStrokeThickness) {
+                BorderEditor.this.rrStrokeThicknessStateChanged(evt);
+            }
+            else if (evt.getSource() == rrShadowOpacity) {
+                BorderEditor.this.rrShadowOpacityStateChanged(evt);
+            }
+            else if (evt.getSource() == rrShadowSpread) {
+                BorderEditor.this.rrShadowSpreadStateChanged(evt);
+            }
+            else if (evt.getSource() == rrShadowX) {
+                BorderEditor.this.rrShadowXStateChanged(evt);
+            }
+            else if (evt.getSource() == rrShadowY) {
+                BorderEditor.this.rrShadowYStateChanged(evt);
+            }
+            else if (evt.getSource() == rrShadowBlur) {
+                BorderEditor.this.rrShadowBlurStateChanged(evt);
+            }
+            else if (evt.getSource() == rrRadius) {
+                BorderEditor.this.rrRadiusStateChanged(evt);
+            }
         }
     }// </editor-fold>//GEN-END:initComponents
 
 private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_borderTypeActionPerformed
     updateBorder();
-    if(borderType.getSelectedIndex() == borderType.getItemCount() - 1) {
+    if(borderType.getSelectedIndex() == borderType.getItemCount() - 2) {
         jTabbedPane1.setEnabledAt(2, true);
         jTabbedPane1.setSelectedIndex(2);
     } else {
-        jTabbedPane1.setEnabledAt(2, false);
-        if(jTabbedPane1.getSelectedIndex() == 2) {
-            jTabbedPane1.setSelectedIndex(0);
+        if(borderType.getSelectedIndex() == borderType.getItemCount() - 1) {
+            jTabbedPane1.setEnabledAt(3, true);
+            jTabbedPane1.setSelectedIndex(3);
+        } else {
+            jTabbedPane1.setEnabledAt(2, false);
+            if(jTabbedPane1.getSelectedIndex() == 2) {
+                jTabbedPane1.setSelectedIndex(0);
+            }
         }
     }
 }//GEN-LAST:event_borderTypeActionPerformed
@@ -1066,7 +1370,7 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                 }
             }
         }
-        if(borderType.getSelectedIndex() == borderType.getItemCount() - 1) {
+        if(borderType.getSelectedIndex() == borderType.getItemCount() - 2) {
             // we need to use a special case because a theme with no images will have a different offset for the border 
             currentBorder = RoundBorder.create().
                     color(getColor(backgroundColor)).
@@ -1081,110 +1385,151 @@ private void borderTypeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
                     strokeColor(getColor(strokeColor)).
                     strokeOpacity(((Number)strokeOpacity.getValue()).intValue());
         } else {
-            switch(borderType.getSelectedIndex()) {
-                case 0:
-                    // null border
-                    currentBorder = null;
-                    break;
-                case 1:
-                    // empty border
-                    currentBorder = Border.getEmpty();
-                    break;
-                case 2: 
-                    // bevel border
-                    if(themeColors.isSelected()) {
-                        if(raisedBorder.isSelected()) {
-                            currentBorder = Border.createBevelRaised();
+            if(borderType.getSelectedIndex() == borderType.getItemCount() - 1) {
+                // we need to use a special case because a theme with no images will have a different offset for the border 
+                currentBorder = RoundRectBorder.create().
+                        shadowBlur(((Number)rrShadowBlur.getValue()).floatValue()).
+                        shadowOpacity(((Number)rrShadowOpacity.getValue()).intValue()).
+                        shadowSpread(((Number)rrShadowSpread.getValue()).floatValue()).
+                        shadowX(((Number)rrShadowX.getValue()).floatValue()).
+                        shadowY(((Number)rrShadowY.getValue()).floatValue()).
+                        stroke(((Number)rrStrokeThickness.getValue()).floatValue(), rrStrokeMillimeter.isSelected()).
+                        strokeColor(getColor(rrStrokeColor)).
+                        strokeOpacity(((Number)rrStrokeOpacity.getValue()).intValue()).
+                        bezierCorners(rrBezier.isSelected()).
+                        cornerRadius(((Number)rrRadius.getValue()).floatValue()).
+                        bottomOnlyMode(rrMode.getSelectedIndex() == 1).
+                        topOnlyMode(rrMode.getSelectedIndex() == 2);
+            } else {
+                switch(borderType.getSelectedIndex()) {
+                    case 0:
+                        // null border
+                        currentBorder = null;
+                        break;
+                    case 1:
+                        // empty border
+                        currentBorder = Border.getEmpty();
+                        break;
+                    case 2: 
+                        // bevel border
+                        if(themeColors.isSelected()) {
+                            if(raisedBorder.isSelected()) {
+                                currentBorder = Border.createBevelRaised();
+                            } else {
+                                currentBorder = Border.createBevelLowered();
+                            }
                         } else {
-                            currentBorder = Border.createBevelLowered();
+                            if(raisedBorder.isSelected()) {
+                                currentBorder = Border.createBevelRaised(getColor(highlightColor), getColor(secondaryHighlightColor),
+                                        getColor(shadowColor), getColor(secondaryShadowColor));
+                            } else {
+                                currentBorder = Border.createBevelLowered(getColor(highlightColor), getColor(secondaryHighlightColor),
+                                        getColor(shadowColor), getColor(secondaryShadowColor));
+                            }
                         }
-                    } else {
-                        if(raisedBorder.isSelected()) {
-                            currentBorder = Border.createBevelRaised(getColor(highlightColor), getColor(secondaryHighlightColor),
-                                    getColor(shadowColor), getColor(secondaryShadowColor));
+                        break;
+                    case 3: 
+                        // etched border
+                        if(themeColors.isSelected()) {
+                            if(raisedBorder.isSelected()) {
+                                currentBorder = Border.createEtchedRaised();
+                            } else {
+                                currentBorder = Border.createEtchedLowered();
+                            }
                         } else {
-                            currentBorder = Border.createBevelLowered(getColor(highlightColor), getColor(secondaryHighlightColor),
-                                    getColor(shadowColor), getColor(secondaryShadowColor));
+                            if(raisedBorder.isSelected()) {
+                                currentBorder = Border.createEtchedRaised(getColor(highlightColor), getColor(shadowColor));
+                            } else {
+                                currentBorder = Border.createEtchedLowered(getColor(highlightColor), getColor(shadowColor));
+                            }
                         }
-                    }
-                    break;
-                case 3: 
-                    // etched border
-                    if(themeColors.isSelected()) {
-                        if(raisedBorder.isSelected()) {
-                            currentBorder = Border.createEtchedRaised();
+                        break;
+                    case 7: {
+                        // this is a theme with no images
+                        if(borderType.getItemCount() < 8) {
+                            break;
+                        }
+                        // image border
+                        Image c = getButtonImageBorderIcon(this.center);
+
+                        if(imageMode.isSelected()) {                    
+                            currentBorder = Border.createImageBorder(getButtonImageBorderIconNotNull(top),
+                                    getButtonImageBorderIconNotNull(topLeft), c);
                         } else {
-                            currentBorder = Border.createEtchedLowered();
+                            currentBorder = Border.createImageBorder(
+                                    getButtonImageBorderIconNotNull(top),
+                                    getButtonImageBorderIconNotNull(bottom),
+                                    getButtonImageBorderIconNotNull(left),
+                                    getButtonImageBorderIconNotNull(right),
+                                    getButtonImageBorderIconNotNull(topLeft),
+                                    getButtonImageBorderIconNotNull(topRight),
+                                    getButtonImageBorderIconNotNull(bottomLeft),
+                                    getButtonImageBorderIconNotNull(bottomRight),
+                                c);
                         }
-                    } else {
-                        if(raisedBorder.isSelected()) {
-                            currentBorder = Border.createEtchedRaised(getColor(highlightColor), getColor(shadowColor));
-                        } else {
-                            currentBorder = Border.createEtchedLowered(getColor(highlightColor), getColor(shadowColor));
-                        }
-                    }
-                    break;
-                case 6: {
-                    // this is a theme with no images
-                    if(borderType.getItemCount() < 8) {
                         break;
                     }
-                    // image border
-                    Image c = getButtonImageBorderIcon(this.center);
+                    case 8: {
+                        Image c = getButtonImageBorderIcon(this.center);
 
-                    if(imageMode.isSelected()) {                    
-                        currentBorder = Border.createImageBorder(getButtonImageBorderIconNotNull(top),
-                                getButtonImageBorderIconNotNull(topLeft), c);
-                    } else {
-                        currentBorder = Border.createImageBorder(
-                                getButtonImageBorderIconNotNull(top),
-                                getButtonImageBorderIconNotNull(bottom),
+                        currentBorder = Border.createHorizonalImageBorder(
                                 getButtonImageBorderIconNotNull(left),
                                 getButtonImageBorderIconNotNull(right),
-                                getButtonImageBorderIconNotNull(topLeft),
-                                getButtonImageBorderIconNotNull(topRight),
-                                getButtonImageBorderIconNotNull(bottomLeft),
-                                getButtonImageBorderIconNotNull(bottomRight),
                             c);
+                        break;
                     }
-                    break;
-                }
-                case 7: {
-                    Image c = getButtonImageBorderIcon(this.center);
+                    case 9: {
+                        Image c = getButtonImageBorderIcon(this.center);
 
-                    currentBorder = Border.createHorizonalImageBorder(
-                            getButtonImageBorderIconNotNull(left),
-                            getButtonImageBorderIconNotNull(right),
-                        c);
-                    break;
-                }
-                case 8: {
-                    Image c = getButtonImageBorderIcon(this.center);
-
-                    currentBorder = Border.createVerticalImageBorder(
-                            getButtonImageBorderIconNotNull(top),
-                            getButtonImageBorderIconNotNull(bottom),
-                        c);
-                    break;
-                }
-                case 4:
-                    // line border
-                    if(themeColors.isSelected()) {
-                        currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue());
-                    } else {
-                        currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                        currentBorder = Border.createVerticalImageBorder(
+                                getButtonImageBorderIconNotNull(top),
+                                getButtonImageBorderIconNotNull(bottom),
+                            c);
+                        break;
                     }
-                    break;
-                case 5:
-                    // rounded border
-                    if(themeColors.isSelected()) {
-                        currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
-                            ((Number)arcHeight.getValue()).intValue());
-                    } else {
-                        currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
-                            ((Number)arcHeight.getValue()).intValue(), getColor(lineColor));
-                    }
-                    break;
+                    case 4:
+                        // line border
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue());
+                            } else {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
+                            }
+                        } else {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue());
+                            } else {
+                                currentBorder = Border.createLineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                            }
+                        }
+                        break;
+                    case 5:
+                        // underline border
+                        if(thicknessMillimeters.isSelected()) {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).floatValue());
+                            } else {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).floatValue(), getColor(lineColor));
+                            }
+                        } else {
+                            if(themeColors.isSelected()) {
+                                currentBorder = Border.createUndelineBorder(((Number)thickness.getValue()).intValue());
+                            } else {
+                                currentBorder = Border.createUnderlineBorder(((Number)thickness.getValue()).intValue(), getColor(lineColor));
+                            }
+                        }
+                        break;
+                    case 6:
+                        // rounded border
+                        if(themeColors.isSelected()) {
+                            currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
+                                ((Number)arcHeight.getValue()).intValue());
+                        } else {
+                            currentBorder = Border.createRoundBorder(((Number)arcWidth.getValue()).intValue(), 
+                                ((Number)arcHeight.getValue()).intValue(), getColor(lineColor));
+                        }
+                        break;
+                }
             }
         }
         final CodenameOneComponentWrapper w = (CodenameOneComponentWrapper)imageBorderPreview;
@@ -1330,6 +1675,62 @@ private void bottomRightActionPerformed(java.awt.event.ActionEvent evt) {//GEN-F
         updateBorder();
     }//GEN-LAST:event_backgroundColorActionPerformed
 
+    private void rrStrokeColorActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_rrStrokeColorActionPerformed
+        updateBorder();
+    }//GEN-LAST:event_rrStrokeColorActionPerformed
+
+    private void rrStrokeOpacityStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrStrokeOpacityStateChanged
+            updateBorder();
+    }//GEN-LAST:event_rrStrokeOpacityStateChanged
+
+    private void rrStrokeThicknessStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrStrokeThicknessStateChanged
+        updateBorder();
+    }//GEN-LAST:event_rrStrokeThicknessStateChanged
+
+    private void rrStrokeMillimeterActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_rrStrokeMillimeterActionPerformed
+        updateBorder();
+    }//GEN-LAST:event_rrStrokeMillimeterActionPerformed
+
+    private void rrShadowOpacityStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrShadowOpacityStateChanged
+        updateBorder();
+    }//GEN-LAST:event_rrShadowOpacityStateChanged
+
+    private void rrShadowSpreadStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrShadowSpreadStateChanged
+        updateBorder();
+    }//GEN-LAST:event_rrShadowSpreadStateChanged
+
+    private void rrShadowXStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrShadowXStateChanged
+        updateBorder();
+    }//GEN-LAST:event_rrShadowXStateChanged
+
+    private void rrShadowYStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrShadowYStateChanged
+        updateBorder();
+    }//GEN-LAST:event_rrShadowYStateChanged
+
+    private void rrShadowBlurStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrShadowBlurStateChanged
+        updateBorder();
+    }//GEN-LAST:event_rrShadowBlurStateChanged
+
+    private void rrRadiusStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_rrRadiusStateChanged
+        updateBorder();
+    }//GEN-LAST:event_rrRadiusStateChanged
+
+    private void rrStrokeColorPickerActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_rrStrokeColorPickerActionPerformed
+        updateBorder();
+    }//GEN-LAST:event_rrStrokeColorPickerActionPerformed
+
+    private void rrBezierActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_rrBezierActionPerformed
+        updateBorder();
+    }//GEN-LAST:event_rrBezierActionPerformed
+
+    private void rrModeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_rrModeActionPerformed
+        updateBorder();
+    }//GEN-LAST:event_rrModeActionPerformed
+
+    private void thicknessMillimetersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_thicknessMillimetersActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_thicknessMillimetersActionPerformed
+
 public Border getResult() {
     return currentBorder;
 }
@@ -1370,7 +1771,18 @@ public Border getResult() {
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel20;
     private javax.swing.JLabel jLabel21;
+    private javax.swing.JLabel jLabel22;
+    private javax.swing.JLabel jLabel23;
+    private javax.swing.JLabel jLabel24;
+    private javax.swing.JLabel jLabel25;
+    private javax.swing.JLabel jLabel26;
+    private javax.swing.JLabel jLabel27;
+    private javax.swing.JLabel jLabel28;
+    private javax.swing.JLabel jLabel29;
     private javax.swing.JLabel jLabel3;
+    private javax.swing.JLabel jLabel30;
+    private javax.swing.JLabel jLabel31;
+    private javax.swing.JLabel jLabel32;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
@@ -1378,6 +1790,7 @@ public Border getResult() {
     private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabel9;
     private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
     private javax.swing.JPanel jPanel5;
@@ -1390,6 +1803,19 @@ public Border getResult() {
     private javax.swing.JCheckBox raisedBorder;
     private javax.swing.JComboBox right;
     private javax.swing.JPanel roundBorderSettings;
+    private javax.swing.JCheckBox rrBezier;
+    private javax.swing.JComboBox rrMode;
+    private javax.swing.JSpinner rrRadius;
+    private javax.swing.JSpinner rrShadowBlur;
+    private javax.swing.JSpinner rrShadowOpacity;
+    private javax.swing.JSpinner rrShadowSpread;
+    private javax.swing.JSpinner rrShadowX;
+    private javax.swing.JSpinner rrShadowY;
+    private javax.swing.JTextField rrStrokeColor;
+    private javax.swing.JButton rrStrokeColorPicker;
+    private javax.swing.JCheckBox rrStrokeMillimeter;
+    private javax.swing.JSpinner rrStrokeOpacity;
+    private javax.swing.JSpinner rrStrokeThickness;
     private javax.swing.JTextField secondaryHighlightColor;
     private javax.swing.JTextField secondaryShadowColor;
     private javax.swing.JSpinner shadowBlur;
@@ -1405,6 +1831,7 @@ public Border getResult() {
     private javax.swing.JSpinner strokeThickness;
     private javax.swing.JCheckBox themeColors;
     private javax.swing.JSpinner thickness;
+    private javax.swing.JCheckBox thicknessMillimeters;
     private javax.swing.JComboBox top;
     private javax.swing.JComboBox topLeft;
     private javax.swing.JComboBox topRight;

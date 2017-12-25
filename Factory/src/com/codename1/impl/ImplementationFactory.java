@@ -42,14 +42,14 @@ public class ImplementationFactory {
     /**
      * Returns the singleton instance of this class
      * 
-     * @return instanceof Implementation factory
+     * @return instance of Implementation factory
      */
     public static ImplementationFactory getInstance() {
         return instance;
     }
     
     /**
-     * Install a new implementation factory this method is invoked by implementors
+     * Install a new implementation factory, this method is invoked by implementors
      * to replace a factory.
      * 
      * @param i implementation factory instance

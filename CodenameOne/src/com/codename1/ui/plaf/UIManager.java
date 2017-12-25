@@ -27,11 +27,18 @@ import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.plaf.StyleParser.BorderInfo;
+import com.codename1.ui.plaf.StyleParser.FontInfo;
+import com.codename1.ui.plaf.StyleParser.ImageInfo;
+import com.codename1.ui.plaf.StyleParser.MarginInfo;
+import com.codename1.ui.plaf.StyleParser.PaddingInfo;
+import com.codename1.ui.plaf.StyleParser.StyleInfo;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.Resources;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
@@ -221,6 +228,27 @@ public class UIManager {
     public Style getComponentStyle(String id) {
         return getComponentStyleImpl(id, false, "");
     }
+    
+    /**
+     * Returns the style of the component with the given baseStyle or a <b>new instance</b> of the default
+     * style, but overrides styles based on the directives in the styleStrings.
+     * 
+     * This method will always return a new style instance to prevent modification of the global
+     * style object.
+     * 
+     * @param theme Theme file used to retrieve images that are referenced by the styleString
+     * @param baseStyle The component ID that serves as the base style for this style.  These base styles are
+     * overridden by the styles provided in styleString.
+     * @param id the component id into which the resulting style is to be cached.
+     * @param styleString Array of style strings to override the styles in {@literal baseStyle}.  Style string syntax is
+     * is {@literal key1:value1; key2:value2; key3:value3; etc...}.  While this is similar to CSS, it is not CSS.  The keys
+     * and values
+     * correspond to properties of {@link Style} and their associated values.
+     * @return the appropriate style (this method never returns null)
+     */
+    public Style parseComponentStyle(Resources theme, String baseStyle, String id, String... styleString) {
+        return parseStyle(theme, id, "", baseStyle, false,  styleString);
+    }
 
     /**
      * Returns the selected style of the component with the given id or a <b>new instance</b> of the default
@@ -234,6 +262,27 @@ public class UIManager {
     public Style getComponentSelectedStyle(String id) {
         return getComponentStyleImpl(id, true, "sel#");
     }
+    
+    /**
+     * Returns the selected style of the component with the given baseStyle or a <b>new instance</b> of the default
+     * style, but overrides styles based on the directives in the styleStrings.
+     * 
+     * This method will always return a new style instance to prevent modification of the global
+     * style object.
+     * 
+     * @param theme Theme file used to retrieve images that are referenced by the styleString
+     * @param baseStyle The component ID that serves as the base style for this style.  These base styles are
+     * overridden by the styles provided in styleString.
+     * @param id the component id into which the resulting style is to be cached.
+     * @param styleString Array of style strings to override the styles in {@literal baseStyle}.  Style string syntax is
+     * is {@literal key1:value1; key2:value2; key3:value3; etc...}.  While this is similar to CSS, it is not CSS.  The keys
+     * and values
+     * correspond to properties of {@link Style} and their associated values.
+     * @return the appropriate style (this method never returns null)
+     */
+    public Style parseComponentSelectedStyle(Resources theme, String baseStyle, String id, String... styleString) {
+        return parseStyle(theme, id, "sel#", baseStyle, true, styleString);
+    }
 
     /**
      * Returns a custom style for the component with the given id, this method always returns a
@@ -246,6 +295,28 @@ public class UIManager {
      */
     public Style getComponentCustomStyle(String id, String type) {
         return getComponentStyleImpl(id, false, type + "#");
+    }
+    
+    /**
+     * Returns the selected style of the component with the given baseStyle or a <b>new instance</b> of the default
+     * style, but overrides styles based on the directives in the styleStrings.
+     * 
+     * This method will always return a new style instance to prevent modification of the global
+     * style object.
+     * 
+     * @param theme Theme file used to retrieve images that are referenced by the styleString
+     * @param baseStyle The component ID that serves as the base style for this style.  These base styles are
+     * overridden by the styles provided in styleString.
+     * @param id the component id into which the resulting style is to be cached.
+     * @param type the style type
+     * @param styleString Array of style strings to override the styles in {@literal baseStyle}.  Style string syntax is
+     * is {@literal key1:value1; key2:value2; key3:value3; etc...}.  While this is similar to CSS, it is not CSS.  The keys
+     * and values
+     * correspond to properties of {@link Style} and their associated values.
+     * @return the appropriate style (this method never returns null)
+     */
+    public Style parseComponentCustomStyle(Resources theme, String baseStyle, String id, String type, String... styleString) {
+        return parseStyle(theme, id, type+"#", baseStyle, false, styleString);
     }
 
     private Style getComponentStyleImpl(String id, boolean selected, String prefix) {
@@ -417,6 +488,12 @@ public class UIManager {
             themeProps.put("Button.sel#bgColor", "a0a0a0");
             themeProps.put("Button.sel#padding", "4,4,4,4");
         }
+        if(installedTheme == null || !installedTheme.containsKey("RaisedButton.derive")) {
+            themeProps.put("RaisedButton.derive", "Button");
+            themeProps.put("RaisedButton.sel#derive", "Button.sel");
+            themeProps.put("RaisedButton.press#derive", "Button.press");
+            themeProps.put("RaisedButton.dis#derive", "Button.dis");
+        }
         
         if(installedTheme == null || !installedTheme.containsKey("Button.press#derive")) {
             themeProps.put("Button.press#border", Border.getDefaultBorder().createPressedVersion());
@@ -428,6 +505,12 @@ public class UIManager {
         if(installedTheme == null || !installedTheme.containsKey("CalendarTitle.derive")) {
             themeProps.put("CalendarTitle.align", centerAlign);
         }
+
+        if(installedTheme == null || !installedTheme.containsKey("CalendarMultipleDay.derive")) {
+            themeProps.put("CalendarMultipleDay.border", Border.getDefaultBorder());
+            themeProps.put("CalendarMultipleDay.align", centerAlign);
+        }
+        themeProps.put("CalendarMultipleDay.sel#derive", "CalendarMultipleDay");
 
         if(installedTheme == null || !installedTheme.containsKey("CalendarSelectedDay.derive")) {
             themeProps.put("CalendarSelectedDay.border", Border.getDefaultBorder());
@@ -885,8 +968,17 @@ public class UIManager {
             themeProps.put("FloatingActionText.fgColor", "a0a0a0");
             themeProps.put("FloatingActionText.align", rightAlign);
         }
-        
-        
+        if(installedTheme == null || !installedTheme.containsKey("ErrorLabel.derive")) {
+            themeProps.put("ErrorLabel.derive", "FloatingHint");
+            themeProps.put("ErrorLabel.sel#derive", "FloatingHint");
+            themeProps.put("ErrorLabel.press#derive", "FloatingHint");
+            themeProps.put("ErrorLabel.fgColor", "ff1744");
+            themeProps.put("ErrorLabel.sel#fgColor", "ff1744");
+            themeProps.put("ErrorLabel.press#fgColor", "ff1744");
+        }        
+        if(installedTheme == null || !installedTheme.containsKey("TextComponent.derive")) {
+            themeProps.put("TextComponent.derive", "Container");
+        }
     }
 
     /**
@@ -1077,6 +1169,190 @@ public class UIManager {
         
     }
     
+    // Cache used to keep track of parsed styles.
+    private Map<String,String> parseCache;
+    
+    private Map<String,String> parseCache() {
+        if (parseCache == null) {
+            parseCache = new HashMap<String,String>();
+        }
+        return parseCache;
+    }
+    
+    private String fromFloatArray(float[] arr) {
+        StringBuilder sb = new StringBuilder();
+        int len = arr.length;
+        boolean first=true;
+        for (int i=0; i<len; i++) {
+            if (first) first = false;
+            else sb.append(",");
+            sb.append(arr[i]);
+        }
+        return sb.toString();
+    }
+    
+    private String fromByteArray(byte[] arr) {
+        StringBuilder sb = new StringBuilder();
+        int len = arr.length;
+        boolean first=true;
+        for (int i=0; i<len; i++) {
+            if (first) first = false;
+            else sb.append(",");
+            sb.append(arr[i]);
+        }
+        return sb.toString();
+    }
+    
+    /**
+     * Creates a style by providing style strings in a specific format. This method allows for the use of inline styles
+     * to override the styles in {@link com.codename1.ui.Component}
+     * @param theme Theme used to retrieve images referenced in the style strings.
+     * @param id The style ID (UIID) to use to cache the style inside the theme.
+     * @param prefix Prefix to use for styles.  Corresponds to the {@literal prefix} argument in {@link #getComponentStyleImpl(java.lang.String, boolean, java.lang.String) 
+     * @param baseStyle The style class from which this new style should derive.
+     * @param selected True if this is for a selected style.
+     * @param styleString Array of style strings to be parsed.  The format is {@literal key1:value1; key2:value2; etc...}.  While this looks similar to CSS, it is important to note that it is NOT
+     * CSS.  The keys and values correspond to the properties of {@link com.codename1.ui.plaf.Style} and their associated values.
+     * @return A style object representing the styles that were provided in the styleString.
+     * 
+     * <h3>Example Usage</h3>
+     * 
+     * {@code
+     * Style s = parseStyle(theme, "Button[MyCustomButton]", "", "Button", false, 
+     *     "fgColor:ff0000; font:18mm; border: 1px solid ff0000; bgType:none; padding: 3mm; margin: 1mm");
+     * 
+     * // Create a 9-piece image border on the fly:
+     * Style s = parseStyle(theme, "Button[MyCustomButton]", "", "Button", false,
+     *      "border:splicedImage /notes.png 0.3 0.4 0.3 0.4");
+     *      // This splices the image found at /notes.png into 9 pieces.  Splice insets are specified by the 4 floating point values
+     *      // at the end of the border directive:  [top] [right] [bottom] [left].
+     * }
+     */
+    Style parseStyle(Resources theme, String id, String prefix, String baseStyle, boolean selected, String... styleString) {
+        String cacheKey = selected ? id + ".sel" : id + "." + prefix;
+        String originalId = id;
+        if (id == null || id.length() == 0) {
+            //if no id return the default style
+            id = "";
+        } else {
+            id = id + ".";
+        }
+        if (Arrays.toString(styleString).equals(parseCache().get(cacheKey)) && ((selected && selectedStyles.containsKey(id)) || (!selected && this.styles.containsKey(id)))) {
+            
+            return getComponentStyleImpl(originalId, selected, prefix);
+        }
+        parseCache().put(cacheKey, Arrays.toString(styleString));
+        Style base = baseStyle != null ? getComponentStyleImpl(baseStyle, selected, prefix) : null;
+        Map<String,String> styles = new HashMap<String,String>();
+        for (String str : styleString) {
+            StyleParser.parseString(styles, str);
+        }
+        StyleInfo styleInfo = new StyleInfo(styles);
+        
+        
+        if (prefix != null && prefix.length() > 0) {
+            id += prefix;
+        }
+        if (themeProps == null) {
+            resetThemeProps(null);
+        }
+        if (baseStyle != null) {
+            themeProps.put(id+"derive", baseStyle);
+        } else {
+            themeProps.remove(id+"derive");
+        }
+        String val = null;
+        Integer bgColor = styleInfo.getBgColor();
+        if (bgColor != null) {
+            themeProps.put(id + Style.BG_COLOR, Integer.toHexString(bgColor));
+        } else {
+            themeProps.remove(id + Style.BG_COLOR);
+        }
+        Integer fgColor = styleInfo.getFgColor();
+        if (fgColor != null) {
+            themeProps.put(id + Style.FG_COLOR, Integer.toHexString(fgColor));
+        } else {
+            themeProps.remove(id + Style.FG_COLOR);
+        }
+        BorderInfo border = styleInfo.getBorder();
+        if (border != null) {
+            themeProps.put(id + Style.BORDER, border.createBorder(theme));
+        } else {
+            themeProps.remove(id + Style.BORDER);
+        }
+        Integer bgType = styleInfo.getBgType();
+        if (bgType != null) {
+            themeProps.put(id + Style.BACKGROUND_TYPE, bgType.byteValue());
+        } else {
+            themeProps.remove(id + Style.BACKGROUND_TYPE);
+        }
+        ImageInfo bgImage = styleInfo.getBgImage();
+        if (bgImage != null) {
+            themeProps.put(id + Style.BG_IMAGE, bgImage.getImage(theme));
+        } else {
+            themeProps.remove(id + Style.BG_IMAGE);
+        }
+        
+        MarginInfo margin = styleInfo.getMargin();
+        if (margin != null) {
+            float[] marginArr = margin.createMargin(base);
+            themeProps.put(id + Style.MARGIN, marginArr[Component.TOP]+","+marginArr[Component.BOTTOM]+","+marginArr[Component.LEFT]+","+marginArr[Component.RIGHT]);
+            byte[] unitArr = margin.createMarginUnit(base);
+            themeProps.put(id + Style.MARGIN_UNIT, new byte[]{unitArr[Component.TOP], unitArr[Component.BOTTOM], unitArr[Component.LEFT], unitArr[Component.RIGHT]});
+        } else {
+            themeProps.remove(id + Style.MARGIN);
+            themeProps.remove(id + Style.MARGIN_UNIT);
+        }
+        PaddingInfo padding = styleInfo.getPadding();
+        if (padding != null) {
+            float[] paddingArr = padding.createPadding(base);
+            themeProps.put(id + Style.PADDING, paddingArr[Component.TOP] + "," + paddingArr[Component.BOTTOM] + "," + paddingArr[Component.LEFT] + ","+paddingArr[Component.RIGHT]);
+            byte[] unitArr = padding.createPaddingUnit(base);
+            themeProps.put(id + Style.PADDING_UNIT, new byte[]{unitArr[Component.TOP], unitArr[Component.BOTTOM], unitArr[Component.LEFT], unitArr[Component.RIGHT]});
+        } else {
+            themeProps.remove(id + Style.PADDING);
+            themeProps.remove(id + Style.PADDING_UNIT);
+        }
+                
+        Integer transparency = styleInfo.getTransparency();
+        if (transparency != null) {
+            themeProps.put(id + Style.TRANSPARENCY, String.valueOf(transparency.intValue()));
+        } else {
+            themeProps.remove(id + Style.TRANSPARENCY);
+        }
+        Integer opacity = styleInfo.getOpacity();
+        if (opacity != null) {
+            themeProps.put(id + Style.OPACITY, String.valueOf(opacity.intValue()));
+        } else {
+            themeProps.remove(id + Style.OPACITY);
+        }
+        Integer alignment = styleInfo.getAlignment();
+        if (alignment != null) {
+            themeProps.put(id + Style.ALIGNMENT, alignment);
+        } else {
+            themeProps.remove(id + Style.ALIGNMENT);
+        }
+        Integer textDecoration = styleInfo.getTextDecoration();
+        if (textDecoration != null) {
+            themeProps.put(id + Style.TEXT_DECORATION, textDecoration);
+        } else {
+            themeProps.remove(id + Style.TEXT_DECORATION);
+        }
+        
+        FontInfo font = styleInfo.getFont();
+        if (font != null) {
+            themeProps.put(id + Style.FONT, font.createFont(base));
+        } else {
+            themeProps.remove(id + Style.FONT);
+        }
+        
+        if (selected) selectedStyles.remove(id);
+        else this.styles.remove(id);
+        
+        return getComponentStyleImpl(originalId, selected, prefix);
+        
+    }
+    
     Style createStyle(String id, String prefix, boolean selected) {
         Style style;
         String originalId = id;
@@ -1162,11 +1438,11 @@ public class UIManager {
                 }
             }
             if (margin != null) {
-                int[] marginArr = toIntArray(margin.trim());
+                float[] marginArr = toFloatArray(margin.trim());
                 style.setMargin(marginArr[0], marginArr[1], marginArr[2], marginArr[3]);
             }
             if (padding != null) {
-                int[] paddingArr = toIntArray(padding.trim());
+                float[] paddingArr = toFloatArray(padding.trim());
                 style.setPadding(paddingArr[0], paddingArr[1], paddingArr[2], paddingArr[3]);
             }
             if(paddingUnit != null) {
@@ -1259,12 +1535,12 @@ public class UIManager {
      * @param str
      * @return
      */
-    private int[] toIntArray(String str) {
-        int[] retVal = new int[4];
+    private float[] toFloatArray(String str) {
+        float[] retVal = new float[4];
         str = str + ",";
         int rlen = retVal.length;
         for (int i = 0; i < rlen; i++) {
-            retVal[i] = Integer.parseInt(str.substring(0, str.indexOf(",")));
+            retVal[i] = Float.parseFloat(str.substring(0, str.indexOf(",")));
             str = str.substring(str.indexOf(",") + 1, str.length());
         }
         return retVal;
@@ -1436,33 +1712,6 @@ public class UIManager {
                     
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
-                }
-                String vkbInputMode = (String)resourceBundle.get("@vkb");
-                if(vkbInputMode != null && vkbInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(vkbInputMode, '|'));
-                    VirtualKeyboard.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String[][] res = getInputMode("@vkb-", tokenized[iter], resourceBundle);
-                        if(res != null) {
-                            VirtualKeyboard.addDefaultInputMode(val, res);
-                        }
-                    }
-                }
-                String textFieldInputMode = (String)resourceBundle.get("@im");
-                if(textFieldInputMode != null && textFieldInputMode.length() > 0) {
-                    String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));
-                    TextField.setDefaultInputModeOrder(tokenized);
-                    int tlen = tokenized.length;
-                    for(int iter = 0 ; iter < tlen ; iter++) {
-                        String val = tokenized[iter];
-                        String actual = (String)resourceBundle.get("@im-" + val);
-                        // val can be null for builtin input mode types...
-                        if(actual != null) {
-                            TextField.addInputMode(val, parseTextFieldInputMode(actual), Character.isUpperCase(val.charAt(0)));
-                        }
-                    }
                 }
                 bundle = new HashMap<String, String>((Hashtable<String, String>)resourceBundle);
             } else {

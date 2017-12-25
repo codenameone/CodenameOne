@@ -23,9 +23,12 @@
  */
 package com.codename1.ui.table;
 
+import com.codename1.io.Util;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
@@ -37,6 +40,8 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
+import com.codename1.util.CaseInsensitiveOrder;
+import java.util.Comparator;
 
 /**
  * <p>The {@code Table} class represents a grid of data that can be used for rendering a grid
@@ -101,10 +106,18 @@ public class Table extends Container {
     private int cellAlignment = Label.LEFT;
 
     /**
-     * This flag allows us to workaround issue 275 without incuring too many updateModel calls
+     * This flag allows us to workaround issue 275 without incurring too many updateModel calls
      */
     private boolean potentiallyDirtyModel;
 
+    /**
+     * Sort support can be toggled with this flag
+     */
+    private boolean sortSupported;
+    
+    private int sortedColumn = -1;
+    private boolean ascending;
+    
     /**
      * Constructor for usage by GUI builder and automated tools, normally one
      * should use the version that accepts the model
@@ -402,6 +415,45 @@ public class Table extends Container {
     }
 
     /**
+     * Returns a generic comparator that tries to work in a way that will sort columns with similar object types.
+     * This method can be overriden to create custom sort orders or return null and thus disable sorting for a 
+     * specific column
+     * 
+     * @param column the column that's sorted
+     * @return the comparator instance
+     */
+    protected Comparator createColumnSortComparator(int column) {
+        final CaseInsensitiveOrder ccmp = new CaseInsensitiveOrder();
+        return new Comparator() {
+            public int compare(Object o1, Object o2) {
+                if(o1 instanceof String && o2 instanceof String) {
+                    return ccmp.compare((String)o1, (String)o2);
+                }
+                double d = Util.toDoubleValue(o1) - Util.toDoubleValue(o2);
+                if(d > 0) {
+                    return 1;
+                }
+                if(d < 0) {
+                    return -1;
+                }
+                return 0;
+            }
+        };
+    }
+    
+    /**
+     * Sorts the given column programmatically
+     * @param column the column to sort
+     * @param ascending true to sort in ascending order
+     */
+    public void sort(int column, boolean ascending) {
+        sortedColumn = column;
+        ascending = false;
+        Comparator cmp = createColumnSortComparator(column);
+        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));          
+    }
+    
+    /**
      * Creates a cell based on the given value
      *
      * @param value the new value object
@@ -410,13 +462,35 @@ public class Table extends Container {
      * @param editable true if the cell is editable
      * @return cell component instance
      */
-    protected Component createCell(Object value, int row, int column, boolean editable) {
+    protected Component createCell(Object value, int row, final int column, boolean editable) {
         if(row == -1) {
-            Label header = new Label((String)value);
-            header.setUIID(getUIID() + "Header");
-            header.getUnselectedStyle().setAlignment(titleAlignment);
-            header.getSelectedStyle().setAlignment(titleAlignment);
-            header.setFocusable(true);
+            Button header = new Button((String)value, getUIID() + "Header");
+            header.getAllStyles().setAlignment(titleAlignment);            
+            header.setTextPosition(LEFT);
+            if(isSortSupported()) {
+                header.addActionListener(new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        Comparator cmp = createColumnSortComparator(column);
+                        if(cmp == null) {
+                            return;
+                        }
+                        if(column == sortedColumn) {
+                            ascending = !ascending;
+                        } else {
+                            sortedColumn = column;
+                            ascending = false;
+                        }
+                        setModel(new SortableTableModel(sortedColumn, ascending, model, cmp));  
+                    }
+                });
+                if(sortedColumn == column) {
+                    if(ascending) {
+                        FontImage.setMaterialIcon(header, FontImage.MATERIAL_ARROW_DROP_UP);
+                    } else {
+                        FontImage.setMaterialIcon(header, FontImage.MATERIAL_ARROW_DROP_DOWN);                            
+                    }
+                }
+            }
             return header;
         }
         if(editable) {
@@ -478,6 +552,9 @@ public class Table extends Container {
      * @return the model instance
      */
     public TableModel getModel() {
+        if(sortedColumn > -1) {
+            return ((SortableTableModel)model).getUnderlying();
+        }
         return model;
     }
 
@@ -782,6 +859,25 @@ public class Table extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    /**
+     * Sort support can be toggled with this flag
+     * @return the sortSupported
+     */
+    public boolean isSortSupported() {
+        return sortSupported;
+    }
+
+    /**
+     * Sort support can be toggled with this flag
+     * @param sortSupported the sortSupported to set
+     */
+    public void setSortSupported(boolean sortSupported) {
+        if(this.sortSupported != sortSupported) {
+            this.sortSupported = sortSupported;
+            setModel(getModel());
+        }
     }
 
     class Listener implements DataChangedListener, ActionListener {

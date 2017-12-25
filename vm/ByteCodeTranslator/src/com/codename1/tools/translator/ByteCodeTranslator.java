@@ -201,11 +201,23 @@ public class ByteCodeTranslator {
 
             File cn1Globals = new File(srcRoot, "cn1_globals.h");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
+            if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+                replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
+            }
             File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
             File nativeMethods = new File(srcRoot, "nativeMethods.m");
             copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
 
+            if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
+                File malloc = new File(srcRoot, "malloc.c");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
+                File rpmalloc = new File(srcRoot, "rpmalloc.c");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
+                File rpmalloch = new File(srcRoot, "rpmalloc.h");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+            }
+            
             Parser.writeOutput(srcRoot);
             
             File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
@@ -356,7 +368,7 @@ public class ByteCodeTranslator {
                     fileTwoEntry.append(file);
                     fileTwoEntry.append(" */,\n");
 
-                    if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh") && !file.endsWith(".bundle") ) {
+                    if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh") && !file.endsWith(".bundle")) {
                         fileThreeEntry.append("				0");
                         fileThreeEntry.append(referenceValue);
                         fileThreeEntry.append("18E9ABBC002F3D1D /* ");
@@ -364,7 +376,7 @@ public class ByteCodeTranslator {
                         fileThreeEntry.append(" */,\n");
                     }
                 } else {
-                    if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith("Info.plist") || file.endsWith(".pch")) {
+                    if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
                         frameworks.append("				0");
                         frameworks.append(referenceValue);
                         frameworks.append("18E9ABBC002F3D1D /* ");
@@ -377,21 +389,29 @@ public class ByteCodeTranslator {
                         frameworks2.append(file);
                         frameworks2.append(" */,\n");
                         
+                        
+                            
+                        /*
+                        
+                        // Removing this because it causes crashes in cocoapods.
+                        // Why was it necessary to add .a files to the same group
+                        // as the sources, if we've already added it to frameworks.
+                        // Related to https://stackoverflow.com/questions/47210585/codename-one-issue-devilering-binary-for-ios
                         if(file.endsWith(".a")) {
                             fileTwoEntry.append("				0");
                             fileTwoEntry.append(fileOneValue);
                             fileTwoEntry.append("18E9ABBC002F3D1D /* ");
                             fileTwoEntry.append(file);
-                            fileTwoEntry.append(" */,\n");
+                            fileTwoEntry.append(" *").append("/,\n");
 
                             if(!file.endsWith(".h") && !file.endsWith(".bundle") && !file.endsWith(".xcdatamodeld")) {
                                 fileThreeEntry.append("				0");
                                 fileThreeEntry.append(referenceValue);
                                 fileThreeEntry.append("18E9ABBC002F3D1D /* ");
                                 fileThreeEntry.append(file);
-                                fileThreeEntry.append(" */,\n");
+                                fileThreeEntry.append(" *").append("/,\n");
                             }
-                        }
+                        }*/
                     } else {
                         // standard resource file
                         resources.append("\n				0");
@@ -510,7 +530,7 @@ public class ByteCodeTranslator {
             while ((index = str.indexOf(target, index)) >= 0) {
                 int targetSize = target.length();
                 str.replace(index, index + targetSize, replacement);
-                index += replacement.length() - targetSize;
+                index += replacement.length();
                 found++;
                 totchanges++;
             }

@@ -49,7 +49,7 @@ public final class IOSNative {
     native boolean isPainted();
     native int getDisplayWidth();
     native int getDisplayHeight();
-    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar, boolean blockCopyPaste);
+    native void editStringAt(int x, int y, int w, int h, long peer, boolean singleLine, int rows, int maxSize, int constraint, String text, boolean forceSlideUp, int color, long imagePeer, int padTop, int padBottom, int padLeft, int padRight, String hint, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
@@ -59,6 +59,8 @@ public final class IOSNative {
     native long scale(long peer, int width, int height);
     native void setNativeClippingMutable(int x, int y, int width, int height, boolean firstClip);
     native void setNativeClippingGlobal(int x, int y, int width, int height, boolean firstClip);
+    native void setAntiAliasedMutable(boolean antialiased) ;
+
     native void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2);
     native void nativeDrawLineGlobal(int color, int alpha, int x1, int y1, int x2, int y2);
     native void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height);
@@ -240,6 +242,7 @@ public final class IOSNative {
     native void setMediaBgDuration(long duration);
     native void setMediaBgPosition(long position);
     native void setMediaBgAlbumCover(long cover);
+    native void setNativeVideoControlsEmbedded(long peer, boolean value);
     
     native boolean isVideoPlaying(long peer);
 
@@ -392,6 +395,7 @@ public final class IOSNative {
     native void restorePurchases();
     native void zoozPurchase(double amount, String currency, String appKey, boolean sandbox, String invoiceNumber);
 
+    native void setLocale(String localeStr);
     native String formatInt(int i);
     native String formatDouble(double d);
     native String formatCurrency(double d);
@@ -416,9 +420,9 @@ public final class IOSNative {
 
     native String getUserAgentString();
     
-    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
+    native void openDatePicker(int type, long time, int x, int y, int w, int h, int preferredWidth, int preferredHeight, int minuteStep);
     native void openStringPicker(String[] stringArray, int selection, int x, int y, int w, int h, int preferredWidth, int preferredHeight);
-
+    
     native void socialShare(String text, long imagePeer, Rectangle sourceRect);
     
     // facebook connect
@@ -616,6 +620,9 @@ public final class IOSNative {
     native void nativeClearRectGlobal(int x, int y, int width, int height);
 
     native void blockCopyPaste(boolean blockCopyPaste);
+
+    
+    
 
 
 

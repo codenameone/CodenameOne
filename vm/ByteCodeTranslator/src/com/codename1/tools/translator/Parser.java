@@ -38,6 +38,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
 
+import com.codename1.tools.translator.bytecodes.LabelInstruction;
+
 /**
  *
  * @author Shai Almog
@@ -47,6 +49,11 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    public static void cleanup() {
+    	nativeSources = null;
+    	classes.clear();
+    	LabelInstruction.cleanup();
+    }
     public static void parse(File sourceFile) throws Exception {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
@@ -118,6 +125,8 @@ public class Parser extends ClassVisitor {
         }
         return i;
     }
+    
+    
     
     private static void generateClassAndMethodIndexHeader(File outputDirectory) throws Exception {
         int classOffset = 0;
@@ -436,6 +445,7 @@ public class Parser extends ClassVisitor {
                 throw (RuntimeException)t;
             }
         }
+        finally { cleanup(); }
     }
     
     private static void readNativeFiles(File outputDirectory) throws IOException {
@@ -862,28 +872,34 @@ public class Parser extends ClassVisitor {
 
         @Override
         public AnnotationVisitor visitParameterAnnotation(int parameter, String desc, boolean visible) {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitParameterAnnotation(parameter, desc, visible));
         }
 
         @Override
         public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String desc, boolean visible) {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitTypeAnnotation(typeRef, typePath, desc, visible));
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)); 
         }
 
         @Override
         public AnnotationVisitor visitAnnotationDefault() {
+            if (mv == null) return null;
             return new AnnotationVisitorWrapper(super.visitAnnotationDefault());
         }
 
         @Override
         public void visitParameter(String name, int access) {
             super.visitParameter(name, access); 
-        }        
+        }    
+        
+        
     }
     
     class FieldVisitorWrapper extends FieldVisitor {
@@ -927,11 +943,13 @@ public class Parser extends ClassVisitor {
 
         @Override
         public AnnotationVisitor visitArray(String name) {
+            if (av == null) return null;
             return super.visitArray(name); 
         }
 
         @Override
         public AnnotationVisitor visitAnnotation(String name, String desc) {
+            if (av == null) return null;
             return super.visitAnnotation(name, desc); 
         }
 
@@ -944,6 +962,8 @@ public class Parser extends ClassVisitor {
         public void visit(String name, Object value) {
             super.visit(name, value); 
         }
+        
+        
     
     }
 }
