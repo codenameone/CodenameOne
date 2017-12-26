@@ -10094,7 +10094,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void setProjectBuildHint(String key, String value) {
          File cnopFile = new File("codenameone_settings.properties");
         if(cnopFile.exists()) {
-            java.util.Properties cnop = new java.util.Properties();
+            Properties cnop = new Properties();
             try(InputStream is = new FileInputStream(cnopFile)) {
                 cnop.load(is);
             } catch(IOException err) {
