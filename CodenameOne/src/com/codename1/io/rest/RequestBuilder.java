@@ -255,9 +255,10 @@ public class RequestBuilder {
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
+     * @return returns the Connection Request object so it can be killed if necessary
      */ 
-    public void getAsJsonMap(final SuccessCallback<Response<Map>> callback) {
-        getAsJsonMap(callback, null);
+    public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback) {
+        return getAsJsonMap(callback, null);
     }
     
     /**
@@ -265,8 +266,9 @@ public class RequestBuilder {
      * Callback
      * @param callback writes the response to this callback
      * @param onError the error callback
+     * @return returns the Connection Request object so it can be killed if necessary
      */ 
-    public void getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
+    public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
         ConnectionRequest request = createRequest();
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
@@ -290,7 +292,8 @@ public class RequestBuilder {
             }
         });
         bindOnError(request, onError);
-        CN.addToQueue(request);        
+        CN.addToQueue(request);       
+        return request;
     }
     
     private void bindOnError(final ConnectionRequest req, final FailureCallback<? extends Object> f) {
@@ -373,5 +376,4 @@ public class RequestBuilder {
 
         return req;
     }
-
 }
