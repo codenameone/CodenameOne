@@ -30,7 +30,7 @@ public class JavascriptTests extends AbstractTest {
         Form f = new Form("Test Browser");
         f.setLayout(new BorderLayout());
         BrowserComponent bc = new BrowserComponent();
-        bc.setPage("<!doctype html><html><head><title>Foo</title><body>Body</body></head></html>", "https://www.codenameone.com");
+        bc.setPage("<!doctype html><html><head><title>Foo</title><body>Body</body></head></html>", "http://www.codenameone.com");
         final Res res = new Res();
         bc.addWebEventListener(BrowserComponent.onLoad, e->{
             try {
