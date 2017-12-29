@@ -23,6 +23,7 @@
 package com.codename1.javascript;
 
 
+import com.codename1.ui.BrowserComponent;
 import com.codename1.util.Callback;
 import com.codename1.util.CallbackAdapter;
 import com.codename1.util.StringUtil;
@@ -31,6 +32,11 @@ import com.codename1.util.SuccessCallback;
 /**
  * A Java Wrapper around a Javascript object. In Javascript there are only a few
  * different types:  Number, String, Boolean, Null, Undefined, and Object.
+ * 
+ * <p><strong>NOTE:</strong> The {@link com.codename1.javascript } package is now deprecated.  The preferred method of 
+ * Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) }, 
+ * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these work asynchronously (except in the XXXAndWait() variants, which 
+ * use invokeAndBlock() to make the calls synchronously.</p>
  * 
  * Arrays and functions are objects also.
  * 
@@ -190,6 +196,7 @@ import com.codename1.util.SuccessCallback;
  * </pre></code>
  * 
  * @author shannah
+ * @deprecated Use {@link BrowserComponent#createJSProxy(java.lang.String) } to create a Javascript proxy object instead.
  */
 public class JSObject {
     

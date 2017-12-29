@@ -3750,7 +3750,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             url = "file:///android_asset"+url;
         }
         AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
-        if(bc.parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+        if(bc.parent.fireBrowserNavigationCallbacks(url)) {
             bc.setURL(url);
         }
     }
@@ -4192,7 +4192,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     
                     // this will fail if dial permission isn't declared
                     if(url.startsWith("tel:")) {
-                        if(parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+                        if(parent.fireBrowserNavigationCallbacks(url)) {
                             try {
                                 Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse(url));
                                 getContext().startActivity(dialer);
@@ -4202,7 +4202,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     // this will fail if dial permission isn't declared
                     if(url.startsWith("mailto:")) {
-                        if(parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+                        if(parent.fireBrowserNavigationCallbacks(url)) {
                             try {
                                 Intent emailIntent = new Intent(Intent.ACTION_SENDTO, Uri.parse(url));        
                                 getContext().startActivity(emailIntent);
@@ -4210,7 +4210,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                         return true;
                     }
-                    return !parent.getBrowserNavigationCallback().shouldNavigate(url); 
+                    return !parent.fireBrowserNavigationCallbacks(url); 
                 }
                 
                 
