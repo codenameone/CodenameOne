@@ -6005,6 +6005,19 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Searches the hierarchy of the component recursively to see if the given
+     * Container is one of the parents of this component
+     * @param cnt a potential parent of this component
+     * @return false if the container isn't one of our parent containers
+     */
+    public boolean isChildOf(Container cnt) {
+        if(cnt == parent) {
+            return true;
+        }
+        return parent != null && parent.isChildOf(cnt);
+    }
+    
+    /**
      * Indicates that this component and all its children should be hidden when the device is switched to portrait mode
      * @return the hideInPortrait
      */
