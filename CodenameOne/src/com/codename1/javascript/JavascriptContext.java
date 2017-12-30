@@ -44,7 +44,15 @@ import java.util.Random;
  * callbacks to allow Javascript to call Java functions, and returning values
  * from Javascript to Java.
  * 
- * <p>Typically you would obtain a context for a BrowserComponent via its constructor,
+ * <p>
+ * <strong>NOTE:</strong> The {@link com.codename1.javascript } package is now
+ * deprecated. The preferred method of Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
+ * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these
+ * work asynchronously (except in the XXXAndWait() variants, which use
+ * invokeAndBlock() to make the calls synchronously.</p>
+ *
+ * <p>
+ * Typically you would obtain a context for a BrowserComponent via its constructor,
  * passing the BrowserComponent to the context.</p>
  * <p>E.g.</p>
  * <code><pre>
@@ -55,6 +63,7 @@ import java.util.Random;
  * </pre></code>
  * 
  * @author shannah
+ * @deprecated Use {@link BrowserComponent#execute(java.lang.String) } directly.
  */
 public class JavascriptContext  {
     

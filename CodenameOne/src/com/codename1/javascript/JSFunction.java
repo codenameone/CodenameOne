@@ -22,6 +22,8 @@
  */
 package com.codename1.javascript;
 
+import com.codename1.ui.BrowserComponent;
+
 /**
 * <p>The JSFunction interface allows you to implement functions in Java that can
 * be called from Javascript. You can assign any JSFunction object to be a member
@@ -30,6 +32,13 @@ package com.codename1.javascript;
 * methods are called asynchronously from Javascript to prevent deadlocks. If you
 * require a return value to Javascript, you can do that by passing a callback
 * function which is called by the JSFunction with some parameters.</p>
+*
+* <p>
+* <strong>NOTE:</strong> The {@link com.codename1.javascript } package is now
+* deprecated. The preferred method of Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
+* {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these
+* work asynchronously (except in the XXXAndWait() variants, which use
+* invokeAndBlock() to make the calls synchronously.</p>
 *
 * <p>The following example, adds a camera object to the Javascript environment
 * that has a capture() method, which can be used to capture images using the
@@ -87,6 +96,7 @@ package com.codename1.javascript;
 * });
 * </pre></code>
 * @author shannah
+* @deprecated Use {@link BrowserComponent#addJSCallback(java.lang.String, com.codename1.util.SuccessCallback) }
 */
 public interface JSFunction {
     public void apply(JSObject self, Object[] args);
