@@ -63,7 +63,7 @@ public class Response<T> {
      * Returns the error message that accompanies the response
      * @return the response
      */
-    public String getResponseMessage() {
+    public String getResponseErrorMessage() {
         return responseMessage;
     }
 }

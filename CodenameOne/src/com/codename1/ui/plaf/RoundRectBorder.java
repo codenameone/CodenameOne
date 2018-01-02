@@ -389,15 +389,36 @@ public class RoundRectBorder extends Border {
             }
         }            
         
-        gp.moveTo(x + radius, y);
-        gp.lineTo(x + widthF - radius, y);
-        gp.quadTo(x + widthF, y, x + widthF, y + radius);
-        gp.lineTo(x + widthF, y + heightF - radius);
-        gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
-        gp.lineTo(x + radius, y + heightF);
-        gp.quadTo(x, y + heightF, x, y + heightF - radius);
-        gp.lineTo(x, y + radius);
-        gp.quadTo(x, y, x + radius, y);
+        if(topOnlyMode) {
+            gp.moveTo(x, y);
+            gp.lineTo(x + widthF, y);
+            gp.lineTo(x + widthF, y + heightF - radius);
+            gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
+            gp.lineTo(x + radius, y + heightF);
+            gp.quadTo(x, y + heightF, x, y + heightF - radius);
+            gp.lineTo(x, y);
+            gp.quadTo(x, y, x + radius, y);
+        } else {
+            if(bottomOnlyMode) {
+                gp.moveTo(x + radius, y);
+                gp.lineTo(x + widthF - radius, y);
+                gp.quadTo(x + widthF, y, x + widthF, y + radius);
+                gp.lineTo(x + widthF, y + heightF);
+                gp.lineTo(x, y + heightF);
+                gp.lineTo(x, y + radius);
+                gp.quadTo(x, y, x + radius, y);
+            } else {
+                gp.moveTo(x + radius, y);
+                gp.lineTo(x + widthF - radius, y);
+                gp.quadTo(x + widthF, y, x + widthF, y + radius);
+                gp.lineTo(x + widthF, y + heightF - radius);
+                gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
+                gp.lineTo(x + radius, y + heightF);
+                gp.quadTo(x, y + heightF, x, y + heightF - radius);
+                gp.lineTo(x, y + radius);
+                gp.quadTo(x, y, x + radius, y);
+            }
+        }
         gp.closePath();            
         return gp;
     }
