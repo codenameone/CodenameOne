@@ -32,6 +32,17 @@ public class BoundingBox {
     private final Coord _northEast;
 
     /**
+     * Creates a bounding box around a coordinate with a given radius.
+     * @param c The coordinate at the center of the bounding box.
+     * @param rLat The latitude radius of the box (in degrees).
+     * @param rLng The longitude radius of the box (in degrees).
+     */
+    public BoundingBox(Coord c, double rLat, double rLng) {
+        _southWest = new Coord(c.getLatitude() - rLat, c.getLongitude() - rLng);
+        _northEast = new Coord(c.getLatitude() + rLat, c.getLongitude() + rLng);
+    }
+    
+    /**
      * Constructor with 2 coordinates for south west and north east
      * 
      * @param getSouthWest coordinate
