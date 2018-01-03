@@ -34,7 +34,7 @@ public class JavascriptTests extends AbstractTest {
         final Res res = new Res();
         bc.addWebEventListener(BrowserComponent.onLoad, e->{
             try {
-                int timeout = 1000;
+                int timeout = 5000;
                 bc.execute("window.person={name:'Steve', somefunc: function(a){this.someval = a}}");
                 JSRef tmp = bc.executeAndWait(timeout, "callback.onSuccess(person.name)");
                 TestUtils.assertEqual(JSType.STRING, tmp.getJSType(), "Wrong JSType for person.name");
