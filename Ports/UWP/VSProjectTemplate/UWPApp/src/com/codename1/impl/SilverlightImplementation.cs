@@ -2506,8 +2506,7 @@ namespace com.codename1.impl
 
             void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
             {
-                BrowserNavigationCallback bn = bc.getBrowserNavigationCallback();
-                if (bn != null && e.Uri != null && !bn.shouldNavigate(e.Uri.ToString()))
+                if (e.Uri != null && !bc.fireBrowserNavigationCallbacks(e.Uri.ToString()))
                 {
                     e.Cancel = true;
                     return;
@@ -2814,11 +2813,13 @@ namespace com.codename1.impl
         public override void browserExecute(PeerComponent n1, string n2)
         {
             WebView webView = null;
-            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal,  () =>
             {
+                
                 webView = (WebView)((SilverlightPeer)n1).element;
-                await webView.InvokeScriptAsync(n2, new string[] { "document.title.toString()" });
-            }).AsTask().GetAwaiter();
+                
+                webView.InvokeScriptAsync("eval", new string[] { n2 });
+            });
         }
 
         public override string browserExecuteAndReturnString(PeerComponent n1, string n2)
