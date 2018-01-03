@@ -406,6 +406,10 @@ public class JavascriptContext  {
      */
     public void getAsync(String javascript, final Callback callback) {
         final String callbackMethod = "callback$$"+callbackId;
+        callbackId++;
+        if (callbackId > 1000) {
+            callbackId = 0;
+        }
         getWindow().set(callbackMethod, new JSFunction() {
 
             public void apply(JSObject self, Object[] args) {
