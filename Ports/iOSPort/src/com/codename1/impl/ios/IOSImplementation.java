@@ -5866,7 +5866,11 @@ public class IOSImplementation extends CodenameOneImplementation {
                 if(lightweightMode != l) {
                     lightweightMode = l;
                     nativeInstance.peerSetVisible(nativePeer[0], !lightweightMode);
-                    getComponentForm().repaint();
+                    // fix for https://groups.google.com/d/msg/codenameone-discussions/LKxy16PhYEY/bvusdq-ICwAJ
+                    Form f = getComponentForm();
+                    if(f != null) {
+                        f.repaint();
+                    }
                 }
             }
         }
