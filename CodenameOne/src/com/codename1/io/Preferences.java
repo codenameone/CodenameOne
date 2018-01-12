@@ -233,6 +233,36 @@ public class Preferences {
     }
 
     /**
+     * Gets the value as a String if the value is null def is returned and saved
+     * @param pref the preference key
+     * @param def the default value
+     * @return the default value or the value
+     */
+    public static String getAndSet(String pref, String def) {
+        Object t = get().get(pref);
+        if(t == null) {
+            set(pref, def);
+            return def;
+        }
+        return t.toString();
+    }
+    
+    /**
+     * Gets the value as a number if the value is null def is returned and saved
+     * @param pref the preference key
+     * @param def the default value
+     * @return the default value or the value
+     */
+    public static int getAndSet(String pref, int def) {
+        Integer t = (Integer)get().get(pref);
+        if(t == null) {
+            set(pref, def);
+            return def;
+        }
+        return t.intValue();
+    }
+    
+    /**
      * Gets the value as a number
      * @param pref the preference key
      * @param def the default value
@@ -246,6 +276,21 @@ public class Preferences {
         return t.intValue();
     }
 
+    /**
+     * Gets the value as a number if the value is null def is returned and saved
+     * @param pref the preference key
+     * @param def the default value
+     * @return the default value or the value
+     */
+    public static long getAndSet(String pref, long def) {
+        Long t = (Long)get().get(pref);
+        if(t == null) {
+            set(pref, def);
+            return def;
+        }
+        return t.longValue();
+    }
+    
     /**
      * Gets the value as a number
      * @param pref the preference key
@@ -261,6 +306,21 @@ public class Preferences {
     }
 
     /**
+     * Gets the value as a number if the value is null def is returned and saved
+     * @param pref the preference key
+     * @param def the default value
+     * @return the default value or the value
+     */
+    public static double getAndSet(String pref, double def) {
+        Double t = (Double)get().get(pref);
+        if(t == null) {
+            set(pref, def);
+            return def;
+        }
+        return t.doubleValue();
+    }
+    
+    /**
      * Gets the value as a number
      * @param pref the preference key
      * @param def the default value
@@ -275,6 +335,21 @@ public class Preferences {
     }
 
     /**
+     * Gets the value as a number if the value is null def is returned and saved
+     * @param pref the preference key
+     * @param def the default value
+     * @return the default value or the value
+     */
+    public static float getAndSet(String pref, float def) {
+        Float t = (Float)get().get(pref);
+        if(t == null) {
+            set(pref, def);
+            return def;
+        }
+        return t.floatValue();
+    }
+    
+    /**
      * Gets the value as a number
      * @param pref the preference key
      * @param def the default value
@@ -287,6 +362,22 @@ public class Preferences {
         }
         return t.floatValue();
     }
+    
+    /**
+     * Gets the value as a number if the value is null def is returned and saved
+     * @param pref the preference key
+     * @param def the default value
+     * @return the default value or the value
+     */
+    public static boolean getAndSet(String pref, boolean def) {
+        Boolean t = (Boolean)get().get(pref);
+        if(t == null) {
+            set(pref, def);
+            return def;
+        }
+        return t.booleanValue();
+    }
+    
 
     /**
      * Gets the value as a number
