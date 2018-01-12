@@ -286,6 +286,8 @@ public class Push {
                 if(pushPrefix != null) {
                     return "cn1-" + pushPrefix + "-" + key;
                 }
+            } else {
+                return key;
             }
         }
         return null;
