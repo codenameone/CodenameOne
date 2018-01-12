@@ -441,6 +441,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static NetworkMonitor netMonitor;
     private static PerformanceMonitor perfMonitor;
     static LocationSimulation locSimulation;
+    static PushSimulator pushSimulation;
     private static boolean blockMonitors;
     private static boolean fxExists = false;
     private JFrame window;
@@ -2570,6 +2571,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             simulatorMenu.add(locactionSim);
             
+            JMenuItem pushSim = new JMenuItem("Push Simulation");
+            pushSim.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    if(pushSimulation == null) {
+                            pushSimulation = new PushSimulator();
+                    }
+                    pref.putBoolean("PushSimulator", true);
+                    pushSimulation.setVisible(true);
+                }
+            });
+            simulatorMenu.add(pushSim);
+
             simulatorMenu.add(componentTreeInspector);
             
 
@@ -3591,6 +3605,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         HttpURLConnection.setFollowRedirects(false);
         if (!blockMonitors && pref.getBoolean("NetworkMonitor", false)) {
             showNetworkMonitor();
+        }
+        if (!blockMonitors && pref.getBoolean("PushSimulator", false)) {
+            pushSimulation = new PushSimulator();
+            pushSimulation.setVisible(true);
         }
         if (!blockMonitors && pref.getBoolean("PerformanceMonitor", false)) {
             showPerformanceMonitor();
@@ -6924,7 +6942,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     }
                 }
             }
-            if(warnAboutHttp) {
+            if(warnAboutHttp && url.indexOf("localhost") < 0 && url.indexOf("127.0.0") < 0) {
                 System.out.println("WARNING: Apple will no longer accept http URL connections from applications you tried to connect to " + 
                         url +" to learn more check out https://www.codenameone.com/blog/ios-http-urls.html" );
             }
@@ -8621,6 +8639,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             d.setProperty("package_name", mainClass);
         }
         super.registerPush(meta, noFallback);
+        
+        if(pushSimulation != null && pushSimulation.isVisible()) {
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    JOptionPane.showMessageDialog(window, "registerForPush invoked. Use the buttons in the push simulator to send the appropriate callback to your app", 
+                            "Push Registration", JOptionPane.INFORMATION_MESSAGE);
+                }
+            });
+        }
     }
 
     @Override

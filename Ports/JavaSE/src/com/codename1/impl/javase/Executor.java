@@ -183,6 +183,57 @@ public class Executor {
         }
     
     }
+
+    public static void registerForPush(final String key){
+        if(c != null && app != null){
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Method registeredForPush = c.getDeclaredMethod("registeredForPush", String.class);
+                        registeredForPush.invoke(app, key);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } 
+                }
+            });
+        }
+    
+    }
+
+    public static void pushRegistrationError(final String message, final int code){
+        if(c != null && app != null){
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Method pushRegistrationError = c.getDeclaredMethod("pushRegistrationError", String.class, Integer.class);
+                        pushRegistrationError.invoke(app, message, code);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } 
+                }               
+            });
+        }
+    }
+    
+
+
+    public static void push(final String message){
+        if(c != null && app != null){
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Method push = c.getDeclaredMethod("push", String.class);
+                        push.invoke(app, message);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } 
+                }
+            });
+        }
+    }
     
     private static void setProxySettings() {
         Preferences proxyPref = Preferences.userNodeForPackage(Component.class);
