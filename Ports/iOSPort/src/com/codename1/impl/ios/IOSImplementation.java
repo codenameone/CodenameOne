@@ -592,7 +592,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        Display.getInstance().editString(cmp, maxSize, constraint, text, i);
+                        editString(cmp, maxSize, constraint, text, i);
                     }
                 });
                 return;
@@ -614,7 +614,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            Display.getInstance().editString(cmp, maxSize, constraint, text, i);
+                            editString(cmp, maxSize, constraint, text, i);
                         }
                     });
                     return;
