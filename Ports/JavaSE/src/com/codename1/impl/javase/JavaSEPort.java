@@ -7503,9 +7503,6 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public char getFileSystemSeparator() {
-        if(exposeFilesystem) {
-            return File.separatorChar;
-        }
         return '/';
     }
 
