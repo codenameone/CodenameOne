@@ -894,7 +894,7 @@ public class Toolbar extends Container {
             sidemenuDialog.getTitleComponent().remove();
             sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);
             if(sidemenuSouthComponent != null) {
-                sidemenuDialog.add(BorderLayout.SOUTH, permanentSideMenuContainer);
+                sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);
             }
             float size = 4.5f;
             try {
