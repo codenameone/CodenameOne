@@ -2543,7 +2543,7 @@ public class Component implements Animation, StyleListener {
         onScrollX(scrollX);
     }
     
-    void resetScroll() {
+    protected void resetScroll() {
         if(scrollListeners != null){
             if(scrollX != 0 || scrollY != 0){
                 scrollListeners.fireScrollEvent(0, 0, this.scrollX, this.scrollY);
