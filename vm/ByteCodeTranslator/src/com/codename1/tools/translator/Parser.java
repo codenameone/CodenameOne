@@ -63,12 +63,13 @@ public class Parser extends ClassVisitor {
             System.out.println("Class: " + r.getClassName() + " derives from: " + r.getSuperName() + " interfaces: " + Arrays.asList(r.getInterfaces()));
         }*/
         Parser p = new Parser();
+        
         p.clsName = r.getClassName().replace('/', '_').replace('$', '_');
         if(p.clsName.startsWith("java_lang_annotation") || p.clsName.startsWith("java_lang_Deprecated")
                  || p.clsName.startsWith("java_lang_Override") || p.clsName.startsWith("java_lang_SuppressWarnings")) {
             return;
         }
-        p.cls = new ByteCodeClass(p.clsName);
+        p.cls = new ByteCodeClass(p.clsName, r.getClassName());
         r.accept(p, ClassReader.EXPAND_FRAMES);
         
         classes.add(p.cls);
@@ -827,7 +828,7 @@ public class Parser extends ClassVisitor {
 
         @Override
         public void visitFieldInsn(int opcode, String owner, String name, String desc) {
-            mtd.addField(opcode, owner, name, desc);
+            mtd.addField(cls, opcode, owner, name, desc);
             super.visitFieldInsn(opcode, owner, name, desc); 
         }
 
