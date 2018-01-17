@@ -255,6 +255,16 @@ public class BytecodeMethod {
         return usedMethods.contains(bm.desc + "." + bm.methodName);
     }
     
+    public void findWritableFields(Set<String> outSet) {
+        int len = instructions.size();
+        for (int i=0; i<len; i++) {
+            Instruction instr = instructions.get(i);
+            if (instr instanceof Field) {
+                
+            }
+        }
+    }
+    
     public static String appendMethodSignatureSuffixFromDesc(String desc, StringBuilder b, List<String> arguments) {
         int currentArrayDim = 0;
         desc = desc.substring(1);
@@ -965,7 +975,10 @@ public class BytecodeMethod {
         addInstruction(new Jump(opcode, label));
     }
 
-    public void addField(int opcode, String owner, String name, String desc) {
+    public void addField(ByteCodeClass cls, int opcode, String owner, String name, String desc) {
+        if (cls.getOriginalClassName().equals(owner) && (opcode == Opcodes.PUTFIELD || opcode == Opcodes.PUTSTATIC)) {
+            cls.addWritableField(name);
+        }
         addInstruction(new Field(opcode, owner, name, desc));
     }
     
