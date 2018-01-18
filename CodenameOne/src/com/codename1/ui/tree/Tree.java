@@ -305,14 +305,15 @@ public class Tree extends Container {
         int cc = parent.getComponentCount();
         for(int iter = 0 ; iter < cc ; iter++) {
             Component current = parent.getComponentAt(iter);
-            if(!model.isLeaf(current)){
+            Object o = current.getClientProperty(KEY_OBJECT);
+
+            if(!model.isLeaf(o)){
             //if(current instanceof Container) {
                 BorderLayout bl = (BorderLayout)((Container)current).getLayout();
 
                 // the tree component is always at north expanded or otherwise
                 current = bl.getNorth();
-                Object o = current.getClientProperty(KEY_OBJECT);
-                if(o != null && o.equals(node)) {
+                if(o == node || o != null && o.equals(node)) {
                     if(isExpanded(current)) {
                         return (Container)bl.getCenter();
                     }
@@ -361,6 +362,9 @@ public class Tree extends Container {
         int plen = path.length;
         for(int iter = 0 ; iter < plen ; iter++) {
             c = expandPathNode(animate, c, path[iter]);
+            if(c == null) {
+                return;
+            }
         }
     }
     

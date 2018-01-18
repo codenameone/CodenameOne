@@ -130,7 +130,9 @@ public class LocalNotificationPublisher extends BroadcastReceiver {
         }
         Notification n = builder.build();
         n.icon = icon;
-        n.defaults |= Notification.DEFAULT_SOUND;
+        if (sound == null || sound.length() == 0) {
+            n.defaults |= Notification.DEFAULT_SOUND;
+        }
         return n;
     }
 

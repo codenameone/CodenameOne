@@ -51,6 +51,7 @@ public class LocationSimulation extends javax.swing.JFrame {
     private static final String[] E_MeasUnitKmString = {"km", "mi", "nm"};
     private static final double[] E_MeasUnitPerKm = {1, 1 / 1.609344, 1 / 1.8520};
     private static final String[] E_MeasUnitMString = {"m", "yd", "yd"};
+    private static int zoom;
     /**
      * single symbol for m/s and yd/s from symbol font set
      */
@@ -74,6 +75,8 @@ public class LocationSimulation extends javax.swing.JFrame {
         setLocationByPlatform(true);
         //setVisible(true);
 
+        Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+        int startingZoom = p.getInt("lastZoom", 9);
         final String htmlPage = "<!DOCTYPE html>\n"
                 + "<html>\n"
                 + "  <head>\n"
@@ -96,7 +99,7 @@ public class LocationSimulation extends javax.swing.JFrame {
                 + "function initialize() {"
                 + "var latlng = new google.maps.LatLng(40.714353, -74.005973 );\n"
                 + "var myOptions = {\n"
-                + "  zoom: 9,\n"
+                + "  zoom: "+startingZoom+",\n"
                 + "  center: latlng,\n"
                 + "  mapTypeControl: true,\n"
                 + "  navigationControl: true,\n"
@@ -174,12 +177,17 @@ public class LocationSimulation extends javax.swing.JFrame {
                                                 String[] ccs = cc.split(",");
                                                 double newlat = Double.parseDouble(ccs[0].trim());
                                                 double newlon = Double.parseDouble(ccs[1].trim());
+                                                
+                                                int zoom = (int)jdoc.getMember("currentZoom");
+                                               
+                                                Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
+                                                p.putInt("lastZoom", zoom);
                                                 if (Math.abs(newlat - iLastLat) + Math.abs(newlon - iLastLon) > 0.000001) {
                                                     iLastLat = newlat;
                                                     iLastLon = newlon;
-                                                    Preferences p = Preferences.userNodeForPackage(com.codename1.ui.Component.class);
                                                     p.putDouble("lastGoodLat", newlat);
                                                     p.putDouble("lastGoodLon", newlon);
+                                                    
                                                     latitude.setText("" + newlat);
                                                     longitude.setText("" + newlon);
                                                 }

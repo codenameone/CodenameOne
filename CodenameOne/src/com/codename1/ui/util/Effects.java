@@ -28,6 +28,7 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.RGBImage;
+import com.codename1.ui.animations.Motion;
 
 /**
  * Static utility class useful for simple visual effects that don't quite fit 
@@ -257,5 +258,35 @@ public class Effects {
         }
         return shadow;
                 
+    }
+
+    /**
+     * Generates a square shadow and returns it
+     * 
+     * @param width the width of the shadow image
+     * @param height the height of the shadow image
+     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+     * @param opacity the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @return an image containing the shadow for source
+     */
+    public static Image squareShadow(int width, int height, int blurRadius, float opacity) {
+        Image img = Image.createImage(width + blurRadius * 2, height + blurRadius * 2, 0 );
+        Graphics g = img.getGraphics();
+        int destAlpha = (int)(opacity * 255.0);
+        g.setColor(0);
+
+        Motion lin = Motion.createLinearMotion(2, destAlpha, blurRadius);
+        
+        // draw a gradient of sort for the shadow
+        for(int iter = blurRadius - 1 ; iter >= 0 ; iter--) {            
+            lin.setCurrentMotionTime(iter);
+            g.setAlpha(lin.getValue());
+            g.drawRect(blurRadius + iter, blurRadius +iter, width - iter * 2, height - iter * 2);
+        }
+        
+        if(Display.getInstance().isGaussianBlurSupported()) {
+            img = Display.getInstance().gaussianBlurImage(img, blurRadius);
+        }
+        return img;                
     }
 }

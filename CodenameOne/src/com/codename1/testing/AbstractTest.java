@@ -22,6 +22,7 @@
  */
 package com.codename1.testing;
 
+import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
@@ -657,7 +658,14 @@ public abstract class AbstractTest implements UnitTest {
     public void waitForFormTitle(final String title) {
         TestUtils.waitForFormTitle(title);
     }
-
+    
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     */
+    public void waitForUnnamedForm() {
+        TestUtils.waitForUnnamedForm();
+    }
+    
     /**
      * This method just invokes the test utils method, it is here for convenience
      * @see TestUtils
@@ -883,4 +891,29 @@ public abstract class AbstractTest implements UnitTest {
     public void selectInList(int[] path, int offset) {
         TestUtils.selectInList(path, offset);
     }
+
+
+    /**
+     * Returns all the command objects from the toolbar in the order of left, right, overflow &amp; sidemenu
+     * @return the set of commands
+     */
+    public Command[] getToolbarCommands() {
+        return TestUtils.getToolbarCommands();
+    }
+    
+    /**
+     * Executes a command from the offset returned by {@link #getToolbarCommands()}
+     * 
+     * @param offset the offset of the command we want to execute
+     */
+    public void executeToolbarCommandAtOffset(int offset) {
+        TestUtils.executeToolbarCommandAtOffset(offset);
+    }
+    
+    /**
+     * Shows the sidemenu UI
+     */
+    public void showSidemenu() {
+        TestUtils.showSidemenu();
+    }    
 }

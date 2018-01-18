@@ -25,19 +25,18 @@ package com.codename1.db;
 
 import com.codename1.io.Log;
 import com.codename1.util.EasyThread;
-import com.codename1.util.RunnableWithResult;
 import com.codename1.util.RunnableWithResultSync;
-import com.codename1.util.SuccessCallback;
 import java.io.IOException;
 
 /**
  * Wraps all database calls in a single thread so they are all proxied thru that thread
  *
  * @author Shai Almog
+ * @deprecated platform specific nuances prevented this approach from working out, we improved the native iOS support for thread safety instead
  */
 public class ThreadSafeDatabase extends Database {
-    private Database underlying;
-    private EasyThread et;
+    private final Database underlying;
+    private final EasyThread et;
     
     /**
      * Wraps the given database with a threadsafe version
@@ -45,6 +44,7 @@ public class ThreadSafeDatabase extends Database {
      */
     public ThreadSafeDatabase(Database db) {
         underlying = db;
+        et = EasyThread.start("Database");
     }
 
     /**
@@ -109,7 +109,7 @@ public class ThreadSafeDatabase extends Database {
     public void commitTransaction() throws IOException {
         invokeWithException(new RunnableWithIOException() {
             public void run() throws IOException {
-                underlying.beginTransaction();
+                underlying.commitTransaction();
             }
         });
     }
@@ -133,6 +133,7 @@ public class ThreadSafeDatabase extends Database {
                 } catch(IOException err) {
                     Log.e(err);
                 }
+                et.kill();
             }
         });
     }
@@ -220,9 +221,12 @@ public class ThreadSafeDatabase extends Database {
     }
     
     private class CursorWrapper implements Cursor {
-        private Cursor underlyingCursor;
+        private final Cursor underlyingCursor;
         public CursorWrapper(Cursor underlyingCursor) {
             this.underlyingCursor = underlyingCursor;
+        }
+
+        protected void finalize()  {
         }
         
         public boolean first() throws IOException {

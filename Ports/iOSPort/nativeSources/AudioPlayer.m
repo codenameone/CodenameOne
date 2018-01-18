@@ -159,12 +159,12 @@ AudioPlayer* currentlyPlaying = nil;
     NSError *setCategoryError = nil;
     BOOL success = [audioSession setCategory:AVAudioSessionCategoryPlayback error:&setCategoryError];
     if (!success) {
-        NSLog(@"ERROR");
+        CN1Log(@"ERROR");
     }
     NSError *activationError = nil;
     success = [audioSession setActive:YES error:&activationError];
     if (!success) {
-        NSLog(@"ERROR");
+        CN1Log(@"ERROR");
     }
     [[UIApplication sharedApplication] beginReceivingRemoteControlEvents];
     
@@ -175,7 +175,7 @@ AudioPlayer* currentlyPlaying = nil;
 #endif*/
         BOOL res = [playerInstance play];
         if (!res) {
-            NSLog(@"Failed to play");
+            CN1Log(@"Failed to play");
         }
     } else if(avPlayerInstance != nil){
         [avPlayerInstance play];

@@ -51,7 +51,6 @@ public class ScaleImageLabel extends Label {
         setUIID("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
-        getAllStyles().setBgTransparency(255);
     }
     
     /**
@@ -62,7 +61,6 @@ public class ScaleImageLabel extends Label {
         setUIID("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
-        getAllStyles().setBgTransparency(255);
         setIcon(i);
     }
     
@@ -172,7 +170,6 @@ public class ScaleImageLabel extends Label {
         super.setUIID(id); 
         setIcon(icon);
         getAllStyles().setBackgroundType(type);
-        getAllStyles().setBgTransparency(255);
     }
 
     @Override
@@ -182,7 +179,6 @@ public class ScaleImageLabel extends Label {
         super.refreshTheme(id, merge);
         setIcon(icon);
         getAllStyles().setBackgroundType(type);
-        getAllStyles().setBgTransparency(255);
     }
     
     /**

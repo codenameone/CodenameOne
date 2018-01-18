@@ -175,6 +175,8 @@ public class BubbleTransition extends Transition {
                 locMotionY.start();
                 clipMotion = Motion.createLinearMotion(Math.max(src.getWidth(), src.getHeight()) * 3 / 2, Math.min(originDest.getWidth(), originDest.getHeight()), duration);
             } else {
+                x = dest.getAbsoluteX();
+                y = dest.getAbsoluteY();
                 clipMotion = Motion.createLinearMotion(0, Math.max(dest.getWidth(), dest.getHeight()) * 3 / 2, duration);
             }
         }

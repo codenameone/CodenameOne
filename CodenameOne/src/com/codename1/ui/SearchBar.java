@@ -59,6 +59,7 @@ class SearchBar extends Toolbar {
         String s = getUIManager().localize("m.search", "Search");
         Label hint = new Label(s, img);
         hint.setUIID("TextHintSearch");
+        search.setHint(s);
         search.setHintLabelImpl(hint);
         
         search.addDataChangedListener(new DataChangedListener() {

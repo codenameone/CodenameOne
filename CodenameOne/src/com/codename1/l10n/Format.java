@@ -39,7 +39,7 @@ public abstract class Format implements Cloneable {
 	public abstract String format(Object source) throws IllegalArgumentException;
 
 	/**
-	 * Parse an string to an object.
+	 * Parse a string to an object.
 	 * 
 	 * @param source document to be parsed.
 	 * @return parsed object.

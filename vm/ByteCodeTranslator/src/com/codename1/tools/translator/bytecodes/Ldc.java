@@ -122,9 +122,9 @@ public class Ldc extends Instruction implements AssignableExpression {
             //b.append("PUSH_LONG(");
             if(((Number)cst).longValue() == Long.MIN_VALUE) {
                 // min value in C is 1 less (more really)
-                b.append(((Number)cst).longValue() + 1);
+                b.append("LLONG_MIN");
             } else {
-                b.append(((Number)cst).longValue());
+                b.append(((Number)cst).longValue()).append("LL");
             }
             //b.append("LL); /* LDC */\n");
         } else if (cst instanceof Double) {
@@ -249,11 +249,11 @@ public class Ldc extends Instruction implements AssignableExpression {
             b.append("PUSH_LONG(");
             if(((Number)cst).longValue() == Long.MIN_VALUE) {
                 // min value in C is 1 less (more really)
-                b.append(((Number)cst).longValue() + 1);
+                b.append("LLONG_MIN");
             } else {
-                b.append(((Number)cst).longValue());
+                b.append(((Number)cst).longValue()).append("LL");
             }
-            b.append("LL); /* LDC */\n");
+            b.append("); /* LDC */\n");
         } else if (cst instanceof Double) {
             Double d = (Double)cst;
             b.append("PUSH_DOUBLE(");

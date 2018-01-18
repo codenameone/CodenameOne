@@ -182,7 +182,7 @@ public class Cookie implements Externalizable {
      * {@inheritDoc}
      */
     public String toString() {
-        return "name = " + name + " value = " + value + " domain = " + domain;
+        return "name = " + name + " value = " + value + " domain = " + domain + "expires = "+expires +" secure = "+secure+" path = "+path;
     }
 
     /**

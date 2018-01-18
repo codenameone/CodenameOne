@@ -17,11 +17,22 @@ namespace com.codename1.impl
         private NativeGraphics _graphics;
         private static IList<AsyncOp> renderingOperations = new List<AsyncOp>();
         private static IList<AsyncOp> pendingRenderingOperations = new List<AsyncOp>();
-
+        bool firstPass = true;
         public WindowsAsyncView(CanvasControl screen)
         {
-           _screen = screen;
-           _screen.Draw += OnDraw;      
+
+
+            _screen = screen;
+            if (Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons"))
+            {
+                if (firstPass)
+                {
+                    _screen.MaxWidth = 1080;
+                    _screen.MaxHeight = 1260;
+                    firstPass = false;
+                }
+            }
+            _screen.Draw += OnDraw;      
         }
 
         private void OnDraw(CanvasControl sender, CanvasDrawEventArgs args)

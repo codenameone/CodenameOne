@@ -53,6 +53,22 @@ import java.util.Vector;
  * @author Shai Almog
  */
 public class MultipartRequest extends ConnectionRequest {
+
+    /**
+     * Special flag to keep input stream files open after they are read
+     * @return the leaveInputStreamsOpen
+     */
+    public static boolean isLeaveInputStreamsOpen() {
+        return leaveInputStreamsOpen;
+    }
+
+    /**
+     * Special flag to keep input stream files open after they are read
+     * @param aLeaveInputStreamsOpen the leaveInputStreamsOpen to set
+     */
+    public static void setLeaveInputStreamsOpen(boolean aLeaveInputStreamsOpen) {
+        leaveInputStreamsOpen = aLeaveInputStreamsOpen;
+    }
     private String boundary;
     private LinkedHashMap args = new LinkedHashMap();
     private Hashtable filenames = new Hashtable();
@@ -63,6 +79,11 @@ public class MultipartRequest extends ConnectionRequest {
     private boolean manualRedirect = true;
     private static boolean canFlushStream = true;
     private Vector ignoreEncoding = new Vector();
+    
+    /**
+     * Special flag to keep input stream files open after they are read
+     */
+    private static boolean leaveInputStreamsOpen;
     
     /**
      * Initialize variables
@@ -365,9 +386,12 @@ public class MultipartRequest extends ConnectionRequest {
                             }
                             s = i.read(buffer);
                     }
-                    // (when passed by stream, leave for caller to clean up).
-                    if (!(value instanceof InputStream)) {
+                    if (value instanceof InputStream) {
+                        if(!leaveInputStreamsOpen) {
                             Util.cleanup(i);
+                        }
+                    } else {
+                        Util.cleanup(i);
                     }
                     //args.remove(key);
                     value = null;

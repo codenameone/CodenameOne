@@ -67,6 +67,12 @@ public final class Graphics {
         impl = Display.impl;
     }
     
+    protected void finalize() {
+        if (nativeGraphics != null) {
+            impl.disposeGraphics(nativeGraphics);
+        }
+    }
+    
     private Transform translation() {
         if (translation == null) {
             translation = Transform.makeTranslation(xTranslate, yTranslate);
@@ -1025,7 +1031,7 @@ public final class Graphics {
      * @return true if anti aliasing is supported
      */
     public boolean isAntiAliasingSupported() {
-        return impl.isAntiAliasingSupported();
+        return impl.isAntiAliasingSupported(nativeGraphics);
     }
     
     /**
@@ -1035,7 +1041,7 @@ public final class Graphics {
      * @return true if text anti aliasing is supported
      */
     public boolean isAntiAliasedTextSupported() {
-        return impl.isAntiAliasedTextSupported();
+        return impl.isAntiAliasedTextSupported(nativeGraphics);
     }
 
     

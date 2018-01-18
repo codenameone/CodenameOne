@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="CodenameOne" default="default" basedir=".">
+    <available file="../cn1-binaries" property="cn1.binaries" value="true"/>
+    <available file="../codenameone-skins" property="codenameone.skins" value="true"/>
+    <property name="cn1.cli" value="node_modules/.bin/cn1"/>
+    <property name="cn1.iphone.target" value="iphone" />
+
+    <target name="get-cn1-binaries" unless="cn1.binaries">
+      <get src="https://github.com/codenameone/cn1-binaries/archive/master.zip" dest="master.zip"/>
+      <unzip src="master.zip" dest=".."/>
+      <move file="../cn1-binaries-master" tofile="../cn1-binaries" />
+    </target>
+
+    <target name="get-codenameone-skins" unless="codenameone.skins">
+      <get src="https://github.com/codenameone/codenameone-skins/archive/master.zip" dest="master.zip"/>
+      <unzip src="master.zip" dest=".."/>
+      <move file="../codenameone-skins-master" tofile="../codenameone-skins" />
+      <ant dir="../codenameone-skins" inheritAll="false" useNativeBasedir="true">
+        <property name="cn1.path" location="."/>
+      </ant>
+    </target>
+
+    <target name="install-deps" depends="get-cn1-binaries,get-codenameone-skins"/>
+
+    <target name="core" depends="install-deps" description="Build Codename One Core">
+      <ant dir="CodenameOne" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+
+    <target name="ios" depends="core" description="Build iOS Port">
+      <ant dir="Ports/iOSPort" target="jar" inheritAll="false" useNativeBasedir="true"/>
+      <ant dir="vm/JavaAPI" target="jar" inheritAll="false" useNativeBasedir="true"/>
+      <ant dir="vm/ByteCodeTranslator" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+
+    <target name="android" depends="core" description="Build Android Port">
+      <ant dir="Ports/Android" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+
+    <target name="javase" depends="core" description="Build JavaSE Port">
+      <ant dir="Ports/JavaSE" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+
+    <target name="cldc11" depends="core" description="Build CLDC11 Jar">
+      <ant dir="Ports/CLDC11" target="jar" inheritAll="false" useNativeBasedir="true"/>
+    </target>
+
+
+    <target name="clean">
+      <ant dir="CodenameOne" target="clean" inheritAll="false" useNativeBasedir="true"/>
+      <ant dir="Ports/JavaSE" target="clean" inheritAll="false" useNativeBasedir="true"/>
+      <ant dir="Ports/Android" target="clean" inheritAll="false" useNativeBasedir="true"/>
+      <ant dir="Ports/iOSPort" target="clean" inheritAll="false" useNativeBasedir="true"/>
+      <ant dir="Ports/CLDC11" target="clean" inheritAll="false" useNativeBasedir="true"/>
+      <delete dir="tests/node_modules"/>
+      <delete>
+        <fileset dir="tests" includes="**/*.jar"/>
+      </delete>
+    </target>
+
+    <target name="install-cli">
+      <echo>Installing Codename One CLI...</echo>
+      <echo>Requires NodeJS/NPM to be installed.  npm must be on your environment PATH.</echo>
+      <mkdir dir="tests/node_modules"/>
+      <exec executable="npm" dir="tests">
+        <arg value="install"/>
+        <arg value="codenameone-cli"/>
+      </exec>
+    </target>
+
+    <target name="test-javase" depends="javase,install-cli" description="Run Unit Tests on Simulator">
+      <echo>Codename One JavaSE Unit Tests</echo>
+      <echo>This target will compile the Codename one sources, build the unit tests located in &quot;tests&quot; directory, and run them in the Codename One simulator.</echo>
+      <echo>Requirements:</echo>
+      <echo>1. NodeJS/npm must be installed.  npm must be in PATH.</echo>
+      <exec executable="${cn1.cli}" dir="tests" failonerror="true">
+        <arg value="test"/>
+        <arg value="-cn1Sources"/>
+        <arg value=".." />
+        <arg value="-s"/>
+        <arg value="-e"/>
+        <arg value="-skipCompileCn1Sources"/>
+      </exec>
+    </target>
+
+    <target name="test-android" depends="android,install-cli" description="Run Unit Tests on Android">
+      <echo>Codename One Android Unit Tests</echo>
+      <echo>IMPORTANT: This target will compile the Codename One sources, build the unit tests located in the &quot;tests&quot; directory, send the build to the Codename One build server, then run the resulting build on a connected Android device or a currently running Android emulator instance.</echo>
+      <echo>Requirements:</echo>
+      <echo>1. Android developer tools must be installed.  adb must be in your environment PATH</echo>
+      <echo>2. NodeJS/NPM must be installed.  "npm" must be on your PATH</echo>
+      <echo>3. At least one android device or emulator must be running and connected.  Use "adb devices -l" to list current devices.  If more than one device is active, you must specific the device name using -DdeviceName=XXXX command-line flag.</echo>
+      <echo>4. Codename One Enterprise Account or higher (since it depends on automated build support)</echo>
+      <echo></echo>
+      <echo>NOTE: Currently running tests against the source is limited to internal Codename One Administrator accounts.  Tests run under enterprise accounts
+        will be compiled on the server with the server's currently deployed version of Codename One</echo>
+      <echo></echo>
+      <echo>Login Details</echo>
+      <echo>CN1USER and CN1PASS environment variables will be used for Codename One server login if provided.  Otherwise it will use the default password
+        as logged in with the IDE.</echo>
+      <exec executable="${cn1.cli}" dir="tests" failonerror="true">
+        <arg value="test"/>
+        <arg value="-cn1Sources"/>
+        <arg value=".." />
+        <arg value="-s"/>
+        <arg value="-e"/>
+        <arg value="-v"/>
+        <arg value="-skipCompileCn1Sources"/>
+        <arg value="-t"/>
+        <arg value="android"/>
+        <arg value="-d"/>
+        <arg value="${deviceName}"/>
+        <arg value="-p"/>
+        <arg value="300"/>
+      </exec>
+    </target>
+
+    <target name="start-appium" description="Start Appium Server">
+      <echo>Installing Appium in tests...</echo>
+      <mkdir dir="tests/node_modules"/>
+      <exec executable="npm" dir="tests" failonerror="true">
+        <arg value="install"/>
+        <arg value="appium"/>
+      </exec>
+      <echo>Starting Appium server</echo>
+      <exec executable="node_modules/.bin/appium" dir="tests" failonerror="true"/>
+    </target>
+
+
+    <target name="update-tests" description="Update tests appium.xml file">
+      <echo>Updating appium.xml to the latest...</echo>
+      <get src="https://raw.githubusercontent.com/shannah/cn1-travis-template/master/appium.xml" dest="tests/core/appium.xml" overwrite="true"/>
+    </target>
+
+    <target name="test-ios" depends="ios,install-cli" description="Run Unit Tests on iOS">
+      <echo>Codename One iOS Unit Tests</echo>
+      <echo>IMPORTANT: This target will compile the Codename One sources, build the unit tests located in the &quot;tests&quot; directory, send the build to the Codename One build server, then run the resulting build on the iOS Simulator on the local machine.</echo>
+      <echo>Requirements:</echo>
+      <echo>1. Mac OS X with Xcode 7.3 or higher</echo>
+      <echo>2. NodeJS/NPM must be installed.  "npm" must be on your PATH</echo>
+      <echo>3. Appium server running locally. (Run "ant start-appium" to start Appium server)</echo>
+      <echo>4. Codename One Enterprise Account or higher (since it depends on automated build support)</echo>
+      <echo></echo>
+      <echo>NOTE: Currently running tests against the source is limited to internal Codename One Administrator accounts.  Tests run under enterprise accounts
+        will be compiled on the server with the server's currently deployed version of Codename One</echo>
+      <echo></echo>
+      <echo>Login Details</echo>
+      <echo>CN1USER and CN1PASS environment variables will be used for Codename One server login if provided.  Otherwise it will use the default password
+        as logged in with the IDE.</echo>
+      <exec executable="${cn1.cli}" dir="tests" failonerror="true">
+        <arg value="test"/>
+        <arg value="-cn1Sources"/>
+        <arg value=".." />
+        <arg value="-s"/>
+        <arg value="-e"/>
+        <arg value="-v"/>
+        <arg value="-skipCompileCn1Sources"/>
+        <arg value="-t"/>
+        <arg value="ios"/>
+        <arg value="-d"/>
+        <arg value="${deviceName}"/>
+        <arg value="-Dcn1.iphone.target=${cn1.iphone.target}"/>
+      </exec>
+    </target>
+
+    <target name="all" depends="core,ios,android,javase,cldc11" description="Build all targets">
+
+    </target>
+
+    <target name="default" depends="all"/>
+</project>

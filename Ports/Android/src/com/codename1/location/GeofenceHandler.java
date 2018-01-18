@@ -43,15 +43,19 @@ public class GeofenceHandler extends IntentService {
         String id = intent.getStringExtra("geofenceID");
         GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
 
-        try {
-            GeofenceListener l = (GeofenceListener) Class.forName(className).newInstance();
-            if (geofencingEvent.getGeofenceTransition() == com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_ENTER) {
-                l.onEntered(id);
-            } else if (geofencingEvent.getGeofenceTransition() == com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_EXIT) {
-                l.onExit(id);
+        for (com.google.android.gms.location.Geofence gf : geofencingEvent.getTriggeringGeofences()) {
+            try {
+                id = gf.getRequestId();
+                GeofenceListener l = (GeofenceListener) Class.forName(className).newInstance();
+                if (geofencingEvent.getGeofenceTransition() == com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_ENTER) {
+                    l.onEntered(id);
+                } else if (geofencingEvent.getGeofenceTransition() == com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_EXIT) {
+                    l.onExit(id);
+                }
+            } catch (Exception e) {
+                Log.e("Codename One", "geofence error", e);
             }
-        } catch (Exception e) {
-            Log.e("Codename One", "geofence error", e);
         }
+
     }
 }

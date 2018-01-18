@@ -29,6 +29,9 @@ import com.codename1.io.Log;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.processing.Result;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.util.Base64;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -298,6 +301,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                         p.setImpl(Util.toIntValue(val));
                         continue;
                     } 
+                    if(p instanceof BooleanProperty) {
+                        p.setImpl(Util.toBooleanValue(val));
+                        continue;
+                    } 
                     if(p instanceof LongProperty) {
                         p.setImpl(Util.toLongValue(val));
                         continue;
@@ -310,6 +317,18 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                         p.setImpl(Util.toDoubleValue(val));
                         continue;
                     } 
+                    if(p.getGenericType() == Image.class || p.getGenericType() == EncodedImage.class) {
+                        if(val instanceof Image) {
+                            p.setImpl(val);                                    
+                        } else {
+                            if(val instanceof byte[]) {
+                                p.setImpl(EncodedImage.create((byte[])val));
+                            } else {
+                                p.setImpl(EncodedImage.create(Base64.decode(((String)val).getBytes())));
+                            }
+                        }
+                        continue;
+                    }
                     p.setImpl(val);                
                 }
             }
@@ -391,6 +410,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
         try {
             InputStream is = Storage.getInstance().createInputStream(name);
             JSONParser jp = new JSONParser();
+            JSONParser.setUseBoolean(true);
+            JSONParser.setUseLongs(true);
             populateFromMap(jp.parseJSON(new InputStreamReader(is, "UTF-8")), parent.getClass());
         } catch(IOException err) {
             Log.e(err);

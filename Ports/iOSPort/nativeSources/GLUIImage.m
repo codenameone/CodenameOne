@@ -91,7 +91,7 @@ extern int nextPowerOf2(int val);
         //GLErrorLog;
         //natural_t memoryAfter = [ExecutableOp get_free_memory];
         //if(name != nil) {
-        //    NSLog(@"Allocated texture %@ that takes up %i", name, memoryBefore - memoryAfter);
+        //    CN1Log(@"Allocated texture %@ that takes up %i", name, memoryBefore - memoryAfter);
         //}
     } else {
         if(texWidth != textureWidth || texHeight != textureHeight) {
@@ -124,7 +124,7 @@ extern int nextPowerOf2(int val);
                 //int fm = [ExecutableOp get_free_memory];
                 glDeleteTextures(1, &tname);
                 GLErrorLog;
-                //NSLog(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm);
+                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm);
             });
         }
     }
@@ -139,7 +139,7 @@ extern int nextPowerOf2(int val);
 
 -(void)dealloc {
     if(name != nil) {
-        //NSLog(@"Deleting image name %@", name); 
+        //CN1Log(@"Deleting image name %@", name); 
 #ifndef CN1_USE_ARC
         [name release];
 #endif
@@ -155,7 +155,7 @@ extern int nextPowerOf2(int val);
                 //int fm = [ExecutableOp get_free_memory];
                 glDeleteTextures(1, &tname);
                 GLErrorLog;
-                //NSLog(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm); 
+                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm); 
             });
         }
     }

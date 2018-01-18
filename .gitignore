@@ -45,3 +45,8 @@ Ports/iOSPort/nbproject/private/private.properties
 /Ports/JavaSEWithSVGSupport/build/
 /Ports/JavaSEWithSVGSupport/dist/
 nightly_builds/.DS_Store
+/tests/iOSTests/build/
+node_modules
+/tests/core/nbproject/private/
+/tests/core/dist/
+/tests/core/build/

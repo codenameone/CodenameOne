@@ -132,12 +132,12 @@ public class HTMLComponent extends Container implements ActionListener,IOCallbac
     private static final int DEFAULT_TEXTFIELD_SIZE = 12;
 
     /**
-     * The default oolumns (in characters) of an textarea
+     * The default oolumns (in characters) of a textarea
      */
     private static final int DEFAULT_TEXTAREA_COLS = 20;
 
     /**
-     * The default rows (in characters) of an textarea
+     * The default rows (in characters) of a textarea
      */
     private static final int DEFAULT_TEXTAREA_ROWS = 2;
 

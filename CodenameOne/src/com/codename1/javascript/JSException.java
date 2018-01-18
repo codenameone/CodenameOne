@@ -24,6 +24,13 @@ package com.codename1.javascript;
 
 /**
  * Thrown by JavaScript code
+ * 
+ *  * <p>
+ * <strong>NOTE:</strong> The {@link com.codename1.javascript } package is now
+ * deprecated. The preferred method of Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
+ * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these
+ * work asynchronously (except in the XXXAndWait() variants, which use
+ * invokeAndBlock() to make the calls synchronously.</p>
  *
  * @author Steve Hannah
  */

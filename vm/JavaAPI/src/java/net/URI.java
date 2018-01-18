@@ -889,9 +889,9 @@ public class URI {
         }
         Iterator<Integer> iter = removals.iterator();
         while (iter.hasNext()) {
-            segments.remove(iter.next());
+            segments.remove(iter.next().intValue());
         }
-        StringBuffer buffer = new StringBuffer();
+        StringBuilder buffer = new StringBuilder();
         for (int i = 0; i < segments.size(); i++) {
             String segment = segments.get(i);
             if (i == 0) {

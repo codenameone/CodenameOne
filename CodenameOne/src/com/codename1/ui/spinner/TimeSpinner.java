@@ -23,12 +23,38 @@
 package com.codename1.ui.spinner;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Label;
 import com.codename1.ui.List;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import java.util.ArrayList;
 
 /**
- * Allows selecting a time of day either in 24 hour batches or AM/PM format
- *
+ * Allows selecting a time of day either in 24 hour batches or AM/PM format.
+ * 
+ * <p>If {@link #setDurationMode(boolean) } is {@literal true } then this will allow
+ * users to set a duration in hours and minutes.</p>
+ * 
+ * <h3>Styles<h3>
+ * 
+ * <table>
+ *   <tr><th>UIID</th><th>Description</th></tr>
+ *   <tr><td>{@literal SpinnerRenderer}</td><td>Used for each cell/row of the spinner.</td></tr>
+ *   <tr><td>{@literal TimeSpinnerHoursLabel}</td><td>Used for the "hours" label to the right of the <em>hours</em> spinner.  Used only in duration mode.</td</tr>
+ *   <tr><td>{@literal TimeSpinnerMinutesLabel}</td><td>Used for the "minutes" label to the right of the <em>minutes</em> spinner.  Used only in duration mode.</td></tr
+ * </table>
+ * 
+ * <h3>Screenshots</h3>
+ * 
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-duration-android.png" alt="Android duration picker" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-duration-hours-android.png" alt="Android duration hours picker" />
+ * <img src="https://www.codenameone.com/img/developer-guide/components-picker-time-android.png" alt="Android duration minutes picker" />
+ * 
+ * 
  * @author Shai Almog
  */
 public class TimeSpinner extends BaseSpinner {
@@ -36,12 +62,16 @@ public class TimeSpinner extends BaseSpinner {
     private Spinner minute;
     private Spinner amPM;
     
+    private ArrayList<Component> hourComponents = new ArrayList<Component>();
+    private ArrayList<Component> minuteComponents = new ArrayList<Component>();
     
     private int startHour = 1;
     private int endHour = 13;
     private int minuteStep = 5;
 
     private boolean durationMode;
+    private boolean showHours=true;
+    private boolean showMinutes=true;
     private boolean showMeridiem = true;
     private int currentHour = 8;
     private int currentMinute = 0;
@@ -106,17 +136,45 @@ public class TimeSpinner extends BaseSpinner {
     }
         
     void addComponents() {
+        setLayout(new LayeredLayout());
+        LayeredLayout ll = (LayeredLayout)getLayout();
+        Container content = new Container(BoxLayout.x());
+        Style allStyles = content.getAllStyles();
+        allStyles.setMargin(0,0,0,0);
+        allStyles.setPadding(0,0,0,0);
+        allStyles.setBgTransparency(0);
+        allStyles.setBorder(Border.createEmpty());
+        
         if(amPM != null) {
-            addComponent(hour);
-            addComponent(createSeparator());
-            addComponent(minute);
+            content.addComponent(hour);
+            hourComponents.add(hour);
+            if (durationMode) {
+                Label l = new Label(getUIManager().localize("hours", "hours"));
+                l.setUIID("TimeSpinnerHoursLabel");
+                hourComponents.add(l);
+                content.addComponent(l);
+            }
+            
+            content.addComponent(createSeparator());
+            content.addComponent(minute);
+            minuteComponents.add(minute);
+            if (durationMode) {
+                Label l = new Label(getUIManager().localize("minutes", "minutes"));
+                l.setUIID("TimeSpinnerMinutesLabel");
+                minuteComponents.add(l);
+                content.addComponent(l);
+            }
             if(showMeridiem) {
-                addComponent(createSeparator());
-                addComponent(amPM);
+                content.addComponent(createSeparator());
+                content.addComponent(amPM);
             } 
         }
+        setHoursVisible(showHours);
+        setMinutesVisible(showMinutes);
+        addComponent(content);
+        ll.setInsets(content, "0 auto 0 auto");
     }
-
+    
     
     /**
      * {@inheritDoc}
@@ -199,6 +257,7 @@ public class TimeSpinner extends BaseSpinner {
     }
 
     /**
+     * Gets the minutes spinner step size.
      * @return the minuteStep
      */
     public int getMinuteStep() {
@@ -206,15 +265,19 @@ public class TimeSpinner extends BaseSpinner {
     }
 
     /**
-     * @param minuteStep the minuteStep to set
+     * Sets the step-size for the minutes spinner.
+     * @param minuteStep The step size.  Must be beween 1 and 60.
      */
     public void setMinuteStep(int minuteStep) {
+        if (minuteStep < 1 || minuteStep > 60) {
+            throw new IllegalArgumentException("Minute step must be between 1 and 60");
+        }
         this.minuteStep = minuteStep;
         if(minute != null) {
             minute.setModel(new SpinnerNumberModel(0, 60, currentMinute, minuteStep));
         }
     }
-
+    
     /**
      * @return the showMeridiem
      */
@@ -347,5 +410,31 @@ public class TimeSpinner extends BaseSpinner {
             }
         }
         this.durationMode = durationMode;
+    }
+    
+    /**
+     * Show or hide the hours spinner.
+     * @param visible True to show the hours spinner.
+     */
+    public void setHoursVisible(boolean visible) {
+        showHours = visible;
+        for (Component c : hourComponents) {
+            c.setVisible(visible);
+            c.setHidden(!visible);
+        }
+        
+        
+    }
+    
+    /**
+     * Show or hide the minutes spinner.
+     * @param visible True to make the minutes spinner visible.
+     */
+    public void setMinutesVisible(boolean visible) {
+        showMinutes = visible;
+        for (Component c : minuteComponents) {
+            c.setVisible(visible);
+            c.setHidden(!visible);
+        }
     }
 }

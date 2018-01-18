@@ -560,7 +560,7 @@ public final class StringBuilder implements CharSequence {
     }
 
     public StringBuilder append(final java.lang.CharSequence cs) {
-        return null;
+        return append(cs, 0, cs.length());
     }
 
     public StringBuilder append(java.lang.CharSequence s, final int start, final int end) {

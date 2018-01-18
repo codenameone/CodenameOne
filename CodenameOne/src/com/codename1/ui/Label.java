@@ -59,7 +59,9 @@ public class Label extends Component {
 
     private int textPosition = RIGHT;
     
-    private int gap = 2;
+    private static int defaultGap = 2;
+    
+    private int gap = defaultGap;
     
     private int shiftText = 0;
     
@@ -117,6 +119,28 @@ public class Label extends Component {
         setUIID(uiid);
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
     }
+
+    // workaround for potential infinite recursion situation https://github.com/codenameone/CodenameOne/commit/54a4092003b0ee5631c05250824a6466b84e757f#commitcomment-24244448
+    private boolean autoSizeLaidOutLock;
+    
+    /**
+     * {@inheritDoc}
+     * This is overriden for auto size mode
+     */
+    @Override
+    protected void laidOut() {
+        if(autoSizeLaidOutLock) {
+            return;
+        }
+        autoSizeLaidOutLock = true;
+        super.laidOut();
+        if(autoSizeMode) {
+            initAutoResize();
+        }
+        autoSizeLaidOutLock = false;
+    }
+    
+    
     
     /**
      * Construct an empty label
@@ -440,6 +464,24 @@ public class Label extends Component {
     }
     
     /**
+     * Set the default gap in pixels between the icon/text to the Label boundaries
+     * 
+     * @param gap the gap in pixels
+     */
+    public static void setDefaultGap(int gap) {
+        defaultGap = gap;
+    }
+    
+    /**
+     * Returns the default gap in pixels between the icon/text to the Label boundaries
+     * 
+     * @return the gap in pixels between the icon/text to the Label boundaries
+     */
+    public static int getDefaultGap() {
+        return defaultGap;
+    }
+    
+    /**
      * {@inheritDoc}
      */
     protected String paramString() {
@@ -500,7 +542,7 @@ public class Label extends Component {
                     }
                 }
                 
-                Font currentFont = originalFont;
+                Font currentFont = getUnselectedStyle().getFont();
                 float fontSize = currentFont.getPixelSize();
                 if(fontSize < 1) {
                     Log.p("Autosize disabled probably because component wasn't using native fonts for UIID: " + getUIID());
@@ -509,24 +551,21 @@ public class Label extends Component {
                 }
                 widthAtLastCheck = w;
                 autoSizeMode = false;
-                while(calcPreferredSize().getWidth() < w) {
+                int currentWidth = calcPreferredSize().getWidth();
+                while(currentWidth < w) {
                     fontSize++;
                     currentFont = currentFont.derive(fontSize, currentFont.getStyle());
                     getAllStyles().setFont(currentFont);
+                    currentWidth = calcPreferredSize().getWidth();
                 }
-                while(calcPreferredSize().getWidth() > w) {
+                while(currentWidth > w) {
                     fontSize--;
                     currentFont = currentFont.derive(fontSize, currentFont.getStyle());
                     getAllStyles().setFont(currentFont);
+                    currentWidth = calcPreferredSize().getWidth();
                 }
                 autoSizeMode = true;
             }
-        }
-    }
-
-    void calcSizeAutoSize() {
-        if(autoSizeMode && originalFont != null) {
-            getAllStyles().setFont(originalFont);
         }
     }
     
@@ -534,7 +573,6 @@ public class Label extends Component {
      * {@inheritDoc}
      */
     protected Dimension calcPreferredSize(){
-        calcSizeAutoSize();
         return getUIManager().getLookAndFeel().getLabelPreferredSize(this);
     }
     

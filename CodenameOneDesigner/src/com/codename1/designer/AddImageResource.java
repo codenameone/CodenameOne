@@ -93,7 +93,7 @@ public class AddImageResource extends javax.swing.JDialog {
 
         help.setContentType("text/html");
         help.setEditable(false);
-        help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      RGB Image is the default image used for the platform with the optimial number of colors on the given platform. When unsure this is probably what you are looking for.\r\n    </p>\r\n  </body>\r\n</html>\r\n"); // NOI18N
+        help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      RGB Image is the default image used for the platform with the optimal number of colors on the given platform. When unsure this is probably what you are looking for.\r\n    </p>\r\n  </body>\r\n</html>\r\n"); // NOI18N
         help.setName("help"); // NOI18N
         jScrollPane1.setViewportView(help);
 

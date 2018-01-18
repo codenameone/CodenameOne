@@ -128,7 +128,7 @@
  			break;
             
 		default:
-			NSLog(@"Unknown event");
+			CN1Log(@"Unknown event");
 	}
 }
 

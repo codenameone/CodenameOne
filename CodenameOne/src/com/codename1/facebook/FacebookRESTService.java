@@ -319,4 +319,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public void longToken(long tok) {
     }
 
+    public void booleanToken(boolean tok) {
+    }
+
 }

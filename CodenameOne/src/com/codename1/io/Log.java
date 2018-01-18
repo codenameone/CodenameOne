@@ -300,6 +300,10 @@ public class Log {
      * @param t
      */
     protected void logThrowable(Throwable t) {
+        if(t == null) {
+            p("Exception logging invoked with null exception...");
+            return;
+        }
         print("Exception: " + t.getClass().getName() + " - " + t.getMessage(), ERROR);
         Thread thr = Thread.currentThread();
         if(thr instanceof CodenameOneThread && ((CodenameOneThread)thr).hasStackFrame()) {

@@ -35,7 +35,7 @@ import java.util.ArrayList;
  */
 public class EasyThread {
     private Thread t;
-    private boolean running;
+    private boolean running = true;
     private ArrayList<Object> queue = new ArrayList<Object>();
     private static final Object LOCK = new Object();
     private EasyThread(String name) {
@@ -66,6 +66,7 @@ public class EasyThread {
                 }
             }
         }, name);
+        t.start();
     }
     
     /**
@@ -183,5 +184,14 @@ public class EasyThread {
             running = false;
             LOCK.notify();
         }
+    }
+    
+    /**
+     * Returns true if the current thread is the easy thread and false othewise similar 
+     * to the isEDT method
+     * @return true if we are currently within this easy thread
+     */
+    public boolean isThisIt() {
+        return t == Thread.currentThread();
     }
 }

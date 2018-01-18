@@ -367,7 +367,7 @@ public class CodenameOneView {
     }
 
     private boolean cn1GrabbedPointer = false;
-    private boolean nativePeerGrabbedPointer = false;
+    //private boolean nativePeerGrabbedPointer = false;
     
     public boolean onTouchEvent(MotionEvent event) {
 
@@ -393,15 +393,17 @@ public class CodenameOneView {
                 y[i] = (int) event.getY(i);
             }
         }
+       /*
         if (!cn1GrabbedPointer) {
+            
             if (x == null) {
                 Component componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
                 if (componentAt != null && (componentAt instanceof PeerComponent)) {
                     
                     if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                        nativePeerGrabbedPointer = true;
+                        //nativePeerGrabbedPointer = true;
                     } else if (event.getAction() == MotionEvent.ACTION_UP) {
-                        nativePeerGrabbedPointer = false;
+                        //nativePeerGrabbedPointer = false;
                     }
                     return false;
                 }
@@ -418,11 +420,20 @@ public class CodenameOneView {
                 }
             }
         }
+        */
         
-        if (nativePeerGrabbedPointer) {
-            return false;
+        //if (nativePeerGrabbedPointer) {
+        //    return false;
+        //}
+        Component componentAt;
+        if (x == null) {
+            componentAt = this.implementation.getCurrentForm().getComponentAt((int)event.getX(), (int)event.getY());
+        } else {
+            componentAt = this.implementation.getCurrentForm().getComponentAt((int)x[0], (int)y[0]);
         }
-        
+        boolean isPeer = (componentAt instanceof PeerComponent);
+        boolean consumeEvent = !isPeer || cn1GrabbedPointer;
+    
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (x == null) {
@@ -430,7 +441,7 @@ public class CodenameOneView {
                 } else {
                     this.implementation.pointerPressed(x, y);
                 }
-                cn1GrabbedPointer = true;
+                if (!isPeer) cn1GrabbedPointer = true;
                 break;
             case MotionEvent.ACTION_UP:
                 if (x == null) {
@@ -438,6 +449,9 @@ public class CodenameOneView {
                 } else {
                     this.implementation.pointerReleased(x, y);
                 }
+                cn1GrabbedPointer = false;
+                break;
+            case MotionEvent.ACTION_CANCEL:
                 cn1GrabbedPointer = false;
                 break;
             case MotionEvent.ACTION_MOVE:
@@ -449,7 +463,7 @@ public class CodenameOneView {
                 break;
         }
 
-        return true;
+        return consumeEvent;
     }
 
     public AndroidGraphics getGraphics() {

@@ -87,7 +87,7 @@ public class Capture {
     
     /**
      * Same as captureAudio only a blocking version that holds the EDT
-     * @return the photo file location or null if the user canceled
+     * @return the audio file location or null if the user canceled
      */
     public static String captureAudio() {
         CallBack c = new CallBack();
@@ -120,10 +120,32 @@ public class Capture {
      */
     public static String capturePhoto(int width, int height) {
         CallBack c = new CallBack();
-        c.targetWidth = width;
-        c.targetHeight = height;
-        capturePhoto(c);
-        Display.getInstance().invokeAndBlock(c);
+        if("ios".equals(Display.getInstance().getPlatformName()) && (width != -1 || height != -1)) {
+            // workaround for threading issues in iOS https://github.com/codenameone/CodenameOne/issues/2246
+            capturePhoto(c);
+            Display.getInstance().invokeAndBlock(c);
+            if(c.url == null) {
+                return null;
+            }
+            ImageIO scale = Display.getInstance().getImageIO();
+            if(scale != null) {
+                try {
+                    String path = c.url.substring(0, c.url.indexOf(".")) + "s" + c.url.substring(c.url.indexOf("."));
+                    OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
+                    scale.save(c.url, os, ImageIO.FORMAT_JPEG, width, height, 1);
+                    Util.cleanup(os);
+                    FileSystemStorage.getInstance().delete(c.url);
+                    return path;
+                } catch (IOException ex) {
+                    Log.e(ex);
+                }
+            }
+        } else {
+            c.targetWidth = width;
+            c.targetHeight = height;
+            capturePhoto(c);
+            Display.getInstance().invokeAndBlock(c);
+        }
         return c.url;
     }
         

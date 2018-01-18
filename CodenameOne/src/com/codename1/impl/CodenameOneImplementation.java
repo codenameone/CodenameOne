@@ -29,7 +29,6 @@ import com.codename1.components.FileTreeModel;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
-import com.codename1.db.Row;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Cookie;
 import com.codename1.io.FileSystemStorage;
@@ -74,12 +73,8 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.Vector;
 
 /**
@@ -232,9 +227,6 @@ public abstract class CodenameOneImplementation {
      * Some implementations might need to perform initializations of the EDT thread
      */
     public void initEDT() {
-        if(Preferences.get("PollingPush", false) && callback != null) {
-            registerPollingFallback();
-        }
     }
 
     /**
@@ -339,6 +331,17 @@ public abstract class CodenameOneImplementation {
      * Invoked for special cases to stop text editing and clear native editing state
      */
     public void stopTextEditing() {    
+    }
+    
+    /**
+     * Using invokeAndBlock inside EditString creates peculiar behaviour that needs
+     * to be worked around.  Ideally no port should use invokeAndBlock for this
+     * but currently JavaSE and UWP both do.  Need to be able to detect this
+     * for workarounds.
+     * @return 
+     */
+    public boolean usesInvokeAndBlockForEditString() {
+        return false;
     }
 
     /**
@@ -1060,6 +1063,7 @@ public abstract class CodenameOneImplementation {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
+        cr.setReadResponseForErrors(false);
         cr.setDuplicateSupported(true);
         cr.setUrl(url);
         cr.downloadImageToStorage(fileName, onSuccess, onFail);
@@ -1081,6 +1085,7 @@ public abstract class CodenameOneImplementation {
         ConnectionRequest cr = new ConnectionRequest();
         cr.setPost(false);
         cr.setFailSilently(true);
+        cr.setReadResponseForErrors(false);
         cr.setDuplicateSupported(true);
         cr.setUrl(url);
         cr.downloadImageToFileSystem(fileName, onSuccess, onFail);
@@ -1285,6 +1290,10 @@ public abstract class CodenameOneImplementation {
     public boolean isAntiAliasingSupported() {
         return false;
     }
+    
+    public boolean isAntiAliasingSupported(Object graphics) {
+        return isAntiAliasingSupported();
+    }
 
     /**
      * Indicates whether the underlying implementation allows for anti-aliased fonts
@@ -1293,6 +1302,10 @@ public abstract class CodenameOneImplementation {
      */
     public boolean isAntiAliasedTextSupported() {
         return false;
+    }
+    
+    public boolean isAntiAliasedTextSupported(Object graphics) {
+        return isAntiAliasedTextSupported();
     }
 
     /**
@@ -1470,7 +1483,13 @@ public abstract class CodenameOneImplementation {
         
     }
     
-    
+    /**
+     * Cleans up resources used by graphics object
+     * @param graphics 
+     */
+    public void disposeGraphics(Object graphics) {
+        
+    }
     
     
     /**
@@ -2052,6 +2071,50 @@ public abstract class CodenameOneImplementation {
     protected void keyReleased(final int keyCode) {
         Display.getInstance().keyReleased(keyCode);
     }
+    
+    /**
+     * Checks whether the alt key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the shift key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isShiftKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the altgraph key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isAltGraphKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the control key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isControlKeyDown() {
+        return false;
+    }
+    
+    /**
+     * Checks whether the meta key is currently down.  Only relevant on desktop ports.
+     * @return 
+     */
+    public boolean isMetaKeyDown() {
+        return false;
+    }
+    
+    
+    
+   
 
     /**
      * Subclasses should invoke this method, it delegates the event to the display and into
@@ -2243,6 +2306,20 @@ public abstract class CodenameOneImplementation {
             case Component.DRAG_REGION_LIKELY_DRAG_XY:
                 startX = 0.9f;
                 startY = 0.9f;
+                break;
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_X:
+                startX = 0f;
+                startY = Math.max(5, startY);
+                break;
+                
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_Y:
+                startY = 0f;
+                startX = Math.max(5, startX);
+                break;
+                
+            case Component.DRAG_REGION_IMMEDIATELY_DRAG_XY:
+                startX = 0f;
+                startY = 0f;
                 break;
             case Component.DRAG_REGION_POSSIBLE_DRAG_X:
                 startY = Math.max(5, startY);
@@ -3798,6 +3875,59 @@ public abstract class CodenameOneImplementation {
     public PeerComponent createBrowserComponent(Object browserComponent) {
         return null;
     }
+    
+    /**
+     * <p>Creates a native overlay for the given component. A native overlay is a native component
+     * that is always present over the given component.  It can be used to help processing user 
+     * events in a more native way.  In the Javascript port, native overlays are used on TextFields, for example,
+     * so that users can tap on the text field and activate the keyboard.  This was necessary because
+     * iOS doesn't allow us to programmatically activate the keyboard.  Without a native overlay, 
+     * the user would first have to tap the lightweight keyboard - upon which we create a native text
+     * field, and then the user would have to tap again to activate the keyboard.  Using native
+     * overlays in that case yields better UX.</p>
+     * 
+     * <p>When using native overlays, you will need to implement {@link #createNativeOverlay(com.codename1.ui.Component) },
+     * {@link #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) }, and {@link #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) }.
+     * {@link #createNativeOverlay(com.codename1.ui.Component) } is called in {@link Component#initComponent() } (i.e. when the component is added to the form). 
+     * This is where you would create the native view and add it to the native view hierarchy above the CN1 canvas.
+     * {@link #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) } is called in {@link Component#laidOut() } (i.e. when the component is resized/positioned).   
+     * This is where you can reposition the native view or change its properties to be appropriate for the "occasion". {@link #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) }
+     * is called in {@link Component#deinitialize() } (i.e. when the component is removed from the form).  You should destroy the native view and remove it from the native view hierarchy here.
+     * 
+     * 
+     * @param cmp The component to create the overlay for.
+     * @return A native object.  The object type/format is decided by the implementation.
+     * @see #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see Component#showNativeOverlay() 
+     */
+    public Object createNativeOverlay(Component cmp) {
+        return null;
+    }
+    
+    /**
+     * Hides the native overlay for a component.
+     * @param cmp The component
+     * @param nativeOverlay The native overlay.
+     * @see #createNativeOverlay(com.codename1.ui.Component) 
+     * @see #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see Component#hideNativeOverlay() 
+     */
+    public void hideNativeOverlay(Component cmp, Object nativeOverlay) {
+        
+    }
+    
+    /**
+     * Updates the native overlay after the component has been repositioned.
+     * @param cmp The component
+     * @param nativeOverlay The native overlay
+     * @see #createNativeOverlay(com.codename1.ui.Component) 
+     * @see #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see Component#updateNativeOverlay()
+     */
+    public void updateNativeOverlay(Component cmp, Object nativeOverlay) {
+        
+    }
 
     /**
      * This method allows customizing the properties of a web view in various ways including platform specific settings.
@@ -4089,6 +4219,33 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
+    private void purgeOldCookies(Map<String,Cookie> cookies) {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<String,Cookie> e : cookies.entrySet()) {
+            if (e.getValue().getExpires() != 0 && e.getValue().getExpires() < now) {
+                cookies.remove(e.getKey());
+            }
+        }
+    }
+    
+    protected final void removeCookiesForDomain(String domain) {
+	if(cookies == null || domain==null){
+            return;
+        }
+        Hashtable h = (Hashtable)cookies.get(domain);
+        if (h == null) {
+            return;
+        }
+        h.clear();
+        if(Cookie.isAutoStored()){
+            if(Storage.getInstance().exists(Cookie.STORAGE_NAME)){
+                Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);
+            }
+            Storage.getInstance().writeObject(Cookie.STORAGE_NAME, cookies);
+        }
+        
+    }
+    
     public void addCookie(Cookie [] cookiesArray) {
         if(cookies == null){
             cookies = new Hashtable();
@@ -4101,7 +4258,12 @@ public abstract class CodenameOneImplementation {
                 h = new Hashtable();
                 cookies.put(cookie.getDomain(), h);
             }
-            h.put(cookie.getName(), cookie);
+            purgeOldCookies(h);
+            if (cookie.getExpires() != 0 && cookie.getExpires() < System.currentTimeMillis()) {
+                h.remove(cookie.getName());
+            } else {
+                h.put(cookie.getName(), cookie);
+            }
         }
         
         if(Cookie.isAutoStored()){
@@ -4338,6 +4500,17 @@ public abstract class CodenameOneImplementation {
         }
     }
 
+    /**
+     * Checks if this platform supports custom cursors.  
+     * @return True if the platform supports custom cursors.
+     * @see Form#setEnableCursors(boolean) 
+     * @see Component#setCursor(int) 
+     * @see ComponentSelector#setCursor(int) 
+     */
+    public boolean isSetCursorSupported() {
+        return false;
+    }
+    
     /**
      * Returns the content length for this connection
      * 
@@ -4904,6 +5077,8 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    
+    
     /**
      * Allows buggy implementations (Android) to release image objects  
      * @param image native image object
@@ -5406,9 +5581,21 @@ public abstract class CodenameOneImplementation {
     }
     
     public boolean transformEqualsImpl(Transform t1, Transform t2){
-        throw new RuntimeException("Transforms not supported");
+        Object o1 = null;
+        if(t1 != null) {
+            o1 = t1.getNativeTransform();
+        }
+        Object o2 = null;
+        if(t2 != null) {
+            o2 = t2.getNativeTransform();
+        }
+        return transformNativeEqualsImpl(o1, o2);
     }
     
+    public boolean transformNativeEqualsImpl(Object t1, Object t2){
+        throw new RuntimeException("Transforms not supported");
+    }
+
     /**
      * Makes a new native translation transform.  Each implementation can decide the format
      * to use internally for transforms.  This should return a transform in that internal format.
@@ -5851,7 +6038,7 @@ public abstract class CodenameOneImplementation {
      */
     public static boolean registerServerPush(String id, String applicationKey, byte pushType, String udid,
             String packageName) {
-        Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
+        //Log.p("registerPushOnServer invoked for id: " + id + " app key: " + applicationKey + " push type: " + pushType);
         Preferences.set("push_key", id);
         /*if(Preferences.get("push_id", (long)-1) == -1) {
             Preferences.set("push_key", id);
@@ -5865,6 +6052,7 @@ public abstract class CodenameOneImplementation {
             };
             r.setPost(false);
             r.setFailSilently(true);
+            r.setReadResponseForErrors(false);
             r.setUrl(Display.getInstance().getProperty("cloudServerURL", "https://codename-one.appspot.com/") + "registerPush");
             long val = Preferences.get("push_id", (long)-1);
             if(val > -1) {
