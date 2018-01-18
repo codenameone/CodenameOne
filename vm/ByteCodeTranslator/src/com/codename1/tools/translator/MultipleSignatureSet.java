@@ -38,4 +38,9 @@ class MultipleSignatureSet implements SignatureSet
 	public String getMethodName() {
 		return(contents.getMethodName());
 	}
+
+    @Override
+    public SignatureSet nextSignature() {
+        return null;
+    }
 }

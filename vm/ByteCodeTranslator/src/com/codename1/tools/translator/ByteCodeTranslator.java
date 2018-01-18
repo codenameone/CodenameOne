@@ -562,7 +562,6 @@ public class ByteCodeTranslator {
                 int targetSize = target.length();
                 str.replace(index, index + targetSize, replacement);
                 index += replacement.length();
-                found++;
                 totchanges++;
             }
         }

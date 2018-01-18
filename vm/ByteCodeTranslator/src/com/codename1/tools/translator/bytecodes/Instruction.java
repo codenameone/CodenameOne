@@ -41,6 +41,13 @@ public abstract class Instruction implements SignatureSet
     public static void setHasInstructions(boolean h) {
         hasInstructions = h;
     }   
+
+    @Override
+    public SignatureSet nextSignature() {
+        return null;
+    }
+    
+    
     
     protected final int opcode;
     protected Instruction(int opcode) {

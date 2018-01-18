@@ -1973,5 +1973,10 @@ public class BytecodeMethod implements SignatureSet {
 		return desc;
 	}
 
+    @Override
+    public SignatureSet nextSignature() {
+        return null;
+    }
+
 
 }

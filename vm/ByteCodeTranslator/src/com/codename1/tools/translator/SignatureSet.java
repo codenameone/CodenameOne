@@ -6,7 +6,5 @@ public interface SignatureSet
 	public String getSignature();
 	public String getMethodName();
 	// next signature in the set is null by default.
-	default public SignatureSet nextSignature() { 
-		return null;
-	}
+	public SignatureSet nextSignature();
 }
