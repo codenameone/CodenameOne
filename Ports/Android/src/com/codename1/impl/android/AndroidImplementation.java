@@ -902,7 +902,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 root.addView(viewBelow, lp);
             }
             getActivity().setContentView(root);
-            myView.getAndroidView().requestFocus();
+            if (!myView.getAndroidView().hasFocus()) {
+                myView.getAndroidView().requestFocus();
+            }
         }
     }
 
@@ -3219,7 +3221,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (AndroidImplementation.AndroidPeer.super.hasFocus()) {
                                 AndroidImplementation.this.blockNativeFocusAll(true);
                                 blockNativeFocus(false);
-                                v.requestFocus();
+                                if (!v.hasFocus()) {
+                                    v.requestFocus();
+                                }
 
                             } else {
                                 blockNativeFocus(true);
@@ -3430,10 +3434,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     // allow this one to gain focus
                     blockNativeFocus(false);
-                    if (v.isInTouchMode()) {
-                        v.requestFocusFromTouch();
-                    } else {
-                        v.requestFocus();
+                    if (!v.hasFocus()) {
+                        if (v.isInTouchMode()) {
+                            v.requestFocusFromTouch();
+                        } else {
+                            v.requestFocus();
+                        }
                     }
                 }
             });
