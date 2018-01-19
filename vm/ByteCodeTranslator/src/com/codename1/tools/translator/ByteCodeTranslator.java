@@ -130,7 +130,7 @@ public class ByteCodeTranslator {
     // re-run of a failed build.
     // the underlying purpose is to make repeated builds produce the same result.
     //
-    private static void cleanDir(File dir)
+    /*private static void cleanDir(File dir)
     {	//
     	// this recursively deletes everything, so be cautious about this!
     	// this is called only on directories we supposedly have just created.
@@ -143,7 +143,8 @@ public class ByteCodeTranslator {
     			  cf.delete(); 
     			}
     	}
-    }
+    }*/
+    
     /**
      * @param args the command line arguments
      */
@@ -197,34 +198,34 @@ public class ByteCodeTranslator {
              System.out.println("Root is: " + root.getAbsolutePath());
             File srcRoot = new File(root, appName + "-src");
             srcRoot.mkdirs();
-            cleanDir(srcRoot);
+            //cleanDir(srcRoot);
   
             System.out.println("srcRoot is: " + srcRoot.getAbsolutePath() );
             
             File imagesXcassets = new File(srcRoot, "Images.xcassets");
             imagesXcassets.mkdirs();
-            cleanDir(imagesXcassets);
+            //cleanDir(imagesXcassets);
 
             File  launchImageLaunchimage = new File(imagesXcassets, "LaunchImage.launchimage");
             launchImageLaunchimage.mkdirs();
-            cleanDir(launchImageLaunchimage);
+            //cleanDir(launchImageLaunchimage);
             
             copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new FileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
 
             File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
             appIconAppiconset.mkdirs();
-            cleanDir(appIconAppiconset);
+            //cleanDir(appIconAppiconset);
 
             copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new FileOutputStream(new File(appIconAppiconset, "Contents.json")));
             
             
             File xcproj = new File(root, appName + ".xcodeproj");
             xcproj.mkdirs();
-            cleanDir(xcproj);
+            //cleanDir(xcproj);
            
             File projectXCworkspace = new File(xcproj, "project.xcworkspace");
             projectXCworkspace.mkdirs();
-            cleanDir(projectXCworkspace);
+            //cleanDir(projectXCworkspace);
             
             /*File xcsharedData = new File(projectXCworkspace, "xcshareddata");
             xcsharedData.mkdirs();*/
