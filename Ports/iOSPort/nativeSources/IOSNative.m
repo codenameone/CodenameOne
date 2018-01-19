@@ -2225,8 +2225,8 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
         
-        w.scrollView.scrollEnabled = NO;
-        w.scrollView.bounces = NO;
+        w.scrollView.scrollEnabled = enabled;
+        w.scrollView.bounces = enabled;
         
         POOL_END();
     });
