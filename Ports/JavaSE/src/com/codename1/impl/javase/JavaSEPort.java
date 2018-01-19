@@ -6503,24 +6503,80 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         private int getCN1X(MouseEvent e) {
             if (canvas == null) {
-                return e.getXOnScreen();
+                int out = e.getXOnScreen();
+                if (out == 0) {
+                    // For some reason the web browser would return 0 for screen coordinates
+                    // but would still have correct values for getX() and getY() when 
+                    // dealing with mouse wheel events.  In these cases we need to 
+                    // get the screen coordinate from the component
+                    // and add it to the relative coordinate.
+                    out = e.getX(); // In some cases absX is set to zero for mouse wheel events
+                    Object source = e.getSource();
+                    if (source instanceof java.awt.Component) {
+                        Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                        out  += pt.x;
+                    }
+                }
+                return out;
             }
             java.awt.Rectangle screenCoords = getScreenCoordinates();
             if (screenCoords == null) {
                 screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
             }
-            return (int)((e.getXOnScreen() - canvas.getLocationOnScreen().x - (canvas.x + screenCoords.x) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
+            int x = e.getXOnScreen();
+            if (x == 0) {
+                // For some reason the web browser would return 0 for screen coordinates
+                // but would still have correct values for getX() and getY() when 
+                // dealing with mouse wheel events.  In these cases we need to 
+                // get the screen coordinate from the component
+                // and add it to the relative coordinate.
+                x = e.getX();
+                Object source = e.getSource();
+                if (source instanceof java.awt.Component) {
+                    Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                    x += pt.x;
+                }
+            }
+            return (int)((x - canvas.getLocationOnScreen().x - (canvas.x + screenCoords.x) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
         }
 
         private int getCN1Y(MouseEvent e) {
             if (canvas == null) {
-                return e.getYOnScreen();
+                int out = e.getYOnScreen();
+                if (out == 0) {
+                    // For some reason the web browser would return 0 for screen coordinates
+                    // but would still have correct values for getX() and getY() when 
+                    // dealing with mouse wheel events.  In these cases we need to 
+                    // get the screen coordinate from the component
+                    // and add it to the relative coordinate.
+                    out = e.getY();
+                    Object source = e.getSource();
+                    if (source instanceof java.awt.Component) {
+                        Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                        out  += pt.y;
+                    }
+                }
+                return out;
             }
             java.awt.Rectangle screenCoords = getScreenCoordinates();
             if (screenCoords == null) {
                 screenCoords = new java.awt.Rectangle(0, 0, 0, 0);
             }
-            return (int)((e.getYOnScreen() - canvas.getLocationOnScreen().y - (canvas.y + screenCoords.y) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
+            int y = e.getYOnScreen();
+            if (y == 0) {
+                // For some reason the web browser would return 0 for screen coordinates
+                // but would still have correct values for getX() and getY() when 
+                // dealing with mouse wheel events.  In these cases we need to 
+                // get the screen coordinate from the component
+                // and add it to the relative coordinate.
+                y = e.getY();
+                Object source = e.getSource();
+                if (source instanceof java.awt.Component) {
+                    Point pt = ((java.awt.Component)source).getLocationOnScreen();
+                    y += pt.y;
+                }
+            }
+            return (int)((y - canvas.getLocationOnScreen().y - (canvas.y + screenCoords.y) * zoomLevel / retinaScale) / zoomLevel * retinaScale);
         }
         
         public CN1JFXPanel() {
