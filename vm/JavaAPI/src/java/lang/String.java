@@ -85,6 +85,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     public String(byte[] bytes, int off, int len, java.lang.String enc) throws java.io.UnsupportedEncodingException{
         this(bytesToChars(bytes, off, len, enc));
     }
+    
+    public String(byte[] bytes, java.nio.charset.Charset charset) throws java.io.UnsupportedEncodingException {
+        this(bytes, 0, bytes.length, charset.displayName());
+    }
 
     /**
      * Construct a new String by converting the specified array of bytes using the specified character encoding. The length of the new String is a function of the encoding, and hence may not be equal to the length of the byte array.
@@ -843,4 +847,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
     
     private native static void releaseNSString(long ns);
+    
+    
+    public native static String format(String format, Object... args);
 }

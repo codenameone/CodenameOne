@@ -424,11 +424,13 @@ public class Parser extends ClassVisitor {
             readNativeFiles(outputDirectory);
 
             // loop over methods and start eliminating the body of unused methods
-            Date now = new Date();
-            int neliminated = eliminateUnusedMethods();
-            Date later = new Date();
-            long dif = later.getTime()-now.getTime();
-            System.out.println("unusued Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
+            if (BytecodeMethod.optimizerOn) {
+                Date now = new Date();
+                int neliminated = eliminateUnusedMethods();
+                Date later = new Date();
+                long dif = later.getTime()-now.getTime();
+                System.out.println("unusued Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
+            }
 
             generateClassAndMethodIndexHeader(outputDirectory);
 

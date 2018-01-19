@@ -270,5 +270,7 @@ public final class Class<T> {
 
     public boolean desiredAssertionStatus() {
         return false;
-    }        
+    }
+    
+    public native Class getComponentType();
 }

@@ -20,26 +20,26 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package java.lang;
+package java.lang.reflect;
 
 /**
- *
+ * Added this for Kotlin
  * @author shannah
  */
-public abstract class Number {
-    public abstract int intValue();
-    
-    public byte byteValue() {
-        return (byte)intValue();
+public class Array {
+    public static Object newInstance(Class<?> componentType,
+                 int[] dimensions) {
+        if (dimensions.length != 1) {
+            throw new IllegalArgumentException("Only 1-dimensional arrays currently supported by Array.newInstance()");
+        }
+        return newInstanceImpl(componentType, dimensions[0]);
+        
     }
-
-    public abstract long longValue();
-
-    public abstract float floatValue();
-
-    public abstract double doubleValue();
-
-    public short shortValue() {
-        return (short) intValue();
+          
+    public static Object newInstance(Class<?> componentType,
+                 int length) {
+        return newInstanceImpl(componentType, length);
+        
     }
+    native static Object newInstanceImpl(Class<?> componentType, int length);
 }

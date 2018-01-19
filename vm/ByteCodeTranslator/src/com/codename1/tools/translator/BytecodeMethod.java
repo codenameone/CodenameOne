@@ -108,6 +108,7 @@ public class BytecodeMethod implements SignatureSet {
     static {
         String op = System.getProperty("optimizer");
         optimizerOn = op == null || op.equalsIgnoreCase("on");
+        //optimizerOn = false;
     }
     
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {

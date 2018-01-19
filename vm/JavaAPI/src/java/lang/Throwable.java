@@ -35,6 +35,7 @@ public class Throwable{
     private Throwable cause;
     private String stack;
     
+    
     /**
      * Constructs a new Throwable with null as its error message string.
      */
@@ -97,6 +98,15 @@ public class Throwable{
             System.out.println("Caused by ");
             cause.printStackTrace();
         }
+    }
+    
+    
+    public StackTraceElement[] getStackTrace() {
+        return new StackTraceElement[0];
+    }
+    
+    public void setStackTrace(StackTraceElement[] el) {
+        
     }
 
     /**

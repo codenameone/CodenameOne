@@ -23,23 +23,15 @@
 package java.lang;
 
 /**
- *
+ * Added this for Kotlin to compile.
  * @author shannah
  */
-public abstract class Number {
-    public abstract int intValue();
-    
-    public byte byteValue() {
-        return (byte)intValue();
+public class AbstractMethodError extends Error {
+    AbstractMethodError() {
+        
     }
-
-    public abstract long longValue();
-
-    public abstract float floatValue();
-
-    public abstract double doubleValue();
-
-    public short shortValue() {
-        return (short) intValue();
+    
+    AbstractMethodError(String msg) {
+        super(msg);
     }
 }

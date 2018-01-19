@@ -20,26 +20,25 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package java.lang;
+package java.nio.charset;
 
 /**
- *
+ * Added this for Kotlin
  * @author shannah
  */
-public abstract class Number {
-    public abstract int intValue();
+public class Charset implements Comparable<Charset> {
+
+    private String name;
+    protected Charset(String canonicalName, String[] aliases) {
+        
+    }
     
-    public byte byteValue() {
-        return (byte)intValue();
+    public int compareTo(Charset another) {
+        return name.compareTo(another.name);
     }
-
-    public abstract long longValue();
-
-    public abstract float floatValue();
-
-    public abstract double doubleValue();
-
-    public short shortValue() {
-        return (short) intValue();
+    
+    public String displayName() {
+        return name;
     }
+    
 }

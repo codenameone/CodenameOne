@@ -20,26 +20,17 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package java.lang;
+package java.util.concurrent;
+
+import java.util.Map;
 
 /**
- *
+ * Added this for Kotlin
  * @author shannah
  */
-public abstract class Number {
-    public abstract int intValue();
-    
-    public byte byteValue() {
-        return (byte)intValue();
-    }
-
-    public abstract long longValue();
-
-    public abstract float floatValue();
-
-    public abstract double doubleValue();
-
-    public short shortValue() {
-        return (short) intValue();
-    }
+public interface ConcurrentMap<K,V> extends Map<K,V> {
+    public V putIfAbsent(K key, V value);
+    public boolean remove(Object key, Object value);
+    public V replace(K key, V value);
+    public boolean replace(K key, V oldValue, V newValue);
 }

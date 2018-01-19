@@ -18,6 +18,7 @@
 package java.util;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 
 /**
  * {@code Arrays} contains static methods which operate on arrays.
@@ -3663,6 +3664,17 @@ public class Arrays {
             throw new ArrayIndexOutOfBoundsException();
         }
         throw new IllegalArgumentException();
+    }
+    
+    public static <T> T[] copyOf(T[] original, int newLength,  Class<? extends T[]> newType) {
+        T[] arr = (T[])Array.newInstance(newType, newLength);
+        int len = Math.min(original.length, newLength);
+        System.arraycopy(original, 0, arr, 0, len);
+        return arr;
+    }
+    
+    public static <T> T[] copyOf(T[] original, int newLength) {
+        return copyOf(original, newLength, (Class<T[]>)original.getClass());
     }
 
     /**

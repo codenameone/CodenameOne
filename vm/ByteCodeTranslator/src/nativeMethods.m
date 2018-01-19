@@ -197,6 +197,14 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     return hash;
 }
 
+JAVA_OBJECT java_lang_reflect_Array_newInstanceImpl___java_lang_Class_int_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_INT len) {
+    enteringNativeAllocations();
+    struct clazz* clz = (struct clazz*)cls;
+    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz->arrayType, sizeof(JAVA_OBJECT), 1);
+    finishedNativeAllocations();
+    return out;
+}
+
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
     enteringNativeAllocations();
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
@@ -802,6 +810,13 @@ JAVA_OBJECT java_lang_Class_forNameImpl___java_lang_String_R_java_lang_Class(COD
             }
             return (JAVA_OBJECT)classesList[iter];
         }
+    }
+    return JAVA_NULL;
+}
+
+JAVA_OBJECT java_lang_Class_getComponentType___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
+    if (((struct clazz*)cls)->isArray) {
+        return (JAVA_OBJECT)((struct clazz*)cls)->arrayType;
     }
     return JAVA_NULL;
 }
@@ -1527,4 +1542,23 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     [pool release];
     finishedNativeAllocations();
     return jString;
+}
+
+JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String(CODENAME_ONE_THREAD_STATE,  JAVA_OBJECT format, JAVA_OBJECT args) {
+    enteringNativeAllocations();
+    JAVA_ARRAY argsArray = (JAVA_ARRAY)args;
+    JAVA_ARRAY_OBJECT* objs = (JAVA_ARRAY_OBJECT*)argsArray->data;
+    int len = argsArray->length;
+    NSMutableArray* argsList1 = [NSMutableArray arrayWithCapacity:len];
+    for (int i=0; i<len; i++) {
+        [argsList1 insertObject: toNSString(CN1_THREAD_STATE_PASS_ARG java_lang_String_valueOf___java_lang_Object_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG objs[i])) atIndex:i];
+    }
+    char *argList = (char *)malloc(sizeof(NSString *) * len);
+    [argsList1 getObjects:(id *)argList];
+    NSString* result = [[[NSString alloc] initWithFormat:toNSString(CN1_THREAD_STATE_PASS_ARG format) arguments:argList] autorelease];
+    free(argList);
+    JAVA_OBJECT out = fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString init]);
+    finishedNativeAllocations();
+    return out;
+    
 }

@@ -20,26 +20,35 @@
  * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-package java.lang;
+
+package java.util;
+
+import java.util.Comparator;
 
 /**
+ * A string comparator equivalent to String.CASE_INSENSITIVE_ORDER which isn't available in Codename One
  *
- * @author shannah
+ * @author Shai Almog
  */
-public abstract class Number {
-    public abstract int intValue();
+public class CaseInsensitiveOrder implements Comparator<String> {
+
+    /**
+     * {@inheritDoc}
+     */
+    public int compare(String s1, String s2) {
+        int n1 = s1.length();
+        int n2 = s2.length();
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+        int min = Math.min(n1, n2);
+        for (int i = 0; i < min; i++) {
+            char c1 = s1.charAt(i);
+            char c2 = s2.charAt(i);
+            if (c1 != c2) {
+                return c1 - c2;
+            }
+        }
+        return n1 - n2;
+    }
     
-    public byte byteValue() {
-        return (byte)intValue();
-    }
-
-    public abstract long longValue();
-
-    public abstract float floatValue();
-
-    public abstract double doubleValue();
-
-    public short shortValue() {
-        return (short) intValue();
-    }
 }
