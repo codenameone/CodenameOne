@@ -203,4 +203,8 @@ public final class Long extends Number {
     public static Long valueOf(long i) {
         return new Long(i);
     }
+
+    public static int compare(long f1, long f2) {
+        return (int)(f1 - f2);
+    }
 }

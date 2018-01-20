@@ -791,6 +791,10 @@ JAVA_DOUBLE java_lang_Math_tan___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA
     return tan(a);
 }
 
+JAVA_DOUBLE java_lang_Math_atan___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
+    return atan(a);
+}
+
 JAVA_BOOLEAN isClassNameEqual(const char * clsName, JAVA_ARRAY_CHAR* chrs, int length) {
     for(int i = 0 ; i < length ; i++) {
         if(clsName[i] != chrs[i]) return JAVA_FALSE;

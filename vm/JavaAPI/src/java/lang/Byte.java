@@ -124,4 +124,8 @@ public final class Byte extends Number {
     public double doubleValue() {
         return value;
     }
+
+    public static int compare(byte f1, byte f2) {
+        return f1 - f2;
+    }
 }

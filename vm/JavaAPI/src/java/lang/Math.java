@@ -134,6 +134,8 @@ public final class Math{
      */
     public native static double tan(double a);
 
+    public native static double atan(double d);
+    
     /**
      * Converts an angle measured in radians to the equivalent angle measured in degrees.
      */
@@ -201,5 +203,4 @@ public final class Math{
         }
         return (int) floor(f + 0.5f);
     }
-    
 }

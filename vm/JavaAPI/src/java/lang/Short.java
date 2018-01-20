@@ -119,4 +119,8 @@ public final class Short extends Number {
     public double doubleValue() {
         return value;
     }
+
+    public static int compare(short f1, short f2) {
+        return f1 - f2;
+    }
 }
