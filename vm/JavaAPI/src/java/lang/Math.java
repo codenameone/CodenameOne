@@ -79,6 +79,8 @@ public final class Math{
      */
     public static native double max(double a, double b);
 
+    public static native double pow(double a, double b);
+
     /**
      * Returns the greater of two float values. That is, the result is the argument closer to positive infinity. If the arguments have the same value, the result is that same value. If either value is NaN, then the result is NaN. Unlike the the numerical comparison operators, this method considers negative zero to be strictly smaller than positive zero. If one argument is positive zero and the other negative zero, the result is positive zero.
      */
