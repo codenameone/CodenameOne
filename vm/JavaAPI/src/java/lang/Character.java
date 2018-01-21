@@ -1074,6 +1074,10 @@ public final class Character{
         return isWhitespace((int) c);
     }
 
+    public static boolean isSpaceChar(char c) {
+        return c == ' ';
+    }
+
     /**
      * Returns true if the given code point is a Unicode whitespace character.
      * The exact set of characters considered as whitespace varies with Unicode version.

@@ -75,6 +75,10 @@ public final class StringBuilder implements CharSequence {
         str.getChars(0, count, value, 0);
     }
 
+    public StringBuilder(CharSequence str){
+        this(str.toString());
+    }    
+    
     private void enlargeBuffer(int min) {
         int newCount = ((value.length >> 1) + value.length) + 2;
         char[] newData = new char[min > newCount ? min : newCount];
