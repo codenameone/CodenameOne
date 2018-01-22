@@ -322,4 +322,8 @@ public final class Integer extends Number {
     public static int signum(int i) {
         return (i >> 31) | (-i >>> 31); // Hacker's delight 2-7
     }
+
+    public static int compare(int f1, int f2) {
+        return f1 - f2;
+    }
 }

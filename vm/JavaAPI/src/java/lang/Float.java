@@ -262,4 +262,14 @@ public final class Float extends Number {
     public static Float valueOf(float i) {
         return new Float(i);
     }
+    
+    public static int compare(float f1, float f2) {
+        if(f1 == f2) {
+            return 0;
+        }
+        if(f1 > f2) {
+            return -1;
+        }
+        return 1;
+    }
 }

@@ -282,4 +282,14 @@ public final class Double extends Number {
     public static Double valueOf(double i) {
         return new Double(i);
     }
+
+    public static int compare(double f1, double f2) {
+        if(f1 == f2) {
+            return 0;
+        }
+        if(f1 > f2) {
+            return -1;
+        }
+        return 1;
+    }
 }
