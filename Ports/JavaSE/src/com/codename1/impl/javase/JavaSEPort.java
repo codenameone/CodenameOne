@@ -1709,10 +1709,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
                 Form f = getCurrentForm();
                 if(f != null){
-                    // NOTE:  This is off edt... I've noticed an NPE
-                    // inset getComponentAt() because of this
-                    // we should move to EDT
-                    Component cmp = f.getResponderAt(x, y);
+                    Component cmp;
+                    try {
+                        cmp = f.getResponderAt(x, y);
+                    } catch (Throwable t) {
+                        // Since this is called off the edt, we sometimes hit 
+                        // NPEs and Array Index out of bounds errors here
+                        cmp = null;
+                    }
                     if(cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                         if (!ignoreWheelMovements) {
                             ignoreWheelMovements = true;
