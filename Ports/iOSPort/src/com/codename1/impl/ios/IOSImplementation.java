@@ -331,9 +331,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         repaintTextEditor(false);
     }
 
+    private boolean pendingEditingText;
     @Override
     public boolean isEditingText(Component c) {
         if(textEditorHidden) {
+            return false;
+        }
+        if (pendingEditingText) {
             return false;
         }
         //return c == currentEditing;
@@ -346,6 +350,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             return false;
         }*/
         //return currentEditing != null;
+        
         return super.isEditingText();
     }
 
@@ -570,6 +575,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         //  We do this because the nativeInstance.isAsyncEditMode() value changes
         // to reflect the currently edited field so it isn't a good way to keep a
         // system default.
+        pendingEditingText = false;
         String defaultAsyncEditingSetting = Display.getInstance().getProperty("ios.VKBAlwaysOpen", null);
         if (defaultAsyncEditingSetting == null) {
             defaultAsyncEditingSetting = nativeInstance.isAsyncEditMode() ? "true" : "false";
@@ -592,13 +598,14 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        editString(cmp, maxSize, constraint, text, i);
+                        pendingEditingText = true;
+                        Display.getInstance().editString(cmp, maxSize, constraint, text, i);
                     }
                 });
                 return;
             }
             
-           if(!cmp.hasFocus()) {
+           if(cmp.isFocusable() && !cmp.hasFocus()) {
                 doNotHideTextEditorSemaphore++;
                 try {
                     cmp.requestFocus();
@@ -614,7 +621,8 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
-                            editString(cmp, maxSize, constraint, text, i);
+                            pendingEditingText = true;
+                            Display.getInstance().editString(cmp, maxSize, constraint, text, i);
                         }
                     });
                     return;
