@@ -30,7 +30,7 @@ public class Charset implements Comparable<Charset> {
 
     private String name;
     protected Charset(String canonicalName, String[] aliases) {
-        
+        name = canonicalName;
     }
     
     public int compareTo(Charset another) {
@@ -39,6 +39,10 @@ public class Charset implements Comparable<Charset> {
     
     public String displayName() {
         return name;
+    }
+    
+    public Charset forName(String name) {
+        throw new UnsupportedOperationException("Charset.forName not implemented on this platform");
     }
     
 }

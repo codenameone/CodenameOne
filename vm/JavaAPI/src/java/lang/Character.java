@@ -1078,6 +1078,14 @@ public final class Character{
         return c == ' ';
     }
 
+    public static byte getDirectionality(char ch) {
+        throw new UnsupportedOperationException("Character.getDirectionality() not supported on this platform");
+    }
+    
+    public static int getType(char ch) {
+        throw new UnsupportedOperationException("Character.getType() not supported on this platform");
+    }
+    
     /**
      * Returns true if the given code point is a Unicode whitespace character.
      * The exact set of characters considered as whitespace varies with Unicode version.
@@ -1113,4 +1121,5 @@ public final class Character{
         // Let icu4c worry about non-BMP code points.
         return false;
     }
+    
 }

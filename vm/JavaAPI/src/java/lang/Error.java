@@ -41,5 +41,13 @@ public class Error extends java.lang.Throwable{
     public Error(java.lang.String s){
          super(s);
     }
+    
+    public Error(java.lang.Throwable t) {
+        super(t);
+    }
+    
+    public Error(java.lang.String msg, java.lang.Throwable t) {
+        super(msg, t);
+    }
 
 }

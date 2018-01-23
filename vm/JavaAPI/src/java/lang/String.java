@@ -23,6 +23,7 @@
 
 package java.lang;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 
 /**
@@ -189,6 +190,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
         return length() - anotherString.length(); 
     }
+    
+    public int compareToIgnoreCase(java.lang.String anotherString) {
+        if (anotherString == this) {
+            return 0;
+        }
+        return toLowerCase().compareTo(anotherString.toLowerCase());
+    }
+    
 
     /**
      * Concatenates the specified string to the end of this string.
@@ -277,6 +286,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return charsToBytes(toCharArray(), null); 
         }
         return charsToBytes(toCharArray(), enc.toCharNoCopy()); 
+    }
+    
+    public byte[] getBytes(Charset charset) throws java.io.UnsupportedEncodingException {
+        return getBytes(charset.displayName());
     }
 
     /**

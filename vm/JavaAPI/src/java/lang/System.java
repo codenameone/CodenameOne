@@ -166,5 +166,9 @@ public final class System {
         }
         return x.hashCode(); 
     }
+    
+    public static long nanoTime() {
+        throw new UnsupportedOperationException("System.nanoTime() not supported on this platform");
+    }
 
 }
