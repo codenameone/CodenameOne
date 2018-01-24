@@ -831,6 +831,19 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /**
+     * Returns true if the system is currently in the process of transitioning between
+     * forms
+     * 
+     * @return true if in the middle of form transition
+     */
+    public boolean isInTransition() {
+        if (animationQueue != null && animationQueue.size() > 0) {
+            Animation ani = (Animation) animationQueue.get(0);
+            return ani instanceof Transition;
+        }
+        return false;
+    }
 
     private void paintTransitionAnimation() {
         Animation ani = (Animation) animationQueue.get(0);
