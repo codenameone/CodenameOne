@@ -213,7 +213,7 @@ public class InteractionDialog extends Container {
     
     private void cleanupLayer(Form f) {
         if(formMode) {
-            Container c = (Container)f.getFormLayeredPane(InteractionDialog.class, false);
+            Container c = (Container)f.getFormLayeredPane(InteractionDialog.class, true);
             c.removeAll();
             c.remove();
         }        
@@ -223,7 +223,7 @@ public class InteractionDialog extends Container {
         //return f.getLayeredPane();
         Container c;
         if(formMode) {
-            c = (Container)f.getFormLayeredPane(InteractionDialog.class, false);
+            c = (Container)f.getFormLayeredPane(InteractionDialog.class, true);
         } else {
             c = (Container)f.getLayeredPane(InteractionDialog.class, false);
         }
