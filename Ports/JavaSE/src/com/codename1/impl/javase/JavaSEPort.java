@@ -7925,15 +7925,22 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to browse the photos")){
             return;
         }
+        
         if(type == Display.GALLERY_VIDEO){
+            checkAppleMusicUsageDescription();
             capture(response, videoExtensions, getGlobsForExtensions(videoExtensions, ";"));
         }else if(type == Display.GALLERY_IMAGE){
+            checkPhotoLibraryUsageDescription();
             capture(response, imageExtensions, getGlobsForExtensions(imageExtensions, ";"));
         } else if (type==-9999) {
+            checkPhotoLibraryUsageDescription();
+            checkAppleMusicUsageDescription();
             String[] exts = Display.getInstance().getProperty("javase.openGallery.accept", "").split(",");
             
             capture(response, exts, getGlobsForExtensions(exts, ";"));
         }else{
+            checkPhotoLibraryUsageDescription();
+            checkAppleMusicUsageDescription();
             String[] exts = new String[videoExtensions.length+imageExtensions.length];
             System.arraycopy(videoExtensions, 0, exts,0, videoExtensions.length);
             System.arraycopy(imageExtensions, 0, exts, videoExtensions.length, imageExtensions.length);
@@ -7941,11 +7948,103 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private boolean cameraUsageDescriptionChecked;
+    
+    private void checkCameraUsageDescription() {
+        if (!cameraUsageDescriptionChecked) {
+            cameraUsageDescriptionChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.NSCameraUsageDescription")) {
+                    Display.getInstance().setProjectBuildHint("ios.NSCameraUsageDescription", "Some functionality of the application requires your camera");
+                }
+            }
+        }
+    }
+    
+    private boolean contactsUsageDescriptionChecked;
+    
+    private void checkContactsUsageDescription() {
+        if (!contactsUsageDescriptionChecked) {
+            contactsUsageDescriptionChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.NSContactsUsageDescription")) {
+                    Display.getInstance().setProjectBuildHint("ios.NSContactsUsageDescription", "Some functionality of the application requires access to your contacts");
+                }
+            }
+        }
+    }
+    
+    private boolean photoLibraryUsageDescriptionChecked;
+    
+    private void checkPhotoLibraryUsageDescription() {
+        if (!photoLibraryUsageDescriptionChecked) {
+            photoLibraryUsageDescriptionChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.NSPhotoLibraryUsageDescription")) {
+                    Display.getInstance().setProjectBuildHint("ios.NSPhotoLibraryUsageDescription", "Some functionality of the application requires access to your photo library");
+                }
+            }
+        }
+    }
+    
+    private boolean appleMusicUsageDescriptionChecked;
+    
+    private void checkAppleMusicUsageDescription() {
+        if (!appleMusicUsageDescriptionChecked) {
+            appleMusicUsageDescriptionChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.NSAppleMusicUsageDescription")) {
+                    Display.getInstance().setProjectBuildHint("ios.NSAppleMusicUsageDescription", "Some functionality of the application requires access to your media library");
+                }
+            }
+        }
+    }
+    
+    private boolean photoLibraryAddUsageDescriptionChecked;
+    
+    private void checkPhotoLibraryAddUsageDescription() {
+        if (!photoLibraryAddUsageDescriptionChecked) {
+            photoLibraryAddUsageDescriptionChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.NSPhotoLibraryAddUsageDescription")) {
+                    Display.getInstance().setProjectBuildHint("ios.NSPhotoLibraryAddUsageDescription", "Some functionality of the application requires write-only access to your photo library");
+                }
+            }
+        }
+    }
+    
+    
+    private boolean microphoneUsageDescriptionChecked;
+    
+    private void checkMicrophoneUsageDescription() {
+        if (!microphoneUsageDescriptionChecked) {
+            microphoneUsageDescriptionChecked = true;
+            
+            Map<String, String> m = Display.getInstance().getProjectBuildHints();
+            if(m != null) {
+                if(!m.containsKey("ios.NSMicrophoneUsageDescription")) {
+                    Display.getInstance().setProjectBuildHint("ios.NSMicrophoneUsageDescription", "Some functionality of the application requires your microphone");
+                }
+            }
+        }
+    }
+    
     @Override
     public void capturePhoto(final com.codename1.ui.events.ActionListener response) {
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to take a picture")){
             return;
         }
+        checkCameraUsageDescription();
         capture(response, new String[] {"png", "jpg", "jpeg"}, "*.png;*.jpg;*.jpeg");
     }
     
@@ -7995,6 +8094,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(!checkForPermission("android.permission.RECORD_AUDIO", "This is required to record the audio")){
             return;
         }
+        checkMicrophoneUsageDescription();
         capture(response, new String[] {"wav", "mp3", "aac"}, "*.wav;*.mp3;*.aac");
     }
 
@@ -8003,6 +8103,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         if(!checkForPermission("android.permission.WRITE_EXTERNAL_STORAGE", "This is required to take a video")){
             return;
         }
+        checkCameraUsageDescription();
+        checkMicrophoneUsageDescription();
         capture(response, new String[] {"mp4", "avi", "mpg", "3gp"}, "*.mp4;*.avi;*.mpg;*.3gp");
     }
 
@@ -9291,6 +9393,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     private Hashtable initContacts() {
+        checkContactsUsageDescription();
         Hashtable retVal = new Hashtable();
         
         Image img = null;
