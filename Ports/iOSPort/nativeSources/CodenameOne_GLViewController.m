@@ -2347,6 +2347,35 @@ BOOL prefersStatusBarHidden = NO;
     return NO;
 }
 
+-(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
+    // simply create a property of 'BOOL' type
+    [(EAGLView *)self.view updateFrameBufferSize:(int)size.width h:(int)size.height];
+    [(EAGLView *)self.view deleteFramebuffer];
+    
+    displayWidth = (int)size.width * scaleValue;
+    displayHeight = (int)size.height * scaleValue;
+    
+    lockDrawing = NO;
+    
+    screenSizeChanged(displayWidth, displayHeight);
+    repaintUI();
+    
+    if ( currentActionSheet != nil ){
+        [UIView beginAnimations:nil context:nil];
+        [UIView setAnimationDuration:0.5];
+        [UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+        
+        currentActionSheet.frame = CGRectMake(0, displayHeight/scaleValue-246, displayWidth/scaleValue, 246);
+        [UIView commitAnimations];
+    }
+#ifdef INCLUDE_MOPUB
+    CGSize adsize = [self.adView adContentViewSize];
+    CGFloat centeredX = (size.width - size.width) / 2;
+    CGFloat bottomAlignedY =size.height - size.height;
+    self.adView.frame = CGRectMake(centeredX, bottomAlignedY, adsize.width, adsize.height);
+#endif
+}
+
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
     
     [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
