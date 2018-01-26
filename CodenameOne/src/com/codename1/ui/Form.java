@@ -2858,8 +2858,9 @@ public class Form extends Container {
                 if (dragged != null) {
                     if (dragged.isDragAndDropInitialized()) {
                         dragged.dragFinishedImpl(x, y);
-                        dragged = null;
+                        
                     }
+                    dragged = null;
                 }
                 return;
             }
@@ -2868,8 +2869,9 @@ public class Form extends Container {
             if (dragged != null) {
                 if (dragged.isDragAndDropInitialized()) {
                     dragged.dragFinishedImpl(x, y);
-                    dragged = null;
+                    
                 }
+                dragged = null;
             }
             dragStopFlag = false;
             
