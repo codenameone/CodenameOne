@@ -1513,6 +1513,17 @@ public final class Display extends CN1Constants {
         }
     }
     
+    /**
+     * Allows us to stop editString on the given text component
+     * @param cmp the text field/text area component
+     * @param onFinish invoked when editing stopped
+     */
+    public void stopEditing(Component cmp, Runnable onFinish) {
+        if(isTextEditing(cmp)) {
+            impl.stopTextEditing(onFinish);
+        }
+    }
+
     boolean isTextEditing(Component c) {
         return impl.isEditingText(c);
     }

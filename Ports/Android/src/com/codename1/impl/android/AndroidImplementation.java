@@ -1007,6 +1007,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static void stopEditing() {
         stopEditing(false);
     }
+
+    public static void stopEditing(final Runnable onFinish) {
+        final Form f = Display.getInstance().getCurrent();
+        f.addSizeChangedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                f.removeSizeChangedListener(this);
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        onFinish.run();
+                    }
+                });
+            }
+        });
+        stopEditing(true);
+    }
     
     public static void stopEditing(final boolean forceVKBClose){
         if (getActivity() == null) {

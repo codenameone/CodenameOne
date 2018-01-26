@@ -332,6 +332,15 @@ public abstract class CodenameOneImplementation {
      */
     public void stopTextEditing() {    
     }
+
+    
+    /**
+     * Invoked for special cases to stop text editing and clear native editing state
+     */
+    public void stopTextEditing(Runnable onFinish) {    
+        stopTextEditing();
+        onFinish.run();
+    }
     
     /**
      * Using invokeAndBlock inside EditString creates peculiar behaviour that needs
