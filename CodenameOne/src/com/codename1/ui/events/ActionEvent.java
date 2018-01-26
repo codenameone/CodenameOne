@@ -153,7 +153,13 @@ public class ActionEvent {
             /**
              * Fired when a {@link com.codename1.ui.Form} is rotated 
              */
-            OrientationChange	
+            OrientationChange,
+            
+            
+            /**
+             * Fired when a component drag is finished
+             */
+            DragFinished
             } ;
     private Type trigger;
     
