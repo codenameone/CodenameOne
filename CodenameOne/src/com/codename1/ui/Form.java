@@ -2855,12 +2855,24 @@ public class Form extends Container {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
             if(ev.isConsumed()) {
+                if (dragged != null) {
+                    if (dragged.isDragAndDropInitialized()) {
+                        dragged.dragFinishedImpl(x, y);
+                        dragged = null;
+                    }
+                }
                 return;
             }
         }
         if(dragStopFlag) {
+            if (dragged != null) {
+                if (dragged.isDragAndDropInitialized()) {
+                    dragged.dragFinishedImpl(x, y);
+                    dragged = null;
+                }
+            }
             dragStopFlag = false;
-            dragged = null;
+            
             return;
         }
         

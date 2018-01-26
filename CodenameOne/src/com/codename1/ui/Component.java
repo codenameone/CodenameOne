@@ -419,6 +419,7 @@ public class Component implements Animation, StyleListener {
     EventDispatcher pointerPressedListeners;
     EventDispatcher pointerReleasedListeners;
     EventDispatcher pointerDraggedListeners;
+    EventDispatcher dragFinishedListeners;
     boolean isUnselectedStyle;
     
     boolean isDragAndDropInitialized() {
@@ -4313,9 +4314,27 @@ public class Component implements Animation, StyleListener {
         }
         dragActivated = false;
         dragAndDropInitialized = false;
+        if (dragFinishedListeners != null && dragFinishedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.DragFinished, x, y);
+            dragFinishedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         dragFinished(x, y);
     }
 
+    /**
+     * Adds a listener to the dragFinished event
+     *
+     * @param l callback to receive drag finished events events
+     */
+    public void addDragFinishedListener(ActionListener l) {
+        if (dragFinishedListeners == null) {
+            dragFinishedListeners = new EventDispatcher();
+        }
+        dragFinishedListeners.addListener(l);
+    }
     /**
      * Adds a listener to the pointer event
      *
@@ -4363,6 +4382,17 @@ public class Component implements Animation, StyleListener {
     public void removePointerPressedListener(ActionListener l) {
         if (pointerPressedListeners != null) {
             pointerPressedListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Removes the listener from the drag finished event
+     *
+     * @param l callback to remove
+     */
+    public void removeDragFinishedListener(ActionListener l) {
+        if (dragFinishedListeners != null) {
+            dragFinishedListeners.removeListener(l);
         }
     }
 
