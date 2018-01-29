@@ -1771,6 +1771,16 @@ public class TextArea extends Component {
     }
 
     /**
+     * Stops text editing of this field if it is being edited
+     * @param onFinish invoked when editing stopped
+     */
+    public void stopEditing(Runnable onFinish) {
+        if(isEditing()) {
+            Display.getInstance().stopEditing(this, onFinish);
+        }
+    }
+
+    /**
      * {@inheritDoc}
      * We override get style here to return the selected style when editing
      * @return the selected style if editing, <code>super.getStyle()</code> otherwise

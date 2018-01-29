@@ -2401,6 +2401,7 @@ public class ConnectionRequest implements IOProgressListener {
     }
     
     private void downloadImage(final SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail, boolean useCache) {
+        setReadResponseForErrors(false);
         if (useCache) {
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
                 public void run() {
