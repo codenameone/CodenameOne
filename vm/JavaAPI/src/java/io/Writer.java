@@ -26,7 +26,7 @@ package java.io;
  * Abstract class for writing to character streams. The only methods that a subclass must implement are write(char[], int, int), flush(), and close(). Most subclasses, however, will override some of the methods defined here in order to provide higher efficiency, additional functionality, or both.
  * Since: JDK1.1, CLDC 1.0 See Also:OutputStreamWriter, Reader
  */
-public abstract class Writer{
+public abstract class Writer implements Appendable {
     /**
      * The object used to synchronize operations on this stream. For efficiency, a character-stream object may use an object other than itself to protect critical sections. A subclass should therefore use the object in this field rather than this or a synchronized method.
      */
@@ -103,4 +103,26 @@ public abstract class Writer{
         }
     }
 
+    public Writer append(CharSequence csq) throws IOException {
+        write(csq.toString());
+        return this;
+    }
+
+    public Writer append(char c) throws IOException {
+        write(c);
+        return this;
+    }
+
+    public Writer append(CharSequence csq, int start, int end) throws IOException {
+        return append(csq.subSequence(start, end));
+        
+    }
+
+    
+    
+    
+    
+
+    
+    
 }
