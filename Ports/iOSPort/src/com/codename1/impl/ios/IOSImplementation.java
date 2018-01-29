@@ -355,8 +355,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void stopTextEditing() {    
-        foldKeyboard();
+    public void stopTextEditing() {  
+        if (isAsyncEditMode()) {
+            foldKeyboard();
+        } else {
+            if (currentEditing != null) {
+                editingUpdate(currentEditing.getText(), currentEditing.getCursorPosition(), true);
+            }
+        }
     }
     
     public static void foldKeyboard() {
@@ -7273,7 +7279,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if(instance.life != null) {
             instance.life.applicationDidEnterBackground();
             if (instance.isEditingText()) {
-                foldKeyboard();
+                instance.stopTextEditing();
             }
         }
     }
