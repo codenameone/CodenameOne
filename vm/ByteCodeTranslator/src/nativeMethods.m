@@ -200,7 +200,7 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
 JAVA_OBJECT java_lang_reflect_Array_newInstanceImpl___java_lang_Class_int_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_INT len) {
     enteringNativeAllocations();
     struct clazz* clz = (struct clazz*)cls;
-    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz->arrayType, sizeof(JAVA_OBJECT), 1);
+    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz, sizeof(JAVA_OBJECT), 1);
     finishedNativeAllocations();
     return out;
 }
