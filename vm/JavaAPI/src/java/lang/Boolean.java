@@ -26,7 +26,7 @@ package java.lang;
  * The Boolean class wraps a value of the primitive type boolean in an object. An object of type Boolean contains a single field whose type is boolean.
  * Since: JDK1.0, CLDC 1.0
  */
-public final class Boolean{
+public final class Boolean implements Comparable<Boolean> {
     /**
      * The Boolean object corresponding to the primitive value false.
      */

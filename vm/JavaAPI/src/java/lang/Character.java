@@ -28,7 +28,7 @@ package java.lang;
  * Character information is based on the Unicode Standard, version 3.0. However, in order to reduce footprint, by default the character property and case conversion operations in CLDC are available only for the ISO Latin-1 range of characters. Other Unicode character blocks can be supported as necessary.
  * Since: JDK1.0, CLDC 1.0
  */
-public final class Character{
+public final class Character implements Comparable<Character>{
     /**
      * The maximum radix available for conversion to and from Strings.
      * See Also:Integer.toString(int, int), Integer.valueOf(java.lang.String), Constant Field Values
@@ -1120,6 +1120,10 @@ public final class Character{
         }
         // Let icu4c worry about non-BMP code points.
         return false;
+    }
+
+    public int compareTo(Character another) {
+        return toString().compareTo(String.valueOf(another.value));
     }
     
 }
