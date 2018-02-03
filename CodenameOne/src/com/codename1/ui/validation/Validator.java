@@ -56,6 +56,29 @@ import java.util.HashMap;
  * the component via an emblem or change of the UIID (to original UIID name + "Invalid" e.g. "TextFieldInvalid").
  * Validators just run thru a set of Constraint objects to decide if validation succeeded or failed.
  *
+ * It's possible to create any custom logic of validation. Example (see
+ * <a href="https://stackoverflow.com/questions/48481888/codename-one-regexconstraint-to-check-a-valid-phone-number/48483465#48483465">this
+ * discussion</a> on StackOverflow):
+ * <pre>{@code
+ * val.addConstraint(phone, new Constraint() {
+ *   public  boolean isValid(Object value) {
+ *       String v = (String)value;
+ *       for(int i = 0 ; i < v.length() ; i++) {
+ *          char c = v.charAt(i);
+ *          if(c >= '0' && c <= '9' || c == '+' || c == '-') {
+ *              continue;
+ *          }
+ *          return false;
+ *       }
+ *       return true;
+ *   }
+ *
+ *   public String getDefaultFailMessage() {
+ *       return "Must be valid phone number";
+ *   }
+ *
+ * });
+ * }</pre>
  * @author Shai Almog
  */
 public class Validator {    
