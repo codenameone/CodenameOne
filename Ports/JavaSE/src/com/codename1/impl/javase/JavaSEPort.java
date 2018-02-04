@@ -429,6 +429,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean portrait = true;
     private BufferedImage portraitSkin;
     private BufferedImage landscapeSkin;
+    private boolean roundedSkin;
     private Map<java.awt.Point, Integer> portraitSkinHotspots;
     private java.awt.Rectangle portraitScreenCoordinates;
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
@@ -1093,15 +1094,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if(zoomLevel != 1) {
                         AffineTransform af = bg.getTransform();
                         bg.setTransform(AffineTransform.getScaleInstance(1, 1));
-                        bg.translate(-(getScreenCoordinates().x + x )* zoomLevel, -(getScreenCoordinates().y + y ) * zoomLevel);
+                        bg.translate(-(screenCoord.x + x )* zoomLevel, -(screenCoord.y + y ) * zoomLevel);
                         super.paintChildren(bg);
                         bg.setTransform(af);
                     } else {
-                        bg.translate(-getScreenCoordinates().x - x, -getScreenCoordinates().y - y);
+                        bg.translate(-screenCoord.x - x, -screenCoord.y - y);
                         super.paintChildren(bg);
-                    }
+                    }                    
                     bg.dispose();
                     painted = true;
+                }
+                
+                if(roundedSkin) {
+                    Graphics2D bg = buffer.createGraphics();
+                    BufferedImage skin = getSkin();
+                    bg.drawImage(skin, -(int) ((getScreenCoordinates().getX() + x) * zoomLevel), -(int) ((getScreenCoordinates().getY() + y) * zoomLevel), 
+                            (int)(skin.getWidth() * zoomLevel), (int)(skin.getHeight() * zoomLevel), null);
+                    bg.dispose();
                 }
                 
                 if (isEnabled()) {
@@ -2025,11 +2034,24 @@ public class JavaSEPort extends CodenameOneImplementation {
 
             portraitSkinHotspots = new HashMap<Point, Integer>();
             portraitScreenCoordinates = new Rectangle();
-            initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
 
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
-            initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+
+            if(props.getProperty("roundScreen", "false").equalsIgnoreCase("true")) {
+                portraitScreenCoordinates.x = Integer.parseInt(props.getProperty("displayX"));
+                portraitScreenCoordinates.y = Integer.parseInt(props.getProperty("displayY"));
+                portraitScreenCoordinates.width = Integer.parseInt(props.getProperty("displayWidth"));
+                portraitScreenCoordinates.height = Integer.parseInt(props.getProperty("displayHeight"));
+                landscapeScreenCoordinates.x = portraitScreenCoordinates.y;
+                landscapeScreenCoordinates.y = portraitScreenCoordinates.x;
+                landscapeScreenCoordinates.width = portraitScreenCoordinates.height;
+                landscapeScreenCoordinates.height = portraitScreenCoordinates.width;
+                roundedSkin = true;
+            } else {
+                initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
+                initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+            }
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
