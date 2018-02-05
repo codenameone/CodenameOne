@@ -1169,6 +1169,9 @@ public class Toolbar extends Container {
     public void addCommandToRightBar(Command cmd) {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
+        if(isRTL()) {
+            cmd.putClientProperty("Left", Boolean.TRUE);
+        }
         sideMenu.addCommand(cmd, 0);        
     }
     
@@ -1194,7 +1197,9 @@ public class Toolbar extends Container {
     public void addCommandToLeftBar(Command cmd) {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
-        cmd.putClientProperty("Left", Boolean.TRUE);
+        if(!isRTL()) {
+            cmd.putClientProperty("Left", Boolean.TRUE);
+        }
         sideMenu.addCommand(cmd, 0);
     }
     
