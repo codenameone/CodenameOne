@@ -4739,9 +4739,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public OutputStream openOutputStream(Object connection, int offset) throws IOException {
         String con = (String) connection;
-        if (con.startsWith("file://")) {
-            con = con.substring(7);
-        }
+        con = removeFilePrefix(con);
         RandomAccessFile rf = new RandomAccessFile(con, "rw");
         rf.seek(offset);
         FileOutputStream fc = new FileOutputStream(rf.getFD());
@@ -4939,7 +4937,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private String addFile(String s) {
         // I explicitly don't create a "proper URL" since code might rely on the fact that the file isn't encoded
         if(s != null && s.startsWith("/")) {
-            return "file:/" + s;
+            return "file://" + s;
         }
         return s;
     }
@@ -5042,13 +5040,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public String getAppHomePath() {
-        return getContext().getFilesDir().getAbsolutePath() + "/";
+        return addFile(getContext().getFilesDir().getAbsolutePath() + "/");
     }
 
     /**
      * @inheritDoc
      */
     public String[] listFiles(String directory) throws IOException {
+        directory = removeFilePrefix(directory);
         return new File(directory).list();
     }
 
@@ -5070,13 +5069,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void mkdir(String directory) {
-        new File(directory).mkdirs();
+        directory = removeFilePrefix(directory);
+        new File(directory).mkdir();
     }
 
     /**
      * @inheritDoc
      */
     public void deleteFile(String file) {
+        file = removeFilePrefix(file);
         File f = new File(file);
         f.delete();
     }
@@ -5085,6 +5086,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean isHidden(String file) {
+        file = removeFilePrefix(file);
         return new File(file).isHidden();
     }
 
@@ -5098,6 +5100,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public long getFileLength(String file) {
+        file = removeFilePrefix(file);
         return new File(file).length();
     }
 
@@ -5105,6 +5108,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public long getFileLastModified(String file) {
+        file = removeFilePrefix(file);
         return new File(file).lastModified();
     }
     
@@ -5112,6 +5116,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean isDirectory(String file) {
+        file = removeFilePrefix(file);
         return new File(file).isDirectory();
     }
 
@@ -5126,6 +5131,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public OutputStream openFileOutputStream(String file) throws IOException {
+        file = removeFilePrefix(file);
         OutputStream os = null;
         try{
             os = createFileOuputStream(file);        
@@ -5152,10 +5158,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return os;        
     }
 
+    private String removeFilePrefix(String file) {
+        if (file.startsWith("file://")) {
+            return file.substring(7);
+        }
+        return file;
+    }
+    
     /**
      * @inheritDoc
      */
     public InputStream openFileInputStream(String file) throws IOException {
+        file = removeFilePrefix(file);
         InputStream is = null;
         try{
             is = createFileInputStream(file);        
@@ -5191,9 +5205,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public boolean exists(String file) {
-        if (file.startsWith("file://")) {
-            file = file.substring(7);
-        }
+        file = removeFilePrefix(file);
         return new File(file).exists();
     }
 
@@ -5201,9 +5213,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void rename(String file, String newName) {
-        if (file.startsWith("file://")) {
-            file = file.substring(7);
-        }
+        file = removeFilePrefix(file);
         new File(file).renameTo(new File(new File(file).getParentFile(), newName));
     }
 
@@ -5220,6 +5230,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected OutputStream createFileOuputStream(String fileName) throws FileNotFoundException {
+        System.out.println("AndroidImplementation.createFileOutputStream(): "+fileName);
         return new FileOutputStream(fileName);
     }
         
