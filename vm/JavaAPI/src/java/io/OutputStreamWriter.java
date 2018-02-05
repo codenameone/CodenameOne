@@ -27,7 +27,7 @@ package java.io;
  * Each invocation of a write() method causes the encoding converter to be invoked on the given character(s). The resulting bytes are accumulated in a buffer before being written to the underlying output stream. The size of this buffer may be specified, but by default it is large enough for most purposes. Note that the characters passed to the write() methods are not buffered.
  * Since: CLDC 1.0 See Also:Writer, UnsupportedEncodingException
  */
-public class OutputStreamWriter extends java.io.Writer{
+public class OutputStreamWriter extends java.io.Writer {
     private OutputStream os;
     private String enc;
     
@@ -87,5 +87,11 @@ public class OutputStreamWriter extends java.io.Writer{
         }
         os.write(str.getBytes(enc));
     }
+    
+    public void write(CharSequence csq) throws IOException {
+        write(csq.toString());
+    }
+
+   
 
 }

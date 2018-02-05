@@ -2225,8 +2225,8 @@ void com_codename1_impl_ios_IOSNative_setNativeBrowserScrollingEnabled___long_bo
         POOL_BEGIN();
         UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
         
-        w.scrollView.scrollEnabled = NO;
-        w.scrollView.bounces = NO;
+        w.scrollView.scrollEnabled = enabled;
+        w.scrollView.bounces = enabled;
         
         POOL_END();
     });
@@ -3002,7 +3002,6 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
         UIImagePickerControllerSourceType sourceType = UIImagePickerControllerSourceTypeCamera; // default
-        popoverController = nil;
         
         bool hasCamera = [UIImagePickerController isSourceTypeAvailable:sourceType];
         if (hasCamera) {
@@ -3023,21 +3022,20 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean(CN1_THREAD_STATE_M
             
             if(popoverSupported() && sourceType != UIImagePickerControllerSourceTypeCamera)
             {
+                if (popoverController != nil) {
 #ifndef CN1_USE_ARC
-                popoverController = [[[NSClassFromString(@"UIPopoverController") alloc]
-                                      initWithContentViewController:pickerController] autorelease];
-#else
+                    [popoverController release];
+#endif
+                    popoverController = nil;
+                }
                 popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
                                      initWithContentViewController:pickerController];
-#endif
                 popoverController.delegate = [CodenameOne_GLViewController instance];
                 [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
                                                    inView:[[CodenameOne_GLViewController instance] view]
                                  permittedArrowDirections:UIPopoverArrowDirectionAny
                                                  animated:YES];
-#ifndef CN1_USE_ARC
-                [popoverController retain];
-#endif
+
             }
             else
             {
@@ -3058,7 +3056,6 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
             }
             sourceType = UIImagePickerControllerSourceTypeSavedPhotosAlbum;
         }
-        popoverController = nil;
         
 #ifndef CN1_USE_ARC
         UIImagePickerController* pickerController = [[[UIImagePickerController alloc] init] autorelease];
@@ -3077,21 +3074,20 @@ void com_codename1_impl_ios_IOSNative_openGallery___int(CN1_THREAD_STATE_MULTI_A
         }
         
         if(popoverSupported()) {
+            if (popoverController != nil) {
 #ifndef CN1_USE_ARC
-            popoverController = [[[NSClassFromString(@"UIPopoverController") alloc]
-                                  initWithContentViewController:pickerController] autorelease];
-#else
+                [popoverController release];
+#endif
+                popoverController = nil;
+            }
             popoverController = [[NSClassFromString(@"UIPopoverController") alloc]
                                  initWithContentViewController:pickerController];
-#endif
+            
             popoverController.delegate = [CodenameOne_GLViewController instance];
             [popoverController presentPopoverFromRect:CGRectMake(0,32,320,480)
                                                inView:[[CodenameOne_GLViewController instance] view]
                              permittedArrowDirections:UIPopoverArrowDirectionAny
                                              animated:YES];
-#ifndef CN1_USE_ARC
-            [popoverController retain];
-#endif
         } else {
             [[CodenameOne_GLViewController instance] presentModalViewController:pickerController animated:YES];
         }
@@ -5071,7 +5067,7 @@ JAVA_OBJECT pickerStringArray = JAVA_NULL;
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
 JAVA_LONG currentDatePickerDuration=-1;
-UIPopoverController* popoverControllerInstance;
+extern UIPopoverController* popoverControllerInstance;
 extern UIView *currentActionSheet;
 JAVA_LONG defaultDatePickerDate;
 

@@ -77,6 +77,14 @@
 // needs a source rect that the java API doesn't pass through.
 int CN1lastTouchX=0;
 int CN1lastTouchY=0;
+BOOL skipNextTouch = NO;
+
+// A flag to enable/disable the CN1TapGestureRecognizer for handling pointer events
+// The new way of handing pointer events is with the gesture recognizer rather 
+// than directly in the view controller because it can catch all events without
+// consuming them, so it plays nicer with native peer components.
+// This flag is turned on by [CN1TapGestureRecognizer install:]
+BOOL CN1useTapGestureRecognizer=NO;
 
 extern void repaintUI();
 extern NSDate* currentDatePickerDate;
@@ -2339,6 +2347,35 @@ BOOL prefersStatusBarHidden = NO;
     return NO;
 }
 
+-(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
+    // simply create a property of 'BOOL' type
+    [(EAGLView *)self.view updateFrameBufferSize:(int)size.width h:(int)size.height];
+    [(EAGLView *)self.view deleteFramebuffer];
+    
+    displayWidth = (int)size.width * scaleValue;
+    displayHeight = (int)size.height * scaleValue;
+    
+    lockDrawing = NO;
+    
+    screenSizeChanged(displayWidth, displayHeight);
+    repaintUI();
+    
+    if ( currentActionSheet != nil ){
+        [UIView beginAnimations:nil context:nil];
+        [UIView setAnimationDuration:0.5];
+        [UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+        
+        currentActionSheet.frame = CGRectMake(0, displayHeight/scaleValue-246, displayWidth/scaleValue, 246);
+        [UIView commitAnimations];
+    }
+#ifdef INCLUDE_MOPUB
+    CGSize adsize = [self.adView adContentViewSize];
+    CGFloat centeredX = (size.width - size.width) / 2;
+    CGFloat bottomAlignedY =size.height - size.height;
+    self.adView.frame = CGRectMake(centeredX, bottomAlignedY, adsize.width, adsize.height);
+#endif
+}
+
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
     
     [(EAGLView *)self.view updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
@@ -2745,9 +2782,15 @@ BOOL prefersStatusBarHidden = NO;
     }
 }
 
-static BOOL skipNextTouch = NO;
+
 
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
 	POOL_BEGIN();
     if(touchesArray == nil) {
         touchesArray = [[NSMutableArray alloc] init];
@@ -2808,6 +2851,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch) {
         skipNextTouch = NO;
         return;
@@ -2838,6 +2887,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch) {
         skipNextTouch = NO;
         return;
@@ -2874,6 +2929,12 @@ static BOOL skipNextTouch = NO;
 }
 
 -(void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (CN1useTapGestureRecognizer) {
+        // We moved to using a CN1TapGestureRecognizer to handle pointer
+        // events rather than the view controller because it is able to 
+        // catch all events, even ones that land on a native peer.
+        return;
+    }
     if(skipNextTouch || (editingComponent != nil && !isVKBAlwaysOpen())) {
         return;
     }
@@ -2924,67 +2985,48 @@ extern int popoverSupported();
 
 //#define LOW_MEM_CAMERA
 - (void)imagePickerController:(UIImagePickerController*)picker didFinishPickingMediaWithInfo:(NSDictionary*)info {
-	POOL_BEGIN();
-	NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
-	if ([mediaType isEqualToString:@"public.image"]) {
-		// get the image
-		UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
-#ifndef CN1_USE_ARC
-        [originalImage retain];
-#endif
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            POOL_BEGIN();
-            UIImage* image = originalImage;
-            BOOL releaseImage = YES;
+
+    NSString* mediaType = [info objectForKey:UIImagePickerControllerMediaType];
+    if ([mediaType isEqualToString:@"public.image"]) {
+        // get the image
+        UIImage* originalImage = [info objectForKey:UIImagePickerControllerOriginalImage];
+
+        UIImage* image = originalImage;
+
 #ifndef LOW_MEM_CAMERA
-            if (image.imageOrientation != UIImageOrientationUp) {
-                UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
-                [image drawInRect:(CGRect){0, 0, image.size}];
-                releaseImage = NO;
-#ifndef CN1_USE_ARC
-                [originalImage release];
+        if (image.imageOrientation != UIImageOrientationUp) {
+            UIGraphicsBeginImageContextWithOptions(image.size, NO, image.scale);
+            [image drawInRect:(CGRect){0, 0, image.size}];
+            image = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+        }
 #endif
-                image = UIGraphicsGetImageFromCurrentImageContext();
-                UIGraphicsEndImageContext();
-            }
-#endif
-            
-            NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
-            
-            NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *documentsDirectory = [paths objectAtIndex:0];
-            NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
-            [data writeToFile:path atomically:YES];
-            if(releaseImage) {
-#ifndef CN1_USE_ARC
-                [originalImage release];
-#endif
-            }
-            com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
-            POOL_END();
-        });
         
-	} else {
+        NSData* data = UIImageJPEGRepresentation(image, 90 / 100.0f);
+        
+        NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+        NSString *documentsDirectory = [paths objectAtIndex:0];
+        NSString *path = [documentsDirectory stringByAppendingPathComponent:@"temp_image.jpg"];
+        [data writeToFile:path atomically:YES];
+        com_codename1_impl_ios_IOSImplementation_capturePictureResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+    
+        
+    } else {
         // was movie type
         NSString *moviePath = [[info objectForKey: UIImagePickerControllerMediaURL] absoluteString];
         com_codename1_impl_ios_IOSImplementation_captureMovieResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG moviePath));
     }
-	
-	if(popoverSupported() && popoverController != nil) {
-		[popoverController dismissPopoverAnimated:YES];
-        popoverController.delegate = nil;
-        popoverController = nil;
-	} else {
-#ifdef LOW_MEM_CAMERA
-		[picker dismissModalViewControllerAnimated:NO];
-#else
-		[picker dismissModalViewControllerAnimated:YES];
-#endif
-	}
     
-	//picker.delegate = nil;
-    //picker = nil;
-    POOL_END();
+    if(popoverSupported() && popoverController != nil) {
+        [popoverController dismissPopoverAnimated:YES];
+    } else {
+#ifdef LOW_MEM_CAMERA
+        [picker dismissModalViewControllerAnimated:NO];
+#else
+        [picker dismissModalViewControllerAnimated:YES];
+#endif
+    }
+
 }
 
 -(void) mailComposeController:(MFMailComposeViewController*)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError*)error {

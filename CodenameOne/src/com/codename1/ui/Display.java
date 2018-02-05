@@ -831,6 +831,19 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /**
+     * Returns true if the system is currently in the process of transitioning between
+     * forms
+     * 
+     * @return true if in the middle of form transition
+     */
+    public boolean isInTransition() {
+        if (animationQueue != null && animationQueue.size() > 0) {
+            Animation ani = (Animation) animationQueue.get(0);
+            return ani instanceof Transition;
+        }
+        return false;
+    }
 
     private void paintTransitionAnimation() {
         Animation ani = (Animation) animationQueue.get(0);
@@ -1470,6 +1483,9 @@ public final class Display extends CN1Constants {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public void editString(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        if (isTextEditing(cmp)) {
+            return;
+        }
         Form f = cmp.getComponentForm();
         
         // this can happen in the spinner in the simulator where the key press should in theory start native 
@@ -1497,6 +1513,17 @@ public final class Display extends CN1Constants {
         }
     }
     
+    /**
+     * Allows us to stop editString on the given text component
+     * @param cmp the text field/text area component
+     * @param onFinish invoked when editing stopped
+     */
+    public void stopEditing(Component cmp, Runnable onFinish) {
+        if(isTextEditing(cmp)) {
+            impl.stopTextEditing(onFinish);
+        }
+    }
+
     boolean isTextEditing(Component c) {
         return impl.isEditingText(c);
     }

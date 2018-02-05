@@ -185,4 +185,13 @@ public class EasyThread {
             LOCK.notify();
         }
     }
+    
+    /**
+     * Returns true if the current thread is the easy thread and false othewise similar 
+     * to the isEDT method
+     * @return true if we are currently within this easy thread
+     */
+    public boolean isThisIt() {
+        return t == Thread.currentThread();
+    }
 }

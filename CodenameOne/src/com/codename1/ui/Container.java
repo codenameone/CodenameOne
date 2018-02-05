@@ -449,7 +449,7 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * Returns the layout manager responsible for arranging this container
+     * Returns the layout manager responsible for arranging this container. 
      * 
      * @return the container layout manager
      */
@@ -457,6 +457,17 @@ public class Container extends Component implements Iterable<Component>{
         return layout;
     }
 
+    /**
+     * Returns the actual layout of this container.  For most components this just
+     * wraps {@link #getLayout()}, but some classes (e.g. Form) don't return their
+     * *actual* layout.  In such cases, this method will return the component's *actual*
+     * layout.
+     * @return 
+     */
+    final Layout getActualLayout() {
+        return layout;
+    }
+    
     /**
      * Sets the layout manager responsible for arranging this container
      * 
@@ -1936,7 +1947,7 @@ public class Container extends Component implements Iterable<Component>{
                 count = calculateLastPaintableOffset(startIter, relx, rely, relx, rely) + 1;
             }
         }
-        boolean overlaps = getLayout().isOverlapSupported();
+        boolean overlaps = getActualLayout().isOverlapSupported();
         Component component = null;
         for (int i = count - 1; i >= startIter; i--) {
             Component cmp = getComponentAt(i);

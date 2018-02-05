@@ -249,7 +249,7 @@ public abstract class LocationManager {
      * 
      * <p><strong>NOTE:</strong> For iOS you must include the <code>ios.background_modes</code> build hint with a value that includes "location" for geofencing to work.</p>
      * 
-     * @param listener a Class that implements the GeofenceListener interface 
+     * @param GeofenceListenerClass a Class that implements the GeofenceListener interface 
      * this class must have an empty constructor
      * @param gf a Geofence to track
      */

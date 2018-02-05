@@ -27,7 +27,7 @@ package java.lang;
  * In addition, this class provides several methods for converting a double to a String and a String to a double, as well as other constants and methods useful when dealing with a double.
  * Since: JDK1.0, CLDC 1.1
  */
-public final class Double extends Number {
+public final class Double extends Number implements Comparable<Double> {
     /**
      * The largest positive finite value of type double. It is equal to the value returned by Double.longBitsToDouble(0x7fefffffffffffffL)
      * See Also:Constant Field Values
@@ -281,5 +281,19 @@ public final class Double extends Number {
      */
     public static Double valueOf(double i) {
         return new Double(i);
+    }
+
+    public static int compare(double f1, double f2) {
+        if(f1 == f2) {
+            return 0;
+        }
+        if(f1 > f2) {
+            return -1;
+        }
+        return 1;
+    }
+
+    public int compareTo(Double another) {
+        return value < another.value ? -1 : value > another.value ? 1 : 0;
     }
 }

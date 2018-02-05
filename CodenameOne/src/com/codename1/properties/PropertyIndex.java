@@ -301,6 +301,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                         p.setImpl(Util.toIntValue(val));
                         continue;
                     } 
+                    if(p instanceof BooleanProperty) {
+                        p.setImpl(Util.toBooleanValue(val));
+                        continue;
+                    } 
                     if(p instanceof LongProperty) {
                         p.setImpl(Util.toLongValue(val));
                         continue;

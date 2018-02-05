@@ -39,6 +39,7 @@ import android.text.InputFilter;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.text.method.DigitsKeyListener;
+import android.text.method.KeyListener;
 import android.text.method.PasswordTransformationMethod;
 import android.util.Log;
 import android.util.SparseArray;
@@ -766,6 +767,8 @@ public class InPlaceEditView extends FrameLayout{
     // Timers for manually blinking cursor on Android 4.4
     private Timer cursorTimer;
     private TimerTask cursorTimerTask;
+    private KeyListener defaultKeyListener;
+    private int defaultMaxLines=-2;
 
     /**
      * Start editing the given text-area
@@ -840,15 +843,14 @@ public class InPlaceEditView extends FrameLayout{
                     }
                 });
             }            
-        }
-		else if (isEditedFieldSwitch) {
+        } else if (isEditedFieldSwitch) {
             //reset copy-paste protection
             if (android.os.Build.VERSION.SDK_INT < 11) {
                 mEditText.setOnCreateContextMenuListener(null);
             } else {
                 mEditText.setCustomSelectionActionModeCallback(null);
             }
-		}
+	}
         if (!isEditedFieldSwitch) {
             mEditText.addTextChangedListener(mEditText.mTextWatcher);
         }
@@ -903,6 +905,7 @@ public class InPlaceEditView extends FrameLayout{
         mEditText.setAdapter((ArrayAdapter<String>) null);
         mEditText.setText(initialText);
         if(!textArea.isSingleLineTextArea() && textArea.textArea.isGrowByContent() && textArea.textArea.getGrowLimit() > -1){
+            defaultMaxLines = mEditText.getMaxLines();
             mEditText.setMaxLines(textArea.textArea.getGrowLimit());
         }
 
@@ -943,6 +946,7 @@ public class InPlaceEditView extends FrameLayout{
             }
             if(Display.getInstance().getProperty("andAddComma", "false").equals("true") &&
                     (codenameOneInputType & TextArea.DECIMAL) == TextArea.DECIMAL) {
+                defaultKeyListener = mEditText.getKeyListener();
                 mEditText.setKeyListener(DigitsKeyListener.getInstance("0123456789.,"));
             }
         }
@@ -1854,11 +1858,22 @@ public class InPlaceEditView extends FrameLayout{
 		/**
 		 * Connects to other textArea.
 		 */
-		public void switchToTextArea(TextArea other) {
+        public void switchToTextArea(TextArea other) {
             if (this.mTextArea != null && this.mTextArea != other) {
                 Display.getInstance().onEditingComplete(this.mTextArea, this.mTextArea.getText());
             }
+            
             this.mTextArea = other;
+            this.setInputType(0);
+            this.setImeOptions(0);
+            if (defaultKeyListener != null) {
+                setKeyListener(defaultKeyListener);
+            }
+            setTransformationMethod(null);
+            if (defaultMaxLines != -2) {
+                setMaxLines(defaultMaxLines);
+            }
+                
             mTextWatcher.reset();
         }
 

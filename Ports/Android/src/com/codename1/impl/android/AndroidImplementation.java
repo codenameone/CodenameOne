@@ -902,7 +902,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 root.addView(viewBelow, lp);
             }
             getActivity().setContentView(root);
-            myView.getAndroidView().requestFocus();
+            if (!myView.getAndroidView().hasFocus()) {
+                myView.getAndroidView().requestFocus();
+            }
         }
     }
 
@@ -1005,7 +1007,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static void stopEditing() {
         stopEditing(false);
     }
-    
+
     public static void stopEditing(final boolean forceVKBClose){
         if (getActivity() == null) {
             return;
@@ -1050,6 +1052,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         saveTextEditingState();
     }
 
+    @Override
+    public void stopTextEditing(final Runnable onFinish) {
+        final Form f = Display.getInstance().getCurrent();
+        f.addSizeChangedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                f.removeSizeChangedListener(this);
+                Display.getInstance().callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        onFinish.run();
+                    }
+                });
+            }
+        });
+        stopEditing(true);
+    }
+    
+    
     protected void setLastSizeChangedWH(int w, int h) {
         // not used?
         //this.lastSizeChangeW = w;
@@ -3219,7 +3240,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (AndroidImplementation.AndroidPeer.super.hasFocus()) {
                                 AndroidImplementation.this.blockNativeFocusAll(true);
                                 blockNativeFocus(false);
-                                v.requestFocus();
+                                if (!v.hasFocus()) {
+                                    v.requestFocus();
+                                }
 
                             } else {
                                 blockNativeFocus(true);
@@ -3430,10 +3453,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 public void run() {
                     // allow this one to gain focus
                     blockNativeFocus(false);
-                    if (v.isInTouchMode()) {
-                        v.requestFocusFromTouch();
-                    } else {
-                        v.requestFocus();
+                    if (!v.hasFocus()) {
+                        if (v.isInTouchMode()) {
+                            v.requestFocusFromTouch();
+                        } else {
+                            v.requestFocus();
+                        }
                     }
                 }
             });
@@ -3750,7 +3775,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             url = "file:///android_asset"+url;
         }
         AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
-        if(bc.parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+        if(bc.parent.fireBrowserNavigationCallbacks(url)) {
             bc.setURL(url);
         }
     }
@@ -4192,7 +4217,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     
                     // this will fail if dial permission isn't declared
                     if(url.startsWith("tel:")) {
-                        if(parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+                        if(parent.fireBrowserNavigationCallbacks(url)) {
                             try {
                                 Intent dialer = new Intent(android.content.Intent.ACTION_DIAL, Uri.parse(url));
                                 getContext().startActivity(dialer);
@@ -4202,7 +4227,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                     // this will fail if dial permission isn't declared
                     if(url.startsWith("mailto:")) {
-                        if(parent.getBrowserNavigationCallback().shouldNavigate(url)) {
+                        if(parent.fireBrowserNavigationCallbacks(url)) {
                             try {
                                 Intent emailIntent = new Intent(Intent.ACTION_SENDTO, Uri.parse(url));        
                                 getContext().startActivity(emailIntent);
@@ -4210,7 +4235,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         }
                         return true;
                     }
-                    return !parent.getBrowserNavigationCallback().shouldNavigate(url); 
+                    return !parent.fireBrowserNavigationCallbacks(url); 
                 }
                 
                 

@@ -77,6 +77,8 @@ public class CustomInvoke extends Instruction {
     public String getMethodUsed() {
         return desc + "." + name;
     }
+    public String getMethodUsedName() { return(name); }
+    public String getSignature() { return(desc); }
     
     @Override
     public void addDependencies(List<String> dependencyList) {

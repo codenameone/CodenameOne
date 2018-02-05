@@ -45,6 +45,7 @@ import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
+import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
@@ -376,9 +377,28 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         ArrayList<AsyncOp> tmp = renderingOperations;
         renderingOperations = pendingRenderingOperations;
         pendingRenderingOperations = tmp;
-        
-        for (AsyncOp o : renderingOperations) {
-            o.prepare();
+        try {
+            for (AsyncOp o : renderingOperations) {
+                o.prepare();
+            }
+        } catch (java.util.ConcurrentModificationException ex) {
+            // This is a race condition that sometimes occurs
+            // Rather than add synchronized here (which may have performance implications)
+            // we'll just "give up" and issue a repaint.
+            Log.p("NOTICE: Hit concurrent modification race condition in flushGraphics.  Skipping flush, and issuing another repaint.");
+            Log.e(ex);
+            Display.getInstance().callSerially(new Runnable() {
+
+                @Override
+                public void run() {
+                    Form f = Display.getInstance().getCurrent();
+                    if (f != null) {
+                        f.repaint();
+                    }
+                }
+                
+            });
+            return;
         }
 
         int children = getChildCount();

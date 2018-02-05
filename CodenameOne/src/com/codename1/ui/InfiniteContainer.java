@@ -48,6 +48,7 @@ public abstract class InfiniteContainer extends Container {
     private boolean requestingResults;
 
     private InfiniteScrollAdapter adapter;
+    private boolean initialized;
     
     /**
      * Creates the InfiniteContainer.
@@ -88,6 +89,10 @@ public abstract class InfiniteContainer extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
+        if(initialized) {
+            return;
+        }
+        initialized = true;
         createInfiniteScroll();
         addPullToRefresh(new Runnable() {
 

@@ -153,6 +153,12 @@ public final class AnimationManager {
                             c.setStep(scrollY);
                             c.updateAnimationState();
                             changed = true;
+                        } else {
+                            if(c.getStep() < c.getMaxSteps()) {
+                                c.setStep(c.getMaxSteps());
+                                c.updateAnimationState();
+                                changed = true;
+                            }
                         }
                     } 
                     if(changed) {

@@ -489,8 +489,8 @@ public class BorderLayout extends Layout {
             dim.setHeight(dim.getHeight() + south.getPreferredH() + south.getStyle().getMarginTop() + south.getStyle().getMarginBottom());
         }
 
-        dim.setWidth(dim.getWidth() + parent.getStyle().getPaddingLeftNoRTL() + parent.getStyle().getPaddingRightNoRTL());
-        dim.setHeight(dim.getHeight() + parent.getStyle().getPaddingTop() + parent.getStyle().getPaddingBottom());
+        dim.setWidth(dim.getWidth() + parent.getStyle().getHorizontalPadding());
+        dim.setHeight(dim.getHeight() + parent.getStyle().getVerticalPadding());
         return dim;
     }
 

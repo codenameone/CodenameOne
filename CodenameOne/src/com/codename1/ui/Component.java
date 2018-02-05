@@ -419,6 +419,7 @@ public class Component implements Animation, StyleListener {
     EventDispatcher pointerPressedListeners;
     EventDispatcher pointerReleasedListeners;
     EventDispatcher pointerDraggedListeners;
+    EventDispatcher dragFinishedListeners;
     boolean isUnselectedStyle;
     
     boolean isDragAndDropInitialized() {
@@ -496,6 +497,68 @@ public class Component implements Animation, StyleListener {
             }
         }
     }
+    
+    /**
+     * The native overlay object.  Used in Javascript port for some components so that there is 
+     * an inivisible "native" peer overlaid on the component itself to catch events.  E.g.
+     * TextFields on iOS can't be programmatically focused except through a user-initiated event -
+     * but since CN1 runs on the EDT, CN1 events aren't considered user-initiated so we can't create
+     * a native text editor on demand the way we do in desktop port - the native text editor must
+     * be *always* present.
+     */
+    private Object nativeOverlay = null;
+    
+    /**
+     * Creates the native overlay for this component. A native overlay is used on some platforms (e.g. Javascript)
+     * to help with user interaction of the component in a native way.
+     * @see #hideNativeOverlay() 
+     * @see #updateNativeOverlay() 
+     * @see #getNativeOverlay() 
+     */
+    protected void showNativeOverlay() {
+        if (nativeOverlay == null) {
+            nativeOverlay = Display.getInstance().getImplementation().createNativeOverlay(this);
+        }
+    }
+
+    /**
+     * Hides the native overlay for this component.
+     * @see #showNativeOverlay() 
+     * @see #updateNativeOverlay() 
+     * @see #getNativeOverlay() 
+     */
+    protected void hideNativeOverlay() {
+        if (nativeOverlay != null) {
+            Display.getInstance().getImplementation().hideNativeOverlay(this, nativeOverlay);
+            nativeOverlay = null;
+        }
+    }
+
+    /**
+     * Updates the native overlay for this component.  This is called each time the component
+     * is laid out, so it can change the position and visibility to match the current context.
+     * @see #showNativeOverlay() 
+     * @see #hideNativeOverlay() 
+     * @see #getNativeOverlay() 
+     */
+    protected void updateNativeOverlay() {
+        if (nativeOverlay != null) {
+            Display.getInstance().getImplementation().updateNativeOverlay(this, nativeOverlay);
+        }
+    }
+    
+    /**
+     * Gets the native overlay for this component.  May be null. Native overlays are used in the Javascript
+     * port to assist with user interaction on touch devices.  Text fields use native overlays to position
+     * an invisible native text field above themselves so that the keyboard will be activated properly when
+     * the user taps the text field.
+     * @return 
+     */
+    public Object getNativeOverlay() {
+        return nativeOverlay;
+    }
+    
+    
     
     /**
      * Checks to see if this platform supports cursors.  If the platform doesn't support cursors then any cursors
@@ -2175,9 +2238,30 @@ public class Component implements Animation, StyleListener {
         paintTensile(g);
     }
 
+    /**
+     * Returns the area of this component that is currently hidden by the virtual keyboard.
+     * @return 
+     */
+    private int getInvisibleAreaUnderVKB() {
+        Form f = getComponentForm();
+        if (f != null) {
+            int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(f);
+            if (invisibleAreaUnderVKB == 0) {
+                return 0;
+            }
+            int bottomGap = f.getHeight() - getAbsoluteY() - getHeight();
+            if (bottomGap < invisibleAreaUnderVKB) {
+                return invisibleAreaUnderVKB - bottomGap;
+            } else {
+                return 0;
+            }
+        }
+        return 0;
+    }
+    
     void paintTensile(Graphics g) {
         if(tensileHighlightIntensity > 0) {
-            int i = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
+            int i = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
             if(scrollY >= i - 1) {
                 getUIManager().getLookAndFeel().paintTensileHighlight(this, g, false , tensileHighlightIntensity);
             } else {
@@ -2492,7 +2576,7 @@ public class Component implements Animation, StyleListener {
         int scrollYtmp = scrollY;
         if(!isSmoothScrolling() || !isTensileDragEnabled()) {
             Form parentForm = getComponentForm();
-            int v = Form.getInvisibleAreaUnderVKB(parentForm);
+            int v = getInvisibleAreaUnderVKB();
             int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
@@ -2530,7 +2614,7 @@ public class Component implements Animation, StyleListener {
     
     private void updateTensileHighlightIntensity(int lastScroll, int scroll, boolean motion) {
         if(tensileHighlightEnabled) {
-            int h = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
+            int h = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
             if(h <= 0) {
                 // layout hasn't completed yet
                 tensileHighlightIntensity = 0;
@@ -3825,7 +3909,7 @@ public class Component implements Animation, StyleListener {
                 int h = getHeight() - s.getVerticalPadding();
 
                 Rectangle view;
-                int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
+                int invisibleAreaUnderVKB = getInvisibleAreaUnderVKB();
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
                 //if the dragging component is out of bounds move the scrollable parent
                 if(!view.contains(draggedx - scrollParent.getAbsoluteX(), draggedy - scrollParent.getAbsoluteY(), getWidth(), getHeight())){
@@ -3893,12 +3977,12 @@ public class Component implements Animation, StyleListener {
                 }
                 int scroll = getScrollY() + (lastScrollY - y);
                 
-                if(isAlwaysTensile() && getScrollDimension().getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) <= getHeight()) {
+                if(isAlwaysTensile() && getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() <= getHeight()) {
                     if (scroll >= -tl && scroll < getHeight() + tl) {
                         setScrollY(scroll);
                     }
                 } else {
-                    if (scroll >= -tl && scroll < getScrollDimension().getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) - getHeight() + tl) {
+                    if (scroll >= -tl && scroll < getScrollDimension().getHeight() + getInvisibleAreaUnderVKB() - getHeight() + tl) {
                         setScrollY(scroll);
                     }
                 }
@@ -4230,9 +4314,27 @@ public class Component implements Animation, StyleListener {
         }
         dragActivated = false;
         dragAndDropInitialized = false;
+        if (dragFinishedListeners != null && dragFinishedListeners.hasListeners()) {
+            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.DragFinished, x, y);
+            dragFinishedListeners.fireActionEvent(ev);
+            if(ev.isConsumed()) {
+                return;
+            }
+        }
         dragFinished(x, y);
     }
 
+    /**
+     * Adds a listener to the dragFinished event
+     *
+     * @param l callback to receive drag finished events events
+     */
+    public void addDragFinishedListener(ActionListener l) {
+        if (dragFinishedListeners == null) {
+            dragFinishedListeners = new EventDispatcher();
+        }
+        dragFinishedListeners.addListener(l);
+    }
     /**
      * Adds a listener to the pointer event
      *
@@ -4280,6 +4382,17 @@ public class Component implements Animation, StyleListener {
     public void removePointerPressedListener(ActionListener l) {
         if (pointerPressedListeners != null) {
             pointerPressedListeners.removeListener(l);
+        }
+    }
+    
+    /**
+     * Removes the listener from the drag finished event
+     *
+     * @param l callback to remove
+     */
+    public void removeDragFinishedListener(ActionListener l) {
+        if (dragFinishedListeners != null) {
+            dragFinishedListeners.removeListener(l);
         }
     }
 
@@ -4363,7 +4476,7 @@ public class Component implements Animation, StyleListener {
                         startedTensileY = true;
                     }
                 } else {
-                    int scrh = getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm());
+                    int scrh = getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB();
                     if(scrollY > scrh) {
                         startTensile(scrollY, Math.max(scrh, 0), true);
                         startedTensileY = true;
@@ -4402,10 +4515,10 @@ public class Component implements Animation, StyleListener {
                     if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
                         int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
                         draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() - 
-                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2,  speed, timeConstant);
+                                getHeight() + getInvisibleAreaUnderVKB() + tl/2,  speed, timeConstant);
                     } else {
                         draggedMotionY = Motion.createFrictionMotion(scroll, getScrollDimension().getHeight() - 
-                                getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()) + tl/2, speed, 0.0007f);
+                                getHeight() + getInvisibleAreaUnderVKB() + tl/2, speed, 0.0007f);
                     }
                 }
             } else {
@@ -4870,7 +4983,7 @@ public class Component implements Animation, StyleListener {
                 if (dragVal < 0) {
                     startTensile(dragVal, 0, true);
                 } else {
-                    int iv = Form.getInvisibleAreaUnderVKB(getComponentForm());
+                    int iv = getInvisibleAreaUnderVKB();
                     int edge = (getScrollDimension().getHeight() - getHeight() + iv);
                     if (dragVal > edge && edge > 0) {
                         startTensile(dragVal, getScrollDimension().getHeight() - getHeight() + iv, true);
@@ -4894,7 +5007,7 @@ public class Component implements Animation, StyleListener {
                 
                 // special callback to scroll Y to allow developers to override the setScrollY method effectively
                 setScrollY(dragVal);
-                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + Form.getInvisibleAreaUnderVKB(getComponentForm()), false);            
+                updateTensileHighlightIntensity(dragVal, getScrollDimension().getHeight() - getHeight() + getInvisibleAreaUnderVKB(), false);            
             }
 
             if(scrollListeners != null){
@@ -5020,9 +5133,11 @@ public class Component implements Animation, StyleListener {
             int h = getHeight() - s.getVerticalPadding();
 
             Rectangle view;
-            int invisibleAreaUnderVKB = Form.getInvisibleAreaUnderVKB(getComponentForm());
+            int invisibleAreaUnderVKB = getInvisibleAreaUnderVKB();
+            
             if (isSmoothScrolling() && destScrollY > -1) {
                 view = new Rectangle(getScrollX(), destScrollY, w, h - invisibleAreaUnderVKB);
+                
             } else {
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
             }
@@ -5220,6 +5335,7 @@ public class Component implements Animation, StyleListener {
                 setScrollX(getScrollDimension().getWidth() - getWidth());
             }
             initComponent();
+            showNativeOverlay();
         }
     }
 
@@ -5231,6 +5347,7 @@ public class Component implements Animation, StyleListener {
      */
     void deinitializeImpl() {
         if (isInitialized()) {
+            hideNativeOverlay();
             paintLockRelease();
             setInitialized(false);
             setDirtyRegion(null);
@@ -5263,7 +5380,7 @@ public class Component implements Animation, StyleListener {
                 return;
             }
             Form f = getComponentForm();
-            int ivk = Form.getInvisibleAreaUnderVKB(f);
+            int ivk = getInvisibleAreaUnderVKB();
             
             if (isScrollableY() && getScrollY() > 0 && getScrollY() + getHeight() >
                     getScrollDimension().getHeight() + ivk) {
@@ -5279,6 +5396,7 @@ public class Component implements Animation, StyleListener {
             if(!isScrollableX() && getScrollX() > 0){
                 setScrollX(0);
             }
+            updateNativeOverlay();
         }
     }
 
@@ -5342,6 +5460,8 @@ public class Component implements Animation, StyleListener {
         }
     }
 
+    
+    
     /**
      * Allows us to determine which component will receive focus next when traversing 
      * with the down key
@@ -5914,6 +6034,19 @@ public class Component implements Animation, StyleListener {
         this.dropTarget = dropTarget;
     }
 
+    /**
+     * Searches the hierarchy of the component recursively to see if the given
+     * Container is one of the parents of this component
+     * @param cnt a potential parent of this component
+     * @return false if the container isn't one of our parent containers
+     */
+    public boolean isChildOf(Container cnt) {
+        if(cnt == parent) {
+            return true;
+        }
+        return parent != null && parent.isChildOf(cnt);
+    }
+    
     /**
      * Indicates that this component and all its children should be hidden when the device is switched to portrait mode
      * @return the hideInPortrait

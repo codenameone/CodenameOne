@@ -24,6 +24,7 @@
 #include "xmlvm.h"
 #import "EAGLView.h"
 #import "CodenameOne_GLViewController.h"
+#import "CN1TapGestureRecognizer.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "com_codename1_ui_Display.h"
 #ifdef NEW_CODENAME_ONE_VM
@@ -114,6 +115,9 @@ static void installSignalHandlers() {
     // app will throw an NPE.
     installSignalHandlers();
     self.window.rootViewController = self.viewController;
+    CN1TapGestureRecognizer* recognizer = [[CN1TapGestureRecognizer alloc] initWithTarget:nil action:nil];
+    [recognizer install:self.viewController];
+    [recognizer release];
     NSURL *url = (NSURL *)[launchOptions valueForKey:UIApplicationLaunchOptionsURLKey];
     if(url != nil) {
         JAVA_OBJECT o = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);

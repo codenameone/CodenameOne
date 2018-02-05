@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
 <tests>
+  <test path="signin-demo" since="3.7"/>
   <test path="core" since="3.7"/>
 </tests>

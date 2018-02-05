@@ -62,6 +62,7 @@ using IKVM.Runtime;
 namespace com.codename1.impl
 {
 
+
     public class SilverlightImplementation : CodenameOneImplementation
     {
         private LocationManager locationManager;
@@ -100,8 +101,8 @@ namespace com.codename1.impl
             scaleFactor = Windows.Graphics.Display.DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
                ss = getDictValue(iCN1Settings, "DefaultStorageFolder", "Cache:");
 #elif WINDOWS_UWP
-              ss = getDictValue(iCN1Settings, "DefaultStorageFolder", "Local:");
-              scaleFactor = Windows.Graphics.Display.DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
+            ss = getDictValue(iCN1Settings, "DefaultStorageFolder", "Local:");
+            scaleFactor = Windows.Graphics.Display.DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
 #elif WINDOWS_APP
              ss = getDictValue(iCN1Settings, "DefaultStorageFolder", "Local:");
             scaleFactor = ScaleDesktop.ScaleFactor;
@@ -113,12 +114,14 @@ namespace com.codename1.impl
             diagonalSizeInInches = DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
             resolutionScale = DisplayInformation.GetForCurrentView().ResolutionScale;
             screen = new CanvasControl();
+
             screen.Width = cl.ActualWidth * scaleFactor;
             screen.Height = cl.ActualHeight * scaleFactor;
             cl.Children.Add(screen);
             screen.ClearColor = Windows.UI.Colors.Transparent; // Maybe white ?
             Canvas.SetLeft(screen, 0);
             Canvas.SetTop(screen, 0);
+
             myView = new WindowsAsyncView(screen);
             /*
             Visual hostVisual = Windows.UI.Xaml.Hosting.ElementCompositionPreview.GetElementVisual(cl);
@@ -231,11 +234,11 @@ namespace com.codename1.impl
                     }
                 } catch (Exception ex)
                 {
-                    Display.getInstance().callSerially(new SendPushRegistrationErrorhRunnable("Failed to open push channel: "+ex.Message, 0));
+                    Display.getInstance().callSerially(new SendPushRegistrationErrorhRunnable("Failed to open push channel: " + ex.Message, 0));
                 }
-               
-                
-           
+
+
+
             });
 
         }
@@ -302,7 +305,7 @@ namespace com.codename1.impl
             {
                 pushLog.Remove(toremove);
             }
-            
+
         }
 
         public static Dictionary<string, long> pushLog = new Dictionary<string, long>();
@@ -328,7 +331,7 @@ namespace com.codename1.impl
                         break;
                     }
 
-                    
+
             }
         }
 
@@ -365,7 +368,7 @@ namespace com.codename1.impl
             }
         }
 
-        class RegisterServerPushRunnable :java.lang.Runnable
+        class RegisterServerPushRunnable : java.lang.Runnable
         {
             private string id;
 
@@ -373,10 +376,10 @@ namespace com.codename1.impl
             {
                 this.id = id;
             }
-           
+
             public void run()
             {
-               
+
                 SilverlightImplementation.instance._registerServerPush(this.id);
             }
         }
@@ -493,7 +496,7 @@ namespace com.codename1.impl
         public override void init(object n1)
         {
 
-           
+
             instance = this;
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
           {
@@ -504,22 +507,20 @@ namespace com.codename1.impl
               Windows.UI.Core.SystemNavigationManager.GetForCurrentView().BackRequested += SilverlightImplementation_BackRequested;
               if (Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons"))
               {
-                  isPhone = false; 
+                  isPhone = false;
               }
 #endif
               cl.SizeChanged += cl_SizeChanged;
               cl.ManipulationMode = ManipulationModes.All;
-              cl.PointerPressed += new PointerEventHandler(Canvas__pointerPressed);
-              //cl.CompositeMode = ElementCompositeMode.MinBlend;
-              screen.ManipulationMode = ManipulationModes.All;
-              
-              screen.PointerPressed += new PointerEventHandler(LayoutRoot_PointerPressed);
-              screen.Tapped += new TappedEventHandler(LayoutRoot_Tapped);
-              screen.PointerWheelChanged += new PointerEventHandler(LayoutRoot_PointerWheelChanged);
-              //screen.ManipulationMode = ManipulationModes.None;
-              //screen.IsHitTestVisible = false;
-              screen.PointerReleased += new PointerEventHandler(LayoutRoot_PointerReleased);
-              screen.PointerMoved += new PointerEventHandler(LayoutRoot_PointerMoved);
+
+              cl.PointerPressed += new PointerEventHandler(LayoutRoot_PointerPressed);
+              screen.IsHitTestVisible = false;
+              cl.IsHitTestVisible = true;
+              cl.Tapped += new TappedEventHandler(LayoutRoot_Tapped);
+              cl.PointerWheelChanged += new PointerEventHandler(LayoutRoot_PointerWheelChanged);
+
+              cl.PointerReleased += new PointerEventHandler(LayoutRoot_PointerReleased);
+              cl.PointerMoved += new PointerEventHandler(LayoutRoot_PointerMoved);
           }).AsTask().GetAwaiter();
             Display.getInstance().getDragSpeed(true);
             _sensor = SimpleOrientationSensor.GetDefault();
@@ -530,6 +531,7 @@ namespace com.codename1.impl
             Display.getInstance().setTransitionYield(0);
             setDragStartPercentage(3);
         }
+
 
         private void LayoutRoot_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
         {
@@ -558,7 +560,7 @@ namespace com.codename1.impl
         {
             point = e.GetPosition(screen);//.Position;
 
-            
+
             if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
             {
                 foreach (object child in cl.Children)
@@ -566,7 +568,7 @@ namespace com.codename1.impl
                     if (child is WebView)
                     {
                         WebView wv = (WebView)child;
-                        
+
                         routeTapEventToWebview(wv, e, "click");
                         wv.Focus(FocusState.Pointer);
                         //wv.InvokeScriptAsync("document.focus", new string[] { });
@@ -575,259 +577,6 @@ namespace com.codename1.impl
                 return;
             }
         }
-
-        private void Canvas__pointerPressed(object sender, PointerRoutedEventArgs e)
-        {
-            //e.S
-        }
-#if WINDOWS_UWP
-        private void SilverlightImplementation_BackRequested(object sender,Windows.UI.Core.BackRequestedEventArgs e)
-        {
-            keyPressed(getBackKeyCode());
-            keyReleased(getBackKeyCode());
-            e.Handled = true;
-        }
-#endif
-         void cl_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            InvalidateLayout();
-        }
- 
-        void app_OrientationChanged(object sender, SimpleOrientationSensorOrientationChangedEventArgs e)
-        {
-            InvalidateLayout();
-        }
-
-        private async void InvalidateLayout()
-        {
-            await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                screen.Height = displayHeight = Convert.ToInt32(cl.ActualHeight * scaleFactor);
-                screen.Width = displayWidth = Convert.ToInt32(cl.ActualWidth * scaleFactor);
-                sizeChanged(displayWidth, displayHeight);
-                Form f = getCurrentForm();
-                if (f != null)
-                {
-                    base.repaint(f);
-                }
-            });
-        }
-
-        public override bool canForceOrientation()
-        {
-            return true;
-        }
-
-        public override string getProperty(string n1, string n2)
-        {
-            string p = n1.ToLower();
-
-            if (p.Equals("os"))
-            {
-                return "Windows Phone";
-            }
-            if (p.Equals("platform"))
-            {
-                return "" + Package.Current.Id.Version.Build;
-            }
-            if (p.Equals("osver"))
-            {
-                return "" + Package.Current.Id.Version.Major + "." + Package.Current.Id.Version.Minor;
-            }
-            if (p.Equals("user-agent"))
-            {
-                return "M";
-            }
-            if (n1.Equals("windows.DisplayInformation.LogicalDpi"))
-            {
-                //return "" + DisplayInformation.GetForCurrentView().LogicalDpi;
-                return logicalDpi + "";
-
-            }
-            if (n1.Equals("windows.DisplayInformation.DiagonalSizeInInches"))
-            {
-                //return ""+DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
-                return diagonalSizeInInches + "";
-            }
-            if (n1.Equals("windows.DisplayInformation.RawDpiX"))
-            {
-                //return "" + DisplayInformation.GetForCurrentView().RawDpiX;
-                return rawDpix+"";
-            }
-            if (n1.Equals("windows.DisplayInformation.RawDpiY"))
-            {
-                //return "" + DisplayInformation.GetForCurrentView().RawDpiY;
-                return "" + rawDpiy;
-            }
-            if (n1.Equals("windows.DisplayInformation.RawPixelsPerViewPixel"))
-            {
-                //return "" + DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
-                return scaleFactor+"";
-            }
-            if (n1.Equals("windows.DisplayInformation.ResolutionScale"))
-            {
-                //return "" + DisplayInformation.GetForCurrentView().ResolutionScale;
-                return resolutionScale + "";
-            }
-            
-            return base.getProperty(n1, n2);
-        }
-        /// <summary>
-        ///  not ideal but I couldn't find any other way...
-        ///  Application.Current.Exit(); // TODO - suspending handler
-        ///  if back command is not defined the minimizeApplication is called so better is to do nothing
-        /// </summary>
-        /// <returns></returns>
-        public override bool minimizeApplication()
-        {
-            return true;
-        }
-        public override void exitApplication()
-        {
-            Application.Current.Exit();
-        }
-
-        public override bool paintNativePeersBehind()
-        {
-            return true;
-        }
-
-        public override media.Media createMedia(java.io.InputStream n1, string n2, java.lang.Runnable n3)
-        {
-            object ss = createStorageOutputStream("CN1TempVideodu73aFljhuiw3yrindo87.mp4");
-            java.io.OutputStream os = (java.io.OutputStream)ss;
-            io.Util.copy(n1, os);
-            StorageFile storageTask = getFile("CN1TempVideodu73aFljhuiw3yrindo87.mp4");
-            StorageFile file = storageTask;
-            Task<Stream> streamTask = file.OpenStreamForReadAsync();
-            Stream s = streamTask.Result;
-            return new CN1Media(s, n2, n3, cl);
-        }
-
-        public override media.Media createMedia(string uri, bool isVideo, java.lang.Runnable onCompletion)
-        {
-            if (isTempFile(uri))
-            {
-                StorageFile sf = getTempFile(uri);
-                uri = sf.Path;
-            }
-            else if (uri.StartsWith("file://"))
-            {
-                StorageFile sf;
-                openInputStream(uri, true, out sf);
-                uri = sf.Path;
-            }
-            return new CN1Media(uri, isVideo, onCompletion, cl);
-        }
-
-        
-
-        public override void lockOrientation(bool portrait)
-        {
-            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                if (portrait)
-                {
-                    DisplayInformation.AutoRotationPreferences = DisplayOrientations.Portrait;
-                }
-                else
-                {
-                    DisplayInformation.AutoRotationPreferences = DisplayOrientations.Landscape;
-                }
-
-            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-
-        public override void unlockOrientation()
-        {
-            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                DisplayInformation.AutoRotationPreferences = DisplayOrientations.None;
-            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
-        }
-
-        public override bool hasNativeTheme()
-        {
-            return true;
-        }
-
-         public override void installNativeTheme()
-        {
-           ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
-            ui.plaf.UIManager uim = ui.plaf.UIManager.getInstance();
-            string[] themeNames = r.getThemeResourceNames();
-            java.util.Hashtable props = r.getTheme((string)themeNames[0]);
-            bool isHardwareButtonsAPIPresent = Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons");
-            if (!isHardwareButtonsAPIPresent)
-            {
-                props.put("@hideBackCommandBool", "false");
-            } else 
-            {
-                props.put("@hideBackCommandBool", "true");
-            } 
-            uim.setThemeProps(props);
-            ui.plaf.DefaultLookAndFeel dl = (ui.plaf.DefaultLookAndFeel)uim.getLookAndFeel();
-            dl.setDefaultEndsWith3Points(false);
-        }
-
-        public override bool isMultiTouch()
-        {
-            return true;
-        }
-
-        private void LayoutRoot_PointerMoved(object sender, PointerRoutedEventArgs e)
-        {
-            var pointerId = e.Pointer;
-            point = e.GetCurrentPoint(cl).Position;
-
-            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
-                foreach (object child in cl.Children)
-                {
-                    if (child is WebView)
-                    {
-                        WebView wv = (WebView)child;
-                        wv.Focus(FocusState.Pointer);
-                        //wv.InvokeScriptAsync("document.focus", new string[] { });
-                        routePointerEventToWebview(wv, e, "mousemove");
-                    }
-                }
-                return;
-            }
-
-            var BB = e.GetIntermediatePoints(cl);
-            if (pointerId.PointerDeviceType == PointerDeviceType.Touch || pointerId.PointerDeviceType == PointerDeviceType.Mouse || pointerId.PointerDeviceType == PointerDeviceType.Pen)
-            {
-                PointerPoint ptrPt = e.GetCurrentPoint(screen);
-                if (ptrPt.Properties.IsLeftButtonPressed)
-                {
-                    pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
-                }
-                if (ptrPt.Properties.IsMiddleButtonPressed)
-                {
-                    pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
-                }
-                if (ptrPt.Properties.IsRightButtonPressed)
-                {
-                    pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
-                }
-            }
-            e.Handled = true;
-        }
-
-        private bool hitTest(int x, int y)
-        {
-            Form f = Display.getInstance().getCurrent();
-            if (f != null)
-            {
-                Component cmp = f.getComponentAt(x, y);
-                if (cmp != null && cmp is PeerComponent)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         private string createJSPointerEventProperties(WebView wv, PointerPoint wvPoint, PointerRoutedEventArgs e)
         {
             int button = 0;
@@ -1136,12 +885,264 @@ namespace com.codename1.impl
             string js = "(function(){" + createJSClickEvent(wv, e, eventName) + "})()";
             wv.InvokeScriptAsync("eval", new string[] { js });
         }
+        
+
+#if WINDOWS_UWP
+        private void SilverlightImplementation_BackRequested(object sender,Windows.UI.Core.BackRequestedEventArgs e)
+        {
+            keyPressed(getBackKeyCode());
+            keyReleased(getBackKeyCode());
+            e.Handled = true;
+        }
+#endif
+         void cl_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            InvalidateLayout();
+        }
+ 
+        void app_OrientationChanged(object sender, SimpleOrientationSensorOrientationChangedEventArgs e)
+        {
+            InvalidateLayout();
+        }
+
+        private async void InvalidateLayout()
+        {
+            await dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                screen.Height = displayHeight = Convert.ToInt32(cl.ActualHeight * scaleFactor);
+                screen.Width = displayWidth = Convert.ToInt32(cl.ActualWidth * scaleFactor);
+                sizeChanged(displayWidth, displayHeight);
+                Form f = getCurrentForm();
+                if (f != null)
+                {
+                    base.repaint(f);
+                }
+            });
+        }
+
+        public override bool canForceOrientation()
+        {
+            return true;
+        }
+
+        public override string getProperty(string n1, string n2)
+        {
+            string p = n1.ToLower();
+
+            if (p.Equals("os"))
+            {
+                return "Windows Phone";
+            }
+            if (p.Equals("platform"))
+            {
+                return "" + Package.Current.Id.Version.Build;
+            }
+            if (p.Equals("osver"))
+            {
+                return "" + Package.Current.Id.Version.Major + "." + Package.Current.Id.Version.Minor;
+            }
+            if (p.Equals("user-agent"))
+            {
+                return "M";
+            }
+            if (n1.Equals("windows.DisplayInformation.LogicalDpi"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().LogicalDpi;
+                return logicalDpi + "";
+
+            }
+            if (n1.Equals("windows.DisplayInformation.DiagonalSizeInInches"))
+            {
+                //return ""+DisplayInformation.GetForCurrentView().DiagonalSizeInInches;
+                return diagonalSizeInInches + "";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiX"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiX;
+                return rawDpix+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.RawDpiY"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawDpiY;
+                return "" + rawDpiy;
+            }
+            if (n1.Equals("windows.DisplayInformation.RawPixelsPerViewPixel"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().RawPixelsPerViewPixel;
+                return scaleFactor+"";
+            }
+            if (n1.Equals("windows.DisplayInformation.ResolutionScale"))
+            {
+                //return "" + DisplayInformation.GetForCurrentView().ResolutionScale;
+                return resolutionScale + "";
+            }
+            
+            return base.getProperty(n1, n2);
+        }
+        /// <summary>
+        ///  not ideal but I couldn't find any other way...
+        ///  Application.Current.Exit(); // TODO - suspending handler
+        ///  if back command is not defined the minimizeApplication is called so better is to do nothing
+        /// </summary>
+        /// <returns></returns>
+        public override bool minimizeApplication()
+        {
+            return true;
+        }
+        public override void exitApplication()
+        {
+            Application.Current.Exit();
+        }
+
+        public override bool paintNativePeersBehind()
+        {
+            return true;
+        }
+
+        public override media.Media createMedia(java.io.InputStream n1, string n2, java.lang.Runnable n3)
+        {
+            object ss = createStorageOutputStream("CN1TempVideodu73aFljhuiw3yrindo87.mp4");
+            java.io.OutputStream os = (java.io.OutputStream)ss;
+            io.Util.copy(n1, os);
+            StorageFile storageTask = getFile("CN1TempVideodu73aFljhuiw3yrindo87.mp4");
+            StorageFile file = storageTask;
+            Task<Stream> streamTask = file.OpenStreamForReadAsync();
+            Stream s = streamTask.Result;
+            return new CN1Media(s, n2, n3, cl);
+        }
+
+        public override media.Media createMedia(string uri, bool isVideo, java.lang.Runnable onCompletion)
+        {
+            if (isTempFile(uri))
+            {
+                StorageFile sf = getTempFile(uri);
+                uri = sf.Path;
+            }
+            else if (uri.StartsWith("file://"))
+            {
+                StorageFile sf;
+                openInputStream(uri, true, out sf);
+                uri = sf.Path;
+            }
+            return new CN1Media(uri, isVideo, onCompletion, cl);
+        }
+
+        
+
+        public override void lockOrientation(bool portrait)
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                if (portrait)
+                {
+                    DisplayInformation.AutoRotationPreferences = DisplayOrientations.Portrait;
+                }
+                else
+                {
+                    DisplayInformation.AutoRotationPreferences = DisplayOrientations.Landscape;
+                }
+
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        public override void unlockOrientation()
+        {
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                DisplayInformation.AutoRotationPreferences = DisplayOrientations.None;
+            }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        public override bool hasNativeTheme()
+        {
+            return true;
+        }
+
+         public override void installNativeTheme()
+        {
+           ui.util.Resources r = ui.util.Resources.open("/winTheme.res");
+            ui.plaf.UIManager uim = ui.plaf.UIManager.getInstance();
+            string[] themeNames = r.getThemeResourceNames();
+            java.util.Hashtable props = r.getTheme((string)themeNames[0]);
+            bool isHardwareButtonsAPIPresent = Windows.Foundation.Metadata.ApiInformation.IsTypePresent("Windows.Phone.UI.Input.HardwareButtons");
+            if (!isHardwareButtonsAPIPresent)
+            {
+                props.put("@hideBackCommandBool", "false");
+            } else 
+            {
+                props.put("@hideBackCommandBool", "true");
+            } 
+            uim.setThemeProps(props);
+            ui.plaf.DefaultLookAndFeel dl = (ui.plaf.DefaultLookAndFeel)uim.getLookAndFeel();
+            dl.setDefaultEndsWith3Points(false);
+        }
+
+        public override bool isMultiTouch()
+        {
+            return true;
+        }
+
+        private void LayoutRoot_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            var pointerId = e.Pointer;
+            point = e.GetCurrentPoint(cl).Position;
+            
+            if (hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
+            {
+                screen.IsHitTestVisible = true;
+                
+            } else
+            {
+                screen.IsHitTestVisible = false;
+                foreach (object child in cl.Children)
+                {
+                    if (child is WebView)
+                    {
+                        WebView wv = (WebView)child;
+                        wv.Focus(FocusState.Pointer);
+                        //wv.InvokeScriptAsync("document.focus", new string[] { });
+                        routePointerEventToWebview(wv, e, "mousemove");
+                    }
+                }
+
+            }
+            var BB = e.GetIntermediatePoints(cl);
+            if (pointerId.PointerDeviceType == PointerDeviceType.Touch || pointerId.PointerDeviceType == PointerDeviceType.Mouse || pointerId.PointerDeviceType == PointerDeviceType.Pen)
+            {
+                PointerPoint ptrPt = e.GetCurrentPoint(screen);
+                if (ptrPt.Properties.IsLeftButtonPressed)
+                {
+                    pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
+                }
+                if (ptrPt.Properties.IsMiddleButtonPressed)
+                {
+                    pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
+                }
+                if (ptrPt.Properties.IsRightButtonPressed)
+                {
+                    pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
+                }
+            }
+
+        }
+
+        private bool hitTest(int x, int y)
+        {
+            Form f = Display.getInstance().getCurrent();
+            if (f != null)
+            {
+                Component cmp = f.getComponentAt(x, y);
+                if (cmp != null && cmp is PeerComponent)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         private void LayoutRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-
             point = e.GetCurrentPoint(cl).Position;
-            
             if (instance.currentlyEditing != null)
             {
                 Form f = instance.currentlyEditing.getComponentForm();
@@ -1150,7 +1151,15 @@ namespace com.codename1.impl
                     return;
                 }
             }
-            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
+            Component c = Display.getInstance().getCurrent().getComponentAt(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
+            if (hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
+            {
+                screen.IsHitTestVisible = true;
+
+            }
+            else
+            {
+                screen.IsHitTestVisible = false;
                 foreach (object child in cl.Children)
                 {
                     if (child is WebView)
@@ -1161,11 +1170,10 @@ namespace com.codename1.impl
                         routePointerEventToWebview(wv, e, "mousedown");
                     }
                 }
-                return;
+
             }
+            
             pointerPressed(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
-            screen.CapturePointer(e.Pointer);
-            e.Handled = true;
         }
 
         private void LayoutRoot_PointerReleased(object sender, PointerRoutedEventArgs e)
@@ -1179,8 +1187,14 @@ namespace com.codename1.impl
                     commitEditing();
                 }
             }
-            if (!hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor))) {
-                foreach (object child in cl.Children)
+            if (hitTest(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor)))
+            {
+                screen.IsHitTestVisible = true;
+            }
+            else
+            {
+                screen.IsHitTestVisible = false;
+                foreach(object child in cl.Children)
                 {
                     if (child is WebView)
                     {
@@ -1190,10 +1204,10 @@ namespace com.codename1.impl
                         routePointerEventToWebview(wv, e, "mouseup");
                     }
                 }
-                return;
+
             }
+            
             pointerReleased(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
-            e.Handled = true;
             return;
         }
 
@@ -1506,7 +1520,7 @@ namespace com.codename1.impl
             }
             base.afterComponentPaint(c, g);
         }
-
+        
         public override void repaint(Animation cmp)
         {
             if (myView != null)
@@ -2009,9 +2023,19 @@ namespace com.codename1.impl
             return sbyteArray;
         }
 
+        const int maxCacheSize = 50;
+        private static ConcurrentDictionary<int, CodenameOneImage> imageCache = new ConcurrentDictionary<int, CodenameOneImage>();
+
         public override object createImage(byte[] bytes, int offset, int len)
         {
-           
+
+            if (imageCache.ContainsKey(bytes.GetHashCode()))
+            {
+                CodenameOneImage cached;
+                imageCache.TryGetValue(bytes.GetHashCode(), out cached);
+                cached.lastAccess = DateTime.Now.Ticks;
+                return cached;
+            }
             if (bytes.Length == 0)
             {
                 // workaround for empty images
@@ -2047,7 +2071,16 @@ namespace com.codename1.impl
                 cim.graphics.destination.dispose();
                 ci = cim;
                 canvasbitmap.Dispose();
-                
+                dispatcher.RunAsync(CoreDispatcherPriority.Low, () =>
+                {
+                    imageCache.TryAdd(bytes.GetHashCode(), ci);
+                    while (imageCache.Count > maxCacheSize)
+                    {
+                        int toRemove = imageCache.OrderBy(m => m.Value.lastAccess).First().Key;
+                        CodenameOneImage ignored;
+                        imageCache.TryRemove(toRemove, out ignored);
+                    }
+                }).AsTask();
             }
             catch (Exception)
             {
@@ -2464,19 +2497,59 @@ namespace com.codename1.impl
             void webview_ContentLoading(WebView sender, WebViewContentLoadingEventArgs e)
             {
                 ActionEvent ev = new ActionEvent(e == null ? null : e.Uri == null ? null : e.Uri.OriginalString);
-                string jsInject = createCaretRangeJSFuncs();
-                //jsInject = "(function(){ " + jsInject + "\n window.__cn1__getMouseEventCaretRange = getMouseEventCaretRange; window.__cn1__selectRange = selectRange;"+
-                //    "window.addEventListener('click', function(e){ try { console.log('caret pos: '); console.log(document.caretRangeFromPoint(e.clientX, e.clientY));console.log(e); e.target.focus(); var caretRange = getMouseEventCaretRange(e); console.log(caretRange); window.setTimeout(function(){try {selectRange(caretRange);} catch (e){console.log(e);}}, 0);} catch (e){console.log(e);}}, false);\n})();";
-                //sender.InvokeScriptAsync("eval", new string[] { jsInject });
+                sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerdown', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerPressed='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
+                sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointerup', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerReleased='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
+                //sender.InvokeScriptAsync("eval", new string[] { "window.addEventListener('pointermove', function(evt){try{window.location.href='https://www.codenameone.com/#-cn1:pointerMoved='+evt.clientX+','+evt.clientY;} catch (e){console.log('failed to call pointerPressed '+e);}}, true);" });
+
                 bc.fireWebEvent("onLoad", ev);
             }
 
             void webview_Navigating(WebView sender, WebViewNavigationStartingEventArgs e)
             {
-                BrowserNavigationCallback bn = bc.getBrowserNavigationCallback();
-                if (bn != null && e.Uri != null && !bn.shouldNavigate(e.Uri.ToString()))
+                if (e.Uri != null && !bc.fireBrowserNavigationCallbacks(e.Uri.ToString()))
                 {
                     e.Cancel = true;
+                    return;
+                }
+                if (isRenderedInFront && e.Uri != null && e.Uri.Fragment != null && e.Uri.Fragment.StartsWith("#-cn1:pointerPressed="))
+                {
+
+                    string value = e.Uri.Fragment.Substring(e.Uri.Fragment.LastIndexOf("=") + 1);
+                    string[] parts = value.Split(',');
+                    int xCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[0])).intValue();
+                    int yCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[1])).intValue();
+                    Windows.Foundation.Point point = new Windows.Foundation.Point(Canvas.GetLeft(sender) + xCoord, Canvas.GetTop(sender) + yCoord);
+                    
+                    pointerPressed(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
+                    e.Cancel = true;
+                }
+                if (isRenderedInFront && e.Uri != null && e.Uri.Fragment != null && e.Uri.Fragment.StartsWith("#-cn1:pointerReleased="))
+                {
+
+                    string value = e.Uri.Fragment.Substring(e.Uri.Fragment.LastIndexOf("=") + 1);
+                    string[] parts = value.Split(',');
+                    int xCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[0])).intValue();
+                    int yCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[1])).intValue();
+                    Windows.Foundation.Point point = new Windows.Foundation.Point(Canvas.GetLeft(sender) + xCoord, Canvas.GetTop(sender) + yCoord);
+
+                    pointerReleased(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
+                    e.Cancel = true;
+                }
+                if (isRenderedInFront && e.Uri != null && e.Uri.Fragment != null && e.Uri.Fragment.StartsWith("#-cn1:pointerMoved="))
+                {
+
+                    string value = e.Uri.Fragment.Substring(e.Uri.Fragment.LastIndexOf("=") + 1);
+                    string[] parts = value.Split(',');
+                    int xCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[0])).intValue();
+                    int yCoord = new java.lang.Double(java.lang.Double.parseDouble(parts[1])).intValue();
+                    Windows.Foundation.Point point = new Windows.Foundation.Point(Canvas.GetLeft(sender) + xCoord, Canvas.GetTop(sender) + yCoord);
+
+                    pointerDragged(Convert.ToInt32(point.X * scaleFactor), Convert.ToInt32(point.Y * scaleFactor));
+                    e.Cancel = true;
+                }
+                if (e.Uri != null && e.Uri.Fragment != null && e.Uri.Fragment.StartsWith("#-cn1:pointer")) {
+                    e.Cancel = true;
+                    return;
                 }
                 ActionEvent ev = new ActionEvent(e.Uri == null ? null : e.Uri.OriginalString);
                 bc.fireWebEvent("onStart", ev);
@@ -2740,11 +2813,13 @@ namespace com.codename1.impl
         public override void browserExecute(PeerComponent n1, string n2)
         {
             WebView webView = null;
-            dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            dispatcher.RunAsync(CoreDispatcherPriority.Normal,  () =>
             {
+                
                 webView = (WebView)((SilverlightPeer)n1).element;
-                await webView.InvokeScriptAsync(n2, new string[] { "document.title.toString()" });
-            }).AsTask().GetAwaiter();
+                
+                webView.InvokeScriptAsync("eval", new string[] { n2 });
+            });
         }
 
         public override string browserExecuteAndReturnString(PeerComponent n1, string n2)

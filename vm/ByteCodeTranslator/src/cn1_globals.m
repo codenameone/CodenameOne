@@ -260,10 +260,21 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
 }
 
 extern struct ThreadLocalData** allThreads; 
-extern struct ThreadLocalData** threadsToDelete;
+extern int nThreadsToKill;
 
 JAVA_BOOLEAN hasAgressiveAllocator;
 
+// the thread just died, mark its remaining resources
+void collectThreadResources(struct ThreadLocalData *current)
+{
+    for(int heapTrav = 0 ; heapTrav < current->heapAllocationSize ; heapTrav++) {
+        JAVA_OBJECT obj = (JAVA_OBJECT)current->pendingHeapAllocations[heapTrav];
+        if(obj) {
+            current->pendingHeapAllocations[heapTrav] = 0;
+            placeObjectInHeapCollection(obj);
+        }
+    }
+}
 /**
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
@@ -275,21 +286,8 @@ void codenameOneGCMark() {
     //int marked = 0;
     
     // copy the allocated objects from already deleted threads so we can delete that data
-    if(threadsToDelete != 0) {
-        for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
-            if(threadsToDelete[i] != 0) {
-                struct ThreadLocalData* current = threadsToDelete[i];
-                for(int heapTrav = 0 ; heapTrav < current->heapAllocationSize ; heapTrav++) {
-                    JAVA_OBJECT obj = (JAVA_OBJECT)current->pendingHeapAllocations[heapTrav];
-                    if(obj) {
-                        current->pendingHeapAllocations[heapTrav] = 0;
-                        placeObjectInHeapCollection(obj);
-                    }
-                }
-            }
-        }
-    }
-
+    //NSLog(@"GC mark, %d dead processes pending",nThreadsToKill);
+    
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -305,8 +303,19 @@ void codenameOneGCMark() {
                 // we don't have much control and who barely call into Java anyway
                 if(t->lightweightThread) {
                     t->threadBlockedByGC = JAVA_TRUE;
+                    int totalwait = 0;
+                    long now = time(0);
                     while(t->threadActive) {
                         usleep(500);
+                        totalwait += 500;
+                        if((totalwait%10000)==0)
+                        {   long later = time(0)-now;
+                            if(later>10000)
+                            {
+                            NSLog(@"GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
+                                  (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
+                            }
+                        }
                     }
                 }
                 
@@ -540,27 +549,6 @@ void codenameOneGCSweep() {
             }
         }
     }
-    
-    //NSLog(@"Sweep removed %i objects", counter);
-     
-    /*if(threadsToDelete != 0) {
-        lockCriticalSection();
-        for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
-            if(threadsToDelete[i] != 0) {
-                //NSLog(@"Deleting thread: %i", i);
-                struct ThreadLocalData* current = threadsToDelete[i];
-                free(current->blocks);
-                free(current->threadObjectStack);
-                free(current->callStackClass);
-                free(current->callStackLine);
-                free(current->callStackMethod);
-                free(current->pendingHeapAllocations);
-                free(current);
-                threadsToDelete[i] = 0;
-            }
-        }
-        unlockCriticalSection();
-    }*/
     
     // we had a thread that really ripped into the GC so we only release that thread now after cleaning RAM
     if(hasAgressiveAllocator) {

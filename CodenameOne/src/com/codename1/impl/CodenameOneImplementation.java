@@ -332,6 +332,15 @@ public abstract class CodenameOneImplementation {
      */
     public void stopTextEditing() {    
     }
+
+    
+    /**
+     * Invoked for special cases to stop text editing and clear native editing state
+     */
+    public void stopTextEditing(Runnable onFinish) {    
+        stopTextEditing();
+        onFinish.run();
+    }
     
     /**
      * Using invokeAndBlock inside EditString creates peculiar behaviour that needs
@@ -3875,6 +3884,59 @@ public abstract class CodenameOneImplementation {
     public PeerComponent createBrowserComponent(Object browserComponent) {
         return null;
     }
+    
+    /**
+     * <p>Creates a native overlay for the given component. A native overlay is a native component
+     * that is always present over the given component.  It can be used to help processing user 
+     * events in a more native way.  In the Javascript port, native overlays are used on TextFields, for example,
+     * so that users can tap on the text field and activate the keyboard.  This was necessary because
+     * iOS doesn't allow us to programmatically activate the keyboard.  Without a native overlay, 
+     * the user would first have to tap the lightweight keyboard - upon which we create a native text
+     * field, and then the user would have to tap again to activate the keyboard.  Using native
+     * overlays in that case yields better UX.</p>
+     * 
+     * <p>When using native overlays, you will need to implement {@link #createNativeOverlay(com.codename1.ui.Component) },
+     * {@link #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) }, and {@link #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) }.
+     * {@link #createNativeOverlay(com.codename1.ui.Component) } is called in {@link Component#initComponent() } (i.e. when the component is added to the form). 
+     * This is where you would create the native view and add it to the native view hierarchy above the CN1 canvas.
+     * {@link #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) } is called in {@link Component#laidOut() } (i.e. when the component is resized/positioned).   
+     * This is where you can reposition the native view or change its properties to be appropriate for the "occasion". {@link #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) }
+     * is called in {@link Component#deinitialize() } (i.e. when the component is removed from the form).  You should destroy the native view and remove it from the native view hierarchy here.
+     * 
+     * 
+     * @param cmp The component to create the overlay for.
+     * @return A native object.  The object type/format is decided by the implementation.
+     * @see #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see Component#showNativeOverlay() 
+     */
+    public Object createNativeOverlay(Component cmp) {
+        return null;
+    }
+    
+    /**
+     * Hides the native overlay for a component.
+     * @param cmp The component
+     * @param nativeOverlay The native overlay.
+     * @see #createNativeOverlay(com.codename1.ui.Component) 
+     * @see #updateNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see Component#hideNativeOverlay() 
+     */
+    public void hideNativeOverlay(Component cmp, Object nativeOverlay) {
+        
+    }
+    
+    /**
+     * Updates the native overlay after the component has been repositioned.
+     * @param cmp The component
+     * @param nativeOverlay The native overlay
+     * @see #createNativeOverlay(com.codename1.ui.Component) 
+     * @see #hideNativeOverlay(com.codename1.ui.Component, java.lang.Object) 
+     * @see Component#updateNativeOverlay()
+     */
+    public void updateNativeOverlay(Component cmp, Object nativeOverlay) {
+        
+    }
 
     /**
      * This method allows customizing the properties of a web view in various ways including platform specific settings.
@@ -5024,6 +5086,8 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    
+    
     /**
      * Allows buggy implementations (Android) to release image objects  
      * @param image native image object

@@ -59,6 +59,20 @@ public class Location {
     public Location() {
     }
 
+    public Location(double latitude, double longitude, double altitude, float direction) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.altitude = altitude;
+        this.direction = direction;
+    }
+
+    
+    
+    public Location(double latitude, double longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
     /**
      * Returns the horizontal accuracy of the location in meters
      * @return the accuracy if exists or 0.0 if not.

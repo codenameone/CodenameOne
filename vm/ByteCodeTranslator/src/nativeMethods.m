@@ -197,6 +197,14 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     return hash;
 }
 
+JAVA_OBJECT java_lang_reflect_Array_newInstanceImpl___java_lang_Class_int_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_INT len) {
+    enteringNativeAllocations();
+    struct clazz* clz = (struct clazz*)cls;
+    JAVA_OBJECT out = allocArray(CN1_THREAD_STATE_PASS_ARG len, clz, sizeof(JAVA_OBJECT), 1);
+    finishedNativeAllocations();
+    return out;
+}
+
 JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
     enteringNativeAllocations();
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
@@ -740,6 +748,10 @@ JAVA_DOUBLE java_lang_Math_max___double_double_R_double(CODENAME_ONE_THREAD_STAT
     return b;
 }
 
+JAVA_DOUBLE java_lang_Math_pow___double_double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a, JAVA_DOUBLE b){
+    return pow(a, b);
+}
+
 JAVA_FLOAT java_lang_Math_max___float_float_R_float(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT a, JAVA_FLOAT b){
     if(a > b) return a;
     return b;
@@ -783,6 +795,10 @@ JAVA_DOUBLE java_lang_Math_tan___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA
     return tan(a);
 }
 
+JAVA_DOUBLE java_lang_Math_atan___double_R_double(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE a) {
+    return atan(a);
+}
+
 JAVA_BOOLEAN isClassNameEqual(const char * clsName, JAVA_ARRAY_CHAR* chrs, int length) {
     for(int i = 0 ; i < length ; i++) {
         if(clsName[i] != chrs[i]) return JAVA_FALSE;
@@ -802,6 +818,13 @@ JAVA_OBJECT java_lang_Class_forNameImpl___java_lang_String_R_java_lang_Class(COD
             }
             return (JAVA_OBJECT)classesList[iter];
         }
+    }
+    return JAVA_NULL;
+}
+
+JAVA_OBJECT java_lang_Class_getComponentType___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls) {
+    if (((struct clazz*)cls)->isArray) {
+        return (JAVA_OBJECT)((struct clazz*)cls)->arrayType;
     }
     return JAVA_NULL;
 }
@@ -890,7 +913,7 @@ JAVA_INT java_lang_Object_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
 }
 
 struct ThreadLocalData** allThreads = 0;
-struct ThreadLocalData** threadsToDelete = 0;
+int nThreadsToKill = 0;         // the number of threads we expect to be finalized, eventually
 
 pthread_key_t   threadIdKey = 0;
 JAVA_LONG threadKeyCounter = 1;
@@ -909,11 +932,12 @@ struct ThreadLocalData* getThreadLocalData() {
         i->lightweightThread = JAVA_FALSE;
         i->threadBlockedByGC = JAVA_FALSE;
         i->threadActive = JAVA_FALSE;
+        i->threadKilled = JAVA_FALSE;
+        
         i->currentThreadObject = 0;
         
         i->utf8Buffer = 0;
         i->utf8BufferSize = 0;
-        
         i->threadObjectStack = malloc(CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
         memset(i->threadObjectStack, 0, CN1_MAX_OBJECT_STACK_DEPTH * sizeof(struct elementStruct));
         i->threadObjectStackOffset = 0;
@@ -952,6 +976,7 @@ struct ThreadLocalData* getThreadLocalData() {
         CODENAME_ONE_ASSERT(threadOffset > -1);
         allThreads[threadOffset] = i;
         unlockCriticalSection();
+        //NSLog(@"Thread slot %d assigned to thread %d",threadOffset,(int)i->threadId);
     }
     return i;
 }
@@ -1132,20 +1157,20 @@ JAVA_VOID java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT ob
 JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_INT p) {
 }
 
-JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadId) {
-    for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
-        if(threadsToDelete[i] != 0 && threadsToDelete[i]->threadId == nativeThreadId) {
-            free(threadsToDelete[i]->blocks);
-            free(threadsToDelete[i]->threadObjectStack);
-            free(threadsToDelete[i]->callStackClass);
-            free(threadsToDelete[i]->callStackLine);
-            free(threadsToDelete[i]->callStackMethod);
-            free(threadsToDelete[i]->pendingHeapAllocations);
-            free(threadsToDelete[i]);
-           
-            threadsToDelete[i] = 0;
-            break;
-        }
+JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadStruct) {
+    // if a thread object was created and never started, it will still become garbage
+    // and will still be finalized.  In that case, it never had resources allocated at all.
+    if(nativeThreadStruct!=0)
+    {
+    struct ThreadLocalData *head = (struct ThreadLocalData *)nativeThreadStruct;
+    free(head->blocks);
+    free(head->threadObjectStack);
+    free(head->callStackClass);
+    free(head->callStackLine);
+    free(head->callStackMethod);
+    free(head->pendingHeapAllocations);
+    free(head);
+    nThreadsToKill--;
     }
 }
 
@@ -1164,7 +1189,34 @@ JAVA_OBJECT java_lang_Thread_currentThread___R_java_lang_Thread(CODENAME_ONE_THR
     }
     return threadStateData->currentThreadObject;
 }
+extern void collectThreadResources(struct ThreadLocalData *current);
+void markDeadThread(struct ThreadLocalData *d)
+{
+    lockCriticalSection();
+    int found = -1;
+    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
+        if(allThreads[iter] == d) {
+            allThreads[iter] = 0;
+            d->threadKilled = JAVA_TRUE;
+            d->threadActive = JAVA_FALSE;
+            found = iter;
+            nThreadsToKill++;
+            collectThreadResources(d);
+            break;
+        }
+    }
+    unlockCriticalSection();
+   
+    if(found>=0)
+    {
+        //  NSLog(@"Deleting thread slot %i id %d", found,(int)d->threadId);
+    }
+    else
+    {
+        NSLog(@"Thread %d not found !!",(int)d->threadId);
+    }
 
+}
 void* threadRunner(void *x)
 {
     JAVA_OBJECT t = (JAVA_OBJECT)x;
@@ -1173,34 +1225,16 @@ void* threadRunner(void *x)
     d->threadActive = JAVA_TRUE;
     d->currentThreadObject = t;
     
-    if(threadsToDelete == 0) {
-        threadsToDelete = malloc(NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-        memset(threadsToDelete, 0, NUMBER_OF_SUPPORTED_THREADS * sizeof(struct ThreadLocalData*));
-    }
-    
-    java_lang_Thread_runImpl___long(d, t, currentThreadId());
+   // NSLog(@"launching thread %d",(int)d->threadId);
+    java_lang_Thread_runImpl___long(d, t, (long)d); // pass the actual structure as threadid
+   // NSLog(@"terminate thread %d",(int)d->threadId);
     
     // we remove the thread here since this is the only place we can do this
     // we add the thread in the getThreadLocalData() method to handle native threads
     // too. Hopefully we won't spawn too many of those...
     
-    lockCriticalSection();
-    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
-        if(allThreads[iter] == d) {
-            NSLog(@"Deleting thread %i", iter);
-            allThreads[iter] = 0;
-            for(int i = 0 ; i < NUMBER_OF_SUPPORTED_THREADS ; i++) {
-                if(threadsToDelete[i] == 0) {
-                    threadsToDelete[i] = d;
-                    d->threadActive = JAVA_FALSE;
-                    break;
-                }
-            }
-            break;
-        }
-    }
-    unlockCriticalSection();
-    
+    markDeadThread(d);
+   
     /*free(d->blocks);
     free(d->threadObjectStack);
     free(d->callStackClass);
@@ -1217,7 +1251,10 @@ JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
     pthread_t pt;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	// create the thread detached, as we never join.  This
+	// fixes the "error 35" problem that occurred after a 
+	// finite number of threads. [ddyer 5/2017]
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     int rc = pthread_create(&pt, &attr, threadRunner, (void *)th);
     if (rc != 0) {
         printf("ERROR creating thread. Return code: %i", rc);
@@ -1513,4 +1550,23 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     [pool release];
     finishedNativeAllocations();
     return jString;
+}
+
+JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String(CODENAME_ONE_THREAD_STATE,  JAVA_OBJECT format, JAVA_OBJECT args) {
+    enteringNativeAllocations();
+    JAVA_ARRAY argsArray = (JAVA_ARRAY)args;
+    JAVA_ARRAY_OBJECT* objs = (JAVA_ARRAY_OBJECT*)argsArray->data;
+    int len = argsArray->length;
+    NSMutableArray* argsList1 = [NSMutableArray arrayWithCapacity:len];
+    for (int i=0; i<len; i++) {
+        [argsList1 insertObject: toNSString(CN1_THREAD_STATE_PASS_ARG java_lang_String_valueOf___java_lang_Object_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG objs[i])) atIndex:i];
+    }
+    char *argList = (char *)malloc(sizeof(NSString *) * len);
+    [argsList1 getObjects:(id *)argList];
+    NSString* result = [[[NSString alloc] initWithFormat:toNSString(CN1_THREAD_STATE_PASS_ARG format) arguments:argList] autorelease];
+    free(argList);
+    JAVA_OBJECT out = fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString init]);
+    finishedNativeAllocations();
+    return out;
+    
 }

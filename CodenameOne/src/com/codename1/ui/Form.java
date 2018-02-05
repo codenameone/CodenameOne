@@ -2281,7 +2281,8 @@ public class Form extends Container {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the layout manager of the form's content pane.
+     * @see #getActualLayout() For the actual layout of the form.
      */
     public Layout getLayout() {
         return contentPane.getLayout();
@@ -2815,7 +2816,25 @@ public class Form extends Container {
             Component pendingButton = (Component)buttonsAwatingRelease.get(0);
             if(atXY == pendingButton) {
                 buttonsAwatingRelease = null;
-                pendingButton.pointerReleased(x, y);
+                if (dragged == pendingButton) {
+                    if (pendingButton.isDragAndDropInitialized()) {
+                        pendingButton.dragFinishedImpl(x, y);
+                    } else {
+                        pendingButton.pointerReleased(x, y);
+                    }
+                    dragged = null;
+                } else {
+                    pendingButton.pointerReleased(x, y);
+                    if (dragged != null) {
+                        if (dragged.isDragAndDropInitialized()) {
+                            dragged.dragFinishedImpl(x, y);
+                            dragged = null;
+                        } else {
+                            dragged.pointerReleased(x, y);
+                            dragged = null;
+                        }
+                    }
+                }
                 return;
             }
             
@@ -2836,12 +2855,26 @@ public class Form extends Container {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);
             if(ev.isConsumed()) {
+                if (dragged != null) {
+                    if (dragged.isDragAndDropInitialized()) {
+                        dragged.dragFinishedImpl(x, y);
+                        
+                    }
+                    dragged = null;
+                }
                 return;
             }
         }
         if(dragStopFlag) {
+            if (dragged != null) {
+                if (dragged.isDragAndDropInitialized()) {
+                    dragged.dragFinishedImpl(x, y);
+                    
+                }
+                dragged = null;
+            }
             dragStopFlag = false;
-            dragged = null;
+            
             return;
         }
         

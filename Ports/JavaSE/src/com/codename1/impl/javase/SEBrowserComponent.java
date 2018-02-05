@@ -101,9 +101,7 @@ public class SEBrowserComponent extends PeerComponent {
         public boolean shouldNavigate(String url) {
             BrowserComponent browserComp = weakBrowserComp.get();
             if (browserComp != null) {
-                if (browserComp.getBrowserNavigationCallback() != null) {
-                    return browserComp.getBrowserNavigationCallback().shouldNavigate(url);
-                }
+                return browserComp.fireBrowserNavigationCallbacks(url);
             }
             return true;
         } 
@@ -378,7 +376,7 @@ public class SEBrowserComponent extends PeerComponent {
                 if (self == null || p == null) {
                     return;
                 }
-                if ( !p.getBrowserNavigationCallback().shouldNavigate(self.web.getEngine().getLocation()) ){
+                if ( !p.fireBrowserNavigationCallbacks(self.web.getEngine().getLocation()) ){
                     self.web.getEngine().getLoadWorker().cancel();
                 }
             }
@@ -484,7 +482,12 @@ public class SEBrowserComponent extends PeerComponent {
     public void execute(final String js) {
         Platform.runLater(new Runnable() {
             public void run() {
-                web.getEngine().executeScript(js);
+                try {
+                    web.getEngine().executeScript(js);
+                } catch (Throwable t) {
+                    Log.p("Javascript exception occurred while running expression: "+js);
+                    throw t;
+                }
             }
         });
     }

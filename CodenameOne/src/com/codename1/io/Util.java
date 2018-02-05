@@ -1397,6 +1397,24 @@ public class Util {
     }    
     
     /**
+     * Returns true or false based on a "soft" object
+     * @param val a boolean value as a Boolean object, String or number
+     * @return true or false
+     */
+    public static boolean toBooleanValue(Object val) {
+        if(val == null) {
+            return false;
+        }
+        if(val instanceof Boolean) {
+            return ((Boolean)val).booleanValue();
+        }
+        if(val instanceof String) {
+            return ((String)val).toLowerCase().startsWith("t");
+        }
+        return toIntValue(val) != 0;
+    }
+    
+    /**
      * Returns the number object as an int
      * @param number this can be a String or any number type
      * @return an int value or an exception

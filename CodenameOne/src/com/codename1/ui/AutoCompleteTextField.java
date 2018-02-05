@@ -110,7 +110,7 @@ public class AutoCompleteTextField extends TextField {
     public AutoCompleteTextField() {
         this(new DefaultListModel(new Object[]{""}));
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -338,7 +338,7 @@ public class AutoCompleteTextField extends TextField {
             public void actionPerformed(ActionEvent evt) {
                 pickedText = (String) l.getSelectedItem();
                 setParentText(pickedText);
-                
+                fireActionEvent();
                 // relaunch text editing if we are still editing
                 if(Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {
                     Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());

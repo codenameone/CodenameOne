@@ -571,6 +571,31 @@ public class StyleParser {
         }
         
         /**
+         * Sets the alignment for this style.  One of {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}
+         * @param alignment One of {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}
+         * @return Self for chaining.
+         */
+        public StyleInfo setAlignment(int alignment) {
+            values.put("alignment", String.valueOf(alignment));
+            return this;
+        }
+        
+        /**
+         * Sets the alignment for this style as a String.  Accepts either a string representation of the integer values for {@link Component#LEFT}, {@link Component#RIGHT}, {@link Component#CENTER}.  Or the 
+         * literal strings "center", "left", or "right".  Or null to unset this property.
+         * @param alignment
+         * @return 
+         */
+        public StyleInfo setAlignment(String alignment) {
+            if (alignment == null || alignment.length() == 0) {
+                values.remove("alignment");
+            } else {
+                values.put("alignment", alignment);
+            }
+            return this;
+        }
+        
+        /**
          * Returns the alignment as a string.  "center", "left", "right", or null.
          * @return 
          */

@@ -30,7 +30,7 @@ import java.util.Arrays;
  * All characters printed by a PrintStream are converted into bytes using the platform's default character encoding.
  * Since: JDK1.0, CLDC 1.0
  */
-public class PrintStream extends FilterOutputStream {
+public class PrintStream extends FilterOutputStream implements Appendable {
     /**
      * indicates whether or not this PrintStream has incurred an error.
      */
@@ -530,6 +530,10 @@ public class PrintStream extends FilterOutputStream {
             print(charSequence.toString());
         }
         return this;
+    }
+
+    public PrintStream append(CharSequence csq, int start, int end) throws IOException {
+        return append(csq.subSequence(start, end));
     }
 
     /**

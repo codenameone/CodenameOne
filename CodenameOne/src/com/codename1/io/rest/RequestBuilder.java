@@ -31,6 +31,8 @@ import com.codename1.ui.CN;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.util.Base64;
 import com.codename1.util.Callback;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -62,11 +64,23 @@ public class RequestBuilder {
     
     private boolean isGzip = false;
     
+    private String contentType;
+    
     RequestBuilder(String method, String url) {
         this.method = method;
         this.url = url;
     }
 
+    /**
+     * Sets the value of the content type
+     * @param s the content type
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder contentType(String s) {
+        contentType = s;
+        return this;
+    } 
+    
     /**
      * Add a path param to the request.
      * For example if the request url is: http://domain.com/users/{id}
@@ -150,6 +164,15 @@ public class RequestBuilder {
     }
 
     /**
+     * Sets both the content type and accept headers to "application/json"
+     * @return RequestBuilder instance
+     */
+    public RequestBuilder jsonContent() {
+        return contentType("application/json").
+                header("Accept", "application/json");
+    }
+    
+    /**
      * Add a basic authentication Authorization header
      * 
      * @return RequestBuilder instance
@@ -171,7 +194,7 @@ public class RequestBuilder {
             public void actionPerformed(NetworkEvent evt) {
                 Response res = null;
                 try {
-                    res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), "UTF-8"));
+                    res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), "UTF-8"), evt.getMessage());
                     callback.onSucess(res);
                 } catch (UnsupportedEncodingException ex) {
                     ex.printStackTrace();
@@ -191,7 +214,7 @@ public class RequestBuilder {
         CN.addToQueueAndWait(request);
         Response res = null;
         try {
-            res = new Response(request.getResponseCode(), new String(request.getResponseData(), "UTF-8"));
+            res = new Response(request.getResponseCode(), new String(request.getResponseData(), "UTF-8"), request.getResponseErrorMessage());
         } catch (UnsupportedEncodingException ex) {
             ex.printStackTrace();
         }
@@ -209,7 +232,7 @@ public class RequestBuilder {
             @Override
             public void actionPerformed(NetworkEvent evt) {
                 Response res = null;
-                res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData());
+                res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData(), evt.getMessage());
                 callback.onSucess(res);
             }
         });
@@ -224,7 +247,7 @@ public class RequestBuilder {
     public Response<byte[]> getAsBytes() {
         ConnectionRequest request = createRequest();
         CN.addToQueueAndWait(request);
-        Response res = new Response(request.getResponseCode(), request.getResponseData());
+        Response res = new Response(request.getResponseCode(), request.getResponseData(), request.getResponseErrorMessage());
         return res;
     }
 
@@ -232,25 +255,70 @@ public class RequestBuilder {
      * Executes the request asynchronously and writes the response to the provided
      * Callback
      * @param callback writes the response to this callback
+     * @return returns the Connection Request object so it can be killed if necessary
      */ 
-    public void getAsJsonMapAsync(final Callback<Response<Map>> callback) {
+    public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback) {
+        return getAsJsonMap(callback, null);
+    }
+    
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback
+     * @param callback writes the response to this callback
+     * @param onError the error callback
+     * @return returns the Connection Request object so it can be killed if necessary
+     */ 
+    public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
         ConnectionRequest request = createRequest();
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
+                if(onError != null) {
+                    // this is an error response code and should be handled as an error
+                    if(evt.getResponseCode() > 310) {
+                        return;
+                    }
+                }
                 Response res = null;
                 byte[] data = evt.getConnectionRequest().getResponseData();
                 JSONParser parser = new JSONParser();
                 try {
                     Map response = parser.parseJSON(new InputStreamReader(new ByteArrayInputStream(data), "UTF-8"));
-                    res = new Response(evt.getResponseCode(), response);
+                    res = new Response(evt.getResponseCode(), response, evt.getMessage());
                     callback.onSucess(res);
                 } catch (IOException ex) {
                     ex.printStackTrace();
                 }
             }
         });
-        CN.addToQueue(request);        
+        bindOnError(request, onError);
+        CN.addToQueue(request);       
+        return request;
+    }
+    
+    private void bindOnError(final ConnectionRequest req, final FailureCallback<? extends Object> f) {
+        if(f == null) {
+            return;
+        }
+        req.addResponseCodeListener(new ActionListener<NetworkEvent>() {
+            public void actionPerformed(NetworkEvent evt) {
+                f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
+            }
+        });
+        req.addExceptionListener(new ActionListener<NetworkEvent>() {
+            public void actionPerformed(NetworkEvent evt) {
+                f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * Executes the request asynchronously and writes the response to the provided
+     * Callback
+     * @param callback writes the response to this callback
+     */ 
+    public void getAsJsonMapAsync(final Callback<Response<Map>> callback) {
+        getAsJsonMap(callback, callback);
     }
     
     /**
@@ -266,7 +334,7 @@ public class RequestBuilder {
         JSONParser parser = new JSONParser();
         try {
             Map response = parser.parseJSON(new InputStreamReader(new ByteArrayInputStream(data), "UTF-8"));
-            res = new Response(request.getResponseCode(), response);
+            res = new Response(request.getResponseCode(), response, request.getResponseErrorMessage());
         } catch (IOException ex) {
             ex.printStackTrace();
         }
@@ -283,7 +351,10 @@ public class RequestBuilder {
         }
         for (String key : pathParams.keySet()) {
             url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", pathParams.get(key));
-        }        
+        }       
+        if(contentType != null) {
+            req.setContentType(contentType);
+        }
         req.setReadResponseForErrors(true);
         req.setDuplicateSupported(true);
         req.setUrl(url);
@@ -305,5 +376,4 @@ public class RequestBuilder {
 
         return req;
     }
-
 }
