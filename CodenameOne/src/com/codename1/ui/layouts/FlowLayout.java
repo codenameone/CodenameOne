@@ -137,11 +137,11 @@ public class FlowLayout extends Layout{
             if((x == s.getPaddingLeft(rtl)) || ( x+ cmp.getPreferredW() <= width) ) {
                 // We take the actual LEFT since drawing is done in reverse
                 x += cmp.getStyle().getMarginLeftNoRTL();
-            	if(rtl) {
+                if(rtl) {
                 	cmp.setX(Math.max(width + initX - (x - initX) - cmp.getPreferredW(), style.getMarginLeftNoRTL()));
-            	} else {
-            		cmp.setX(x);
-            	}
+                } else {
+                    cmp.setX(x);
+                }
 
                 cmp.setY(y + cmp.getStyle().getMarginTop());
 
@@ -249,7 +249,11 @@ public class FlowLayout extends Layout{
                 }
                 break;
             case Component.RIGHT:
-                x+=width;  // this will remove the last gap
+                if(!target.isRTL()) {
+                    x+=width;  // this will remove the last gap                    
+                } else {
+                    x -= width;
+                }
                 break;
         }
         Style parentStyle = target.getStyle();

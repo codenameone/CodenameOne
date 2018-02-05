@@ -444,7 +444,11 @@ public class Toolbar extends Container {
                 // we now internally fallback to as arrow...
             case AS_ARROW:
                 cmd.setCommandName("");
-                cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "TitleCommand", iconSize));
+                if(!isRTL()) {
+                    cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "TitleCommand", iconSize));
+                } else {
+                    cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_FORWARD, "TitleCommand", iconSize));
+                }
                 addCommandToLeftBar(cmd);
                 break;
             case AS_REGULAR_COMMAND:
