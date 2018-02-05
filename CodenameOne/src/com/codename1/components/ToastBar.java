@@ -854,6 +854,13 @@ public class ToastBar {
     }
 
     /**
+     * Simplifies a common use case of showing an information message with an info icon that fades out after a few seconds
+     * @param msg the message
+     */
+    public static void showInfoMessage(String msg) {
+        showMessage(msg, FontImage.MATERIAL_INFO, 3500);
+    }
+    /**
      * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
      * @param msg the error message
      * @param timeout the timeout value in milliseconds
