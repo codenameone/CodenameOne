@@ -5230,7 +5230,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     protected OutputStream createFileOuputStream(String fileName) throws FileNotFoundException {
-        System.out.println("AndroidImplementation.createFileOutputStream(): "+fileName);
         return new FileOutputStream(fileName);
     }
         
