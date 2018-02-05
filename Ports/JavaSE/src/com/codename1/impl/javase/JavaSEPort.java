@@ -429,6 +429,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private boolean portrait = true;
     private BufferedImage portraitSkin;
     private BufferedImage landscapeSkin;
+    private boolean roundedSkin;
     private Map<java.awt.Point, Integer> portraitSkinHotspots;
     private java.awt.Rectangle portraitScreenCoordinates;
     private Map<java.awt.Point, Integer> landscapeSkinHotspots;
@@ -1093,15 +1094,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if(zoomLevel != 1) {
                         AffineTransform af = bg.getTransform();
                         bg.setTransform(AffineTransform.getScaleInstance(1, 1));
-                        bg.translate(-(getScreenCoordinates().x + x )* zoomLevel, -(getScreenCoordinates().y + y ) * zoomLevel);
+                        bg.translate(-(screenCoord.x + x )* zoomLevel, -(screenCoord.y + y ) * zoomLevel);
                         super.paintChildren(bg);
                         bg.setTransform(af);
                     } else {
-                        bg.translate(-getScreenCoordinates().x - x, -getScreenCoordinates().y - y);
+                        bg.translate(-screenCoord.x - x, -screenCoord.y - y);
                         super.paintChildren(bg);
-                    }
+                    }                    
                     bg.dispose();
                     painted = true;
+                }
+                
+                if(roundedSkin) {
+                    Graphics2D bg = buffer.createGraphics();
+                    BufferedImage skin = getSkin();
+                    bg.drawImage(skin, -(int) ((getScreenCoordinates().getX() + x) * zoomLevel), -(int) ((getScreenCoordinates().getY() + y) * zoomLevel), 
+                            (int)(skin.getWidth() * zoomLevel), (int)(skin.getHeight() * zoomLevel), null);
+                    bg.dispose();
                 }
                 
                 if (isEnabled()) {
@@ -2011,25 +2020,44 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             z.close();
 
-            String pix = props.getProperty("pixelRatio");
-            if (pix != null && pix.length() > 0) {
-                try {
-                    pixelMilliRatio = Double.valueOf(pix);
-                } catch (NumberFormatException err) {
-                    err.printStackTrace();
+            String ppi = props.getProperty("ppi");
+            if(ppi != null) {
+                double ppiD = Double.valueOf(ppi);
+                pixelMilliRatio = ppiD / 25.4;
+            } else {
+                String pix = props.getProperty("pixelRatio");
+                if (pix != null && pix.length() > 0) {
+                    try {
+                        pixelMilliRatio = Double.valueOf(pix);
+                    } catch (NumberFormatException err) {
+                        err.printStackTrace();
+                        pixelMilliRatio = null;
+                    }
+                } else {
                     pixelMilliRatio = null;
                 }
-            } else {
-                pixelMilliRatio = null;
             }
 
             portraitSkinHotspots = new HashMap<Point, Integer>();
             portraitScreenCoordinates = new Rectangle();
-            initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
 
             landscapeSkinHotspots = new HashMap<Point, Integer>();
             landscapeScreenCoordinates = new Rectangle();
-            initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+
+            if(props.getProperty("roundScreen", "false").equalsIgnoreCase("true")) {
+                portraitScreenCoordinates.x = Integer.parseInt(props.getProperty("displayX"));
+                portraitScreenCoordinates.y = Integer.parseInt(props.getProperty("displayY"));
+                portraitScreenCoordinates.width = Integer.parseInt(props.getProperty("displayWidth"));
+                portraitScreenCoordinates.height = Integer.parseInt(props.getProperty("displayHeight"));
+                landscapeScreenCoordinates.x = portraitScreenCoordinates.y;
+                landscapeScreenCoordinates.y = portraitScreenCoordinates.x;
+                landscapeScreenCoordinates.width = portraitScreenCoordinates.height;
+                landscapeScreenCoordinates.height = portraitScreenCoordinates.width;
+                roundedSkin = true;
+            } else {
+                initializeCoordinates(map, props, portraitSkinHotspots, portraitScreenCoordinates);
+                initializeCoordinates(landscapeMap, props, landscapeSkinHotspots, landscapeScreenCoordinates);
+            }
 
             platformName = props.getProperty("platformName", "se");
             platformOverrides = props.getProperty("overrideNames", "").split(",");
@@ -2059,10 +2087,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"));
-            float factor = ((float) getDisplayHeightImpl()) / 480.0f;
-            int med = (int) (15.0f * factor);
-            int sm = (int) (11.0f * factor);
-            int la = (int) (19.0f * factor);
+            int med = (int) Math.round(2.6 * pixelMilliRatio.doubleValue());
+            int sm = (int) Math.round(2 * pixelMilliRatio.doubleValue());
+            int la = (int) Math.round(3.3 * pixelMilliRatio.doubleValue());
             setFontSize(Integer.parseInt(props.getProperty("mediumFontSize", "" + med)),
                     Integer.parseInt(props.getProperty("smallFontSize", "" + sm)),
                     Integer.parseInt(props.getProperty("largeFontSize", "" + la)));
@@ -2220,17 +2247,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             KeyStroke f2 = KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0);
             screenshot.setAccelerator(f2);
             screenshot.addActionListener(new ActionListener() {
-
-                private File findScreenshotFile() {
-                    int counter = 1;
-                    File f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
-                    while (f.exists()) {
-                        counter++;
-                        f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
-                    }
-                    return f;
-                }
-
                 @Override
                 public void actionPerformed(ActionEvent ae) {
                     final float zoom = zoomLevel;
@@ -2300,6 +2316,83 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
 
+            JMenuItem screenshotWithSkin = new JMenuItem("Screenshot With Skin");
+            simulatorMenu.add(screenshotWithSkin);
+            screenshotWithSkin.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    final float zoom = zoomLevel;
+                    zoomLevel = 1;
+                    
+                    final Form frm = Display.getInstance().getCurrent();
+                    BufferedImage headerImageTmp;
+                    if (isPortrait()) {
+                        headerImageTmp = header;
+                    } else {
+                        headerImageTmp = headerLandscape;
+                    }
+                    if (!includeHeaderInScreenshot) {
+                        headerImageTmp = null;
+                    }
+                    int headerHeightTmp = 0;
+                    if (headerImageTmp != null) {
+                        headerHeightTmp = headerImageTmp.getHeight();
+                    }
+                    final int headerHeight = headerHeightTmp;
+                    final BufferedImage headerImage = headerImageTmp;
+                    //gr.translate(0, statusBarHeight);
+                    Display.getInstance().callSerially(new Runnable() {
+                        public void run() {
+                            final com.codename1.ui.Image img = com.codename1.ui.Image.createImage(frm.getWidth(), frm.getHeight());
+                            com.codename1.ui.Graphics gr = img.getGraphics();
+                            takingScreenshot = true;
+                            screenshotActualZoomLevel = zoom;
+                            try {
+                                frm.paint(gr);
+                            } finally {
+                                takingScreenshot = false;
+                            }
+                            final int imageWidth = img.getWidth();
+                            final int imageHeight = img.getHeight();
+                            final int[] imageRGB = img.getRGB();
+                            SwingUtilities.invokeLater(new Runnable() {
+                                public void run() {
+                                    BufferedImage bi = new BufferedImage(frm.getWidth(), frm.getHeight() + headerHeight, BufferedImage.TYPE_INT_ARGB);
+                                    bi.setRGB(0, headerHeight, imageWidth, imageHeight, imageRGB, 0, imageWidth);
+                                    BufferedImage skin = getSkin();
+                                    BufferedImage newSkin = new BufferedImage(skin.getWidth(), skin.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                                    Graphics2D g2d = newSkin.createGraphics();
+                                    g2d.drawImage(bi, getScreenCoordinates().x, getScreenCoordinates().y, null);
+                                    if (headerImage != null) {
+                                        g2d.drawImage(headerImage, getScreenCoordinates().x, getScreenCoordinates().y, null);
+                                    }                        
+                                    g2d.drawImage(skin, 0, 0, null);
+                                    g2d.dispose();
+                                    OutputStream out = null;
+                                    try {
+                                        out = new FileOutputStream(findScreenshotFile());
+                                        ImageIO.write(newSkin, "png", out);
+                                        out.close();
+                                    } catch (Throwable ex) {
+                                        ex.printStackTrace();
+                                        System.exit(1);
+                                    } finally {
+                                        zoomLevel = zoom;
+                                        try {
+                                            out.close();
+                                        } catch (Throwable ex) {
+                                        }
+                                        frm.repaint();
+                                        canvas.repaint();
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            
+            
             includeHeaderInScreenshot = pref.getBoolean("includeHeaderScreenshot", true);
             final JCheckBoxMenuItem includeHeaderMenu = new JCheckBoxMenuItem("Screenshot StatusBar");
             includeHeaderMenu.setToolTipText("Include status bar area in Screenshots");
@@ -3002,6 +3095,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
     }
+    
+    File findScreenshotFile() {
+        int counter = 1;
+        File f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
+        while (f.exists()) {
+            counter++;
+            f = new File(System.getProperty("user.home"), "CodenameOne Screenshot " + counter + ".png");
+        }
+        return f;
+    }
+
 
     private JMenu createSkinsMenu(final JFrame frm, final JMenu menu) throws MalformedURLException {
         JMenu m;

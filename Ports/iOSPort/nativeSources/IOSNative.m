@@ -5067,7 +5067,7 @@ JAVA_OBJECT pickerStringArray = JAVA_NULL;
 int stringPickerSelection;
 NSDate* currentDatePickerDate;
 JAVA_LONG currentDatePickerDuration=-1;
-UIPopoverController* popoverControllerInstance;
+extern UIPopoverController* popoverControllerInstance;
 extern UIView *currentActionSheet;
 JAVA_LONG defaultDatePickerDate;
 
