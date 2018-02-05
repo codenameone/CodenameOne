@@ -292,8 +292,10 @@ public class Toolbar extends Container {
         if(onTopSideMenu) {
             if(sidemenuDialog != null && sidemenuDialog.isShowing()) {
                 sidemenuDialog.disposeToTheLeft();
-                Style s = getComponentForm().getFormLayeredPane(Toolbar.class, false).getUnselectedStyle();
+                Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+                Style s = cnt.getUnselectedStyle();
                 s.setBgTransparency(0);
+                cnt.remove();
             } 
         } else {
             SideMenuBar.closeCurrentMenu();
@@ -1001,7 +1003,8 @@ public class Toolbar extends Container {
         }
         
         float f = ((float)v) / ((float)dw) * 80.0f;
-        Style s = getComponentForm().getFormLayeredPane(Toolbar.class, false).getUnselectedStyle();
+        Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);
+        Style s = cnt.getUnselectedStyle();
         s.setBgTransparency((int)f);
         s.setBgColor(0);
         
