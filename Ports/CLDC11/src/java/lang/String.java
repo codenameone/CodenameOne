@@ -494,4 +494,20 @@ public final class String implements CharSequence {
         return substring(start, end);
     }
 
+    /**
+     * Checks if string contains the given char sequence.
+     * @param seq The charsequence to check
+     * @return True if seq is contained in string.
+     */
+    public boolean contains(CharSequence seq) {
+        return false; //TODO codavaj!!
+    }
+    
+    /**
+     * Checks if string is empty.
+     * @return True if string is empty
+     */
+    public boolean isEmpty() {
+        return false; //TODO codavaj!!
+    }
 }
