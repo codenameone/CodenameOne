@@ -4922,9 +4922,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return (int)Math.round((((float)dipCount) * ppi));
     }
-
+    
+    
+    @Override
+    public Object getPasteDataFromClipboard() {
+        String s = nativeInstance.getClipboardString();
+        if(s != null) {
+            return s;
+        }
+        return super.getPasteDataFromClipboard();
+    }
+    
     @Override
     public void copyToClipboard(Object obj) {
+        if(obj instanceof String) {
+            nativeInstance.setClipboardString((String)obj);
+            super.copyToClipboard(obj);
+            return;
+        }
+        nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
     }
 
@@ -5223,12 +5239,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public int getKeyboardType() {
         return Display.KEYBOARD_TYPE_VIRTUAL;
-    }
-
-    @Override
-    public Object getPasteDataFromClipboard() {
-        // TODO
-        return super.getPasteDataFromClipboard();
     }
 
     /**

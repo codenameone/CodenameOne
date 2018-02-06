@@ -367,6 +367,14 @@ public class ActionEvent {
     }
 
     /**
+     * Returns the numeric progress of native browser loading on Android
+     * @return the progress value
+     */
+    public int getProgress() {
+        return keyEvent;
+    }
+
+    /**
      * If this event was sent as a result of a command action this method returns
      * that command
      * @return the command action that triggered the action event

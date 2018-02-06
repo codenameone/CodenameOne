@@ -179,6 +179,7 @@ public class InfiniteScrollAdapter {
      * This prevents running out of memory or performance overhead with too many components... 
      * Notice that -1 is a special case value for no component limit.
      * @return the componentLimit
+     * @deprecated this feature has some inherent problems and doesn't work as expected
      */
     public int getComponentLimit() {
         return componentLimit;
@@ -190,6 +191,7 @@ public class InfiniteScrollAdapter {
      * This prevents running out of memory or performance overhead with too many components... 
      * Notice that -1 is a special case value for no component limit.
      * @param componentLimit the componentLimit to set
+     * @deprecated this feature has some inherent problems and doesn't work as expected
      */
     public void setComponentLimit(int componentLimit) {
         this.componentLimit = componentLimit;

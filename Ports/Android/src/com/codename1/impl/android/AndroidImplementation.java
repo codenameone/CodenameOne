@@ -4250,6 +4250,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                @Override 
                public void onProgressChanged(WebView view, int newProgress) {
+                   parent.fireWebEvent("Progress", new ActionEvent(parent, ActionEvent.Type.Progress, newProgress));
                     if(!hideProgress && isNativeTitle() && getCurrentForm() != null && getCurrentForm().getTitle() != null && getCurrentForm().getTitle().length() > 0 ){
                         if(getActivity() != null){
                             try{

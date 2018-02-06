@@ -321,6 +321,23 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(CN1_THREAD_STATE_MU
     //XMLVM_END_WRAPPER
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG pasteboard.string);
+    POOL_END();
+    return str;
+}
+
+void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+    POOL_BEGIN();
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    pasteboard.string = ns;
+    POOL_END();
+}
+
+
 void retainCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
     com_codename1_impl_ios_IOSImplementation_retain___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);
 }
@@ -4865,7 +4882,35 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     pSize *= scaleValue;
     POOL_BEGIN();
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
-    UIFont* fnt = [UIFont fontWithName:str size:pSize];
+    
+    UIFont* fnt;
+    if([str hasPrefix:@"HelveticaNeue"]) {
+        if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
+            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightUltraLight];
+        } else {
+            if([str isEqualToString:@"HelveticaNeue-Light"]) {
+                fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightLight];
+            } else {
+                if([str isEqualToString:@"HelveticaNeue-Medium"]) {
+                    fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightMedium];
+                } else {
+                    if([str isEqualToString:@"HelveticaNeue-Bold"]) {
+                        fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightBold];
+                    } else {
+                        if([str isEqualToString:@"HelveticaNeue-CondensedBlack"]) {
+                            fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightHeavy];
+                        } else {
+                            // this is probably an italic font, fallback to regular code...
+                            fnt = [UIFont fontWithName:str size:pSize];
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        fnt = [UIFont fontWithName:str size:pSize];
+    }
+    
 #ifndef CN1_USE_ARC
     [fnt retain];
 #endif
