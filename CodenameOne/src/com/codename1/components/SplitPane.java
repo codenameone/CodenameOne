@@ -487,16 +487,29 @@ public class SplitPane extends Container {
      * Sets the inset of the divider explicitly.  This The inset is measured from the top for
      * vertical split panes and the left for horizontal split panes.  Setting this to "50%" will
      * move the divider to the middle point.  Setting it to "0" would set it all the way to the 
+     * left/top.  This will clamp the value at the minimum and maximum offsets if clamp is true.
+     * @param inset 
+     * @param clamp True to clamp the inset to prevent it from running off the page.
+     */
+    public void setInset(String inset, boolean clamp) {
+        getDividerInset().setValueAsString(inset);
+        isExpanded = false;
+        isCollapsed = false;
+        if (clamp) {
+            clampInset();
+        }
+    }
+    
+    /**
+     * Sets the inset of the divider explicitly.  This The inset is measured from the top for
+     * vertical split panes and the left for horizontal split panes.  Setting this to "50%" will
+     * move the divider to the middle point.  Setting it to "0" would set it all the way to the 
      * left/top.  This will clamp the value at the minimum and maximum offsets.
      * @param inset 
      */
     public void setInset(String inset) {
-        getDividerInset().setValueAsString(inset);
-        isExpanded = false;
-        isCollapsed = false;
-        clampInset();
+        setInset(inset, true);
     }
-    
     /**
      * Sets the preferred inset of this split pane.  The preferred inset will be automatically 
      * changed whenever the user explicitly moves the divider to a new position.
