@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -108,6 +109,29 @@ public class Preferences {
         }
         save();
         fireChange(pref, prior, o);
+    }
+    
+    /**
+     * Sets a set of preference values as a batch, and performs a single save.
+     * @param values The key/value pairs to set in preferences.
+     */
+    public static void set(Map<String,Object> values) {
+        ArrayList<Object[]> changeParams = new ArrayList<Object[]>();
+        for (Map.Entry<String,Object> entry : values.entrySet()) {
+            String pref = entry.getKey();
+            Object o = entry.getValue();
+            Object prior = get(pref, null);
+            if (o == null) {
+                get().remove(pref);
+            } else {
+                get().put(pref, o);
+            }
+            changeParams.add(new Object[]{pref, prior, o});
+        }
+        save();
+        for (Object[] params : changeParams) {
+            fireChange((String)params[0], params[1], params[2]);
+        }
     }
 
     /**
