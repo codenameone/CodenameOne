@@ -164,7 +164,8 @@ public class AutoCompleteTextField extends TextField {
     @Override
     public void setText(String text) {
         super.setText(text);
-        if (text == null || (pickedText != null && pickedText.equals(text))) {
+        if (text == null || text.equals(getText()) || (pickedText != null && pickedText.equals(text))) {
+            pickedText = null;
             return;
         }
         pickedText = null;
