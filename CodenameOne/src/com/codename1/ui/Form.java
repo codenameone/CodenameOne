@@ -1086,24 +1086,90 @@ public class Form extends Container {
      * @return the layered pane instance
      */
     public Container getLayeredPane(Class c, boolean top) {
+        Container layeredPaneImpl = getLayeredPaneImpl();
         if(c == null) {
-             for(Component cmp : getLayeredPaneImpl()) {
+             for(Component cmp : layeredPaneImpl) {
                  if(cmp.getClientProperty("cn1$_cls") == null) {
                      return (Container)cmp;
                  }
              } 
         }
         String n = c.getName();
-        for(Component cmp : getLayeredPaneImpl()) {
+        for(Component cmp : layeredPaneImpl) {
             if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container)cmp;
             }
         } 
         Container cnt = new Container();
+        int zIndex = 0;
+        int componentCount = layeredPaneImpl.getComponentCount();
         if(top) {
-            getLayeredPaneImpl().add(cnt);
+            if (componentCount > 0) {
+                Integer z = (Integer)layeredPaneImpl.getComponentAt(componentCount-1).getClientProperty(Z_INDEX_PROP);
+                if (z != null) {
+                    zIndex = z.intValue();
+                }
+            }
+            layeredPaneImpl.add(cnt);
         } else {
-            getLayeredPaneImpl().addComponent(0, cnt);            
+            if (componentCount > 0) {
+                if (componentCount > 0) {
+                    Integer z = (Integer)layeredPaneImpl.getComponentAt(0).getClientProperty(Z_INDEX_PROP);
+                    if (z != null) {
+                        zIndex = z.intValue();
+                    }
+                }
+            }
+            layeredPaneImpl.addComponent(0, cnt);            
+        }
+        cnt.putClientProperty("cn1$_cls", n);
+        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
+        return cnt;
+    }
+    
+    private static final String Z_INDEX_PROP = "cn1$_zIndex";
+    
+    /**
+     * Returns the layered pane for the class and if one doesn't exist a new one is created dynamically and returned
+     * @param c the class with which this layered pane is associated, null for the global layered pane which
+     * is always on the bottom
+     * @param zIndex if created this indicates the zIndex at which the pane is placed.  Higher z values in front of lower z values.
+     * @return the layered pane instance
+     */
+    public Container getLayeredPane(Class c, int zIndex) {
+        Container layeredPaneImpl = getLayeredPaneImpl();
+        if(c == null) {
+             for(Component cmp : layeredPaneImpl) {
+                 if(cmp.getClientProperty("cn1$_cls") == null) {
+                     return (Container)cmp;
+                 }
+             } 
+        }
+        String n = c.getName();
+        for(Component cmp : layeredPaneImpl) {
+            if(n.equals(cmp.getClientProperty("cn1$_cls"))) {
+                return (Container)cmp;
+            }
+        } 
+        Container cnt = new Container();
+        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
+        int len = layeredPaneImpl.getComponentCount();
+        int insertIndex = -1;
+        
+        for (int i=0; i<len; i++) {
+            Component cmp = layeredPaneImpl.getComponentAt(i);
+            Integer cmpZIndex = (Integer)cmp.getClientProperty(Z_INDEX_PROP);
+            int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();
+            if (cmpZ >= zIndex) {
+                insertIndex = i;
+                break;
+            }
+        }
+        
+        if(insertIndex == -1) {
+            layeredPaneImpl.add(cnt);
+        } else {
+            layeredPaneImpl.addComponent(insertIndex, cnt);            
         }
         cnt.putClientProperty("cn1$_cls", n);
         return cnt;
