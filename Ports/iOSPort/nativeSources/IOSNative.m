@@ -321,6 +321,23 @@ JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayHeight__(CN1_THREAD_STATE_MU
     //XMLVM_END_WRAPPER
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardString__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    POOL_BEGIN();
+    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    JAVA_OBJECT str = fromNSString(CN1_THREAD_STATE_PASS_ARG pasteboard.string);
+    POOL_END();
+    return str;
+}
+
+void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT str) {
+    POOL_BEGIN();
+    NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG str);
+    UIPasteboard *pasteboard = [UIPasteboard generalPasteboard];
+    pasteboard.string = ns;
+    POOL_END();
+}
+
+
 void retainCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
     com_codename1_impl_ios_IOSImplementation_retain___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);
 }
