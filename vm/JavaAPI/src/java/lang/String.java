@@ -863,4 +863,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     
     
     public native static String format(String format, Object... args);
+    
+    public boolean contains(CharSequence seq) {
+        return seq == null ? false : indexOf(seq.toString()) != -1;
+    }
+    
+    public boolean isEmpty() {
+        return length() == 0;
+    }
 }
