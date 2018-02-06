@@ -118,25 +118,22 @@ matrix:
           - android-22
           - sys-img-armeabi-v7a-android-22
 ##</CN1:android-22>##
-# Need to wait for iOS build server update before  iOS automated tests
-# will work, so we comment them out for now.
-# TODO: Uncomment when build server is updated.
-# ##<CN1:ios-9_3>##
-#    - osx_image: xcode7.3
-#      node_js: "6"
-#      env: CN1_PLATFORM=ios DEVICE=9.3 CN1_RUNTESTS_IOS_SIMULATOR=1
-#      sudo: required
-#      os: osx
-#      language: node_js
-# ##</CN1:ios-9_3>##
-# ##<CN1:ios-10_3>##
-#    - osx_image: xcode8.3
-#      node_js: "6"
-#      env: CN1_PLATFORM=ios DEVICE=10.3 CN1_RUNTESTS_IOS_SIMULATOR=1
-#      sudo: required
-#      os: osx
-#      language: node_js
-# ##</CN1:ios-10_3>##
+##<CN1:ios-9_3>##
+   - osx_image: xcode7.3
+     node_js: "6"
+     env: CN1_PLATFORM=ios DEVICE=9.3 CN1_RUNTESTS_IOS_SIMULATOR=1
+     sudo: required
+     os: osx
+     language: node_js
+##</CN1:ios-9_3>##
+##<CN1:ios-10_3>##
+   - osx_image: xcode8.3
+     node_js: "6"
+     env: CN1_PLATFORM=ios DEVICE=10.3 CN1_RUNTESTS_IOS_SIMULATOR=1
+     sudo: required
+     os: osx
+     language: node_js
+##</CN1:ios-10_3>##
 
 script:
   - bash .travis/build.sh;
