@@ -3765,7 +3765,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return ((AndroidImplementation.AndroidBrowserComponent) browserPeer).getURL();
     }
 
-    public void setBrowserURL(PeerComponent browserPeer, String url) {
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
         if (url.startsWith("jar:")) {
             url = url.substring(6);
             if(url.indexOf("/") != 0) {
@@ -3776,8 +3777,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         AndroidImplementation.AndroidBrowserComponent bc = (AndroidImplementation.AndroidBrowserComponent) browserPeer;
         if(bc.parent.fireBrowserNavigationCallbacks(url)) {
-            bc.setURL(url);
+            bc.setURL(url, headers);
         }
+    }
+
+    @Override
+    public boolean isURLWithCustomHeadersSupported() {
+        return true;
+    }    
+    
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url) {
+        setBrowserURL(browserPeer, url, null);
     }
 
     public void browserStop(PeerComponent browserPeer) {
@@ -3876,7 +3887,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // Send the Javascript string via SetURL.
         // NOTE!! This is sent asynchronously so we will need to wait for
         // the result to come in.
-        bc.setURL(js);
+        bc.setURL(js, null);
         int maxTries = 500;
         int tryCounter = 0;
         if(Display.getInstance().isEdt()) {
@@ -4211,7 +4222,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
                 public boolean shouldOverrideUrlLoading(WebView view, String url) {
                     if (url.startsWith("jar:")) {
-                        setURL(url);
+                        setURL(url, null);
                         return true;
                     }
                     
@@ -4467,10 +4478,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return retVal[0];
         }
 
-        public void setURL(final String url) {
+        public void setURL(final String url, final Map<String, String> headers) {
             act.runOnUiThread(new Runnable() {
                 public void run() {
-                    web.loadUrl(url);
+                    if(headers != null) {
+                        web.loadUrl(url, headers);
+                    } else {
+                        web.loadUrl(url);
+                    }
                 }
             });
         }

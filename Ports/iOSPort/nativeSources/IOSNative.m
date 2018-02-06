@@ -2261,6 +2261,28 @@ void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String(CN1_
     });
 }
 
+void com_codename1_impl_ios_IOSNative_setBrowserURL___long_java_lang_String_java_lang_String_1ARRAY_java_lang_String_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT url, JAVA_OBJECT keys, JAVA_OBJECT values) {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+        UIWebView* w = (BRIDGE_CAST UIWebView*)((void *)peer);
+        NSString *str = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+        NSMutableURLRequest* request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:str]];
+
+        JAVA_ARRAY_OBJECT* keyData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keys)->data;
+        JAVA_ARRAY_OBJECT* valueData = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)values)->data;
+        int count = ((JAVA_ARRAY)keys)->length;
+
+        for(int iter = 0 ; iter < count ; iter++) {
+            NSString* k = toNSString(CN1_THREAD_GET_STATE_PASS_ARG keyData[iter]);
+            NSString* v = toNSString(CN1_THREAD_GET_STATE_PASS_ARG valueData[iter]);
+            [request setValue:v forHTTPHeaderField:k];
+        }
+        
+        [w loadRequest:request];
+        POOL_END();
+    });
+}
+
 void com_codename1_impl_ios_IOSNative_browserBack___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
