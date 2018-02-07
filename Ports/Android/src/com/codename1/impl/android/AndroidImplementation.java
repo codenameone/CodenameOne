@@ -248,6 +248,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private boolean compatPaintMode;
     private MediaRecorder recorder = null;
 
+    private boolean statusBarHidden;
     private boolean superPeerMode = true;
 
     /**
@@ -588,6 +589,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 notify.run();
             }
 
+            if(statusBarHidden) {
+                getActivity().getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+                getActivity().getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+            }
+            
             if(Display.getInstance().getProperty("StatusbarHidden", "").equals("true")){
                 getActivity().getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
             }
