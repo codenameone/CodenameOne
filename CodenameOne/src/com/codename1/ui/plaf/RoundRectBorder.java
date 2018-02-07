@@ -318,11 +318,25 @@ public class RoundRectBorder extends Border {
             }
         }
         tg.translate(shapeX, shapeY);
-        c.getStyle().setBorder(Border.createEmpty());
 
         GeneralPath gp = createShape(shapeW, shapeH);
+        Style s = c.getStyle();
+        if(s.getBgImage() == null ) {
+            byte type = s.getBackgroundType();
+            if(type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
+                tg.fillShape(gp);
+                if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                    tg.setAlpha(strokeOpacity);
+                    tg.setColor(strokeColor);
+                    tg.drawShape(gp, this.stroke);
+                }            
+                return target;
+            }
+        }
+        
+        c.getStyle().setBorder(Border.createEmpty());
         tg.setClip(gp);
-        c.getStyle().getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
+        s.getBgPainter().paint(tg, new Rectangle(0, 0, w, h));
         if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
             tg.setClip(0, 0, w, h);
             tg.setAlpha(strokeOpacity);
