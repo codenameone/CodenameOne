@@ -5805,6 +5805,29 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isURLWithCustomHeadersSupported() {
+        return true;
+    }        
+    
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
+        url = unfile(url);
+        if(url.startsWith("jar://")) {
+            String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
+            url = "file://localhost" + str + url.substring(6);
+        } 
+        
+        String[] keys = new String[headers.size()];
+        headers.keySet().toArray(keys);
+        String[] values = new String[keys.length];
+        for(int iter = 0 ; iter < keys.length ; iter++) {
+            values[iter] = headers.get(keys[iter]);
+        }
+        
+        nativeInstance.setBrowserURL(get(browserPeer), url, keys, values);
+    }
+
+    @Override
     public void setBuiltinSoundsEnabled(boolean enabled) {
         // TODO
         super.setBuiltinSoundsEnabled(enabled);

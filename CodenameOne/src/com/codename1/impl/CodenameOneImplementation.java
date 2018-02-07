@@ -3987,6 +3987,24 @@ public abstract class CodenameOneImplementation {
             setBrowserURL(browserPeer, tardir  + "/" + url);            
         }
     }
+
+    /**
+     * Sets the page URL, jar: URL's must be supported by the implementation
+     * @param browserPeer browser instance
+     * @param url  the URL
+     * @param headers custom headers for the request URL
+     */
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) { 
+        throw new RuntimeException();
+    }
+    
+    /**
+     * Returns true if setBrowserURL with custom headers is supported
+     * @return returns false by default
+     */
+    public boolean isURLWithCustomHeadersSupported() {
+        return false;
+    }
     
     /**
      * Sets the page URL, jar: URL's must be supported by the implementation

@@ -412,6 +412,24 @@ public class BrowserComponent extends Container {
         Display.impl.setBrowserURL(internal, url);
     }
 
+    /**
+     * Sets the page URL, jar: URL's must be supported by the implementation. Notice this API isn't supported
+     * in all platforms see {@link #isURLWithCustomHeadersSupported() }
+     * @param url  the URL
+     * @param headers headers to push into the request for the url
+     */
+    public void setURL(String url, Map<String, String> headers) {
+        Display.impl.setBrowserURL(internal, url, headers);
+    }
+
+    /**
+     * Returns true if the method {@link #setURL(java.lang.String, java.util.Map) } is supported
+     * @return false by default 
+     */
+    public boolean isURLWithCustomHeadersSupported() {
+        return Display.impl.isURLWithCustomHeadersSupported();
+    }
+    
 
     /**
      * Sets the page URL while respecting the hierarchy of the html
