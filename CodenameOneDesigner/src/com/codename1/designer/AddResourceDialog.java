@@ -44,11 +44,10 @@ public class AddResourceDialog extends javax.swing.JPanel {
     public static final int THEME = 3;
     public static final int DATA = 4;
     public static final int LOCALIZATION = 5;
-    public static final int SVG = 6;
-    public static final int TIMELINE = 7;
-    public static final int UI = 8;
-    public static final int INDEXED_IMAGE = 9;
-    public static final int MULTI_IMAGE = 10;
+    public static final int TIMELINE = 6;
+    public static final int UI = 7;
+    public static final int INDEXED_IMAGE = 8;
+    public static final int MULTI_IMAGE = 9;
     
     /**
      * Indicates the name selected for the property by the software,
@@ -139,7 +138,7 @@ public class AddResourceDialog extends javax.swing.JPanel {
         jLabel2.setText("Type");
         jLabel2.setName("jLabel2"); // NOI18N
 
-        type.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Image", "Animation", "Font", "Theme", "Data", "Localization (L10N)", "SVG", "Timeline", "GUI", "Indexed Image", "Multi Image" }));
+        type.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Image", "Animation", "Font", "Theme", "Data", "Localization (L10N)", "Timeline", "GUI", "Indexed Image", "Multi Image" }));
         type.setName("type"); // NOI18N
 
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(this);
@@ -236,11 +235,6 @@ public class AddResourceDialog extends javax.swing.JPanel {
                 res.setL10N(name.getText(), h);
                 view.setSelectedResource(name.getText());
                 //ResourceEditorView.expandAndSelect(tree, name.getText());
-                break;
-            case SVG: // SVG
-                MultiImageSVGEditor svgEditor = new MultiImageSVGEditor(res, name.getText());
-                svgEditor.selectFile();
-                view.setSelectedResource(name.getText());
                 break;
             case UI:
                 UserInterfaceEditor uiEditor = new UserInterfaceEditor(name.getText(), 

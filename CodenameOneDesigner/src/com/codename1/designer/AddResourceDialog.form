@@ -1,4 +1,4 @@
-<?xml version="1.1" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 
 <Form version="1.5" maxVersion="1.5" type="org.netbeans.modules.form.forminfo.JPanelFormInfo">
   <Properties>
@@ -73,18 +73,17 @@
     <Component class="javax.swing.JComboBox" name="type">
       <Properties>
         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
-          <StringArray count="11">
+          <StringArray count="10">
             <StringItem index="0" value="Image"/>
             <StringItem index="1" value="Animation"/>
             <StringItem index="2" value="Font"/>
             <StringItem index="3" value="Theme"/>
             <StringItem index="4" value="Data"/>
             <StringItem index="5" value="Localization (L10N)"/>
-            <StringItem index="6" value="SVG"/>
-            <StringItem index="7" value="Timeline"/>
-            <StringItem index="8" value="GUI"/>
-            <StringItem index="9" value="Indexed Image"/>
-            <StringItem index="10" value="Multi Image"/>
+            <StringItem index="6" value="Timeline"/>
+            <StringItem index="7" value="GUI"/>
+            <StringItem index="8" value="Indexed Image"/>
+            <StringItem index="9" value="Multi Image"/>
           </StringArray>
         </Property>
         <Property name="name" type="java.lang.String" value="type" noResource="true"/>
