@@ -1859,6 +1859,7 @@ public class InPlaceEditView extends FrameLayout{
 		 * Connects to other textArea.
 		 */
         public void switchToTextArea(TextArea other) {
+            mTextWatcher.reset();
             if (this.mTextArea != null && this.mTextArea != other) {
                 Display.getInstance().onEditingComplete(this.mTextArea, this.mTextArea.getText());
             }
@@ -1873,8 +1874,6 @@ public class InPlaceEditView extends FrameLayout{
             if (defaultMaxLines != -2) {
                 setMaxLines(defaultMaxLines);
             }
-                
-            mTextWatcher.reset();
         }
 
         @Override
