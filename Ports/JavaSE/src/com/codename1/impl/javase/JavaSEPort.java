@@ -8712,6 +8712,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             System.out.println("ERROR: resources cannont be nested in directories in Codename One! Invalid resource: " + resource);
             return null;
         }
+        
+        if(resource.indexOf("notification_sound") > -1) {
+            throw new RuntimeException("notification_sound is a reserved file name and can't be used in getResource()!");
+        }
+        
+        if(resource.startsWith("raw")) {
+            throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
+        }
+        
         if (baseResourceDir != null) {
             try {
                 File f = new File(baseResourceDir, resource);
