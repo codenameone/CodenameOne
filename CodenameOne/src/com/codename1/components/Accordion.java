@@ -246,6 +246,24 @@ public class Accordion extends Container {
     }
     
     /**
+     * Sets the closed icon using material image
+     * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
+     * @param size the size in millimeters for the arrow
+     */ 
+    public void setCloseIcon(char closeIcon, float size) {
+        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"), size);
+    }
+
+    /**
+     * Sets the open icon using material image
+     * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
+     * @param size the size in millimeters for the arrow
+     */ 
+    public void setOpenIcon(char openIcon, float size) {
+        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"), size);
+    }
+    
+    /**
      * Sets the closed icon using material image with a custom uiid
      * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
      * @param uiid to custom icon from res file
