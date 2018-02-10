@@ -7375,7 +7375,7 @@ JAVA_VOID com_codename1_impl_ios_IOSImplementation_paintComponentBackground___ja
     }
     JAVA_OBJECT bgImageOrig = com_codename1_ui_plaf_Style_getBgImage___R_com_codename1_ui_Image(threadStateData, s);
     if (bgImageOrig == JAVA_NULL) {
-        if (com_codename1_ui_plaf_Style_getBackgroundType___R_byte(threadStateData, s) ==get_static_com_codename1_ui_plaf_Style_BACKGROUND_GRADIENT_LINEAR_VERTICAL()) {
+        if (com_codename1_ui_plaf_Style_getBackgroundType___R_byte(threadStateData, s) >=get_static_com_codename1_ui_plaf_Style_BACKGROUND_GRADIENT_LINEAR_VERTICAL()) {
             com_codename1_impl_CodenameOneImplementation_drawGradientBackground___com_codename1_ui_plaf_Style_java_lang_Object_int_int_int_int(threadStateData, __cn1ThisObject, s, nativeGraphics, x, y, width, height);
             return;
         }

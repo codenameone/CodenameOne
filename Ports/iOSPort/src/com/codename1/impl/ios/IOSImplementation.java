@@ -6698,7 +6698,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int rlen = roots.length;
         for(int iter = 0 ; iter < rlen ; iter++) {
             if(roots[iter].startsWith("/")) {
-                roots[iter] = "file:/" + roots[iter];
+                roots[iter] = "file://" + roots[iter];
             }
             if(!roots[iter].endsWith("/")) {
                 roots[iter] = roots[iter] + "/";
@@ -6787,11 +6787,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private String unfile(String file) {
-        if(file.startsWith("file:/")) {
-            file = file.substring(5);
-            if(file.startsWith("//")) {
-                 file = file.substring(1);
-            }
+        if (file.startsWith("file:///")) {
+            return file.substring(7);
+        }
+        if (file.startsWith("file://")) {
+            return file.substring(6);
+        }
+        if (file.startsWith("file:/")) {
+            return file.substring(5);
         }
         return file;
     }

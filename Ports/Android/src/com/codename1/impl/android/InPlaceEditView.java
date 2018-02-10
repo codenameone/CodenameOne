@@ -552,7 +552,7 @@ public class InPlaceEditView extends FrameLayout{
                 }
             }
             // When the user touches the screen outside the text-area, finish editing
-            endEditing(REASON_TOUCH_OUTSIDE, leaveVKBOpen);
+            endEditing(REASON_TOUCH_OUTSIDE, leaveVKBOpen, 0);
         } else {
             final int evtX = (int) event.getX();
             final int evtY = (int) event.getY();
@@ -1038,15 +1038,15 @@ public class InPlaceEditView extends FrameLayout{
         return mIsEditing && mEditText != null && mEditText.mTextArea != null && mEditText.mTextArea.contains(x, y);
     }
 
-    private synchronized void endEditing(int reason, boolean forceVKBOpen) {
-        endEditing(reason, forceVKBOpen, false);
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, int actionCode) {
+        endEditing(reason, forceVKBOpen, false, actionCode);
     }
 
     /**
      * Finish the in-place editing of the given text area, release the edit lock, and allow the synchronous call
      * to 'edit' to return.
      */
-    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose) {
+    private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode) {
         if (cursorTimer != null) {
             cursorTimer.cancel();
         }
@@ -1065,17 +1065,18 @@ public class InPlaceEditView extends FrameLayout{
         if (forceVKBClose) {
             leaveKeyboardShowing = false;
         }
-        if (!leaveKeyboardShowing) {
+        if (!leaveKeyboardShowing || actionCode == EditorInfo.IME_ACTION_DONE || actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
             showVirtualKeyboard(false);
         }
         int imo = mEditText.getImeOptions() & 0xf; // Get rid of flags
         if (reason == REASON_IME_ACTION
                 && mEditText.mTextArea instanceof TextField
                 && ((TextField) mEditText.mTextArea).getDoneListener() != null
-                && ((imo & EditorInfo.IME_ACTION_DONE) != 0 || (imo & EditorInfo.IME_ACTION_SEARCH) != 0 || (imo & EditorInfo.IME_ACTION_SEND) != 0 || (imo & EditorInfo.IME_ACTION_GO) != 0)) {
+                && (actionCode == EditorInfo.IME_ACTION_DONE)|| actionCode == EditorInfo.IME_ACTION_SEARCH || actionCode == EditorInfo.IME_ACTION_SEND || actionCode == EditorInfo.IME_ACTION_GO) {
             ((TextField) mEditText.mTextArea).fireDoneEvent();
-            showVirtualKeyboard(false);
+
         }
+        
 
         // Call this in onComplete instead
         //mIsEditing = false;
@@ -1123,6 +1124,7 @@ public class InPlaceEditView extends FrameLayout{
      */
     Runnable onEditorAction(int actionCode) {
         actionCode = actionCode & 0xf;
+        final int fActionCode = actionCode;
         boolean hasNext = false;
         if (EditorInfo.IME_ACTION_NEXT == actionCode && mEditText != null &&
                 mEditText.mTextArea != null) {
@@ -1147,7 +1149,7 @@ public class InPlaceEditView extends FrameLayout{
 
 				@Override
 				public void run() {
-        endEditing(REASON_IME_ACTION, false);
+        endEditing(REASON_IME_ACTION, false, fActionCode);
     }
 			};
 		}
@@ -1278,7 +1280,7 @@ public class InPlaceEditView extends FrameLayout{
     // Called on Android UI thread.
     public static void endEdit(boolean forceVKBClose) {
         if (sInstance != null) {
-            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose);
+            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose, 0);
             // No longer need these because end editing will allow the onComplete handler to
             // be called which will trigger a releaseEdit
             //ViewParent p = sInstance.getParent();
@@ -1295,7 +1297,7 @@ public class InPlaceEditView extends FrameLayout{
 
     public static void stopEdit(boolean forceVKBClose) {
         if (sInstance != null) {
-            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose);
+            sInstance.endEditing(REASON_UNDEFINED, false, forceVKBClose, 0);
         }
     }
 
@@ -1524,7 +1526,7 @@ public class InPlaceEditView extends FrameLayout{
                         impl.getActivity().runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                instance.endEditing(REASON_UNDEFINED, true);
+                                instance.endEditing(REASON_UNDEFINED, true, 0);
                             }
                         });
                     }
@@ -1888,7 +1890,7 @@ public class InPlaceEditView extends FrameLayout{
         @Override
         public boolean onKeyPreIme(int keyCode, KeyEvent event) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
-                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true);
+                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
                 return true;
             }
             return super.onKeyPreIme(keyCode, event);
@@ -1902,7 +1904,7 @@ public class InPlaceEditView extends FrameLayout{
             // again
             if (keyCode == KeyEvent.KEYCODE_BACK
                     || keyCode == KeyEvent.KEYCODE_MENU) {
-                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true);
+                endEditing(InPlaceEditView.REASON_SYSTEM_KEY, false, true, 0);
             }
 
             return super.onKeyDown(keyCode, event);
