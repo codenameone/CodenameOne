@@ -3671,6 +3671,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
+            Toolkit tk = Toolkit.getDefaultToolkit();
+            setDefaultPixelMilliRatio(tk.getScreenResolution() / 25.4 * getRetinaScale());
+            pixelMilliRatio = getDefaultPixelMilliRatio();
             JPanel panel = new javax.swing.JPanel();  
             panel.setLayout(new BorderLayout());
             JPanel bottom = new javax.swing.JPanel(); 
