@@ -2087,9 +2087,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"));
-            int med = (int) Math.round(2.6 * pixelMilliRatio.doubleValue());
-            int sm = (int) Math.round(2 * pixelMilliRatio.doubleValue());
-            int la = (int) Math.round(3.3 * pixelMilliRatio.doubleValue());
+            int med;
+            int sm;
+            int la;
+            if(pixelMilliRatio == null) {
+                float factor = ((float) getDisplayHeightImpl()) / 480.0f;
+                med = (int) (15.0f * factor);
+                sm = (int) (11.0f * factor);
+                la = (int) (19.0f * factor);
+            } else {
+                med = (int) Math.round(2.6 * pixelMilliRatio.doubleValue());
+                sm = (int) Math.round(2 * pixelMilliRatio.doubleValue());
+                la = (int) Math.round(3.3 * pixelMilliRatio.doubleValue());
+            }
             setFontSize(Integer.parseInt(props.getProperty("mediumFontSize", "" + med)),
                     Integer.parseInt(props.getProperty("smallFontSize", "" + sm)),
                     Integer.parseInt(props.getProperty("largeFontSize", "" + la)));
