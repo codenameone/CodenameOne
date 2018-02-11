@@ -779,6 +779,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                         textEditorHidden = false;
                     }
                     boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
+                    if(showToolbar && Display.getInstance().getProperty("iosHideToolbar", "false").equalsIgnoreCase("true")) {
+                        showToolbar = false;
+                    }
                     if ( currentEditing != null ){
                         nativeInstance.editStringAt(x,
                                 y,
