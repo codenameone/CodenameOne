@@ -148,7 +148,7 @@
         <copy file="../../../codenameone-skins/android.skin" todir="src" />
         <copy file="../../../codenameone-skins/ipad_os7.skin" tofile="src/ipad.skin" />
         <copy file="../../../codenameone-skins/nexus.skin" todir="src" / -->
-        <copy file="../../../codenameone-skins/iphone3gs_os7.skin" tofile="src/iphone3gs.skin" />
+        <copy file="../../../codenameone-skins/OTA/iphone3gs_os7.skin" tofile="src/iphone3gs.skin" />
         <!--copy file="../../../codenameone-skins/iphone4_os7.skin" tofile="src/iphone4.skin" />
         <copy file="../../../codenameone-skins/iphone5_os7.skin" tofile="src/iphone5.skin" />
         <copy file="../../../codenameone-skins/xoom.skin" todir="src" / -->
