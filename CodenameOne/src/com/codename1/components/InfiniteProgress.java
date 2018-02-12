@@ -75,7 +75,7 @@ public class InfiniteProgress extends Component {
      * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
      */
     private int angleIncrease = 16;
-    
+        
     /**
      * Default constructor to define the UIID
      */
@@ -146,6 +146,9 @@ public class InfiniteProgress extends Component {
         // reduce repaint thrushing of the UI from the infinite progress
         boolean val = super.animate() || tick % tickCount == 0;
         tick++;
+        if(val) {
+            angle += angleIncrease;            
+        }
         return val;
     }
     
@@ -198,10 +201,8 @@ public class InfiniteProgress extends Component {
         
         Image rotated;
         if(animation instanceof FontImage) {
-            angle += angleIncrease;
             rotated = animation.rotate(v);
         } else {
-            angle += angleIncrease;
             Integer angle = new Integer(v);
             rotated = cache.get(angle);
             if(rotated == null) {
