@@ -77,10 +77,10 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+//import java.util.Timer;
+//import java.util.TimerTask;
+//import java.util.logging.Level;
+//import java.util.logging.Logger;
 
 /**
  *
@@ -765,8 +765,8 @@ public class InPlaceEditView extends FrameLayout{
     }
     
     // Timers for manually blinking cursor on Android 4.4
-    private Timer cursorTimer;
-    private TimerTask cursorTimerTask;
+    //private Timer cursorTimer;
+    //private TimerTask cursorTimerTask;
     private KeyListener defaultKeyListener;
     private int defaultMaxLines=-2;
 
@@ -782,7 +782,6 @@ public class InPlaceEditView extends FrameLayout{
      *                            native field, just change the connected field
      */
     private synchronized void startEditing(Activity activity, TextAreaData textArea, String initialText, int codenameOneInputType, final boolean isEditedFieldSwitch) {
-
         int txty = lastTextAreaY = textArea.getAbsoluteY() + textArea.getScrollY();
         int txtx = lastTextAreaX = textArea.getAbsoluteX() + textArea.getScrollX();
         lastTextAreaWidth = textArea.getWidth();
@@ -809,7 +808,7 @@ public class InPlaceEditView extends FrameLayout{
         }
         int id = activity.getResources().getIdentifier("cn1Style", "attr", activity.getApplicationInfo().packageName);
         if (!isEditedFieldSwitch) {
-        mEditText = new EditView(activity, textArea.textArea, this, id);
+            mEditText = new EditView(activity, textArea.textArea, this, id);
         } else {
             mEditText.switchToTextArea(textArea.textArea);
         }
@@ -966,6 +965,15 @@ public class InPlaceEditView extends FrameLayout{
         mEditText.setFilters(FilterArray);
         mEditText.setSelection(mEditText.getText().length());
         showVirtualKeyboard(true);
+        if (Boolean.FALSE.equals(textArea.getClientProperty("android.cursorVisible"))) {
+            // This provides an imperfect workaround for this issue:
+            // https://github.com/codenameone/CodenameOne/issues/2317
+            // Blinking cursor causes text to disappear on some versions of android
+            // Can't seem to find how to detect whether device is affected, so
+            // just providing a client property to disable the blinking cursor
+            // on a particular text field.
+            mEditText.setCursorVisible(false);
+        }
         
         /*
         // Leaving this hack here for posterity.  It seems that this manually
@@ -982,6 +990,14 @@ public class InPlaceEditView extends FrameLayout{
         //    Memory: 16000000000
         //    Heap: 256000000
         //    Display: 720 x 1280
+        //
+        // UPDATE Feb. 13, 2018:
+        // This issue seems to be still present in some devices, but it isn't clear even
+        // how to detect it.
+        // Issue reported and reproduced here https://github.com/codenameone/CodenameOne/issues/2317
+        // Issue has been observed in a Virtual Box installation with 5.1.1, but
+        // cannot be reproduced in a Nexus 5 running 5.1.1.
+        // 
         if (Build.VERSION.SDK_INT < 21) {
             // HACK!!!  On Android 4.4, it seems that the natural blinking cursor
             // causes text to disappear when it blinks.  Manually blinking the
@@ -1047,9 +1063,9 @@ public class InPlaceEditView extends FrameLayout{
      * to 'edit' to return.
      */
     private synchronized void endEditing(int reason, boolean forceVKBOpen, boolean forceVKBClose, int actionCode) {
-        if (cursorTimer != null) {
-            cursorTimer.cancel();
-        }
+        //if (cursorTimer != null) {
+        //    cursorTimer.cancel();
+        //}
         if (!mIsEditing || mEditText == null) {
             return;
         }
@@ -1381,7 +1397,9 @@ public class InPlaceEditView extends FrameLayout{
                                         sInstance.mEditLayoutParams.height = h;
                                         sInstance.mEditText.requestLayout();
                                         sInstance.invalidate();
-                                        sInstance.setVisibility(VISIBLE);
+                                        if (sInstance.getVisibility() != VISIBLE) {
+                                            sInstance.setVisibility(VISIBLE);
+                                        }
                                         sInstance.bringToFront();
                                     }
                                 }
@@ -1417,10 +1435,7 @@ public class InPlaceEditView extends FrameLayout{
         final TextArea textArea = (TextArea) component;
         final String initialText = textArea.getText();
         textArea.putClientProperty("InPlaceEditView.initialText", initialText);
-        Dimension prefSize = textArea.getPreferredSize();
-
-
-
+        
         // The very first time we try to edit a string, let's determine if the
         // system default is to do async editing.  If the system default
         // is not yet set, we set it here, and it will be used as the default from now on
@@ -1483,8 +1498,8 @@ public class InPlaceEditView extends FrameLayout{
 
         }
 
-		//if true, then in async mode we are currently editing and are switching to another field
-		final boolean isEditedFieldSwitch;
+        //if true, then in async mode we are currently editing and are switching to another field
+        final boolean isEditedFieldSwitch;
 
         // If we are already editing, we need to finish that up before we proceed to edit the next field.
         synchronized(editingLock) {
@@ -1566,7 +1581,7 @@ public class InPlaceEditView extends FrameLayout{
 
             @Override
             public void run() {
-				if (!isEditedFieldSwitch) {
+		if (!isEditedFieldSwitch) {
                     releaseEdit();
 
                     if (sInstance == null) {
@@ -1581,7 +1596,7 @@ public class InPlaceEditView extends FrameLayout{
 
 
 
-				}
+		}
                 if(scrollableParent || parentForm.isFormBottomPaddingEditingMode()){
                     setEditMode(true);
                 }else{
@@ -1691,7 +1706,7 @@ public class InPlaceEditView extends FrameLayout{
         onComplete.run();
     }
 
-	public static void setEditedTextField(final TextArea textarea) {
+    public static void setEditedTextField(final TextArea textarea) {
         Display display = Display.getInstance();
         Runnable task = new Runnable(){
             public void run() {
