@@ -324,7 +324,11 @@ public class RoundRectBorder extends Border {
         if(s.getBgImage() == null ) {
             byte type = s.getBackgroundType();
             if(type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
-                tg.fillShape(gp);
+                byte bgt = c.getStyle().getBgTransparency();
+                if(bgt != 0) {
+                    tg.setAlpha(bgt &0xff);
+                    tg.fillShape(gp);
+                }
                 if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
                     tg.setAlpha(strokeOpacity);
                     tg.setColor(strokeColor);
