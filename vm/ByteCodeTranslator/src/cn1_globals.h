@@ -535,26 +535,27 @@ if(SP[-1].type == CN1_TYPE_LONG || SP[-1].type == CN1_TYPE_DOUBLE) {\
     SP++; \
 }
 
-#define BC_DUP2_X2() { \
-    if (SP[-2].type == CN1_TYPE_LONG || SP[-2].type == CN1_TYPE_DOUBLE) {\
-        (*SP).data.l = SP[-1].data.l; \
-        SP[-1].data.l = SP[-2].data.l; \
-        SP[-2].data.l = (*SP).data.l; \
-        (*SP).type = SP[-1].type; \
-        SP[-1].type = SP[-2].type; \
-        SP[-2].type = (*SP).type; \
-    } else {\
-        (*SP).data.l = SP[-1].data.l; \
-        SP[-1].data.l = SP[-2].data.l; \
-        SP[-2].data.l = SP[-3].data.l; \
-        SP[-3].data.l = (*SP).data.l; \
-        (*SP).type = SP[-1].type; \
-        SP[-1].type = SP[-2].type; \
-        SP[-2].type = SP[-3].type; \
-        SP[-3].type = (*SP).type; \
-    }\
-    SP++; \
+struct elementStruct* BC_DUP2_X2_DD(struct elementStruct* SP);
+struct elementStruct* BC_DUP2_X2_DSS(struct elementStruct* SP);
+struct elementStruct* BC_DUP2_X2_SSD(struct elementStruct* SP);
+struct elementStruct* BC_DUP2_X2_SSSS(struct elementStruct* SP);
+struct elementStruct* BC_DUP_X2_SD(struct elementStruct* SP);
+struct elementStruct* BC_DUP_X2_SSS(struct elementStruct* SP);
+
+#define IS_DOUBLE_WORD(offset) (SP[offset].type == CN1_TYPE_LONG || SP[offset].type == CN1_TYPE_DOUBLE)
+
+#define BC_DUP_X2() {\
+    if (IS_DOUBLE_WORD(-2)) SP=BC_DUP_X2_SD(SP);\
+    else SP=BC_DUP_X2_SSS(SP);\
 }
+
+#define BC_DUP2_X2() { \
+    if (IS_DOUBLE_WORD(-2)) SP=BC_DUP2_X2_DD(SP);\
+else if (IS_DOUBLE_WORD(-1)) SP=BC_DUP2_X2_DSS(SP);\
+    else if (IS_DOUBLE_WORD(-3)) SP=BC_DUP2_X2_SSD(SP);\
+    else SP=BC_DUP2_X2_SSSS(SP);\
+}
+
 
 #define BC_I2B() SP[-1].data.i = ((SP[-1].data.i << 24) >> 24)
 

@@ -291,7 +291,7 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 break;
                 
             case Opcodes.DUP_X2:
-                b.append("    BC_DUP2_X2(); /* DUP_X2 */\n");
+                b.append("    BC_DUP_X2(); /* DUP_X2 */\n");
                 break;
                 
             case Opcodes.DUP2_X2:
