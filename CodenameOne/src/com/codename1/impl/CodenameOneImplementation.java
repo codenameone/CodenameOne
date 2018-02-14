@@ -4248,10 +4248,14 @@ public abstract class CodenameOneImplementation {
 
     private void purgeOldCookies(Map<String,Cookie> cookies) {
         long now = System.currentTimeMillis();
+        ArrayList<String> toRemove = new ArrayList<String>();
         for (Map.Entry<String,Cookie> e : cookies.entrySet()) {
             if (e.getValue().getExpires() != 0 && e.getValue().getExpires() < now) {
-                cookies.remove(e.getKey());
+                toRemove.add(e.getKey());
             }
+        }
+        for (String key : toRemove) {
+            cookies.remove(key);
         }
     }
     
