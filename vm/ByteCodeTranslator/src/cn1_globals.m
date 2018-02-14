@@ -156,7 +156,7 @@ struct elementStruct* BC_DUP2_X2_DSS(struct elementStruct* SP) {
     SP[-3].type = SP[0].type;
     return SP+1;
 }
-struct elementStruct*BC_DUP2_X2_SSD(struct elementStruct* SP) {
+struct elementStruct* BC_DUP2_X2_SSD(struct elementStruct* SP) {
     SP[1].data.l = SP[-1].data.l;
     SP[0].data.l = SP[-2].data.l;
     SP[-1].data.l = SP[-3].data.l;
