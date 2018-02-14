@@ -6,7 +6,9 @@
 package com.codename1.ui;
 
 import com.codename1.testing.AbstractTest;
+import com.codename1.testing.TestUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  *
@@ -28,6 +30,11 @@ public class ByteCodeLevelTests extends AbstractTest {
         assertTrue(new String[0] instanceof String[], "String[] should be instanceof String[]");
         assertTrue(new int[1][1] instanceof Object[], "int[][] should be instanceof Object[]");
         assertTrue(new int[1][1][1] instanceof Object[][], "int[][][] should be instanceof Object[][]");
+        
+        int[][] a = {{0,0,0},{0,0,0}};
+        a[0][1]++;
+        TestUtils.assertEqual("[[0, 1, 0], [0, 0, 0]]", Arrays.deepToString(a), "deepToString(int[][]) incorrect result");
+        
         return true;
 
     }
