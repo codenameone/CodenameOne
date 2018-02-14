@@ -346,12 +346,12 @@ public class Parser extends ClassVisitor {
         char[] chr = str.toCharArray();
         for(int iter = 0 ; iter < len ; iter++) {
             char c = chr[iter];
-            if(c > 127) {
+            if(c > 127 || c < 32) {
                 // needs encoding... Verify there are no more characters to encode
                 StringBuilder d = new StringBuilder();
                 for(int internal = 0 ; internal < len ; internal++) {
                     c = chr[internal];
-                    if(c > 127) {
+                    if(c > 127 || c < 32) {
                         d.append("~~u");
                         d.append(fourChars(Integer.toHexString(c)));
                     } else {
