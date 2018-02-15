@@ -133,7 +133,7 @@ public class Util {
         int total = 0;
         while(size > -1) {
             o.write(buffer, 0, size);
-            if(copiedSizeCallback != null) copiedSizeCallback.ioStreamUpdate(i, total += size);
+            if(callback != null) callback.ioStreamUpdate(i, total += size);
             Log.p("Size: " + total);
             size = i.read(buffer);
         }
