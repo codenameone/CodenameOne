@@ -27,6 +27,7 @@ package com.codename1.io;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.Externalizable;
+import com.codename1.io.IOProgressListener;
 import com.codename1.properties.PropertyBusinessObject;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
@@ -123,15 +124,16 @@ public class Util {
      * @param i source
      * @param o destination
      * @param bufferSize the size of the buffer, which should be a power of 2 large enough
-     * @param copiedSizeCallback called after each copy step
+     * @param callback called after each copy step
      */
-    public static void copyNoClose(InputStream i, OutputStream o, int bufferSize, Consumer<Integer> copiedSizeCallback) throws IOException {
+    public static void copyNoClose(InputStream i, OutputStream o, int bufferSize, IOProgressListener callback) throws IOException {
+
         byte[] buffer = new byte[bufferSize];
         int size = i.read(buffer);
         int total = 0;
         while(size > -1) {
             o.write(buffer, 0, size);
-            if(copiedSizeCallback != null) copiedSizeCallback.accept(total += size);
+            if(copiedSizeCallback != null) copiedSizeCallback.ioStreamUpdate(i, total += size);
             Log.p("Size: " + total);
             size = i.read(buffer);
         }
