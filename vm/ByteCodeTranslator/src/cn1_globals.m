@@ -136,6 +136,78 @@ void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** SP) {
 
 JAVA_OBJECT* constantPoolObjects = 0;
 
+struct elementStruct* BC_DUP2_X2_DD(struct elementStruct* SP) {
+    (*SP).data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = (*SP).data.l;
+    (*SP).type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = (*SP).type;
+    return (struct elementStruct*)(SP+1);
+}
+struct elementStruct* BC_DUP2_X2_DSS(struct elementStruct* SP) {
+    SP[0].data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = SP[-3].data.l;
+    SP[-3].data.l = SP[0].data.l;
+    SP[0].type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = SP[-3].type;
+    SP[-3].type = SP[0].type;
+    return SP+1;
+}
+struct elementStruct* BC_DUP2_X2_SSD(struct elementStruct* SP) {
+    SP[1].data.l = SP[-1].data.l;
+    SP[0].data.l = SP[-2].data.l;
+    SP[-1].data.l = SP[-3].data.l;
+    SP[-2].data.l = SP[1].data.l;
+    SP[-3].data.l = SP[0].data.l;
+    SP[1].type = SP[-1].type;
+    SP[0].type = SP[-2].type;
+    SP[-1].type = SP[-3].type;
+    SP[-2].type = SP[1].type;
+    SP[-3].type = SP[0].type;
+    return SP+2;
+}
+struct elementStruct* BC_DUP2_X2_SSSS(struct elementStruct* SP) {
+    SP[1].data.l = SP[-1].data.l;
+    SP[0].data.l = SP[-2].data.l;
+    SP[-1].data.l = SP[-3].data.l;
+    SP[-2].data.l = SP[-4].data.l;
+    SP[-3].data.l = SP[1].data.l;
+    SP[-4].data.l = SP[0].data.l;
+    SP[1].type = SP[-1].type;
+    SP[0].type = SP[-2].type;
+    SP[-1].type = SP[-3].type;
+    SP[-2].type = SP[-4].type;
+    SP[-3].type = SP[1].type;
+    SP[-4].type = SP[0].type;
+    return SP+2;
+}
+
+struct elementStruct* BC_DUP_X2_SD(struct elementStruct* SP) {
+    SP[0].data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = SP[0].data.l;
+    SP[0].type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = SP[0].type;
+    return SP+1;
+}
+
+struct elementStruct* BC_DUP_X2_SSS(struct elementStruct* SP) {
+    SP[0].data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = SP[-3].data.l;
+    SP[-3].data.l = SP[0].data.l;
+    SP[0].type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = SP[-3].type;
+    SP[-3].type = SP[0].type;
+    return SP+1;
+}
+
+
 int instanceofFunction(int sourceClass, int destId) {
     if(sourceClass == destId) {
         return JAVA_TRUE;

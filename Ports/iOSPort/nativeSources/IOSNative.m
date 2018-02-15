@@ -243,6 +243,7 @@ extern void Java_com_codename1_impl_ios_IOSImplementation_scale(float x, float y
 extern int isIPad();
 extern int isIOS7();
 extern int isIOS8();
+extern int isIOS8_2();
 
 NSString* fixFilePath(NSString* ns) {
     if([ns hasPrefix:@"file:"]) {
@@ -4906,7 +4907,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createTruetypeFont___java_lang_String
     NSString* str = toNSString(CN1_THREAD_STATE_PASS_ARG name);
     
     UIFont* fnt;
-    if([str hasPrefix:@"HelveticaNeue"]) {
+    if(isIOS8_2() && [str hasPrefix:@"HelveticaNeue"]) {
         if([str isEqualToString:@"HelveticaNeue-UltraLight"]) {
             fnt = [UIFont systemFontOfSize:pSize weight:UIFontWeightUltraLight];
         } else {

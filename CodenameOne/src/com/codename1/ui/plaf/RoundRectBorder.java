@@ -327,6 +327,7 @@ public class RoundRectBorder extends Border {
                 byte bgt = c.getStyle().getBgTransparency();
                 if(bgt != 0) {
                     tg.setAlpha(bgt &0xff);
+                    tg.setColor(s.getBgColor());
                     tg.fillShape(gp);
                 }
                 if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {

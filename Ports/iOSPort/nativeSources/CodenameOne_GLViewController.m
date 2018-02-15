@@ -217,12 +217,19 @@ int isIPad() {
 #define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
 
 int cn1IsIOS8 = -1;
+int cn1IsIOS8_2 = -1;
 
 BOOL isIOS8() {
     if (cn1IsIOS8 < 0) {
         cn1IsIOS8 = !SYSTEM_VERSION_LESS_THAN(@"8.0") ? 1:0;
     }
     return cn1IsIOS8 > 0;
+}
+BOOL isIOS8_2() {
+    if (cn1IsIOS8_2 < 0) {
+        cn1IsIOS8_2 = !SYSTEM_VERSION_LESS_THAN(@"8.2") ? 1:0;
+    }
+    return cn1IsIOS8_2 > 0;
 }
 
 BOOL isVKBAlwaysOpen() {
