@@ -425,7 +425,10 @@ public class SignatureComponent extends Container {
                 calcSignatureRect(signatureRect);
                 g.drawRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
                 g.drawString("X", signatureRect.getX() + Display.getInstance().convertToPixels(1, true), signatureRect.getY() + signatureRect.getHeight() / 2);
+                g.pushClip();
+                g.clipRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());
                 paintSignature(g);
+                g.popClip();
             }
             
             /**
