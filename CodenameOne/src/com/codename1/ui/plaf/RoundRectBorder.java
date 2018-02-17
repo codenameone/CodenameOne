@@ -41,7 +41,7 @@ import com.codename1.ui.geom.Rectangle;
  * @author Shai Almog
  */
 public class RoundRectBorder extends Border {
-    private static final String CACHE_KEY = "cn1$$-rbcache";
+    private static final String CACHE_KEY = "cn1$$-rrbcache";
         
     /**
      * The color of the edge of the border if applicable
