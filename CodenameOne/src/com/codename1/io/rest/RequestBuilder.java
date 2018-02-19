@@ -35,6 +35,7 @@ import com.codename1.util.FailureCallback;
 import com.codename1.util.SuccessCallback;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
@@ -146,6 +147,7 @@ public class RequestBuilder {
      * Sets the request to be a gzip request
      * 
      * @return RequestBuilder instance
+     * @deprecated this API was implemented incorrectly
      */ 
     public RequestBuilder gzip() {
         isGzip = true;
@@ -188,7 +190,7 @@ public class RequestBuilder {
      * @param callback writes the response to this callback
      */ 
     public void getAsStringAsync(final Callback<Response<String>> callback) {
-        ConnectionRequest request = createRequest();
+        ConnectionRequest request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
@@ -210,7 +212,7 @@ public class RequestBuilder {
      * @return Response Object
      */ 
     public Response<String> getAsString() {
-        ConnectionRequest request = createRequest();
+        ConnectionRequest request = createRequest(false);
         CN.addToQueueAndWait(request);
         Response res = null;
         try {
@@ -227,7 +229,7 @@ public class RequestBuilder {
      * @param callback writes the response to this callback
      */ 
     public void getAsBytesAsync(final Callback<Response<byte[]>> callback) {
-        ConnectionRequest request = createRequest();
+        ConnectionRequest request = createRequest(false);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
@@ -245,7 +247,7 @@ public class RequestBuilder {
      * @return Response Object
      */ 
     public Response<byte[]> getAsBytes() {
-        ConnectionRequest request = createRequest();
+        ConnectionRequest request = createRequest(false);
         CN.addToQueueAndWait(request);
         Response res = new Response(request.getResponseCode(), request.getResponseData(), request.getResponseErrorMessage());
         return res;
@@ -269,7 +271,7 @@ public class RequestBuilder {
      * @return returns the Connection Request object so it can be killed if necessary
      */ 
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
-        ConnectionRequest request = createRequest();
+        ConnectionRequest request = createRequest(true);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
             @Override
             public void actionPerformed(NetworkEvent evt) {
@@ -280,15 +282,9 @@ public class RequestBuilder {
                     }
                 }
                 Response res = null;
-                byte[] data = evt.getConnectionRequest().getResponseData();
-                JSONParser parser = new JSONParser();
-                try {
-                    Map response = parser.parseJSON(new InputStreamReader(new ByteArrayInputStream(data), "UTF-8"));
-                    res = new Response(evt.getResponseCode(), response, evt.getMessage());
-                    callback.onSucess(res);
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
+                Map response = (Map)evt.getMetaData();
+                res = new Response(evt.getResponseCode(), response, evt.getMessage());
+                callback.onSucess(res);
             }
         });
         bindOnError(request, onError);
@@ -327,28 +323,36 @@ public class RequestBuilder {
      * @return Response Object
      */ 
     public Response<Map> getAsJsonMap() {
-        ConnectionRequest request = createRequest();
+        ConnectionRequest request = createRequest(true);
         CN.addToQueueAndWait(request);
-        Response res = null;
-        byte[] data = request.getResponseData();
-        JSONParser parser = new JSONParser();
-        try {
-            Map response = parser.parseJSON(new InputStreamReader(new ByteArrayInputStream(data), "UTF-8"));
-            res = new Response(request.getResponseCode(), response, request.getResponseErrorMessage());
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-        return res;
+        Map response = ((Connection)request).json;
+        return new Response(request.getResponseCode(), response, request.getResponseErrorMessage());
     }
 
-    private ConnectionRequest createRequest() {
-
-        ConnectionRequest req;
-        if(!isGzip){
-            req = new ConnectionRequest();
-        }else{
-            req = new GZConnectionRequest();
+    static class Connection extends GZConnectionRequest {
+        private boolean parseJSON;
+        Map json;
+        
+        public Connection(boolean parseJSON) {
+            this.parseJSON = parseJSON;
         }
+        
+        @Override
+        protected void readUnzipedResponse(InputStream input) throws IOException {
+            if(parseJSON) {
+                JSONParser parser = new JSONParser();
+                json = parser.parseJSON(new InputStreamReader(input, "UTF-8"));
+                if(hasResponseListeners() && !isKilled()) {
+                    fireResponseListener(new NetworkEvent(this, json));
+                }
+                return;
+            } 
+            super.readUnzipedResponse(input);
+        }
+    }
+    
+    private ConnectionRequest createRequest(boolean parseJson) {
+        ConnectionRequest req = new Connection(parseJson);
         for (String key : pathParams.keySet()) {
             url = com.codename1.util.StringUtil.replaceAll(url, "{" + key + "}", pathParams.get(key));
         }       
