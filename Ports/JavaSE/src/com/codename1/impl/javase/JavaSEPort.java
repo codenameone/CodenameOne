@@ -3667,7 +3667,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void init(Object m) {
         inInit = true;
-        
+
+        File updater = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar");
+        if(!updater.exists()) {
+            System.out.println("******************************************************************************");
+            System.out.println("* It seems that you are using an old plugin version please upate to the latest plugin and invoke Codename One -> Codename One Settings -> Basic -> Update Client Libs");
+            System.out.println("******************************************************************************");
+        }
+                
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
