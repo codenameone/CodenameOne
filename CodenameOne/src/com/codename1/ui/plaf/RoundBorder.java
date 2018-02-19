@@ -411,11 +411,14 @@ public class RoundBorder extends Border {
         int x = c.getX();
         int y = c.getY();
         if(w > 0 && h > 0) {
-            CacheValue val = (CacheValue)c.getClientProperty(CACHE_KEY + instanceVal);
-            if(val != null && val.modificationTime == modificationTime && 
-                    val.img.getWidth() == w && val.img.getHeight() == h) {
-                g.drawImage(val.img, x, y);
-                return;
+            Object k = c.getClientProperty(CACHE_KEY + instanceVal);
+            if(k instanceof CacheValue) {
+                CacheValue val = (CacheValue)k;
+                if(val.modificationTime == modificationTime && 
+                        val.img.getWidth() == w && val.img.getHeight() == h) {
+                    g.drawImage(val.img, x, y);
+                    return;
+                }
             }
         } else {
             return;
