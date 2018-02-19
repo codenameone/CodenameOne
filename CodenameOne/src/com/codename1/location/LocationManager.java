@@ -210,8 +210,8 @@ public abstract class LocationManager {
      * to the Listener.
      */
     public void setLocationListener(final LocationListener l, LocationRequest req) {
+				request = req;
         setLocationListener(l);
-        request = req;
     }
 
     /**
