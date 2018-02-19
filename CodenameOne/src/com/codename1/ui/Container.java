@@ -478,7 +478,9 @@ public class Container extends Component implements Iterable<Component>{
             for(int iter = 0 ; iter < getComponentCount() ; iter++) {
                 Component c = getComponentAt(iter);
                 Object cons = this.layout.getComponentConstraint(c);
-                layout.addLayoutComponent(cons, c, this);
+                if(cons != null) {
+                    layout.addLayoutComponent(cons, c, this);
+                }
             }
         }
         this.layout = layout;
