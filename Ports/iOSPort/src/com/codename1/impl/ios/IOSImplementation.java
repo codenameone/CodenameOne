@@ -6680,6 +6680,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.getFileSize(getStorageDirectory() + "/" + name);
     }
 
+    @Override
+    public String toNativePath(String path) {
+        return unfile(path);
+    }
+
+    
+    
     /**
      * @inheritDoc
      */

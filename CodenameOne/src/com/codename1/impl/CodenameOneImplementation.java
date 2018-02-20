@@ -6470,6 +6470,15 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Converts a FileSystemStorage path to a native path.
+     * @param path The file system storage path.
+     * @return The native path.
+     */
+    public String toNativePath(String path) {
+        return path;
+    }
+    
+    /**
      * This will return the application home directory.
      * 
      * @return a writable directory that represent the application home directory
