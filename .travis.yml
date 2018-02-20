@@ -26,7 +26,7 @@ matrix:
 # ##</CN1:android-15>##
 ##<CN1:android-16>##
     - language: android
-      if: env(CN1USER) IS PRESENT 
+      if: type IN (push, cron)
       jdk: oraclejdk8
       env: CN1_PLATFORM=android API=16 CN1_RUNTESTS_ANDROID_EMULATOR=1
       addons:
