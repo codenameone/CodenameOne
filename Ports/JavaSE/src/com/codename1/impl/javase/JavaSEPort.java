@@ -9456,6 +9456,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return null;
     }
 
+    @Override
+    public String toNativePath(String path) {
+        return unfile(path);
+    }
+
+    
+    
     public String getAppHomePath() {
         if(exposeFilesystem) {
             File home = new File(System.getProperty("user.home") + File.separator + appHomeDir);
@@ -10430,5 +10437,5 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
         throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
-   }    
+   }  
 }

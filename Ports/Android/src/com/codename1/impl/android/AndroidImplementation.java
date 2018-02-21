@@ -4413,6 +4413,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         s.setUserAgentString((String)value);
                         return;
                     }
+                    s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                     String methodName = "set" + key;
                     for (Method m : s.getClass().getMethods()) {
                         if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 0) {
@@ -5065,6 +5066,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String getAppHomePath() {
         return addFile(getContext().getFilesDir().getAbsolutePath() + "/");
     }
+
+    @Override
+    public String toNativePath(String path) {
+        return removeFilePrefix(path);
+    }
+    
+    
 
     /**
      * @inheritDoc
