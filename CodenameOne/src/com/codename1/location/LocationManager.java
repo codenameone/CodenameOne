@@ -187,7 +187,18 @@ public abstract class LocationManager {
      * from getting updates
      */
     public void setLocationListener(final LocationListener l) {
-			setLocationListener(l,null);
+        synchronized (this) {
+            if (listener != null) {
+                clearListener();
+                request = null;
+                status = TEMPORARILY_UNAVAILABLE;
+            }
+            listener = l;
+            if (l == null) {
+                return;
+            }
+            bindListener();
+        }
     }
     
     /**
@@ -199,18 +210,8 @@ public abstract class LocationManager {
      * to the Listener.
      */
     public void setLocationListener(final LocationListener l, LocationRequest req) {
-				synchronized (this) {
-            if (listener != null) {             
-                status = TEMPORARILY_UNAVAILABLE;
-            }
-						clearListener(); //we must stop updating also if listener is null for example for getCurrentLocation
-						request = req;
-            listener = l;
-            if (l == null) {
-                return;
-            }
-            bindListener();
-        }
+        setLocationListener(l);
+        request = req;
     }
 
     /**
