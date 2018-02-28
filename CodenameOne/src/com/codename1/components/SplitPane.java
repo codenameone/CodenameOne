@@ -334,6 +334,12 @@ public class SplitPane extends Container {
      */
     private boolean isCollapsed;
 
+    /**
+     * Creates a new SplitPane.
+     * @param settings The settings for the split pane (e.g. insets, styles, etc...).
+     * @param topOrLeft The component to place in the "top" (for vertical), or "left" (for horizontal).
+     * @param bottomOrRight The component to place in the "bottom" (for vertical) or "right" (for horizontal).
+     */
     public SplitPane(Settings settings, Component topOrLeft, Component bottomOrRight) {
         super(new LayeredLayout());
         int orientation = settings.orientation;
