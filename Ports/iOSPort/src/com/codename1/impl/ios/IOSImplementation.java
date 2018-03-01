@@ -5163,6 +5163,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Boolean canExecute(String url) {
+        if (url.startsWith("file:")) {
+            url = "file:"+unfile(url);
+        }
         if(nativeInstance.canExecute(url)) {
             return Boolean.TRUE;
         }
@@ -5171,6 +5174,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void execute(String url) {
+        if (url.startsWith("file:")) {
+            url = "file:"+unfile(url);
+        }
         nativeInstance.execute(url);
     }
 

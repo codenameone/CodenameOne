@@ -1688,7 +1688,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_
     __block JAVA_BOOLEAN result;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
+        
         NSString* ns = toNSString(CN1_THREAD_GET_STATE_PASS_ARG url);
+        if([ns hasPrefix:@"file:"]) {
+            ns = [NSURL fileURLWithPath:[ns substringFromIndex:5]];
+        }
         result = [[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:ns]];
         POOL_END();
     });
