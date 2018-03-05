@@ -409,6 +409,7 @@ public class SwipeableContainer extends Container {
                             if (topX > 0) {
                                 if (topX > bottomLeftW / 2) {
                                     open = false;
+                                    openedToRight = false;
                                     openToRight();
                                 } else {
                                     open = true;
@@ -417,6 +418,7 @@ public class SwipeableContainer extends Container {
                             } else {
                                 if (topX + topWrapper.getWidth() < bottomRightX + bottomRightW / 2) {
                                     open = false;
+                                    openedToLeft = false;
                                     openToLeft();
                                 } else {
                                     open = true;
