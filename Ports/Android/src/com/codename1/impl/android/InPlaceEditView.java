@@ -63,6 +63,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.FrameLayout;
+import com.codename1.ui.Accessor;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -1739,7 +1740,7 @@ public class InPlaceEditView extends FrameLayout{
         float pixelSize = f == null ? Display.getInstance().convertToPixels(4) : f.getPixelSize();
         while( p != null){
 
-            if(p.isScrollableY() && p.getAbsoluteY() + p.getScrollY() < Display.getInstance().getDisplayHeight() / 2 - pixelSize * 2){
+            if(Accessor.scrollableYFlag(p) && p.getAbsoluteY() + p.getScrollY() < Display.getInstance().getDisplayHeight() / 2 - pixelSize * 2){
                 return true;
             }
             p = p.getParent();
