@@ -670,7 +670,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // async editing viable.  We start with half-way down the screen.
                 int keyboardClippingThresholdY = Display.getInstance().getDisplayWidth() / 2;
                 while(p != null) {
-                    if(p.isScrollableY()  && p.getAbsoluteY() < keyboardClippingThresholdY) {
+                    if(Accessor.scrollableYFlag(p)  && p.getAbsoluteY() < keyboardClippingThresholdY) {
                         break;
                     }
                     p = p.getParent();

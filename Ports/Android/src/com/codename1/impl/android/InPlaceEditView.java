@@ -63,6 +63,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.FrameLayout;
+import com.codename1.ui.Accessor;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -1506,7 +1507,20 @@ public class InPlaceEditView extends FrameLayout{
             if (mIsEditing) {
 
                 if (impl.isAsyncEditMode()) {
-                    isEditedFieldSwitch = true;
+                    // Using isEditedFieldSwitch was causing issues with cursors not showing up.
+                    // https://github.com/codenameone/CodenameOne/issues/2353
+                    // https://stackoverflow.com/questions/49004370/focus-behaviour-in-textarea-in-cn1
+                    // Disabling this feature by default now, but can be re-enabled by setting
+                    // Display.getInstance().setProperty("android.reuseTextEditorOnSwitch", "true");
+                    // This editedFieldSwitch feature was added a while back to improve experience on older
+                    // Android devices where the field switching was going too slow. 
+                    // https://github.com/codenameone/CodenameOne/issues/2012
+                    // This issue was resolved in this commit (https://github.com/jaanushansen/CodenameOne/commit/f3e53a80704149e4d7cde276d01c1368bcdcfe2c)
+                    // which was submitted as part of a pull request.  This fix has been the source of several
+                    // regressions, mostly related to properties not being propagated properly when a text field is changed
+                    // However, this issue (with the cursor not showing up), doesn't appear to have a simple solution
+                    // so, I'm disabling this feature for now.
+                    isEditedFieldSwitch = "true".equals(Display.getInstance().getProperty("android.reuseTextEditorOnSwitch", "false"));
                     final String[] out = new String[1];
                     TextArea prevTextArea = null;
                     if(sInstance != null && sInstance.mLastEditText != null) {
@@ -1726,7 +1740,7 @@ public class InPlaceEditView extends FrameLayout{
         float pixelSize = f == null ? Display.getInstance().convertToPixels(4) : f.getPixelSize();
         while( p != null){
 
-            if(p.isScrollableY() && p.getAbsoluteY() + p.getScrollY() < Display.getInstance().getDisplayHeight() / 2 - pixelSize * 2){
+            if(Accessor.scrollableYFlag(p) && p.getAbsoluteY() + p.getScrollY() < Display.getInstance().getDisplayHeight() / 2 - pixelSize * 2){
                 return true;
             }
             p = p.getParent();
