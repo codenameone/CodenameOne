@@ -8283,6 +8283,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (mimeType.contains("amr")) {
                 suffix = ".amr";
             }
+            if (mimeType.contains("aiff")) {
+                suffix = ".aiff";
+            }
             if (mimeType.contains("3gpp")) {
                 suffix = ".3gp";
             }
