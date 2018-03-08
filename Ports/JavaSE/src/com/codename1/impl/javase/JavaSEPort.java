@@ -8280,6 +8280,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else if (mimeType.contains("wav")) {
                 suffix = ".wav";
             }
+            if (mimeType.contains("aiff")) {
+                suffix = ".aiff";
+            }
             if (mimeType.contains("amr")) {
                 suffix = ".amr";
             }
