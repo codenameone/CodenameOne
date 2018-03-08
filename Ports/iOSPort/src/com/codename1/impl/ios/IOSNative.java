@@ -625,8 +625,32 @@ public final class IOSNative {
 
     native void blockCopyPaste(boolean blockCopyPaste);
 
-    
-    
+    //#define INCLUDE_CONTACTS_USAGE
+    //#define INCLUDE_CALENDARS_USAGE
+    //#define INCLUDE_CAMERA_USAGE
+    //#define INCLUDE_FACEID_USAGE
+    //#define INCLUDE_LOCATION_USAGE
+    //#define INCLUDE_MICROPHONE_USAGE
+    //#define INCLUDE_MOTION_USAGE
+    //#define INCLUDE_PHOTOLIBRARYADD_USAGE
+    //#define INCLUDE_PHOTOLIBRARY_USAGE
+    //#define INCLUDE_REMINDERS_USAGE
+    //#define INCLUDE_SIRI_USAGE
+    //#define INCLUDE_SPEECHRECOGNITION_USAGE
+    //#define INCLUDE_NFCREADER_USAGE
+    native boolean checkContactsUsage();
+    native boolean checkCalendarsUsage();
+    native boolean checkCameraUsage();
+    native boolean checkFaceIDUsage();
+    native boolean checkLocationUsage();
+    native boolean checkMicrophoneUsage();
+    native boolean checkMotionUsage();
+    native boolean checkPhotoLibraryAddUsage();
+    native boolean checkPhotoLibraryUsage();
+    native boolean checkRemindersUsage();
+    native boolean checkSiriUsage();
+    native boolean checkSpeechRecognitionUsage();
+    native boolean checkNFCReaderUsage();
 
 
 
