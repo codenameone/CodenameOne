@@ -2759,6 +2759,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public LocationManager getLocationManager() {
+        if (!nativeInstance.checkLocationUsage()) {
+            throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");
+        }
         if(lm == null) {
             lm = new Loc();
         }
@@ -2793,6 +2796,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     public void captureAudio(ActionListener response) {
+        if (!nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
+        }
         dropEvents = false;
         String p = FileSystemStorage.getInstance().getAppHomePath();
         if(!p.endsWith("/")) {
@@ -2835,6 +2841,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting image
      */
     public void capturePhoto(ActionListener response) {
+        if (!nativeInstance.checkCameraUsage()) {
+            throw new RuntimeException("Please add the ios.NSCameraUsageDescription build hint");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false);
@@ -2848,6 +2857,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
+        if (!nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
+        }
         final long[] peer = new long[] { nativeInstance.createAudioRecorder(path) };
         return new Media() {
             private boolean playing;
@@ -2955,6 +2967,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting video
      */
     public void captureVideo(ActionListener response) {
+        if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(true);
@@ -2968,6 +2983,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void openGallery(ActionListener response, int type) {
+        if (!nativeInstance.checkPhotoLibraryUsage()) {
+            throw new RuntimeException("Please add the ios.NSPhotoLibraryUsageDescription build hint");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
@@ -5517,17 +5535,26 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return nativeInstance.createContact(firstName, surname, officePhone, homePhone, cellPhone, email);
     }
 
     @Override
     public boolean deleteContact(String id) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return nativeInstance.deleteContact(Integer.parseInt(id));
     }
     
     
     @Override
     public String[] getAllContacts(boolean withNumbers) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int[] c = new int[nativeInstance.getContactCount(withNumbers)];
         int clen = c.length;
         nativeInstance.getContactRefIds(c, withNumbers);
@@ -5540,11 +5567,17 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void refreshContacts() {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         nativeInstance.refreshContacts();
     }
 
     @Override
     public String[] getLinkedContactIds(Contact c) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int recId = Integer.parseInt(c.getId());
         int num = nativeInstance.countLinkedContacts(recId);
         String[] out = new String[num];
@@ -5563,6 +5596,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int recId = Integer.parseInt(id);
         Contact c = new Contact();
         c.setId(id);
@@ -5581,6 +5617,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Contact getContactById(String id) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return getContactById(id, true, true, true, true, true);
         
         /*c.setId("" + id);
