@@ -478,7 +478,9 @@ public class Container extends Component implements Iterable<Component>{
             for(int iter = 0 ; iter < getComponentCount() ; iter++) {
                 Component c = getComponentAt(iter);
                 Object cons = this.layout.getComponentConstraint(c);
-                layout.addLayoutComponent(cons, c, this);
+                if(cons != null) {
+                    layout.addLayoutComponent(cons, c, this);
+                }
             }
         }
         this.layout = layout;
@@ -2075,8 +2077,8 @@ public class Container extends Component implements Iterable<Component>{
     }
 
     /**
-     * Return the conatainer components objects as list of Strings
-     * @return the conatainer components objects as list of Strings
+     * Return the container components objects as list of Strings
+     * @return the container components objects as list of Strings
      */
     private String getComponentsNames() {
         String ret = "[";

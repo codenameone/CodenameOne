@@ -136,13 +136,129 @@ void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** SP) {
 
 JAVA_OBJECT* constantPoolObjects = 0;
 
+struct elementStruct* BC_DUP2_X2_DD(struct elementStruct* SP) {
+    (*SP).data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = (*SP).data.l;
+    (*SP).type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = (*SP).type;
+    return (struct elementStruct*)(SP+1);
+}
+struct elementStruct* BC_DUP2_X2_DSS(struct elementStruct* SP) {
+    SP[0].data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = SP[-3].data.l;
+    SP[-3].data.l = SP[0].data.l;
+    SP[0].type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = SP[-3].type;
+    SP[-3].type = SP[0].type;
+    return SP+1;
+}
+struct elementStruct* BC_DUP2_X2_SSD(struct elementStruct* SP) {
+    SP[1].data.l = SP[-1].data.l;
+    SP[0].data.l = SP[-2].data.l;
+    SP[-1].data.l = SP[-3].data.l;
+    SP[-2].data.l = SP[1].data.l;
+    SP[-3].data.l = SP[0].data.l;
+    SP[1].type = SP[-1].type;
+    SP[0].type = SP[-2].type;
+    SP[-1].type = SP[-3].type;
+    SP[-2].type = SP[1].type;
+    SP[-3].type = SP[0].type;
+    return SP+2;
+}
+struct elementStruct* BC_DUP2_X2_SSSS(struct elementStruct* SP) {
+    SP[1].data.l = SP[-1].data.l;
+    SP[0].data.l = SP[-2].data.l;
+    SP[-1].data.l = SP[-3].data.l;
+    SP[-2].data.l = SP[-4].data.l;
+    SP[-3].data.l = SP[1].data.l;
+    SP[-4].data.l = SP[0].data.l;
+    SP[1].type = SP[-1].type;
+    SP[0].type = SP[-2].type;
+    SP[-1].type = SP[-3].type;
+    SP[-2].type = SP[-4].type;
+    SP[-3].type = SP[1].type;
+    SP[-4].type = SP[0].type;
+    return SP+2;
+}
+
+struct elementStruct* BC_DUP_X2_SD(struct elementStruct* SP) {
+    SP[0].data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = SP[0].data.l;
+    SP[0].type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = SP[0].type;
+    return SP+1;
+}
+
+struct elementStruct* BC_DUP_X2_SSS(struct elementStruct* SP) {
+    SP[0].data.l = SP[-1].data.l;
+    SP[-1].data.l = SP[-2].data.l;
+    SP[-2].data.l = SP[-3].data.l;
+    SP[-3].data.l = SP[0].data.l;
+    SP[0].type = SP[-1].type;
+    SP[-1].type = SP[-2].type;
+    SP[-2].type = SP[-3].type;
+    SP[-3].type = SP[0].type;
+    return SP+1;
+}
+
+
 int instanceofFunction(int sourceClass, int destId) {
-    if(sourceClass >= cn1_array_start_offset || destId >= cn1_array_start_offset) {
-        return sourceClass == destId;
-    }
     if(sourceClass == destId) {
         return JAVA_TRUE;
     }
+    if (sourceClass == cn1_array_1_id_JAVA_INT && destId == cn1_class_id_java_lang_Object) {
+        int foo = 1;
+    }
+    if (destId == cn1_array_1_id_JAVA_INT && sourceClass == cn1_class_id_java_lang_Object) {
+        int foo = 1;
+    }
+    if(sourceClass >= cn1_array_start_offset || destId >= cn1_array_start_offset) {
+        
+        // (destId instanceof sourceClass)
+        // E.g. (new int[0] instanceof Object) ===> sourceClass==Object and destId=int[]
+        
+        if (sourceClass < cn1_array_start_offset) {
+            return sourceClass == cn1_class_id_java_lang_Object;
+        }  else if (destId < cn1_array_start_offset) {
+            return JAVA_FALSE;
+        }
+        
+        // At this point we know that both sourceClass and destId are array types
+        
+        // The start offset for reference array types
+        int refArrayStartOffset = cn1_array_start_offset+100;
+        if (sourceClass < refArrayStartOffset || destId < refArrayStartOffset) {
+            if (sourceClass >= refArrayStartOffset) {
+                // We need to deal with things like (int[][] instanceof Object[])
+                int srcDim = (sourceClass - refArrayStartOffset)%3+1;
+                int destDim = (destId - cn1_array_start_offset)%4;
+                
+                if (srcDim < destDim) {
+                    if (srcDim > 1) {
+                        sourceClass = sourceClass-1;
+                    } else {
+                        sourceClass =(sourceClass - refArrayStartOffset)/3;
+                    }
+                    return instanceofFunction(sourceClass, destId-1);
+                }
+            }
+            // if either is primitive, then they must be the same type.
+            return sourceClass == destId;
+        }
+        int srcDimension = (sourceClass - refArrayStartOffset)%3+1;
+        int destDimension = (destId - refArrayStartOffset)%3+1;
+        
+        int sourceClassComponentTypeId = srcDimension > 1 ? sourceClass-1 : (sourceClass - refArrayStartOffset)/3;
+        int destClassComponentTypeId = destDimension > 1 ? destId-1 : (destId - refArrayStartOffset)/3;
+        return instanceofFunction(sourceClassComponentTypeId, destClassComponentTypeId);
+    }
+    
     int* i = classInstanceOf[destId];
     int counter = 0;
     while(i[counter] > -1) {
@@ -153,6 +269,7 @@ int instanceofFunction(int sourceClass, int destId) {
     }
     return JAVA_FALSE;
 }
+
 
 
 JAVA_OBJECT* releaseQueue = 0;

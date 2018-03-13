@@ -412,6 +412,24 @@ public class BrowserComponent extends Container {
         Display.impl.setBrowserURL(internal, url);
     }
 
+    /**
+     * Sets the page URL, jar: URL's must be supported by the implementation. Notice this API isn't supported
+     * in all platforms see {@link #isURLWithCustomHeadersSupported() }
+     * @param url  the URL
+     * @param headers headers to push into the request for the url
+     */
+    public void setURL(String url, Map<String, String> headers) {
+        Display.impl.setBrowserURL(internal, url, headers);
+    }
+
+    /**
+     * Returns true if the method {@link #setURL(java.lang.String, java.util.Map) } is supported
+     * @return false by default 
+     */
+    public boolean isURLWithCustomHeadersSupported() {
+        return Display.impl.isURLWithCustomHeadersSupported();
+    }
+    
 
     /**
      * Sets the page URL while respecting the hierarchy of the html
@@ -1345,6 +1363,31 @@ public class BrowserComponent extends Container {
     }
     
     /**
+     * A wrapper class for a literal javascript expression that can be passed as an 
+     * arg in {@link #execute(java.lang.String, java.lang.Object[]) }.
+     */
+    public static class JSExpression {
+        
+        private String expression;
+        
+        /**
+         * Creates a literal javascript expression.
+         * @param expression The javascript expression.
+         */ 
+        public JSExpression(String expression) {
+            this.expression = expression;
+        }
+        
+        /**
+         * Gets the javascript expression as a string.
+         * @return The javascript literal expression.
+         */
+        public String toString() {
+            return expression;
+        } 
+    }
+    
+    /**
      * Injects parameters into a Javascript string expression.  This will quote strings properly.  The 
      *  expression should include placeholders for each parameter of the form ${0}, ${1}, etc..
      * @param jsExpression The javascript expression with placeholders to inject parameters.
@@ -1362,6 +1405,8 @@ public class BrowserComponent extends Container {
                 jsExpression = StringUtil.replaceAll(jsExpression, pattern, quote((String)param));
             } else if (param instanceof JSProxy) {
                 jsExpression = StringUtil.replaceAll(jsExpression, pattern, ((JSProxy)param).self);
+            } else if (param instanceof JSExpression) {
+                jsExpression = ((JSExpression)param).expression;
             } else if (param instanceof JSRef) {
                 JSRef jsr = (JSRef)param;
                 if (jsr.isNull()) {

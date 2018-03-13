@@ -2087,9 +2087,19 @@ public class JavaSEPort extends CodenameOneImplementation {
             setFontFaces(props.getProperty("systemFontFamily", "Arial"),
                     props.getProperty("proportionalFontFamily", "SansSerif"),
                     props.getProperty("monospaceFontFamily", "Monospaced"));
-            int med = (int) Math.round(2.6 * pixelMilliRatio.doubleValue());
-            int sm = (int) Math.round(2 * pixelMilliRatio.doubleValue());
-            int la = (int) Math.round(3.3 * pixelMilliRatio.doubleValue());
+            int med;
+            int sm;
+            int la;
+            if(pixelMilliRatio == null) {
+                float factor = ((float) getDisplayHeightImpl()) / 480.0f;
+                med = (int) (15.0f * factor);
+                sm = (int) (11.0f * factor);
+                la = (int) (19.0f * factor);
+            } else {
+                med = (int) Math.round(2.6 * pixelMilliRatio.doubleValue());
+                sm = (int) Math.round(2 * pixelMilliRatio.doubleValue());
+                la = (int) Math.round(3.3 * pixelMilliRatio.doubleValue());
+            }
             setFontSize(Integer.parseInt(props.getProperty("mediumFontSize", "" + med)),
                     Integer.parseInt(props.getProperty("smallFontSize", "" + sm)),
                     Integer.parseInt(props.getProperty("largeFontSize", "" + la)));
@@ -3657,10 +3667,20 @@ public class JavaSEPort extends CodenameOneImplementation {
      */
     public void init(Object m) {
         inInit = true;
-        
+
+        File updater = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "UpdateCodenameOne.jar");
+        if(!updater.exists()) {
+            System.out.println("******************************************************************************");
+            System.out.println("* It seems that you are using an old plugin version please upate to the latest plugin and invoke Codename One -> Codename One Settings -> Basic -> Update Client Libs");
+            System.out.println("******************************************************************************");
+        }
+                
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
         boolean desktopSkin = pref.getBoolean("desktopSkin", false);
         if (desktopSkin && m == null) {
+            Toolkit tk = Toolkit.getDefaultToolkit();
+            setDefaultPixelMilliRatio(tk.getScreenResolution() / 25.4 * getRetinaScale());
+            pixelMilliRatio = getDefaultPixelMilliRatio();
             JPanel panel = new javax.swing.JPanel();  
             panel.setLayout(new BorderLayout());
             JPanel bottom = new javax.swing.JPanel(); 
@@ -8260,8 +8280,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             } else if (mimeType.contains("wav")) {
                 suffix = ".wav";
             }
+            if (mimeType.contains("aiff")) {
+                suffix = ".aiff";
+            }
             if (mimeType.contains("amr")) {
                 suffix = ".amr";
+            }
+            if (mimeType.contains("aiff")) {
+                suffix = ".aiff";
             }
             if (mimeType.contains("3gpp")) {
                 suffix = ".3gp";
@@ -8712,6 +8738,15 @@ public class JavaSEPort extends CodenameOneImplementation {
             System.out.println("ERROR: resources cannont be nested in directories in Codename One! Invalid resource: " + resource);
             return null;
         }
+        
+        if(resource.indexOf("notification_sound") > -1) {
+            throw new RuntimeException("notification_sound is a reserved file name and can't be used in getResource()!");
+        }
+        
+        if(resource.startsWith("raw")) {
+            throw new RuntimeException("Files starting with 'raw' are reserved file names and can't be used in getResource()!");
+        }
+        
         if (baseResourceDir != null) {
             try {
                 File f = new File(baseResourceDir, resource);
@@ -9427,6 +9462,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return null;
     }
 
+    @Override
+    public String toNativePath(String path) {
+        return unfile(path);
+    }
+
+    
+    
     public String getAppHomePath() {
         if(exposeFilesystem) {
             File home = new File(System.getProperty("user.home") + File.separator + appHomeDir);
@@ -10401,5 +10443,5 @@ public class JavaSEPort extends CodenameOneImplementation {
             return;
         }
         throw new RuntimeException("Illegal state, file not found: " + cnopFile.getAbsolutePath());
-   }    
+   }  
 }

@@ -85,15 +85,15 @@ public class AddImageResource extends javax.swing.JDialog {
         jLabel2.setText("Type");
         jLabel2.setName("jLabel2"); // NOI18N
 
-        type.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "RGB Image", "Multi-Image", "SVG Image", "Timeline", "GIF Animation" }));
+        type.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "RGB Image", "Multi-Image", "Timeline", "GIF Animation" }));
         type.setName("type"); // NOI18N
         type.addActionListener(formListener);
 
         jScrollPane1.setName("jScrollPane1"); // NOI18N
 
-        help.setContentType("text/html");
+        help.setContentType("text/html"); // NOI18N
         help.setEditable(false);
-        help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      RGB Image is the default image used for the platform with the optimal number of colors on the given platform. When unsure this is probably what you are looking for.\r\n    </p>\r\n  </body>\r\n</html>\r\n"); // NOI18N
+        help.setText("<html>\r\n  <head>\r\n\r\n  </head>\r\n  <body>\r\n    <p style=\"margin-top: 0\">\r\n      RGB Image is the default image used for the platform with the optimial number of colors on the given platform. When unsure this is probably what you are looking for.\r\n    </p>\r\n  </body>\r\n</html>\r\n"); // NOI18N
         help.setName("help"); // NOI18N
         jScrollPane1.setViewportView(help);
 
@@ -124,16 +124,16 @@ public class AddImageResource extends javax.swing.JDialog {
             .add(layout.createSequentialGroup()
                 .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 409, Short.MAX_VALUE)
-                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 409, Short.MAX_VALUE)
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel1)
                             .add(jLabel2))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(name, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 363, Short.MAX_VALUE)
-                            .add(type, 0, 363, Short.MAX_VALUE)))
+                            .add(name)
+                            .add(type, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel3))
                 .addContainerGap())
         );
@@ -168,11 +168,11 @@ public class AddImageResource extends javax.swing.JDialog {
             if (evt.getSource() == type) {
                 AddImageResource.this.typeActionPerformed(evt);
             }
-            else if (evt.getSource() == cancel) {
-                AddImageResource.this.cancelActionPerformed(evt);
-            }
             else if (evt.getSource() == ok) {
                 AddImageResource.this.okActionPerformed(evt);
+            }
+            else if (evt.getSource() == cancel) {
+                AddImageResource.this.cancelActionPerformed(evt);
             }
         }
     }// </editor-fold>//GEN-END:initComponents
@@ -186,17 +186,17 @@ public class AddImageResource extends javax.swing.JDialog {
                 break;
 
             // SVG Image
-            case 2:
+            /*case 2:
                 helpText = "SVG (Scalable Vector Graphics) files can be used on supported platforms, a set of fallback images can be defined which are stored as PNG's for the platforms that don't support SVG files.";
-                break;
+                break;*/
 
             // Timeline
-            case 3:
+            case 2:
                 helpText = "Timeline allows defining simple animations mostly for splash screen/progress indication etc.";
                 break;
 
             // GIF Animation
-            case 4:
+            case 3:
                 helpText = "Animated GIF's can be imported and converted to a timeline, notice that multiple images will be created and this is a suboptimial way to create such effects.";
                 break;
         }

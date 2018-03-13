@@ -3581,20 +3581,23 @@ public class Arrays {
                 Class<?> elemClass = elem.getClass();
                 if (elemClass.isArray()) {
                     // element is an array type
-
-                    // get the declared Class of the array (element)
-                    //Class<?> elemElemClass = elemClass.getComponentType();
-                    // element is an Object[], so we assert that
-                    if (deepToStringImplContains(origArrays, elem)) {
-                        sb.append("[...]"); //$NON-NLS-1$
+                    if (isPrimitiveArray(elem)) {
+                        sb.append(toStringObj((Object)elem));
                     } else {
-                        Object[] newArray = (Object[]) elem;
-                        Object[] newOrigArrays = new Object[origArrays.length + 1];
-                        System.arraycopy(origArrays, 0, newOrigArrays, 0,
-                                origArrays.length);
-                        newOrigArrays[origArrays.length] = newArray;
-                        // make the recursive call to this method
-                        deepToStringImpl(newArray, newOrigArrays, sb);
+                        // get the declared Class of the array (element)
+                        //Class<?> elemElemClass = elemClass.getComponentType();
+                        // element is an Object[], so we assert that
+                        if (deepToStringImplContains(origArrays, elem)) {
+                            sb.append("[...]"); //$NON-NLS-1$
+                        } else {
+                            Object[] newArray = (Object[]) elem;
+                            Object[] newOrigArrays = new Object[origArrays.length + 1];
+                            System.arraycopy(origArrays, 0, newOrigArrays, 0,
+                                    origArrays.length);
+                            newOrigArrays[origArrays.length] = newArray;
+                            // make the recursive call to this method
+                            deepToStringImpl(newArray, newOrigArrays, sb);
+                        }
                     }
                 } else { // element is NOT an array, just an Object
                     sb.append(array[i]);
@@ -3604,7 +3607,47 @@ public class Arrays {
         sb.append(']');
         return sb.toString();
     }
+    
+    private static boolean isPrimitiveArray(Object arr) {
+        return arr instanceof int[]
+                || arr instanceof byte[]
+                || arr instanceof char[]
+                || arr instanceof boolean[]
+                || arr instanceof long[]
+                || arr instanceof short[]
+                || arr instanceof double[]
+                || arr instanceof float[];
+    }
+    
 
+    private static String toStringObj(Object arr) {
+        if (arr instanceof Object[]) {
+            return toString((Object[])arr);
+        }
+        if (arr instanceof int[]) {
+            return toString((int[])arr);
+        }
+        if (arr instanceof byte[]) {
+            return toString((byte[])arr);
+        }
+        if (arr instanceof char[]) {
+            return toString((char[])arr);
+        }
+        if (arr instanceof short[]) {
+            return toString((short[])arr);
+        }
+        if (arr instanceof long[]) {
+            return toString((long[])arr);
+        }
+        if (arr instanceof double[]) {
+            return toString((double[])arr);
+        }
+        if (arr instanceof float[]) {
+            return toString((float[])arr);
+        }
+        return String.valueOf(arr);
+    }
+    
     /**
      * Utility method used to assist the implementation of
      * {@link #deepToString(Object[])}.

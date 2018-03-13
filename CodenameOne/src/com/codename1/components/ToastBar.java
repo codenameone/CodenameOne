@@ -83,7 +83,26 @@ import java.util.TimerTask;
  */
 public class ToastBar {
    
-   
+    /**
+     * The default timeout for info/error messages
+     */
+    private static int defaultMessageTimeout = 4000;
+
+    /**
+     * The default timeout for info/error messages
+     * @return the defaultMessageTimeout
+     */
+    public static int getDefaultMessageTimeout() {
+        return defaultMessageTimeout;
+    }
+
+    /**
+     * The default timeout for info/error messages
+     * @param aDefaultMessageTimeout the defaultMessageTimeout to set
+     */
+    public static void setDefaultMessageTimeout(int aDefaultMessageTimeout) {
+        defaultMessageTimeout = aDefaultMessageTimeout;
+    }
     private int position = Component.BOTTOM;
     
     /**
@@ -802,7 +821,7 @@ public class ToastBar {
      * @param msg the error message
      */
     public static void showErrorMessage(String msg) {
-        showErrorMessage(msg, 3500);
+        showErrorMessage(msg, defaultMessageTimeout);
     }
 
     /**
@@ -841,7 +860,7 @@ public class ToastBar {
      * @param listener the action to perform when the ToastBar is tapped
      */
     public static void showMessage(String msg, char icon, ActionListener listener) {
-        showMessage(msg, icon, 3500, listener);
+        showMessage(msg, icon, defaultMessageTimeout, listener);
     }
 
     /**
@@ -850,9 +869,16 @@ public class ToastBar {
      * @param msg the message
      */
     public static void showMessage(String msg, char icon) {
-        showMessage(msg, icon, 3500);
+        showMessage(msg, icon, defaultMessageTimeout);
     }
 
+    /**
+     * Simplifies a common use case of showing an information message with an info icon that fades out after a few seconds
+     * @param msg the message
+     */
+    public static void showInfoMessage(String msg) {
+        showMessage(msg, FontImage.MATERIAL_INFO, defaultMessageTimeout);
+    }
     /**
      * Simplifies a common use case of showing an error message with an error icon that fades out after a few seconds
      * @param msg the error message

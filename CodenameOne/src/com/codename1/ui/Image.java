@@ -1093,13 +1093,15 @@ public class Image {
     }
 
     /**
-     * DO NOT CALL THIS METHOD UNLESS YOU KNOW WHAT YOU ARE DOING! Images dispose
+     * DO NOT CALL THIS METHOD UNLESS YOU KNOW WHAT YOU ARE DOING, IT WILL CAUSE PLATFORM SPECIFC CRASHES OTHERWISE! Images dispose
      * automatically for most cases except for very rare special cases.
      * Images on devices usually holds a native memory, some platforms garbage 
      * collectors might fail to release the native and to fail with out of memory
      * errors.
      * Use this method to make sure the image will be released from memory, after 
      * calling this the image will become unusable.
+     * 
+     * @deprecated SERIOUSLY, DON'T INVOKE THIS METHOD UNLESS YOU KNOW WHAT YOU ARE DOING IT WILL CAUSE PLATFORM SPECIFC CRASHES OTHERWISE. IF YOU INVOKED THIS METHOD YOU ARE PROBABLY MAKING A MISTAKE
      */
     public void dispose(){
         if(image != null) {

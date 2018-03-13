@@ -2996,7 +2996,8 @@ private void setupNetbeansActionPerformed(java.awt.event.ActionEvent evt) {//GEN
 }//GEN-LAST:event_setupNetbeansActionPerformed
 
 private void addSVGImagesActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addSVGImagesActionPerformed
-    new ImageSVGEditor(loadedResources, null, this).selectFiles();
+    //new ImageSVGEditor(loadedResources, null, this).selectFiles();
+    JOptionPane.showMessageDialog(mainPanel, "This features is no longer supported, see the discussion here: https://github.com/codenameone/CodenameOne/issues/2286", "No Longer Supported", JOptionPane.ERROR_MESSAGE);
 }//GEN-LAST:event_addSVGImagesActionPerformed
 
 public static void helpVideo(String url) {

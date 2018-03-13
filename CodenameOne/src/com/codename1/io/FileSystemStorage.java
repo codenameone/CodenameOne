@@ -325,4 +325,13 @@ public class FileSystemStorage {
      public String getCachesDir() {
          return Util.getImplementation().getCachesDir();
      }
+     
+     /**
+      * Converts a file system path to a native path.
+      * @param path A file system path.
+      * @return The native path.
+      */
+     public String toNativePath(String path) {
+         return Util.getImplementation().toNativePath(path);
+     }
 }

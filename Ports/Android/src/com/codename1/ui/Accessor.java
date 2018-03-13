@@ -32,4 +32,7 @@ public class Accessor {
     public static Object getNativeGraphics(Graphics g) {
         return g.getGraphics();
     }
+    public static boolean scrollableYFlag(Container c) {
+        return c.scrollableYFlag();
+    }
 }

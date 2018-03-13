@@ -163,8 +163,10 @@ public class AutoCompleteTextField extends TextField {
      */
     @Override
     public void setText(String text) {
+        String old = getText();
         super.setText(text);
-        if (text == null || (pickedText != null && pickedText.equals(text))) {
+        if (text == null || text.equals(old) || (pickedText != null && pickedText.equals(text))) {
+            pickedText = null;
             return;
         }
         pickedText = null;
@@ -185,7 +187,7 @@ public class AutoCompleteTextField extends TextField {
             popup.setVisible(v);
             popup.setEnabled(v);
             f.repaint();
-        } 
+        }
         if(f != null) {
             dontCalcSize = false;
             f.revalidate();
@@ -215,23 +217,18 @@ public class AutoCompleteTextField extends TextField {
                 popup.getComponentAt(0).setScrollY(0);
                 popup.setVisible(v);
                 popup.setEnabled(v);
-                Form f = getComponentForm();
-                if(f != null) {
-                    if(popup.getHeight() < f.getContentPane().getHeight()/2){
-                        int popupHeight = calcPopuupHeight((List)popup.getComponentAt(0));
-                        popup.setHeight(popupHeight);
-                        dontCalcSize = false;                        
-                        popup.forceRevalidate();
-                        dontCalcSize = true;
-                        f.repaint();
-                    }                  
-                }
+            }
+            Form f = getComponentForm();
 
-                if(!v) {
-                    if(f != null) {
-                        f.repaint();
-                    }
-                }
+            if (popup.getComponentCount() > 0) {
+                int popupHeight = calcPopuupHeight((List)popup.getComponentAt(0));
+                popup.setHeight(popupHeight);
+                dontCalcSize = false;                        
+                popup.forceRevalidate();
+                dontCalcSize = true;
+            }
+            if (f != null) {
+                f.repaint();
             }
         }
         return res;

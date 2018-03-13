@@ -670,7 +670,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 // async editing viable.  We start with half-way down the screen.
                 int keyboardClippingThresholdY = Display.getInstance().getDisplayWidth() / 2;
                 while(p != null) {
-                    if(p.isScrollableY()  && p.getAbsoluteY() < keyboardClippingThresholdY) {
+                    if(Accessor.scrollableYFlag(p)  && p.getAbsoluteY() < keyboardClippingThresholdY) {
                         break;
                     }
                     p = p.getParent();
@@ -779,6 +779,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                         textEditorHidden = false;
                     }
                     boolean showToolbar = cmp.getClientProperty("iosHideToolbar") == null;
+                    if(showToolbar && Display.getInstance().getProperty("iosHideToolbar", "false").equalsIgnoreCase("true")) {
+                        showToolbar = false;
+                    }
                     if ( currentEditing != null ){
                         nativeInstance.editStringAt(x,
                                 y,
@@ -2756,6 +2759,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     public LocationManager getLocationManager() {
+        if (!nativeInstance.checkLocationUsage()) {
+            throw new RuntimeException("Please add the ios.NSLocationUsageDescription or ios.NSLocationAlwaysUsageDescription build hint");
+        }
         if(lm == null) {
             lm = new Loc();
         }
@@ -2790,6 +2796,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     
     public void captureAudio(ActionListener response) {
+        if (!nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
+        }
         dropEvents = false;
         String p = FileSystemStorage.getInstance().getAppHomePath();
         if(!p.endsWith("/")) {
@@ -2832,6 +2841,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting image
      */
     public void capturePhoto(ActionListener response) {
+        if (!nativeInstance.checkCameraUsage()) {
+            throw new RuntimeException("Please add the ios.NSCameraUsageDescription build hint");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(false);
@@ -2845,6 +2857,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Media createMediaRecorder(String path, String mimeType) throws IOException{
+        if (!nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSMicrophoneUsageDescription build hint");
+        }
         final long[] peer = new long[] { nativeInstance.createAudioRecorder(path) };
         return new Media() {
             private boolean playing;
@@ -2952,6 +2967,9 @@ public class IOSImplementation extends CodenameOneImplementation {
      * @param response callback for the resulting video
      */
     public void captureVideo(ActionListener response) {
+        if (!nativeInstance.checkCameraUsage() || !nativeInstance.checkMicrophoneUsage()) {
+            throw new RuntimeException("Please add the ios.NSCameraUsageDescription and ios.NSMicrophoneUsageDescription build hints");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.captureCamera(true);
@@ -2965,6 +2983,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void openGallery(ActionListener response, int type) {
+        if (!nativeInstance.checkPhotoLibraryUsage()) {
+            throw new RuntimeException("Please add the ios.NSPhotoLibraryUsageDescription build hint");
+        }
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
@@ -4922,9 +4943,25 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return (int)Math.round((((float)dipCount) * ppi));
     }
-
+    
+    
+    @Override
+    public Object getPasteDataFromClipboard() {
+        String s = nativeInstance.getClipboardString();
+        if(s != null) {
+            return s;
+        }
+        return super.getPasteDataFromClipboard();
+    }
+    
     @Override
     public void copyToClipboard(Object obj) {
+        if(obj instanceof String) {
+            nativeInstance.setClipboardString((String)obj);
+            super.copyToClipboard(obj);
+            return;
+        }
+        nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
     }
 
@@ -5144,6 +5181,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Boolean canExecute(String url) {
+        if (url.startsWith("file:")) {
+            url = "file:"+unfile(url);
+        }
         if(nativeInstance.canExecute(url)) {
             return Boolean.TRUE;
         }
@@ -5152,6 +5192,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void execute(String url) {
+        if (url.startsWith("file:")) {
+            url = "file:"+unfile(url);
+        }
         nativeInstance.execute(url);
     }
 
@@ -5223,12 +5266,6 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public int getKeyboardType() {
         return Display.KEYBOARD_TYPE_VIRTUAL;
-    }
-
-    @Override
-    public Object getPasteDataFromClipboard() {
-        // TODO
-        return super.getPasteDataFromClipboard();
     }
 
     /**
@@ -5498,17 +5535,26 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return nativeInstance.createContact(firstName, surname, officePhone, homePhone, cellPhone, email);
     }
 
     @Override
     public boolean deleteContact(String id) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return nativeInstance.deleteContact(Integer.parseInt(id));
     }
     
     
     @Override
     public String[] getAllContacts(boolean withNumbers) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int[] c = new int[nativeInstance.getContactCount(withNumbers)];
         int clen = c.length;
         nativeInstance.getContactRefIds(c, withNumbers);
@@ -5521,11 +5567,17 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void refreshContacts() {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         nativeInstance.refreshContacts();
     }
 
     @Override
     public String[] getLinkedContactIds(Contact c) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int recId = Integer.parseInt(c.getId());
         int num = nativeInstance.countLinkedContacts(recId);
         String[] out = new String[num];
@@ -5544,6 +5596,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public Contact getContactById(String id, boolean includesFullName, boolean includesPicture, boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         int recId = Integer.parseInt(id);
         Contact c = new Contact();
         c.setId(id);
@@ -5562,6 +5617,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public Contact getContactById(String id) {
+        if (!nativeInstance.checkContactsUsage()) {
+            throw new RuntimeException("Please add the ios.NSContactsUsageDescription build hint");
+        }
         return getContactById(id, true, true, true, true, true);
         
         /*c.setId("" + id);
@@ -5792,6 +5850,29 @@ public class IOSImplementation extends CodenameOneImplementation {
             url = "file://localhost" + str + url.substring(6);
         } 
         nativeInstance.setBrowserURL(get(browserPeer), url);
+    }
+
+    @Override
+    public boolean isURLWithCustomHeadersSupported() {
+        return true;
+    }        
+    
+    @Override
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) {
+        url = unfile(url);
+        if(url.startsWith("jar://")) {
+            String str = StringUtil.replaceAll(nativeInstance.getResourcesDir(), " ", "%20");
+            url = "file://localhost" + str + url.substring(6);
+        } 
+        
+        String[] keys = new String[headers.size()];
+        headers.keySet().toArray(keys);
+        String[] values = new String[keys.length];
+        for(int iter = 0 ; iter < keys.length ; iter++) {
+            values[iter] = headers.get(keys[iter]);
+        }
+        
+        nativeInstance.setBrowserURL(get(browserPeer), url, keys, values);
     }
 
     @Override
@@ -6644,6 +6725,13 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.getFileSize(getStorageDirectory() + "/" + name);
     }
 
+    @Override
+    public String toNativePath(String path) {
+        return unfile(path);
+    }
+
+    
+    
     /**
      * @inheritDoc
      */
@@ -6665,7 +6753,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int rlen = roots.length;
         for(int iter = 0 ; iter < rlen ; iter++) {
             if(roots[iter].startsWith("/")) {
-                roots[iter] = "file:/" + roots[iter];
+                roots[iter] = "file://" + roots[iter];
             }
             if(!roots[iter].endsWith("/")) {
                 roots[iter] = roots[iter] + "/";
@@ -6754,11 +6842,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     private String unfile(String file) {
-        if(file.startsWith("file:/")) {
-            file = file.substring(5);
-            if(file.startsWith("//")) {
-                 file = file.substring(1);
-            }
+        if (file.startsWith("file:///")) {
+            return file.substring(7);
+        }
+        if (file.startsWith("file://")) {
+            return file.substring(6);
+        }
+        if (file.startsWith("file:/")) {
+            return file.substring(5);
         }
         return file;
     }

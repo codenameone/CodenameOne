@@ -107,8 +107,8 @@ public abstract class CodenameOneImplementation {
     private int dragStartPercentage = 3;
     private Form currentForm;
     private static Object displayLock;
-    private Animation[] paintQueue = new Animation[100];
-    private Animation[] paintQueueTemp = new Animation[100];
+    private Animation[] paintQueue = new Animation[200];
+    private Animation[] paintQueueTemp = new Animation[200];
     private int paintQueueFill = 0;
     private Graphics codenameOneGraphics;
 
@@ -3987,6 +3987,24 @@ public abstract class CodenameOneImplementation {
             setBrowserURL(browserPeer, tardir  + "/" + url);            
         }
     }
+
+    /**
+     * Sets the page URL, jar: URL's must be supported by the implementation
+     * @param browserPeer browser instance
+     * @param url  the URL
+     * @param headers custom headers for the request URL
+     */
+    public void setBrowserURL(PeerComponent browserPeer, String url, Map<String, String> headers) { 
+        throw new RuntimeException();
+    }
+    
+    /**
+     * Returns true if setBrowserURL with custom headers is supported
+     * @return returns false by default
+     */
+    public boolean isURLWithCustomHeadersSupported() {
+        return false;
+    }
     
     /**
      * Sets the page URL, jar: URL's must be supported by the implementation
@@ -4230,10 +4248,14 @@ public abstract class CodenameOneImplementation {
 
     private void purgeOldCookies(Map<String,Cookie> cookies) {
         long now = System.currentTimeMillis();
+        ArrayList<String> toRemove = new ArrayList<String>();
         for (Map.Entry<String,Cookie> e : cookies.entrySet()) {
             if (e.getValue().getExpires() != 0 && e.getValue().getExpires() < now) {
-                cookies.remove(e.getKey());
+                toRemove.add(e.getKey());
             }
+        }
+        for (String key : toRemove) {
+            cookies.remove(key);
         }
     }
     
@@ -6447,6 +6469,15 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /**
+     * Converts a FileSystemStorage path to a native path.
+     * @param path The file system storage path.
+     * @return The native path.
+     */
+    public String toNativePath(String path) {
+        return path;
+    }
+    
     /**
      * This will return the application home directory.
      * 

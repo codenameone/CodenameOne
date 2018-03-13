@@ -26,6 +26,7 @@ package com.codename1.ui.tree;
 import com.codename1.components.SpanButton;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
@@ -41,6 +42,8 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Vector;
 
 /**
@@ -82,6 +85,65 @@ public class Tree extends Container {
     private boolean multilineMode;
     
     /**
+     * A marker interface used for Tree state returned from {@link #getTreeState() } and
+     * passed to {@link #setTreeState(com.codename1.ui.tree.Tree.TreeState) } for retaining 
+     * state in a Tree when the model is changed.
+     */
+    public static interface TreeState {
+        
+    }
+    
+    private static class State implements TreeState {
+        Set<Object> expandedSet = new HashSet<Object>();
+        private void extractStateFrom(final Tree tree) {
+            expandedSet.clear();
+            ComponentSelector.select("*", tree).each(new ComponentSelector.ComponentClosure() {
+
+                public void call(Component c) {
+                    if (tree.isExpanded(c)) {
+                        Object o = c.getClientProperty(KEY_OBJECT);
+                        expandedSet.add(o);
+                    }
+                }
+            });
+            
+            
+        }
+        
+        
+        private void applyStateTo(Tree tree) {
+            applyStateTo(tree, tree);
+        }
+        
+        private void applyStateTo(final Tree tree, Container parent) {
+            ComponentSelector.select("*", parent).each(new ComponentSelector.ComponentClosure() {
+
+                public void call(Component cmp) {
+                    Object o = cmp.getClientProperty(KEY_OBJECT);
+                
+                    if (o != null) {
+                        if(expandedSet.contains(o)) {
+                            if (!tree.isExpanded(cmp)) {
+                                Container dest = tree.expandNode(false, cmp, false);
+                                applyStateTo(tree, dest);
+                                
+                            }
+                            
+                        } else {
+                            if (tree.isExpanded(cmp)) {
+                                tree.collapseNode(cmp, null);
+                            }
+                        }
+
+                    } 
+                }
+                
+            });
+            
+        }
+    }
+    
+    /**
      * Constructor for usage by GUI builder and automated tools, normally one
      * should use the version that accepts the model
      */
@@ -92,6 +154,28 @@ public class Tree extends Container {
             {"A", "B", "C"},
             {"1", "2", "3"}
         }));
+    }
+    
+    /**
+     * Gets the state of the tree in a format that can be restored later
+     * by either the same tree or a different tree whose model includes the same
+     * nodes.
+     * @return A TreeState object that can be passed to {@link #setTreeState(com.codename1.ui.tree.Tree.TreeState) }
+     */
+    public TreeState getTreeState() {
+        State out = new State();
+        out.extractStateFrom(this);
+        return out;
+    }
+    
+    /**
+     * Sets the tree state.
+     * @param state The state, which was returned from the {@link #getTreeState() } method.
+     */
+    public void setTreeState(TreeState state) {
+        if (state instanceof State) {
+            ((State)state).applyStateTo(this);
+        }
     }
 
     /**
@@ -257,12 +341,16 @@ public class Tree extends Container {
     public static void setNodeIcon(Image nodeIcon) {
         nodeImage = nodeIcon;
     }
-
     private Container expandNode(boolean animate, Component c) {
-        return expandNodeImpl(animate, c);
+        return expandNode(animate, c, true);
     }
-    
+    private Container expandNode(boolean animate, Component c, boolean revalidate) {
+        return expandNodeImpl(animate, c, revalidate);
+    }
     private Container expandNodeImpl(boolean animate, Component c) {
+        return expandNodeImpl(animate, c, true);
+    }
+    private Container expandNodeImpl(boolean animate, Component c, boolean revalidate) {
         Container p = c.getParent().getLeadParent();
         if(p != null) {
             c = p;
@@ -286,7 +374,9 @@ public class Tree extends Container {
                 revalidate();
             }
         } else {
-            parent.revalidate();
+            if (revalidate) {
+                parent.revalidate();
+            }
         }
         return dest;
     }
@@ -395,9 +485,14 @@ public class Tree extends Container {
         Container p = c.getParent();
         for(int iter = 0 ; iter < p.getComponentCount() ; iter++) {
             if(p.getComponentAt(iter) != c) {
-                Label dummy = new Label();
-                p.replaceAndWait(p.getComponentAt(iter), dummy, t, true);
-                p.removeComponent(dummy);
+                if (t == null) {
+                    p.removeComponent(p.getComponentAt(iter));
+                    break; // there should only be one container with all children
+                } else {
+                    Label dummy = new Label();
+                    p.replaceAndWait(p.getComponentAt(iter), dummy, t, true);
+                    p.removeComponent(dummy);
+                }
             }
         }
     }

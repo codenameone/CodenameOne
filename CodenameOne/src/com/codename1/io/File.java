@@ -72,11 +72,29 @@ public class File {
     }
     
     public java.lang.String getParent() {
-        return path.substring(0, path.lastIndexOf('/'));
+        
+        if ("file://".equals(path) || "file:///".equals(path) || path.length() == 0) {
+            return null;
+        }
+        
+        String out = path;
+        if (out.endsWith("/")) {
+            out = out.substring(0, out.length()-1);
+            if (out.endsWith("/")) {
+                return null;
+            }
+        }
+        return out.substring(0, out.lastIndexOf('/'));
+        
+        
     }
     
     public File getParentFile() {
-        return new File(getParent());
+        String parentPath = getParent();
+        if (parentPath == null) {
+            return null;
+        }
+        return new File(parentPath);
     }
     
     public java.lang.String getPath() {
@@ -207,12 +225,19 @@ public class File {
     }
     
     public boolean mkdir() {
-        return mkdirs();
+        FileSystemStorage.getInstance().mkdir(path);
+        return exists() && isDirectory();
     }
     
     public boolean mkdirs() {
-        FileSystemStorage.getInstance().mkdir(path);
-        return exists() && isDirectory();
+        File parentFile = getParentFile();
+        if (parentFile!= null  && !parentFile.exists()) {
+            boolean res = getParentFile().mkdirs();
+            if (!res) {
+                return res;
+            }
+        }
+        return mkdir();
     }
     
     public boolean renameTo(File f) {
