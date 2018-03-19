@@ -251,8 +251,14 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
         JAVA_ARRAY_BYTE* s = sourceData;
         JAVA_ARRAY_BYTE* end = s + len;
         for (count=0; s < end; s = s + 1)
-            if (!decode(&state, &codepoint, (uint8_t)*s))
+            if (!decode(&state, &codepoint, (uint8_t)*s)) {
+                if (codepoint > 65535) {
+                    count +=2;
+                } else {
                     count+=1;
+                }
+            }
+        
         if (state != UTF8_ACCEPT) {
             // Need to throw an exception here.
             JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
@@ -266,10 +272,22 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
         state = UTF8_ACCEPT;
         codepoint = 0;
         s = sourceData;
+        //MIN_SUPPLEMENTARY_CODE_POINT + ((highSurrogate & 1023) << 10) + (lowSurrogate & 1023);
         for (; s < end; s = s+1)
             if (!decode(&state, &codepoint, (uint8_t)*s)) {
-                *dest = (JAVA_CHAR)codepoint;
-                dest= dest + 1;
+                
+                if (codepoint > 65535) {
+                    //(char) (MIN_HIGH_SURROGATE + (((codePoint - MIN_SUPPLEMENTARY_CODE_POINT) >> 10) & 1023));
+                    *dest = 55296 + (((codepoint - 0x10000) >> 10) & 1023);
+                    dest = dest + 1;
+                    //(MIN_LOW_SURROGATE + ((codePoint - MIN_SUPPLEMENTARY_CODE_POINT) & 1023))
+                    *dest = 56320 + ((codepoint - 0x10000) & 1023);
+                    dest = dest+1;
+                    
+                } else {
+                    *dest = (JAVA_CHAR)codepoint;
+                    dest= dest + 1;
+                }
             }
                 
         finishedNativeAllocations();
