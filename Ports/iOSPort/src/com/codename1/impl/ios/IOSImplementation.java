@@ -3247,6 +3247,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                         byte[] data = toByteArray(stream);
                         Util.cleanup(stream);
                         moviePlayerPeer = nativeInstance.createVideoComponent(data, onCompletionCallbackId);
+                        nativeInstance.setNativeVideoControlsEmbedded(moviePlayerPeer, embedNativeControls);
                         component = PeerComponent.create(new long[] { nativeInstance.getVideoViewPeer(moviePlayerPeer) });
                     } catch (IOException ex) {
                         ex.printStackTrace();

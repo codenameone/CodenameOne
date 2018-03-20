@@ -188,6 +188,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
         try {
+            // TODO: In JDK9 this throws a warning
+            // WARNING: An illegal reflective access operation has occurred
+            // WARNING: Illegal reflective access by com.codename1.impl.javase.JavaSEPort to field sun.awt.CGraphicsDevice.scale
+            // WARNING: Please consider reporting this to the maintainers of com.codename1.impl.javase.JavaSEPort
+            // WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+            // WARNING: All illegal access operations will be denied in a future release
+            // A workaround is sugtested in this bug report.  Will require some testing.
+            // https://bugs.openjdk.java.net/browse/JDK-8172962
+            // 
             Field field = graphicsDevice.getClass().getDeclaredField("scale");
             if (field != null) {
                 field.setAccessible(true);
