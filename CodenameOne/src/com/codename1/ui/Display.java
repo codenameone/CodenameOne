@@ -2490,6 +2490,7 @@ public final class Display extends CN1Constants {
      * Boolean value.
      * 
      * @param l the listener 
+     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
      */
     public void setVirtualKeyboardListener(ActionListener l){
         virtualKeyboardListener = l;
@@ -2499,6 +2500,7 @@ public final class Display extends CN1Constants {
      * Gets the VirtualKeyboardListener Objects of exists.
      * 
      * @return a Listener Object or null if not exists
+     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
      */ 
     public ActionListener getVirtualKeyboardListener() {
         return virtualKeyboardListener;

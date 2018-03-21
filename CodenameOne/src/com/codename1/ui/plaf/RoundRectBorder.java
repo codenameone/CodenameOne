@@ -100,20 +100,12 @@ public class RoundRectBorder extends Border {
      * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
      */
     private boolean bezierCorners;
-    
-    /**
-     * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
-     */
-    private boolean topOnlyMode;
-    
-    /**
-     * Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
-     */
-    private boolean bottomOnlyMode;
-    
+        
     // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
     private static int instanceCounter;
     private final int instanceVal;
+
+    private boolean topLeft = true, topRight = true, bottomLeft = true, bottomRight = true;
     
     private RoundRectBorder() {
         shadowSpread = Display.getInstance().convertToPixels(0.2f);
@@ -260,6 +252,50 @@ public class RoundRectBorder extends Border {
         return this;
     }
     
+
+    /**
+     * True to draw the top left corner rounded, false to draw it as a corner
+     * 
+     * @param topLeft true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder topLeftMode(boolean topLeft) {
+        this.topLeft = topLeft;
+        return this;
+    }
+    
+    /**
+     * True to draw the top right corner rounded, false to draw it as a corner
+     * 
+     * @param topRight true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder topRightMode(boolean topRight) {
+        this.topRight = topRight;
+        return this;
+    }
+    
+    /**
+     * True to draw the bottom left corner rounded, false to draw it as a corner
+     * 
+     * @param bottomLeft true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bottomLeftMode(boolean bottomLeft) {
+        this.bottomLeft = bottomLeft;
+        return this;
+    }
+    
+    /**
+     * True to draw the bottom right corner rounded, false to draw it as a corner
+     * 
+     * @param bottomRight true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bottomRightMode(boolean bottomRight) {
+        this.bottomRight = bottomRight;
+        return this;
+    }
     
     /**
      * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
@@ -268,7 +304,15 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
-        this.topOnlyMode = topOnlyMode;
+        if(topOnlyMode) {
+            this.topLeft = false;
+            this.topRight = false;
+            this.bottomLeft = true;
+            this.bottomRight = true;
+        } else {
+            this.topLeft = true;
+            this.topRight = true;
+        }
         return this;
     }
     
@@ -279,7 +323,15 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
-        this.bottomOnlyMode = bottomOnlyMode;
+        if(bottomOnlyMode) {
+            this.topLeft = true;
+            this.topRight = true;
+            this.bottomLeft = false;
+            this.bottomRight = false;
+        } else {
+            this.bottomLeft = true;
+            this.bottomRight = true;
+        }
         return this;
     }
     
@@ -358,6 +410,26 @@ public class RoundRectBorder extends Border {
         final int h = c.getHeight();
         int x = c.getX();
         int y = c.getY();
+        if(shadowOpacity == 0) {
+            Style s = c.getStyle();
+            if(s.getBgImage() == null ) {
+                byte type = s.getBackgroundType();
+                if(type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
+                    GeneralPath gp = createShape(w, h);
+                    byte bgt = c.getStyle().getBgTransparency();
+                    if(bgt != 0) {
+                        int a = g.getAlpha();
+                        g.setAlpha(bgt &0xff);
+                        g.setColor(s.getBgColor());
+                        g.translate(x, y);
+                        g.fillShape(gp);
+                        g.translate(-x, -y);
+                        g.setAlpha(a);
+                    }
+                    return;
+                }
+            }        
+        }
         if(w > 0 && h > 0) {
             Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
             if(background != null && background.getWidth() == w && background.getHeight() == h) {
@@ -407,37 +479,37 @@ public class RoundRectBorder extends Border {
                 y += 0.5f;
             }
         }            
-        
-        if(topOnlyMode) {
-            gp.moveTo(x, y);
+                        
+        if(topLeft) {
+            gp.moveTo(x + radius, y);
+        } else {
+            gp.moveTo(x, y);            
+        }
+        if(topRight) {
+            gp.lineTo(x + widthF - radius, y);            
+            gp.quadTo(x + widthF, y, x + widthF, y + radius);
+        } else {
             gp.lineTo(x + widthF, y);
+        }
+        if(bottomRight) {
             gp.lineTo(x + widthF, y + heightF - radius);
             gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
+        } else {
+            gp.lineTo(x + widthF, y + heightF);
+        }
+        if(bottomLeft) {
             gp.lineTo(x + radius, y + heightF);
             gp.quadTo(x, y + heightF, x, y + heightF - radius);
-            gp.lineTo(x, y);
+        } else {
+            gp.lineTo(x, y + heightF);
+        }
+        if(topLeft) {
+            gp.lineTo(x, y + radius);
             gp.quadTo(x, y, x + radius, y);
         } else {
-            if(bottomOnlyMode) {
-                gp.moveTo(x + radius, y);
-                gp.lineTo(x + widthF - radius, y);
-                gp.quadTo(x + widthF, y, x + widthF, y + radius);
-                gp.lineTo(x + widthF, y + heightF);
-                gp.lineTo(x, y + heightF);
-                gp.lineTo(x, y + radius);
-                gp.quadTo(x, y, x + radius, y);
-            } else {
-                gp.moveTo(x + radius, y);
-                gp.lineTo(x + widthF - radius, y);
-                gp.quadTo(x + widthF, y, x + widthF, y + radius);
-                gp.lineTo(x + widthF, y + heightF - radius);
-                gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
-                gp.lineTo(x + radius, y + heightF);
-                gp.quadTo(x, y + heightF, x, y + heightF - radius);
-                gp.lineTo(x, y + radius);
-                gp.quadTo(x, y, x + radius, y);
-            }
+            gp.lineTo(x, y);            
         }
+        
         gp.closePath();            
         return gp;
     }
@@ -568,7 +640,7 @@ public class RoundRectBorder extends Border {
      * @return whether this is the top only mode
      */
     public boolean isTopOnlyMode() {
-        return topOnlyMode;
+        return topLeft && topRight && (!bottomLeft) && (!bottomRight);
     }
     
     /**
@@ -577,7 +649,7 @@ public class RoundRectBorder extends Border {
      * @return whether this is the bottom only mode
      */
     public boolean isBottomOnlyMode() {
-        return bottomOnlyMode;
+        return (!topLeft) && (!topRight) && bottomLeft && bottomRight;
     }
     
     @Override
@@ -627,6 +699,38 @@ public class RoundRectBorder extends Border {
             return false;
         }
         return true;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the topLeft value
+     */
+    public boolean isTopLeft() {
+        return topLeft;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the topRight value
+     */
+    public boolean isTopRight() {
+        return topRight;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the bottomLeft value
+     */
+    public boolean isBottomLeft() {
+        return bottomLeft;
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     * @return the bottomRight value
+     */
+    public boolean isBottomRight() {
+        return bottomRight;
     }
     
     
