@@ -1338,6 +1338,7 @@ public class Toolbar extends Container {
         c = l.getRenderer().getListFocusComponent(l);
         c.setUIID("CommandFocus");
         l.setFixedSelection(List.FIXED_NONE_CYCLIC);
+        l.setScrollVisible(false);
         ((DefaultListCellRenderer)l.getRenderer()).setShowNumbers(false);
         return l;
     }
