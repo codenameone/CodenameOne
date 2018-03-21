@@ -2249,7 +2249,7 @@ public class Component implements Animation, StyleListener {
             if (invisibleAreaUnderVKB == 0) {
                 return 0;
             }
-            int bottomGap = f.getHeight() - getAbsoluteY() - getHeight();
+            int bottomGap = f.getHeight() - getAbsoluteY() - getScrollY() - getHeight();
             if (bottomGap < invisibleAreaUnderVKB) {
                 return invisibleAreaUnderVKB - bottomGap;
             } else {
