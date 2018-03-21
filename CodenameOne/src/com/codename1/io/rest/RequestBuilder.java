@@ -363,7 +363,7 @@ public class RequestBuilder {
         req.setDuplicateSupported(true);
         req.setUrl(url);
         req.setHttpMethod(method);
-        req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT"));
+        req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));
         if(body != null){
             req.setRequestBody(body);
             req.setWriteRequest(true);
