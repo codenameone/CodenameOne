@@ -304,14 +304,14 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
-        if(!topOnlyMode) {
-            this.topLeft = true;
-            this.topRight = true;
-            this.bottomLeft = false;
-            this.bottomRight = false;
-        } else {
+        if(topOnlyMode) {
+            this.topLeft = false;
+            this.topRight = false;
             this.bottomLeft = true;
             this.bottomRight = true;
+        } else {
+            this.topLeft = true;
+            this.topRight = true;
         }
         return this;
     }
@@ -323,14 +323,14 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
-        if(!bottomOnlyMode) {
-            this.topLeft = false;
-            this.topRight = false;
-            this.bottomLeft = true;
-            this.bottomRight = true;
-        } else {
+        if(bottomOnlyMode) {
             this.topLeft = true;
             this.topRight = true;
+            this.bottomLeft = false;
+            this.bottomRight = false;
+        } else {
+            this.bottomLeft = true;
+            this.bottomRight = true;
         }
         return this;
     }
