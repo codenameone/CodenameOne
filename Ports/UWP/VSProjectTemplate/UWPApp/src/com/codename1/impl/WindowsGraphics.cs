@@ -195,7 +195,7 @@ namespace com.codename1.impl
         {
             //using (createAlphaLayer())
             //{
-                graphics.DrawRoundedRectangle(x, y, w, h, arcW, arcH, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+                graphics.DrawRoundedRectangle(x, y, w, h, (float)arcW/2.0, (float)arcH/2.0, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
             //}
                
         }
@@ -204,7 +204,7 @@ namespace com.codename1.impl
         {
             //using (createAlphaLayer())
             //{
-                graphics.FillRoundedRectangle(x, y, w, h, arcW, arcH, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
+                graphics.FillRoundedRectangle(x, y, w, h, (float)arcW/2.0, (float)arcH/2.0, Color.FromArgb((byte)alpha, c.R, c.G, c.B));
             //}
                 
         }

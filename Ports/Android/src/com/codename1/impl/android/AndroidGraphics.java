@@ -330,7 +330,7 @@ class AndroidGraphics {
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
         applyTransform();
-        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);
         unapplyTransform();
         canvas.restore();
     }
@@ -1261,7 +1261,7 @@ class AndroidGraphics {
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
         applyTransform();
-        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);
         unapplyTransform();
         canvas.restore();
     }

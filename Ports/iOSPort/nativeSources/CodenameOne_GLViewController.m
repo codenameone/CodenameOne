@@ -673,7 +673,7 @@ int maxVal(int a, int b) {
 CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     [UIColorFromRGB(color, alpha) set];
     CGRect rrect = CGRectMake(x, y, width, height);
-    CGFloat radius = MAX(arcWidth, arcHeight);
+    CGFloat radius = MAX(arcWidth, arcHeight)/2.0;
     CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect);
     CGFloat miny = CGRectGetMinY(rrect), midy = CGRectGetMidY(rrect), maxy = CGRectGetMaxY(rrect);
     CGContextMoveToPoint(context, minx, midy);
