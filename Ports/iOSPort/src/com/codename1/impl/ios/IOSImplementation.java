@@ -3082,11 +3082,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         private long moviePlayerPeer;
         private boolean fullScreen;
         private boolean embedNativeControls=true;
+        private List<Runnable> completionHandlers;
         
         
         public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
             this.uri = uri;
             this.isVideo = isVideo;
+            if (onCompletion != null) {
+                addCompletionHandler(onCompletion);
+            }
+            onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.onCompletionCallbackId = registerMediaCallback(onCompletion);
             if(!isVideo) {
                 moviePlayerPeer = nativeInstance.createAudio(uri, onCompletion);
@@ -3096,6 +3108,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         public IOSMedia(InputStream stream, String mimeType, Runnable onCompletion) {
             this.stream = stream;
             this.mimeType = mimeType;
+            if (onCompletion != null) {
+                addCompletionHandler(onCompletion);
+            }
+            onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.onCompletionCallbackId = registerMediaCallback(onCompletion);            
             isVideo = mimeType.indexOf("video") > -1;
             if(!isVideo) {
@@ -3107,7 +3130,47 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         }
+        
+        private void fireCompletionHandlers() {
+            if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
+                    public void run() {
+                        if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                            List<Runnable>  toRun;
+
+                            synchronized(IOSMedia.this) {
+                                toRun = new ArrayList<Runnable>(completionHandlers);
+                            }
+                            for (Runnable r : toRun) {
+                                r.run();
+                            }
+                        }
+                    }
+
+                });
+            }
+        }
+
+        public void addCompletionHandler(Runnable onCompletion) {
+            synchronized(this) {
+                if (completionHandlers == null) {
+                    completionHandlers = new ArrayList<Runnable>();
+                }
+
+                completionHandlers.add(onCompletion);
+            }
+        }
+
+        public void removeCompletionHandler(Runnable onCompletion) {
+            if (completionHandlers != null) {
+                synchronized(this) {
+                    completionHandlers.remove(onCompletion);
+                }
+            }
+        }
+        
         @Override
         public void play() {
             if(isVideo) {
@@ -3332,6 +3395,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new IOSMedia(uri, isVideo, onCompletion);
     }
 
+    @Override
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        super.addCompletionHandler(media, onCompletion);
+        if (media instanceof IOSMedia) {
+            ((IOSMedia)media).addCompletionHandler(onCompletion);
+        }
+    }
+
+    @Override
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        super.removeCompletionHandler(media, onCompletion);
+        if (media instanceof IOSMedia) {
+            ((IOSMedia)media).removeCompletionHandler(onCompletion);
+        }
+    }
+
+    
+    
 
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return new IOSMedia(stream, mimeType, onCompletion);

@@ -108,6 +108,27 @@ public class MediaManager {
     public static Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return Display.getInstance().createMedia(uri, isVideo, onCompletion);
     }
+    
+    /**
+     * Adds a callback to a Media element that will be called when the media finishes playing.
+     * 
+     * @param media The media to add the callback to.
+     * @param onCompletion The callback that will run on the EDT when the playback completes.
+     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public static void addCompletionHandler(Media media, Runnable onCompletion) {
+        Display.getInstance().addCompletionHandler(media, onCompletion);
+    }
+    
+    /**
+     * Removes onComplete callback from Media element.
+     * @param media The media element.
+     * @param onCompletion The callback.
+     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public static void removeCompletionHandler(Media media, Runnable onCompletion) {
+        Display.getInstance().removeCompletionHandler(media, onCompletion);
+    }
 
     /**
      * Creates the Media in the given stream

@@ -61,7 +61,7 @@ public class MediaPlayer extends Container {
     private Container buttonsBar;
     private boolean hideNativeVideoControls;
     private boolean showControls=true;
-    
+    private Runnable loopOnCompletion;
     
     private boolean userSetIcons = false;
     private Media video;
@@ -70,7 +70,7 @@ public class MediaPlayer extends Container {
     private String pendingDataURI;
     private boolean autoplay;
     private boolean loop;
-    private Runnable onCompletion;
+    //private Runnable onCompletion;
     
     /**
      * Empty constructor
@@ -167,6 +167,7 @@ public class MediaPlayer extends Container {
     public MediaPlayer(Media video) {
         this();
         this.video = video;
+        updateLoopOnCompletionHandler();
         //initUI();
     }
     
@@ -275,12 +276,8 @@ public class MediaPlayer extends Container {
      */
     public void setDataSource(String uri, Runnable onCompletion) throws IOException{
         dataSource = uri;
-        if(onCompletion instanceof CompletionWrapper) {
-            video = MediaManager.createMedia(uri, true, onCompletion);
-        } else {
-            this.onCompletion = onCompletion;
-            video = MediaManager.createMedia(uri, true, new CompletionWrapper());
-        }
+        video = MediaManager.createMedia(uri, true, onCompletion);
+        updateLoopOnCompletionHandler();
         if (isInitialized()) {
             initUI();
         }
@@ -327,12 +324,10 @@ public class MediaPlayer extends Container {
      * @throws java.io.IOException if the creation of the Media has failed
      */
     public void setDataSource(InputStream is, String mimeType, Runnable onCompletion) throws IOException{
-        if(onCompletion instanceof CompletionWrapper) {
-            video = MediaManager.createMedia(is, mimeType, onCompletion);
-        } else {
-            this.onCompletion = onCompletion;
-            video = MediaManager.createMedia(is, mimeType, new CompletionWrapper());
-        }
+        
+        video = MediaManager.createMedia(is, mimeType, onCompletion);
+        
+        updateLoopOnCompletionHandler();
         if (isInitialized()) {
             initUI();
         }
@@ -342,8 +337,11 @@ public class MediaPlayer extends Container {
         removeAll();
         setLayout(new BorderLayout());        
         
-        if(video != null){
-            addComponent(BorderLayout.CENTER, video.getVideoComponent());        
+        if(video != null && video.getVideoComponent() != null){
+            Component videoComponent = video.getVideoComponent();
+            if (videoComponent != null) {
+                addComponent(BorderLayout.CENTER, videoComponent);        
+            }
         }
         
         buttonsBar = new Container(new FlowLayout(Container.CENTER));
@@ -602,14 +600,41 @@ public class MediaPlayer extends Container {
         return loop;
     }
 
+    private void updateLoopOnCompletionHandler() {
+        if (isLoop() && loopOnCompletion == null) {
+            loopOnCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    if (video != null) {
+                        video.setTime(0);
+                        video.play();
+                    }
+                }
+
+            };
+        }
+        if (isLoop()) {
+            Display.getInstance().addCompletionHandler(video, loopOnCompletion);
+        } else {
+            if (loopOnCompletion != null) {
+                Display.getInstance().removeCompletionHandler(video, loopOnCompletion);
+            }
+        }
+    }
+    
     /**
      * Sets playback to loop
      * @param loop the loop to set
      */
     public void setLoop(boolean loop) {
-        this.loop = loop;
+        if (loop != this.loop) {
+            this.loop = loop;
+            updateLoopOnCompletionHandler();
+        }
     }
 
+    /*
     class CompletionWrapper implements Runnable {
         public void run() {
             if(onCompletion != null) {
@@ -624,4 +649,5 @@ public class MediaPlayer extends Container {
             }
         }
     }
+    */
 }

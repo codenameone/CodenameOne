@@ -3693,6 +3693,28 @@ public abstract class CodenameOneImplementation {
     public Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
         return null;
     }
+    
+    /**
+     * Adds a callback to a Media element that will be called when the media finishes playing.
+     * 
+     * @param media The media to add the callback to.
+     * @param onCompletion The callback that will run on the EDT when the playback completes.
+     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     * @see Display#addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+    }
+    
+    /**
+     * Removes onComplete callback from Media element.
+     * @param media The media element.
+     * @param onCompletion The callback.
+     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     * @see Display#removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        
+    }
 
     /**
      * Plays the sound in the given stream
