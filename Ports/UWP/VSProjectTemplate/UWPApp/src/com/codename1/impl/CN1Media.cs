@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading;
 using Windows.UI.Core;
@@ -13,8 +13,9 @@ namespace com.codename1.impl
         private MediaElement elem;
         private SilverlightPeer peer;
         private bool video;
-        private java.lang.Runnable onComplete;
+        //private java.lang.Runnable onComplete;
         private Canvas cl;
+        private System.Collections.Generic.List<java.lang.Runnable> completionHandlers;
 
         public CN1Media(string uri, bool video, java.lang.Runnable onComplete, Canvas cl)
         {
@@ -28,7 +29,11 @@ namespace com.codename1.impl
                     elem.MediaOpened += elem_MediaOpened;
                     elem.Source = new Uri(uri, UriKind.RelativeOrAbsolute);
                     this.video = video;
-                    this.onComplete = onComplete;
+                    //this.onComplete = onComplete;
+                    if (onComplete != null)
+                    {
+                        addCompletionHandler(onComplete);
+                    }
                     elem.MediaEnded += elem_MediaEnded;
                     are.Set();
                 }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
@@ -36,9 +41,26 @@ namespace com.codename1.impl
             }
         }
 
+        public void addCompletionHandler(java.lang.Runnable onComplete)
+        {
+            if (completionHandlers == null)
+            {
+                completionHandlers = new System.Collections.Generic.List<java.lang.Runnable>();
+            }
+            completionHandlers.Add(onComplete);
+        }
+
+        public void removeCompletionHandler(java.lang.Runnable onComplete)
+        {
+            if (completionHandlers != null)
+            {
+                completionHandlers.Remove(onComplete);
+            }
+        }
+
         void elem_MediaOpened(object sender, RoutedEventArgs e)
         {
-            //ready = true;
+            //ready = true;a
         }
 
         public CN1Media(Stream s, string mime, java.lang.Runnable onComplete, Canvas cl)
@@ -53,7 +75,11 @@ namespace com.codename1.impl
                     elem.MediaOpened += elem_MediaOpened;
                     elem.SetSource(s.AsRandomAccessStream(), "");
                     video = mime.StartsWith("video");
-                    this.onComplete = onComplete;
+                    //this.onComplete = onComplete;
+                    if (onComplete != null)
+                    {
+                        addCompletionHandler(onComplete);
+                    }
                     elem.MediaEnded += elem_MediaEnded;
                     are.Set();
                 }).AsTask().ConfigureAwait(false).GetAwaiter().GetResult();
@@ -63,10 +89,16 @@ namespace com.codename1.impl
 
         void elem_MediaEnded(object sender, RoutedEventArgs e)
         {
-            if (onComplete != null)
+            if (completionHandlers != null)
             {
                 ui.Display disp = ui.Display.getInstance();
-                disp.callSerially(onComplete);
+                System.Collections.Generic.List<java.lang.Runnable> toRun = new System.Collections.Generic.List<java.lang.Runnable>();
+                toRun.AddRange(completionHandlers);
+                foreach (var completionHandler in toRun)
+                {
+                    disp.callSerially(completionHandler);
+                }
+                
             }
         }
 
