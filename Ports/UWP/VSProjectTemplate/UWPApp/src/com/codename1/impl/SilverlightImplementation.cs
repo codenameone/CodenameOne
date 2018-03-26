@@ -1027,7 +1027,23 @@ namespace com.codename1.impl
             return new CN1Media(uri, isVideo, onCompletion, cl);
         }
 
-        
+         public override void addCompletionHandler(media.Media media, java.lang.Runnable onCompletion)
+        {
+            base.addCompletionHandler(media, onCompletion);
+            if (media is CN1Media)
+            {
+                ((CN1Media)media).addCompletionHandler(onCompletion);
+            }
+        }
+
+        public override void removeCompletionHandler(media.Media media, java.lang.Runnable onCompletion)
+        {
+            if (media is CN1Media)
+            {
+                ((CN1Media)media).removeCompletionHandler(onCompletion);
+            }
+            base.removeCompletionHandler(media, onCompletion);
+        }
 
         public override void lockOrientation(bool portrait)
         {
