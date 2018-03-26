@@ -1540,6 +1540,58 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     POOL_END();
 }
 
+/*
+// Checks avaiable bytes for NetworkConnection
+    native int available(long peer);
+
+    // Read pending data from NetworkConnection
+    native int readData(long peer, byte[] bytes, int off, int len);
+
+    // Reads next byte from NetworkConnection
+    native int shiftByte(long peer);
+
+    // Appends pending data to NetworkConnection
+    // data is a NSData* object
+    // We go through java in order to use locking concurrency
+    native void appendData(long peer, long data);
+*/
+
+JAVA_INT com_codename1_impl_ios_IOSNative_available___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    
+    JAVA_INT result = [impl available];
+    
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_appendData___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_LONG data) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    NSData* nsData = (BRIDGE_CAST NetworkConnectionImpl*)((void *)data);
+    [impl appendData:nsData];    
+    POOL_END();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_readData___long_byte_1ARRAY_int_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT len) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    JAVA_INT result = [impl readData:buffer offset:offset len:len];
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_shiftByte___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    
+    JAVA_INT result = [impl shiftByte];
+    
+    POOL_END();
+    return result;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSSLCertificates___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
@@ -1642,30 +1694,9 @@ void connectionComplete(void* peer) {
 }
 
 void connectionReceivedData(void* peer, NSData* data) {
-#ifndef NEW_CODENAME_ONE_VM
-    if (!__TIB_byte.classInitialized) __INIT_byte();
-    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, [data length]);
-    [data getBytes:byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_];
-    com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer, byteArray);
-#else
-    struct ThreadLocalData* threadStateData = getThreadLocalData();
-    enteringNativeAllocations();
-    if([data length] > 65536) {
-        int offset = 0;
-        while(offset < [data length]) {
-            int currentLength = MIN(65536, [data length] - offset);
-            JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, currentLength);
-            [data getBytes:((JAVA_ARRAY)byteArray)->data range:NSMakeRange(offset, currentLength)];
-            com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
-            offset += 65536;
-        }
-    } else {
-        JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
-        [data getBytes:((JAVA_ARRAY)byteArray)->data];
-        com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
-    }
-    finishedNativeAllocations();
-#endif
+    com_codename1_impl_ios_IOSImplementation_appendData___long_long(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer, (JAVA_LONG)data);
+
+
 }
 
 void connectionError(void* peer, NSString* message) {

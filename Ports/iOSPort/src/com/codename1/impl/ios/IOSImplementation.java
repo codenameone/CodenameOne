@@ -6099,14 +6099,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
     
-    public static void appendData(long peer, byte[] data) {
+    public static void appendData(long peer, long data) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
             n = instance.connections.get(peer);
         }
         if(n != null) {
             synchronized(n.LOCK) {
-                n.appendData(data);
+                nativeInstance.appendData(peer, data);
                 n.connected = true;
                 n.LOCK.notifyAll();
             }
@@ -6276,8 +6276,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static class NetworkConnection extends InputStream {
         private long peer;
+        private boolean closed;
         private FileBackedOutputStream body;
-        private Vector pendingData = new Vector();
+        //private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
         private String[] sslCertificates;
@@ -6352,6 +6353,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         
+        /*
         public void appendData(byte[] data) {
             boolean w = false;
             synchronized(LOCK) {
@@ -6369,16 +6371,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                 System.gc();
             }
         }
+        */
+        
+        private int shiftByte() {
+            return nativeInstance.shiftByte(peer);
+        }
         
         @Override
         public int read() throws IOException {
             synchronized(LOCK) {
-                if(pendingData.size() == 0) {
+                if(available() == 0) {
                     if(completed) {
                         return -1;
                     }
 
-                    while(pendingData.size() == 0) {
+                    while(available() == 0) {
                         try {
                             LOCK.wait();
                         } catch (InterruptedException ex) {
@@ -6386,21 +6393,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(error != null) {
                             throw new IOException(error);
                         }
-                        if(completed && pendingData.size() == 0) {
+                        if(completed && available() == 0) {
                             return -1;
                         }
                     }
                 }
 
-                byte[] chunk = (byte[])pendingData.elementAt(0);
-                int val = chunk[0] & 0xff;
-                if(chunk.length == 1) {
-                    pendingData.removeElementAt(0);
-                } else {
-                    byte[] b = new byte[chunk.length - 1];
-                    System.arraycopy(chunk, 1, b, 0, b.length);
-                    pendingData.setElementAt(b, 0);
-                }
+                //byte[] chunk = (byte[])pendingData.elementAt(0);
+                int val = shiftByte() & 0xff;
+                //if(chunk.length == 1) {
+                //    pendingData.removeElementAt(0);
+                //} else {
+                //    byte[] b = new byte[chunk.length - 1];
+                //    System.arraycopy(chunk, 1, b, 0, b.length);
+                //    pendingData.setElementAt(b, 0);
+                //}
                 if(error != null) {
                     throw new IOException(error);
                 }
@@ -6413,6 +6420,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(error != null) {
                 throw new IOException(error);
             }
+            return nativeInstance.available(peer);
+            /*
             synchronized(LOCK) {
                 int count = 0;
                 for(int iter = 0 ; iter < pendingData.size() ; iter++) {
@@ -6421,16 +6430,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 return count;
             }
+            */
         }
 
         @Override
         public void close() throws IOException {
             synchronized(LOCK) {
-                if(pendingData == null) {
+                //if(pendingData == null) {
+                //    return;
+                //}
+                if (closed) {
                     return;
                 }
+                closed = true;
                 completed = true;
-                pendingData = null;
+                //pendingData = null;
                 super.close();
                 nativeInstance.closeConnection(peer);
             }
@@ -6450,37 +6464,37 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public int read(byte[] bytes, int off, int len) throws IOException {
             synchronized(LOCK) {
-                if(pendingData.size() == 0) {
+                if(available() == 0) {
                     if(completed) {
                         return -1;
                     }
 
-                    while(pendingData.size() == 0) {
+                    while(available() == 0) {
                         try {
                             LOCK.wait();
                         } catch (InterruptedException ex) {
                         }
-                        if(completed && pendingData.size() == 0) {
+                        if(completed && available() == 0) {
                             return -1;
                         }
                     }
                 }
+                len = nativeInstance.readData(peer, bytes, off, len);
+                //byte[] chunk = (byte[])pendingData.elementAt(0);
+                //if(chunk.length < len) {
+                //    len = chunk.length;
+                //}
+                //for(int iter = 0 ; iter < len ; iter++) {
+                //    bytes[iter + off] = chunk[iter];
+                //}
 
-                byte[] chunk = (byte[])pendingData.elementAt(0);
-                if(chunk.length < len) {
-                    len = chunk.length;
-                }
-                for(int iter = 0 ; iter < len ; iter++) {
-                    bytes[iter + off] = chunk[iter];
-                }
-
-                if(chunk.length == len) {
-                    pendingData.removeElementAt(0);
-                } else {
-                    byte[] b = new byte[chunk.length - len];
-                    System.arraycopy(chunk, len, b, 0, b.length);
-                    pendingData.setElementAt(b, 0);
-                }
+                //if(chunk.length == len) {
+                //    pendingData.removeElementAt(0);
+                //} else {
+                //    byte[] b = new byte[chunk.length - len];
+                //    System.arraycopy(chunk, len, b, 0, b.length);
+                //    pendingData.setElementAt(b, 0);
+                //}
                 if(error != null) {
                     throw new IOException(error);
                 }
