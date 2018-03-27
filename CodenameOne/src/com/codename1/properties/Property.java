@@ -80,12 +80,14 @@ public class Property<T, K> extends PropertyBase<T, K> {
         return value;
     }
     
+    
     /**
      * Sets the property value and potentially fires a change event
      * @param value the new value
      */
     public K set(T value) {
-        if(this.value != value) { 
+        if(!(this.value == value || 
+                (this.value != null && this.value.equals(value)))) { 
             this.value = value;
             firePropertyChanged();
         }
