@@ -100,6 +100,7 @@ import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.Arrays;
 
 
 /**
@@ -1487,7 +1488,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
-        ((Matrix)nativeTransform).transformCoord(in, out);
+        ((Matrix)nativeTransform).transformPoints(Math.min(3, in.length), in, 0, out, 0, 1);
     }
 
     @Override
@@ -1547,6 +1548,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.nativeFillRect(ng.color, ng.alpha, x, y, width, height);
     }
+
+    @Override
+    public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        if(ng.alpha == 0) {
+            return;
+        }
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        ng.fillPolygon(ng.color, ng.alpha, xPoints, yPoints, nPoints);
+    }
+    
+    
     
     public void clearRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
@@ -4374,6 +4389,27 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.clearRectMutable(x, y, width, height);
         }
 
+        void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {
+            
+            // With mutable contexts the performance should be similar between
+            // drawing a shape and drawing a polygon, so let's just use
+            // the more generate fillShape code.
+            GeneralPath path = GeneralPath.createFromPool();
+            try {
+                for (int i=0; i<nPoints; i++) {
+                    if (i==0) {
+                        path.moveTo(xPoints[0], yPoints[0]);
+                    } else {
+                        path.lineTo(xPoints[i], yPoints[i]);
+                    }
+                }
+                path.closePath();
+                this.nativeFillShape(path);
+            } finally {
+                GeneralPath.recycle(path);
+            }
+        }
+
         
     }
 
@@ -4389,6 +4425,30 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Currently global graphics doesn't support antialiasing.
             return false;
         }
+
+        @Override
+        void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {
+            if (GeneralPath.isConvexPolygon(xPoints, yPoints)) {
+                nativeInstance.fillPolygonGlobal(color, alpha, xPoints, yPoints, nPoints);
+            } else {
+                GeneralPath path = GeneralPath.createFromPool();
+                try {
+                    for (int i=0; i<nPoints; i++) {
+                        if (i==0) {
+                            path.moveTo(xPoints[0], yPoints[0]);
+                        } else {
+                            path.lineTo(xPoints[i], yPoints[i]);
+                        }
+                    }
+                    path.closePath();
+                    this.nativeFillShape(path);
+                } finally {
+                    GeneralPath.recycle(path);
+                }
+            }
+        }
+        
+        
         
         @Override
         boolean isAntiAliasingSupported() {
@@ -4495,6 +4555,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             setNativeClippingGlobal(x, y, width, height, firstClip);
         }
         
+        @Override
         void setNativeClipping(ClipShape clip){
             if (clip.isRect()) {
                 clip.getBounds(reusableRect);
@@ -8129,6 +8190,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             return isRect;
         }
         
+        public String toString() {
+            if (isRect()) {
+                return rect.toString();
+            } else {
+                return p.toString();
+            }
+        }
         
         
         @Override

@@ -24,6 +24,8 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
+import java.util.Arrays;
 
 /**
  * Encapsulates a 3D transform that can be used in {@link com.codename1.ui.Graphics} contexts
@@ -849,8 +851,8 @@ public class Transform {
                 
                 out[0] = in[0]+translateX;
                 out[1] = in[1]+translateY;
-                if ( len > 2 ){
-                    out[2] = in[1]+translateZ;
+                if ( len > 2 && olen > 2 ){
+                    out[2] = in[2]+translateZ;
                 } else if (olen > 2){
                     out[2] = 0;
                 }
@@ -858,7 +860,7 @@ public class Transform {
             case TYPE_SCALE:
                 out[0] = in[0]*scaleX;
                 out[1] = in[1]*scaleY;
-                if ( len > 2 ){
+                if ( len > 2 && olen > 2 ){
                     out[2] = in[2]*scaleZ;
                 } else if ( olen > 2){
                     out[2] = 0;

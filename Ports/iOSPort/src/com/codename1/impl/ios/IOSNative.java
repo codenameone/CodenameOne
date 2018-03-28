@@ -666,6 +666,9 @@ public final class IOSNative {
     // We go through java in order to use locking concurrency
     native void appendData(long peer, long data);
 
+    
+    native void fillPolygonGlobal(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints);
+
 
 
    

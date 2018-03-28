@@ -42,6 +42,7 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
+#import "FillPolygon.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
 #import <MediaPlayer/MediaPlayer.h>
@@ -678,6 +679,9 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_in
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h);
 //native void clearRectMutable(int x, int y, int width, int height);
 void com_codename1_impl_ios_IOSNative_clearRectMutable___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
@@ -703,6 +707,34 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+/*
+
+    native void fillPolygonGlobal(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints);
+
+ */
+
+
+void com_codename1_impl_ios_IOSNative_fillPolygonGlobal___int_int_int_1ARRAY_int_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_OBJECT xPoints, JAVA_OBJECT yPoints, JAVA_INT nPoints) {
+    POOL_BEGIN();
+    JAVA_INT* x = (JAVA_INT*)((JAVA_ARRAY)xPoints)->data;
+    JAVA_INT* y = (JAVA_INT*)((JAVA_ARRAY)yPoints)->data;
+    JAVA_FLOAT xFloats[nPoints];
+    JAVA_FLOAT yFloats[nPoints];
+    for (int i=0; i<nPoints; i++) {
+        xFloats[i] = (JAVA_FLOAT)*(x+i);
+        yFloats[i] = (JAVA_FLOAT)*(y+i);
+    }
+    FillPolygon* f = [[FillPolygon alloc] initWithArgs:xFloats y:yFloats num:nPoints color:color alpha:alpha];
+    
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+    POOL_END();
+}
+
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawRectMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
