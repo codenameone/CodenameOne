@@ -1698,10 +1698,8 @@ public final class GeneralPath implements Shape {
      */
     public void setShape(Shape s, Transform t) {
         if (s.getClass() == GeneralPath.class) {
-            Log.p("Using setPath()");
             setPath((GeneralPath)s, t);
         } else if (s.getClass() == Rectangle.class) {
-            Log.p("Using setRect");
             setRect((Rectangle)s, t);
         } else {
             reset();
