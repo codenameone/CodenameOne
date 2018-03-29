@@ -236,7 +236,13 @@ public class URLImage extends EncodedImage {
                         adaptedIns = null;
                         adapt = null;
                     } else {
-                        adapted = adapter.adaptImage(img, placeholder);
+                        try {
+                            adapted = adapter.adaptImage(img, placeholder);
+                        } catch(Exception err) {
+                            Log.p("Failed to load image from URL: " + url);
+                            Log.e(err);
+                            return;
+                        }
                     }
                     if(storageFile != null) {
                         OutputStream o = Storage.getInstance().createOutputStream(storageFile);
