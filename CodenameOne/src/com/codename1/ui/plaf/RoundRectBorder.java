@@ -423,6 +423,11 @@ public class RoundRectBorder extends Border {
                         g.setColor(s.getBgColor());
                         g.translate(x, y);
                         g.fillShape(gp);
+                        if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                            g.setAlpha(strokeOpacity);
+                            g.setColor(strokeColor);
+                            g.drawShape(gp, this.stroke);
+                        }            
                         g.translate(-x, -y);
                         g.setAlpha(a);
                     }
