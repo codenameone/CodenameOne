@@ -100,6 +100,7 @@ import com.codename1.util.Callback;
 import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.Arrays;
 
 
 /**
@@ -1487,7 +1488,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void transformPoint(Object nativeTransform, float[] in, float[] out) {
-        ((Matrix)nativeTransform).transformCoord(in, out);
+        ((Matrix)nativeTransform).transformPoints(Math.min(3, in.length), in, 0, out, 0, 1);
     }
 
     @Override
@@ -1547,6 +1548,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.applyClip();
         ng.nativeFillRect(ng.color, ng.alpha, x, y, width, height);
     }
+
+    @Override
+    public void fillPolygon(Object graphics, int[] xPoints, int[] yPoints, int nPoints) {
+        NativeGraphics ng = (NativeGraphics)graphics;
+        if(ng.alpha == 0) {
+            return;
+        }
+        ng.checkControl();
+        ng.applyTransform();
+        ng.applyClip();
+        ng.fillPolygon(ng.color, ng.alpha, xPoints, yPoints, nPoints);
+    }
+    
+    
     
     public void clearRect(Object graphics, int x, int y, int width, int height) {
         NativeGraphics ng = (NativeGraphics)graphics;
@@ -3082,11 +3097,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         private long moviePlayerPeer;
         private boolean fullScreen;
         private boolean embedNativeControls=true;
+        private List<Runnable> completionHandlers;
         
         
         public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
             this.uri = uri;
             this.isVideo = isVideo;
+            if (onCompletion != null) {
+                addCompletionHandler(onCompletion);
+            }
+            onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.onCompletionCallbackId = registerMediaCallback(onCompletion);
             if(!isVideo) {
                 moviePlayerPeer = nativeInstance.createAudio(uri, onCompletion);
@@ -3096,6 +3123,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         public IOSMedia(InputStream stream, String mimeType, Runnable onCompletion) {
             this.stream = stream;
             this.mimeType = mimeType;
+            if (onCompletion != null) {
+                addCompletionHandler(onCompletion);
+            }
+            onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.onCompletionCallbackId = registerMediaCallback(onCompletion);            
             isVideo = mimeType.indexOf("video") > -1;
             if(!isVideo) {
@@ -3107,7 +3145,47 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         }
+        
+        private void fireCompletionHandlers() {
+            if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
+                    public void run() {
+                        if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                            List<Runnable>  toRun;
+
+                            synchronized(IOSMedia.this) {
+                                toRun = new ArrayList<Runnable>(completionHandlers);
+                            }
+                            for (Runnable r : toRun) {
+                                r.run();
+                            }
+                        }
+                    }
+
+                });
+            }
+        }
+
+        public void addCompletionHandler(Runnable onCompletion) {
+            synchronized(this) {
+                if (completionHandlers == null) {
+                    completionHandlers = new ArrayList<Runnable>();
+                }
+
+                completionHandlers.add(onCompletion);
+            }
+        }
+
+        public void removeCompletionHandler(Runnable onCompletion) {
+            if (completionHandlers != null) {
+                synchronized(this) {
+                    completionHandlers.remove(onCompletion);
+                }
+            }
+        }
+        
         @Override
         public void play() {
             if(isVideo) {
@@ -3332,6 +3410,24 @@ public class IOSImplementation extends CodenameOneImplementation {
         return new IOSMedia(uri, isVideo, onCompletion);
     }
 
+    @Override
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        super.addCompletionHandler(media, onCompletion);
+        if (media instanceof IOSMedia) {
+            ((IOSMedia)media).addCompletionHandler(onCompletion);
+        }
+    }
+
+    @Override
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        super.removeCompletionHandler(media, onCompletion);
+        if (media instanceof IOSMedia) {
+            ((IOSMedia)media).removeCompletionHandler(onCompletion);
+        }
+    }
+
+    
+    
 
     public Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
         return new IOSMedia(stream, mimeType, onCompletion);
@@ -4293,6 +4389,27 @@ public class IOSImplementation extends CodenameOneImplementation {
             nativeInstance.clearRectMutable(x, y, width, height);
         }
 
+        void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {
+            
+            // With mutable contexts the performance should be similar between
+            // drawing a shape and drawing a polygon, so let's just use
+            // the more generate fillShape code.
+            GeneralPath path = GeneralPath.createFromPool();
+            try {
+                for (int i=0; i<nPoints; i++) {
+                    if (i==0) {
+                        path.moveTo(xPoints[0], yPoints[0]);
+                    } else {
+                        path.lineTo(xPoints[i], yPoints[i]);
+                    }
+                }
+                path.closePath();
+                this.nativeFillShape(path);
+            } finally {
+                GeneralPath.recycle(path);
+            }
+        }
+
         
     }
 
@@ -4308,6 +4425,30 @@ public class IOSImplementation extends CodenameOneImplementation {
             // Currently global graphics doesn't support antialiasing.
             return false;
         }
+
+        @Override
+        void fillPolygon(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints) {
+            if (GeneralPath.isConvexPolygon(xPoints, yPoints)) {
+                nativeInstance.fillPolygonGlobal(color, alpha, xPoints, yPoints, nPoints);
+            } else {
+                GeneralPath path = GeneralPath.createFromPool();
+                try {
+                    for (int i=0; i<nPoints; i++) {
+                        if (i==0) {
+                            path.moveTo(xPoints[0], yPoints[0]);
+                        } else {
+                            path.lineTo(xPoints[i], yPoints[i]);
+                        }
+                    }
+                    path.closePath();
+                    this.nativeFillShape(path);
+                } finally {
+                    GeneralPath.recycle(path);
+                }
+            }
+        }
+        
+        
         
         @Override
         boolean isAntiAliasingSupported() {
@@ -4414,6 +4555,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             setNativeClippingGlobal(x, y, width, height, firstClip);
         }
         
+        @Override
         void setNativeClipping(ClipShape clip){
             if (clip.isRect()) {
                 clip.getBounds(reusableRect);
@@ -6018,14 +6160,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         ng.fillLinearGradient(startColor, endColor, x, y, width, height, horizontal);
     }
     
-    public static void appendData(long peer, byte[] data) {
+    public static void appendData(long peer, long data) {
         NetworkConnection n;
         synchronized(CONNECTIONS_LOCK) {
             n = instance.connections.get(peer);
         }
         if(n != null) {
             synchronized(n.LOCK) {
-                n.appendData(data);
+                nativeInstance.appendData(peer, data);
                 n.connected = true;
                 n.LOCK.notifyAll();
             }
@@ -6195,8 +6337,9 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     static class NetworkConnection extends InputStream {
         private long peer;
+        private boolean closed;
         private FileBackedOutputStream body;
-        private Vector pendingData = new Vector();
+        //private Vector pendingData = new Vector();
         private boolean completed;
         private Hashtable headers = new Hashtable();
         private String[] sslCertificates;
@@ -6271,6 +6414,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             }
         }
         
+        /*
         public void appendData(byte[] data) {
             boolean w = false;
             synchronized(LOCK) {
@@ -6288,16 +6432,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                 System.gc();
             }
         }
+        */
+        
+        private int shiftByte() {
+            return nativeInstance.shiftByte(peer);
+        }
         
         @Override
         public int read() throws IOException {
             synchronized(LOCK) {
-                if(pendingData.size() == 0) {
+                if(available() == 0) {
                     if(completed) {
                         return -1;
                     }
 
-                    while(pendingData.size() == 0) {
+                    while(available() == 0) {
                         try {
                             LOCK.wait();
                         } catch (InterruptedException ex) {
@@ -6305,21 +6454,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                         if(error != null) {
                             throw new IOException(error);
                         }
-                        if(completed && pendingData.size() == 0) {
+                        if(completed && available() == 0) {
                             return -1;
                         }
                     }
                 }
 
-                byte[] chunk = (byte[])pendingData.elementAt(0);
-                int val = chunk[0] & 0xff;
-                if(chunk.length == 1) {
-                    pendingData.removeElementAt(0);
-                } else {
-                    byte[] b = new byte[chunk.length - 1];
-                    System.arraycopy(chunk, 1, b, 0, b.length);
-                    pendingData.setElementAt(b, 0);
-                }
+                //byte[] chunk = (byte[])pendingData.elementAt(0);
+                int val = shiftByte() & 0xff;
+                //if(chunk.length == 1) {
+                //    pendingData.removeElementAt(0);
+                //} else {
+                //    byte[] b = new byte[chunk.length - 1];
+                //    System.arraycopy(chunk, 1, b, 0, b.length);
+                //    pendingData.setElementAt(b, 0);
+                //}
                 if(error != null) {
                     throw new IOException(error);
                 }
@@ -6332,6 +6481,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(error != null) {
                 throw new IOException(error);
             }
+            return nativeInstance.available(peer);
+            /*
             synchronized(LOCK) {
                 int count = 0;
                 for(int iter = 0 ; iter < pendingData.size() ; iter++) {
@@ -6340,16 +6491,21 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 return count;
             }
+            */
         }
 
         @Override
         public void close() throws IOException {
             synchronized(LOCK) {
-                if(pendingData == null) {
+                //if(pendingData == null) {
+                //    return;
+                //}
+                if (closed) {
                     return;
                 }
+                closed = true;
                 completed = true;
-                pendingData = null;
+                //pendingData = null;
                 super.close();
                 nativeInstance.closeConnection(peer);
             }
@@ -6369,37 +6525,37 @@ public class IOSImplementation extends CodenameOneImplementation {
         @Override
         public int read(byte[] bytes, int off, int len) throws IOException {
             synchronized(LOCK) {
-                if(pendingData.size() == 0) {
+                if(available() == 0) {
                     if(completed) {
                         return -1;
                     }
 
-                    while(pendingData.size() == 0) {
+                    while(available() == 0) {
                         try {
                             LOCK.wait();
                         } catch (InterruptedException ex) {
                         }
-                        if(completed && pendingData.size() == 0) {
+                        if(completed && available() == 0) {
                             return -1;
                         }
                     }
                 }
+                len = nativeInstance.readData(peer, bytes, off, len);
+                //byte[] chunk = (byte[])pendingData.elementAt(0);
+                //if(chunk.length < len) {
+                //    len = chunk.length;
+                //}
+                //for(int iter = 0 ; iter < len ; iter++) {
+                //    bytes[iter + off] = chunk[iter];
+                //}
 
-                byte[] chunk = (byte[])pendingData.elementAt(0);
-                if(chunk.length < len) {
-                    len = chunk.length;
-                }
-                for(int iter = 0 ; iter < len ; iter++) {
-                    bytes[iter + off] = chunk[iter];
-                }
-
-                if(chunk.length == len) {
-                    pendingData.removeElementAt(0);
-                } else {
-                    byte[] b = new byte[chunk.length - len];
-                    System.arraycopy(chunk, len, b, 0, b.length);
-                    pendingData.setElementAt(b, 0);
-                }
+                //if(chunk.length == len) {
+                //    pendingData.removeElementAt(0);
+                //} else {
+                //    byte[] b = new byte[chunk.length - len];
+                //    System.arraycopy(chunk, len, b, 0, b.length);
+                //    pendingData.setElementAt(b, 0);
+                //}
                 if(error != null) {
                     throw new IOException(error);
                 }
@@ -8034,6 +8190,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             return isRect;
         }
         
+        public String toString() {
+            if (isRect()) {
+                return rect.toString();
+            } else {
+                return p.toString();
+            }
+        }
         
         
         @Override

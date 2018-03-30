@@ -6925,6 +6925,26 @@ public class JavaSEPort extends CodenameOneImplementation {
         return media[0];
     }
 
+    @Override
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        super.addCompletionHandler(media, onCompletion);
+        if (media instanceof CodenameOneMediaPlayer) {
+            ((CodenameOneMediaPlayer)media).addCompletionHandler(onCompletion);
+        }
+    }
+
+    @Override
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        super.removeCompletionHandler(media, onCompletion); 
+        if (media instanceof CodenameOneMediaPlayer) {
+            ((CodenameOneMediaPlayer)media).removeCompletionHandler(onCompletion);
+        }
+    }
+
+    
+    
+    
+    
     private class NativeScreenGraphics {
 
         BufferedImage sourceImage;
@@ -8245,6 +8265,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     class CodenameOneMediaPlayer implements Media {
 
         private Runnable onCompletion;
+        private List<Runnable> completionHandlers;
         private javafx.scene.media.MediaPlayer player;
 //        private MediaPlayer player;
         private boolean realized = false;
@@ -8255,14 +8276,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
             if (onCompletion != null) {
-                this.onCompletion = new Runnable() {
-
-                    @Override
-                    public void run() {
-                        Display.getInstance().callSerially(onCompletion);
-                    }
-                };
+                addCompletionHandler(onCompletion);
             }
+            this.onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.isVideo = isVideo;
             this.frm = f;
             try {
@@ -8322,14 +8345,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             stream.close();
 
             if (onCompletion != null) {
-                this.onCompletion = new Runnable() {
-
-                    @Override
-                    public void run() {
-                        Display.getInstance().callSerially(onCompletion);
-                    }
-                };
+                addCompletionHandler(onCompletion);
+                
             }
+            this.onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+            };
             this.isVideo = mimeType.contains("video");
             this.frm = f;
             try {
@@ -8345,6 +8370,47 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
+        
+        private void fireCompletionHandlers() {
+            if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                            List<Runnable>  toRun;
+
+                            synchronized(CodenameOneMediaPlayer.this) {
+                                toRun = new ArrayList<Runnable>(completionHandlers);
+                            }
+                            for (Runnable r : toRun) {
+                                r.run();
+                            }
+                        }
+                    }
+
+                });
+            }
+        }
+        
+        public void addCompletionHandler(Runnable onCompletion) {
+            synchronized(this) {
+                if (completionHandlers == null) {
+                    completionHandlers = new ArrayList<Runnable>();
+                }
+
+                completionHandlers.add(onCompletion);
+            }
+        }
+
+        public void removeCompletionHandler(Runnable onCompletion) {
+            if (completionHandlers != null) {
+                synchronized(this) {
+                    completionHandlers.remove(onCompletion);
+                }
+            }
+        }
+        
         public void cleanup() {
             pause();
         }
