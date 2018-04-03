@@ -1601,7 +1601,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_available___long_R_int(CN1_THREAD_STAT
 void com_codename1_impl_ios_IOSNative_appendData___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_LONG data) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
-    NSData* nsData = (BRIDGE_CAST NetworkConnectionImpl*)((void *)data);
+    NSData* nsData = (BRIDGE_CAST NSData*)((void *)data);
     [impl appendData:nsData];    
     POOL_END();
 }
