@@ -50,7 +50,9 @@ int connections = 0;
 }
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout {
-    [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:YES];
+    });
     connections++;
     float time = ((float)timeout) / 1000.0;
     
@@ -278,9 +280,10 @@ extern void connectionError(void* peer, NSString* message);
             return count;
         } else {
             [data getBytes:((JAVA_ARRAY)buffer)->data+offset+count range:NSMakeRange(pendingDataPos, [data length] - pendingDataPos)];
-            count += [data length];
+            count += ([data length] - pendingDataPos);
+            
+            toFill -= ([data length]- pendingDataPos);
             pendingDataPos = 0;
-            toFill -= [data length];
             [pendingData removeObjectAtIndex:0];
             if ([pendingData count] == 0) {
                 return count;
