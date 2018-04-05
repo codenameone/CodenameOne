@@ -7379,13 +7379,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }else{
                     is = con.getErrorStream();
                 }
+                boolean isText = false;
+                String contentType = con.getContentType();
+                if (contentType != null) {
+                    if (contentType.startsWith("text/") || contentType.contains("json") || contentType.contains("css") || contentType.contains("javascript")) {
+                        isText = true;
+                    }
+                }
+                final boolean fIsText = isText;
                 InputStream i = new BufferedInputStream(is) {
 
                     public synchronized int read(byte b[], int off, int len)
                             throws IOException {
                         int s = super.read(b, off, len);
                         if(nr != null) {
-                            if (s > -1) {
+                            if (fIsText && s > -1) {
                                 nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
                             }
                         }
