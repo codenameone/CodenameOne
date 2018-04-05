@@ -8932,6 +8932,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Media createMediaRecorder(String path, String mime) throws IOException {
+        checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
         }        

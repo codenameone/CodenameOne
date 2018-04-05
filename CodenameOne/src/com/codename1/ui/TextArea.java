@@ -380,7 +380,8 @@ public class TextArea extends Component {
     
     
     /**
-     * Sets the constraint 
+     * Sets the constraint which provides a hint to the virtual keyboard input, notice this <b>doesn't</b>
+     * limit input type in any way!
      * 
      * @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
      * it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
