@@ -3717,6 +3717,27 @@ public class Component implements Animation, StyleListener {
     }
 
     /**
+     * Returns the component as an image.
+     * @return This component as an image.
+     */
+    public Image toImage() {
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            return null;
+        }
+        Image image = Image.createImage(getWidth(), getHeight(),0x0);
+        Graphics g = image.getGraphics();
+
+        g.translate(-getX(), -getY());
+        paintComponentBackground(g);
+        paint(g);
+        if (isBorderPainted()) {
+            paintBorder(g);
+        }
+        g.translate(getX(), getY());
+        return image;
+    }
+    
+    /**
      * Invoked on the focus component to let it know that drag has started on the parent container
      * for the case of a component that doesn't support scrolling
      */
