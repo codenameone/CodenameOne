@@ -4442,7 +4442,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                     String methodName = "set" + key;
                     for (Method m : s.getClass().getMethods()) {
-                        if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 0) {
+                        if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 1) {
                             try {
                                 m.invoke(s, value);
                             } catch (Exception ex) {
