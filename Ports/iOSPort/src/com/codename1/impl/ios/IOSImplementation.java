@@ -101,6 +101,7 @@ import com.codename1.util.StringUtil;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
+import java.util.Collections;
 
 
 /**
@@ -3084,6 +3085,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             cb.nsObserverPeer = nsObserverPeer;
         }
     }
+    // To prevent media from being GC'd before they are finished playing
+    // https://github.com/codenameone/CodenameOne/issues/2380
+    private List<IOSMedia> activeMedia;
     
     class IOSMedia implements Media {
         private String uri;
@@ -3100,6 +3104,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         private List<Runnable> completionHandlers;
         
         
+        
         public IOSMedia(String uri, boolean isVideo, Runnable onCompletion) {
             this.uri = uri;
             this.isVideo = isVideo;
@@ -3110,6 +3115,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    unmarkActive();
                     fireCompletionHandlers();
                 }
                 
@@ -3130,6 +3136,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                 @Override
                 public void run() {
+                    unmarkActive();
                     fireCompletionHandlers();
                 }
                 
@@ -3144,6 +3151,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                     ex.printStackTrace();
                 }
             }
+            
+        }
+        
+        private void markActive() {
+            if (activeMedia == null) {
+                activeMedia = Collections.synchronizedList(new ArrayList<IOSMedia>());
+            }
+            // Prevent premature GC
+            // https://github.com/codenameone/CodenameOne/issues/2380
+            activeMedia.add(this);
         }
         
         private void fireCompletionHandlers() {
@@ -3218,8 +3235,15 @@ public class IOSImplementation extends CodenameOneImplementation {
             } else {
                 nativeInstance.playAudio(moviePlayerPeer);                
             }
+            markActive();
         }
 
+        private void unmarkActive() {
+            if (activeMedia != null && activeMedia.contains(this)) {
+                activeMedia.remove(this);
+            }
+        }
+        
         @Override
         public void pause() {
             if(moviePlayerPeer != 0) {
@@ -3229,6 +3253,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.pauseAudio(moviePlayerPeer);
                 }
             }
+            unmarkActive();
         }
 
         public void prepare() {
@@ -3249,7 +3274,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     nativeInstance.releasePeer(moviePlayerPeer);
                     moviePlayerPeer = 0;
                 }
+                unmarkActive();
             }
+            
         }
         
         protected void finalize() {

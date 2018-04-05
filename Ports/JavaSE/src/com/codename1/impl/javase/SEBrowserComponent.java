@@ -110,6 +110,9 @@ public class SEBrowserComponent extends PeerComponent {
             System.out.println("[JS Console] "+val);
         }
     }
+
+    
+    
     
     
     
@@ -478,7 +481,7 @@ public class SEBrowserComponent extends PeerComponent {
         }
         return result[0];
     }
-     
+    
     public void execute(final String js) {
         Platform.runLater(new Runnable() {
             public void run() {
@@ -536,6 +539,8 @@ public class SEBrowserComponent extends PeerComponent {
                     //SEBrowserComponent.this.repaint();
                     
                     
+                } else {
+                    complete[0] = true;
                 }
                 synchronized(DEINIT_LOCK) {
                     DEINIT_LOCK.notify();
@@ -553,6 +558,7 @@ public class SEBrowserComponent extends PeerComponent {
                 }
             }
         });
+        //getComponentForm().deregisterAnimated(this);
         super.deinitialize();
     }
 
@@ -560,6 +566,7 @@ public class SEBrowserComponent extends PeerComponent {
     protected void initComponent() {
         super.initComponent(); //To change body of generated methods, choose Tools | Templates.
         init();
+        //getComponentForm().registerAnimated(this);
     }
     
     
@@ -588,6 +595,8 @@ public class SEBrowserComponent extends PeerComponent {
                     frm.repaint();
                     SEBrowserComponent.this.repaint();
 
+                } else {
+                    completed[0] = true;
                 }
 
             }
