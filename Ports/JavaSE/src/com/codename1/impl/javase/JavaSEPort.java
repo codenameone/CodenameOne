@@ -9185,7 +9185,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
-            url = "file://" + unfile(url);
+            
+            try {
+                File f = new File(unfile(url));
+                url = f.toURI().toString();
+            } catch (Throwable t){
+                url = "file://" + unfile(url);
+            }
         }
         if (url.startsWith("jar:")) {
             url = url.substring(6);
