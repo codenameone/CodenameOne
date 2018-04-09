@@ -3311,7 +3311,7 @@ private void imageBorderWizardMenuItemActionPerformed(java.awt.event.ActionEvent
 
     private void initNativeTheme() {
         Preferences p = Preferences.userNodeForPackage(getClass());
-        String t = p.get("nativeCN1Theme", "/iPhoneTheme.res");
+        String t = p.get("nativeCN1Theme", "/iOS7Theme.res");
         boolean local = p.getBoolean("nativeCN1Local", true);
         setNativeTheme(t, local);
         if(local) {

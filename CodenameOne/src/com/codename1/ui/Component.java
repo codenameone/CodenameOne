@@ -302,6 +302,11 @@ public class Component implements Animation, StyleListener {
     private boolean snapToGrid;
 
     private boolean hideInPortrait;
+
+    /**
+     * Indicates that this component and all its children should be hidden when the device is switched to landscape mode
+     */
+    private boolean hideInLandscape;
     private int scrollOpacity = 0xff;
     private boolean ignorePointerEvents;
             
@@ -2730,12 +2735,16 @@ public class Component implements Animation, StyleListener {
     private Dimension preferredSizeImpl() {
         if (!sizeRequestedByUser && (shouldCalcPreferredSize || preferredSize == null)) {
             shouldCalcPreferredSize = false;
-            if(hideInPortrait && Display.getInstance().isPortrait()) {
+            if(hideInPortrait && Display.INSTANCE.isPortrait()) {
                 preferredSize = new Dimension(0, 0);
             } else {
-                preferredSize = calcPreferredSize();
-                if (preferredSizeStr != null) {
-                    Component.parsePreferredSize(preferredSizeStr, preferredSize);
+                if(hideInLandscape && !Display.INSTANCE.isPortrait()) {
+                    preferredSize = new Dimension(0, 0);
+                } else {
+                    preferredSize = calcPreferredSize();
+                    if (preferredSizeStr != null) {
+                        Component.parsePreferredSize(preferredSizeStr, preferredSize);
+                    }
                 }
             }
         }
@@ -3160,6 +3169,22 @@ public class Component implements Animation, StyleListener {
      */
     protected boolean shouldRenderComponentSelection() {
         return false;
+    }
+
+    /**
+     * Indicates that this component and all its children should be hidden when the device is switched to landscape mode
+     * @return the hideInLandscape
+     */
+    public boolean isHideInLandscape() {
+        return hideInLandscape;
+    }
+
+    /**
+     * Indicates that this component and all its children should be hidden when the device is switched to landscape mode
+     * @param hideInLandscape the hideInLandscape to set
+     */
+    public void setHideInLandscape(boolean hideInLandscape) {
+        this.hideInLandscape = hideInLandscape;
     }
 
     class AnimationTransitionPainter implements Painter{

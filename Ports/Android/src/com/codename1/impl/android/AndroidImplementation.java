@@ -2741,8 +2741,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
-            return null;
+        if(!uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+                return null;
+            }
         }
         if (uri.startsWith("file://")) {
             return createMedia(removeFilePrefix(uri), isVideo, onCompletion);
@@ -2835,9 +2837,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+        /*if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
             return null;
-        }
+        }*/
         boolean isVideo = mimeType.contains("video");
 
         if (!isVideo && stream instanceof FileInputStream) {
