@@ -186,7 +186,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowSpread(int shadowSpread) {
-        this.shadowSpread = shadowSpread;
+        this.shadowSpread = shadowSpread * 100f/Display.getInstance().convertToPixels(100f);
         return this;
     }
 
@@ -410,64 +410,70 @@ public class RoundRectBorder extends Border {
         final int h = c.getHeight();
         int x = c.getX();
         int y = c.getY();
-        if(shadowOpacity == 0) {
-            Style s = c.getStyle();
-            if(s.getBgImage() == null ) {
-                byte type = s.getBackgroundType();
-                if(type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
-                    GeneralPath gp = createShape(w, h);
-                    byte bgt = c.getStyle().getBgTransparency();
-                    if(bgt != 0) {
-                        int a = g.getAlpha();
-                        g.setAlpha(bgt &0xff);
-                        g.setColor(s.getBgColor());
-                        g.translate(x, y);
-                        g.fillShape(gp);
+        boolean antiAliased = g.isAntiAliased();
+        g.setAntiAliased(true);
+        try {
+            if(shadowOpacity == 0) {
+                Style s = c.getStyle();
+                if(s.getBgImage() == null ) {
+                    byte type = s.getBackgroundType();
+                    if(type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
+                        GeneralPath gp = createShape(w, h);
+                        byte bgt = c.getStyle().getBgTransparency();
+                        if(bgt != 0) {
+                            int a = g.getAlpha();
+                            g.setAlpha(bgt &0xff);
+                            g.setColor(s.getBgColor());
+                            g.translate(x, y);
+                            g.fillShape(gp);
+                            if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                                g.setAlpha(strokeOpacity);
+                                g.setColor(strokeColor);
+                                g.drawShape(gp, this.stroke);
+                            }            
+                            g.translate(-x, -y);
+                            g.setAlpha(a);
+                        }
                         if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                            int a = g.getAlpha();
                             g.setAlpha(strokeOpacity);
                             g.setColor(strokeColor);
+                            g.translate(x, y);
                             g.drawShape(gp, this.stroke);
-                        }            
-                        g.translate(-x, -y);
-                        g.setAlpha(a);
+                            g.translate(-x, -y);
+                            g.setAlpha(a);
+                        }      
+                        return;
                     }
-                    if(this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
-                        int a = g.getAlpha();
-                        g.setAlpha(strokeOpacity);
-                        g.setColor(strokeColor);
-                        g.translate(x, y);
-                        g.drawShape(gp, this.stroke);
-                        g.translate(-x, -y);
-                        g.setAlpha(a);
-                    }      
+                }        
+            }
+            if(w > 0 && h > 0) {
+                Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
+                if(background != null && background.getWidth() == w && background.getHeight() == h) {
+                    g.drawImage(background, x, y);
                     return;
                 }
-            }        
-        }
-        if(w > 0 && h > 0) {
-            Image background = (Image)c.getClientProperty(CACHE_KEY + instanceVal);
-            if(background != null && background.getWidth() == w && background.getHeight() == h) {
-                g.drawImage(background, x, y);
+            } else {
                 return;
             }
-        } else {
-            return;
-        }
-                
-        Image target = createTargetImage(c, w, h, true);
-        g.drawImage(target, x, y);
-        c.putClientProperty(CACHE_KEY + instanceVal, target);
 
-        // update the cache with a more refined version and repaint
-        Display.getInstance().callSeriallyOnIdle(new Runnable() {
-            public void run() {
-                if(w == c.getWidth() && h == c.getHeight()) {
-                    Image target = createTargetImage(c, w, h, false);
-                    c.putClientProperty(CACHE_KEY + instanceVal, target);
-                    c.repaint();
+            Image target = createTargetImage(c, w, h, true);
+            g.drawImage(target, x, y);
+            c.putClientProperty(CACHE_KEY + instanceVal, target);
+
+            // update the cache with a more refined version and repaint
+            Display.getInstance().callSeriallyOnIdle(new Runnable() {
+                public void run() {
+                    if(w == c.getWidth() && h == c.getHeight()) {
+                        Image target = createTargetImage(c, w, h, false);
+                        c.putClientProperty(CACHE_KEY + instanceVal, target);
+                        c.repaint();
+                    }
                 }
-            }
-        });
+            });
+        } finally {
+            g.setAntiAliased(antiAliased);
+        }
     }
     
     private GeneralPath createShape(int shapeW, int shapeH) {
