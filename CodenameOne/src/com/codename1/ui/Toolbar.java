@@ -1348,6 +1348,10 @@ public class Toolbar extends Container {
      * override this default behavior.
      */
     protected void initTitleBarStatus() {
+        Form f = getComponentForm();
+        if(f != null && !f.shouldPaintStatusBar()) {
+            return;
+        }
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             // check if its already added:
             if (((BorderLayout) getLayout()).getNorth() == null) {
