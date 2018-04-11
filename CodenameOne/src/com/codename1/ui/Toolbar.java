@@ -1170,7 +1170,7 @@ public class Toolbar extends Container {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         if(isRTL()) {
-            cmd.putClientProperty("Left", Boolean.TRUE);
+            cmd.putClientProperty("Left", null);
         }
         sideMenu.addCommand(cmd, 0);        
     }
