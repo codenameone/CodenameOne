@@ -120,13 +120,17 @@ import java.awt.event.MouseWheelListener;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
+import java.awt.font.TextAttribute;
+import java.awt.font.TextLayout;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
+import java.awt.geom.Rectangle2D;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
+import java.text.AttributedString;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
@@ -5310,7 +5314,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         // the latter indicates mutable image graphics
-        nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
+        java.awt.Font fnt = nativeGraphics.getFont();
+        if (isEmojiFontLoaded() && fnt.canDisplayUpTo(str) != -1) {
+            // This might have emojis
+            // render as attributed string
+            AttributedString astr = createAttributedString(fnt, str);
+            nativeGraphics.drawString(astr.getIterator(), x, y + nativeGraphics.getFontMetrics().getAscent());
+        } else {
+            nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
+        }
         if (perfMonitor != null) {
             perfMonitor.drawString(str, x, y);
         }
@@ -5430,6 +5442,110 @@ public class JavaSEPort extends CodenameOneImplementation {
         return stringWidth(nativeFont, new String(ch, offset, length));
     }
 
+    private Rectangle2D getStringBoundsWithEmojis(java.awt.Font font, String str) {
+        if (isEmojiFontLoaded() && hasUnsupportedChars(font, str)) {
+            TextLayout textLayout = new TextLayout( 
+                    createAttributedString(font, str).getIterator(), 
+                    canvas.getFRC()
+            );
+            
+            Rectangle2D.Float textBounds = ( Rectangle2D.Float ) textLayout.getBounds();
+            return textBounds;
+        } else {
+            return font.getStringBounds(str, canvas.getFRC());
+        }
+    }
+    
+    private java.awt.Font emojiFont;
+    private boolean attemptedToLoadEmojiFont;
+    private Map<Integer,java.awt.Font> emojiFontCache;
+    
+    private boolean isEmojiFontLoaded() {
+        return getEmojiFont() != null;
+    }
+    
+    private java.awt.Font getEmojiFont() {
+        if (emojiFont == null) {
+            if (!attemptedToLoadEmojiFont) {
+                attemptedToLoadEmojiFont = true;
+                try {
+                    emojiFont = (java.awt.Font)loadTrueTypeFont("NotoEmoji-Regular", "NotoEmoji-Regular.ttf");
+                    //emojiFont = (java.awt.Font)loadTrueTypeFont("OpenSansEmoji", "OpenSansEmoji.ttf");
+                } catch (Throwable t){
+                    System.out.println("Failed to load emoji font "+t.getMessage());
+                }
+            }
+        }
+        return emojiFont;
+    }
+    
+    private java.awt.Font deriveEmojiFont(float size) {
+        if (emojiFont == null) {
+            return null;
+        }
+        if (emojiFontCache == null) {
+            emojiFontCache = new HashMap<Integer,java.awt.Font>();
+        }
+        int key = (int)Math.round(size);
+        if (!emojiFontCache.containsKey(key)) {
+            java.awt.Font fnt = emojiFont.deriveFont(size);
+            emojiFontCache.put(key, fnt);
+            return fnt;
+        }
+        return emojiFontCache.get(key);
+    }
+    
+    private AttributedString createAttributedString(java.awt.Font font, String str) {
+        java.awt.Font emojiFont = deriveEmojiFont(font.getSize2D());
+        AttributedString astr = new AttributedString(str);
+        astr.addAttribute(TextAttribute.FONT, font);
+        if (emojiFont == null) {
+            return astr;
+        }
+        int pos = font.canDisplayUpTo(str);
+        if (pos == -1) {
+            return astr;
+        }
+        int len = str.length();
+        char[] chars = str.toCharArray();
+        while (pos < len) {
+            // find next char that the font can render
+            int spanEnd = len;
+            for (int j=pos+1; j<len; j++) {
+                char c = chars[j];
+                
+                if (j < len-1 && Character.isSurrogatePair(c, chars[j+1])) {
+                    int codePoint = Character.toCodePoint(c, chars[j+1]);
+                    if (font.canDisplay(codePoint)) {
+                        spanEnd = j;
+                        break;
+                    }
+                } else {
+                    if (font.canDisplay(c)) {
+                        spanEnd = j;
+                        break;
+                    }
+                }
+            }
+            astr.addAttribute(TextAttribute.FONT, emojiFont, pos, spanEnd);
+            if (spanEnd < len) {
+                pos = font.canDisplayUpTo(chars, spanEnd, len);
+                if (pos == -1) {
+                    pos = len;
+                }
+            } else {
+                pos = spanEnd;
+            }
+            
+        }
+        
+        return astr;
+    }
+    
+    private boolean hasUnsupportedChars(java.awt.Font font, String str) {
+        return font.canDisplayUpTo(str) != -1;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -5442,7 +5558,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return 0;
         }
         java.awt.Font fnt = font(nativeFont);
-        java.awt.geom.Rectangle2D r2d = fnt.getStringBounds(str, canvas.getFRC());
+        java.awt.geom.Rectangle2D r2d = getStringBoundsWithEmojis(fnt, str);//fnt.getStringBounds(str, canvas.getFRC());
         int w = (int) Math.ceil(r2d.getWidth());
         return w;
     }
@@ -5455,7 +5571,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.charWidth(nativeFont, ch);
         }
         checkEDT();
-        int w = (int) Math.ceil(font(nativeFont).getStringBounds("" + ch, canvas.getFRC()).getWidth());
+        java.awt.Font fnt = font(nativeFont);
+        if (isEmojiFontLoaded() && !Character.isHighSurrogate(ch) && !fnt.canDisplay(ch)) {
+            fnt = deriveEmojiFont(fnt.getSize2D());
+        }
+        int w = (int) Math.ceil(fnt.getStringBounds("" + ch, canvas.getFRC()).getWidth());
         return w;
     }
 
