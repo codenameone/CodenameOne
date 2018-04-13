@@ -163,6 +163,18 @@ public class Font extends CN {
     }
     
     /**
+     * Shorthand for {@code createTrueTypeFont(name, name)} &amp;  
+     * {@code derive(size)} which is useful for cases such as native: fonts. 
+     * @param fontName the native font name
+     * @param sizeMm the size in mm
+     * @return a font object
+     */
+    public static Font createTrueTypeFont(String fontName, float sizeMm) {
+        return createTrueTypeFont(fontName, fontName).
+                derive(Display.getInstance().convertToPixels(sizeMm), STYLE_PLAIN);
+    }
+
+    /**
      * Creates a true type font with the given name/filename (font name might be different from the file name
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
      * order to be detectable. The file name should contain no slashes or any such value.<br>
