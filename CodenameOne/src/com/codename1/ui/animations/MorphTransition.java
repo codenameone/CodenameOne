@@ -114,6 +114,7 @@ public class MorphTransition extends Transition {
         int size = fromTo.size();
         fromToComponents = new CC[size];
         Form destForm = d.getComponentForm();
+        destForm.forceRevalidate();
         Form sourceForm = s.getComponentForm();
         for(int iter = 0 ; iter < size ; iter++) {
             String k = keyIterator.next();

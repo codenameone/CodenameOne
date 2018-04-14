@@ -172,7 +172,8 @@ public class Toolbar extends Container {
         setLayout(new BorderLayout());
         setUIID("Toolbar");
         sideMenu = new ToolbarSideMenu();
-        if(centeredDefault && getUnselectedStyle().getAlignment() == CENTER) {
+        if(centeredDefault && 
+                UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
             setTitleCentered(true);
         }
     }
@@ -1170,7 +1171,7 @@ public class Toolbar extends Container {
         checkIfInitialized();
         cmd.putClientProperty("TitleCommand", Boolean.TRUE);
         if(isRTL()) {
-            cmd.putClientProperty("Left", Boolean.TRUE);
+            cmd.putClientProperty("Left", null);
         }
         sideMenu.addCommand(cmd, 0);        
     }
@@ -1348,6 +1349,10 @@ public class Toolbar extends Container {
      * override this default behavior.
      */
     protected void initTitleBarStatus() {
+        Form f = getComponentForm();
+        if(f != null && !f.shouldPaintStatusBar()) {
+            return;
+        }
         if (getUIManager().isThemeConstant("paintsTitleBarBool", false)) {
             // check if its already added:
             if (((BorderLayout) getLayout()).getNorth() == null) {

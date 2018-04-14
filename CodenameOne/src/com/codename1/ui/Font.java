@@ -64,102 +64,7 @@ import java.util.Hashtable;
  * maintain that functionality.
  * </p>
  */
-public class Font {
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int FACE_MONOSPACE = 32;
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int FACE_PROPORTIONAL = 64;
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int FACE_SYSTEM = 0;
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int SIZE_LARGE = 16;
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int SIZE_MEDIUM = 0;
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int SIZE_SMALL = 8;
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int STYLE_BOLD = 1;
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int STYLE_ITALIC = 2;
-    
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int STYLE_UNDERLINED = 4;
-    
-    /**
-     * Constant for the name of the main thin native font.
-     */
-    public static final String NATIVE_MAIN_THIN="native:MainThin";
-    
-    /**
-     * Constant for the main light native font.
-     */
-    public static final String NATIVE_MAIN_LIGHT="native:MainLight";
-    
-    /**
-     * Constant for the main regular native font.
-     */
-    public static final String NATIVE_MAIN_REGULAR="native:MainRegular";
-    
-    /**
-     * Constant for the main bold native font.
-     */
-    public static final String NATIVE_MAIN_BOLD="native:MainBold";
-    
-    /**
-     * Constant for the main black native font.
-     */
-    public static final String NATIVE_MAIN_BLACK="native:MainBlack";
-    
-    /**
-     * Constant for the italic thin native font.
-     */
-    public static final String NATIVE_ITALIC_THIN="native:ItalicThin";
-    
-    /**
-     * Constant for the italic light native font.
-     */
-    public static final String NATIVE_ITALIC_LIGHT="native:ItalicLight";
-    
-    /**
-     * Constant for the italic bold native font.
-     */
-    public static final String NATIVE_ITALIC_BOLD="native:ItalicBold";
-    
-    /**
-     * Constant for the italic black native font.
-     */
-    public static final String NATIVE_ITALIC_BLACK="native:ItalicBlack";
-    
-
-    /**
-     * Constant allowing us to author portable system fonts
-     */
-    public static final int STYLE_PLAIN = 0;
+public class Font extends CN {
     
     private static Font defaultFont = new Font(null);
     
@@ -248,6 +153,28 @@ public class Font {
     }
     
     /**
+     * Shorthand for {@code createTrueTypeFont(name, name)} which is useful
+     * for cases such as native: fonts.
+     * @param fontName the native font name
+     * @return a font object
+     */
+    public static Font createTrueTypeFont(String fontName) {
+        return createTrueTypeFont(fontName, fontName);
+    }
+    
+    /**
+     * Shorthand for {@code createTrueTypeFont(name, name)} &amp;  
+     * {@code derive(size)} which is useful for cases such as native: fonts. 
+     * @param fontName the native font name
+     * @param sizeMm the size in mm
+     * @return a font object
+     */
+    public static Font createTrueTypeFont(String fontName, float sizeMm) {
+        return createTrueTypeFont(fontName, fontName).
+                derive(Display.getInstance().convertToPixels(sizeMm), STYLE_PLAIN);
+    }
+
+    /**
      * Creates a true type font with the given name/filename (font name might be different from the file name
      * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
      * order to be detectable. The file name should contain no slashes or any such value.<br>
@@ -265,7 +192,7 @@ public class Font {
      * @return the font object created or null if true type fonts aren't supported on this platform
      */
     public static Font createTrueTypeFont(String fontName, String fileName) {
-        String alreadyLoaded = fileName + "_" + fontReturnedHeight + "_"+ Font.STYLE_PLAIN;
+        String alreadyLoaded = fileName + "_" + fontReturnedHeight + "_"+ STYLE_PLAIN;
         Font f = derivedFontCache.get(alreadyLoaded);
         if(f != null) {
             return f;

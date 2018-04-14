@@ -867,7 +867,12 @@ public class Button extends Label {
      */
     public final boolean isCapsText() {
         if(capsText == null) {
-            return capsTextDefault && (getUIID().equals("Button") || getUIID().equals("RaisedButton"));
+            if(capsTextDefault) {
+                String uiid = getUIID();
+                return uiid.equals("Button") || uiid.equals("RaisedButton") || 
+                        getUIManager().getThemeConstant("capsButtonUiids", "").indexOf(uiid) > -1;
+            }
+            return false;
         }
         return capsText;
     }

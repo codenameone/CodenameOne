@@ -5471,7 +5471,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!attemptedToLoadEmojiFont) {
                 attemptedToLoadEmojiFont = true;
                 try {
-                    emojiFont = (java.awt.Font)loadTrueTypeFont("NotoEmoji-Regular", "NotoEmoji-Regular.ttf");
+                    emojiFont = (java.awt.Font)loadTrueTypeFont("Noto Emoji", "NotoEmoji-Regular.ttf");
                     //emojiFont = (java.awt.Font)loadTrueTypeFont("OpenSansEmoji", "OpenSansEmoji.ttf");
                 } catch (Throwable t){
                     System.out.println("Failed to load emoji font "+t.getMessage());
