@@ -417,4 +417,12 @@ public class TextComponent extends InputComponent {
         }
         return super.setPropertyValue(name, value);
     }
+    
+    /**
+     * Returns the text in the field {@link com.codename1.ui.TextArea#getText()}
+     * @return the text
+     */
+    public String getText() {
+        return field.getText();
+    }
 }
