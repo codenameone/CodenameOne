@@ -27,7 +27,6 @@ import com.codename1.db.Row;
 import com.codename1.io.Util;
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Blob;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -188,9 +187,7 @@ public class SECursor implements Cursor, Row{
             throw new IOException("Cursor is closed");
         }
         try {
-            Blob b = resultSet.getBlob(index+1);
-            InputStream is = b.getBinaryStream();
-            return Util.readInputStream(is);
+            return resultSet.getBytes(index+1);
         } catch (SQLException ex) {
             ex.printStackTrace();
             throw new IOException(ex.getMessage());
