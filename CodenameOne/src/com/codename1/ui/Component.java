@@ -383,7 +383,8 @@ public class Component implements Animation, StyleListener {
     private Rectangle dirtyRegion = null;
     private final Object dirtyRegionLock = new Object();
     private Label componentLabel;
-    private String id;
+    private String portraitUiid;
+    private String landscapeUiid;
     
     private Resources inlineStylesTheme;
     private String inlineAllStyles;
@@ -1451,7 +1452,13 @@ public class Component implements Animation, StyleListener {
      * @return unique string identifying this component for the style sheet
      */
     public String getUIID() {
-        return id;
+        if(landscapeUiid != null) {
+            if(Display.impl.isPortrait()) {
+                return portraitUiid;
+            }
+            return landscapeUiid;
+        }
+        return portraitUiid;
     }
 
     /**
@@ -1461,7 +1468,18 @@ public class Component implements Animation, StyleListener {
      * @param id UIID unique identifier for component type
      */
     public void setUIID(String id) {
-        this.id = id;
+        setUIID(id, null);
+    }
+    
+    /**
+     * This method sets the Component the Unique identifier.
+     * 
+     * @param portraitUiid UIID unique identifier for component type in portrait mode
+     * @param landscapeUiid UIID unique identifier for component type in landscape mode
+     */
+    public void setUIID(String portraitUiid, String landscapeUiid) {
+        this.portraitUiid = portraitUiid;
+        this.landscapeUiid = landscapeUiid;
         unSelectedStyle = null;
         selectedStyle = null;
         disabledStyle = null;
