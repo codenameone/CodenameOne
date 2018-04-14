@@ -176,7 +176,7 @@ static GLuint getOGLProgram(){
     //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
     //_glEnableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, numPoints);
     //GLErrorLog;
     //_glDisableClientState(GL_VERTEX_ARRAY);
     //GLErrorLog;
