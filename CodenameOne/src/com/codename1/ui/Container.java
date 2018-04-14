@@ -1855,7 +1855,7 @@ public class Container extends Component implements Iterable<Component>{
         }
         return closest;
     }
-    
+
     /**
      * Returns the top-most component that responds to pointer events at absolute 
      * coordinate {@literal (x, y)}.  This may return {@literal null} if there are 
@@ -1972,7 +1972,7 @@ public class Container extends Component implements Iterable<Component>{
                 }
                 if (cmp instanceof Container) {
                     Component c = ((Container) cmp).getComponentAt(x, y);
-                    if(c != null){
+                    if(c != null && (!cmp.respondsToPointerEvents() || c.respondsToPointerEvents())){
                         component = c;
                     }
                 }
