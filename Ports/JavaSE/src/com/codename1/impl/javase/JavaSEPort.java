@@ -1733,7 +1733,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(f != null){
                     Component cmp;
                     try {
-                        cmp = f.getResponderAt(x, y);
+                        cmp = f.getComponentAt(x, y);
                     } catch (Throwable t) {
                         // Since this is called off the edt, we sometimes hit 
                         // NPEs and Array Index out of bounds errors here
@@ -1744,9 +1744,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                             ignoreWheelMovements = true;
                         }
                         return;
+                    } else {
+                        ignoreWheelMovements = false;
                     }
                 }
-                
                 requestFocus();
                 final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
 
@@ -1764,7 +1765,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                         scrollWheeling = true;
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
+                            
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerPressed(x, y);
@@ -1782,7 +1784,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 return;
                             }
@@ -1800,7 +1802,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 return;
                             }
@@ -1818,7 +1820,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 f.pointerReleased(x, y + units);
                                 return;

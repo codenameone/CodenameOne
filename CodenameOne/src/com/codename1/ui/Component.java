@@ -45,7 +45,6 @@ import com.codename1.ui.util.Resources;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 
 /**
@@ -5057,7 +5056,13 @@ public class Component implements Animation, StyleListener {
                             tensileDragEnabled = true;
                             int dest = getGridPosY();
                             int scroll = getScrollY();
-                            if (dest != scroll) {
+                            if (Math.abs(dest-scroll) == 1) {
+                                // Fixes issue with exponential decay where it never actually reaches destination
+                                // so it creates infinite loop
+                                setScrollY(dest);
+                                draggedMotionY = null;
+                            }
+                            else if (dest != scroll) {
                                 startTensile(scroll, dest, true);
                             } else {
                                 draggedMotionY = null;
