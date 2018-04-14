@@ -95,15 +95,25 @@ public class Container extends Component implements Iterable<Component>{
     static int sidemenuBarTranslation;
 
     /**
+     * Constructs a new Container with a new layout manager and UIID
+     * 
+     * @param layout the specified layout manager
+     * @param uiid the uiid of the container
+     */
+    public Container(Layout layout, String uiid) {
+        super();
+        setUIID(uiid);
+        this.layout = layout;
+        setFocusable(false);
+    }
+    
+    /**
      * Constructs a new Container with a new layout manager.
      * 
      * @param layout the specified layout manager
      */
     public Container(Layout layout) {
-        super();
-        setUIID("Container");
-        this.layout = layout;
-        setFocusable(false);
+        this(layout, "Container");
     }
 
     /** 
