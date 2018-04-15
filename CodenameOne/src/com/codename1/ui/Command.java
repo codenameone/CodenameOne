@@ -44,6 +44,7 @@ public class Command implements ActionListener{
     private String command;
     private boolean enabled = true;
     private float iconGapMM = -1;
+    private float materialIconSize = -1;
     
     /**
      * Simplifies code dealing with commands allowing them to be used in switch statements
@@ -361,5 +362,19 @@ public class Command implements ActionListener{
      */
     public void setIconGapMM(float iconGapMM) {
         this.iconGapMM = iconGapMM;
+    }
+
+    /**
+     * @return the materialIconSize
+     */
+    public float getMaterialIconSize() {
+        return materialIconSize;
+    }
+
+    /**
+     * @param materialIconSize the materialIconSize to set
+     */
+    public void setMaterialIconSize(float materialIconSize) {
+        this.materialIconSize = materialIconSize;
     }
 }

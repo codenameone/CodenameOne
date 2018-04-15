@@ -170,7 +170,11 @@ public class Toolbar extends Container {
      */
     public Toolbar() {
         setLayout(new BorderLayout());
-        setUIID("Toolbar");
+        if(UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
+            setUIID("Toolbar", "ToolbarLandscape");
+        } else {
+            setUIID("Toolbar");
+        }
         sideMenu = new ToolbarSideMenu();
         if(centeredDefault && 
                 UIManager.getInstance().getComponentStyle("Title").getAlignment() == CENTER) {
@@ -433,10 +437,16 @@ public class Toolbar extends Container {
         getComponentForm().setBackCommand(cmd);
         switch(policy) {
             case ALWAYS:
+                if(UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
+                    cmd.putClientProperty("luiid", "BackCommandLandscape");
+                }
                 cmd.putClientProperty("uiid", "BackCommand");
                 addCommandToLeftBar(cmd);
                 break;
             case WHEN_USES_TITLE_OTHERWISE_ARROW:
+                if(UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
+                    cmd.putClientProperty("luiid", "BackCommandLandscape");
+                }
                 cmd.putClientProperty("uiid", "BackCommand");
                 if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
                     if(getUIManager().isThemeConstant("iosStyleBackArrowBool", false)) {
@@ -450,10 +460,11 @@ public class Toolbar extends Container {
             case AS_ARROW:
                 cmd.setCommandName("");
                 if(!isRTL()) {
-                    cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_BACK, "TitleCommand", iconSize));
+                    cmd.setMaterialIcon(FontImage.MATERIAL_ARROW_BACK);
                 } else {
-                    cmd.setIcon(FontImage.createMaterial(FontImage.MATERIAL_ARROW_FORWARD, "TitleCommand", iconSize));
+                    cmd.setMaterialIcon(FontImage.MATERIAL_ARROW_FORWARD);
                 }
+                cmd.setMaterialIconSize(iconSize);
                 addCommandToLeftBar(cmd);
                 break;
             case AS_REGULAR_COMMAND:
@@ -461,6 +472,9 @@ public class Toolbar extends Container {
                 break;
             case ONLY_WHEN_USES_TITLE:
                 if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
+                    if(UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
+                        cmd.putClientProperty("luiid", "BackCommandLandscape");
+                    }
                     cmd.putClientProperty("uiid", "BackCommand");
                     if(getUIManager().isThemeConstant("iosStyleBackArrowBool", false)) {
                         cmd.setIconGapMM(0.5f);
@@ -521,13 +535,8 @@ public class Toolbar extends Container {
             }
         
         };
-        Image img;
-        if(iconSize > 0) {
-            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"), iconSize);
-        } else {
-            img = FontImage.createMaterial(FontImage.MATERIAL_SEARCH, UIManager.getInstance().getComponentStyle("TitleCommand"));
-        }
-        searchCommand.setIcon(img);
+        searchCommand.setMaterialIcon(FontImage.MATERIAL_SEARCH);
+        searchCommand.setMaterialIconSize(iconSize);
         addCommandToRightBar(searchCommand);
     }    
     
@@ -662,21 +671,12 @@ public class Toolbar extends Container {
     }    
     
     private void setCommandMaterialIcon(Command cmd, char icon, String defaultUIID) {
-        String uiid = (String)cmd.getClientProperty("uiid");
-        if(uiid != null) {
-            FontImage.setMaterialIcon(cmd, icon, uiid);
-        } else {
-            FontImage.setMaterialIcon(cmd, icon, defaultUIID);
-        }
+        cmd.setMaterialIcon(icon);
     }
     
     private void setCommandMaterialIcon(Command cmd, char icon, float size, String defaultUIID) {
-        String uiid = (String)cmd.getClientProperty("uiid");
-        if(uiid != null) {
-            FontImage.setMaterialIcon(cmd, icon, uiid, size);
-        } else {
-            FontImage.setMaterialIcon(cmd, icon, defaultUIID, size);
-        }
+        cmd.setMaterialIcon(icon);
+        cmd.setMaterialIconSize(size);
     }
     
     /**
@@ -776,7 +776,8 @@ public class Toolbar extends Container {
             b.setTextPosition(Label.RIGHT);
             String uiid = (String)cmd.getClientProperty("uiid");
             if(uiid != null) {
-                b.setUIID(uiid);
+                String luiid = (String)cmd.getClientProperty("luiid");
+                b.setUIID(uiid, luiid);
             } else {
                 b.setUIID("SideCommand");
             }
@@ -794,7 +795,8 @@ public class Toolbar extends Container {
                 b.setTextPosition(Label.RIGHT);
                 String uiid = (String)cmd.getClientProperty("uiid");
                 if(uiid != null) {
-                    b.setUIID(uiid);
+                    String luiid = (String)cmd.getClientProperty("luiid");
+                    b.setUIID(uiid, luiid);
                 } else {
                     b.setUIID("SideCommand");
                 }
@@ -1754,7 +1756,7 @@ public class Toolbar extends Container {
                             BorderLayout bl = (BorderLayout) l;
                             Component west = bl.getWest();
                             Button back = createBackCommandButton();
-                            if (!back.getUIID().equals("BackCommand")) {
+                            if (!back.getUIID().startsWith("BackCommand")) {
                                 back.setUIID("BackCommand");
                             }
                             hideEmptyCommand(back);

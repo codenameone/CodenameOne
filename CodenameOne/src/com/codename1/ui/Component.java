@@ -1467,7 +1467,30 @@ public class Component implements Animation, StyleListener {
      * @param id UIID unique identifier for component type
      */
     public void setUIID(String id) {
-        setUIID(id, null);
+        this.portraitUiid = id;
+        unSelectedStyle = null;
+        selectedStyle = null;
+        disabledStyle = null;
+        pressedStyle = null;
+        allStyles = null;
+        if(!sizeRequestedByUser) {
+            preferredSize = null;
+        }
+    }
+    
+    boolean onOrientationChange() {
+        if(landscapeUiid != null) {
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+            return true;
+        }
+        return false;
     }
     
     /**
@@ -1477,16 +1500,8 @@ public class Component implements Animation, StyleListener {
      * @param landscapeUiid UIID unique identifier for component type in landscape mode
      */
     public void setUIID(String portraitUiid, String landscapeUiid) {
-        this.portraitUiid = portraitUiid;
         this.landscapeUiid = landscapeUiid;
-        unSelectedStyle = null;
-        selectedStyle = null;
-        disabledStyle = null;
-        pressedStyle = null;
-        allStyles = null;
-        if(!sizeRequestedByUser) {
-            preferredSize = null;
-        }
+        setUIID(portraitUiid);
     }
     
     /**

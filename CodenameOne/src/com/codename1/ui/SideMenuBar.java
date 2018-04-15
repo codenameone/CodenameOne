@@ -401,8 +401,12 @@ public class SideMenuBar extends MenuBar {
             for (int i = 0; i < rightCommands.size(); i++) {
                 Command rightCommand = (Command) rightCommands.get(rightCommands.size() -1 - i);
                 String uiid = (String)rightCommand.getClientProperty("uiid");
+                String landscapeUiid = (String)rightCommand.getClientProperty("luiid");
                 if(uiid == null){
                     uiid = "TitleCommand";
+                    if(landscapeUiid == null && UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
+                        landscapeUiid = uiid + "Landscape";
+                    } 
                 }
                 int txtPosition = Component.RIGHT;
                 Integer pos = (Integer)rightCommand.getClientProperty("textPosition");
@@ -413,7 +417,7 @@ public class SideMenuBar extends MenuBar {
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     final Button b = new Button(rightCommand);
-                    b.setUIID(uiid);
+                    b.setUIID(uiid, landscapeUiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
                     b.setTextPosition(txtPosition);
                     
@@ -467,8 +471,12 @@ public class SideMenuBar extends MenuBar {
             for (int i = 0; i < leftCommands.size(); i++) {
                 Command leftCommand = (Command) leftCommands.get(leftCommands.size() -1 - i);
                 String uiid = (String)leftCommand.getClientProperty("uiid");
+                String landscapeUiid = (String)leftCommand.getClientProperty("luiid");
                 if(uiid == null){
                     uiid = "TitleCommand";
+                    if(landscapeUiid == null && UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
+                        landscapeUiid = uiid + "Landscape";
+                    } 
                 }
                 int txtPosition = Component.RIGHT;
                 Integer pos = (Integer)leftCommand.getClientProperty("textPosition");
@@ -479,7 +487,7 @@ public class SideMenuBar extends MenuBar {
                 Layout l = getTitleAreaContainer().getLayout();
                 if (l instanceof BorderLayout) {
                     Button b = new Button(leftCommand);
-                    b.setUIID(uiid);
+                    b.setUIID(uiid, landscapeUiid);
                     b.putClientProperty("TitleCommand", Boolean.TRUE);
                     b.setTextPosition(txtPosition);
                     
@@ -1111,10 +1119,11 @@ public class SideMenuBar extends MenuBar {
         b.setText(c.getCommandName());
         b.setTextPosition(Label.RIGHT);
         String uiid = (String)c.getClientProperty("uiid");
+        String landscapeUiid = (String)c.getClientProperty("luiid");
         if(uiid != null) {
-            b.setUIID(uiid);
+            b.setUIID(uiid, landscapeUiid);
         } else {
-            b.setUIID("SideCommand");
+            b.setUIID("SideCommand", landscapeUiid);
         }
         return b;
     }

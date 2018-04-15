@@ -176,7 +176,7 @@ public class Button extends Label {
             setDisabledIcon(cmd.getDisabledIcon());
             setPressedIcon(cmd.getPressedIcon());
         } else {
-            FontImage.setMaterialIcon(this, cmd.getMaterialIcon());
+            FontImage.setMaterialIcon(this, cmd.getMaterialIcon(), cmd.getMaterialIconSize());
         }
         if(cmd.getIconGapMM() > -1) {
             setGap(Display.INSTANCE.convertToPixels(cmd.getIconGapMM()));
@@ -197,7 +197,7 @@ public class Button extends Label {
             setText(cmd.getCommandName());
             if(cmd.getIcon() == null) {
                 if(cmd.getMaterialIcon() != 0) {
-                    FontImage.setMaterialIcon(this, cmd.getMaterialIcon());
+                    FontImage.setMaterialIcon(this, cmd.getMaterialIcon(), cmd.getMaterialIconSize());
                 }
             } else {
                 setIcon(cmd.getIcon());
@@ -795,7 +795,7 @@ public class Button extends Label {
             }
         } 
         if(cmd != null && cmd.getMaterialIcon() != 0) {
-            FontImage.setMaterialIcon(this, cmd.getMaterialIcon());
+            FontImage.setMaterialIcon(this, cmd.getMaterialIcon(), cmd.getMaterialIconSize());
         }
     }
     

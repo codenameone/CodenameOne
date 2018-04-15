@@ -927,6 +927,17 @@ public class Container extends Component implements Iterable<Component>{
         }
     }
 
+    @Override
+    boolean onOrientationChange() {
+        boolean v = super.onOrientationChange();
+        int cmpCount = getComponentCount();
+        for (int iter = 0; iter < cmpCount ; iter++) {
+            Component c = getComponentAt(iter);
+            v = c.onOrientationChange() || v;
+        }
+        return v;
+    }    
+    
     private boolean requestFocusChild(boolean avoidRepaint) {
         int cmpCount = getComponentCount();
         for (int iter = 0; iter < cmpCount ; iter++) {

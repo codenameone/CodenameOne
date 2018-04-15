@@ -578,6 +578,16 @@ public class Form extends Container {
             if (orientationListener != null) {
                 orientationListener.fireActionEvent(new ActionEvent(this,ActionEvent.Type.OrientationChange));
             }
+            boolean a = getContentPane().onOrientationChange();
+            if(getToolbar() != null) {
+                if(getToolbar().onOrientationChange() || a) {
+                    forceRevalidate();
+                }
+            } else {
+                if(a) {
+                    forceRevalidate();
+                }
+            }
         }
         if (sizeChangedListener != null) {
             sizeChangedListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.SizeChange, w, h));
