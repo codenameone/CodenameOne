@@ -171,9 +171,16 @@ public class Button extends Label {
     }
 
     private void updateCommand() {
-        setRolloverIcon(cmd.getRolloverIcon());
-        setDisabledIcon(cmd.getDisabledIcon());
-        setPressedIcon(cmd.getPressedIcon());
+        if(cmd.getMaterialIcon() == 0) {
+            setRolloverIcon(cmd.getRolloverIcon());
+            setDisabledIcon(cmd.getDisabledIcon());
+            setPressedIcon(cmd.getPressedIcon());
+        } else {
+            FontImage.setMaterialIcon(this, cmd.getMaterialIcon());
+        }
+        if(cmd.getIconGapMM() > -1) {
+            setGap(Display.INSTANCE.convertToPixels(cmd.getIconGapMM()));
+        }
     }
 
     /**
@@ -188,7 +195,13 @@ public class Button extends Label {
         this.cmd = cmd;
         if(cmd != null) {
             setText(cmd.getCommandName());
-            setIcon(cmd.getIcon());
+            if(cmd.getIcon() == null) {
+                if(cmd.getMaterialIcon() != 0) {
+                    FontImage.setMaterialIcon(this, cmd.getMaterialIcon());
+                }
+            } else {
+                setIcon(cmd.getIcon());
+            }
             setEnabled(cmd.isEnabled());
             updateCommand();
             addActionListener(cmd);
@@ -781,6 +794,9 @@ public class Button extends Label {
                 putClientProperty("cn1$origText", null);
             }
         } 
+        if(cmd != null && cmd.getMaterialIcon() != 0) {
+            FontImage.setMaterialIcon(this, cmd.getMaterialIcon());
+        }
     }
     
     

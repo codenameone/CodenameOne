@@ -439,6 +439,10 @@ public class Toolbar extends Container {
             case WHEN_USES_TITLE_OTHERWISE_ARROW:
                 cmd.putClientProperty("uiid", "BackCommand");
                 if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
+                    if(getUIManager().isThemeConstant("iosStyleBackArrowBool", false)) {
+                        cmd.setIconGapMM(0.5f);
+                        cmd.setMaterialIcon(FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);
+                    } 
                     addCommandToLeftBar(cmd);
                     break;
                 } 
@@ -458,6 +462,10 @@ public class Toolbar extends Container {
             case ONLY_WHEN_USES_TITLE:
                 if(getUIManager().isThemeConstant("backUsesTitleBool", false)) {
                     cmd.putClientProperty("uiid", "BackCommand");
+                    if(getUIManager().isThemeConstant("iosStyleBackArrowBool", false)) {
+                        cmd.setIconGapMM(0.5f);
+                        cmd.setMaterialIcon(FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);
+                    } 
                     addCommandToLeftBar(cmd);
                 }
                 break;

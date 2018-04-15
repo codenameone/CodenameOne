@@ -1700,6 +1700,7 @@ public class SideMenuBar extends MenuBar {
 
         public CommandWrapper(Command cmd) {
             super(cmd.getCommandName(), cmd.getIcon(), cmd.getId());
+            super.setMaterialIcon(cmd.getMaterialIcon());
             super.setPressedIcon(cmd.getPressedIcon());
             super.setRolloverIcon(cmd.getRolloverIcon());
             super.setDisabledIcon(cmd.getDisabledIcon());
@@ -1718,6 +1719,16 @@ public class SideMenuBar extends MenuBar {
             return cmd.isEnabled();
         }
 
+        @Override
+        public void setMaterialIcon(char materialIcon) {
+            cmd.setMaterialIcon(materialIcon);
+        }
+
+        @Override
+        public char getMaterialIcon() {
+            return cmd.getMaterialIcon();
+        }
+        
         public void setEnabled(boolean b) {
             cmd.setEnabled(b);
         }

@@ -37,11 +37,14 @@ import java.util.HashMap;
 public class Command implements ActionListener{
     private boolean disposesDialog = true;
     private Image icon;
+    private char materialIcon;
     private Image pressedIcon;
     private Image rolloverIcon;
     private Image disabledIcon;
     private String command;
     private boolean enabled = true;
+    private float iconGapMM = -1;
+    
     /**
      * Simplifies code dealing with commands allowing them to be used in switch statements
      * more easily
@@ -328,5 +331,35 @@ public class Command implements ActionListener{
         };
         cmd.setIcon(icon);
         return cmd;
+    }
+
+    /**
+     * @return the materialIcon
+     */
+    public char getMaterialIcon() {
+        return materialIcon;
+    }
+
+    /**
+     * @param materialIcon the materialIcon to set
+     */
+    public void setMaterialIcon(char materialIcon) {
+        this.materialIcon = materialIcon;
+    }
+
+    /**
+     * The gap between the text and the icon in millimeters or -1 for default
+     * @return the iconGapMM
+     */
+    public float getIconGapMM() {
+        return iconGapMM;
+    }
+
+    /**
+     * The gap between the text and the icon in millimeters or -1 for default
+     * @param iconGapMM the iconGapMM to set
+     */
+    public void setIconGapMM(float iconGapMM) {
+        this.iconGapMM = iconGapMM;
     }
 }
