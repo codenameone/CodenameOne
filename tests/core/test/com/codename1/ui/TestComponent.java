@@ -22,6 +22,7 @@ import com.codename1.testing.TestUtils;
 import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
@@ -71,6 +72,7 @@ public class TestComponent extends AbstractTest {
 
     private void getComponentAt_int_int() {
         testNestedScrollingLabels();
+        getComponentAt_int_int_nested();
         getComponentAt_int_int_button();
         getComponentAt_int_int_label();
         getComponentAt_int_int_container();
@@ -123,6 +125,55 @@ public class TestComponent extends AbstractTest {
         assertEqual(l, middleComponent, "Found wrong component");
 
 
+    }
+    
+    
+    private void getComponentAt_int_int_nested() {
+        log("Testing getComponentAt(x, y) with layered nesting");
+        int w = Display.getInstance().getDisplayWidth();
+        int h = Display.getInstance().getDisplayHeight();
+
+        Form f = new Form("My Form", new BorderLayout());
+        Container bottom = new Container() {
+
+            @Override
+            protected Dimension calcPreferredSize() {
+                return new Dimension(w, h);
+            }
+            
+        };
+        bottom.setGrabsPointerEvents(true);
+        bottom.setName("Bottom");
+        
+        Container top = new Container(BoxLayout.y());
+        //top.setScrollableY(true);
+        top.setScrollableY(true);
+        top.setGrabsPointerEvents(true);
+        
+        Component content = new Component() {
+
+            @Override
+            protected Dimension calcPreferredSize() {
+                return new Dimension(w, h * 2);
+            }
+            
+        };
+        content.setFocusable(false);
+        content.setGrabsPointerEvents(false);
+        content.setName("Content");
+        top.add(content);
+        top.setName("Top");
+        Container wrapper = new Container(new LayeredLayout());
+        wrapper.add(bottom).add(top);
+        
+        
+        
+        f.add(BorderLayout.CENTER, wrapper);
+
+        f.show();
+        TestUtils.waitForFormTitle("My Form", 2000);
+        Component middleComponent = f.getComponentAt(w/2, h/2);
+        assertEqual(content, middleComponent, "Found wrong component");
     }
 
     private void testNestedScrollingLabels() {
