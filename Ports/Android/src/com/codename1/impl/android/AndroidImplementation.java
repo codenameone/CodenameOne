@@ -6158,7 +6158,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (name != null) {
                                 filePath = getAppHomePath()
                                         + getFileSystemSeparator() + name;
-                                File f = new File(filePath);
+                                File f = new File(removeFilePrefix(filePath));
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
                                 int read = -1;
