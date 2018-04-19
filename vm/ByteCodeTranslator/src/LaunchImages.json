@@ -41,7 +41,7 @@
       "idiom" : "iphone",
       "subtype" : "1125h",
       "filename" : "Default-iPhoneX-Landscape@3.png",
-      "minimum-system-version" : "9.0",
+      "minimum-system-version" : "11.0",
       "orientation" : "landscape",
       "scale" : "3x"
     },
@@ -50,7 +50,7 @@
       "idiom" : "iphone",
       "subtype" : "2436h",
       "filename" : "Default-iPhoneX@3.png",
-      "minimum-system-version" : "9.0",
+      "minimum-system-version" : "11.0",
       "orientation" : "portrait",
       "scale" : "3x"
     },
