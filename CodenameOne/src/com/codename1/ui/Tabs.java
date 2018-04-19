@@ -569,19 +569,21 @@ public class Tabs extends Container {
                         }
                     }
                 }
-                active = tabsContainer.getComponentIndex(b);                
-                Component content = contentPane.getComponentAt(active);
-                if (content instanceof Container) {
-                    ((Container) content).setBlockFocus(false);
+                if (active != tabsContainer.getComponentIndex(b)) {
+                    active = tabsContainer.getComponentIndex(b);                
+                    Component content = contentPane.getComponentAt(active);
+                    if (content instanceof Container) {
+                        ((Container) content).setBlockFocus(false);
+                    }
+                    setSelectedIndex(active, animateTabSelection);
+                    initTabsFocus();
+                    selectedTab = b;
+                    if(!animateTabSelection) {
+                        selectedTab.setShouldCalcPreferredSize(true);
+                        tabsContainer.revalidate();
+                    }
+                    tabsContainer.scrollComponentToVisible(selectedTab);
                 }
-                setSelectedIndex(active, animateTabSelection);
-                initTabsFocus();
-                selectedTab = b;
-                if(!animateTabSelection) {
-                    selectedTab.setShouldCalcPreferredSize(true);
-                    tabsContainer.revalidate();
-                }
-                tabsContainer.scrollComponentToVisible(selectedTab);
             }
         });
 

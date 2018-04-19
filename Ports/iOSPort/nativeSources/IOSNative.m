@@ -6481,10 +6481,10 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
         GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
         
         int d0 = destPos + i;
-        outData[d0++] = outputVector.v[0];
-        outData[d0++] = outputVector.v[1];
+        outData[d0++] = outputVector.v[0] / outputVector.v[3];
+        outData[d0++] = outputVector.v[1] / outputVector.v[3];
         if (pointSize==3) {
-            outData[d0] = outputVector.v[2];
+            outData[d0] = outputVector.v[2] / outputVector.v[3];
         }     
     }
     

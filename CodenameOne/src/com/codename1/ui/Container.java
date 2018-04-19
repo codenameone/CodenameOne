@@ -1993,7 +1993,7 @@ public class Container extends Component implements Iterable<Component>{
                 }
                 if (cmp instanceof Container) {
                     Component c = ((Container) cmp).getComponentAt(x, y);
-                    if(c != null && (!cmp.respondsToPointerEvents() || c.respondsToPointerEvents())){
+                    if(c != null){
                         component = c;
                     }
                 }
@@ -2009,6 +2009,10 @@ public class Container extends Component implements Iterable<Component>{
                         }
                         tmp = tmp.getParent();
                     }
+                    if (cmp.respondsToPointerEvents()) {
+                        return component;
+                    }
+                    
                 }
             }
         }
