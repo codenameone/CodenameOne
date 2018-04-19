@@ -422,6 +422,19 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 System.exit(0);
                 return;
             }
+            if(args[0].equalsIgnoreCase("-sync-xml")) {
+                java.awt.Container cnt = new java.awt.Container();
+                com.codename1.ui.Display.init(cnt);
+                File output = new File(args[1]);
+                EditableResources.setXMLEnabled(true);
+                EditableResources res = new EditableResources();
+                res.openFileWithXMLSupport(output);
+                FileOutputStream fos = new FileOutputStream(output);
+                res.save(fos);
+                fos.close();
+                System.exit(0);
+                return;
+            }
         }
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
         Display.init(null);
