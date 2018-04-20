@@ -21,11 +21,11 @@
                         <rect key="frame" x="0.0" y="0.0" width="375" height="812"/>
                         <autoresizingMask key="autoresizingMask"/>
                         <subviews>
-                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" insetsLayoutMarginsFromSafeArea="NO" image="LaunchImage.Background.png" translatesAutoresizingMaskIntoConstraints="NO" id="aQA-vL-BJl">
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" insetsLayoutMarginsFromSafeArea="NO" image="Launch.Background.png" translatesAutoresizingMaskIntoConstraints="NO" id="aQA-vL-BJl">
                                 <rect key="frame" x="0.0" y="-26" width="375" height="838"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMinX="YES" widthSizable="YES" flexibleMaxX="YES" flexibleMinY="YES" heightSizable="YES" flexibleMaxY="YES"/>
                             </imageView>
-                            <imageView userInteractionEnabled="NO" contentMode="center" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" image="LaunchImage.Foreground.png" translatesAutoresizingMaskIntoConstraints="NO" id="gU5-hE-p8S">
+                            <imageView userInteractionEnabled="NO" contentMode="center" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" image="Launch.Foreground.png" translatesAutoresizingMaskIntoConstraints="NO" id="gU5-hE-p8S">
                                 <rect key="frame" x="0.0" y="0.0" width="375" height="812"/>
                                 <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                             </imageView>
@@ -43,7 +43,7 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchImage.Background.png" width="16" height="16"/>
-        <image name="LaunchImage.Foreground.png" width="16" height="16"/>
+        <image name="Launch.Background.png" width="16" height="16"/>
+        <image name="Launch.Foreground.png" width="152" height="152"/>
     </resources>
 </document>
