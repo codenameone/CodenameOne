@@ -227,10 +227,12 @@ public class Command implements ActionListener{
         if(((Command)obj).command == null) {
             return (obj != null) && obj.getClass() == getClass() && command == null &&
                 ((Command)obj).icon == icon && ((Command)obj).commandId == commandId && 
+                ((Command)obj).materialIcon == materialIcon && ((Command)obj).materialIconSize == materialIconSize && 
                 (clientProperties == ((Command)obj).clientProperties || clientProperties != null && clientProperties.equals(((Command)obj).clientProperties));
         } else {
             return (obj != null) && obj.getClass() == getClass() && ((Command)obj).command.equals(command) &&
                 ((Command)obj).icon == icon && ((Command)obj).commandId == commandId &&
+                ((Command)obj).materialIcon == materialIcon && ((Command)obj).materialIconSize == materialIconSize && 
                 (clientProperties == ((Command)obj).clientProperties || clientProperties != null && clientProperties.equals(((Command)obj).clientProperties));
         }
     }
