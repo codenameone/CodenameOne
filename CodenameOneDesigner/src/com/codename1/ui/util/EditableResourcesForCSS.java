@@ -13,11 +13,11 @@ import java.io.File;
  *
  * @author shannah
  */
-public class CSSEditableResources extends EditableResources {
+public class EditableResourcesForCSS extends EditableResources {
     
     File resourceFile;
     
-    public CSSEditableResources(File resourceFile) {
+    public EditableResourcesForCSS(File resourceFile) {
         this.resourceFile = resourceFile;
     }
     

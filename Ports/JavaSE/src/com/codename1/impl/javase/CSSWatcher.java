@@ -17,6 +17,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -24,11 +26,26 @@ import java.io.OutputStreamWriter;
  */
 public class CSSWatcher implements Runnable {
     private Thread watchThread;
+    private Process childProcess;
+    private boolean closing;
     
-    
+    public CSSWatcher() {
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                if (childProcess != null && childProcess.isAlive()) {
+                    try {
+                        closing = true;
+                        childProcess.destroyForcibly();
+                    } catch (Throwable t){}
+                }
+            }
+            
+        }));
+    }
     
     private void watch() throws IOException {
-        
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
         final File srcFile = new File("css", "theme.css");
         if (!srcFile.exists()) {
@@ -50,11 +67,36 @@ public class CSSWatcher implements Runnable {
                 "-Dprism.order=sw"
         );
         Process p = pb.start();
+        if (childProcess != null) {
+            try {
+                childProcess.destroyForcibly();
+            } catch (Throwable t){}
+        }
+        childProcess = p;
         String line;
        
         OutputStream stdin = p.getOutputStream();
-        InputStream stderr = p.getErrorStream();
+        final InputStream stderr = p.getErrorStream();
+        final BufferedReader errorReader = new BufferedReader(new InputStreamReader(stderr));
+        new Thread(new Runnable() {
+            public void run() {
+                while (true) {
+                    try {
+                        String l = errorReader.readLine();
+                        if (l != null) {
+                            System.err.println("CSS> "+l);
+                        } else {
+                            break;
+                        }
+                    } catch (IOException ex) {
+                        Logger.getLogger(CSSWatcher.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+        }).start();
+        
         InputStream stdout = p.getInputStream();
+        
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(stdout));
         BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stdin));
@@ -87,7 +129,11 @@ public class CSSWatcher implements Runnable {
                     });
                 }
             } catch (Throwable t) {
+                if (closing) {
+                    return;
+                }
                 t.printStackTrace();
+                
                 if (!p.isAlive()) {
                     watchThread = null;
                     start();
@@ -116,5 +162,9 @@ public class CSSWatcher implements Runnable {
             watchThread.start();
         }
     }
+
+    
+    
+    
     
 }

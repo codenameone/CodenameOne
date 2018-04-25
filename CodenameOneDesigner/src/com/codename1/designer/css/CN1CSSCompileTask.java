@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.codename1.ui.css;
+package com.codename1.designer.css;
 
 import java.io.File;
 import java.io.FileInputStream;

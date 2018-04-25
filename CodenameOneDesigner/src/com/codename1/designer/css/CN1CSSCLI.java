@@ -3,13 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.codename1.ui.css;
+package com.codename1.designer.css;
 
 
 
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Display;
-import com.codename1.ui.css.CSSTheme.WebViewProvider;
+import com.codename1.designer.css.CSSTheme.WebViewProvider;
 import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.Dimension;
@@ -25,7 +25,9 @@ import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
@@ -97,6 +99,12 @@ public class CN1CSSCLI extends Application {
             } else {
                 outputPath = args[1];
             }
+        } else {
+            File tmpF = new File(inputPath).getParentFile().getParentFile();
+            tmpF = new File(tmpF, "src");
+            tmpF = new File(tmpF, new File(inputPath).getName()+".res");
+            outputPath = tmpF.getAbsolutePath();
+            
         }
         System.out.println("Input: "+inputPath);
         System.out.println("Output: "+outputPath);
@@ -203,6 +211,23 @@ public class CN1CSSCLI extends Application {
         System.out.println("Lock obtained");
         try {
             Map<String,String> checksums = loadChecksums(baseDir);
+            if (outputFile.exists()) {
+                String outputFileChecksum = getMD5Checksum(outputFile.getAbsolutePath());
+                String previousChecksum = checksums.get(inputFile.getName());
+                if (previousChecksum == null || !previousChecksum.equals(outputFileChecksum)) {
+                    File bak = new File(inputFile.getParentFile(), outputFile.getName()+"."+System.currentTimeMillis()+".bak");
+                    Files.copy(outputFile.toPath(), bak.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println(outputFile+" has been modified since it was last compiled.  Making copy at "+bak);
+                    outputFile.delete();
+                }
+                
+            }
+           
+            if (outputFile.exists() && inputFile.lastModified() <= outputFile.lastModified()) {
+                System.out.println("File has not changed since last compile.");
+                return;
+            }
+                    
 
             try {
                 URL url = inputFile.toURI().toURL();
@@ -221,14 +246,16 @@ public class CN1CSSCLI extends Application {
                             }).start();
                         }
                         while (web == null) {
+                            System.out.println("Waiting for web browser");
                             synchronized(lock) {
                                 try {
-                                    lock.wait();
+                                    lock.wait(1000l);
                                 } catch (InterruptedException ex) {
                                     Logger.getLogger(CN1CSSCLI.class.getName()).log(Level.SEVERE, null, ex);
                                 }
                             }
                         }
+                        System.out.println("Web browser is available");
                         return web;
                     }
 

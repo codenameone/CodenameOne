@@ -30,7 +30,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.Font;
-import com.codename1.ui.css.CN1CSSCLI;
+import com.codename1.designer.css.CN1CSSCLI;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;

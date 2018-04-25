@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.codename1.ui.css;
+package com.codename1.designer.css;
 
 import com.codename1.io.Util;
 import com.codename1.ui.Component;
@@ -18,7 +18,7 @@ import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.util.CSSEditableResources;
+import com.codename1.ui.util.EditableResourcesForCSS;
 import com.codename1.ui.util.EditableResources;
 import java.io.ByteArrayInputStream;
 import java.io.DataOutputStream;
@@ -1002,7 +1002,7 @@ public class CSSTheme {
         public float getMMValue(double targetDpi, int baseWidth, int baseHeight) {
             switch (src.getLexicalUnitType()) {
                 case LexicalUnit.SAC_POINT:
-                    return (float)this.getNumericValue() / 72f;
+                    return (float)this.getNumericValue() / 72f * 25.4f;
                 case LexicalUnit.SAC_PIXEL:
                     return (float)(this.getNumericValue() * 25.4/targetDpi);
                 case LexicalUnit.SAC_MILLIMETER:
@@ -1325,6 +1325,27 @@ public class CSSTheme {
                 case MODIFIED:
                 case ADDED:
                     return true;
+            }
+            Element el = elements.get(id);
+            String derive = el.getThemeDerive(el.getFlattenedStyle(), "");
+            String unselectedDerive = el.getThemeDerive(el.getFlattenedUnselectedStyle(), "");
+            String selectedDerive = el.getThemeDerive(el.getFlattenedSelectedStyle(), "");
+            String pressedDerive = el.getThemeDerive(el.getFlattenedPressedStyle(), "");
+            String disabledDerive = el.getThemeDerive(el.getFlattenedDisabledStyle(), "");
+            if (derive != null && isModified(derive)) {
+                return true;
+            }
+            if (unselectedDerive != null && isModified(unselectedDerive)) {
+                return true;
+            }
+            if (selectedDerive != null && isModified(selectedDerive)) {
+                return true;
+            }
+            if (pressedDerive != null && isModified(pressedDerive)) {
+                return true;
+            }
+            if (disabledDerive != null && isModified(disabledDerive)) {
+                return true;
             }
             return false;
         }
@@ -2039,7 +2060,7 @@ public class CSSTheme {
     public void loadResourceFile() throws IOException {
         if ( resourceFile != null && resourceFile.exists()) {
             if (res == null) {
-                res = new CSSEditableResources(resourceFile);
+                res = new EditableResourcesForCSS(resourceFile);
             }
             res.openFile(new FileInputStream(resourceFile));
         }
@@ -2051,7 +2072,7 @@ public class CSSTheme {
     
     public void createImageBorders(WebViewProvider webviewProvider) {
         if (res == null) {
-            res = new CSSEditableResources(resourceFile);
+            res = new EditableResourcesForCSS(resourceFile);
         }
         ArrayList<Border> borders = new ArrayList<Border>();
         
@@ -4492,6 +4513,8 @@ public class CSSTheme {
                 return getThemeBorder(styles, "top");
             }
         }
+        
+        
         
         
         public String getThemeDerive(Map<String,LexicalUnit> styles, String suffix) {
