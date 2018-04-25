@@ -60,11 +60,12 @@ public class CSSWatcher implements Runnable {
         
         ProcessBuilder pb = new ProcessBuilder(
                 javaBin.getAbsolutePath(),
-                "-jar", designerJar.getAbsolutePath(),
+                "-jar", "-Dcli=true", designerJar.getAbsolutePath(),
                 "-css",
                 srcFile.getAbsolutePath(),
                 "-watch",
                 "-Dprism.order=sw"
+                
         );
         Process p = pb.start();
         if (childProcess != null) {

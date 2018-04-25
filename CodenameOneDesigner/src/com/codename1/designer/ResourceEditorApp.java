@@ -94,49 +94,59 @@ public class ResourceEditorApp extends SingleFrameApplication {
     
 
     static {
-        String n = System.getProperty("os.name");
-        if(n != null && n.startsWith("Mac")) {
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
-            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codename One Designer");
-            try {
-                Class applicationClass = Class.forName("com.apple.eawt.Application");
-
-                Object macApp = applicationClass.getConstructor((Class[])null).newInstance((Object[])null);
-
-                Class applicationListenerClass = Class.forName("com.apple.eawt.ApplicationListener");
-
-                Method addListenerMethod = applicationClass.getDeclaredMethod("addApplicationListener", new Class[] { applicationListenerClass });
-                
-                Object proxy = Proxy.newProxyInstance(ResourceEditorApp.class.getClassLoader(), new Class[] { applicationListenerClass }, 
-                        new InvocationHandler() {
-                    public Object invoke(Object o, Method method, Object[] os) throws Throwable {
-                        if(method.getName().equals("handleQuit")) {
-                            setMacApplicationEventHandled(os[0], true);
-                            QuitAction.INSTANCE.quit();
-                            return null;
-                        }
-                        if(method.getName().equals("handleAbout")) {
-                            setMacApplicationEventHandled(os[0], true);
-                            ri.aboutActionPerformed();
-                            return null;
-                        }
-                        return null;
-                    }
-                });
-
-                addListenerMethod.invoke(macApp, new Object[] { proxy });
-                
-                Method enableAboutMethod = applicationClass.getDeclaredMethod("setEnabledAboutMenu", new Class[] { boolean.class });
-                enableAboutMethod.invoke(macApp, new Object[] { Boolean.TRUE });
-                //ImageIcon i = new ImageIcon("/application64.png");
-                //Method setDockIconImage = applicationClass.getDeclaredMethod("setDockIconImage", new Class[] { java.awt.Image.class });
-                //setDockIconImage.invoke(macApp, new Object[] { i.getImage() });
-            } catch(Throwable t) {
-                t.printStackTrace();
+        if ("true".equals(System.getProperty("cli", null))) {
+            System.setProperty("apple.awt.UIElement", "true");
+            String n = System.getProperty("os.name");
+            if(n != null && n.startsWith("Mac")) {
+                IS_MAC=true;
+            } else {
+                IS_MAC=false;
             }
-            IS_MAC = true;
         } else {
-            IS_MAC = false;
+            String n = System.getProperty("os.name");
+            if(n != null && n.startsWith("Mac")) {
+                System.setProperty("apple.laf.useScreenMenuBar", "true");
+                System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codename One Designer");
+                try {
+                    Class applicationClass = Class.forName("com.apple.eawt.Application");
+
+                    Object macApp = applicationClass.getConstructor((Class[])null).newInstance((Object[])null);
+
+                    Class applicationListenerClass = Class.forName("com.apple.eawt.ApplicationListener");
+
+                    Method addListenerMethod = applicationClass.getDeclaredMethod("addApplicationListener", new Class[] { applicationListenerClass });
+
+                    Object proxy = Proxy.newProxyInstance(ResourceEditorApp.class.getClassLoader(), new Class[] { applicationListenerClass }, 
+                            new InvocationHandler() {
+                        public Object invoke(Object o, Method method, Object[] os) throws Throwable {
+                            if(method.getName().equals("handleQuit")) {
+                                setMacApplicationEventHandled(os[0], true);
+                                QuitAction.INSTANCE.quit();
+                                return null;
+                            }
+                            if(method.getName().equals("handleAbout")) {
+                                setMacApplicationEventHandled(os[0], true);
+                                ri.aboutActionPerformed();
+                                return null;
+                            }
+                            return null;
+                        }
+                    });
+
+                    addListenerMethod.invoke(macApp, new Object[] { proxy });
+
+                    Method enableAboutMethod = applicationClass.getDeclaredMethod("setEnabledAboutMenu", new Class[] { boolean.class });
+                    enableAboutMethod.invoke(macApp, new Object[] { Boolean.TRUE });
+                    //ImageIcon i = new ImageIcon("/application64.png");
+                    //Method setDockIconImage = applicationClass.getDeclaredMethod("setDockIconImage", new Class[] { java.awt.Image.class });
+                    //setDockIconImage.invoke(macApp, new Object[] { i.getImage() });
+                } catch(Throwable t) {
+                    t.printStackTrace();
+                }
+                IS_MAC = true;
+            } else {
+                IS_MAC = false;
+            }
         }
     }
         
