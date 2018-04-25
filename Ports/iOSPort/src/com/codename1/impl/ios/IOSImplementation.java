@@ -5048,6 +5048,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public int getDeviceDensity() {
+        // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
+        // to the getDeviceDensity() method in the Shooter project or the iOS screenshots
+        // will produce slightly different results than the actual device.
+        
         if(dDensity == -1) {
             if(Display.getInstance().getProperty("ios.densityOld", "false").equals("true")) {
                 dDensity = super.getDeviceDensity();
@@ -5083,6 +5087,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public int convertToPixels(int dipCount, boolean horizontal) {
+        // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
+        // to the convertToPixels() method in the Shooter project or the iOS screenshots
+        // will produce slightly different results than the actual device.
+        
         // ipad mini is ignored, there is no sensible way to detect it
         if(ppi == 0) {
             int dispWidth = getDisplayWidth();
@@ -5097,15 +5105,20 @@ public class IOSImplementation extends CodenameOneImplementation {
                     ppi = 6.4173236936575;
                 } else {
                     int largest = Math.max(dispWidth, getDisplayHeight());
-                    if(largest > 2000) {
-                        // iphone 6 plus
-                        ppi = 19.25429416;                    
+                    if (largest == 2436) {
+                        // iphone X
+                        ppi = 18.031496062992126;
                     } else {
-                        if(largest > 1300) {
-                            // iphone 6
-                            ppi = 12.8369704749679;                    
+                        if(largest > 2000) {
+                            // iphone 6 plus
+                            ppi = 19.25429416;                    
                         } else {
-                            ppi = 12.8369704749679;                    
+                            if(largest > 1300) {
+                                // iphone 6
+                                ppi = 12.8369704749679;                    
+                            } else {
+                                ppi = 12.8369704749679;                    
+                            }
                         }
                     }
                 }

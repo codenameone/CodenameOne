@@ -4267,10 +4267,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
                 public void repaint(long tm, int x, int y, int width, int height) {
                     
-                    int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
-                    int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
-                    int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                    int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                    int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                    int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                    int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                    int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
                     Rectangle bounds;
                     if (getSkin() != null) {
                         bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
@@ -4441,18 +4441,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             public void textValueChanged(TextEvent e) {
-                if (cmp instanceof com.codename1.ui.TextField) {
+                //if (cmp instanceof com.codename1.ui.TextField) {
                     updateText();
-                }
+                //}
 
             }
 
             private void updateText() {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        if(cmp instanceof com.codename1.ui.TextField) {
-                            ((com.codename1.ui.TextField) cmp).setText(getText(tf));
-                        }
+                        //if(cmp instanceof com.codename1.ui.TextField) {
+                            ((com.codename1.ui.TextArea) cmp).setText(getText(tf));
+                        //}
                     }
                 });
             }

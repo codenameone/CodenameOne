@@ -30,6 +30,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.Font;
+import com.codename1.ui.css.CN1CSSCLI;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;
@@ -57,6 +58,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.prefs.Preferences;
@@ -438,6 +440,15 @@ public class ResourceEditorApp extends SingleFrameApplication {
                     System.exit(0);
                 }
                 return;
+            }
+            if (args.length >= 2 && args[0].equalsIgnoreCase("-css")) {
+                List<String> cssArgs = new ArrayList<String>(Arrays.asList(args));
+                cssArgs.remove(0);
+                
+                CN1CSSCLI.main(cssArgs.toArray(new String[cssArgs.size()]));
+                
+                return;
+                
             }
         }
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());
