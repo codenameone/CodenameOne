@@ -29,6 +29,7 @@ import java.util.TimeZone;
  * The date and time spinner extends the time spinner by allowing to pick a specific day as well
  *
  * @author Shai Almog
+ * @deprecated use Picker instead
  */
 public class DateTimeSpinner extends TimeSpinner {
     private Spinner date;

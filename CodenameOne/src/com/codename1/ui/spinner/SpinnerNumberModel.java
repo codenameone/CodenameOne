@@ -33,6 +33,7 @@ import com.codename1.ui.util.EventDispatcher;
  * Represents a numeric model for the spinner
  *
  * @author Shai Almog
+ * @deprecated use Picker instead
  */
 class SpinnerNumberModel implements ListModel {
     private EventDispatcher dataListener = new EventDispatcher();
