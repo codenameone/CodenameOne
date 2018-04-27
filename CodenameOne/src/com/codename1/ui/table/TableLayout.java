@@ -77,7 +77,7 @@ import java.util.Vector;
  *       <td> width           </td><td> The column width in percentages, -1 will use the preferred size. -2 for width will take up the rest of the available space</td>
  *   </tr>
  *   <tr>
- *       <td> height          </td><td> Similar to width but doesn't support the -2 value</td>
+ *       <td> height          </td><td> The row height in percentages, -1 will use the preferred size. -2 for height will take up the rest of the available space</td>
  *   </tr>
  *   <tr>
  *       <td> spanHorizontal  </td><td> The cells that should be occupied horizontally defaults to 1 and can't exceed the column count - current offset.</td>
@@ -314,10 +314,8 @@ public class TableLayout extends Layout {
     private static int minimumSizePerColumn = 10;
     private Constraint[] tablePositions;
 
-    private int[] columnSizes;
     private int[] columnPositions;
     private int[] rowPositions;
-    private boolean[] modifableColumnSize;
 
     /**
      * Special case marker SPAN constraint reserving place for other elements
@@ -333,6 +331,9 @@ public class TableLayout extends Layout {
 
     private int rows, columns;
     private boolean growHorizontally;
+    private boolean truncateHorizontally; //whether we should truncate or shrink the table if the prefered width of all elements exceed the available width. default = false = shrink
+    private boolean truncateVertically;
+    
     
     /**
      * A table must declare the amount of rows and columns in advance
@@ -394,54 +395,74 @@ public class TableLayout extends Layout {
             int right = s.getPaddingRight(parent.isRTL());
 
             boolean rtl = parent.isRTL();
+            
 
-            columnSizes = new int[columns];
-            if(modifableColumnSize == null || columns != modifableColumnSize.length) {
-                modifableColumnSize = new boolean[columns];
-            }
+         //compute columns width and X position
+            int[] columnSizes = new int[columns];
+            boolean[] modifableColumnSize = new boolean[columns];
+            boolean[] growingColumnSize = new boolean[columns];
             columnPositions = new int[columns];
-            int[] rowSizes = new int[rows];
-            rowPositions = new int[rows];
-
+            
             int pWidth = parent.getLayoutWidth() - parent.getSideGap() - left - right; 
-            int pHeight = parent.getLayoutHeight() - parent.getBottomGap() - top - bottom; 
-
-            int currentX = left;
-            int availableReminder = pWidth;
             int cslen = columnSizes.length;
+            int availableReminder = pWidth;
+            int growingWidth = 0;
+            boolean hasGrowingCols = false;
+            int totalWidth = 0;
+            int totalModifyablePixels = 0;
+            
             for(int iter = 0 ; iter < cslen ; iter++) {
-                columnSizes[iter] = getColumnWidthPixels(iter, pWidth, availableReminder);
+                int[] psize = getColumnWidthPixels(iter, pWidth);
+            	columnSizes[iter] = psize[0];
                 availableReminder -= columnSizes[iter];
-            }
-
-            // try to recalculate the columns for none horizontally scrollable tables
-            // so they are distributed sensibly if no room is available
-            if(!parent.isScrollableX()) {
-                int totalWidth = 0;
-                int totalModifyablePixels = 0;
-
-                // check how many columns we can modify (the user hasn't requested a specific size for those)
-                for(int iter = 0 ; iter < modifableColumnSize.length ; iter++) {
-                    if(modifableColumnSize[iter]) {
-                        totalModifyablePixels += columnSizes[iter];
-                    }
-                    totalWidth += columnSizes[iter];
+                totalWidth += columnSizes[iter];
+                if( psize[1]<0) {
+                	modifableColumnSize[iter] = true;
+                    totalModifyablePixels += columnSizes[iter];
                 }
-                if(pWidth < totalWidth) {
-                    int totalPixelsToRemove = totalWidth - pWidth;
-
-                    int totalPixelsNecessary = totalModifyablePixels - totalPixelsToRemove;
-
-                    // Go over the modifyable columns and remove the right pixels according to the ratio
-                    for(int iter = 0 ; iter < modifableColumnSize.length ; iter++) {
-                        if(modifableColumnSize[iter]) {
-                            columnSizes[iter] = (int)(((float)columnSizes[iter]) / ((float)totalModifyablePixels) * totalPixelsNecessary);
-                        }
-                    }
+                if(psize[1]<-1) {
+                	growingColumnSize[iter]=true;
+                	hasGrowingCols = true;
+                	growingWidth += columnSizes[iter];
                 }
             }
+            
+            //If there is some space left and some "auto growing" columns, attribute them the availableReminder space
+            if (hasGrowingCols && availableReminder>0) {
+            	 for(int iter = 0 ; iter < cslen ; iter++) {
+            		if (growingColumnSize[iter]) {
+            			int sp = (int) (((float)columnSizes[iter]) / ((float)growingWidth) * availableReminder);
+            			columnSizes[iter]+=sp;
+            		}
+            	 }
+            }
+            
+            // For horizontally scrollable tables, if not enough room is available
+            // to correctly display all the components given their preferred width, truncate or shrink the table
+            if(!parent.isScrollableX() && pWidth < totalWidth) {
+            		if (truncateHorizontally) {
+            			//TODO: see if this is actually necessary to recompute the column size for truncated columns as the drawer should already automatically clip components with pixels out of the drawing boundaries
+            			availableReminder = pWidth;
+            			for(int iter = 0 ; iter < cslen ; iter++) {
+            				columnSizes[iter] = Math.min(columnSizes[iter], Math.max(0, availableReminder)); 
+            				availableReminder -= columnSizes[iter];
+            			}
+            		}
+            		else { // try to recalculate the columns width so they are distributed sensibly 
+	                    int totalPixelsToRemove = totalWidth - pWidth;
+	                    int totalPixelsNecessary = totalModifyablePixels - totalPixelsToRemove;
+	                    // Go over the modifyable columns and remove the right pixels according to the ratio
+	                    for(int iter = 0 ; iter < cslen ; iter++) {
+	                        if(modifableColumnSize[iter]) {
+	                            columnSizes[iter] = (int)(((float)columnSizes[iter]) / ((float)totalModifyablePixels) * totalPixelsNecessary);
+	                        }
+	                    }
+            		}
+            }
 
-            for(int iter = 0 ; iter < columnSizes.length ; iter++) {
+            //Compute X position
+            int currentX = left;
+            for(int iter = 0 ; iter < cslen ; iter++) {
                 if(rtl) {
                     currentX += columnSizes[iter];
                     columnPositions[iter] = pWidth - currentX;
@@ -451,18 +472,79 @@ public class TableLayout extends Layout {
                 }
             }
 
-            int currentY = top;
+            
+         //Compute rows height and Y position
+            int[] rowSizes = new int[rows];
+            boolean[] modifableRowSize = new boolean[rows];
+            boolean[] growingRowSize = new boolean[rows];
+            rowPositions = new int[rows];
+                        
+            int pHeight = parent.getLayoutHeight() - parent.getBottomGap() - top - bottom; 
             int rlen = rowSizes.length;
+            availableReminder = pHeight;
+            int growingHeight= 0;
+            boolean hasGrowingRows = false;
+            int totalHeight = 0;
+            totalModifyablePixels = 0;
+            
             for(int iter = 0 ; iter < rlen ; iter++) {
-                if(parent.isScrollableY()) {
-                    rowSizes[iter] = getRowHeightPixels(iter, pHeight, -1);
-                } else {
-                    rowSizes[iter] = getRowHeightPixels(iter, pHeight, pHeight - currentY + top);
+            	int[] psize = getRowHeightPixels(iter, pHeight);
+            	rowSizes[iter] = psize[0];
+                availableReminder -= rowSizes[iter];
+                totalHeight += rowSizes[iter];
+                if(psize[0]<0) {
+                	modifableRowSize[iter] = true;
+                    totalModifyablePixels += rowSizes[iter];
                 }
-                rowPositions[iter] = currentY;
-                currentY += rowSizes[iter];
+                if(psize[0]<-1) {
+                	growingRowSize[iter] = true;
+                	hasGrowingRows = true;
+                	growingHeight += rowSizes[iter];
+                }
             }
-
+            
+            //If there is some space left and some "auto growing" rows, attribute them the availableReminder space
+            if (hasGrowingRows && availableReminder>0) {
+            	 for(int iter = 0 ; iter < rlen ; iter++) {
+            		if (growingRowSize[iter]) {
+            			int sp = (int) (((float)rowSizes[iter]) / ((float)growingHeight) * availableReminder);
+            			rowSizes[iter]+=sp;
+            		}
+            	 }
+            }
+            
+            // For vertically scrollable tables, if not enough room is available
+            // to correctly display all the components given their preferred height, truncate or shrink the table
+            if(!parent.isScrollableY() && pHeight < totalHeight) {
+            	if (truncateVertically) {
+        			//TODO: see if this is actually necessary to recompute the row size for truncated rows as the drawer should already automatically clip components with pixels out of the drawing boundaries
+        			availableReminder = pHeight;
+        			for(int iter = 0 ; iter < rlen ; iter++) {
+        				rowSizes[iter] = Math.min(rowSizes[iter], Math.max(0, availableReminder)); 
+        				availableReminder -= rowSizes[iter];
+        			}
+        		}
+            	else { // try to recalculate the rows height so they are distributed sensibly
+                    int totalPixelsToRemove = totalHeight - pHeight;
+                    int totalPixelsNecessary = totalModifyablePixels - totalPixelsToRemove;
+                    // Go over the modifyable rows and remove the bottom pixels according to the ratio
+                    for(int iter = 0 ; iter < rlen ; iter++) {
+                        if(modifableRowSize[iter]) {
+                        	rowSizes[iter] = (int)(((float)rowSizes[iter]) / ((float)totalModifyablePixels) * totalPixelsNecessary);
+                        }
+                    }
+            	}
+            }
+                        
+            //Compute Y position
+            int currentY = top;
+            for(int iter = 0 ; iter < rlen ; iter++) {
+            	 rowPositions[iter] = currentY;
+                 currentY += rowSizes[iter];
+            }
+         
+            
+         //Place each cell component   
             int clen = columnSizes.length;
             for(int r = 0 ; r < rlen ; r++) {
                 for(int c = 0 ; c < clen ; c++) {
@@ -596,52 +678,53 @@ public class TableLayout extends Layout {
         }
     }
 
-    private int getColumnWidthPixels(int column, int percentageOf, int available) {
+    
+    
+    /**
+     * @param column: the column index
+     * @param percentageOf: the table width to take into account to compute percentages constraints. if <0 these constraints are ignored and the max prefered width of the components of this column is returned
+     * @return a size 2 int array with: the prefered width of the column , in pixels, as first element of the array and a constraint code for this column as second element. 0=column width is fixed, -1=column width is modifiable, -2=column width can automatically grow to take all the available space
+     */
+    private int[] getColumnWidthPixels(int column, int percentageOf) 
+    {
         int current = 0;
-        if(modifableColumnSize == null) {
-            modifableColumnSize = new boolean[columns];
-        }
-        
-        int availableSpaceColumn = -1;
         boolean foundExplicitWidth = false;
-        for(int iter = 0 ; iter < rows ; iter++) {
+        boolean growable = false;
+        for(int iter = 0 ; iter < rows ; iter++) 
+        {
             Constraint c = tablePositions[iter * columns + column];
 
+            //ignore "virtual" cells (i.e. cells that are part of a merge)
             if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanHorizontal > 1) {
                 continue;
             }
             
             // width in percentage of the parent container
-            if(c.width > 0 && available > -1) {
+            if(c.width > 0 && percentageOf > -1) {
                 current = Math.max(current, c.width * percentageOf / 100);
                 foundExplicitWidth = true;
-                modifableColumnSize[column] = false;
-            } else if (!foundExplicitWidth) {
-                // special case, width -2 gives the column the rest of the available space
+            } 
+            else if (!foundExplicitWidth) {
+            	// special case, width -2 gives the column the rest of the available space (and growHorizontally=true is the same as setting -2 in the width constraint of a cell from the last column. Kept here for historical reasons)
                 if(c.width == -2 || (growHorizontally && column == columns - 1)) {
-                    if(available < 0) {
-                        return Display.getInstance().getDisplayWidth();
-                    }
-                    return available;
+                	growable=true;
                 }
                 Style s = c.parent.getStyle();
                 current = Math.max(current, c.parent.getPreferredW()  + s.getMarginLeftNoRTL() + s.getMarginRightNoRTL());
-                modifableColumnSize[column] = true;
-            }
-            if(available > -1) {
-                current = Math.min(available, current);
             }
         }
-        if(availableSpaceColumn > -1) {
-            modifableColumnSize[availableSpaceColumn] = false;
-            return percentageOf - current;
-        }
-        return current;
+             
+        return new int[] {current, (foundExplicitWidth?0:(growable?-2:-1))};
     }
 
-    private int getRowHeightPixels(int row, int percentageOf, int available) {
+    
+    private int[] getRowHeightPixels(int row, int percentageOf) 
+    {
         int current = 0;
-        for(int iter = 0 ; iter < columns ; iter++) {
+        boolean foundExplicitHeight = false;
+        boolean growable = false;
+        for(int iter = 0 ; iter < columns ; iter++) 
+        {
             Constraint c = tablePositions[row * columns + iter];
 
             if(c == null || c == H_SPAN_CONSTRAINT || c == V_SPAN_CONSTRAINT || c == VH_SPAN_CONSTRAINT || c.spanVertical > 1) {
@@ -649,19 +732,25 @@ public class TableLayout extends Layout {
             }
 
             // height in percentage of the parent container
-            if(c.height > 0) {
+            if(c.height > 0 && percentageOf > -1) {
                 current = Math.max(current, c.height * percentageOf / 100);
-            } else {
+                foundExplicitHeight = true;
+            }
+            else if (!foundExplicitHeight) {
+            	// special case, height -2 gives the row the possibility to take the rest of the available space -> tag these rows
+                if(c.height == -2) {
+                	growable=true;
+                }
                 Style s = c.parent.getStyle();
                 current = Math.max(current, c.parent.getPreferredH() + s.getMarginTop() + s.getMarginBottom());
             }
-            if(available > -1) {
-                current = Math.min(available, current);
-            }
         }
-        return current;
+         
+        return new int[] {current, (foundExplicitHeight?0:(growable?-2:-1))};
     }
-
+     
+    
+    
     /**
      * {@inheritDoc}
      */
@@ -670,14 +759,12 @@ public class TableLayout extends Layout {
         int w = s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL();
         int h = s.getPaddingTop() + s.getPaddingBottom();
 
-        int maxW = Display.getInstance().getDisplayWidth() * 2;
-        int maxH = Display.getInstance().getDisplayHeight() * 2;
         for(int iter = 0 ; iter < columns ; iter++) {
-            w += getColumnWidthPixels(iter, maxW, -1);
+            w += getColumnWidthPixels(iter, -1)[0];
         }
 
         for(int iter = 0 ; iter < rows ; iter++) {
-            h += getRowHeightPixels(iter, maxH, -1);
+            h += getRowHeightPixels(iter, -1)[0];
         }
 
         return new Dimension(w, h);
@@ -1054,6 +1141,39 @@ public class TableLayout extends Layout {
     public void setGrowHorizontally(boolean growHorizontally) {
         this.growHorizontally = growHorizontally;
     }
+    
+    /**
+     * Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
+     * @return the truncateHorizontally
+     */
+    public boolean isTruncateHorizontally() {
+        return truncateHorizontally;
+    }
+    
+    /**
+     * Indicates whether the table should be truncated if it do not have enough available horizontal space to display all its content. If not, will shrink
+     * @param truncateHorizontally the truncateHorizontally to set
+     */
+    public void setTruncateHorizontally(boolean truncateHorizontally) {
+        this.truncateHorizontally = truncateHorizontally;
+    }
+    
+    /**
+     * Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
+     * @return the truncateVertically
+     */
+    public boolean isTruncateVertically() {
+        return truncateVertically;
+    }
+    
+    /**
+     * Indicates whether the table should be truncated if it do not have enough available vertical space to display all its content. If not, will shrink
+     * @param truncateVertically the truncateVertically to set
+     */
+    public void setTruncateVertically(boolean truncateVertically) {
+        this.truncateVertically = truncateVertically;
+    }
+    
 
     /**
      * <p>Creates a table layout container that grows the last column horizontally, the number of rows is automatically
