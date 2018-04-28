@@ -49,7 +49,7 @@ public class CSSWatcher implements Runnable {
         File javaBin = new File(System.getProperty("java.home"), "bin/java");
         final File srcFile = new File("css", "theme.css");
         if (!srcFile.exists()) {
-            System.out.println("No theme.css file found.  CSSWatcher canceled");
+            //System.out.println("No theme.css file found.  CSSWatcher canceled");
             return;
         } else {
             System.out.println("Found theme.css file.  Watching for changes...");
