@@ -32,6 +32,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.TextArea;
+import com.codename1.ui.TextComponent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.spinner.Picker;
@@ -407,6 +408,47 @@ public class UiBinding {
     }
 
     /**
+     * Adapts a {@link com.codename1.ui.TextComponent} to binding
+     * @param <PropertyType> the type of the property generic
+     */
+    public static class TextComponentAdapter<PropertyType> extends ComponentAdapter<PropertyType, TextComponent> {
+        /**
+         * Constructs a new binding
+         * @param toPropertyType the conversion logic to the property
+         */
+        public TextComponentAdapter(ObjectConverter toPropertyType) {
+            super(toPropertyType, new StringConverter());
+        }
+
+        /**
+         * Constructs a new binding assuming a String property
+         */
+        public TextComponentAdapter() {
+            super(new ObjectConverter(), new ObjectConverter());
+        }
+
+        @Override
+        public void assignTo(PropertyType value, TextComponent cmp) {
+            cmp.getField().setText((String)toComponentType.convert(value));
+        }
+
+        @Override
+        public PropertyType getFrom(TextComponent cmp) {
+            return (PropertyType)toPropertyType.convert(cmp.getText());
+        }
+
+        @Override
+        public void bindListener(TextComponent cmp, ActionListener<ActionEvent> l) {
+            cmp.getField().addActionListener(l);
+        }
+
+        @Override
+        public void removeListener(TextComponent cmp, ActionListener<ActionEvent> l) {
+            cmp.getField().removeActionListener(l);
+        }
+    }
+    
+    /**
      * Adapts a {@link com.codename1.ui.CheckBox} or 
      * {@link com.codename1.ui.RadioButton} to binding
      * @param <PropertyType> the type of the property generic
@@ -708,6 +750,9 @@ public class UiBinding {
         ObjectConverter cnv = getPropertyConverter(prop);
         if(cmp instanceof TextArea) {
             return bind(prop, cmp, new TextAreaAdapter(cnv));
+        }
+        if(cmp instanceof TextComponent) {
+            return bind(prop, cmp, new TextComponentAdapter(cnv));
         }
         if(cmp instanceof CheckBox) {
             return bind(prop, cmp, new CheckBoxRadioSelectionAdapter(cnv));
