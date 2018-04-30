@@ -30,6 +30,7 @@ public class CSSWatcher implements Runnable {
     private Thread watchThread;
     private Process childProcess;
     private boolean closing;
+    private static final int MIN_DESIGNER_VERSION=6;
     
     public CSSWatcher() {
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
@@ -83,7 +84,7 @@ public class CSSWatcher implements Runnable {
                 updateStatusProperties.load(input);
                 String designerVersionStr = updateStatusProperties.getProperty("designer", "0");
                 Double designerVersionDbl = Double.parseDouble(designerVersionStr);
-                if (designerVersionDbl > 4.0) {
+                if (designerVersionDbl >= MIN_DESIGNER_VERSION) {
                     return true;
                 }
             } catch (IOException ex) {
