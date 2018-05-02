@@ -270,22 +270,26 @@ public class Effects {
      * @return an image containing the shadow for source
      */
     public static Image squareShadow(int width, int height, int blurRadius, float opacity) {
-        Image img = Image.createImage(width + blurRadius * 2, height + blurRadius * 2, 0 );
+        
+        Image img = Image.createImage(width + blurRadius *2, height + blurRadius * 2, 0 );
         Graphics g = img.getGraphics();
         int destAlpha = (int)(opacity * 255.0);
         g.setColor(0);
-
-        Motion lin = Motion.createLinearMotion(2, destAlpha, blurRadius);
-        
-        // draw a gradient of sort for the shadow
-        for(int iter = blurRadius - 1 ; iter >= 0 ; iter--) {            
-            lin.setCurrentMotionTime(iter);
-            g.setAlpha(lin.getValue());
-            g.drawRect(blurRadius + iter, blurRadius +iter, width - iter * 2, height - iter * 2);
-        }
         
         if(Display.getInstance().isGaussianBlurSupported()) {
+            // Note:  This is not exactly the same as the result when we don't have gaussian blur
+            // But it looks better.
+            g.setAlpha(Math.min(destAlpha*2, 255));
+            g.fillRect(blurRadius-1, blurRadius-1, width+2, height+2);
             img = Display.getInstance().gaussianBlurImage(img, blurRadius);
+        } else {
+            Motion lin = Motion.createLinearMotion(0, destAlpha, blurRadius);
+            // draw a gradient of sort for the shadow
+            for(int iter = blurRadius - 1 ; iter >= 0 ; iter--) {            
+                lin.setCurrentMotionTime(iter);
+                g.setAlpha(Math.max(0, (int)(lin.getValue() * iter/(blurRadius-1f))));
+                g.drawRect(iter, iter, width + (blurRadius-iter) * 2, height + (blurRadius-iter) * 2);
+            }
         }
         return img;                
     }
