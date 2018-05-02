@@ -48,17 +48,6 @@ import java.util.ArrayList;
  * and visualizations to their apps without having to include external libraries
  * or embedding web views. We also wanted to harness the new features in the
  * graphics pipeline to maximize performance.</p>  
- *       <h4>Device Support</h4>
- * <p>
- * Since the charts package makes use of 2D transformations and shapes, it
- * requires some of the graphics features that are not yet available on all
- * platforms. Currently the following platforms are supported:
- * </p>
- * <ol>
- * <li>Simulator</li>
- * <li>Android</li>
- * <li>iOS</li>
- * </ol>  
  *       <h4>Features</h4>
  * <ol>
  * <li><strong>Built-in support for many common types of charts</strong>
