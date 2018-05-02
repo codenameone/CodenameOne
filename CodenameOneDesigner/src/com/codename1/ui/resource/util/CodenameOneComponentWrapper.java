@@ -48,9 +48,23 @@ public class CodenameOneComponentWrapper extends JLabel {
     }
     public CodenameOneComponentWrapper(com.codename1.ui.Component codenameOneCmp, boolean forceShow) {
         this.codenameOneCmp = codenameOneCmp;
+        if(codenameOneCmp instanceof Label) {
+            ((Label)codenameOneCmp).setLegacyRenderer(true);
+        }
         if(codenameOneCmp.getParent() == null) {
             if(!(codenameOneCmp instanceof Form)) {
-                Form dummy = new Form("");
+                Form dummy = new Form("") {
+                    @Override
+                    protected boolean shouldPaintStatusBar() {
+                        return false;
+                    }
+
+                    @Override
+                    protected Component createStatusBar() {
+                        return new com.codename1.ui.Container();
+                    }
+                };
+                dummy.getTitleArea().setPreferredSize(new com.codename1.ui.geom.Dimension(0, 0));
                 dummy.setLayout(new com.codename1.ui.layouts.BorderLayout());
                 dummy.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, codenameOneCmp);
                 dummy.setWidth(1000);

@@ -380,7 +380,8 @@ public class TextArea extends Component {
     
     
     /**
-     * Sets the constraint 
+     * Sets the constraint which provides a hint to the virtual keyboard input, notice this <b>doesn't</b>
+     * limit input type in any way!
      * 
      * @param constraint one of ANY, EMAILADDR, NUMERIC, PHONENUMBER, URL, DECIMAL
      * it can be bitwised or'd with one of PASSWORD, UNEDITABLE, SENSITIVE, NON_PREDICTIVE,
@@ -818,6 +819,11 @@ public class TextArea extends Component {
         currentRowWidth += font.charWidth(c);
         return currentRowWidth;
     }
+    
+    private int updateRowWidth(String str, Font font) {
+        currentRowWidth += font.stringWidth(str);
+        return currentRowWidth;
+    }
 
     private boolean fastCharWidthCheck(char[] chrs, int off, int length, int width, int charWidth, Font f) {
         if(length * charWidth < width) {
@@ -953,6 +959,15 @@ public class TextArea extends Component {
                         break;
                     }*/
                     currentRow+=c;
+                    if (i < textLength-1 && Character.isSurrogatePair(c, text[i+1]) ) {
+                        // Surrogate pairs (e.g. emojis) shouldn't be split up.
+                        currentRow+=text[++i];
+                        maxLength+=2;
+                        if(font.stringWidth(currentRow) >= textAreaWidth) {
+                            break;
+                        }
+                        continue;
+                    }
                     if(font.stringWidth(currentRow) >= textAreaWidth) {
                         break;
                     }
@@ -977,6 +992,19 @@ public class TextArea extends Component {
                 // search for "space" character at close as possible to the end of the row
                 for( i=to; i < textLength ; i++){
                     char c = text[i];
+                    if (i < textLength-1 && Character.isSurrogatePair(c, text[i+1]) ) {
+                        // Surrogate pairs (e.g. emojis) shouldn't be split up.
+                        
+                        String testStr = new String(new char[]{text[i], text[i+1]});
+                        
+                        i++;
+                        if (updateRowWidth(testStr, font) >= textAreaWidth) {
+                            break;
+                        }
+                        maxLength+=2;
+                        
+                        continue;
+                    }
                     if(updateRowWidth(c, font) >= textAreaWidth) {
                         break;
                     }
@@ -993,7 +1021,6 @@ public class TextArea extends Component {
                     maxLength++;
                 }
             }
-            
             // if we got to the end of the text use the entire row,
             // also if space is next character (in the next row) we can cut the line
             if(i == textLength || text[i] == ' ' || text[i] == '\n') {
@@ -1037,6 +1064,11 @@ public class TextArea extends Component {
                         maxLength = 1;
                     }
                     spaceIndex = maxLength;
+                    if (spaceIndex > 0 && spaceIndex < textLength && Character.isSurrogatePair(text[spaceIndex-1], text[spaceIndex])) {
+                        // Make sure the space index isn't on the 2nd char of a surrogate pair (e.g. for emojis).
+                        spaceIndex++;
+                        maxLength++;
+                    }
                     rowText = new String(text, from, spaceIndex - from);
                     from = spaceIndex;
                 }

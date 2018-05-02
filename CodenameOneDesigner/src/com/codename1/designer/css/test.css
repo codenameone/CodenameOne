@@ -1,0 +1,111 @@
+/*Button {
+    border-radius: 5px;
+    border: 2px solid #ccc;
+    padding: 20px;
+    margin: 30px;
+    background : red;
+    color: white;
+    box-shadow: 0 10px 10px rgba(0, 0, 0, .5);
+    
+}
+
+Button.pressed {
+    box-shadow: inset 0 10px 10px rgba(0, 0, 0, .5);
+}
+
+Label {
+    background: gray;
+    color: blue;
+}*/
+
+@font-face {
+    font-family: fontawesome;
+    src: url(https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.4.0/fonts/fontawesome-webfont.ttf);
+    
+}
+
+@font-face {
+    font-family: bangers;
+    src: url(https://raw.githubusercontent.com/google/fonts/master/ofl/bangers/Bangers.ttf);
+}
+
+@font-face {
+    font-family: alegreya;
+    src: url(https://raw.githubusercontent.com/google/fonts/master/ofl/alegreya/Alegreya-Black.ttf)
+}
+
+Button.selected {
+    padding: 20px 20px 30px 10px;
+    border: 30px solid red;
+}
+
+Tech {
+    background-image: url(http://solutions.weblite.ca/images/technologies.jpg);
+}
+
+FooImage {
+    padding: 10px;
+    
+    cn1-image-id: "Foobar.jpg";
+    /**/
+    background: radial-gradient(
+      yellow,
+      #f06d06
+    );
+    background-size: cover;
+    /*background-repeat: repeat-x;*/
+    /*border: 1px solid black;
+    border-radius: 20px;*/
+    background-color: rgba(0,0,0,100);
+    width: 100%;
+    height: 100%;
+   
+    font: 10mm italic;
+    font-family: /*"bangers";*/ "alegreya";
+    text-decoration: cn1-3d;
+    cn1-derive: Button;
+    opacity: 0.4;
+        
+}
+
+SearchField {
+    cn1-derive : TextField;
+    background: linear-gradient(#ccc, #eaeaea);
+    opacity: 0.5;
+    border-radius: 10px;
+    min-height: 40px;
+    min-width: 40px;
+}
+/*
+Label, Button {
+    padding: 1px 5px 10px 20px;
+    margin: 2px;
+    padding-top: 21px;
+    background: radial-gradient(farthest-side at 60% 55%,blue,green,yellow,black);
+}
+
+
+
+Label.selected, Button.selected {
+    border: 2px solid black;
+    background:url(https://upload.wikimedia.org/wikipedia/commons/f/fc/Yosemite_Valley_from_Wawona_Tunnel_view,_vista_point..JPG);
+    padding: 1px 5px 10px 20px;
+    margin: 4px;
+    
+}
+
+Button {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+}
+
+Button.pressed {
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, .125);
+}
+
+Gradient {
+    background: linear-gradient(red, blue);
+    border-radius: 10px;
+    border: 1px solid rgb(0,0,0);
+}
+*/

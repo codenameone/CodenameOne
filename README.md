@@ -1,4 +1,4 @@
-# Codename One
+<img src="https://www.codenameone.com/img/blog/codenameone-4-0-release-image-taxi.jpg"> 
 
 [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
 
@@ -7,23 +7,24 @@
 <img align="right" src="https://www.codenameone.com/img/iphone-and-android.png" height="250">
 
 [Codename One](https://www.codenameone.com/) is a mobile cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.).
-It is a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) thru a portable abstraction which enables 100% code reuse.
+It is a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) through a portable abstraction which enables 100% code reuse.
 
 Codename One is the only platform that...
 
 - Has Write Once Run Anywhere support with no special hardware requirements and 100% code reuse
-- Compiles Java (or Kotlin) into native code for iOS, UWP (Universal Windows Platform), Android & even JavaScript
+- Compiles Java (or Kotlin) into native code for iOS, UWP (Universal Windows Platform), Android & even JavaScript (with seamless PWA support)
 - Is Open Source & Free with an enterprise grade commercial offering
 - Is Easy to use with 100% portable Drag & Drop GUI builder
 - Has Full access to underlying native OS capabilities using the native OS programming language (e.g. Objective-C) without compromising portability
 - Has full control over every pixel on the screen! Just override paint and draw or use a glass pane to draw anywhere...
 - Lets you use native widgets (views) and mix them with Codename One components within the same hierarchy (heavyweight/lightweight mixing)
+- Supports seamless Continuous Integration out of the box
 
 [Codename One](https://www.codenameone.com/) is a mature open source project with roots dating back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. You can learn about its history and how it works in [this video](https://www.youtube.com/watch?v=EMRmo6ZRnGw).
 
 ## Quick Start
 
-There is a lot to know about Codename One, if you just want to see a 3 minute video that explains how to use it check this out. Notice there are similar videos for Eclipse, IntelliJ/IDEA [here](https://www.codenameone.com/download.html):
+There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA [here](https://www.codenameone.com/download.html):
 
 [![Hello Codename One](http://img.youtube.com/vi/73d65cvyQv4/0.jpg)](http://www.youtube.com/watch?v=73d65cvyQv4 "Hello World Codename One")
 
@@ -81,7 +82,7 @@ Codename One's iOS VM is quite unique and is open source as well. You can read m
 
 ParparVM is a uniquely conservative VM that translates Java bytecode to C code. Thus providing native performance and access while still providing a safety net. This approach is unique to Codename One and is essential for future compatibility!
 
-Apple has a tendency to change things abruptly e.g. 64bit support, bitcode etc. Since ParparVM just generates a standard Xcode project there were no code changes required for any of these tectonic shifts. It's as if you handcoded the project yourself!
+Apple has a tendency to change things abruptly e.g. 64bit support, bitcode etc. Since ParparVM generates a standard Xcode project there were no code changes required for any of these tectonic shifts. It's as if you handcoded the project yourself!
 
 You can even open the resulting project in xcode and debug it or profile it directly on the iOS device. This provides a lot of useful information such as readable callstacks and valuable/actionable performance tracking...
 

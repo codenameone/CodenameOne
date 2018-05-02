@@ -34,8 +34,16 @@ import java.io.IOException;
  */
 class DatabaseImpl extends Database {
     private long peer;
+    
     public DatabaseImpl(String dbName) {
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(dbName);
+    }
+    
+    public static long getPeer(Object db) {
+        if (db instanceof DatabaseImpl) {
+            return ((DatabaseImpl)db).peer;
+        }
+        return 0l;
     }
     
     @Override

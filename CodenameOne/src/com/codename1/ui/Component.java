@@ -45,7 +45,6 @@ import com.codename1.ui.util.Resources;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 
 /**
@@ -302,6 +301,11 @@ public class Component implements Animation, StyleListener {
     private boolean snapToGrid;
 
     private boolean hideInPortrait;
+
+    /**
+     * Indicates that this component and all its children should be hidden when the device is switched to landscape mode
+     */
+    private boolean hideInLandscape;
     private int scrollOpacity = 0xff;
     private boolean ignorePointerEvents;
             
@@ -378,7 +382,8 @@ public class Component implements Animation, StyleListener {
     private Rectangle dirtyRegion = null;
     private final Object dirtyRegionLock = new Object();
     private Label componentLabel;
-    private String id;
+    private String portraitUiid;
+    private String landscapeUiid;
     
     private Resources inlineStylesTheme;
     private String inlineAllStyles;
@@ -1446,7 +1451,13 @@ public class Component implements Animation, StyleListener {
      * @return unique string identifying this component for the style sheet
      */
     public String getUIID() {
-        return id;
+        if(landscapeUiid != null) {
+            if(Display.impl.isPortrait()) {
+                return portraitUiid;
+            }
+            return landscapeUiid;
+        }
+        return portraitUiid;
     }
 
     /**
@@ -1456,7 +1467,7 @@ public class Component implements Animation, StyleListener {
      * @param id UIID unique identifier for component type
      */
     public void setUIID(String id) {
-        this.id = id;
+        this.portraitUiid = id;
         unSelectedStyle = null;
         selectedStyle = null;
         disabledStyle = null;
@@ -1465,6 +1476,32 @@ public class Component implements Animation, StyleListener {
         if(!sizeRequestedByUser) {
             preferredSize = null;
         }
+    }
+    
+    boolean onOrientationChange() {
+        if(landscapeUiid != null) {
+            unSelectedStyle = null;
+            selectedStyle = null;
+            disabledStyle = null;
+            pressedStyle = null;
+            allStyles = null;
+            if(!sizeRequestedByUser) {
+                preferredSize = null;
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * This method sets the Component the Unique identifier.
+     * 
+     * @param portraitUiid UIID unique identifier for component type in portrait mode
+     * @param landscapeUiid UIID unique identifier for component type in landscape mode
+     */
+    public void setUIID(String portraitUiid, String landscapeUiid) {
+        this.landscapeUiid = landscapeUiid;
+        setUIID(portraitUiid);
     }
     
     /**
@@ -2249,7 +2286,7 @@ public class Component implements Animation, StyleListener {
             if (invisibleAreaUnderVKB == 0) {
                 return 0;
             }
-            int bottomGap = f.getHeight() - getAbsoluteY() - getHeight();
+            int bottomGap = f.getHeight() - getAbsoluteY() - getScrollY() - getHeight();
             if (bottomGap < invisibleAreaUnderVKB) {
                 return invisibleAreaUnderVKB - bottomGap;
             } else {
@@ -2730,12 +2767,16 @@ public class Component implements Animation, StyleListener {
     private Dimension preferredSizeImpl() {
         if (!sizeRequestedByUser && (shouldCalcPreferredSize || preferredSize == null)) {
             shouldCalcPreferredSize = false;
-            if(hideInPortrait && Display.getInstance().isPortrait()) {
+            if(hideInPortrait && Display.INSTANCE.isPortrait()) {
                 preferredSize = new Dimension(0, 0);
             } else {
-                preferredSize = calcPreferredSize();
-                if (preferredSizeStr != null) {
-                    Component.parsePreferredSize(preferredSizeStr, preferredSize);
+                if(hideInLandscape && !Display.INSTANCE.isPortrait()) {
+                    preferredSize = new Dimension(0, 0);
+                } else {
+                    preferredSize = calcPreferredSize();
+                    if (preferredSizeStr != null) {
+                        Component.parsePreferredSize(preferredSizeStr, preferredSize);
+                    }
                 }
             }
         }
@@ -3160,6 +3201,22 @@ public class Component implements Animation, StyleListener {
      */
     protected boolean shouldRenderComponentSelection() {
         return false;
+    }
+
+    /**
+     * Indicates that this component and all its children should be hidden when the device is switched to landscape mode
+     * @return the hideInLandscape
+     */
+    public boolean isHideInLandscape() {
+        return hideInLandscape;
+    }
+
+    /**
+     * Indicates that this component and all its children should be hidden when the device is switched to landscape mode
+     * @param hideInLandscape the hideInLandscape to set
+     */
+    public void setHideInLandscape(boolean hideInLandscape) {
+        this.hideInLandscape = hideInLandscape;
     }
 
     class AnimationTransitionPainter implements Painter{
@@ -3716,6 +3773,27 @@ public class Component implements Animation, StyleListener {
         return draggedImage;
     }
 
+    /**
+     * Returns the component as an image.
+     * @return This component as an image.
+     */
+    public Image toImage() {
+        if (getWidth() <= 0 || getHeight() <= 0) {
+            return null;
+        }
+        Image image = Image.createImage(getWidth(), getHeight(),0x0);
+        Graphics g = image.getGraphics();
+
+        g.translate(-getX(), -getY());
+        paintComponentBackground(g);
+        paint(g);
+        if (isBorderPainted()) {
+            paintBorder(g);
+        }
+        g.translate(getX(), getY());
+        return image;
+    }
+    
     /**
      * Invoked on the focus component to let it know that drag has started on the parent container
      * for the case of a component that doesn't support scrolling
@@ -4993,7 +5071,13 @@ public class Component implements Animation, StyleListener {
                             tensileDragEnabled = true;
                             int dest = getGridPosY();
                             int scroll = getScrollY();
-                            if (dest != scroll) {
+                            if (Math.abs(dest-scroll) == 1) {
+                                // Fixes issue with exponential decay where it never actually reaches destination
+                                // so it creates infinite loop
+                                setScrollY(dest);
+                                draggedMotionY = null;
+                            }
+                            else if (dest != scroll) {
                                 startTensile(scroll, dest, true);
                             } else {
                                 draggedMotionY = null;

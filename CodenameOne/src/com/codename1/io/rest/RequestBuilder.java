@@ -298,11 +298,13 @@ public class RequestBuilder {
         }
         req.addResponseCodeListener(new ActionListener<NetworkEvent>() {
             public void actionPerformed(NetworkEvent evt) {
+                evt.consume();
                 f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
             }
         });
         req.addExceptionListener(new ActionListener<NetworkEvent>() {
             public void actionPerformed(NetworkEvent evt) {
+                evt.consume();
                 f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
             }
         });
@@ -359,11 +361,12 @@ public class RequestBuilder {
         if(contentType != null) {
             req.setContentType(contentType);
         }
+        req.setFailSilently(true);
         req.setReadResponseForErrors(true);
         req.setDuplicateSupported(true);
         req.setUrl(url);
         req.setHttpMethod(method);
-        req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT"));
+        req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));
         if(body != null){
             req.setRequestBody(body);
             req.setWriteRequest(true);

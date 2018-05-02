@@ -652,6 +652,23 @@ public final class IOSNative {
     native boolean checkSpeechRecognitionUsage();
     native boolean checkNFCReaderUsage();
 
+    // Checks avaiable bytes for NetworkConnection
+    native int available(long peer);
+
+    // Read pending data from NetworkConnection
+    native int readData(long peer, byte[] bytes, int off, int len);
+
+    // Reads next byte from NetworkConnection
+    native int shiftByte(long peer);
+
+    // Appends pending data to NetworkConnection
+    // data is a NSData* object
+    // We go through java in order to use locking concurrency
+    native void appendData(long peer, long data);
+
+    
+    native void fillPolygonGlobal(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints);
+
 
 
    

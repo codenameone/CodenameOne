@@ -93,6 +93,9 @@ public class Picker extends Button {
                     if(val != null) {
                         value = val;
                         updateValue();
+                    } else {
+                        // cancel pressed.   Don't send the rest of the events.
+                        evt.consume();
                     }
                     setEnabled(true);
                 } else {
@@ -119,6 +122,8 @@ public class Picker extends Button {
                             }
                             if (showDialog(pickerDlg, gs)) {
                                 value = gs.getValue();
+                            } else {
+                                evt.consume();
                             }
                             break;
                         }
@@ -139,6 +144,8 @@ public class Picker extends Button {
                                 cld.set(Calendar.MONTH, ds.getCurrentMonth() - 1);
                                 cld.set(Calendar.YEAR, ds.getCurrentYear());
                                 value = cld.getTime();
+                            } else {
+                                evt.consume();
                             }
                             break;
                         }
@@ -173,6 +180,8 @@ public class Picker extends Button {
                                     hour = ts.getCurrentHour();
                                 }
                                 value = new Integer(hour * 60 + ts.getCurrentMinute());
+                            } else {
+                                evt.consume();
                             }
                             break;
                         }
@@ -197,6 +206,8 @@ public class Picker extends Button {
                                 }
                                 cld.set(Calendar.MINUTE, dts.getCurrentMinute());
                                 value = cld.getTime();
+                            } else {
+                                evt.consume();
                             }
                             break;
                         }
@@ -220,6 +231,8 @@ public class Picker extends Button {
                                 
                                 value = new Long(ts.getCurrentHour() * 60 * 60 * 1000l + 
                                         ts.getCurrentMinute() * 60 * 1000l);
+                            } else {
+                                evt.consume();
                             }
                             break;
                         }

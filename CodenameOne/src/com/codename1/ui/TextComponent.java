@@ -26,8 +26,6 @@ package com.codename1.ui;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.LayeredLayout;
-import com.codename1.ui.plaf.Border;
-import java.util.ArrayList;
 
 /**
  * <p>Encapsulates a text field and label into a single component. This allows the UI to adapt for iOS/Android 
@@ -416,5 +414,13 @@ public class TextComponent extends InputComponent {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+    
+    /**
+     * Returns the text in the field {@link com.codename1.ui.TextArea#getText()}
+     * @return the text
+     */
+    public String getText() {
+        return field.getText();
     }
 }

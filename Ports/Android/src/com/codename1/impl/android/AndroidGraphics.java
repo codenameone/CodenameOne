@@ -330,7 +330,7 @@ class AndroidGraphics {
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
         applyTransform();
-        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);
         unapplyTransform();
         canvas.restore();
     }
@@ -792,9 +792,9 @@ class AndroidGraphics {
         paint.setAntiAlias(false);
         paint.setAlpha(255);
         if(!horizontal) {
-            paint.setShader(new LinearGradient(0, 0, 0, height, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x, y+height, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         } else {
-            paint.setShader(new LinearGradient(0, 0, width, 0, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
+            paint.setShader(new LinearGradient(x, y, x+width, y, 0xff000000 | startColor, 0xff000000 | endColor, Shader.TileMode.MIRROR));
         }
         canvas.save();
         applyTransform();
@@ -1261,7 +1261,7 @@ class AndroidGraphics {
         this.tmprectF.set(x, y, x + width, y + height);
         canvas.save();
         applyTransform();
-        canvas.drawRoundRect(this.tmprectF, arcWidth, arcHeight, paint);
+        canvas.drawRoundRect(this.tmprectF, arcWidth/2f, arcHeight/2f, paint);
         unapplyTransform();
         canvas.restore();
     }

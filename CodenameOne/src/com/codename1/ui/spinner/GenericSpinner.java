@@ -33,6 +33,7 @@ import com.codename1.ui.list.ListModel;
  * where a combo box is not available
  *
  * @author Shai Almog
+ * @deprecated use Picker instead
  */
 public class GenericSpinner extends BaseSpinner {
     private Spinner[] spin;

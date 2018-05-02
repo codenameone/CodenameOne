@@ -48,7 +48,10 @@ public class Executor {
     public static void main(final String[] argv) throws Exception {
         
         setProxySettings();
-        
+        if (CSSWatcher.isSupported()) {
+            CSSWatcher cssWatcher = new CSSWatcher();
+            cssWatcher.start();
+        }
         final Properties p = new Properties();
         String currentDir = System.getProperty("user.dir");
         File props = new File(currentDir, "codenameone_settings.properties");

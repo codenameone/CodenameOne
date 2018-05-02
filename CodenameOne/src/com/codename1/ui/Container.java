@@ -95,15 +95,25 @@ public class Container extends Component implements Iterable<Component>{
     static int sidemenuBarTranslation;
 
     /**
+     * Constructs a new Container with a new layout manager and UIID
+     * 
+     * @param layout the specified layout manager
+     * @param uiid the uiid of the container
+     */
+    public Container(Layout layout, String uiid) {
+        super();
+        setUIID(uiid);
+        this.layout = layout;
+        setFocusable(false);
+    }
+    
+    /**
      * Constructs a new Container with a new layout manager.
      * 
      * @param layout the specified layout manager
      */
     public Container(Layout layout) {
-        super();
-        setUIID("Container");
-        this.layout = layout;
-        setFocusable(false);
+        this(layout, "Container");
     }
 
     /** 
@@ -917,6 +927,17 @@ public class Container extends Component implements Iterable<Component>{
         }
     }
 
+    @Override
+    boolean onOrientationChange() {
+        boolean v = super.onOrientationChange();
+        int cmpCount = getComponentCount();
+        for (int iter = 0; iter < cmpCount ; iter++) {
+            Component c = getComponentAt(iter);
+            v = c.onOrientationChange() || v;
+        }
+        return v;
+    }    
+    
     private boolean requestFocusChild(boolean avoidRepaint) {
         int cmpCount = getComponentCount();
         for (int iter = 0; iter < cmpCount ; iter++) {
@@ -1855,7 +1876,7 @@ public class Container extends Component implements Iterable<Component>{
         }
         return closest;
     }
-    
+
     /**
      * Returns the top-most component that responds to pointer events at absolute 
      * coordinate {@literal (x, y)}.  This may return {@literal null} if there are 
@@ -1988,6 +2009,10 @@ public class Container extends Component implements Iterable<Component>{
                         }
                         tmp = tmp.getParent();
                     }
+                    if (cmp.respondsToPointerEvents()) {
+                        return component;
+                    }
+                    
                 }
             }
         }

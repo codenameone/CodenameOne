@@ -2490,6 +2490,7 @@ public final class Display extends CN1Constants {
      * Boolean value.
      * 
      * @param l the listener 
+     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
      */
     public void setVirtualKeyboardListener(ActionListener l){
         virtualKeyboardListener = l;
@@ -2499,6 +2500,7 @@ public final class Display extends CN1Constants {
      * Gets the VirtualKeyboardListener Objects of exists.
      * 
      * @return a Listener Object or null if not exists
+     * @deprecated virtual keyboard API's are no longer supported you can only start/stop editing as the VKB has no API access in iOS
      */ 
     public ActionListener getVirtualKeyboardListener() {
         return virtualKeyboardListener;
@@ -3007,6 +3009,27 @@ public final class Display extends CN1Constants {
         return impl.createMedia(uri, isVideo, onCompletion);
     }
 
+    /**
+     * Adds a callback to a Media element that will be called when the media finishes playing.
+     * 
+     * @param media The media to add the callback to.
+     * @param onCompletion The callback that will run on the EDT when the playback completes.
+     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        impl.addCompletionHandler(media, onCompletion);
+    }
+    
+    /**
+     * Removes onComplete callback from Media element.
+     * @param media The media element.
+     * @param onCompletion The callback.
+     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable) 
+     */
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        impl.removeCompletionHandler(media, onCompletion);
+    }
+    
     /**
      * Create the sound in the given stream
      * Notice that an audio is "auto destroyed" on completion and cannot be played

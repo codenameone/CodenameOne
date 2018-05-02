@@ -673,7 +673,7 @@ int maxVal(int a, int b) {
 CGContextRef roundRect(CGContextRef context, int color, int alpha, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     [UIColorFromRGB(color, alpha) set];
     CGRect rrect = CGRectMake(x, y, width, height);
-    CGFloat radius = MAX(arcWidth, arcHeight);
+    CGFloat radius = MAX(arcWidth, arcHeight)/2.0;
     CGFloat minx = CGRectGetMinX(rrect), midx = CGRectGetMidX(rrect), maxx = CGRectGetMaxX(rrect);
     CGFloat miny = CGRectGetMinY(rrect), midy = CGRectGetMidY(rrect), maxy = CGRectGetMaxY(rrect);
     CGContextMoveToPoint(context, minx, midy);
@@ -1885,12 +1885,22 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
                 if(largest < 1400) {
                     img = [UIImage imageNamed:@"Default-667h@2x.png"];
                 } else {
-                    bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
-                    // iphone 6+
-                    if(isPortrait) {
-                        img = [UIImage imageNamed:@"Default-736h@3x.png"];
+                    if (largest == 2436) {
+                        // iPhone X
+                        bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+                        if(isPortrait) {
+                            img = [UIImage imageNamed:@"Default-iPhoneX@3.png"];
+                        } else {
+                            img = [UIImage imageNamed:@"Default-iPhoneX-Landscape@3.png"];
+                        }
                     } else {
-                        img = [UIImage imageNamed:@"Default-736h-Landscape@3x.png"];
+                        bool isPortrait = (orientation == UIInterfaceOrientationPortrait || orientation == UIInterfaceOrientationPortraitUpsideDown);
+                        // iphone 6+
+                        if(isPortrait) {
+                            img = [UIImage imageNamed:@"Default-736h@3x.png"];
+                        } else {
+                            img = [UIImage imageNamed:@"Default-736h-Landscape@3x.png"];
+                        }
                     }
                 }
             }

@@ -35,6 +35,7 @@ import java.util.TimeZone;
  * Represents a date model for the spinner
  *
  * @author Shai Almog
+ * @deprecated use Picker instead
  */
 class SpinnerDateModel implements ListModel {
     private EventDispatcher dataListener = new EventDispatcher();

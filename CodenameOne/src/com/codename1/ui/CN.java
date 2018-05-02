@@ -47,6 +47,106 @@ import java.util.Hashtable;
  */
 public class CN extends  CN1Constants {
     /**
+     * Constant for the name of the main thin native font.
+     */
+    public static final String NATIVE_MAIN_THIN="native:MainThin";
+    
+    /**
+     * Constant for the main light native font.
+     */
+    public static final String NATIVE_MAIN_LIGHT="native:MainLight";
+    
+    /**
+     * Constant for the main regular native font.
+     */
+    public static final String NATIVE_MAIN_REGULAR="native:MainRegular";
+    
+    /**
+     * Constant for the main bold native font.
+     */
+    public static final String NATIVE_MAIN_BOLD="native:MainBold";
+    
+    /**
+     * Constant for the main black native font.
+     */
+    public static final String NATIVE_MAIN_BLACK="native:MainBlack";
+    
+    /**
+     * Constant for the italic thin native font.
+     */
+    public static final String NATIVE_ITALIC_THIN="native:ItalicThin";
+    
+    /**
+     * Constant for the italic light native font.
+     */
+    public static final String NATIVE_ITALIC_LIGHT="native:ItalicLight";
+    
+    /**
+     * Constant for the italic regular native font.
+     */
+    public static final String NATIVE_ITALIC_REGULAR ="native:ItalicRegular";
+    
+    /**
+     * Constant for the italic bold native font.
+     */
+    public static final String NATIVE_ITALIC_BOLD="native:ItalicBold";
+    
+    /**
+     * Constant for the italic black native font.
+     */
+    public static final String NATIVE_ITALIC_BLACK="native:ItalicBlack";
+    
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int FACE_MONOSPACE = 32;
+
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int FACE_PROPORTIONAL = 64;
+
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int FACE_SYSTEM = 0;
+
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int SIZE_LARGE = 16;
+
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int SIZE_MEDIUM = 0;
+
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int SIZE_SMALL = 8;
+
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int STYLE_BOLD = 1;
+
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int STYLE_ITALIC = 2;
+    
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int STYLE_UNDERLINED = 4;
+    
+    /**
+     * Constant allowing us to author portable system fonts
+     */
+    public static final int STYLE_PLAIN = 0;
+
+    /**
      * The north layout constraint (top of container).
      */
     public static final String NORTH = "North";
@@ -114,7 +214,7 @@ public class CN extends  CN1Constants {
      */
     public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
     
-    private CN() {}
+    CN() {}
     
     /**
      * This method allows us to manipulate the drag started detection logic.

@@ -83,7 +83,7 @@ public abstract class NumericProperty<T, K> extends Property<T, K> {
 
     @Override
     public K set(T value) {
-        if(nullable && value == null) {
+        if(!nullable && value == null) {
             throw new NullPointerException(getName() + " can't be null");
         }
         return super.set(value);

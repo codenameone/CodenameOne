@@ -42,6 +42,7 @@
 #include "com_codename1_ui_Display.h"
 #include "com_codename1_ui_Component.h"
 #include "java_lang_Throwable.h"
+#import "FillPolygon.h"
 #import "AudioPlayer.h"
 #import "DrawGradient.h"
 #import <MediaPlayer/MediaPlayer.h>
@@ -678,6 +679,9 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_in
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+
+
 extern void Java_com_codename1_impl_ios_IOSImplementation_clearRectMutable(int x, int y, int w, int h);
 //native void clearRectMutable(int x, int y, int width, int height);
 void com_codename1_impl_ios_IOSNative_clearRectMutable___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
@@ -703,6 +707,34 @@ void com_codename1_impl_ios_IOSNative_nativeFillRectGlobal___int_int_int_int_int
     POOL_END();
     //XMLVM_END_WRAPPER
 }
+
+/*
+
+    native void fillPolygonGlobal(int color, int alpha, int[] xPoints, int[] yPoints, int nPoints);
+
+ */
+
+
+void com_codename1_impl_ios_IOSNative_fillPolygonGlobal___int_int_int_1ARRAY_int_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT color, JAVA_INT alpha, JAVA_OBJECT xPoints, JAVA_OBJECT yPoints, JAVA_INT nPoints) {
+    POOL_BEGIN();
+    JAVA_INT* x = (JAVA_INT*)((JAVA_ARRAY)xPoints)->data;
+    JAVA_INT* y = (JAVA_INT*)((JAVA_ARRAY)yPoints)->data;
+    JAVA_FLOAT xFloats[nPoints];
+    JAVA_FLOAT yFloats[nPoints];
+    for (int i=0; i<nPoints; i++) {
+        xFloats[i] = (JAVA_FLOAT)*(x+i);
+        yFloats[i] = (JAVA_FLOAT)*(y+i);
+    }
+    FillPolygon* f = [[FillPolygon alloc] initWithArgs:xFloats y:yFloats num:nPoints color:color alpha:alpha];
+    
+    [CodenameOne_GLViewController upcoming:f];
+#ifndef CN1_USE_ARC
+    [f release];
+#endif
+    POOL_END();
+}
+
+
 
 void com_codename1_impl_ios_IOSNative_nativeDrawRectMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
 {
@@ -1540,6 +1572,58 @@ void com_codename1_impl_ios_IOSNative_connect___long(CN1_THREAD_STATE_MULTI_ARG 
     POOL_END();
 }
 
+/*
+// Checks avaiable bytes for NetworkConnection
+    native int available(long peer);
+
+    // Read pending data from NetworkConnection
+    native int readData(long peer, byte[] bytes, int off, int len);
+
+    // Reads next byte from NetworkConnection
+    native int shiftByte(long peer);
+
+    // Appends pending data to NetworkConnection
+    // data is a NSData* object
+    // We go through java in order to use locking concurrency
+    native void appendData(long peer, long data);
+*/
+
+JAVA_INT com_codename1_impl_ios_IOSNative_available___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    
+    JAVA_INT result = [impl available];
+    
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_appendData___long_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_LONG data) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    NSData* nsData = (BRIDGE_CAST NSData*)((void *)data);
+    [impl appendData:nsData];    
+    POOL_END();
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_readData___long_byte_1ARRAY_int_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer, JAVA_OBJECT buffer, JAVA_INT offset, JAVA_INT len) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    JAVA_INT result = [impl readData:buffer offset:offset len:len];
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_shiftByte___long_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
+    POOL_BEGIN();
+    NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
+    
+    JAVA_INT result = [impl shiftByte];
+    
+    POOL_END();
+    return result;
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSSLCertificates___long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
     POOL_BEGIN();
     NetworkConnectionImpl* impl = (BRIDGE_CAST NetworkConnectionImpl*)((void *)peer);
@@ -1642,30 +1726,9 @@ void connectionComplete(void* peer) {
 }
 
 void connectionReceivedData(void* peer, NSData* data) {
-#ifndef NEW_CODENAME_ONE_VM
-    if (!__TIB_byte.classInitialized) __INIT_byte();
-    org_xmlvm_runtime_XMLVMArray* byteArray = XMLVMArray_createSingleDimension(__CLASS_byte, [data length]);
-    [data getBytes:byteArray->fields.org_xmlvm_runtime_XMLVMArray.array_];
-    com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer, byteArray);
-#else
-    struct ThreadLocalData* threadStateData = getThreadLocalData();
-    enteringNativeAllocations();
-    if([data length] > 65536) {
-        int offset = 0;
-        while(offset < [data length]) {
-            int currentLength = MIN(65536, [data length] - offset);
-            JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, currentLength);
-            [data getBytes:((JAVA_ARRAY)byteArray)->data range:NSMakeRange(offset, currentLength)];
-            com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
-            offset += 65536;
-        }
-    } else {
-        JAVA_OBJECT byteArray = __NEW_ARRAY_JAVA_BYTE(threadStateData, [data length]);
-        [data getBytes:((JAVA_ARRAY)byteArray)->data];
-        com_codename1_impl_ios_IOSImplementation_appendData___long_byte_1ARRAY(threadStateData, (JAVA_LONG)peer, byteArray);
-    }
-    finishedNativeAllocations();
-#endif
+    com_codename1_impl_ios_IOSImplementation_appendData___long_long(CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)peer, (JAVA_LONG)data);
+
+
 }
 
 void connectionError(void* peer, NSString* message) {
@@ -6418,10 +6481,10 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
         GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
         
         int d0 = destPos + i;
-        outData[d0++] = outputVector.v[0];
-        outData[d0++] = outputVector.v[1];
+        outData[d0++] = outputVector.v[0] / outputVector.v[3];
+        outData[d0++] = outputVector.v[1] / outputVector.v[3];
         if (pointSize==3) {
-            outData[d0] = outputVector.v[2];
+            outData[d0] = outputVector.v[2] / outputVector.v[3];
         }     
     }
     

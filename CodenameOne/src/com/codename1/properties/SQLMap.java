@@ -498,7 +498,7 @@ public class SQLMap {
             int count = 0;
             Object[] values = new Object[cmp.getPropertyIndex().getSize()];
             for(PropertyBase p : cmp.getPropertyIndex()) {
-                if(count == 0) {
+                if(count != 0) {
                     createStatement.append(",");
                 }
                 if(p instanceof Property) {

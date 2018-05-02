@@ -120,13 +120,17 @@ import java.awt.event.MouseWheelListener;
 import java.awt.event.TextEvent;
 import java.awt.event.TextListener;
 import java.awt.event.WindowAdapter;
+import java.awt.font.TextAttribute;
+import java.awt.font.TextLayout;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.PathIterator;
+import java.awt.geom.Rectangle2D;
 import java.io.*;
 import java.net.*;
 import java.nio.channels.FileChannel;
 import java.security.MessageDigest;
 import java.sql.DriverManager;
+import java.text.AttributedString;
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
@@ -158,6 +162,7 @@ import javax.swing.text.DefaultCaret;
 import javax.swing.text.JTextComponent;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import org.sqlite.SQLiteConfig;
 import org.w3c.dom.Document;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
@@ -188,6 +193,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         GraphicsDevice graphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
 
         try {
+            // TODO: In JDK9 this throws a warning
+            // WARNING: An illegal reflective access operation has occurred
+            // WARNING: Illegal reflective access by com.codename1.impl.javase.JavaSEPort to field sun.awt.CGraphicsDevice.scale
+            // WARNING: Please consider reporting this to the maintainers of com.codename1.impl.javase.JavaSEPort
+            // WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+            // WARNING: All illegal access operations will be denied in a future release
+            // A workaround is sugtested in this bug report.  Will require some testing.
+            // https://bugs.openjdk.java.net/browse/JDK-8172962
+            // 
             Field field = graphicsDevice.getClass().getDeclaredField("scale");
             if (field != null) {
                 field.setAccessible(true);
@@ -1720,7 +1734,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 if(f != null){
                     Component cmp;
                     try {
-                        cmp = f.getResponderAt(x, y);
+                        cmp = f.getComponentAt(x, y);
                     } catch (Throwable t) {
                         // Since this is called off the edt, we sometimes hit 
                         // NPEs and Array Index out of bounds errors here
@@ -1731,9 +1745,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                             ignoreWheelMovements = true;
                         }
                         return;
+                    } else {
+                        ignoreWheelMovements = false;
                     }
                 }
-                
                 requestFocus();
                 final int units = convertToPixels(e.getUnitsToScroll() * 5, true) * -1;
 
@@ -1751,7 +1766,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                         scrollWheeling = true;
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
+                            
                             if(cmp != null && cmp.isFocusable()) {
                                 cmp.setFocusable(false);
                                 f.pointerPressed(x, y);
@@ -1769,7 +1785,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 return;
                             }
@@ -1787,7 +1803,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 return;
                             }
@@ -1805,7 +1821,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     public void run() {
                         Form f = getCurrentForm();
                         if(f != null){
-                            Component cmp = f.getResponderAt(x, y);
+                            Component cmp = f.getComponentAt(x, y);
                             if (cmp != null && Accessor.isScrollDecelerationMotionInProgress(cmp)) {
                                 f.pointerReleased(x, y + units);
                                 return;
@@ -1834,8 +1850,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         return canvas;
     }
 
+    public static JavaSEPort instance;
+    
     public JavaSEPort() {
         canvas = new C();
+        instance = this;
     }
 
     public void paintDirty() {
@@ -4252,10 +4271,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             JTextArea t = new JTextArea(ta.getLines(), ta.getColumns()) {
                 public void repaint(long tm, int x, int y, int width, int height) {
                     
-                    int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
-                    int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
-                    int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
-                    int marginBottom = cmp.getSelectedStyle().getPadding(Component.BOTTOM);
+                    int marginTop = 0;//cmp.getSelectedStyle().getPadding(Component.TOP);
+                    int marginLeft = 0;//cmp.getSelectedStyle().getPadding(Component.LEFT);
+                    int marginRight = 0;//cmp.getSelectedStyle().getPadding(Component.RIGHT);
+                    int marginBottom = 0;//cmp.getSelectedStyle().getPadding(Component.BOTTOM);
                     Rectangle bounds;
                     if (getSkin() != null) {
                         bounds = new Rectangle((int) ((cmp.getAbsoluteX() + cmp.getScrollX() + getScreenCoordinates().x + canvas.x + marginLeft) * zoomLevel),
@@ -4426,18 +4445,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             public void textValueChanged(TextEvent e) {
-                if (cmp instanceof com.codename1.ui.TextField) {
+                //if (cmp instanceof com.codename1.ui.TextField) {
                     updateText();
-                }
+                //}
 
             }
 
             private void updateText() {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
-                        if(cmp instanceof com.codename1.ui.TextField) {
-                            ((com.codename1.ui.TextField) cmp).setText(getText(tf));
-                        }
+                        //if(cmp instanceof com.codename1.ui.TextField) {
+                            ((com.codename1.ui.TextArea) cmp).setText(getText(tf));
+                        //}
                     }
                 });
             }
@@ -5301,7 +5320,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         checkEDT();
         Graphics2D nativeGraphics = getGraphics(graphics);
         // the latter indicates mutable image graphics
-        nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
+        java.awt.Font fnt = nativeGraphics.getFont();
+        if (isEmojiFontLoaded() && fnt.canDisplayUpTo(str) != -1) {
+            // This might have emojis
+            // render as attributed string
+            AttributedString astr = createAttributedString(fnt, str);
+            nativeGraphics.drawString(astr.getIterator(), x, y + nativeGraphics.getFontMetrics().getAscent());
+        } else {
+            nativeGraphics.drawString(str, x, y + nativeGraphics.getFontMetrics().getAscent());
+        }
         if (perfMonitor != null) {
             perfMonitor.drawString(str, x, y);
         }
@@ -5421,6 +5448,110 @@ public class JavaSEPort extends CodenameOneImplementation {
         return stringWidth(nativeFont, new String(ch, offset, length));
     }
 
+    private Rectangle2D getStringBoundsWithEmojis(java.awt.Font font, String str) {
+        if (isEmojiFontLoaded() && hasUnsupportedChars(font, str)) {
+            TextLayout textLayout = new TextLayout( 
+                    createAttributedString(font, str).getIterator(), 
+                    canvas.getFRC()
+            );
+            
+            Rectangle2D.Float textBounds = ( Rectangle2D.Float ) textLayout.getBounds();
+            return textBounds;
+        } else {
+            return font.getStringBounds(str, canvas.getFRC());
+        }
+    }
+    
+    private java.awt.Font emojiFont;
+    private boolean attemptedToLoadEmojiFont;
+    private Map<Integer,java.awt.Font> emojiFontCache;
+    
+    private boolean isEmojiFontLoaded() {
+        return getEmojiFont() != null;
+    }
+    
+    private java.awt.Font getEmojiFont() {
+        if (emojiFont == null) {
+            if (!attemptedToLoadEmojiFont) {
+                attemptedToLoadEmojiFont = true;
+                try {
+                    emojiFont = (java.awt.Font)loadTrueTypeFont("Noto Emoji", "NotoEmoji-Regular.ttf");
+                    //emojiFont = (java.awt.Font)loadTrueTypeFont("OpenSansEmoji", "OpenSansEmoji.ttf");
+                } catch (Throwable t){
+                    System.out.println("Failed to load emoji font "+t.getMessage());
+                }
+            }
+        }
+        return emojiFont;
+    }
+    
+    private java.awt.Font deriveEmojiFont(float size) {
+        if (emojiFont == null) {
+            return null;
+        }
+        if (emojiFontCache == null) {
+            emojiFontCache = new HashMap<Integer,java.awt.Font>();
+        }
+        int key = (int)Math.round(size);
+        if (!emojiFontCache.containsKey(key)) {
+            java.awt.Font fnt = emojiFont.deriveFont(size);
+            emojiFontCache.put(key, fnt);
+            return fnt;
+        }
+        return emojiFontCache.get(key);
+    }
+    
+    private AttributedString createAttributedString(java.awt.Font font, String str) {
+        java.awt.Font emojiFont = deriveEmojiFont(font.getSize2D());
+        AttributedString astr = new AttributedString(str);
+        astr.addAttribute(TextAttribute.FONT, font);
+        if (emojiFont == null) {
+            return astr;
+        }
+        int pos = font.canDisplayUpTo(str);
+        if (pos == -1) {
+            return astr;
+        }
+        int len = str.length();
+        char[] chars = str.toCharArray();
+        while (pos < len) {
+            // find next char that the font can render
+            int spanEnd = len;
+            for (int j=pos+1; j<len; j++) {
+                char c = chars[j];
+                
+                if (j < len-1 && Character.isSurrogatePair(c, chars[j+1])) {
+                    int codePoint = Character.toCodePoint(c, chars[j+1]);
+                    if (font.canDisplay(codePoint)) {
+                        spanEnd = j;
+                        break;
+                    }
+                } else {
+                    if (font.canDisplay(c)) {
+                        spanEnd = j;
+                        break;
+                    }
+                }
+            }
+            astr.addAttribute(TextAttribute.FONT, emojiFont, pos, spanEnd);
+            if (spanEnd < len) {
+                pos = font.canDisplayUpTo(chars, spanEnd, len);
+                if (pos == -1) {
+                    pos = len;
+                }
+            } else {
+                pos = spanEnd;
+            }
+            
+        }
+        
+        return astr;
+    }
+    
+    private boolean hasUnsupportedChars(java.awt.Font font, String str) {
+        return font.canDisplayUpTo(str) != -1;
+    }
+    
     /**
      * @inheritDoc
      */
@@ -5433,7 +5564,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return 0;
         }
         java.awt.Font fnt = font(nativeFont);
-        java.awt.geom.Rectangle2D r2d = fnt.getStringBounds(str, canvas.getFRC());
+        java.awt.geom.Rectangle2D r2d = getStringBoundsWithEmojis(fnt, str);//fnt.getStringBounds(str, canvas.getFRC());
         int w = (int) Math.ceil(r2d.getWidth());
         return w;
     }
@@ -5446,7 +5577,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             perfMonitor.charWidth(nativeFont, ch);
         }
         checkEDT();
-        int w = (int) Math.ceil(font(nativeFont).getStringBounds("" + ch, canvas.getFRC()).getWidth());
+        java.awt.Font fnt = font(nativeFont);
+        if (isEmojiFontLoaded() && !Character.isHighSurrogate(ch) && !fnt.canDisplay(ch)) {
+            fnt = deriveEmojiFont(fnt.getSize2D());
+        }
+        int w = (int) Math.ceil(fnt.getStringBounds("" + ch, canvas.getFRC()).getWidth());
         return w;
     }
 
@@ -6916,6 +7051,26 @@ public class JavaSEPort extends CodenameOneImplementation {
         return media[0];
     }
 
+    @Override
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        super.addCompletionHandler(media, onCompletion);
+        if (media instanceof CodenameOneMediaPlayer) {
+            ((CodenameOneMediaPlayer)media).addCompletionHandler(onCompletion);
+        }
+    }
+
+    @Override
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        super.removeCompletionHandler(media, onCompletion); 
+        if (media instanceof CodenameOneMediaPlayer) {
+            ((CodenameOneMediaPlayer)media).removeCompletionHandler(onCompletion);
+        }
+    }
+
+    
+    
+    
+    
     private class NativeScreenGraphics {
 
         BufferedImage sourceImage;
@@ -7350,13 +7505,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }else{
                     is = con.getErrorStream();
                 }
+                boolean isText = false;
+                String contentType = con.getContentType();
+                if (contentType != null) {
+                    if (contentType.startsWith("text/") || contentType.contains("json") || contentType.contains("css") || contentType.contains("javascript")) {
+                        isText = true;
+                    }
+                }
+                final boolean fIsText = isText;
                 InputStream i = new BufferedInputStream(is) {
 
                     public synchronized int read(byte b[], int off, int len)
                             throws IOException {
                         int s = super.read(b, off, len);
                         if(nr != null) {
-                            if (s > -1) {
+                            if (fIsText && s > -1) {
                                 nr.setResponseBody(nr.getResponseBody() + new String(b, off, len));
                             }
                         }
@@ -8236,6 +8399,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     class CodenameOneMediaPlayer implements Media {
 
         private Runnable onCompletion;
+        private List<Runnable> completionHandlers;
         private javafx.scene.media.MediaPlayer player;
 //        private MediaPlayer player;
         private boolean realized = false;
@@ -8246,14 +8410,16 @@ public class JavaSEPort extends CodenameOneImplementation {
         
         public CodenameOneMediaPlayer(String uri, boolean isVideo, JFrame f, javafx.embed.swing.JFXPanel fx, final Runnable onCompletion) throws IOException {
             if (onCompletion != null) {
-                this.onCompletion = new Runnable() {
-
-                    @Override
-                    public void run() {
-                        Display.getInstance().callSerially(onCompletion);
-                    }
-                };
+                addCompletionHandler(onCompletion);
             }
+            this.onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+                
+            };
             this.isVideo = isVideo;
             this.frm = f;
             try {
@@ -8313,14 +8479,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             stream.close();
 
             if (onCompletion != null) {
-                this.onCompletion = new Runnable() {
-
-                    @Override
-                    public void run() {
-                        Display.getInstance().callSerially(onCompletion);
-                    }
-                };
+                addCompletionHandler(onCompletion);
+                
             }
+            this.onCompletion = new Runnable() {
+
+                @Override
+                public void run() {
+                    fireCompletionHandlers();
+                }
+            };
             this.isVideo = mimeType.contains("video");
             this.frm = f;
             try {
@@ -8336,6 +8504,47 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         }
 
+        
+        private void fireCompletionHandlers() {
+            if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                Display.getInstance().callSerially(new Runnable() {
+
+                    @Override
+                    public void run() {
+                        if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                            List<Runnable>  toRun;
+
+                            synchronized(CodenameOneMediaPlayer.this) {
+                                toRun = new ArrayList<Runnable>(completionHandlers);
+                            }
+                            for (Runnable r : toRun) {
+                                r.run();
+                            }
+                        }
+                    }
+
+                });
+            }
+        }
+        
+        public void addCompletionHandler(Runnable onCompletion) {
+            synchronized(this) {
+                if (completionHandlers == null) {
+                    completionHandlers = new ArrayList<Runnable>();
+                }
+
+                completionHandlers.add(onCompletion);
+            }
+        }
+
+        public void removeCompletionHandler(Runnable onCompletion) {
+            if (completionHandlers != null) {
+                synchronized(this) {
+                    completionHandlers.remove(onCompletion);
+                }
+            }
+        }
+        
         public void cleanup() {
             pause();
         }
@@ -8849,6 +9058,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Media createMediaRecorder(String path, String mime) throws IOException {
+        checkMicrophoneUsageDescription();
         if(!checkForPermission("android.permission.READ_PHONE_STATE", "This is required to access the mic")){
             return null;
         }        
@@ -8972,12 +9182,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             // of the db.
             // It can contain directory names relative to the
             // current working directory
+            SQLiteConfig config = new SQLiteConfig();
+            config.enableLoadExtension(true);
             File dir = new File(getStorageDir() + "/database");
             if (!dir.exists()) {
                 dir.mkdir();
             }
             java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:"
-                    + getStorageDir() + "/database/" + databaseName);
+                    + getStorageDir() + "/database/" + databaseName,
+                    config.toProperties()
+            );
 
             return new SEDatabase(conn);
         } catch (SQLException ex) {
@@ -9101,7 +9315,13 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     public void setBrowserURL(final PeerComponent browserPeer, String url) {
         if(url.startsWith("file:") && (url.indexOf("/html/") < 0 || !exposeFilesystem)) {
-            url = "file://" + unfile(url);
+            
+            try {
+                File f = new File(unfile(url));
+                url = f.toURI().toString();
+            } catch (Throwable t){
+                url = "file://" + unfile(url);
+            }
         }
         if (url.startsWith("jar:")) {
             url = url.substring(6);

@@ -1753,6 +1753,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         Image combo = m.getThemeImageConstant("comboImage");
         if(combo != null) {
             setComboBoxImage(combo);
+        } else {
+            if(Font.isNativeFontSchemeSupported()) {
+                Style c = UIManager.getInstance().createStyle("ComboBox.", "", false);
+                combo = FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, c);
+                setComboBoxImage(combo);
+            }
         }
         updateCheckBoxConstants(m, false, "");
         updateCheckBoxConstants(m, true, "Focus");

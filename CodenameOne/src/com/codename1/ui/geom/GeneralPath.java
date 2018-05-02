@@ -3042,5 +3042,105 @@ public final class GeneralPath implements Shape {
 //}
 
     }
+    
+    
+    /**
+     * Checks to see if the set of points form a convex polygon. 
+     * if 
+     * @param xPoints The x coordinates of the polygon.
+     * @param yPoints The y coordinates of the polygon.
+     * @return True if the points comprise a convex polygon.
+     */
+    public static boolean isConvexPolygon(float[] xPoints, float[] yPoints) {
+        int len = xPoints.length;
+        Pt[] p = new Pt[len];
+        for (int i=0; i<len; i++) {
+            Pt point = new Pt();
+            point.x = xPoints[i];
+            point.y = yPoints[i];
+            p[i] = point;
+        }
+        return detectPolygonType(p, len) == 1;
+        
+    }
+    
+    public static boolean isConvexPolygon(int[] xPoints, int[] yPoints) {
+        int len = xPoints.length;
+        Pt[] p = new Pt[len];
+        for (int i=0; i<len; i++) {
+            Pt point = new Pt();
+            point.x = xPoints[i];
+            point.y = yPoints[i];
+            p[i] = point;
+        }
+        return detectPolygonType(p, len) == 1;
+        
+    }
+    
+
+
+    private static Pt tmpV1, tmpV2;
+ 
+    // 1 = convex, -1 = concave, 0 = not polygon
+    private static int detectPolygonType(Pt[] p, int num_vertices) {
+        Pt v1 = tmpV1 == null ? (tmpV1 = new Pt()) : tmpV1;
+        Pt v2 = tmpV2 == null ? (tmpV2 = new Pt()) : tmpV2;
+
+        double det_value;
+        double cur_det_value;
+        int i;
+
+        if (num_vertices < 3) {
+            return 0;
+        }
+
+        v1 = calcVector(p[0], p[num_vertices - 1], v1);
+        v2 = calcVector(p[1], p[0], v2);
+        det_value = calcDeterminant(v1, v2);
+
+        for (i = 1; i < num_vertices - 1; i++) {
+            v2.clone(v1);
+            v2 = calcVector(p[i + 1], p[i], v2);
+            cur_det_value = calcDeterminant(v1, v2);
+
+            if ((cur_det_value * det_value) < 0.0) {
+                return -1;
+            }
+
+        }
+
+        v1 = v2;
+        v2 = calcVector(p[0], p[num_vertices - 1], v2);
+        cur_det_value = calcDeterminant(v1, v2);
+
+        if ((cur_det_value * det_value) < 0.0) {
+            return -1;
+        } else {
+            return 1;
+        }
+
+    }
+
+    private static double calcDeterminant(Pt p1, Pt p2) {
+        return (p1.x * p2.y - p1.y * p2.x);
+    }
+
+    private static class Pt {
+
+        double x, y;
+        
+        void clone(Pt target) {
+            target.x = x;
+            target.y = y;
+        }
+    }
+
+    private static Pt calcVector(Pt p0, Pt p1, Pt out) {
+        Pt p = out;
+
+        p.x = p0.x - p1.x;
+        p.y = p0.y - p1.y;
+        return (p);
+    }
 
 }

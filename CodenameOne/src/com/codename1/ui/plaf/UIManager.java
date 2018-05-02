@@ -412,6 +412,11 @@ public class UIManager {
             themeProps.put("ToolbarSearch.derive", "Toolbar");
         }
         
+        themeProps.put("ToolbarLandscape.derive", "Toolbar");
+        themeProps.put("TitleCommandLandscape.derive", "TitleCommand");
+        themeProps.put("BackCommandLandscape.derive", "BackCommand");
+        themeProps.put("TitleLandscape.derive", "Title");
+        
         if (installedTheme == null || !installedTheme.containsKey("TextFieldSearch.derive")) {
             themeProps.put("TextFieldSearch.derive", "Title");
             themeProps.put("TextFieldSearch.align", leftAlign);

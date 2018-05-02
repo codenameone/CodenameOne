@@ -30,6 +30,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.EditorTTFFont;
 import com.codename1.ui.Font;
+import com.codename1.designer.css.CN1CSSCLI;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.resource.util.QuitAction;
 import com.codename1.ui.util.EditableResources;
@@ -57,6 +58,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.prefs.Preferences;
@@ -92,49 +94,59 @@ public class ResourceEditorApp extends SingleFrameApplication {
     
 
     static {
-        String n = System.getProperty("os.name");
-        if(n != null && n.startsWith("Mac")) {
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
-            System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codename One Designer");
-            try {
-                Class applicationClass = Class.forName("com.apple.eawt.Application");
-
-                Object macApp = applicationClass.getConstructor((Class[])null).newInstance((Object[])null);
-
-                Class applicationListenerClass = Class.forName("com.apple.eawt.ApplicationListener");
-
-                Method addListenerMethod = applicationClass.getDeclaredMethod("addApplicationListener", new Class[] { applicationListenerClass });
-                
-                Object proxy = Proxy.newProxyInstance(ResourceEditorApp.class.getClassLoader(), new Class[] { applicationListenerClass }, 
-                        new InvocationHandler() {
-                    public Object invoke(Object o, Method method, Object[] os) throws Throwable {
-                        if(method.getName().equals("handleQuit")) {
-                            setMacApplicationEventHandled(os[0], true);
-                            QuitAction.INSTANCE.quit();
-                            return null;
-                        }
-                        if(method.getName().equals("handleAbout")) {
-                            setMacApplicationEventHandled(os[0], true);
-                            ri.aboutActionPerformed();
-                            return null;
-                        }
-                        return null;
-                    }
-                });
-
-                addListenerMethod.invoke(macApp, new Object[] { proxy });
-                
-                Method enableAboutMethod = applicationClass.getDeclaredMethod("setEnabledAboutMenu", new Class[] { boolean.class });
-                enableAboutMethod.invoke(macApp, new Object[] { Boolean.TRUE });
-                //ImageIcon i = new ImageIcon("/application64.png");
-                //Method setDockIconImage = applicationClass.getDeclaredMethod("setDockIconImage", new Class[] { java.awt.Image.class });
-                //setDockIconImage.invoke(macApp, new Object[] { i.getImage() });
-            } catch(Throwable t) {
-                t.printStackTrace();
+        if ("true".equals(System.getProperty("cli", null))) {
+            System.setProperty("apple.awt.UIElement", "true");
+            String n = System.getProperty("os.name");
+            if(n != null && n.startsWith("Mac")) {
+                IS_MAC=true;
+            } else {
+                IS_MAC=false;
             }
-            IS_MAC = true;
         } else {
-            IS_MAC = false;
+            String n = System.getProperty("os.name");
+            if(n != null && n.startsWith("Mac")) {
+                System.setProperty("apple.laf.useScreenMenuBar", "true");
+                System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codename One Designer");
+                try {
+                    Class applicationClass = Class.forName("com.apple.eawt.Application");
+
+                    Object macApp = applicationClass.getConstructor((Class[])null).newInstance((Object[])null);
+
+                    Class applicationListenerClass = Class.forName("com.apple.eawt.ApplicationListener");
+
+                    Method addListenerMethod = applicationClass.getDeclaredMethod("addApplicationListener", new Class[] { applicationListenerClass });
+
+                    Object proxy = Proxy.newProxyInstance(ResourceEditorApp.class.getClassLoader(), new Class[] { applicationListenerClass }, 
+                            new InvocationHandler() {
+                        public Object invoke(Object o, Method method, Object[] os) throws Throwable {
+                            if(method.getName().equals("handleQuit")) {
+                                setMacApplicationEventHandled(os[0], true);
+                                QuitAction.INSTANCE.quit();
+                                return null;
+                            }
+                            if(method.getName().equals("handleAbout")) {
+                                setMacApplicationEventHandled(os[0], true);
+                                ri.aboutActionPerformed();
+                                return null;
+                            }
+                            return null;
+                        }
+                    });
+
+                    addListenerMethod.invoke(macApp, new Object[] { proxy });
+
+                    Method enableAboutMethod = applicationClass.getDeclaredMethod("setEnabledAboutMenu", new Class[] { boolean.class });
+                    enableAboutMethod.invoke(macApp, new Object[] { Boolean.TRUE });
+                    //ImageIcon i = new ImageIcon("/application64.png");
+                    //Method setDockIconImage = applicationClass.getDeclaredMethod("setDockIconImage", new Class[] { java.awt.Image.class });
+                    //setDockIconImage.invoke(macApp, new Object[] { i.getImage() });
+                } catch(Throwable t) {
+                    t.printStackTrace();
+                }
+                IS_MAC = true;
+            } else {
+                IS_MAC = false;
+            }
         }
     }
         
@@ -421,6 +433,32 @@ public class ResourceEditorApp extends SingleFrameApplication {
                 generate(res, output);
                 System.exit(0);
                 return;
+            }
+            if(args[0].equalsIgnoreCase("-sync-xml")) {
+                try {
+                    java.awt.Container cnt = new java.awt.Container();
+                    com.codename1.ui.Display.init(cnt);
+                    File output = new File(args[1]);
+                    EditableResources.setXMLEnabled(true);
+                    EditableResources res = new EditableResources();
+                    res.openFileWithXMLSupport(output);
+                    FileOutputStream fos = new FileOutputStream(output);
+                    res.save(fos);
+                    fos.close();
+                    
+                } finally {
+                    System.exit(0);
+                }
+                return;
+            }
+            if (args.length >= 2 && args[0].equalsIgnoreCase("-css")) {
+                List<String> cssArgs = new ArrayList<String>(Arrays.asList(args));
+                cssArgs.remove(0);
+                
+                CN1CSSCLI.main(cssArgs.toArray(new String[cssArgs.size()]));
+                
+                return;
+                
             }
         }
         JavaSEPortWithSVGSupport.setDefaultInitTarget(new JPanel());

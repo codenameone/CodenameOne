@@ -2741,11 +2741,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
-            return null;
+        if(!uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
+            if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+                return null;
+            }
         }
         if (uri.startsWith("file://")) {
-            return createMedia(uri.substring(7), isVideo, onCompletion);
+            return createMedia(removeFilePrefix(uri), isVideo, onCompletion);
         }
         File file = null;
         if (uri.indexOf(':') < 0) {
@@ -2801,6 +2803,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return retVal;
     }
 
+    @Override
+    public void addCompletionHandler(Media media, Runnable onCompletion) {
+        super.addCompletionHandler(media, onCompletion);
+        if (media instanceof Video) {
+            ((Video)media).addCompletionHandler(onCompletion);
+        } else if (media instanceof Audio) {
+            ((Audio)media).addCompletionHandler(onCompletion);
+        } else if (media instanceof MediaProxy) {
+            ((MediaProxy)media).addCompletionHandler(onCompletion);
+        }
+    }
+
+    @Override
+    public void removeCompletionHandler(Media media, Runnable onCompletion) {
+        super.removeCompletionHandler(media, onCompletion);
+        if (media instanceof Video) {
+            ((Video)media).removeCompletionHandler(onCompletion);
+        } else if (media instanceof Audio) {
+            ((Audio)media).removeCompletionHandler(onCompletion);
+        } else if (media instanceof MediaProxy) {
+            ((MediaProxy)media).removeCompletionHandler(onCompletion);
+        }
+    }
+
+    
+    
     /**
      * @inheritDoc
      */
@@ -2809,9 +2837,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (getActivity() == null) {
             return null;
         }
-        if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
+        /*if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to play media")){
             return null;
-        }
+        }*/
         boolean isVideo = mimeType.contains("video");
 
         if (!isVideo && stream instanceof FileInputStream) {
@@ -4416,7 +4444,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                     String methodName = "set" + key;
                     for (Method m : s.getClass().getMethods()) {
-                        if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 0) {
+                        if (m.getName().equalsIgnoreCase(methodName) && m.getParameterTypes().length == 1) {
                             try {
                                 m.invoke(s, value);
                             } catch (Exception ex) {
@@ -5735,6 +5763,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         private boolean nativeController = true;
         private boolean nativePlayer;
         private Form curentForm;
+        private List<Runnable> completionHandlers;
 
         public Video(final VideoView nativeVideo, final Activity activity, final Runnable onCompletion) {
             super(new RelativeLayout(activity));
@@ -5757,24 +5786,41 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nativeVideo.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer arg0) {
-                    if (onCompletion != null) {
-                        onCompletion.run();
-                    }
+                    fireCompletionHandlers();
                 }
             });
+            if (onCompletion != null) {
+                addCompletionHandler(onCompletion);
+            }
 
             nativeVideo.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mp, int what, int extra) {
-                    if (onCompletion != null) {
-                        onCompletion.run();
-                    }
+                    fireCompletionHandlers();
                     return false;
                 }
             });
 
         }
 
+        
+        private void fireCompletionHandlers() {
+            if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        if (completionHandlers != null && !completionHandlers.isEmpty()) {
+                            ArrayList<Runnable> toRun;
+                            synchronized(Video.this) {
+                                toRun = new ArrayList<Runnable>(completionHandlers);
+                            }
+                            for (Runnable r : toRun) {
+                                r.run();
+                            }
+                        }
+                    }
+                });
+            }
+        }
         private void setNativeController(final boolean nativeController) {
             if (nativeController != this.nativeController) {
                 this.nativeController = nativeController;
@@ -6033,6 +6079,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         public Object getVariable(String key) {
             return null;
         }
+
+        private void addCompletionHandler(Runnable onCompletion) {
+            synchronized(this) {
+                if (completionHandlers == null) {
+                    completionHandlers = new ArrayList<Runnable>();
+                }
+                completionHandlers.add(onCompletion);
+            }
+        }
+        
+        private void removeCompletionHandler(Runnable onCompletion) {
+            synchronized(this) {
+                if (completionHandlers != null) {
+                    completionHandlers.remove(onCompletion);
+                }
+            }
+        }
     }
 
     @Override
@@ -6095,7 +6158,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             if (name != null) {
                                 filePath = getAppHomePath()
                                         + getFileSystemSeparator() + name;
-                                File f = new File(filePath);
+                                File f = new File(removeFilePrefix(filePath));
                                 OutputStream tmp = createFileOuputStream(f);
                                 byte[] buffer = new byte[1024];
                                 int read = -1;

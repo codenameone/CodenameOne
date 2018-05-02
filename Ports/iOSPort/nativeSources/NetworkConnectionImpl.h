@@ -33,10 +33,16 @@
     NSURLConnection *connection;
     int chunkedStreamingLen;
     NSString* sslCertificates;
+    NSMutableArray* pendingData;
+    int pendingDataPos;
 }
 
 - (void*)openConnection:(NSString*)url timeout:(int)timeout;
 - (void)connect;
+- (JAVA_INT)available;
+- (JAVA_INT)shiftByte;
+- (void)appendData:(NSData*)data;
+- (JAVA_INT)readData:(JAVA_OBJECT)buffer offset:(JAVA_INT)offset len:(JAVA_INT)len;
 - (void)setMethod:(NSString*)mtd;
 - (int)getResponseCode;
 - (NSString*)getResponseMessage;

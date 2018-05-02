@@ -368,7 +368,6 @@ public class BorderLayout extends Layout {
                     }
                     if(south != null) {
                         th -= south.getHeight();
-                        append += south.getHeight();
                     }
                     if(d.getHeight() < h) {
                         int newY = (s.getPaddingTop() + th) / 2 - d.getHeight() / 2 + append;
