@@ -144,6 +144,15 @@ public class ListProperty<T, K> extends PropertyBase<T, K> implements Iterable<T
         value.remove(offset);
         return (K)parent.parent;
     }
+
+    /**
+     * Removes the item with this value
+     * @param v the value object
+     */
+    public K remove(T v) {
+        value.remove(v);
+        return (K)parent.parent;
+    }
     
     /**
      * Compares this property to another property
