@@ -561,7 +561,6 @@ public class RoundRectBorder extends Border {
     private Stroke stroke1;
     
     private void drawShape(Graphics g, int color, int opacity, int width, int height) {
-        System.out.println("Opacity "+opacity);
         g.setColor(color);
         g.setAlpha(opacity);
         GeneralPath gp = createShape(width, height);
