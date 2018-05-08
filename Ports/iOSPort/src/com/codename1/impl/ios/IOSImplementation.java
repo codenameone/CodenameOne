@@ -5073,7 +5073,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
                 int largest = Math.max(dispWidth, getDisplayHeight());
                 if(largest > 2000) {
-                    dDensity = Display.DENSITY_HD;
+                    dDensity = Display.DENSITY_560;
                     return dDensity;
                 }
                 dDensity = Display.DENSITY_VERY_HIGH;
