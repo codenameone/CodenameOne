@@ -104,7 +104,7 @@ public class CSSWatcher implements Runnable {
         } else {
             System.out.println("Found theme.css file.  Watching for changes...");
         }
-        final File destFile = new File("src", "theme.css.res");
+        final File destFile = new File("src", "theme.res");
         File userHome = new File(System.getProperty("user.home"));
         File cn1Home = new File(userHome, ".codenameone");
         File designerJar = new File(cn1Home, "designer_1.jar");
@@ -114,6 +114,7 @@ public class CSSWatcher implements Runnable {
                 "-jar", "-Dcli=true", designerJar.getAbsolutePath(),
                 "-css",
                 srcFile.getAbsolutePath(),
+                destFile.getAbsolutePath(),
                 "-watch",
                 "-Dprism.order=sw"
                 
