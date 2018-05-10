@@ -109,5 +109,5 @@ elif [[ -n ${CN1_RUNTESTS_IOS_SIMULATOR} ]]; then
   trap stop_appium EXIT
   ant test-ios
 fi
-
+kill $(jobs -p)
 exit 0
