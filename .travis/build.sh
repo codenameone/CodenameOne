@@ -111,7 +111,7 @@ elif [[ -n ${CN1_RUNTESTS_IOS_SIMULATOR} ]]; then
 fi
 function killjobs () {
     JOBS="$(jobs -p)";
-    if [ -n "${JOBS}" ]; then;
+    if [ -n "${JOBS}" ]; then
         kill -KILL ${JOBS};
     fi
 }
