@@ -945,7 +945,7 @@ public class UIManager {
             themeProps.put("FloatingActionButton.sel#marUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
             themeProps.put("FloatingActionButton.sel#margin", "0,2,1,2");
         }
-        if(installedTheme == null || !installedTheme.containsKey("FloatingActionButton.derive")) {
+        if(installedTheme == null || !installedTheme.containsKey("Badge.derive")) {
             themeProps.put("Badge.fgColor", "ffffff");
             themeProps.put("Badge.bgColor", "d32f2f");
             themeProps.put("Badge.press#fgColor", "ffffff");
