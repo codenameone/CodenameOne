@@ -117,6 +117,7 @@ public class FloatingActionButton extends Button {
      */
     protected FloatingActionButton(char icon, String text, String uiid, float size) {
         FontImage image = FontImage.createMaterial(icon, uiid, size);
+        image.setBgTransparency(0);
         sizeMm = size;
         setIcon(image);
         setText("");
@@ -140,6 +141,7 @@ public class FloatingActionButton extends Button {
             all.setAlignment(CENTER);
             updateBorder();
             FontImage image = FontImage.createMaterial(i.getText().charAt(0), id, sizeMm);
+            image.setBgTransparency(0);
             setIcon(image);
         }
     }
@@ -181,6 +183,7 @@ public class FloatingActionButton extends Button {
         if(getIcon() instanceof FontImage && propertyName.equals(Style.FG_COLOR)) {
             FontImage i = (FontImage)getIcon();
             FontImage image = FontImage.createMaterial(i.getText().charAt(0), "FloatingActionButton", sizeMm);
+            image.setBgTransparency(0);
             setIcon(image);
         }
     }    
