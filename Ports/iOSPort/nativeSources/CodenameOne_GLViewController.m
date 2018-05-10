@@ -2254,6 +2254,8 @@ BOOL prefersStatusBarHidden = NO;
     [self drawFrame:[CodenameOne_GLViewController instance].view.bounds];
 }
 
+// NOTE:  This is deprecated.  It is no longer called at all in iOS 11.3 (at least!) and higher.
+// You should handle device rotation in the viewWillTransitionToSize method.
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration {
     if(firstTime) {
         return;
@@ -2365,6 +2367,29 @@ BOOL prefersStatusBarHidden = NO;
 }
 
 -(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
+    
+    if(editingComponent != nil) {
+        // Since willRotateToInterfaceOrientation is deprecated, newer versions (tested 11.3)
+        // don't call it anymore on rotation.
+        // So we duplicate this check for text editing here now.
+        // Currently we just end text editing when the device is rotated.  A smoother UX would
+        // result from a more nuanced approach (e.g. close it and reopen it when rotation is 
+        // complete.  But we'll tackle that as required/requested.
+        if([editingComponent isKindOfClass:[UITextView class]]) {
+            UITextView* v = (UITextView*)editingComponent;
+            stringEdit(YES, -1, v.text);
+        } else {
+            UITextField* v = (UITextField*)editingComponent;
+            stringEdit(YES, -1, v.text);
+        }
+        [editingComponent resignFirstResponder];
+        [editingComponent removeFromSuperview];
+#ifndef CN1_USE_ARC
+        [editingComponent release];
+#endif
+        editingComponent = nil;
+    }
+    
     // simply create a property of 'BOOL' type
     [(EAGLView *)self.view updateFrameBufferSize:(int)size.width h:(int)size.height];
     [(EAGLView *)self.view deleteFramebuffer];
