@@ -30,7 +30,6 @@ import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
@@ -112,11 +111,12 @@ public class FloatingActionButton extends Button {
      *
      * @param icon one of the FontImage.MATERIAL_* constants
      * @param text the text of the sub FloatingActionButton
-     * @string uiid the uiid of the FAB
+     * @param uiid the uiid of the FAB
      * @param size the size in millimeters
      */
     protected FloatingActionButton(char icon, String text, String uiid, float size) {
         FontImage image = FontImage.createMaterial(icon, uiid, size);
+        setGap(0);
         image.setBgTransparency(0);
         sizeMm = size;
         setIcon(image);
