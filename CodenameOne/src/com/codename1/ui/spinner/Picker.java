@@ -23,6 +23,7 @@
 
 package com.codename1.ui.spinner;
 
+import com.codename1.components.InteractionDialog;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
@@ -32,6 +33,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -71,12 +73,73 @@ public class Picker extends Button {
     private int minuteStep = 5;
     
     /**
+     * Flag to indicate that the picker should prefer lightweight components 
+     * rather than native components.
+     */
+    private boolean lightweightMode;
+    
+    /**
+     * Checks if the given type is supported in LightWeight mode.  
+     * @param type The type.  Expects one of the Display.PICKER_XXX constants.
+     * @return True if the given type is supported in lightweight mode.
+     */
+    private static boolean isLightweightModeSupportedForType(int type) {
+        switch (type) {
+            case Display.PICKER_TYPE_STRINGS:
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_TIME:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+                return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Sets the picker to use lightweight mode for its widgets.  With this mode enabled
+     * the picker will use cross-platform lightweight widgets instead of native widgets.
+     * @param lightweightMode 
+     */
+    public void setLightweightMode(boolean lightweightMode) {
+        this.lightweightMode = lightweightMode;
+    }
+    
+    /**
+     * Checks if this picker is in lightweight mode.  If this returns true, then the 
+     * picker will use cross-platform lightweight widgets instead of native widgets.
+     */
+    public boolean isLightweightMode() {
+        return lightweightMode;
+    }
+    
+    /**
+     * Check to see if the built-in action listener should ignore a given 
+     * action event.  This allows us to propagate action events
+     * out of the Picker as opposed to detecting clicks on the picker button.
+     * @param evt
+     * @return 
+     */
+    private boolean ignoreActionEvent(ActionEvent evt) {
+        return evt.getX() == -99 && evt.getY() == -99;
+    }
+    
+    /**
      * Default constructor
      */
     public Picker() {
         setUIID("TextField");
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
+                if (ignoreActionEvent(evt)) {
+                    // This was fired from the interaction dialog in lightweight mode
+                    // we don't want to re-handle it here.
+                    return;
+                }
+                if (lightweightMode && isLightweightModeSupportedForType(type)) {
+                    showInteractionDialog();
+                    evt.consume();
+                    return;
+                }
+                
                 if(Display.getInstance().isNativePickerTypeSupported(type)) {
                     
                     switch (type) {
@@ -241,6 +304,126 @@ public class Picker extends Button {
                     updateValue();
                 }
             }
+            
+            private Spinner3D createStringPicker3D() {
+                Spinner3D out = new Spinner3D(new DefaultListModel((String[])metaData));
+                if (value != null) {
+                    out.setValue(value);
+                }
+                //out.refreshStyles();
+                return out;
+            }
+            
+            private DateSpinner3D createDatePicker3D() {
+                DateSpinner3D out = new DateSpinner3D();
+                if (value != null) {
+                    out.setValue(value);
+                } else {
+                    out.setValue(new Date());
+                }
+                return out;
+            }
+            
+            private TimeSpinner3D createTimePicker3D() {
+                TimeSpinner3D out = new TimeSpinner3D();
+                out.setMinuteStep(minuteStep);
+                out.setShowMeridiem(showMeridiem);
+                if (value != null) {
+                    out.setValue(value);
+                } else {
+                    out.setValue(0);
+                }
+                return out;
+            }
+            
+            private DateTimeSpinner3D createDateTimePicker3D() {
+                DateTimeSpinner3D out = new DateTimeSpinner3D();
+                if (value != null) {
+                    out.setValue(value);
+                } else {
+                    out.setValue(new Date());
+                }
+                return out;
+            }
+            
+            private void showInteractionDialog() {
+                final InteractionDialog dlg = new InteractionDialog();
+                dlg.getTitleComponent().setVisible(false);
+                dlg.setUIID("PickerDialog");
+                dlg.getContentPane().setLayout(new BorderLayout());
+                dlg.getContentPane().setUIID("PickerDialogContent");
+                
+                final ISpinner3D spinner;
+                final Component spinnerC;
+                switch (type) {
+                    case Display.PICKER_TYPE_STRINGS:
+                        spinner = createStringPicker3D();
+                        break;
+                    case Display.PICKER_TYPE_DATE:
+                        spinner = createDatePicker3D();
+                        break;
+                    case Display.PICKER_TYPE_TIME:
+                        spinner = createTimePicker3D();
+                        break;
+                    case Display.PICKER_TYPE_DATE_AND_TIME:
+                        spinner = createDateTimePicker3D();
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unsupported picker type "+type);
+                }
+                
+                spinnerC = (Component)spinner;
+                dlg.getContentPane().add(BorderLayout.CENTER, spinnerC);
+                
+                
+                Button doneButton = new Button("Done", "PickerButton");
+                doneButton.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        dlg.disposeToTheBottom();
+                        value = spinner.getValue();
+                        updateValue();
+                        // (x, y) = (-99, -99) signals the built-in action listner
+                        // to ignore this event and just propagage it to external
+                        // listeners.  See ignoreActionEvent(ActionEvent)
+                        fireActionEvent(-99, -99);
+                        
+                    }
+                    
+                });
+                Button cancelButton = new Button("Cancel", "PickerButton");
+                cancelButton.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        dlg.disposeToTheBottom();
+                    }
+                    
+                });
+                
+                Container buttonBar = BorderLayout.centerEastWest(null, doneButton, cancelButton);
+                buttonBar.setUIID("PickerButtonBar");
+                dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
+                
+                Form form = getComponentForm();
+                if (form == null) {
+                    throw new RuntimeException("Attempt to show interaction dialog while button is not on form.  Illegal state");
+                }
+                
+                int top = form.getContentPane().getHeight() - dlg.getPreferredH();
+                int left = 0;
+                int right = 0;
+                int bottom = 0;
+                dlg.setWidth(Display.getInstance().getDisplayWidth());
+                dlg.setHeight(dlg.getPreferredH());
+                dlg.setY(Display.getInstance().getDisplayHeight());
+                dlg.setX(0);
+                dlg.setRepositionAnimation(false);
+                dlg.show(top, bottom, left, right);
+                
+            }
+            
             
             private boolean showDialog(Dialog pickerDlg, Component c) {
                 pickerDlg.addComponent(BorderLayout.CENTER, c);

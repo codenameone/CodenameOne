@@ -173,6 +173,16 @@ public class Rectangle2D implements Shape {
         this.x = x;
         path=null;
     }
+    
+    
+    /**
+     * Sets the x position of the rectangle as a double.
+     * @param x 
+     */
+    public void setX(double x) {
+        this.x = x;
+        path = null;
+    }
 
     /**
      * Sets the y position of the rectangle
@@ -182,6 +192,15 @@ public class Rectangle2D implements Shape {
     public void setY(int y) {
         this.y = y;
         path=null;
+    }
+    
+    /**
+     * Sets the y position of the rectangle as a double.
+     * @param y The y position
+     */
+    public void setY(double y) {
+        this.y = y;
+        path = null;
     }
 
     /**

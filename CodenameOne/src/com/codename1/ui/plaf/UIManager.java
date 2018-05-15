@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.charts.util.ColorUtil;
 import com.codename1.io.Log;
 import com.codename1.ui.*;
 import com.codename1.ui.events.ActionEvent;
@@ -983,6 +984,65 @@ public class UIManager {
         }        
         if(installedTheme == null || !installedTheme.containsKey("TextComponent.derive")) {
             themeProps.put("TextComponent.derive", "Container");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("Spinner3DRow")) {
+            // For the rows of the Spinner3D widget
+            themeProps.put("Spinner3DRow.derive", "Label");
+            themeProps.put("Spinner3DRow.sel#derive", "Label");
+            themeProps.put("Spinner3DRow.fgColor", "878A93");
+            themeProps.put("Spinner3DRow.transparency", "0");
+            themeProps.put("Spinner3DRow.sel#fgColor", "2A2B2F");
+            themeProps.put("Spinner3DRow.border", Border.createEmpty());
+            themeProps.put("Spinner3DRow.align", centerAlign);
+            themeProps.put("Spinner3DRow.sel#align", centerAlign);
+            themeProps.put("Spinner3DRow.padding", "1.5,1.5,1,1");
+            themeProps.put("Spinner3DRow.sel#padding", "1.5,1.5,1,1");
+            themeProps.put("Spinner3DRow.padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            themeProps.put("Spinner3DRow.sel#padUnit", new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});
+            
+            themeProps.put("Spinner3DRow.font", Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 2.8f));
+            themeProps.put("Spinner3DRow.sel#font", Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 2.8f));
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("Spinner3DOverlay")) {
+            themeProps.put("Spinner3DOverlay.border", Border.createCompoundBorder(
+                    Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)),
+                    Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)), Border.createEmpty(), Border.createEmpty()
+            ));
+            themeProps.put("Spinner3DOverlay.transparency", "255");
+            themeProps.put("Spinner3DOverlay.bgColor", "D1D4DD");
+            
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerDialog")) {
+            // For the interaction dialog when showing a Picker in lightweight mode
+            themeProps.put("PickerDialog.padding", "0,0,0,0");
+            themeProps.put("PickerDialog.border", Border.createEmpty());
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerDialogContent")) {
+            // For the content pane of the interaction dialog when showing a Picker in lightweight mode
+            themeProps.put("PickerDialogContent.padding", "0,0,0,0");
+            themeProps.put("PickerDialogContent.margin", "0,0,0,0");
+            themeProps.put("PickerDialogContent.border", Border.createEmpty());
+            themeProps.put("PickerDialogContent.bgColor", "D1D4DD");
+            themeProps.put("PickerDialogContent.transparency", "255");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerButtonBar")) {
+            // For the button bar (with Cancel and Done) of the Picker interaction dialog in lightweight mode
+            themeProps.put("PickerButtonBar.margin", "0,0,0,0");
+            themeProps.put("PickerButtonBar.border", Border.createCompoundBorder(Border.createLineBorder(1, ColorUtil.rgb(148, 150, 151)), Border.createEmpty(), Border.createEmpty(), Border.createEmpty()));
+            themeProps.put("PickerButtonBar.bgColor", "F0F1F3");
+            themeProps.put("PickerButtonBar.transparency", "255");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerButton")) {
+            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
+            themeProps.put("PickerButton.derive", "Button");
+            themeProps.put("PickerButton.sel#derive", "Button");
+            themeProps.put("PickerButton.press#derive", "Button");
         }
     }
 
