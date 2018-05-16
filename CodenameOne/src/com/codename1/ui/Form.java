@@ -40,6 +40,7 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -75,6 +76,8 @@ public class Form extends Container {
     static int rippleY;
     
     ArrayList<Component> buttonsAwatingRelease;
+    
+    private VirtualInputDevice currentInputDevice;
     
     private AnimationManager animMananger = new AnimationManager(this);
     
@@ -227,6 +230,21 @@ public class Form extends Container {
      */
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
+    }
+    
+    /**
+     * Sets the current virtual input device for the form.  This will execute the {@link VirtualInputDevice#close() }
+     * method of the current input device, and then set {@literal device} as the new current input device.
+     * 
+     * <p>Some examples of virtual input devices are the Picker widget and the virtual keyboard.</p>
+     * @param device
+     * @throws Exception 
+     */
+    public void setCurrentInputDevice(VirtualInputDevice device) throws Exception {
+        if (currentInputDevice != null) {
+            currentInputDevice.close();
+        }
+        currentInputDevice = device;
     }
     
     /**
@@ -1873,6 +1891,11 @@ public class Form extends Container {
      * {@inheritDoc}
      */
     void deinitializeImpl() {
+        try {
+            setCurrentInputDevice(null);
+        } catch (Exception ex) {
+            Log.e(ex);
+        }
         super.deinitializeImpl();
         animMananger.flush();
         buttonsAwatingRelease = null;
