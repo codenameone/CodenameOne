@@ -22,9 +22,16 @@
  */
 package com.codename1.ui.spinner;
 
+import com.codename1.ui.CN;
+import static com.codename1.ui.CN.convertToPixels;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.SpinnerNode.RowFormatter;
 import java.util.Calendar;
@@ -131,7 +138,8 @@ class TimeSpinner3D extends Container implements ISpinner3D {
                 }
                 
             });
-           
+            //getAllStyles().setBgColor(hour.getUnselectedStyle().getBgColor());
+            //getAllStyles().setBgTransparency(255);
             addComponents();
         }
     }
@@ -141,20 +149,41 @@ class TimeSpinner3D extends Container implements ISpinner3D {
         
         
         if(amPM != null) {
-            setLayout(new GridLayout(showMeridiem ? 3:2));
+            //setLayout(BoxLayout.x());
+            setLayout(new LayeredLayout());
             addComponent(hour);
             
             addComponent(minute);
-            
+            LayeredLayout ll = (LayeredLayout)getLayout();
             if(showMeridiem) {
                 //content.addComponent(createSeparator());
                 addComponent(amPM);
-            } 
+                ll.setInsets(hour, "0 67% 0 0")
+                        .setInsets(minute, "0 33% 0 33%")
+                        .setInsets(amPM, "0 0 0 67%");
+            }  else {
+                ll.setInsets(hour, "0 50% 0 0")
+                        .setInsets(minute, "0 0 0 50%");
+            }
+            
+            
+            
         }
         setHoursVisible(showHours);
         setMinutesVisible(showMinutes);
 
     }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+        Dimension size = super.calcPreferredSize();
+        Label l = new Label("00  00  AM", "Spinner3DRow");
+        float w = l.getPreferredW() * 1.5f + convertToPixels(10f);
+        size.setWidth((int)w);
+        return size;
+    }
+    
+    
     
     
     /**
@@ -422,4 +451,15 @@ class TimeSpinner3D extends Container implements ISpinner3D {
         setCurrentHour(cld.get(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY));
         setCurrentMeridiem(cld.get(Calendar.AM_PM) == 0 ? false : true);
     }
+
+    @Override
+    public void paint(Graphics g) {
+        int alpha = g.getAlpha();
+        g.setColor(hour.getSelectedOverlayStyle().getBgColor());
+        g.setAlpha(255);
+        g.fillRect(getX(), getY(), getWidth(), getHeight());
+        super.paint(g); //To change body of generated methods, choose Tools | Templates.
+    }
+    
+    
 }

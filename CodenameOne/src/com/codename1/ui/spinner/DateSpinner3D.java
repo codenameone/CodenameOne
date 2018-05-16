@@ -25,8 +25,12 @@ package com.codename1.ui.spinner;
 import com.codename1.l10n.L10NManager;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.CN;
+import static com.codename1.ui.CN.convertToPixels;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Style;
 import java.util.Calendar;
@@ -60,7 +64,7 @@ class DateSpinner3D extends Container implements ISpinner3D {
      * Default constructor
      */
     public DateSpinner3D() {
-        setLayout(new LayeredLayout());
+        setLayout(BoxLayout.x());
         Calendar c = Calendar.getInstance();
         currentDay = c.get(Calendar.DAY_OF_MONTH);
         currentMonth = c.get(Calendar.MONTH) + 1;
@@ -109,13 +113,19 @@ class DateSpinner3D extends Container implements ISpinner3D {
                 }
             });
             addComponents();
+            
+            //getAllStyles().setBgColor(year.getUnselectedStyle().getBgColor());
+            //getAllStyles().setBgTransparency(255);
         }
     }
         
     private void addComponents() {
         if(year != null) {
+            Label l = new Label("December", "Spinner3DRow");
             if(monthDayYear) {
                 addComponent(month);
+                
+                month.setPreferredW((int)(l.getPreferredW() * 1.5f));
                 Style monthStyle = Style.createProxyStyle(month.getRowStyle(), month.getSelectedRowStyle());
                 monthStyle.setAlignment(Component.LEFT);
                 monthStyle.setPaddingLeft(3f);
@@ -127,24 +137,34 @@ class DateSpinner3D extends Container implements ISpinner3D {
                 
                 
                 //addComponent(createSeparator());
+                l.setText("00");
+                day.setPreferredW((int)(l.getPreferredW() * 1.5f) + convertToPixels(3f));
                 addComponent(day);
                 Style dayStyle = Style.createProxyStyle(day.getRowStyle(), day.getSelectedRowStyle());
                 dayStyle.setAlignment(Component.RIGHT);
                 dayStyle.setPaddingRight(3f);
                 //day.refreshStyles();
                 //addComponent(createSeparator());
+                l.setText("0000");
+                year.setPreferredW((int)(l.getPreferredW()*1.5f) + convertToPixels(3f));
                 addComponent(year);
                 
                 Style yearStyle = Style.createProxyStyle(year.getRowStyle(), year.getSelectedRowStyle());
                 yearStyle.setAlignment(Component.RIGHT);
                 yearStyle.setPaddingRight(3f);
                 //year.refreshStyles();
-                LayeredLayout ll = (LayeredLayout)getLayout();
-                ll.setInsets(month, "0 55% 0 0")
-                        .setInsets(day, "0 35% 0 45%")
-                        .setInsets(year, "0 0 0 65%");
+                //LayeredLayout ll = (LayeredLayout)getLayout();
+                //ll.setInsets(month, "0 55% 0 0")
+                //        .setInsets(day, "0 35% 0 45%")
+                //        .setInsets(year, "0 0 0 65%");
 
             } else {
+                month.setPreferredW((int)(l.getPreferredW() * 1.5f));
+                l.setText("00");
+                day.setPreferredW((int)(l.getPreferredW() * 1.5f) + convertToPixels(3f));
+                l.setText("0000");
+                year.setPreferredW((int)(l.getPreferredW()*1.5f) + convertToPixels(3f));
+                
                 addComponent(day);
                 Style dayStyle = Style.createProxyStyle(day.getRowStyle(), day.getSelectedRowStyle());
                 dayStyle.setAlignment(Component.RIGHT);
@@ -165,10 +185,10 @@ class DateSpinner3D extends Container implements ISpinner3D {
                 //year.refreshStyles();
                 
                 addComponent(year);
-                LayeredLayout ll = (LayeredLayout)getLayout();
-                ll.setInsets(day, "0 67% 0 0")
-                        .setInsets(month, "0 33% 0 33%")
-                        .setInsets(year, "0 0 0 67%");
+                //LayeredLayout ll = (LayeredLayout)getLayout();
+                //ll.setInsets(day, "0 67% 0 0")
+                //        .setInsets(month, "0 33% 0 33%")
+                //        .setInsets(year, "0 0 0 67%");
             }
             
         }
@@ -397,6 +417,16 @@ class DateSpinner3D extends Container implements ISpinner3D {
         setCurrentYear(cld.get(Calendar.YEAR));
         
         
+    }
+
+    @Override
+    public void paint(Graphics g) {
+        int alpha = g.getAlpha();
+        g.setColor(year.getSelectedOverlayStyle().getBgColor());
+        g.setAlpha(255);
+        g.fillRect(getX(), getY(), getWidth(), getHeight());
+        g.setAlpha(alpha);
+        super.paint(g); //To change body of generated methods, choose Tools | Templates.
     }
     
     

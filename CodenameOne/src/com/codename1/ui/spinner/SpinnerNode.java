@@ -320,7 +320,7 @@ class SpinnerNode extends Node {
         }
         if (listModel != null) {
             ListModel<String> list = listModel;
-            int len = list.getSize();
+            //int len = list.getSize();
             //for (int i=0; i<len; i++) {
             final Node n = new Node();
             //String lbl = list.getItemAt(i);
@@ -436,8 +436,18 @@ class SpinnerNode extends Node {
                     } else {
                         child.removeTags("selected");
                         int opacity = (int)(Math.cos(angle) * 255);
+                        opacity = Math.min(255, Math.max(0, opacity));
+                        int currOpacity = child.getRenderer().getStyle().getOpacity();
+                        if (opacity != currOpacity) {
+                            Style currUnslectedStyle = child.getRenderer().getUnselectedStyle();
+                            if (currUnslectedStyle == getRowStyle()) {
+                                child.getRenderer().setUnselectedStyle(new Style(currUnslectedStyle));
+                            }
+                            child.getRenderer().getUnselectedStyle().setOpacity(opacity);
+                        }
                         //Log.p("Opacity="+opacity);
-                        child.getRenderer().getStyle().setOpacity(Math.min(255, Math.max(0, opacity)));
+                        
+                        
                     }
                     //System.out.println("Max angle:"+maxAngle);
                     double projectedHeight = Math.abs((diameter/2) * (Math.sin(minAngle) - Math.sin(maxAngle)));
@@ -471,7 +481,11 @@ class SpinnerNode extends Node {
 
     @Override
     public void render(Graphics g) {
-        
+        g.setColor(selectedRowOverlay.getRenderer().getUnselectedStyle().getBgColor());
+        int alpha = g.getAlpha();
+        g.setAlpha(255);
+        g.fillRect(0, 0, (int)boundsInLocal.get().getWidth(), (int)boundsInLocal.get().getHeight());
+        g.setAlpha(alpha);
         super.render(g);
         
         int clipX = g.getClipX();

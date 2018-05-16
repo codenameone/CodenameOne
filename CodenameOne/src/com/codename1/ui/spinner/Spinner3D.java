@@ -9,6 +9,7 @@ import com.codename1.l10n.DateFormat;
 import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.SelectionListener;
@@ -16,6 +17,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.scene.PerspectiveCamera;
 import com.codename1.ui.scene.Scene;
@@ -38,6 +40,7 @@ class Spinner3D extends Container implements ISpinner3D {
     private static class ScrollingContainer extends Container {
         ScrollingContainer() {
             super(BoxLayout.y());
+            getUnselectedStyle().setBorder(Border.createEmpty());
         }
         
         public void setScrollY(int scrollY) {
@@ -79,6 +82,8 @@ class Spinner3D extends Container implements ISpinner3D {
             
         };
         scene.setName("Scene");
+        //getAllStyles().setBgColor(root.getRowStyle().getBgColor());
+        //getUnselectedStyle().setBgTransparency(255);
         
         
         root.boundsInLocal.get().setWidth(Display.getInstance().getDisplayWidth());
@@ -386,6 +391,10 @@ class Spinner3D extends Container implements ISpinner3D {
         return root.getSelectedRowStyle();
     }
     
+    public Style getSelectedOverlayStyle() {
+        return root.getSelectedOverlayStyle();
+    }
+    
     //public void refreshStyles() {
     //    root.refreshStyles();
     //}
@@ -417,4 +426,17 @@ class Spinner3D extends Container implements ISpinner3D {
             }
         }
     }
+
+    @Override
+    public void paint(Graphics g) {
+        int alpha = g.getAlpha();
+        g.setColor(root.getSelectedOverlayStyle().getBgColor());
+        g.setAlpha(255);
+        g.fillRect(getX(), getY(), getWidth(), getHeight());
+        g.setAlpha(alpha);
+        super.paint(g);
+        
+    }
+    
+    
 }

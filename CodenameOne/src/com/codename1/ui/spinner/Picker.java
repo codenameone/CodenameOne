@@ -34,11 +34,13 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.UIManager;
 import java.util.Calendar;
 import java.util.Date;
@@ -347,11 +349,21 @@ public class Picker extends Button {
             }
             
             private void showInteractionDialog() {
+                boolean isTablet = Display.getInstance().isTablet();
                 final InteractionDialog dlg = new InteractionDialog();
+                
                 dlg.getTitleComponent().setVisible(false);
-                dlg.setUIID("PickerDialog");
+                dlg.setUIID(isTablet ? "PickerDialogTablet" : "PickerDialog");
+                if (isTablet) {
+                    dlg.getUnselectedStyle().setBgColor(new Label("", "Spinner3DOverlay").getUnselectedStyle().getBgColor());
+                    dlg.getUnselectedStyle().setBgTransparency(255);
+                    dlg.getUnselectedStyle().setBorder(RoundRectBorder.create().cornerRadius(2f));
+                    
+                }
                 dlg.getContentPane().setLayout(new BorderLayout());
-                dlg.getContentPane().setUIID("PickerDialogContent");
+                
+                String dlgUiid = isTablet ? "PickerDialogContentTablet" : "PickerDialogContent";
+                dlg.getContentPane().setUIID(dlgUiid);
                 
                 final ISpinner3D spinner;
                 final Component spinnerC;
@@ -376,7 +388,7 @@ public class Picker extends Button {
                 dlg.getContentPane().add(BorderLayout.CENTER, spinnerC);
                 
                 
-                Button doneButton = new Button("Done", "PickerButton");
+                Button doneButton = new Button("Done", isTablet? "PickerButtonTablet" : "PickerButton");
                 doneButton.addActionListener(new ActionListener() {
 
                     @Override
@@ -392,7 +404,7 @@ public class Picker extends Button {
                     }
                     
                 });
-                Button cancelButton = new Button("Cancel", "PickerButton");
+                Button cancelButton = new Button("Cancel", isTablet ? "PickerButtonTablet" : "PickerButton");
                 cancelButton.addActionListener(new ActionListener() {
 
                     @Override
@@ -403,7 +415,7 @@ public class Picker extends Button {
                 });
                 
                 Container buttonBar = BorderLayout.centerEastWest(null, doneButton, cancelButton);
-                buttonBar.setUIID("PickerButtonBar");
+                buttonBar.setUIID(isTablet ? "PickerButtonBarTablet" : "PickerButtonBar");
                 dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);
                 
                 Form form = getComponentForm();
@@ -420,7 +432,12 @@ public class Picker extends Button {
                 dlg.setY(Display.getInstance().getDisplayHeight());
                 dlg.setX(0);
                 dlg.setRepositionAnimation(false);
-                dlg.show(top, bottom, left, right);
+                
+                if (Display.getInstance().isTablet()) {
+                    dlg.showPopupDialog(Picker.this);
+                } else {
+                    dlg.show(top, bottom, left, right);
+                }
                 
             }
             

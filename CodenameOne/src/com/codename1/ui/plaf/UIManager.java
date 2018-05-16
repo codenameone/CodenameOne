@@ -1021,6 +1021,10 @@ public class UIManager {
             themeProps.put("PickerDialog.border", Border.createEmpty());
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("PickerDialogTablet")) {
+            themeProps.put("PickerDialogTablet.derive", "Dialog");
+        }
+        
         if (installedTheme == null || !installedTheme.containsKey("PickerDialogContent")) {
             // For the content pane of the interaction dialog when showing a Picker in lightweight mode
             themeProps.put("PickerDialogContent.padding", "0,0,0,0");
@@ -1028,6 +1032,10 @@ public class UIManager {
             themeProps.put("PickerDialogContent.border", Border.createEmpty());
             themeProps.put("PickerDialogContent.bgColor", "D1D4DD");
             themeProps.put("PickerDialogContent.transparency", "255");
+        }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PicketDialogContentTablet")) {
+            themeProps.put("PickerDialogContentTablet.derive", "PopupContentPane");
         }
         
         if (installedTheme == null || !installedTheme.containsKey("PickerButtonBar")) {
@@ -1038,12 +1046,25 @@ public class UIManager {
             themeProps.put("PickerButtonBar.transparency", "255");
         }
         
+        if (installedTheme == null || !installedTheme.containsKey("PickerButtonBarTablet")) {
+            themeProps.put("PickerButtonBarTablet.derive", "Container");
+        }
+        
         if (installedTheme == null || !installedTheme.containsKey("PickerButton")) {
             // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
             themeProps.put("PickerButton.derive", "Button");
             themeProps.put("PickerButton.sel#derive", "Button");
             themeProps.put("PickerButton.press#derive", "Button");
         }
+        
+        if (installedTheme == null || !installedTheme.containsKey("PickerButtonTablet")) {
+            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
+            themeProps.put("PickerButtonTablet.derive", "Button");
+            themeProps.put("PickerButtonTablet.sel#derive", "Button");
+            themeProps.put("PickerButtonTablet.press#derive", "Button");
+        }
+        
+        
     }
 
     /**

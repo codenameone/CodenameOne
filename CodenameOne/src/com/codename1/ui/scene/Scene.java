@@ -25,6 +25,7 @@ package com.codename1.ui.scene;
 import com.codename1.properties.Property;
 import com.codename1.ui.Component;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Border;
 
 /**
  * A scene graph.  Supports 3D on platforms where {@link com.codename1.ui.Transform#isPerspectiveSupported() } is true (iOS and Android currently).
@@ -40,6 +41,7 @@ public class Scene extends Component {
     public final Property<Camera,Scene> camera;
     
     public Scene() {
+        setUIID("Scene");
         camera = new Property<Camera,Scene>("camera", (Camera)null);
     }
     
