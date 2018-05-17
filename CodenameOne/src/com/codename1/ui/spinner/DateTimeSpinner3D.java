@@ -42,7 +42,7 @@ import java.util.Date;
  *
  * @author Steve Hannah
  */
-class DateTimeSpinner3D extends Container implements ISpinner3D {
+class DateTimeSpinner3D extends Container implements InternalPickerWidget {
     private Spinner3D date;
     private TimeSpinner3D time;
     private Date today = new Date();

@@ -32,7 +32,7 @@ import java.util.Date;
  * This is used by the Picker widget when in lightweight mode.
  * @author Steve Hannah
  */
-class Spinner3D extends Container implements ISpinner3D {
+class Spinner3D extends Container implements InternalPickerWidget {
     private SpinnerNode root;
     
     private Scene scene; 

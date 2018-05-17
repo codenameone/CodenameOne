@@ -137,6 +137,12 @@ public class Picker extends Button {
      */
     public Picker() {
         setUIID("TextField");
+        if (!Display.getInstance().isNativePickerTypeSupported(Display.PICKER_TYPE_STRINGS)) {
+            // For platforms that don't support native pickers, we'll make lightweight mode
+            // the default.  This will result in these platforms using the new Spinner3D classes
+            // instead of the old Spinner classes
+            lightweightMode = true;
+        }
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
                 if (ignoreActionEvent(evt)) {
@@ -393,7 +399,7 @@ public class Picker extends Button {
                 dlg.getContentPane().setUIID(dlgUiid);
                 dlg.getContentPane().getUnselectedStyle().setBgColor(new Label("", "Spinner3DOverlay").getUnselectedStyle().getBgColor());
                 
-                final ISpinner3D spinner;
+                final InternalPickerWidget spinner;
                 final Component spinnerC;
                 switch (type) {
                     case Display.PICKER_TYPE_STRINGS:

@@ -45,7 +45,7 @@ import java.util.Date;
  * 
  * @author Steve Hannah
  */
-class TimeSpinner3D extends Container implements ISpinner3D {
+class TimeSpinner3D extends Container implements InternalPickerWidget {
     private Spinner3D hour;
     private Spinner3D minute;
     private Spinner3D amPM;

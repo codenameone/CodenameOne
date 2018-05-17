@@ -27,7 +27,7 @@ package com.codename1.ui.spinner;
  * by the Picker.
  * @author shannah
  */
-interface ISpinner3D {
+interface InternalPickerWidget {
     public void setValue(Object value);
     public Object getValue();
 }
