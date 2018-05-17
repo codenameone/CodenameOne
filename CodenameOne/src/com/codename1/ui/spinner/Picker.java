@@ -99,6 +99,7 @@ public class Picker extends Button {
             case Display.PICKER_TYPE_DURATION:
             case Display.PICKER_TYPE_DURATION_HOURS:
             case Display.PICKER_TYPE_DURATION_MINUTES:
+            case Display.PICKER_TYPE_CALENDAR:
                 return true;
         }
         return false;
@@ -208,6 +209,11 @@ public class Picker extends Button {
                             }
                             break;
                         }
+                        case Display.PICKER_TYPE_CALENDAR:
+                            showInteractionDialog();
+                            evt.consume();
+                            break;
+                                
                         case Display.PICKER_TYPE_DATE: {
                             DateSpinner ds = new DateSpinner();
                             if(value == null) {
@@ -342,6 +348,18 @@ public class Picker extends Button {
                 return out;
             }
             
+            private CalendarPicker createCalendarPicker() {
+                
+                CalendarPicker out = new CalendarPicker();
+                if (value != null) {
+                    out.setValue(value);
+                } else {
+                    out.setValue(new Date());
+                }
+            
+                return out;
+            }
+            
             private TimeSpinner3D createTimePicker3D() {
                 TimeSpinner3D out = new TimeSpinner3D();
                 out.setMinuteStep(minuteStep);
@@ -404,6 +422,9 @@ public class Picker extends Button {
                 switch (type) {
                     case Display.PICKER_TYPE_STRINGS:
                         spinner = createStringPicker3D();
+                        break;
+                    case Display.PICKER_TYPE_CALENDAR:
+                        spinner = createCalendarPicker();
                         break;
                     case Display.PICKER_TYPE_DATE:
                         spinner = createDatePicker3D();
@@ -758,6 +779,7 @@ public class Picker extends Button {
                 setText(value.toString());
                 break;
             }
+            case Display.PICKER_TYPE_CALENDAR:
             case Display.PICKER_TYPE_DATE: {
                 setText(L10NManager.getInstance().formatDateShortStyle((Date)value));
                 break;
