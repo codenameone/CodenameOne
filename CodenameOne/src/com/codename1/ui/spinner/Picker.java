@@ -96,6 +96,9 @@ public class Picker extends Button {
             case Display.PICKER_TYPE_DATE:
             case Display.PICKER_TYPE_TIME:
             case Display.PICKER_TYPE_DATE_AND_TIME:
+            case Display.PICKER_TYPE_DURATION:
+            case Display.PICKER_TYPE_DURATION_HOURS:
+            case Display.PICKER_TYPE_DURATION_MINUTES:
                 return true;
         }
         return false;
@@ -355,6 +358,20 @@ public class Picker extends Button {
                 return out;
             }
             
+            private DurationSpinner3D createDurationPicker3D() {
+                DurationSpinner3D out = new DurationSpinner3D(
+                        type == Display.PICKER_TYPE_DURATION_MINUTES ? DurationSpinner3D.FIELD_MINUTE :
+                        type == Display.PICKER_TYPE_DURATION_HOURS ? DurationSpinner3D.FIELD_HOUR :
+                                DurationSpinner3D.FIELD_HOUR | DurationSpinner3D.FIELD_MINUTE
+                );
+                if (value != null) {
+                    out.setValue(value);
+                } else {
+                    out.setValue(0);
+                }
+                return out;
+            }
+            
             private void showInteractionDialog() {
                 boolean isTablet = Display.getInstance().isTablet();
                 final InteractionDialog dlg = new InteractionDialog();
@@ -390,6 +407,11 @@ public class Picker extends Button {
                         break;
                     case Display.PICKER_TYPE_DATE_AND_TIME:
                         spinner = createDateTimePicker3D();
+                        break;
+                    case Display.PICKER_TYPE_DURATION:
+                    case Display.PICKER_TYPE_DURATION_HOURS:
+                    case Display.PICKER_TYPE_DURATION_MINUTES:
+                        spinner = createDurationPicker3D();
                         break;
                     default:
                         throw new IllegalArgumentException("Unsupported picker type "+type);
