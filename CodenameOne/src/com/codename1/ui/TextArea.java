@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
@@ -34,6 +35,7 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 import com.codename1.ui.util.UITimer;
+import java.io.IOException;
 import java.util.ArrayList;
 
 /**
@@ -587,6 +589,7 @@ public class TextArea extends Component {
             }
             Display d = Display.getInstance();
             if(action == 0 && isTypedKey(keyCode)) {
+                registerAsInputDevice();
                 Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText(), keyCode);
             }
         }
@@ -615,6 +618,7 @@ public class TextArea extends Component {
     void editString() {
         if(autoDegradeMaxSize && (!hadSuccessfulEdit) && (maxSize > 1024)) {
             try {
+                registerAsInputDevice();
                 Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText());
             } catch(IllegalArgumentException err) {
                 maxSize -= 1024;
@@ -622,6 +626,7 @@ public class TextArea extends Component {
                 editString();
             }
         } else {
+            registerAsInputDevice();
             Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText());
         }
     }
@@ -1742,11 +1747,36 @@ public class TextArea extends Component {
     }
     
 
+    protected void registerAsInputDevice() {
+        final TextArea cmp = this;
+        Form f = this.getComponentForm();
+        if (f != null && Display.impl.getEditingText() != this) {
+            try {
+                f.setCurrentInputDevice(new VirtualInputDevice() {
+
+                    @Override
+                    public void close() throws Exception {
+                        if (cmp.isEditing()) {
+                            cmp.stopEditing();
+                        }
+                    }
+                });
+            } catch (Exception ex) {
+                Log.e(ex);
+                // Failed to edit string because the previous input device would not
+                // give up control
+                return;
+            }
+        }
+    }
+    
     /**
      * Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
      */
     public void startEditing() {
         if(!Display.getInstance().isTextEditing(this)) {
+            final TextArea cmp = this;
+            registerAsInputDevice();
             Display.getInstance().editString(this, maxSize, constraint, text);
         }
     }
@@ -1770,6 +1800,7 @@ public class TextArea extends Component {
                         UITimer.timer(30, false, new Runnable() {
                             public void run() {
                                 ta.repaint();
+                                registerAsInputDevice();
                                 Display.getInstance().editString(TextArea.this, maxSize, constraint, text);
                             }
                         });
@@ -1779,6 +1810,7 @@ public class TextArea extends Component {
             }
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
+                    registerAsInputDevice();
                     Display.getInstance().editString(TextArea.this, maxSize, constraint, text);
                 }
             });

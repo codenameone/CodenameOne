@@ -273,14 +273,21 @@ public class InteractionDialog extends Container {
     public void show(int top, int bottom, int left, int right) {
         disposed = false;
         Form f = Display.getInstance().getCurrent();
-        getUnselectedStyle().setMargin(TOP, top);
-        getUnselectedStyle().setMargin(BOTTOM, bottom);
-        getUnselectedStyle().setMargin(LEFT, left);
-        getUnselectedStyle().setMargin(RIGHT, right);
-        getUnselectedStyle().setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        Style unselectedStyle = getUnselectedStyle();
+        
+        unselectedStyle.setMargin(TOP, top);
+        unselectedStyle.setMargin(BOTTOM, bottom);
+        unselectedStyle.setMargin(LEFT, left);
+        unselectedStyle.setMargin(RIGHT, right);
+        unselectedStyle.setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
         
         // might occur when showing the dialog twice...
         remove();
+        
+        // We issue a revalidate in case this is the first time the layered pane 
+        // appears in the form.  Without this, the "show" animation won't work 
+        // the first time.
+        getLayeredPane(f).revalidate();
         
         getLayeredPane(f).addComponent(BorderLayout.center(this));
         if(animateShow) {
@@ -361,12 +368,53 @@ public class InteractionDialog extends Container {
      * Removes the interaction dialog from view with an animation to the left
      */
     public void disposeToTheLeft() {
+        disposeTo(Component.LEFT);
+    }
+    
+    /**
+     * Removes the interaction dialog from view with an animation to the bottom
+     */
+    public void disposeToTheBottom() {
+        disposeTo(Component.BOTTOM);
+    }
+    
+    /**
+     * Removes the interaction dialog from view with an animation to the top
+     */
+    public void disposeToTheTop() {
+        disposeTo(Component.TOP);
+    }
+    
+    /**
+     * Removes the interaction dialog from view with an animation to the right
+     */
+    public void disposeToTheRight() {
+        disposeTo(Component.RIGHT);
+    }
+    
+    
+    private void disposeTo(int direction) {
         disposed = true;
         final Container p = getParent();
         if(p != null) {
             final Form f = p.getComponentForm();
             if(f != null) {
-                setX(-getWidth());
+                switch (direction) {
+                    case Component.LEFT:
+                        setX(-getWidth());
+                        break;
+                    case Component.TOP:
+                        setY(-getHeight());
+                        break;
+                    case Component.RIGHT:
+                        setX(Display.getInstance().getDisplayWidth());
+                        break;
+                    case Component.BOTTOM:
+                        setY(Display.getInstance().getDisplayHeight());
+                        break;
+                        
+                }
+                
                 if(animateShow) {
                     p.animateUnlayout(400, 255, new Runnable() {
                         public void run() {
