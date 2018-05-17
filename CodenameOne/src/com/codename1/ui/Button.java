@@ -216,6 +216,41 @@ public class Button extends Label {
     public Button(Image icon) {
         this("", icon);
     }
+
+    /**
+     * Constructs a button with the specified material image icon.
+     * 
+     * @param icon appearing on the button
+     */
+    public Button(char icon) {
+        this("");
+        setMaterialIcon(icon);
+    }
+
+    /**
+     * Constructor a button with text, material image and uiid
+     * 
+     * @param text label appearing on the button
+     * @param icon image appearing on the button
+     * @param id UIID unique identifier for button
+     */
+    public Button(String text, char icon, String id) {
+        this(text, null, id);
+        setMaterialIcon(icon);
+    }
+
+    /**
+     * Constructor a button with text, material image and uiid
+     * 
+     * @param text label appearing on the button
+     * @param icon image appearing on the button
+     * @param iconSize image size in millimeters
+     * @param id UIID unique identifier for button
+     */
+    public Button(String text, char icon, float iconSize, String id) {
+        this(text, null, id);
+        setMaterialIcon(icon, iconSize);
+    }
     
     /**
      * Constructor a button with text, image and uiid
@@ -257,6 +292,29 @@ public class Button extends Label {
      */
     public Button(Image icon, String id) {
         this("", icon, id);
+    }
+    
+    /**
+     * Constructor a button with material image icon and UIID
+     * 
+     * @param icon image appearing on the button
+     * @param id UIID unique identifier for button
+     */
+    public Button(char icon, String id) {
+        this("", id);
+        setMaterialIcon(icon);
+    }
+    
+    /**
+     * Constructor a button with material image icon and UIID
+     * 
+     * @param icon image appearing on the button
+     * @param iconSize the size of the icon in millimeters
+     * @param id UIID unique identifier for button
+     */
+    public Button(char icon, float iconSize, String id) {
+        this("", id);
+        setMaterialIcon(icon, iconSize);
     }
     
     /**
