@@ -59,6 +59,16 @@ public class InstantUI {
     public void excludeProperty(PropertyBase exclude) {
         exclude.putClientProperty("cn1$excludeFromUI", Boolean.TRUE);
     }
+
+    /**
+     * Excludes the properties from the generated UI
+     * @param exclude the properties to exclude
+     */
+    public void excludeProperties(PropertyBase... exclude) {
+        for(PropertyBase p : exclude) {
+            p.putClientProperty("cn1$excludeFromUI", Boolean.TRUE);
+        }
+    }
     
     /**
      * Returns true if the property was excluded from the GUI
