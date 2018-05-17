@@ -24,6 +24,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.io.Log;
+import com.codename1.ui.CN1Constants;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
@@ -1074,16 +1075,61 @@ public class Resources {
     Image readMultiImage(DataInputStream input, boolean skipAll) throws IOException {
         EncodedImage resultImage = null;
         if(dpi == -1) {
-            dpi = Display.getInstance().getDeviceDensity();
+            dpi = Display.getInstance().getDeviceDPI();
         }
         int dpiCount = input.readInt();
-        int bestFitOffset = 0;
-        int bestFitDPI = 0;
         int[] lengths = new int[dpiCount];
         int[] dpis = new int[dpiCount];
+        //Choose the ressource that is closest in resolution to the device DPI
+        int bestFitOffset = 0;
+        int bestFitDPI = 0;
+        float bestFitDPIDist = Float.MAX_VALUE;
+        for(int iter = 0 ; iter < dpiCount ; iter++) {
+        	int currentDPI = convertDensityToDPI(input.readInt());
+            lengths[iter] = input.readInt();
+            dpis[iter] = currentDPI;
+            if(dpi == currentDPI) {
+            	bestFitDPI = currentDPI;
+            	bestFitDPIDist = 0;
+                bestFitOffset = iter;
+            }
+            else
+            {
+	            //Compute a pseudo distance between the device DPI resolution and the ressource resolution
+	            float currentDPIDist = Math.abs((float) (currentDPI-dpi)/dpi);
+	            boolean better = false;
+	            if (bestFitDPI != dpi) { //else we already found a resource that match exactly the device resolution
+	            	if ((currentDPI>dpi && bestFitDPI<dpi) || (currentDPI<dpi && bestFitDPI>dpi)) { //one resolution is higher than the device DPI and one is lower 
+		            	//We will roughly compare them (by steps of 25%) instead of exactly to avoid situations where one is just a few percents closer than the other 
+		            	if ((int) (currentDPIDist*100.0/25.0) == (int) (bestFitDPIDist*100.0/25.0)) { //they are roughly at the same distance. 
+		            		if (currentDPI < bestFitDPI) { //We keep the one with lowest resolution to lower memory footprint
+		            			better = true;
+		            		}
+		            	}
+		            	else { //one is clearly closer than the other
+		            		if (currentDPIDist < bestFitDPIDist) { //we keep the closest one
+		            			better = true;
+		            		}
+		            	}
+	            	}
+	            	else { //Both resolutions are either lower or higher than the device DPI. So we just have to compare the distances to pick the closest one
+	            		if (currentDPIDist <  bestFitDPIDist) {
+	            			better = true;
+	            		}
+	            	}
+	            }
+	            if (better)
+				{
+	            	bestFitDPI = currentDPI;
+	            	bestFitDPIDist = currentDPIDist;
+	                bestFitOffset = iter;
+	            }
+            }
+        }
+        /*
         boolean found = false;
         for(int iter = 0 ; iter < dpiCount ; iter++) {
-            int currentDPI = input.readInt();
+            int currentDPI = convertDensityToDPI(input.readInt());
             lengths[iter] = input.readInt();
             dpis[iter] = currentDPI;
             if(bestFitDPI != dpi && dpi >= currentDPI && currentDPI >= bestFitDPI) {
@@ -1104,7 +1150,7 @@ public class Resources {
                 }
             }
         }
-        
+        */
         if(runtimeMultiImages && !skipAll) {
             byte[][] data = new byte[dpiCount][];
             for(int iter = 0 ; iter < lengths.length ; iter++) {
@@ -1130,6 +1176,36 @@ public class Resources {
 
         return resultImage;
     }
+    
+    /**
+     * Function used to convert old density constant (an int between 10 and 80) to its matching new density constant (expressed in DPI)
+    **/
+    private static int convertDensityToDPI(int density) {
+    	if (density<=80) { //must be an old density value
+	    	switch(density) {
+	    		case 10: //DENSITY_VERY_LOW
+	    			return CN1Constants.DPI_VERY_LOW;
+	    		case 20: //DENSITY_LOW
+	    			return CN1Constants.DPI_LOW;
+	    		case 30: //DENSITY_MEDIUM
+	    			return CN1Constants.DPI_MEDIUM;
+	    		case 40: //DENSITY_HIGH
+	    			return CN1Constants.DPI_HIGH;
+	    		case 50: //DENSITY_VERY_HIGH
+	    			return CN1Constants.DPI_XHIGH; 
+	    		case 60: //DENSITY_HD
+	    			return CN1Constants.DPI_XXHIGH; 
+	    		case 65: //DENSITY_560
+	    			return CN1Constants.DPI_XXXHIGH;
+	    		case 70: //DENSITY_2HD
+	    			return CN1Constants.DPI_2HD;
+	    		case 80: //DENSITY_4K
+	    			return CN1Constants.DPI_4K;	
+	    	}
+    	}
+    	return density;
+    }
+    
 
     void loadSVGRatios(DataInputStream input) throws IOException {
         input.readFloat();

@@ -29,52 +29,61 @@ package com.codename1.ui;
  * @author Shai Almog
  */
 public class CN1Constants {
-    /**
+    
+	/**
      * Very Low Density 176x220 And Smaller
      */
     public static final int DENSITY_VERY_LOW = 10;
+	public static final int DPI_VERY_LOW = 88; 	//72 
 
     /**
      * Low Density Up To 240x320
      */
     public static final int DENSITY_LOW = 20;
+	public static final int DPI_LOW = 120;		//96 
 
     /**
      * Medium Density Up To 360x480
      */
     public static final int DENSITY_MEDIUM = 30;
-
+	public static final int DPI_MEDIUM = 160;	//150
+	
     /**
      * Hi Density Up To 480x854
      */
     public static final int DENSITY_HIGH = 40;
-
+	public static final int DPI_HIGH = 240;		//220
+	
     /**
      * Very Hi Density Up To 1440x720
      */
     public static final int DENSITY_VERY_HIGH = 50;
-
+	public static final int DPI_XHIGH = 320; 	//320 
+	
     /**
      * HD Up To 1920x1080
      */
     public static final int DENSITY_HD = 60;
-
+	public static final int DPI_XXHIGH = 480; 	//420
+	 
     /**
      * Intermediate density for screens that sit somewhere between HD to 2HD
      */
     public static final int DENSITY_560 = 65;
-    
+	public static final int DPI_XXXHIGH = 640; 
+	
     /**
      * Double the HD level density
      */
     public static final int DENSITY_2HD = 70;
-
+	public static final int DPI_2HD = 960;
+	
     /**
      * 4K level density 
      */
     public static final int DENSITY_4K = 80;
-
-
+	public static final int DPI_4K = 1280;
+    
     /**
      * Date native picker type, it returns a java.util.Date result.
      */

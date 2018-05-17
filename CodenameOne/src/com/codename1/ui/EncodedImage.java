@@ -235,10 +235,50 @@ public class EncodedImage extends Image {
         if(imageData.length == 1) {
             return imageData[0];
         }
-        int dpi = Display.getInstance().getDeviceDensity();
+        int dpi = Display.getInstance().getDeviceDPI();
         int bestFitOffset = 0;
         int bestFitDPI = 0;
+        float bestFitDPIDist = Float.MAX_VALUE;
         int dlen = dpis.length;
+        for(int iter = 0 ; iter < dlen ; iter++) {
+            int currentDPI = dpis[iter];
+            if(dpi == currentDPI) {
+            	//bestFitDPI = currentDPI;
+            	//bestFitDPIDist = 0;
+                bestFitOffset = iter;
+                break;
+            }
+            //Compute a pseudo distance between the device DPI resolution and the ressource resolution
+            float currentDPIDist = Math.abs((float) (currentDPI-dpi)/dpi);
+            boolean better = false;
+            if (bestFitDPI != dpi) { //else we already found a resource that match exactly the device resolution
+            	if ((currentDPI>dpi && bestFitDPI<dpi) || (currentDPI<dpi && bestFitDPI>dpi)) { //one resolution is higher than the device DPI and one is lower 
+	            	//We will roughly compare them (by steps of 25%) instead of exactly to avoid situations where one is just a few percents closer than the other 
+	            	if ((int) (currentDPIDist*100.0/25.0) == (int) (bestFitDPIDist*100.0/25.0)) { //they are roughly at the same distance. 
+	            		if (currentDPI < bestFitDPI) { //We keep the one with lowest resolution to lower memory footprint
+	            			better = true;
+	            		}
+	            	}
+	            	else { //one is clearly closer than the other
+	            		if (currentDPIDist < bestFitDPIDist) { //we keep the closest one
+	            			better = true;
+	            		}
+	            	}
+            	}
+            	else { //Both resolutions are either lower or higher than the device DPI. So we just have to compare the distances to pick the closest one
+            		if (currentDPIDist <  bestFitDPIDist) {
+            			better = true;
+            		}
+            	}
+            }
+            if (better)
+			{
+            	bestFitDPI = currentDPI;
+            	bestFitDPIDist = currentDPIDist;
+                bestFitOffset = iter;
+            }
+        }
+        /*
         for(int iter = 0 ; iter < dlen ; iter++) {
             int currentDPI = dpis[iter];
             if(dpi == currentDPI) {
@@ -250,6 +290,7 @@ public class EncodedImage extends Image {
                 bestFitOffset = iter;
             }
         }
+        */
         lastTestedDPI = dpi;
         return imageData[bestFitOffset];
     }
@@ -329,7 +370,7 @@ public class EncodedImage extends Image {
 
     private Image getInternalImpl() {
         
-        if(imageData != null && imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDensity()) {
+        if(imageData != null && imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDPI()) {
             hardCache = null;
             cache = null;
             width = -1;
