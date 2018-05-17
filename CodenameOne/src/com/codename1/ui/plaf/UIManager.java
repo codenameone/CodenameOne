@@ -1006,12 +1006,13 @@ public class UIManager {
         }
         
         if (installedTheme == null || !installedTheme.containsKey("Spinner3DOverlay")) {
-            themeProps.put("Spinner3DOverlay.border", Border.createCompoundBorder(
-                    Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)),
-                    Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)), Border.createEmpty(), Border.createEmpty()
-            ));
+            //themeProps.put("Spinner3DOverlay.border", Border.createCompoundBorder(
+            //        Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)),
+            //        Border.createLineBorder(1, ColorUtil.rgb(171, 184, 183)), Border.createEmpty(), Border.createEmpty()
+            //));
             themeProps.put("Spinner3DOverlay.transparency", "255");
-            themeProps.put("Spinner3DOverlay.bgColor", "D1D4DD");
+            themeProps.put("Spinner3DOverlay.bgColor", "efeff4");
+            themeProps.put("Spinner3DOverlay.fgColor", "abb8b7");
             
         }
         

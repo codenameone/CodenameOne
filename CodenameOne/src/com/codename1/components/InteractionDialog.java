@@ -25,6 +25,10 @@ package com.codename1.components;
 
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
+import static com.codename1.ui.Component.BOTTOM;
+import static com.codename1.ui.Component.LEFT;
+import static com.codename1.ui.Component.RIGHT;
+import static com.codename1.ui.Component.TOP;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -254,7 +258,31 @@ public class InteractionDialog extends Container {
         }
     }
     
-    
+    public void resize(final int top, final int bottom, final int left, final int right) {
+        if (!disposed) {
+            final Form f = Display.getInstance().getCurrent();
+            
+            Style unselectedStyle = getUnselectedStyle();
+
+            unselectedStyle.setMargin(TOP, Math.max(0, top));
+            unselectedStyle.setMargin(BOTTOM, Math.max(0, bottom));
+            unselectedStyle.setMargin(LEFT, Math.max(0, left));
+            unselectedStyle.setMargin(RIGHT, Math.max(0, right));
+            unselectedStyle.setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+
+            getParent().setX(getX());
+            getParent().setY(getY());
+            setX(0);
+            setY(0);
+            getParent().setWidth(getWidth());
+            getParent().setHeight(getHeight());
+            
+            getLayeredPane(f).animateLayout(400);
+            
+
+            
+        }
+    }
     
     /**
      * This method shows the form as a modal alert allowing us to produce a behavior
