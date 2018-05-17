@@ -23,9 +23,9 @@
 package com.codename1.ui.scene;
 
 import com.codename1.properties.Property;
-import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.GeneralPath;
@@ -70,14 +70,17 @@ public class Node {
     /**
      * The component that should be rendered inside this node.
      */
-    private Component renderer;
+    //private Component renderer;
+    NodePainter renderer;
+    
+    private Style style;
     
     /**
      * Private wrapper around the renderer component.  This gives us
      * access to some package-private methods in Component that we need to use
      * for rendering.
      */
-    private RenderableContainer rendererCnt;
+    //private RenderableContainer rendererCnt;
     
     /**
      * Flag of whether to render the component onto an image buffer before rendering.
@@ -148,7 +151,10 @@ public class Node {
              * {@link #localCanvasZ} to something other than 0 since the node will be rotated at its 
              * center point.
              */
-            localCanvasZ;
+            localCanvasZ,
+            
+            opacity
+            ;
     
     /**
      * The rotation axis around which rotations should be performed. (0, 0, 1) results in a rotation
@@ -196,6 +202,7 @@ public class Node {
         localCanvasZ = new Property<Double,Node>("localCanvasZ", 0.0);
         visible = new Property<Boolean,Node>("visible", true);
         paintingRect = new Property<Rectangle,Node>("paintingRect", (Rectangle)null);
+        opacity = new Property<Double,Node>("opacity", 1.0);
         
     }
     
@@ -352,6 +359,20 @@ public class Node {
     public void setNeedsLayout(boolean needsLayout) {
         this.needsLayout = needsLayout;
     }
+
+    /**
+     * @return the style
+     */
+    public Style getStyle() {
+        return style;
+    }
+
+    /**
+     * @param style the style to set
+     */
+    public void setStyle(Style style) {
+        this.style = style;
+    }
     
     
     
@@ -374,6 +395,8 @@ public class Node {
                 paintComponentBackground(g);
                 paint(g);
                 paintBorder(g);
+                g.setColor(0xff0000);
+                g.drawRect(getX(), getY(), getWidth()-1, getHeight()-1);
             } catch (Throwable t) {
                 
             }
@@ -385,15 +408,8 @@ public class Node {
      * Sets the component that should be used to render the node's contents.
      * @param comp 
      */
-    public void setRenderer(Component comp) {
-        if (rendererCnt == null) {
-            rendererCnt = new RenderableContainer();
-        }
-        rendererCnt.removeAll();
-        rendererCnt.add(BorderLayout.CENTER, comp);
+    public void setRenderer(NodePainter comp) {
         renderer = comp;
-        boundsInLocal.get().setWidth(rendererCnt.getPreferredW());
-        boundsInLocal.get().setHeight(rendererCnt.getPreferredH());
     }
     
     private Rectangle getPaintingRect() {
@@ -462,25 +478,41 @@ public class Node {
         newT.concatenate(getLocalToSceneTransform());
         newT.translate(-scene.getAbsoluteX(), -scene.getAbsoluteY());
         g.setTransform(newT);
+        int alpha = g.getAlpha();
+        int nodeAlpha = (int)Math.round(alpha * opacity.get());
+        nodeAlpha = Math.max(Math.min(255, nodeAlpha), 0);
+        g.setAlpha(nodeAlpha);
         try {
+            
             if (renderer != null) {
                 Rectangle paintingRect = getPaintingRect();
                 //System.out.println("Rendering on paint rect "+paintingRect);
                 //System.out.println("Renderer: "+renderer);
-                rendererCnt.setX(paintingRect.getX());
-                rendererCnt.setY(paintingRect.getY());
-                rendererCnt.setWidth(Math.max(0, paintingRect.getWidth()));
-                rendererCnt.setHeight(Math.max(paintingRect.getHeight(), 0));
-                rendererCnt.layoutContainer();
+                //rendererCnt.setX(paintingRect.getX());
+                //rendererCnt.setY(paintingRect.getY());
+                //rendererCnt.setWidth(Math.max(0, paintingRect.getWidth()));
+                //rendererCnt.setHeight(Math.max(paintingRect.getHeight(), 0));
+                //rendererCnt.layoutContainer();
+                
+                
                 if (renderAsImage) {
-                    g.drawImage(rendererCnt.toImage(), paintingRect.getX(), paintingRect.getY());
+                    
+                    Image im = Image.createImage(paintingRect.getWidth(), paintingRect.getHeight(), 0);
+                    Graphics ig = im.getGraphics();
+                    renderer.paint(ig, new Rectangle(0, 0, paintingRect.getWidth(), paintingRect.getHeight()), this);
+                    
+                    g.drawImage(im, paintingRect.getX(), paintingRect.getY());
+                    
                 } else {
-                    rendererCnt.render(g);
+                    //rendererCnt.render(g);
+                    renderer.paint(g, paintingRect, this);
                 }
+                
             }
             layoutChildrenInternal();
             renderChildren(g);
         } finally {
+            g.setAlpha(alpha);
             g.setTransform(existingT);
         }
         
@@ -502,7 +534,7 @@ public class Node {
      * Gets the renderer component for this node.
      * @return 
      */
-    public Component getRenderer() {
+    public NodePainter getRenderer() {
         return renderer;
     }
     

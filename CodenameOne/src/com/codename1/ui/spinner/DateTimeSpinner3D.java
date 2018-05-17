@@ -113,7 +113,6 @@ class DateTimeSpinner3D extends Container implements ISpinner3D {
     public Date getCurrentDate() {
         if(date != null) {
             Date dt = (Date)date.getValue();
-            System.out.println("Getting date value: "+dt);
             Calendar cld = Calendar.getInstance();
             cld.setTime(dt);
             cld.set(Calendar.HOUR_OF_DAY, 0);
@@ -122,7 +121,6 @@ class DateTimeSpinner3D extends Container implements ISpinner3D {
             cld.set(Calendar.MILLISECOND, 0);
             
             Integer minutesInDay = (Integer)time.getValue();
-            System.out.println("Getting time value: "+minutesInDay);
             if (minutesInDay == null) {
                 minutesInDay = 0;
             }

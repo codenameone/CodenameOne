@@ -336,7 +336,6 @@ class TimeSpinner3D extends Container implements ISpinner3D {
     public void setCurrentHour(int currentHour) {
         this.currentHour = currentHour;
         if(hour != null) {
-            System.out.println("Setting hour value to "+currentHour);
             hour.setValue(new Integer(currentHour));
         }
     }
@@ -422,6 +421,8 @@ class TimeSpinner3D extends Container implements ISpinner3D {
         Calendar cld = Calendar.getInstance();
         cld.setTime(new Date());
         cld.set(Calendar.MINUTE, getCurrentMinute());
+        cld.set(Calendar.SECOND, 0);
+        cld.set(Calendar.MILLISECOND, 0);
         cld.set(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY, getCurrentHour());
         if (showMeridiem) {
             cld.set(Calendar.AM_PM, isCurrentMeridiem() ? 1 : 0);
@@ -430,6 +431,8 @@ class TimeSpinner3D extends Container implements ISpinner3D {
         zero.setTime(new Date());
         zero.set(Calendar.HOUR_OF_DAY, 0);
         zero.set(Calendar.MINUTE, 0);
+        zero.set(Calendar.SECOND, 0);
+        zero.set(Calendar.MILLISECOND, 0);
         return (int)((cld.getTime().getTime()- zero.getTime().getTime())/1000l/60l);
     }
     
@@ -443,10 +446,9 @@ class TimeSpinner3D extends Container implements ISpinner3D {
         cld.setTime(new Date());
         cld.set(Calendar.HOUR_OF_DAY, 0);
         cld.set(Calendar.MINUTE, 0);
-        System.out.println("Midnight was "+cld.getTime());
+        cld.set(Calendar.SECOND, 0);
+        cld.set(Calendar.MILLISECOND, 0);
         cld.setTime(new Date(cld.getTime().getTime() + dt.intValue() * 60l * 1000l));
-        System.out.println("Now set time to "+cld.getTime());
-        System.out.println("Curr minute ="+cld.get(Calendar.MINUTE));
         setCurrentMinute(cld.get(Calendar.MINUTE));
         setCurrentHour(cld.get(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY));
         setCurrentMeridiem(cld.get(Calendar.AM_PM) == 0 ? false : true);
