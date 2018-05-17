@@ -259,7 +259,21 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                                     ((ListProperty)p).add(e);
                                 }
                             } else {
-                                ((ListProperty)p).setList((Collection)val);
+                                List l = (List)val;
+                                if(!l.isEmpty()) {
+                                    if(l.get(0) instanceof PropertyBusinessObject || p.getGenericType() == null) {
+                                        ((ListProperty)p).setList((Collection)val);
+                                    } else {
+                                        Class eType = p.getGenericType();
+                                        for(Object e : l) {
+                                            PropertyBusinessObject po = (PropertyBusinessObject)eType.newInstance();
+                                            po.getPropertyIndex().populateFromMap((Map<String, Object>)e, eType);
+                                            ((ListProperty)p).add(po);
+                                        }
+                                    }
+                                } else {
+                                    ((ListProperty)p).setList((Collection)val);                                
+                                }
                             }
                         }
                         continue;
