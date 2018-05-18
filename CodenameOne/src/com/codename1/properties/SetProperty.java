@@ -25,36 +25,37 @@ package com.codename1.properties;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 /**
- * Base class for a property as a list which can contain multiple elements within
- *
- * @author Shai Almog
+ * Base class for a property as a set which can contain multiple elements within
  */
-public class ListProperty<T, K> extends CollectionProperty<T, K> {
-    private ArrayList<T> value = new ArrayList<T>();
+public class SetProperty<T, K> extends CollectionProperty<T, K> {
+
+	private Set<T> value = new HashSet<T>();
     
     /**
      * Constructs a property with the given name and value
      * @param name the name of the property
      * @param values default values for the property
      */
-    public ListProperty(String name, T... values) {
+    public SetProperty(String name, T... values) {
         this(name, null, values);
     }
     
     /**
      * Constructs a property with the given name and values by specifying the
      * type of the elements explicitly. The element type needs to be specified
-     * if the list should contain {@link PropertyBusinessObject}s and needs
+     * if the set should contain {@link PropertyBusinessObject}s and needs
      * to get deserialized properly!
      * @param name the name of the property
      * @param elementType subclass of {@link PropertyBusinessObject}
      * @param values default values for the property
      */
-    public ListProperty(String name, Class<T> elementType, T... values) {
+    public SetProperty(String name, Class<T> elementType, T... values) {
         super(name, elementType);
         for(T t : values) {
             value.add(t);
@@ -68,39 +69,18 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
      * Constructs a property with null value
      * @param name the name of the property
      */
-    public ListProperty(String name) {
+    public SetProperty(String name) {
         super(name);
     }
-    
+          
     /**
-     * Gets the property value
-     * @param offset the offset within the list
-     * @return the property value
-     */
-    public T get(int offset) {
-        return value.get(offset);
-    }
-    
-    /**
-     * The size of the property list
+     * The size of the property set
      * @return the number of elements
      */
     public int size() {
         return value.size();
     }
-    
-    /**
-     * Sets the property value and potentially fires a change event
-     * @param offset the position for the new value
-     * @param v the new value
-     * @return the parent object for chaining
-     */
-    public K set(int offset, T v) {
-        value.set(offset, v);
-        firePropertyChanged();
-        return (K)parent.parent;
-    }
-
+  
     /**
      * Sets the entire content of the property
      * @param t the collection of elements to set
@@ -109,75 +89,45 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     public K set(Collection<T> t) {
         value.clear();
         value.addAll(t);
-        firePropertyChanged();
+        firePropertyChanged();        
         return (K)parent.parent;
-    }
+    } 
     
     /**
-     * Historical alias of set(Collection<T> t)
-     * Sets the entire content of the property
-     * @param t the collection of elements to set
-     * @return the parent object for chaining
-     */
-    public K setList(Collection<T> t) {
-        return set(t);
-    }
-        
-    /**
-     * Adds a property value and fires a change event
-     * @param offset the position for the new value
+     * Adds a property value to the set and fires a change event if it changed the set
      * @param v the new value
      */
-    public K add(int offset, T v) {
-        value.add(offset, v);
-        firePropertyChanged();
+    public K add(T v) {
+        if (value.add(v)) {
+        	firePropertyChanged();
+        }
         return (K)parent.parent;
     }
 
     /**
-     * Adds a property value to the end of the list and fires a change event
+     * Adds a collection of values to the set and fires a change event if it changed the set
      * @param v the new value
-     */
-    public K add(T v) {
-        value.add(v);
-        firePropertyChanged();
-        return (K)parent.parent;
-    }
-    
-    /**
-     * Adds a all properties value to the list and fires a change event
-     * @param v the collection of values to add
      */
     public K addAll(Collection<? extends T> v) {
         if (value.addAll(v)) {
-                firePropertyChanged();
+        	firePropertyChanged();
         }
         return (K)parent.parent;
     }
-    
+        
     /**
-     * Removes the item at the given offset
-     * @param offset the offset
-     */
-    public K remove(int offset) {
-        value.remove(offset);
-        firePropertyChanged();
-        return (K)parent.parent;
-    }
-    
-    /**
-     * Removes the item with this value
-     * @param v the value object
+     * Removes the given item from the set and fires a change event if this item has been sucessfully removed 
+     * @param the item to remove
      */
     public K remove(T v) {
-    	if (value.remove(v)) {
-    		firePropertyChanged();
-    	}
+        if (value.remove(v)) {
+        	firePropertyChanged();
+        }
         return (K)parent.parent;
     }
-    
+        
     /**
-     * Removes from the list all values from the given collection and fires a change event if the list has changed
+     * Removes from the set all values from the given collection and fires a change event if the set has changed
      * @param the item to remove
      */
     public K removeAll(Collection<? extends T>  v) {
@@ -197,7 +147,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
         if(!super.equals(obj)) {
             return false;
         }
-        ListProperty other = (ListProperty)obj;
+        SetProperty other = (SetProperty) obj;
         return other.value.equals(value);
     }
 
@@ -244,7 +194,7 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     }
 
     /**
-     * Remove all the elements from the list
+     * Remove all the elements from the set and fires a change event if the set wasn't empty
      */
     public void clear() {
         if(value.size() > 0) {
@@ -254,21 +204,13 @@ public class ListProperty<T, K> extends CollectionProperty<T, K> {
     }
 
     /**
-     * Returns true if the given element is contained in the list property  
+     * Returns true if the given element is contained in the set property  
      * @param element the element
-     * @return true if the given element is contained in the list property  
+     * @return true if the given element is contained in the set property  
      */
     public boolean contains(T element) {
         return value.contains(element);
     }
 
 
-    /**
-     * Returns the index of the given element in the list property  
-     * @param element the element
-     * @return the index of the given element in the list property  
-     */
-    public int indexOf(T element) {
-        return value.indexOf(element);
-    }
 }
