@@ -165,6 +165,16 @@ public class Accordion extends Container {
     public void addContent(Component header, Component body) {        
         add(new AccordionContent(header, body));
     }
+    
+    /**
+     * Add an item to the Accordion Container
+     * 
+     * @param header the item title Component
+     * @param body the item Component to hide/show
+     */ 
+    public void addContent(MultiButton header, Component body) {        
+        add(new AccordionContent(header, body));
+    }
 
     /**
      * Returns the body component of the currently expanded accordion element or null if none is expanded
@@ -294,12 +304,11 @@ public class Accordion extends Container {
     class AccordionContent extends Container {
         
         private boolean closed = true;
-        
         private final Button arrow = new Button();
-        
         private Component body;
-        Component header;
-            
+        private Component header;
+        private MultiButton headerMb= null;
+ 
         public AccordionContent(Component header, final Component body) {
             setUIID("AccordionItem");
             setLayout(new BorderLayout());
@@ -336,6 +345,32 @@ public class Accordion extends Container {
             body.setHidden(true);
             add(BorderLayout.CENTER, body);
         }
+        
+        public AccordionContent(MultiButton header,final Component body) {
+            setUIID(header.getUIID());
+            setLayout(new BorderLayout());
+            this.body = body;
+            this.headerMb = header;
+            header.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent evt) {
+                    //toggle the current
+                    openCloseMultiButton(!isClosed());
+                    if (autoClose) {
+                        for (int i = 0; i < Accordion.this.getComponentCount(); i++) {
+                            AccordionContent c = (AccordionContent) Accordion.this.getComponentAt(i);
+                            if (c != AccordionContent.this && !c.isClosed()) {
+                                c.openCloseMultiButton(true);
+                            }
+                        }
+                    }
+                    Accordion.this.animateLayout(250);
+                    fireEvent(evt);
+                }
+            });
+            body.setHidden(true);
+            add(BorderLayout.NORTH, header);
+            add(BorderLayout.CENTER, body);
+        }
 
         public boolean isClosed() {
             return closed;
@@ -347,6 +382,16 @@ public class Accordion extends Container {
                 arrow.setIcon(closeIcon);
             } else {
                 arrow.setIcon(openIcon);
+            }
+            body.setHidden(closed);
+        }
+        
+        public void openCloseMultiButton(boolean close) {
+            closed = close;
+            if (closed) {
+                headerMb.setEmblem(closeIcon);
+            } else {
+                headerMb.setEmblem(openIcon);
             }
             body.setHidden(closed);
         }
