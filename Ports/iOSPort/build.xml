@@ -73,6 +73,7 @@
     -->
     <target name="-pre-compile">
         <copy file="../../Themes/iPhoneTheme.res" todir="nativeSources" />
+        <copy file="../../Themes/iOS7Theme.res" todir="nativeSources" />
     </target>
     <target name="-post-jar">
         <delete file="${dist.jar}.old" />
