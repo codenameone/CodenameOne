@@ -1746,26 +1746,37 @@ public class TextArea extends Component {
         return endsWith3Points;
     }
     
+    // When we are dealing with text editing, we'll just let the native 
+    // layer dispose of the keyboard, so we set a flag here to let it know
+    // when we are starting text editing.
+    private static boolean doNotStopEditingPreviousInputDevice;
 
     protected void registerAsInputDevice() {
         final TextArea cmp = this;
         Form f = this.getComponentForm();
         if (f != null && Display.impl.getEditingText() != this) {
             try {
+                doNotStopEditingPreviousInputDevice = true;
                 f.setCurrentInputDevice(new VirtualInputDevice() {
 
                     @Override
                     public void close() throws Exception {
+                        if (doNotStopEditingPreviousInputDevice) {
+                            return;
+                        }
                         if (cmp.isEditing()) {
                             cmp.stopEditing();
                         }
                     }
                 });
+                
             } catch (Exception ex) {
                 Log.e(ex);
                 // Failed to edit string because the previous input device would not
                 // give up control
                 return;
+            } finally {
+                doNotStopEditingPreviousInputDevice = false;
             }
         }
     }
