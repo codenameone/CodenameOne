@@ -236,43 +236,43 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 Object val = m.get(p.getName());
                 if(val != null) {
                     if(val instanceof List) {
-                        if(p instanceof ListProperty) {
+                        if(p instanceof CollectionProperty) {
                             if(recursiveType != null) {
-                                if(((ListProperty)p) != null) {
-                                    ((ListProperty)p).clear();
+                                if(((CollectionProperty)p) != null) {
+                                    ((CollectionProperty)p).clear();
                                 } 
                                 for(Object e : (Collection)val) {
                                     if(e instanceof Map) {
-                                        Class eType = ((ListProperty) p).getGenericType();
+                                        Class eType = ((CollectionProperty) p).getGenericType();
                                         // maybe don't use recursiveType here anymore???
                                         // elementType is usually sufficient... 
                                         Class type = (eType == null)? recursiveType : eType; 
                                         PropertyBusinessObject po = (PropertyBusinessObject)type.newInstance();
                                         po.getPropertyIndex().populateFromMap((Map<String, Object>)e, type);
-                                        ((ListProperty)p).add(po);
+                                        ((CollectionProperty)p).add(po);
                                         continue;
                                     }
                                     if(e instanceof List) {
-                                        ((ListProperty)p).add(listParse((List)e, recursiveType));
+                                        ((CollectionProperty)p).add(listParse((List)e, recursiveType));
                                         continue;
                                     }
-                                    ((ListProperty)p).add(e);
+                                    ((CollectionProperty)p).add(e);
                                 }
                             } else {
                                 List l = (List)val;
                                 if(!l.isEmpty()) {
                                     if(l.get(0) instanceof PropertyBusinessObject || p.getGenericType() == null) {
-                                        ((ListProperty)p).setList((Collection)val);
+                                        ((CollectionProperty)p).set((Collection)val);
                                     } else {
                                         Class eType = p.getGenericType();
                                         for(Object e : l) {
                                             PropertyBusinessObject po = (PropertyBusinessObject)eType.newInstance();
                                             po.getPropertyIndex().populateFromMap((Map<String, Object>)e, eType);
-                                            ((ListProperty)p).add(po);
+                                            ((CollectionProperty)p).add(po);
                                         }
                                     }
                                 } else {
-                                    ((ListProperty)p).setList((Collection)val);                                
+                                    ((CollectionProperty)p).set((Collection)val);                                
                                 }
                             }
                         }
@@ -386,8 +386,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 m.put(p.getName(), pp.asExplodedMap());
                 continue;
             }
-            if(p instanceof ListProperty) {
-                ListProperty pp = (ListProperty)p;
+            if(p instanceof CollectionProperty) {
+            	CollectionProperty pp = (CollectionProperty)p;
                 m.put(p.getName(), pp.asExplodedList());
                 continue;
             }
@@ -554,9 +554,9 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 out.writeInt(getSize());
                 for(PropertyBase b : PropertyIndex.this) {
                     out.writeUTF(b.getName());
-                    if(b instanceof ListProperty) {
+                    if(b instanceof CollectionProperty) {
                         out.writeByte(2);
-                        Util.writeObject(((ListProperty)b).asList(), out);
+                        Util.writeObject(((CollectionProperty)b).asList(), out);
                         continue;
                     }
                     if(b instanceof MapProperty) {
@@ -586,9 +586,9 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                             }
                             break;
                             
-                        case 2: // ListProperty
-                            if(pb instanceof ListProperty) {
-                                ((ListProperty)pb).setList((List)data);
+                        case 2: // CollectionProperty
+                            if(pb instanceof CollectionProperty) {
+                                ((CollectionProperty)pb).set((List)data);
                             }
                             break;
                             
