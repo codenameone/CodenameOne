@@ -228,6 +228,8 @@ public class CN1CSSCLI extends Application {
     }
     
     
+    
+    
     private static void compile(File inputFile, File outputFile) throws IOException {
         File baseDir = inputFile.getParentFile().getParentFile();
         File checksumsFile = getChecksumsFile(baseDir);
@@ -247,7 +249,9 @@ public class CN1CSSCLI extends Application {
                 String outputFileChecksum = getMD5Checksum(outputFile.getAbsolutePath());
                 String previousChecksum = checksums.get(inputFile.getName());
                 if (previousChecksum == null || !previousChecksum.equals(outputFileChecksum)) {
-                    File bak = new File(inputFile.getParentFile(), outputFile.getName()+"."+System.currentTimeMillis()+".bak");
+                    File backups = new File(inputFile.getParentFile(), ".backups");
+                    backups.mkdirs();
+                    File bak = new File(backups, outputFile.getName()+"."+System.currentTimeMillis()+".bak");
                     Files.copy(outputFile.toPath(), bak.toPath(), StandardCopyOption.REPLACE_EXISTING);
                     System.out.println(outputFile+" has been modified since it was last compiled.  Making copy at "+bak);
                     outputFile.delete();
