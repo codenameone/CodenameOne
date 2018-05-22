@@ -65,16 +65,19 @@ public class Accordion extends Container {
 
     private Image closeIcon;
     private Image openIcon;
-    private boolean autoClose = true;
-    private final EventDispatcher listeners = new EventDispatcher();
+    private boolean autoClose                   = true;
+    private String uiidBackGroundItem           = "AccordionItem";
+    private String uiidHeader                   = "AccordionArrow";
+    private String uiidOpenCloseIcon            = "AccordionArrow";
+    private final EventDispatcher listeners     = new EventDispatcher();
     
     /**
      * Empty Constructor
      */ 
     public Accordion() {
         super.setLayout(BoxLayout.y());
-        this.closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle("AccordionArrow"));
-        this.openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        this.closeIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
+        this.openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
         setScrollableY(true);
     }
     
@@ -97,8 +100,8 @@ public class Accordion extends Container {
      */ 
     public Accordion(char openIcon, char closeIcon) {
         super.setLayout(BoxLayout.y());
-        this.closeIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
-        this.openIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        this.closeIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
+        this.openIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
         setScrollableY(true);
     }
     
@@ -110,6 +113,7 @@ public class Accordion extends Container {
      */ 
     public Accordion(char openIcon, char closeIcon, String openCloseUIID) {
         super.setLayout(BoxLayout.y());
+        this.uiidOpenCloseIcon = openCloseUIID;
         this.closeIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(openCloseUIID));
         this.openIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(openCloseUIID));
         setScrollableY(true);
@@ -122,7 +126,7 @@ public class Accordion extends Container {
      * @param body the item Component to hide/show
      */ 
     public void addContent(String header, Component body) {
-        addContent(new Label(header), body);
+        addContent(new Label(header, uiidHeader), body);
     }
 
     /**
@@ -234,7 +238,7 @@ public class Accordion extends Container {
      * @param closeIcon the close icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_DOWN})
      */ 
     public void setCloseIcon(char closeIcon) {
-        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
     }
 
     /**
@@ -242,7 +246,7 @@ public class Accordion extends Container {
      * @param openIcon the open icon (e.g. {@code FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT})
      */ 
     public void setOpenIcon(char openIcon) {
-        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"));
+        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
     }
     
     /**
@@ -251,7 +255,7 @@ public class Accordion extends Container {
      * @param size the size in millimeters for the arrow
      */ 
     public void setCloseIcon(char closeIcon, float size) {
-        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"), size);
+        this.closeIcon = FontImage.createMaterial(closeIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon), size);
     }
 
     /**
@@ -260,7 +264,7 @@ public class Accordion extends Container {
      * @param size the size in millimeters for the arrow
      */ 
     public void setOpenIcon(char openIcon, float size) {
-        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle("AccordionArrow"), size);
+        this.openIcon = FontImage.createMaterial(openIcon, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon), size);
     }
     
     /**
@@ -294,14 +298,12 @@ public class Accordion extends Container {
     class AccordionContent extends Container {
         
         private boolean closed = true;
-        
         private final Button arrow = new Button();
-        
         private Component body;
-        Component header;
+        private Component header;
             
         public AccordionContent(Component header, final Component body) {
-            setUIID("AccordionItem");
+            setUIID(uiidBackGroundItem);
             setLayout(new BorderLayout());
             this.body = body;
             this.header = header;
@@ -309,8 +311,8 @@ public class Accordion extends Container {
             header.setPressedStyle(header.getUnselectedStyle());
             Container top = new Container(new BorderLayout());
             top.add(BorderLayout.CENTER, header);
-            top.setUIID("AccordionHeader");
-            arrow.setUIID("AccordionArrow");
+            top.setUIID(uiidHeader);
+            arrow.setUIID(uiidOpenCloseIcon);
             arrow.setIcon(closeIcon);
             arrow.addActionListener(new ActionListener() {
 
@@ -336,7 +338,7 @@ public class Accordion extends Container {
             body.setHidden(true);
             add(BorderLayout.CENTER, body);
         }
-
+        
         public boolean isClosed() {
             return closed;
         }
@@ -372,5 +374,58 @@ public class Accordion extends Container {
     private void fireEvent(ActionEvent ev) {
         listeners.fireActionEvent(ev);
     }
+    
+    /**
+     * Default UIID for the content item within the accordion 
+     * 
+     * @param uiidBackGroundItem to custom the background in the accordion component
+     */
+    public void setBackgroundItemUIID(String uiidBackGroundItem) {
+        this.uiidBackGroundItem = uiidBackGroundItem;
+    }
 
+    /**
+     * Default UIID for the content item within the accordion 
+     * 
+     * @return the uiid
+     */
+    public String getBackgroundItemUIID() {
+        return uiidBackGroundItem;
+    }
+    
+    /**
+     * UIID for the header component
+     * 
+     * @param uiidHeader to custom the header in the accordion component
+     */
+    public void setHeaderUIID(String uiidHeader) {
+        this.uiidHeader = uiidHeader;
+    }
+
+    /**
+     * UIID for the header component
+     * 
+     * @retrun the uiid
+     */
+    public String getHeaderUIID() {
+        return uiidHeader;
+    }
+    
+    /**
+     * UIID for the arrow icon for expanding/collapsing
+     * 
+     * @param uiidOpenCloseIcon to custom the background of the Open/Close icon
+     */
+    public void setOpenCloseIconUIID(String uiidOpenCloseIcon) {
+        this.uiidOpenCloseIcon = uiidOpenCloseIcon;
+    }
+
+    /**
+     * UIID for the arrow icon for expanding/collapsing
+     * 
+     * @return the UIID
+     */
+    public String getOpenCloseIconUIID() {
+        return uiidOpenCloseIcon;
+    }
 }
