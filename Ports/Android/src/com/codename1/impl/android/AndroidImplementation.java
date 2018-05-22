@@ -755,8 +755,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Thread.NORM_PRIORITY;
     }
 
+    /* Override of this function no longer needed as getDeviceDensity now derive from getDeviceDPI by default
     @Override
-    protected int getDeviceDensity() {
+    public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();
         if (getActivity() != null) {
             getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
@@ -794,7 +795,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         return Display.DENSITY_MEDIUM;
     }
-
+    */
     
     @Override
     public int getDeviceDPI() {

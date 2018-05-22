@@ -3555,37 +3555,74 @@ public abstract class CodenameOneImplementation {
      * @return one of the DENSITY constants of Display
      */
     @Deprecated
-    protected int getDeviceDensity() {
-        int d = getActualDisplayHeight() * getDisplayWidth();
-        if(isTablet()) {
-            // tablets have lower density and allow fitting more details in the screen despite a high resolution
-            if(d >= 1440*720) {
-                return Display.DENSITY_HIGH;
-            }
-            return Display.DENSITY_MEDIUM;
-        }
-        if(d <= 176*220) {
-            return Display.DENSITY_VERY_LOW;
-        }
-        if(d <= 240*320) {
-            return Display.DENSITY_LOW;
-        }
-        if(d <= 360*480) {
-            return Display.DENSITY_MEDIUM;
-        }
-        if(d <= 480*854) {
-            return Display.DENSITY_HIGH;
-        }
-        if(d <= 1440*720) {
-            return Display.DENSITY_VERY_HIGH;
-        }
-        return Display.DENSITY_HD;
+    public int getDeviceDensity() {
+    	int device_dpi = getDeviceDPI();
+    	int mm_density = Display.DENSITY_HD;
+    	int dpi_best_dist = Math.abs(Display.DPI_XXHIGH-device_dpi);
+    	
+    	int dpi_dest = Math.abs(Display.DPI_VERY_LOW-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_VERY_LOW;
+    		dpi_best_dist = dpi_dest;
+    	}
+    	    		
+    	dpi_dest = Math.abs(Display.DPI_LOW-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_LOW;
+    		dpi_best_dist = dpi_dest;
+    	}
+    	
+    	dpi_dest = Math.abs(Display.DPI_MEDIUM-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_MEDIUM;
+    		dpi_best_dist = dpi_dest;
+    	}
+    	
+    	dpi_dest = Math.abs(Display.DPI_HIGH-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_HIGH;
+    		dpi_best_dist = dpi_dest;
+    	}
+    
+    	dpi_dest = Math.abs(Display.DPI_XHIGH-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_VERY_HIGH;
+    		dpi_best_dist = dpi_dest;
+    	}
+  	  
+    	/* already tested as default
+    	dpi_dest = Math.abs(Display.DPI_XXHIGH-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_HD;
+    		dpi_best_dist = dpi_dest;
+    	}
+    	*/
+  	
+    	dpi_dest = Math.abs(Display.DPI_XXXHIGH-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_560;
+    		dpi_best_dist = dpi_dest;
+    	}
+    	
+    	dpi_dest = Math.abs(Display.DPI_2HD-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_2HD;
+    		dpi_best_dist = dpi_dest;
+    	}
+  		
+    	dpi_dest = Math.abs(Display.DPI_4K-device_dpi);
+    	if (dpi_dest<dpi_best_dist) {
+    		mm_density = Display.DENSITY_4K;
+    		dpi_best_dist = dpi_dest;
+    	}
+  		
+        return mm_density;
     }
     
     
     /**
      * The screen estimated density expressed as dots-per-inch (= pixels-per-inch). 
-     * Notice that in most case that DPI density do not correspond to the exact screen resolution
+     * Notice that in most case that DPI density do not match the exact screen resolution
      * and is just an estimate as most platforms do not provide exact informations for this value
      */
     public int getDeviceDPI() {

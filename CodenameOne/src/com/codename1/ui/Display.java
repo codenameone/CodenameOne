@@ -2993,16 +2993,23 @@ public final class Display extends CN1Constants {
      *
      * @return one of the DENSITY constants of Display
      */
-    /*
+    @Deprecated
     public int getDeviceDensity() {
         return impl.getDeviceDensity();
     }
-    */
     
+    
+    /**
+     * Returns one of the PPI screen density for this device.
+     * Notice that depending on the platform, this value can be exact or an estimation
+     * and an implementation might decide to change the density based on DPI constraints.
+     *
+    */
     public int getDeviceDPI() {
         return impl.getDeviceDPI();
     }
 
+    
     /**
      * Plays a builtin device sound matching the given identifier, implementations
      * and themes can offer additional identifiers to the ones that are already built

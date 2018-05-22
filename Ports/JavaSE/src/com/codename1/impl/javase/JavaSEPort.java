@@ -323,18 +323,19 @@ public class JavaSEPort extends CodenameOneImplementation {
         designMode = aDesignMode;
     }
 
+    /* override no longer needed as getDeviceDensity now derive from getDeviceDPI by default
     @Override
-    protected int getDeviceDensity() {
+    public int getDeviceDensity() {
         if(defaultPixelMilliRatio != null) {
-            /*
-            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
-                return Display.DENSITY_MEDIUM;
-            }
-            if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
-                return Display.DENSITY_VERY_HIGH;
-            }
-            System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
-            */
+            
+            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
+            //    return Display.DENSITY_MEDIUM;
+            //}
+            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
+            //    return Display.DENSITY_VERY_HIGH;
+            //}
+            //System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
+            
             if (retinaScale > 1.5) {
                 return Display.DENSITY_VERY_HIGH;
             } else {
@@ -343,7 +344,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         return super.getDeviceDensity();
     }
-    
+    */
     
     public int getDeviceDPI() {
         if(defaultPixelMilliRatio != null) {

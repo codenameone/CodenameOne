@@ -5046,8 +5046,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private int dDensity = -1;
     
+    /* Override of this function no longer needed as getDeviceDensity now derive from getDeviceDPI by default
     @Override
-    protected int getDeviceDensity() {
+    public int getDeviceDensity() {
         // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
         // to the getDeviceDensity() method in the Shooter project or the iOS screenshots
         // will produce slightly different results than the actual device.
@@ -5082,6 +5083,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return dDensity;
     }
+    */
+    
     
     private int dDPI = -1;
     
