@@ -67,7 +67,7 @@ public class Accordion extends Container {
     private Image openIcon;
     private boolean autoClose                   = true;
     private String uiidBackGroundItem           = "AccordionItem";
-    private String uiidHeader                   = "AccordionHeader";
+    private String uiidHeader                   = "AccordionArrow";
     private String uiidOpenCloseIcon            = "AccordionArrow";
     private final EventDispatcher listeners     = new EventDispatcher();
     
@@ -126,9 +126,7 @@ public class Accordion extends Container {
      * @param body the item Component to hide/show
      */ 
     public void addContent(String header, Component body) {
-        Label l = new Label(header);
-        l.setUIID(uiidHeader);
-        addContent(l, body);
+        addContent(new Label(header, uiidHeader), body);
     }
 
     /**
@@ -376,26 +374,58 @@ public class Accordion extends Container {
     private void fireEvent(ActionEvent ev) {
         listeners.fireActionEvent(ev);
     }
+    
     /**
+     * Default UIID for the content item within the accordion 
      * 
      * @param uiidBackGroundItem to custom the background in the accordion component
      */
-    public void setUiidBackGroundItem(String uiidBackGroundItem) {
+    public void setBackgroundItemUIID(String uiidBackGroundItem) {
         this.uiidBackGroundItem = uiidBackGroundItem;
     }
+
     /**
+     * Default UIID for the content item within the accordion 
+     * 
+     * @return the uiid
+     */
+    public String getBackgroundItemUIID() {
+        return uiidBackGroundItem;
+    }
+    
+    /**
+     * UIID for the header component
      * 
      * @param uiidHeader to custom the header in the accordion component
      */
-    public void setUiidHeader(String uiidHeader) {
+    public void setHeaderUIID(String uiidHeader) {
         this.uiidHeader = uiidHeader;
     }
+
     /**
+     * UIID for the header component
+     * 
+     * @retrun the uiid
+     */
+    public String getHeaderUIID() {
+        return uiidHeader;
+    }
+    
+    /**
+     * UIID for the arrow icon for expanding/collapsing
      * 
      * @param uiidOpenCloseIcon to custom the background of the Open/Close icon
      */
-    public void setUiidOpenCloseIcon(String uiidOpenCloseIcon) {
+    public void setOpenCloseIconUIID(String uiidOpenCloseIcon) {
         this.uiidOpenCloseIcon = uiidOpenCloseIcon;
     }
 
+    /**
+     * UIID for the arrow icon for expanding/collapsing
+     * 
+     * @return the UIID
+     */
+    public String getOpenCloseIconUIID() {
+        return uiidOpenCloseIcon;
+    }
 }
