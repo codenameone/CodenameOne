@@ -1813,6 +1813,12 @@ public class TextArea extends Component {
         
     }
     
+    /**
+     * Registers this TextArea as the current input device for the current form.
+     * 
+     * @deprecated Don't call this method directly, unless you really know what you're doing.  It is used
+     * primarily by implementation APIs.
+     */
     public void registerAsInputDevice() {
         final TextArea cmp = this;
         Form f = this.getComponentForm();

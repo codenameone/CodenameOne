@@ -247,6 +247,12 @@ public class Form extends Container {
         currentInputDevice = device;
     }
     
+    /**
+     * Returns the current virtual input device in the form.
+     * 
+     * @return The current input device in the form.
+     * @see #setCurrentInputDevice(com.codename1.ui.VirtualInputDevice) 
+     */
     public VirtualInputDevice getCurrentInputDevice() {
         return currentInputDevice;
     }
