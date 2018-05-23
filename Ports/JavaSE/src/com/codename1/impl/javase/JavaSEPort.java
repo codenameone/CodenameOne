@@ -323,7 +323,30 @@ public class JavaSEPort extends CodenameOneImplementation {
         designMode = aDesignMode;
     }
 
+    /* override no longer needed as getDeviceDensity now derive from getDeviceDPI by default
+    @Override
     public int getDeviceDensity() {
+        if(defaultPixelMilliRatio != null) {
+            
+            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
+            //    return Display.DENSITY_MEDIUM;
+            //}
+            //if(Math.round(defaultPixelMilliRatio.doubleValue()) == 20) {
+            //    return Display.DENSITY_VERY_HIGH;
+            //}
+            //System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
+            
+            if (retinaScale > 1.5) {
+                return Display.DENSITY_VERY_HIGH;
+            } else {
+                return Display.DENSITY_MEDIUM;
+            }
+        }
+        return super.getDeviceDensity();
+    }
+    */
+    
+    public int getDeviceDPI() {
         if(defaultPixelMilliRatio != null) {
             /*
             if(Math.round(defaultPixelMilliRatio.doubleValue()) == 10) {
@@ -335,12 +358,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             System.out.println("Ratio "+defaultPixelMilliRatio.doubleValue());
             */
             if (retinaScale > 1.5) {
-                return Display.DENSITY_VERY_HIGH;
+                return Display.DPI_XHIGH;
             } else {
-                return Display.DENSITY_MEDIUM;
+                return Display.DPI_MEDIUM;
             }
         }
-        return super.getDeviceDensity();
+        return super.getDeviceDPI(); 
+    }
+    
+    
+    public int convertToPixels(int dipCount, boolean horizontal) {
+        if (pixelMilliRatio != null) {
+            return (int) Math.round(dipCount * pixelMilliRatio.doubleValue());
+        }
+        return super.convertToPixels(dipCount, horizontal);
     }
     
     /**
@@ -9704,12 +9735,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         return "file://home/";
     }
 
-    public int convertToPixels(int dipCount, boolean horizontal) {
-        if (pixelMilliRatio != null) {
-            return (int) Math.round(dipCount * pixelMilliRatio.doubleValue());
-        }
-        return super.convertToPixels(dipCount, horizontal);
-    }
+    
 
     private File downloadSkin(File skinDir, String url, String version, JLabel label) throws IOException {
         String fileName = url.substring(url.lastIndexOf("/"));

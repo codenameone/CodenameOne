@@ -213,6 +213,8 @@ public class StyleParser {
                     return "inherit";
                 case Style.UNIT_TYPE_DIPS:
                     return value + "mm";
+                case Style.UNIT_TYPE_DP:
+                    return value + "dp";
                 case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
                     return value + "%";
                 default:
@@ -232,6 +234,8 @@ public class StyleParser {
                     return "inherit";
                 case Style.UNIT_TYPE_DIPS:
                     return StyleParser.format(value, decimalPlaces) + "mm";
+                case Style.UNIT_TYPE_DP:
+                    return ((int)Math.round(value))+"dp";
                 case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
                     return StyleParser.format(value, decimalPlaces) + "%";
                 default:
@@ -249,6 +253,8 @@ public class StyleParser {
                     return 0;
                 case Style.UNIT_TYPE_DIPS:
                     return Display.getInstance().convertToPixels((float)value);
+                case Style.UNIT_TYPE_DP:
+                    return Display.getInstance().convertDPsToPixels((int)Math.round(value));
                 case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
                     return (int)(Display.getInstance().getDisplayWidth() * value / 100f);
                 default:
@@ -981,6 +987,8 @@ public class StyleParser {
                     switch (units[side]) {
                         case Style.UNIT_TYPE_DIPS:
                             return px / (float)Display.getInstance().convertToPixels(1f);
+                        case Style.UNIT_TYPE_DP:
+                            return px / ((float)Display.getInstance().convertDPsToPixels(1000)/1000f);
                         default:
                             return px;
                     }
@@ -1045,6 +1053,8 @@ public class StyleParser {
                     switch (units[side]) {
                         case Style.UNIT_TYPE_DIPS:
                             return px / (float)Display.getInstance().convertToPixels(1f);
+                        case Style.UNIT_TYPE_DP:
+                            return px / ((float)Display.getInstance().convertDPsToPixels(1000)/1000f);
                         default:
                             return px;
                     }
@@ -1215,6 +1225,8 @@ public class StyleParser {
                 return (int)Math.round(v.getValue());
             case Style.UNIT_TYPE_DIPS:
                 return Display.getInstance().convertToPixels((float)v.getValue());
+            case Style.UNIT_TYPE_DP:
+                return Display.getInstance().convertDPsToPixels((int)Math.round(v.getValue()));
             case Style.UNIT_TYPE_SCREEN_PERCENTAGE :
                 return (int)Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0);
         }
@@ -1228,8 +1240,25 @@ public class StyleParser {
                 return (float)v.getValue() / Display.getInstance().convertToPixels(1f);
             case Style.UNIT_TYPE_DIPS:
                 return (float)v.getValue();
+            case Style.UNIT_TYPE_DP:
+                return (float)Display.getInstance().convertDPsToPixels((int)v.getValue()) / Display.getInstance().convertToPixels(1f);
             case Style.UNIT_TYPE_SCREEN_PERCENTAGE :
                 return (int)Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0) / Display.getInstance().convertToPixels(1f);
+        }
+        return 0;
+    }
+    
+    private static float getDPValue(String val) {
+        ScalarValue v = parseSingleTRBLValue(val);
+        switch (v.getUnit()) {
+            case Style.UNIT_TYPE_PIXELS:
+                return (float)v.getValue() / (Display.getInstance().convertDPsToPixels(1000)/1000f);
+            case Style.UNIT_TYPE_DP:
+                return (float)v.getValue();
+            case Style.UNIT_TYPE_DIPS:
+                return Display.getInstance().convertToPixels((float)v.getValue()) / (Display.getInstance().convertDPsToPixels(1000)/1000f);
+            case Style.UNIT_TYPE_SCREEN_PERCENTAGE :
+                return (int)Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0) / (Display.getInstance().convertDPsToPixels(1000)/1000f);
         }
         return 0;
     }
@@ -1742,6 +1771,8 @@ public class StyleParser {
             switch (getWidthUnit()) {
                 case Style.UNIT_TYPE_DIPS:
                     return "mm";
+                case Style.UNIT_TYPE_DP:
+                    return "dp";
                 default:
                     return "px";
             }
@@ -1755,6 +1786,8 @@ public class StyleParser {
         private Border createLineBorder() {
             if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
                 return Border.createLineBorder((float)getWidth(), getColor());
+            } else if (this.getWidthUnit() == Style.UNIT_TYPE_DP) {
+                return Border.createLineBorder(Display.getInstance().convertDPsToPixels(getWidth().intValue()), getColor());
             } else {
                 return Border.createLineBorder(getWidth().intValue(), getColor());
             }
@@ -1763,6 +1796,8 @@ public class StyleParser {
         private Border createDashedBorder() {
             if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
                 return Border.createDashedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
+            } else if (this.getWidthUnit() == Style.UNIT_TYPE_DP) {
+                return Border.createDashedBorder(Display.getInstance().convertDPsToPixels(getWidth().intValue()), getColor());
             } else {
                 return Border.createDashedBorder(getWidth().intValue(), getColor());
             }
@@ -1771,6 +1806,8 @@ public class StyleParser {
         private Border createDottedBorder() {
             if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
                 return Border.createDottedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
+            } else if (this.getWidthUnit() == Style.UNIT_TYPE_DP) {
+                return Border.createDottedBorder(Display.getInstance().convertDPsToPixels(getWidth().intValue()), getColor());
             } else {
                 return Border.createDottedBorder(getWidth().intValue(), getColor());
             }
@@ -1779,6 +1816,8 @@ public class StyleParser {
         private Border createUnderlineBorder() {
             if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {
                 return Border.createUnderlineBorder(Display.getInstance().convertToPixels(getWidth()), getColor());
+            } else if (this.getWidthUnit() == Style.UNIT_TYPE_DP) {
+                return Border.createUnderlineBorder(Display.getInstance().convertDPsToPixels(getWidth().intValue()), getColor());
             } else {
                 return Border.createUnderlineBorder(getWidth().intValue(), getColor());
             }
@@ -1888,6 +1927,8 @@ public class StyleParser {
                         break;
                     case Style.UNIT_TYPE_DIPS:
                         b.shadowSpread((float)sv.getValue());
+                    case Style.UNIT_TYPE_DP:
+                        b.shadowSpread(sv.getPixelValue());
                 }
             }
             if (getShadowX() != null) {
@@ -2118,6 +2159,8 @@ public class StyleParser {
             }
             if (widthUnit == Style.UNIT_TYPE_DIPS) {
                 return Display.getInstance().convertToPixels(width);
+            } else if (widthUnit == Style.UNIT_TYPE_DP) {
+                return Display.getInstance().convertDPsToPixels(width.intValue());
             } else {
                 return width.intValue();
             }
@@ -2510,6 +2553,10 @@ public class StyleParser {
             if (getSize() == null) return prefix;
             if (getSizeUnit() == Style.UNIT_TYPE_DIPS) {
                 return prefix + getSize() + unitString();
+            } else if (getSizeUnit() == Style.UNIT_TYPE_DP) {
+                return prefix + getSize().intValue() + unitString();
+            } else if (getSizeUnit() == Style.UNIT_TYPE_SP) {
+                return prefix + getSize().intValue() + unitString();
             } else if (getSizeUnit() == StyleParser.UNIT_INHERIT) {
                 return prefix;
             } else {
@@ -2537,6 +2584,10 @@ public class StyleParser {
                 switch (getSizeUnit()) {
                     case Style.UNIT_TYPE_DIPS:
                         return Display.getInstance().convertToPixels(getSize());
+                    case Style.UNIT_TYPE_DP:
+                        return Display.getInstance().convertDPsToPixels(getSize().intValue());
+                    case Style.UNIT_TYPE_SP:
+                        return Display.getInstance().convertSPsToPixels(getSize().intValue());
                     default:
                         return getSize();
                 }
@@ -2546,6 +2597,8 @@ public class StyleParser {
         private String unitString() {
             switch (getSizeUnit()) {
                 case Style.UNIT_TYPE_DIPS: return "mm";
+                case Style.UNIT_TYPE_DP: return "dp";
+                case Style.UNIT_TYPE_SP: return "sp";
                 case Style.UNIT_TYPE_PIXELS: return "px";
                     
             }
@@ -2816,7 +2869,7 @@ public class StyleParser {
         boolean parsedValue = false;
         for (int i=0; i<plen; i++) {
             char c = val.charAt(i);
-            if (!parsedValue && (c == '%' || c == 'm' || c == 'p' || c == 'i')) {
+            if (!parsedValue && (c == '%' || c == 'm' || c == 'p' || c == 'i' || c == 'd' || c == 's')) {
                 out.setValue((sb.length() > 0) ? Double.parseDouble(sb.toString()) : 0);
                 parsedValue = true;
                 sb.setLength(0);
@@ -2828,10 +2881,19 @@ public class StyleParser {
 
         if (parsedValue) {
             String unitStr = sb.toString();
-            out.setUnit("mm".equals(unitStr) ? Style.UNIT_TYPE_DIPS : 
-                    "%".equals(unitStr) ? Style.UNIT_TYPE_SCREEN_PERCENTAGE :
-                            "inherit".equals(unitStr) ? UNIT_INHERIT :
-                                    Style.UNIT_TYPE_PIXELS);
+            byte vunit = Style.UNIT_TYPE_PIXELS;
+            if ("mm".equals(unitStr)) {
+            	vunit = Style.UNIT_TYPE_DIPS;
+            } else if ("dp".equals(unitStr)){
+            	vunit = Style.UNIT_TYPE_DP;
+            } else if ("sp".equals(unitStr)){
+            	vunit = Style.UNIT_TYPE_SP;
+            } else if ("%".equals(unitStr)){
+            	vunit = Style.UNIT_TYPE_SCREEN_PERCENTAGE;
+            } else if ("inherit".equals(unitStr)){
+            	vunit = UNIT_INHERIT;
+            }
+            out.setUnit(vunit);
         } else {
             out.setUnit(Style.UNIT_TYPE_PIXELS);
             out.setValue(Double.parseDouble(sb.toString()));

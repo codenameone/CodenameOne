@@ -755,6 +755,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Thread.NORM_PRIORITY;
     }
 
+    /* Override of this function no longer needed as getDeviceDensity now derive from getDeviceDPI by default
     @Override
     public int getDeviceDensity() {
         DisplayMetrics metrics = new DisplayMetrics();
@@ -794,7 +795,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         return Display.DENSITY_MEDIUM;
     }
-
+    */
+    
+    @Override
+    public int getDeviceDPI() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        if (getActivity() != null) {
+            getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        } else {
+            metrics = getContext().getResources().getDisplayMetrics();
+        }
+        
+        return metrics.densityDpi; // (int) (metrics.density * 160f);
+    }
+    
+    
+    @Override
+    public float getFontScale() {
+        return getContext().getResources().getConfiguration().fontScale;
+    }
+    
+    
     /**
      * A status flag to indicate that CN1 is in the process of deinitializing.
      */
@@ -4055,12 +4076,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         });
     }
-
-    public int convertToPixels(int dipCount, boolean horizontal) {
-        DisplayMetrics dm = getContext().getResources().getDisplayMetrics();
-        float ppi = dm.density * 160f;
-        return (int) (((float) dipCount) / 25.4f * ppi);
-    }
+    
 
     public boolean isPortrait() {
         int orientation = getContext().getResources().getConfiguration().orientation;
