@@ -247,6 +247,10 @@ public class Form extends Container {
         currentInputDevice = device;
     }
     
+    public VirtualInputDevice getCurrentInputDevice() {
+        return currentInputDevice;
+    }
+    
     /**
      * Allows subclasses to disable the global toolbar for a specific form by overriding this method
      */

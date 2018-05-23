@@ -305,6 +305,9 @@ public abstract class CodenameOneImplementation {
      * @param initiatingKeycode the keycode used to initiate the edit.
      */
     public final void editStringImpl(Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
+        if (cmp instanceof TextArea) {
+            ((TextArea)cmp).registerAsInputDevice();
+        }
         editingText = cmp;
         editString(cmp, maxSize, constraint, text, initiatingKeycode);
         if(!isAsyncEditMode()) {

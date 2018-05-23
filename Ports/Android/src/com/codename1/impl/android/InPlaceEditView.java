@@ -1434,6 +1434,7 @@ public class InPlaceEditView extends FrameLayout{
 
 
         final TextArea textArea = (TextArea) component;
+        textArea.registerAsInputDevice();
         final String initialText = textArea.getText();
         textArea.putClientProperty("InPlaceEditView.initialText", initialText);
         
