@@ -546,8 +546,13 @@ public class CN extends  CN1Constants {
      *
      * @return one of the DENSITY constants of Display
      */
+    /*
     public static int getDeviceDensity() {
         return Display.impl.getDeviceDensity();
+    }
+    */
+    public static int getDeviceDPI() {
+        return Display.impl.getDeviceDPI();
     }
 
     /**

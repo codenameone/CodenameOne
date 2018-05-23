@@ -86,11 +86,13 @@ public class EncodedImage extends Image {
     private Object cache;
     private Image hardCache;
     private int locked;
+    private boolean old_density_mode;
     
     private EncodedImage(byte[][] imageData) {
         super(null);
         this.imageData = imageData;
     }
+        
 
     /**
      * Allows subclasses to create more advanced variations of this class that
@@ -125,10 +127,29 @@ public class EncodedImage extends Image {
      * screen DPI/resolution can vary significantly in runtime (something that just doesn't happen on devices).
      */
     public static EncodedImage createMulti(int[] dpis, byte[][] data) {
+        return createMulti(dpis, data, false);
+    }
+    
+    
+    /**
+     * Creates an encoded image that acts as a multi-image, DO NOT USE THIS METHOD. Its for internal
+     * use to improve the user experience of the simulator
+     * 
+     * @param dpis device DPI's
+     * @param data the data matching each multi-image DPI
+     * @param if dpis values are expressed as old DENSITY_xxx modes (if not dpis are expressed as PPI)
+     * @return an encoded image that acts as a multi-image in runtime
+     * @deprecated this method is meant for internal use only, it would be very expensive to use
+     * this method for real applications. Its here for simulators and development purposes where 
+     * screen DPI/resolution can vary significantly in runtime (something that just doesn't happen on devices).
+     */
+    public static EncodedImage createMulti(int[] dpis, byte[][] data, boolean old_density_mode) {
         EncodedImage e = new EncodedImage(data);
         e.dpis = dpis;
+        e.old_density_mode = old_density_mode;
         return e;
     }
+    
     
     /**
      * Converts an image to encoded image
@@ -235,23 +256,80 @@ public class EncodedImage extends Image {
         if(imageData.length == 1) {
             return imageData[0];
         }
-        int dpi = Display.getInstance().getDeviceDensity();
+        
         int bestFitOffset = 0;
         int bestFitDPI = 0;
         int dlen = dpis.length;
-        for(int iter = 0 ; iter < dlen ; iter++) {
-            int currentDPI = dpis[iter];
-            if(dpi == currentDPI) {
-                bestFitOffset = iter;
-                break;
+        
+        if (old_density_mode) 
+        {
+        	int dpi = Display.getInstance().getDeviceDensity();
+        	
+        	for(int iter = 0 ; iter < dlen ; iter++) {
+                int currentDPI = dpis[iter];
+                if(dpi == currentDPI) {
+                    bestFitOffset = iter;
+                    break;
+                }
+                if(bestFitDPI != dpi && dpi >= currentDPI && currentDPI >= bestFitDPI) {
+                    bestFitDPI = currentDPI;
+                    bestFitOffset = iter;
+                }
             }
-            if(bestFitDPI != dpi && dpi >= currentDPI && currentDPI >= bestFitDPI) {
-                bestFitDPI = currentDPI;
-                bestFitOffset = iter;
-            }
+        	
+        	lastTestedDPI = dpi;
         }
-        lastTestedDPI = dpi;
+        else
+        {
+        	int dpi = Display.getInstance().getDeviceDPI();
+
+        	float bestFitDPIDist = Float.MAX_VALUE;
+
+        	for(int iter = 0 ; iter < dlen ; iter++) {
+        		int currentDPI = dpis[iter];
+        		if(dpi == currentDPI) {
+        			//bestFitDPI = currentDPI;
+        			//bestFitDPIDist = 0;
+        			bestFitOffset = iter;
+        			break;
+        		}
+        		//Compute a pseudo distance between the device DPI resolution and the ressource resolution
+        		float currentDPIDist = Math.abs((float) (currentDPI-dpi)/dpi);
+        		boolean better = false;
+        		if (bestFitDPI != dpi) { //else we already found a resource that match exactly the device resolution
+        			if ((currentDPI>dpi && bestFitDPI<dpi) || (currentDPI<dpi && bestFitDPI>dpi)) { //one resolution is higher than the device DPI and one is lower 
+        				//We will roughly compare them (by steps of 25%) instead of exactly to avoid situations where one is just a few percents closer than the other 
+        				if ((int) (currentDPIDist*100.0/25.0) == (int) (bestFitDPIDist*100.0/25.0)) { //they are roughly at the same distance. 
+        					if (currentDPI < bestFitDPI) { //We keep the one with lowest resolution to lower memory footprint
+        						better = true;
+        					}
+        				}
+        				else { //one is clearly closer than the other
+        					if (currentDPIDist < bestFitDPIDist) { //we keep the closest one
+        						better = true;
+        					}
+        				}
+        			}
+        			else { //Both resolutions are either lower or higher than the device DPI. So we just have to compare the distances to pick the closest one
+        				if (currentDPIDist <  bestFitDPIDist) {
+        					better = true;
+        				}
+        			}
+        		}
+        		if (better)
+        		{
+        			bestFitDPI = currentDPI;
+        			bestFitDPIDist = currentDPIDist;
+        			bestFitOffset = iter;
+        		}
+        	}
+        	
+        	lastTestedDPI = dpi;
+        }
+        
+        
         return imageData[bestFitOffset];
+        
     }
 
     /**
@@ -266,7 +344,8 @@ public class EncodedImage extends Image {
         }
         return new EncodedImage(new byte[][] {data});
     }
-
+        
+    
     /**
      * Creates an image from the given byte array with the variables set appropriately.
      * This saves LWUIT allot of resources since it doesn't need to actually traverse the 
@@ -329,7 +408,7 @@ public class EncodedImage extends Image {
 
     private Image getInternalImpl() {
         
-        if(imageData != null && imageData.length > 1 && lastTestedDPI != Display.getInstance().getDeviceDensity()) {
+        if(imageData != null && imageData.length > 1 && lastTestedDPI != (old_density_mode?Display.getInstance().getDeviceDensity():Display.getInstance().getDeviceDPI())) {
             hardCache = null;
             cache = null;
             width = -1;
