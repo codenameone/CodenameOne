@@ -6218,6 +6218,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a picture")){
             return;
         }
+        if (getRequestedPermissions().contains(Manifest.permission.CAMERA)) {
+            // Normally we don't need to request the CAMERA permission since we use
+            // the ACTION_IMAGE_CAPTURE intent, which handles permissions itself.
+            // BUT: If the camera permission is included in the Manifest file, the 
+            // intent will defer to the app's permissions, and on Android 6, 
+            // the permission is denied unless we do the runtime check for permission.
+            // See https://github.com/codenameone/CodenameOne/issues/2409#issuecomment-391696058
+            if(!checkForPermission(Manifest.permission.CAMERA, "This is required to take a picture")){
+                return;
+            }
+        }
         callback = new EventDispatcher();
         callback.addListener(response);
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
@@ -6244,8 +6255,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if(!checkForPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, "This is required to take a video")){
             return;
         }
-        if (!checkForPermission(Manifest.permission.CAMERA, "This is required to take a video")) {
-            return;
+        if (getRequestedPermissions().contains(Manifest.permission.CAMERA)) {
+            // Normally we don't need to request the CAMERA permission since we use
+            // the ACTION_VIDEO_CAPTURE intent, which handles permissions itself.
+            // BUT: If the camera permission is included in the Manifest file, the 
+            // intent will defer to the app's permissions, and on Android 6, 
+            // the permission is denied unless we do the runtime check for permission.
+            // See https://github.com/codenameone/CodenameOne/issues/2409#issuecomment-391696058
+            if(!checkForPermission(Manifest.permission.CAMERA, "This is required to take a video")){
+                return;
+            }
         }
         callback = new EventDispatcher();
         callback.addListener(response);
@@ -8375,6 +8394,30 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return checkForPermission(permission, description, false);
     }
 
+    /**
+     * Return a list of all of the permissions that have been requested by the app (granted or no).
+     * This can be used to see which permissions are included in the manifest file.
+     * @return 
+     */
+    public static List<String> getRequestedPermissions() {
+        PackageManager pm = getContext().getPackageManager();
+        try
+        {
+            PackageInfo packageInfo = pm.getPackageInfo(getContext().getPackageName(), PackageManager.GET_PERMISSIONS);
+            String[] requestedPermissions = null;
+            if (packageInfo != null) {
+                requestedPermissions = packageInfo.requestedPermissions;
+                return Arrays.asList(requestedPermissions);
+            }
+            return new ArrayList<String>();
+        }
+        catch (PackageManager.NameNotFoundException e)
+        {
+            com.codename1.io.Log.e(e);
+            return new ArrayList<String>();
+        }
+    }
+    
     public static boolean checkForPermission(String permission, String description, boolean forceAsk){
         //before sdk 23 no need to ask for permission
         if(android.os.Build.VERSION.SDK_INT < 23){
