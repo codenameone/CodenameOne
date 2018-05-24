@@ -32,21 +32,23 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.ComponentSelector;
+import static com.codename1.ui.ComponentSelector.$;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.VirtualInputDevice;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.UIManager;
-import java.io.IOException;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -83,7 +85,7 @@ public class Picker extends Button {
      * Flag to indicate that the picker should prefer lightweight components 
      * rather than native components.
      */
-    private boolean lightweightMode;
+    private boolean useLightweightPopup;
     
     /**
      * Checks if the given type is supported in LightWeight mode.  
@@ -108,18 +110,18 @@ public class Picker extends Button {
     /**
      * Sets the picker to use lightweight mode for its widgets.  With this mode enabled
      * the picker will use cross-platform lightweight widgets instead of native widgets.
-     * @param lightweightMode 
+     * @param useLightweightPopup 
      */
-    public void setLightweightMode(boolean lightweightMode) {
-        this.lightweightMode = lightweightMode;
+    public void setUseLightweightPopup(boolean useLightweightPopup) {
+        this.useLightweightPopup = useLightweightPopup;
     }
     
     /**
      * Checks if this picker is in lightweight mode.  If this returns true, then the 
      * picker will use cross-platform lightweight widgets instead of native widgets.
      */
-    public boolean isLightweightMode() {
-        return lightweightMode;
+    public boolean isUseLightweightPopup() {
+        return useLightweightPopup;
     }
     
     /**
@@ -142,7 +144,7 @@ public class Picker extends Button {
             // For platforms that don't support native pickers, we'll make lightweight mode
             // the default.  This will result in these platforms using the new Spinner3D classes
             // instead of the old Spinner classes
-            lightweightMode = true;
+            useLightweightPopup = true;
         }
         addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {
@@ -151,9 +153,7 @@ public class Picker extends Button {
                     // we don't want to re-handle it here.
                     return;
                 }
-                
-                
-                if (lightweightMode && isLightweightModeSupportedForType(type)) {
+                if (useLightweightPopup && isLightweightModeSupportedForType(type)) {
                     showInteractionDialog();
                     evt.consume();
                     return;
@@ -553,7 +553,7 @@ public class Picker extends Button {
         });
         updateValue();
     }
-    
+
     /**
      * Sets the type of the picker to one of Display.PICKER_TYPE_DATE, Display.PICKER_TYPE_DATE_AND_TIME, Display.PICKER_TYPE_STRINGS, 
      * Display.PICKER_TYPE_DURATION, Display.PICKER_TYPE_DURATION_HOURS, Display.PICKER_TYPE_DURATION_MINUTES or
