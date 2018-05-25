@@ -4279,7 +4279,7 @@ public abstract class CodenameOneImplementation {
      * convert sp count into pixels
      * Scalable pixels (sp) serve the same function as density-independent pixels (dp), but for fonts. 
      * The default value of an sp is equal to one physical pixel on a screen with a density of 160.
-	 * The primary difference between an sp and a dp is that sp's preserve a user's font settings. 
+	 * The primary difference between an sp and a dp is that sp’s preserve a user's font settings. 
 	 * Users who have larger text settings for accessibility will see font sizes match their text size preferences.
      */
      public int convertSPsToPixels(int spCount, boolean horizontal) {
