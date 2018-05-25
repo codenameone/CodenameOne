@@ -24,7 +24,6 @@
 package com.codename1.ui.util;
 
 import com.codename1.io.Log;
-import com.codename1.ui.CN1Constants;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
@@ -168,7 +167,6 @@ public class Resources {
     }
     
     private int dpi = -1;
-    private int ppmm_density = -1;
     
     /**
      * Hashtable containing the mapping between element types and their names in the
@@ -190,7 +188,6 @@ public class Resources {
     
     Resources(InputStream input, int dpi) throws IOException {
         this.dpi = dpi;
-        this.ppmm_density = dpi; //TODO remove this when the resource editor would use PPI density values (i.e DPI_xxx) rather than pixels/mm bucket (i.e DENSITY_xxx) ones
         openFile(input);
     }
     
@@ -1076,98 +1073,36 @@ public class Resources {
 
     Image readMultiImage(DataInputStream input, boolean skipAll) throws IOException {
         EncodedImage resultImage = null;
-        
-        boolean old_density_mode = true;
-        //Read the multiImage data to determine if images are tagged with old density values or PPI ones
-        int dpiCount = input.readInt(); 
+        if(dpi == -1) {
+            dpi = Display.getInstance().getDeviceDensity();
+        }
+        int dpiCount = input.readInt();
+        int bestFitOffset = 0;
+        int bestFitDPI = 0;
         int[] lengths = new int[dpiCount];
         int[] dpis = new int[dpiCount];
+        boolean found = false;
         for(int iter = 0 ; iter < dpiCount ; iter++) {
-        	int currentDPI = input.readInt();
+            int currentDPI = input.readInt();
             lengths[iter] = input.readInt();
             dpis[iter] = currentDPI;
-            if (!isOldDensityValue(currentDPI)) {old_density_mode=false;}
+            if(bestFitDPI != dpi && dpi >= currentDPI && currentDPI >= bestFitDPI) {
+                bestFitDPI = currentDPI;
+                bestFitOffset = iter;
+                found = true;
+            }
         }
-        
-        int bestFitOffset = 0;
-    	int bestFitDPI = 0;
-        if (old_density_mode) 
-        {
-        	if(ppmm_density == -1) {
-        		ppmm_density = Display.getInstance().getDeviceDensity();
-        	}
-        	
-        	boolean found = false;
-        	for(int iter = 0 ; iter < dpiCount ; iter++) {
-        		int currentDPI = dpis[iter];
-        		if(bestFitDPI != ppmm_density && ppmm_density >= currentDPI && currentDPI >= bestFitDPI) {
-        			bestFitDPI = currentDPI;
-        			bestFitOffset = iter;
-        			found = true;
-        		}
-        	}
-        	if(!found) {
-        		// special case for low DPI devices when running with high resolution resources
-        		// we want to pick the loweset resolution possible
-        		bestFitDPI = dpis[0];
-        		bestFitOffset = 0;
-        		for(int iter = 1 ; iter < dpiCount ; iter++) {
-        			if(dpis[iter] < bestFitDPI) {
-        				bestFitDPI = dpis[iter];
-        				bestFitOffset = iter;
-        			}
-        		}
-        	}
-
-        }
-        else 
-        {
-        	if(dpi == -1) {
-        		dpi = Display.getInstance().getDeviceDPI();
-        	}
-
-        	//Choose the resource that is closest in resolution to the device DPI
-        	float bestFitDPIDist = Float.MAX_VALUE;
-        	for(int iter = 0 ; iter < dpiCount ; iter++) {
-        		int currentDPI = dpis[iter];
-        		if(dpi == currentDPI) {
-        			bestFitDPI = currentDPI;
-        			bestFitDPIDist = 0;
-        			bestFitOffset = iter;
-        		}
-        		else
-        		{
-        			//Compute a pseudo distance between the device DPI resolution and the resource resolution
-        			float currentDPIDist = Math.abs((float) (currentDPI-dpi)/dpi);
-        			boolean better = false;
-        			if (bestFitDPI != dpi) { //else we already found a resource that match exactly the device resolution
-        				if ((currentDPI>dpi && bestFitDPI<dpi) || (currentDPI<dpi && bestFitDPI>dpi)) { //one resolution is higher than the device DPI and one is lower 
-        					//We will roughly compare them (by steps of 25%) instead of exactly to avoid situations where one is just a few percents closer than the other 
-        					if ((int) (currentDPIDist*100.0/25.0) == (int) (bestFitDPIDist*100.0/25.0)) { //they are roughly at the same distance. 
-        						if (currentDPI < bestFitDPI) { //We keep the one with lowest resolution to lower memory footprint
-        							better = true;
-        						}
-        					}
-        					else { //one is clearly closer than the other
-        						if (currentDPIDist < bestFitDPIDist) { //we keep the closest one
-        							better = true;
-        						}
-        					}
-        				}
-        				else { //Both resolutions are either lower or higher than the device DPI. So we just have to compare the distances to pick the closest one
-        					if (currentDPIDist <  bestFitDPIDist) {
-        						better = true;
-        					}
-        				}
-        			}
-        			if (better)
-        			{
-        				bestFitDPI = currentDPI;
-        				bestFitDPIDist = currentDPIDist;
-        				bestFitOffset = iter;
-        			}
-        		}
-        	}
+        if(!found) {
+            // special case for low DPI devices when running with high resolution resources
+            // we want to pick the loweset resolution possible
+            bestFitDPI = dpis[0];
+            bestFitOffset = 0;
+            for(int iter = 1 ; iter < dpiCount ; iter++) {
+                if(dpis[iter] < bestFitDPI) {
+                    bestFitDPI = dpis[iter];
+                    bestFitOffset = iter;
+                }
+            }
         }
         
         if(runtimeMultiImages && !skipAll) {
@@ -1177,9 +1112,9 @@ public class Resources {
                 data[iter] = new byte[size];
                 input.readFully(data[iter], 0, size);
             }
-            return EncodedImage.createMulti(dpis, data, old_density_mode);
+            return EncodedImage.createMulti(dpis, data);
         } else {
-        	for(int iter = 0 ; iter < lengths.length ; iter++) {
+            for(int iter = 0 ; iter < lengths.length ; iter++) {
                 int size = lengths[iter];
                 if(!skipAll && bestFitOffset == iter) {
                     byte[] multiImageData = new byte[size];
@@ -1195,28 +1130,6 @@ public class Resources {
 
         return resultImage;
     }
-    
-    /**
-     * Function used to convert check is a density value is one of the old DENSITY_xxx CN1 values
-    **/
-    private static boolean isOldDensityValue(int density) {
-    	if (density<=CN1Constants.DENSITY_4K) { //could be an old density value
-	    	switch(density) {
-	    		case CN1Constants.DENSITY_VERY_LOW:
-	    		case CN1Constants.DENSITY_LOW:
-	    		case CN1Constants.DENSITY_MEDIUM:
-	    		case CN1Constants.DENSITY_HIGH:
-	    		case CN1Constants.DENSITY_VERY_HIGH:
-	    		case CN1Constants.DENSITY_HD:
-	    		case CN1Constants.DENSITY_560:
-	    		case CN1Constants.DENSITY_2HD:
-	    		case CN1Constants.DENSITY_4K:
-	    			return true;	
-	    	}
-    	}
-    	return false;
-    }
-    
 
     void loadSVGRatios(DataInputStream input) throws IOException {
         input.readFloat();

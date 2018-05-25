@@ -3552,118 +3552,39 @@ public abstract class CodenameOneImplementation {
     }
     
     /**
-     * Returns one of old density variables suitable for this device. 
-     * This is deprecated and should no longer be used. Use getDeviceDPI instead
+     * Returns one of the density variables appropriate for this device, notice that
+     * density doesn't always correspond to resolution and an implementation might
+     * decide to change the density based on DPI constraints.
      *
      * @return one of the DENSITY constants of Display
      */
-    @Deprecated
     public int getDeviceDensity() {
-    	int device_dpi = getDeviceDPI();
-    	int mm_density = Display.DENSITY_HD;
-    	int dpi_best_dist = Math.abs(Display.DPI_XXHIGH-device_dpi);
-    	
-    	int dpi_dest = Math.abs(Display.DPI_VERY_LOW-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_VERY_LOW;
-    		dpi_best_dist = dpi_dest;
-    	}
-    	    		
-    	dpi_dest = Math.abs(Display.DPI_LOW-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_LOW;
-    		dpi_best_dist = dpi_dest;
-    	}
-    	
-    	dpi_dest = Math.abs(Display.DPI_MEDIUM-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_MEDIUM;
-    		dpi_best_dist = dpi_dest;
-    	}
-    	
-    	dpi_dest = Math.abs(Display.DPI_HIGH-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_HIGH;
-    		dpi_best_dist = dpi_dest;
-    	}
-    
-    	dpi_dest = Math.abs(Display.DPI_XHIGH-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_VERY_HIGH;
-    		dpi_best_dist = dpi_dest;
-    	}
-  	  
-    	/* already tested as default
-    	dpi_dest = Math.abs(Display.DPI_XXHIGH-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_HD;
-    		dpi_best_dist = dpi_dest;
-    	}
-    	*/
-  	
-    	dpi_dest = Math.abs(Display.DPI_XXXHIGH-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_560;
-    		dpi_best_dist = dpi_dest;
-    	}
-    	
-    	dpi_dest = Math.abs(Display.DPI_2HD-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_2HD;
-    		dpi_best_dist = dpi_dest;
-    	}
-  		
-    	dpi_dest = Math.abs(Display.DPI_4K-device_dpi);
-    	if (dpi_dest<dpi_best_dist) {
-    		mm_density = Display.DENSITY_4K;
-    		dpi_best_dist = dpi_dest;
-    	}
-  		
-        return mm_density;
-    }
-    
-    
-    /**
-     * The screen estimated density expressed as dots-per-inch (= pixels-per-inch). 
-     * Notice that in most case that DPI density do not match the exact screen resolution
-     * and is just an estimate as most platforms do not provide exact informations for this value
-     */
-    public int getDeviceDPI() {
         int d = getActualDisplayHeight() * getDisplayWidth();
         if(isTablet()) {
             // tablets have lower density and allow fitting more details in the screen despite a high resolution
             if(d >= 1440*720) {
-                return Display.DPI_HIGH;
+                return Display.DENSITY_HIGH;
             }
-            return Display.DPI_MEDIUM;
+            return Display.DENSITY_MEDIUM;
         }
         if(d <= 176*220) {
-            return Display.DPI_VERY_LOW;
+            return Display.DENSITY_VERY_LOW;
         }
         if(d <= 240*320) {
-            return Display.DPI_LOW;
+            return Display.DENSITY_LOW;
         }
         if(d <= 360*480) {
-            return Display.DPI_MEDIUM;
+            return Display.DENSITY_MEDIUM;
         }
         if(d <= 480*854) {
-            return Display.DPI_HIGH;
+            return Display.DENSITY_HIGH;
         }
         if(d <= 1440*720) {
-            return Display.DPI_XHIGH;
+            return Display.DENSITY_VERY_HIGH;
         }
-        return Display.DPI_XXHIGH;
+        return Display.DENSITY_HD;
     }
-    
-    
-    /**
-     * @return the current user preference for the scaling factor for fonts, for platforms that support it
-     */
-    public float getFontScale() {
-    	return 1.0f;
-    }
-    
-    
+
     /**
      * Plays a builtin device sound matching the given identifier, implementations
      * and themes can offer additional identifiers to the ones that are already built
@@ -4256,36 +4177,23 @@ public abstract class CodenameOneImplementation {
      * @param horizontal indicates pixels in the horizontal plane
      * @return value in pixels
      */
-    public int convertToPixels(int dipCount, boolean horizontal) { 
-        	return convertMillimetersToPixels(dipCount, horizontal);
+    public int convertToPixels(int dipCount, boolean horizontal) {
+        switch(getDeviceDensity()) {
+            case Display.DENSITY_VERY_LOW:
+                return dipCount;
+            case Display.DENSITY_LOW:
+                return dipCount * 2;
+            case Display.DENSITY_MEDIUM:
+                return dipCount * 5;
+            case Display.DENSITY_HIGH:
+                return dipCount * 10;
+            case Display.DENSITY_VERY_HIGH:
+                return dipCount * 14;
+            case Display.DENSITY_HD:
+                return dipCount * 20;
+        }
+        return dipCount;
     }
-    
-    public int convertMillimetersToPixels(double millimeters, boolean horizontal) { 
-    	return (int) Math.round(getDeviceDPI()/25.4*millimeters); 
-    }
-    
-    /**
-    * Convert dp count into pixels 
-    * A dp (Density-independent pixel) is a flexible unit that scale to have uniform dimension on any screen
-    * It is equal to one physical pixel on a screen with a density of 160
-    * It is a really common unit measure on Android and is the base unit of measurement for the Material Design system
-    */
-    public int convertDPsToPixels(int dpCount, boolean horizontal) {
-    	return (int) Math.round(getDeviceDPI()/160.0*dpCount);
-    }
-    
-    
-    /**
-     * convert sp count into pixels
-     * Scalable pixels (sp) serve the same function as density-independent pixels (dp), but for fonts. 
-     * The default value of an sp is equal to one physical pixel on a screen with a density of 160.
-	 * The primary difference between an sp and a dp is that sp's preserve a user's font settings. 
-	 * Users who have larger text settings for accessibility will see font sizes match their text size preferences.
-     */
-     public int convertSPsToPixels(int spCount, boolean horizontal) {
-     	return (int) Math.round(getDeviceDPI()/160.0*spCount*getFontScale());
-     }
-    
 
     /**
      * Indicates whether the device is a tablet, notice that this is often a guess

@@ -36,7 +36,6 @@
 #endif
 
 #import <UIKit/UIKit.h>
-#import <sys/utsname.h>
 #import "CodenameOne_GLViewController.h"
 #import "NetworkConnectionImpl.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
@@ -246,8 +245,6 @@ extern int isIPad();
 extern int isIOS7();
 extern int isIOS8();
 extern int isIOS8_2();
-
-extern float fontScale();
 
 NSString* fixFilePath(NSString* ns) {
     if([ns hasPrefix:@"file:"]) {
@@ -1223,13 +1220,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet__(CN1_THREAD_STATE_MULTI_
     return isIPad();
     //XMLVM_END_WRAPPER
 }
-
-
-JAVA_FLOAT com_codename1_impl_ios_IOSNative_fontScale__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
-{
-    return fontScale();
-}
-
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
@@ -3267,14 +3257,6 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion__(CN1_THREAD_STATE_MUL
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return fromNSString(CN1_THREAD_STATE_PASS_ARG [[UIDevice currentDevice] name]);
-}
-
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getModelID__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    struct utsname systemInfo;
-    uname(&systemInfo);
-    NSString* mId = [NSString stringWithCString:systemInfo.machine
-                                            encoding:NSUTF8StringEncoding];
-    return fromNSString(CN1_THREAD_STATE_PASS_ARG mId);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {
@@ -6852,10 +6834,6 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isTablet___R_boolean(CN1_THREAD_ST
     return com_codename1_impl_ios_IOSNative_isTablet__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
-JAVA_FLOAT com_codename1_impl_ios_IOSNative_fontScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return com_codename1_impl_ios_IOSNative_fontScale__(CN1_THREAD_STATE_PASS_ARG instanceObject);
-}
-
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isIOS7___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_isIOS7__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
@@ -7093,10 +7071,6 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getOSVersion___R_java_lang_String(C
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getDeviceName___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_getDeviceName__(CN1_THREAD_STATE_PASS_ARG instanceObject);
-}
-
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_getModelID___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    return com_codename1_impl_ios_IOSNative_getModelID__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGoodLocation___long_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG peer) {

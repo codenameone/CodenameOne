@@ -209,15 +209,6 @@ public class LayeredLayout extends Layout {
     public static final byte UNIT_PERCENT = Style.UNIT_TYPE_SCREEN_PERCENTAGE;
     
     /**
-     * Unit used for insets.  dp.
-     * 
-     * @see Inset#unit(byte) 
-     * @see Inset#changeUnits(byte) 
-     */
-    public static final byte UNIT_DP = Style.UNIT_TYPE_DP;
-    
-    
-    /**
      * Unit used for insets.  Auto.  Auto unit type for an inset indicates the 
      * the inset will be automatically determined at layout time.
      * 
@@ -2051,7 +2042,6 @@ public class LayeredLayout extends Layout {
             public String getValueAsString() {
                 switch (unit) {
                     case UNIT_DIPS: return value +"mm";
-                    case UNIT_DP: return ((int)value)+"dp";
                     case UNIT_PIXELS: return ((int)value)+"px";
                     case UNIT_PERCENT: return value + "%";
                     case UNIT_AUTO: return "auto";
@@ -2072,7 +2062,6 @@ public class LayeredLayout extends Layout {
                 
                 switch (unit) {
                     case UNIT_DIPS: return l10n.format(value, decimalPlaces) +"mm";
-                    case UNIT_DP: return ((int)value)+"dp";
                     case UNIT_PIXELS: return ((int)value)+"px";
                     case UNIT_PERCENT: return l10n.format(value, decimalPlaces) + "%";
                     case UNIT_AUTO: return "auto";
@@ -2239,14 +2228,6 @@ public class LayeredLayout extends Layout {
             }
             
             /**
-             * Sets the units to dp.  Doesn't perform any calculations on the value.
-             * @return Self for chaining.
-             */
-            public Inset setDPs() {
-                return unit(UNIT_DP);
-            }
-            
-            /**
              * Sets the inset value to the provided number of pixels.  This will chnage the unit
              * to pixels.
              * @param px The pixel value of the inset.
@@ -2279,17 +2260,6 @@ public class LayeredLayout extends Layout {
                 }
                 this.value = percent;
                 return unit(UNIT_PERCENT);
-            }
-            
-            /**
-             * Sets the inset value to the provided number of dp.  This will change the unit
-             * to dp.
-             * @param dp The dp value of the inset.
-             * @return Self for chaining.
-             */
-            public Inset setDPs(int dp) {
-                this.value = dp;
-                return unit(UNIT_DP);
             }
             
             /**
@@ -2430,9 +2400,6 @@ public class LayeredLayout extends Layout {
                         case UNIT_DIPS:
                             preferredValue = Display.getInstance().convertToPixels(value);
                             break;
-                        case UNIT_DP:
-                            preferredValue = Display.getInstance().convertDPsToPixels((int) value);
-                            break;
                         case UNIT_PERCENT:
                             preferredValue = 0;
                             break;
@@ -2481,9 +2448,6 @@ public class LayeredLayout extends Layout {
                             break;
                         case UNIT_DIPS:
                             preferredValue = baseValue + Display.getInstance().convertToPixels(value);
-                            break;
-                        case UNIT_DP:
-                            preferredValue = baseValue + Display.getInstance().convertDPsToPixels((int) value);
                             break;
                         case UNIT_PERCENT:
                             preferredValue = baseValue;
@@ -2602,9 +2566,6 @@ public class LayeredLayout extends Layout {
                         break;
                     case UNIT_DIPS:
                         calculatedValue = baseValue + Display.getInstance().convertToPixels(value);
-                        break;
-                    case UNIT_DP:
-                        calculatedValue = baseValue + Display.getInstance().convertDPsToPixels((int) value);
                         break;
                     case UNIT_PERCENT: {
                         Inset oppositeInset = getOppositeInset();
@@ -2754,8 +2715,6 @@ public class LayeredLayout extends Layout {
                     this.setDips(Float.parseFloat(val.substring(0, pos)));
                 } else if ((pos=val.indexOf("px")) != -1) {
                     this.setPixels(Integer.parseInt(val.substring(0, pos)));
-                } else if ((pos=val.indexOf("dp")) != -1) {
-                    this.setDPs(Integer.parseInt(val.substring(0, pos)));
                 } else if ((pos=val.indexOf("%")) != -1) {
                     this.setPercent(Float.parseFloat(val.substring(0, pos)));
                 } else if ("auto".equals(val)) {
@@ -2844,9 +2803,6 @@ public class LayeredLayout extends Layout {
                 } else if (unit == UNIT_PIXELS) {
                     float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
                     return value / pixelsPerDip;
-                }  else if (unit == UNIT_DP) {
-                    float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
-                    return Display.getInstance().convertDPsToPixels((int) value) / pixelsPerDip;
                 } else {
                     // In both auto and percent cases, we'll use the existing calculated value as our base
                     float pixelsPerDip = Display.getInstance().convertToPixels(1000)/1000f;
@@ -2873,8 +2829,6 @@ public class LayeredLayout extends Layout {
                     return Display.getInstance().convertToPixels(value);
                 } else if (unit == UNIT_PIXELS) {
                     return (int)value;
-                } else if (unit == UNIT_DP) {
-                    return Display.getInstance().convertDPsToPixels((int) value);
                 } else {
                     // In both auto and percent cases, we'll use the existing calculated value as our source.
                     int calc = calculatedValue;
@@ -2884,36 +2838,6 @@ public class LayeredLayout extends Layout {
                     }
                     return calc + delta;
                 }
-            }
-            
-            
-            /**
-             * Gets the current value of this inset in dps.  If the inset uses a different unit
-             * then this will calculate the corresponding value.
-             * @return The value of this inset in dp.
-             */
-            public int getCurrentValueDP() {
-            	 if (unit == UNIT_DIPS) {
-            		 float pixelsPerDp = Display.getInstance().convertToPixels(1000)/1000f;
-                     return Math.round(Display.getInstance().convertToPixels(value) / pixelsPerDp);
-                 } else if (unit == UNIT_PIXELS) {
-                     float pixelsPerDp = Display.getInstance().convertDPsToPixels(1000)/1000f;
-                     return  Math.round(value / pixelsPerDp);
-                 }  else if (unit == UNIT_DP) {
-                	 return (int)value;
-                 } else {
-                     // In both auto and percent cases, we'll use the existing calculated value as our base
-                     float pixelsPerDp = Display.getInstance().convertDPsToPixels(1000)/1000f;
-                     int calc = calculatedValue;
-                     //System.out.println("Calculated value of side "+side+" = "+calc);
-                     //new RuntimeException("Foobar").printStackTrace();
-                     if (referenceComponent != null) {
-                         calc -= calculatedBaseValue;
-                     }
-                     float out = calc / pixelsPerDp;
-                     //System.out.println("calc="+out+"dp");
-                     return Math.round(out + (delta / pixelsPerDp));
-                 }
             }
             
             /**
@@ -2969,8 +2893,6 @@ public class LayeredLayout extends Layout {
                         setPixels(getCurrentValuePx());
                     } else if (unit == UNIT_DIPS) {
                         setDips(getCurrentValueMM());
-                    } else if (unit == UNIT_DP) {
-                        setDPs(getCurrentValueDP());
                     } else if (unit == UNIT_PERCENT) {
                         try {
                             if (parent != null) {
@@ -3004,8 +2926,6 @@ public class LayeredLayout extends Layout {
                         setPixels(getCurrentValuePx());
                     } else if (unit == UNIT_DIPS) {
                         setDips(getCurrentValueMM());
-                    } else if (unit == UNIT_DP) {
-                        setDPs(getCurrentValueDP());
                     } else if (unit == UNIT_PERCENT) {
                         try {
                             setPercent(getCurrentValuePx() * 100f / (isVertical()?refBox.getHeight() : refBox.getWidth()));
@@ -3132,8 +3052,6 @@ public class LayeredLayout extends Layout {
                         return baseValue + (int)value;
                     case UNIT_DIPS :
                         return baseValue + Display.getInstance().convertToPixels(value);
-                    case UNIT_DP :
-                        return baseValue + Display.getInstance().convertDPsToPixels((int) value);
                     case UNIT_PERCENT : {
                         
                         Rectangle baseRect = getReferenceBox(parent, cmp);
@@ -3207,13 +3125,6 @@ public class LayeredLayout extends Layout {
                         //System.out.println("Old dips for side "+side+" = "+value);
                         value += (delta / pixelsPerDip);
                         //System.out.println("New dips for side "+side+" = "+value);
-                        break;
-                    }
-                    case UNIT_DP : {
-                        float pixelsPerDp = Display.getInstance().convertDPsToPixels(1000)/1000f;
-                        //System.out.println("Old dps for side "+side+" = "+value);
-                        value += (delta / pixelsPerDp);
-                        //System.out.println("New dps for side "+side+" = "+value);
                         break;
                     }
                     case UNIT_PERCENT: {

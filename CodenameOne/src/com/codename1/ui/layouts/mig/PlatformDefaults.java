@@ -282,10 +282,23 @@ public final class PlatformDefaults
 
 	public static int getPlatformDPI(int plaf)
 	{
-		return Display.getInstance().getDeviceDPI();
+            switch(Display.getInstance().getDeviceDensity()) {
+                case Display.DENSITY_HD:
+                    return 420;
+                case Display.DENSITY_VERY_HIGH:
+                    return 320;
+                case Display.DENSITY_HIGH:
+                    return 220;
+                case Display.DENSITY_MEDIUM:
+                    return 150;
+                case Display.DENSITY_LOW:
+                    return 96;
+                case Display.DENSITY_VERY_LOW:
+                    return 72;
+            }
+            return 96;
 	}
-	
-	
+
 	/** Returns the current platform
 	 * @return <code>PlatformDefaults.WINDOWS</code> or <code>PlatformDefaults.MAC_OSX</code>
 	 */

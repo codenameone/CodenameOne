@@ -2340,64 +2340,9 @@ public final class Display extends CN1Constants {
      * @return value in pixels
      */
     public int convertToPixels(float dipCount) {
-        //return Math.round(impl.convertToPixels((int)(dipCount * 1000), true) / 1000.0f);
-        return impl.convertMillimetersToPixels(dipCount, true);
+        return Math.round(impl.convertToPixels((int)(dipCount * 1000), true) / 1000.0f);
     }
 
-    
-    /**
-     * Converts the dps count to pixels. A dp is a flexible unit that scale to have uniform dimension on any screen
-     * It is equal to one physical pixel on a screen with a density of 160
-     * 
-     * @param dpCount the dps that we will convert to pixels
-     * @param horizontal indicates pixels in the horizontal plane
-     * @return value in pixels
-     */
-    public int convertDPsToPixels(int dpCount, boolean horizontal) {
-        return impl.convertDPsToPixels(dpCount, horizontal);
-    }
-    
-    
-    /**
-    * Converts the dps count to pixels. A dp is a flexible unit that scale to have uniform dimension on any screen
-    * It is equal to one physical pixel on a screen with a density of 160
-    * 
-    * @param dpCount the dps that we will convert to pixels
-    * @return value in pixels
-    */
-    public int convertDPsToPixels(int dpCount) {
-        return impl.convertDPsToPixels(dpCount, true);
-    }
-    
-    
-    /**
-    * Converts the sps count to pixels. A sp serve the same function as a dp, but for fonts. 
-    * It is a flexible unit that scale to have uniform dimension on any screen but that also takes
-    * into account users preffered text settings for accessibility
-    * By default, it is equal to one physical pixel on a screen with a density of 160
-    * 
-    * @param spCount the sps that we will convert to pixels
-    * @param horizontal indicates pixels in the horizontal plane
-    * @return value in pixels
-    */
-    public int convertSPsToPixels(int spCount, boolean horizontal) {
-     	return impl.convertSPsToPixels(spCount, horizontal);
-    }
-    
-    /**
-    * Converts the sps count to pixels. A sp serve the same function as a dp, but for fonts. 
-    * It is a flexible unit that scale to have uniform dimension on any screen but that also takes
-    * into account users preffered text settings for accessibility
-    * By default, it is equal to one physical pixel on a screen with a density of 160
-    * 
-    * @param spCount the sps that we will convert to pixels
-    * @return value in pixels
-    */
-    public int convertSPsToPixels(int spCount) {
-    	return impl.convertSPsToPixels(spCount, true);
-    }
-    
-    
     /**
      * Checks to see if the platform supports a native image cache.
      * @return True on platforms that support a native image cache.  Currently only Javascript.
@@ -2993,23 +2938,10 @@ public final class Display extends CN1Constants {
      *
      * @return one of the DENSITY constants of Display
      */
-    @Deprecated
     public int getDeviceDensity() {
         return impl.getDeviceDensity();
     }
-    
-    
-    /**
-     * Returns one of the PPI screen density for this device.
-     * Notice that depending on the platform, this value can be exact or an estimation
-     * and an implementation might decide to change the density based on DPI constraints.
-     *
-    */
-    public int getDeviceDPI() {
-        return impl.getDeviceDPI();
-    }
 
-    
     /**
      * Plays a builtin device sound matching the given identifier, implementations
      * and themes can offer additional identifiers to the ones that are already built
