@@ -2573,6 +2573,37 @@ public class Container extends Component implements Iterable<Component>{
     public void animateLayout(final int duration) {
         animateLayout(duration, false, 255, true);
     }
+    
+    /**
+     * Updates the tab indices in this container recursively. This method is used internally by 
+     * layout managers when calculating the traversal order of components in a form.
+     * @param offset The starting tab index.
+     * @return The ending tab index (+1)
+     * @deprecated For internal use only.
+     */
+    public int updateTabIndices(int offset) {
+        Container parent = this;
+        Layout l = parent.getActualLayout();
+        if (l.overridesTabIndices(parent)) {
+            return l.updateTabIndices(parent, offset);
+        }
+        
+        int len = parent.getComponentCount();
+        int idx = offset;
+        for (int i=0; i<len; i++) {
+            Component c = parent.getComponentAt(i);
+            int prefIdx = c.getPreferredTabIndex();
+            if (prefIdx == 0) {
+                c.setTabIndex(idx++);
+            } else {
+                c.setTabIndex(prefIdx);
+            }
+            if (c instanceof Container) {
+                idx = ((Container)c).updateTabIndices(idx);
+            }
+        }
+        return idx;
+    }
 
     /**
      * <p>

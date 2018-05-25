@@ -881,4 +881,15 @@ public class BorderLayout extends Layout {
     public static Container west(Component west) {
         return Container.encloseIn(new BorderLayout(), west, BorderLayout.WEST);
     }
+
+    @Override
+    public boolean overridesTabIndices(Container parent) {
+        return true;
+    }
+
+    @Override
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+        return new Component[]{portraitNorth, portraitWest, portraitCenter, portraitEast, portraitSouth};
+    }
+    
 }

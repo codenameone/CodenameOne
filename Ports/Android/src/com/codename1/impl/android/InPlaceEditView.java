@@ -754,7 +754,7 @@ public class InPlaceEditView extends FrameLayout{
             fontHeight = s.getFont().getHeight();
             textArea = ta;
             isRTL = ta.isRTL();
-            nextDown = textArea.getNextFocusDown() != null ? textArea.getNextFocusDown() : textArea.getComponentForm().findNextFocusVertical(true);
+            nextDown = textArea.getNextFocusDown() != null ? textArea.getNextFocusDown() : textArea.getComponentForm().getNextComponent(textArea);
             isSingleLineTextArea = textArea.isSingleLineTextArea();
             hint = ta.getHint();
             nativeHintBool = textArea.getUIManager().isThemeConstant("nativeHintBool", false);
@@ -1143,33 +1143,45 @@ public class InPlaceEditView extends FrameLayout{
         actionCode = actionCode & 0xf;
         final int fActionCode = actionCode;
         boolean hasNext = false;
+        Component next = null;
         if (EditorInfo.IME_ACTION_NEXT == actionCode && mEditText != null &&
                 mEditText.mTextArea != null) {
-            Component next = mEditText.mTextArea.getNextFocusDown();
-            if (next == null) {
-                next = mEditText.mTextArea.getComponentForm().findNextFocusVertical(true);
-            }
-
-            if (next != null && next instanceof TextArea && ((TextArea)next).isEditable() && ((TextArea)next).isEnabled()) {
+            next = mEditText.mTextArea.getComponentForm().getNextComponent(mEditText.mTextArea);
+            if (next != null) {
                 hasNext = true;
+            }
+            
+            if (next != null && next instanceof TextArea && ((TextArea) next).isEditable() && ((TextArea) next).isEnabled()) {
                 nextTextArea = (TextArea) next;
             }
         }
-		if (hasNext && nextTextArea != null && impl.isAsyncEditMode()) {
-			//in async edit mode go right to next field edit to avoid hiding and showing again the native edit text
+        if (hasNext && nextTextArea != null && impl.isAsyncEditMode()) {
+            //in async edit mode go right to next field edit to avoid hiding and showing again the native edit text
             TextArea theNext = nextTextArea;
-			nextTextArea = null;
+            nextTextArea = null;
             edit(sInstance.impl, theNext, theNext.getConstraint());
-			return null;
+            return null;
+        
         } else {
-			return new Runnable() {
+            final Component fNext = next;
+            final boolean fHasNext = hasNext;
+            return new Runnable() {
 
-				@Override
-				public void run() {
-        endEditing(REASON_IME_ACTION, false, fActionCode);
-    }
-			};
-		}
+                @Override
+                public void run() {
+                    endEditing(REASON_IME_ACTION, false, fActionCode);
+                    if (fHasNext && fNext != null) {
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                fNext.requestFocus();
+                                fNext.startEditingAsync();
+                            }
+                        });
+                    }
+                    
+                }
+            };
+        }
     }
 
     private static int trySetEditModeCount=0;

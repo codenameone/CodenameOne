@@ -924,6 +924,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         C() {
             super(null);
+            setFocusTraversalKeysEnabled(false);
             addKeyListener(this);
             addMouseListener(this);
             addMouseWheelListener(this);

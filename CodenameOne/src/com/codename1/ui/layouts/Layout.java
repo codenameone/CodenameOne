@@ -25,6 +25,8 @@ package com.codename1.ui.layouts;
 
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.*;
+import java.util.ArrayList;
+
 
 /**
  * Abstract class that can be used to arrange components in a container using
@@ -131,4 +133,77 @@ public abstract class Layout {
     public boolean obscuresPotential(Container parent) {
         return false;
     }
+    
+    /**
+     * If a layout specifies a different traversal order of its components than the
+     * component index, then it should override this method to return {@literal true}, and
+     * it should also override {@link #getChildrenInTraversalOrder(com.codename1.ui.Container) }
+     * to set the tab indices of a container's children.
+     * 
+     * @param parent The parent component.
+     * @return True if this layout overrides tab traversal order.
+     */
+    public boolean overridesTabIndices(Container parent) {
+        return false;
+    }
+    
+    /**
+     * Updates the tab traversal order 
+     * @param parent
+     * @param offset
+     * @return 
+     */
+    public final int updateTabIndices(Container parent, int offset) {
+        if (overridesTabIndices(parent)) {
+            Component cmps[] = getChildrenInTraversalOrder(parent);
+            return updateTabIndicesImpl(parent, cmps, offset);
+        }
+        return offset;
+    }
+    
+    /**
+     * Gets the children of the parent container in the order that they should 
+     * be traversed when tabbing through a form.
+     * 
+     * <p>This should only be overridden if the Layout defines a different traversal order
+     * than the standard index order.  </p>
+     * 
+     * <p>Layouts that implement this method, should override the {@link #overridesTabIndices(com.codename1.ui.Container) }
+     * method to return {@literal true}.</p>
+     * @param parent 
+     * @return Array of Components in the order
+     */
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+        return null;
+    }
+    
+    
+    
+    /**
+     * Utility method 
+     * @param parent
+     * @param components
+     * @param offset
+     * @return 
+     */
+    private static int updateTabIndicesImpl(Container parent, Component[] components, int offset) {
+        int len = components.length;
+        int idx = offset;
+        for (int i=0; i<len; i++) {
+            Component cmp = components[i];
+            if (cmp != null) {
+                int prefIdx = cmp.getPreferredTabIndex();
+                if (prefIdx == 0) {
+                    cmp.setTabIndex(idx++);
+                } else {
+                    cmp.setTabIndex(prefIdx);
+                }
+                if (cmp instanceof Container) {
+                    idx = ((Container)cmp).updateTabIndices(idx);
+                }
+            }
+        }
+        return idx;
+    }
+        
 }

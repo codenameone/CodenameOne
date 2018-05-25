@@ -71,12 +71,17 @@ public class TextEditUtil {
             public void run() {
                 Component next = getNextEditComponent();
                 if (next != null) {
+                    if (next.isFocusable()) {
+                        next.requestFocus();
+                        next.startEditingAsync();
+                    }
+                    /*
                     if (next instanceof TextArea) {
                         TextArea text = (TextArea) next;
                         text.requestFocus();
                         Display.getInstance().editString(next,
                                 text.getMaxSize(), text.getConstraint(), text.getText(), 0);
-                    }
+                    }*/
                 } 
             }
         };
@@ -88,23 +93,15 @@ public class TextEditUtil {
      * @return the next editable TextArea after the currently edited component.
      */
     private static Component getNextEditComponent() {
-        Component nextTextArea = null;
+        
         if (curEditedComponent != null) {
-            Component next = curEditedComponent.getNextFocusDown();
-            if (next == null) {
-                Form parent = curEditedComponent.getComponentForm();
-                
-                // could happen in the case of a table that gets recreated on edit
-                if(parent != null) {
-                    next = parent.findNextFocusVertical(true);
-                }
+            Form parent = curEditedComponent.getComponentForm();
+            if (parent != null) {
+                return parent.getNextComponent(curEditedComponent);
             }
-
-            if (next != null && next instanceof TextArea && ((TextArea) next).isEditable() && ((TextArea) next).isEnabled()) {
-                nextTextArea = (TextArea) next;
-            }
+            
         }
-        return nextTextArea;
+        return null;
     }
 
 }
