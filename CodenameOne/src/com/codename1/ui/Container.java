@@ -1649,7 +1649,7 @@ public class Container extends Component implements Iterable<Component>{
      *
      * @param c the component that will be scrolling for visibility
      */
-    public void scrollComponentToVisible(Component c) {
+    public void scrollComponentToVisible(final Component c) {
         if (isScrollable()) {
             if (c != null) {
                 Rectangle r = c.getVisibleBounds();
@@ -1669,8 +1669,9 @@ public class Container extends Component implements Iterable<Component>{
                     }
                 }
                 boolean moveToVisible = true;
-                boolean large = c.getVisibleBounds().getSize().getHeight() > getHeight() || 
-                        c.getVisibleBounds().getSize().getWidth() > getWidth();
+                Dimension size = r.getSize();
+                boolean large = size.getHeight() > getHeight() || 
+                        size.getWidth() > getWidth();
                 if (large) {
                     int x = getScrollX();
                     int y = getScrollY();
@@ -1696,7 +1697,7 @@ public class Container extends Component implements Iterable<Component>{
             }
         }
     }
-
+    
     /**
      * This method scrolls the Container if Scrollable towards the given 
      * Component based on the given direction.
