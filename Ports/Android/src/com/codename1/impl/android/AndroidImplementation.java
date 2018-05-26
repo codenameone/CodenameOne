@@ -797,22 +797,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     */
     
+    private int dDPI = -1;
+    
     @Override
     public int getDeviceDPI() {
-        DisplayMetrics metrics = new DisplayMetrics();
-        if (getActivity() != null) {
-            getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        } else {
-            metrics = getContext().getResources().getDisplayMetrics();
+        if (dDPI == -1) {
+            DisplayMetrics metrics = new DisplayMetrics();
+            if (getActivity() != null) {
+                getActivity().getWindowManager().getDefaultDisplay().getMetrics(metrics);
+            } else {
+                metrics = getContext().getResources().getDisplayMetrics();
+            }
+
+            dDPI = metrics.densityDpi; // (int) (metrics.density * 160f);
         }
-        
-        return metrics.densityDpi; // (int) (metrics.density * 160f);
+        return dDPI;
     }
     
     
+    private float fScale = -1;
+    
     @Override
     public float getFontScale() {
-        return getContext().getResources().getConfiguration().fontScale;
+        if (fScale == -1) {
+            fScale = getContext().getResources().getConfiguration().fontScale;
+        }
+        return fScale;
     }
     
     
